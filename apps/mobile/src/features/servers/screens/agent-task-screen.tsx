@@ -23,7 +23,6 @@ import {
   QuestionSecretComposer,
 } from "@/features/chat/components/browser-secret-card";
 import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
-import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
 import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
 import { ChatHeader } from "@/features/chat/components/chat-header";
@@ -31,8 +30,9 @@ import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useRowsAfterOpenTransition } from "@/features/chat/components/chat-view";
 import { useMarkThreadRead, useThreadOpeningUnread } from "@/features/chat/components/use-agent-thread-reads";
+import { useAttachSheet } from "@/features/chat/components/use-attach-sheet";
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
-import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
+import { type ChatAttachment, useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import {
   useComposerDictation,
@@ -469,9 +469,9 @@ function AgentTaskChat({
     return () => clearTimeout(timer);
   }, [awaitingTurn]);
 
-  async function send(value: string) {
+  async function send(value: string, extraFiles: readonly ChatAttachment[] = []) {
     const text = value.trim();
-    const files = filesAllowed ? attachments.items : [];
+    const files = filesAllowed ? [...attachments.items, ...extraFiles] : [];
     if ((!text && files.length === 0) || !canSend || (sending && (isDraft || files.length > 0))) return;
     if (files.length > INPUT_LIMITS.attachments) {
       void haptics.notification("error");
@@ -510,6 +510,7 @@ function AgentTaskChat({
       } catch (error) {
         start.failed();
         void haptics.notification("error");
+        if (extraFiles.length) attachments.restore(extraFiles);
         setDraft((current) => (current.trim() ? current : value));
         setSendError(errorMessage(error, t("mobile.server.threads.error.start")));
         setSending(false);
@@ -531,12 +532,32 @@ function AgentTaskChat({
       message.failed();
       motion.cancelSend();
       void haptics.notification("error");
+      if (extraFiles.length) attachments.restore(extraFiles);
       setDraft((current) => (current.trim() ? current : value));
       setSendError(errorMessage(error, t("mobile.server.threads.error.send")));
     } finally {
       setSending(false);
     }
   }
+
+  const latestSend = useRef(send);
+  latestSend.current = send;
+  const latestDraft = useRef(draft);
+  latestDraft.current = draft;
+  const sendRecentPhoto = useCallback(
+    (photo: ChatAttachment) => void latestSend.current(latestDraft.current, [photo]),
+    [],
+  );
+
+  useAttachSheet(
+    attachments,
+    {
+      context: contextMeter,
+      onSendPhoto: sendRecentPhoto,
+      onUseSkill: mentionSkills.length ? () => setSkillPickerVersion((version) => version + 1) : undefined,
+    },
+    filesAllowed && isFocused,
+  );
 
   const respondToListApproval = useCallback(
     (approval: PendingApproval, decision: ApprovalDecision) =>
@@ -841,22 +862,6 @@ function AgentTaskChat({
           )}
         </Animated.View>
       </KeyboardGestureArea>
-      {filesAllowed && attachments.menuAnchor && isFocused ? (
-        <ChatAttachmentPanel
-          anchor={attachments.menuAnchor}
-          appActive={appActive}
-          attachments={attachments}
-          context={contextMeter}
-          fallbackBackground={fieldBackground}
-          foreground={foreground}
-          keyboardHeight={motion.keyboardHeight}
-          keyboardOffset={keyboardOffset}
-          liquidGlassAvailable={liquidGlassAvailable}
-          onClose={attachments.closeMenu}
-          onUseSkill={mentionSkills.length ? () => setSkillPickerVersion((version) => version + 1) : undefined}
-          progress={menuProgress}
-        />
-      ) : null}
     </View>
   );
 }

@@ -32,7 +32,7 @@ import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import type { ChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import type { ComposerContextMeter } from "@/features/chat/components/composer-context-ring";
-import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
+import { type ChatAttachment, useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { VoiceAgentAvatar } from "@/features/chat/components/voice-call-bar";
@@ -95,7 +95,6 @@ import {
   BrowserTakeoverCard,
   QuestionSecretComposer,
 } from "./browser-secret-card";
-import { ChatAttachmentPanel } from "./chat-attachment-panel";
 import { ChatBackdropLayer, useChatBackdropBase } from "./chat-backdrop-layer";
 import { ChatBackdropUndo } from "./chat-backdrop-undo";
 import type { OutboxRowStatus } from "./chat-outbox-status";
@@ -103,6 +102,7 @@ import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
 import { addPastedFiles, ChatDropTarget } from "./composer-paste-target";
 import { type ComposerVoice, liveVoice } from "./composer-voice";
+import { useAttachSheet } from "./use-attach-sheet";
 import type { ChatQueueController } from "./use-chat-queue";
 import { useComposerDictation, useComposerDictationWithSettings } from "./use-composer-dictation";
 import { useGptLiveConversation } from "./use-gpt-live-conversation";
@@ -875,10 +875,10 @@ export function ChatView({
     };
   }, [stopTurn, activeTurnId, target.id, errorMessage, t, failureContext]);
 
-  function sendMessage(value: string): void {
+  function sendMessage(value: string, extraFiles: readonly ChatAttachment[] = []): void {
     if (!canSend) return;
     const body = value.trim();
-    const files = attachments.items;
+    const files = [...attachments.items, ...extraFiles];
     if (!body && files.length === 0) return;
     if (files.length > INPUT_LIMITS.attachments) {
       const message = t("mobile.chat.attachment.limit", { limit: INPUT_LIMITS.attachments });
@@ -1041,6 +1041,18 @@ export function ChatView({
   const latestSend = useRef(sendMessage);
   latestSend.current = sendMessage;
   const send = useCallback((value: string) => latestSend.current(value), []);
+  const latestDraft = useRef(draft);
+  latestDraft.current = draft;
+  const sendRecentPhoto = useCallback((photo: ChatAttachment) => latestSend.current(latestDraft.current, [photo]), []);
+  useAttachSheet(
+    attachments,
+    {
+      context: contextMeter,
+      onSendPhoto: sendRecentPhoto,
+      onUseSkill: mentionSkills?.length ? () => setSkillPickerVersion((version) => version + 1) : undefined,
+    },
+    isFocused,
+  );
   const cancelReply = useCallback(() => setReplyTarget(null), []);
   const respondToApproval = useCallback(
     (approval: PendingApproval, decision: ApprovalDecision) =>
@@ -1432,22 +1444,6 @@ export function ChatView({
             </KeyboardGestureArea>
           </View>
         </ChatDropTarget>
-        {attachments.menuAnchor && isFocused ? (
-          <ChatAttachmentPanel
-            anchor={attachments.menuAnchor}
-            appActive={appActive}
-            attachments={attachments}
-            context={contextMeter}
-            fallbackBackground={fieldBackground}
-            foreground={foreground}
-            keyboardHeight={motion.keyboardHeight}
-            keyboardOffset={keyboardOffset}
-            liquidGlassAvailable={liquidGlassAvailable}
-            onClose={attachments.closeMenu}
-            onUseSkill={mentionSkills?.length ? () => setSkillPickerVersion((version) => version + 1) : undefined}
-            progress={menuProgress}
-          />
-        ) : null}
       </View>
     </GestureDetector>
   );

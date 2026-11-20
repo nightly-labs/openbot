@@ -169,6 +169,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.attachment.replace": "Replace",
   "mobile.chat.attachment.files": "Files",
   "mobile.chat.attachment.photos": "Photos",
+  "mobile.chat.attachment.recentPhoto": "Recent photo",
+  "mobile.chat.attachment.sheetTitle": "Add to chat",
   "mobile.chat.attachment.camera": "Camera",
   "mobile.chat.attachment.useSkill": "Use skill or app",
   "mobile.chat.attachment.addFailed": "Could not add attachment",

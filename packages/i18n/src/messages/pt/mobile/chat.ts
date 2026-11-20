@@ -171,6 +171,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "Substituir",
   "mobile.chat.attachment.files": "Arquivos",
   "mobile.chat.attachment.photos": "Fotos",
+  "mobile.chat.attachment.recentPhoto": "Foto recente",
+  "mobile.chat.attachment.sheetTitle": "Adicionar ao chat",
   "mobile.chat.attachment.camera": "Câmera",
   "mobile.chat.attachment.useSkill": "Usar habilidade ou app",
   "mobile.chat.attachment.addFailed": "Não foi possível adicionar o anexo",
