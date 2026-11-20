@@ -99,6 +99,10 @@ export class DynamicIslandWindowController {
     return { ...this.#preference };
   }
 
+  get available(): boolean {
+    return this.#options.windowKind !== null;
+  }
+
   get presentation(): DynamicIslandPresentation {
     return this.#presentation;
   }

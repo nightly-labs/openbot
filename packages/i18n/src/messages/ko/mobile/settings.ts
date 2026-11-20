@@ -142,6 +142,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "레트로 노을",
   "mobile.settings.appearance.backdrop.snowfall": "눈 내리는 밤",
   "mobile.settings.appearance.backdrop.fireflies": "반딧불이",
+  "mobile.settings.appearance.backdrop.coast": "네온 해안",
   "mobile.settings.appearance.backdrop.agentPage": "에이전트 페이지",
   "mobile.settings.appearance.backdrop.agentPageNote": "에이전트가 설정함",
   "mobile.settings.appearance.backdrop.photo": "사진",

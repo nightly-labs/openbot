@@ -547,6 +547,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Añadir agentes",
   "mobile.server.browserProfiles.agentsHint":
     "Un toque da este perfil al agente o lo devuelve al perfil compartido. Un cambio cierra las pestañas abiertas del agente.",
+  "mobile.server.browserProfiles.movedNote":
+    "Los inicios de sesión en sitios se quedan en el perfil anterior. Un agente movido debe iniciar sesión de nuevo en esos sitios.",
   "mobile.server.browserProfiles.clear": "Borrar datos",
   "mobile.server.browserProfiles.clearTitle": "¿Borrar los datos de {name}?",
   "mobile.server.browserProfiles.clearBody":

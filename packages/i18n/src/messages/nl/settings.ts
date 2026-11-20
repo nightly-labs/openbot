@@ -58,6 +58,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Retro zonsondergang",
   "settings.chatBackdrop.snowfall": "Sneeuwval",
   "settings.chatBackdrop.fireflies": "Vuurvliegjes",
+  "settings.chatBackdrop.coast": "Neonkust",
   "settings.chatBackdrop.upload": "Afbeelding uploaden…",
   "settings.chatBackdrop.uploadRefused": "Gebruik een PNG-, JPEG-, GIF-, WebP- of AVIF-afbeelding van maximaal 20 MB.",
   "settings.chatBackdrop.saveFailed": "De achtergrond is niet opgeslagen.",

@@ -241,6 +241,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Ogni profilo mantiene accessi e cookie propri. Una modifica chiude le schede aperte dell'agente.",
   "agentSettings.browserProfile.manage": "Gestisci",
+  "agentSettings.browserProfile.movedNote":
+    "Gli accessi ai siti restano nel profilo precedente. L'agente deve accedere di nuovo a questi siti.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "L'intero processo di {provider} gira in una sandbox, quindi una scrittura all'esterno non riesce. Disponibile solo su macOS.",
 } as const satisfies PartialTranslation<typeof source>;
