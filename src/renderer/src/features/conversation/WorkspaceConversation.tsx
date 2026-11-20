@@ -24,6 +24,7 @@ import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
+import { withoutSideThreadTurns } from "../../queue-reconciliation";
 import { quitShortcutHintShown } from "../../quit-shortcut-hint";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
@@ -389,6 +390,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const { t } = useText();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
+  const mainQueue = createMemo(() => {
+    const agent = activeAgent();
+    const queue = activeQueue();
+    return agent && queue ? withoutSideThreadTurns(queue, agentTasks.snapshot(agent.id)?.tasks ?? []) : queue;
+  });
   const threads = createMemo((): ConversationThreads | undefined => {
     const agent = activeAgent();
     if (!agent || !agentTasks.available()) return undefined;
@@ -543,7 +549,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         discontinuous={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.windowMode === "around" : false}
         loadingOlder={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.olderLoading === true : false}
         olderError={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.olderError ?? null) : null}
-        queue={activeQueue()}
+        queue={mainQueue()}
         browserTabs={browserTabs()}
         activeBrowserTabId={activeBrowserTabId()}
         browserVisibilitySuspended={browserVisibilitySuspended()}
