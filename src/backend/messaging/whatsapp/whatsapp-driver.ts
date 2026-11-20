@@ -158,6 +158,7 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   readonly post = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, body: MessageBody) {
+    yield* this.#checkPlace(target.platformChannelId);
     const sent = yield* this.#send(target, {
       text: this.#statusText(body),
       ...this.#mentions(body.text),
@@ -282,6 +283,7 @@ class WhatsAppAdapter implements MessagingAdapter {
     if (!caption || caption.length > WHATSAPP_CAPTION_LIMIT) return null;
     const content = yield* this.#fileContent(file).pipe(Effect.catch(() => Effect.succeed(null)));
     if (!content) return null;
+    yield* this.#checkPlace(target.platformChannelId);
     return yield* this.#send(target, { ...content, caption, ...this.#mentions(caption) }).pipe(
       Effect.catch((failure) => {
         const cause = failure.cause;
@@ -432,7 +434,7 @@ class WhatsAppAdapter implements MessagingAdapter {
 
   #send(target: MessageTarget, content: AnyMessageContent): Effect.Effect<string, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
-      yield* this.#checkPlace(target.platformChannelId);
+      yield* this.#allowPlace(target.platformChannelId);
       const quoteId = whatsAppQuoteId(target);
       const options: MiscMessageGenerationOptions | undefined = quoteId
         ? { quoted: this.#quoted(target, quoteId) }
@@ -468,6 +470,17 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   #checkPlace(chatJid: string): Effect.Effect<void, MessagingAdapterError> {
+    return this.#allowPlace(chatJid).pipe(
+      Effect.flatMap(() => {
+        const identity = whatsAppIdentity(this.#handle);
+        const user = isJidGroup(chatJid) ? null : userPart(chatJid);
+        const contact = user !== null && user !== identity?.number && chatJid.endsWith("@s.whatsapp.net");
+        return contact ? this.#checkAccount(user) : Effect.void;
+      }),
+    );
+  }
+
+  #allowPlace(chatJid: string): Effect.Effect<void, MessagingAdapterError> {
     return Effect.suspend(() => {
       const identity = whatsAppIdentity(this.#handle);
       if (!identity) return Effect.fail(new MessagingAdapterError({ cause: new Error("not_linked") }));
@@ -476,9 +489,7 @@ class WhatsAppAdapter implements MessagingAdapter {
       const allowed = isJidGroup(chatJid)
         ? rules.groups.has(chatJid)
         : user === identity.number || (user !== null && allowsContact(rules, user));
-      if (!allowed) return Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
-      const contact = user !== null && user !== identity.number && chatJid.endsWith("@s.whatsapp.net");
-      return contact ? this.#checkAccount(user) : Effect.void;
+      return allowed ? Effect.void : Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
     });
   }
 

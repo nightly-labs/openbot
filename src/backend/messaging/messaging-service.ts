@@ -2361,7 +2361,7 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ],
   [
     "no_account",
-    `OpenBot sent nothing. ${sourceText("error.messaging.whatsappNumberNotFound")} Tell the user to open Marketplace, then Apps, then WhatsApp, to remove this contact, and to add it again with its country code.`,
+    `OpenBot sent nothing: WhatsApp has no account for the number of this contact. Tell the user to open Marketplace, then Apps, then WhatsApp, and to check the number of this contact. ${sourceText("error.messaging.whatsappNumberNotFound")} When the number is not correct, the user must remove the contact and add it again.`,
   ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],

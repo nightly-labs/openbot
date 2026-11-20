@@ -725,41 +725,54 @@ try {
       const sales = agents.listAgents().find((agent) => agent.name === "Sales");
       assert.ok(sales, "No Sales agent.");
       const jid = `${NO_COUNTRY_CODE}@s.whatsapp.net`;
-      phone.noAccount.add(NO_COUNTRY_CODE);
-      phone.lookupFails = true;
-      await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: NO_COUNTRY_CODE, kind: "contact", name: "Marta" }));
-      await postAs(agents, sales.id, jid, "Sent while WhatsApp does not answer.");
-      assert.equal(phone.textsTo(jid).length, 1, "A post did not go out while the account check had no answer.");
-      phone.lookupFails = false;
-      const refused = await runCauseEffect(
-        agents.messaging.outboundTool(
-          sales.id,
-          { threadId: `thread-${sales.id}`, turnId: `turn-${sales.id}` },
-          "messaging_post",
-          { connection: connectionId(agents), place: jid, text: "Nobody gets this." },
-          () => Effect.succeed([]),
-        ),
-      );
-      const text = refused.contentItems[0]?.text ?? "";
-      assert.ok(text.includes("OpenBot sent nothing"), `The agent was not told that the post failed: ${text}`);
-      assert.ok(text.includes("country code"), "The agent was not told to add the country code.");
-      assert.equal(phone.textsTo(jid).length, 1, "A post to a number with no account went out.");
-      await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: FRIEND, kind: "contact", name: "Ewa" }));
-      const friendJid = `${FRIEND}@s.whatsapp.net`;
-      const lookupsBefore = phone.lookups.filter((number) => number === FRIEND).length;
-      await postAs(agents, sales.id, friendJid, "First post.");
-      await postAs(agents, sales.id, friendJid, "Second post.");
-      assert.equal(phone.textsTo(friendJid).length, 2, "A post to a contact with an account did not go out.");
-      assert.equal(
-        phone.lookups.filter((number) => number === FRIEND).length - lookupsBefore,
-        1,
-        "OpenBot asked WhatsApp again about a contact it already checked on this connection.",
-      );
-      const contacts = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
-      assert.ok(contacts.includes(NO_COUNTRY_CODE), "OpenBot removed the saved contact.");
-      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, NO_COUNTRY_CODE));
-      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, FRIEND));
-      return { refused: true, lookupsPerContact: 1 };
+      try {
+        phone.noAccount.add(NO_COUNTRY_CODE);
+        phone.lookupFails = true;
+        await runCauseEffect(
+          messaging.addWhatsAppSender(OWNER, { id: NO_COUNTRY_CODE, kind: "contact", name: "Marta" }),
+        );
+        const unknownBefore = phone.lookups.filter((number) => number === NO_COUNTRY_CODE).length;
+        await postAs(agents, sales.id, jid, "Sent while WhatsApp does not answer.");
+        assert.equal(phone.textsTo(jid).length, 1, "A post did not go out while the account check had no answer.");
+        assert.equal(
+          phone.lookups.filter((number) => number === NO_COUNTRY_CODE).length - unknownBefore,
+          1,
+          "One post asked WhatsApp more than once about the same contact.",
+        );
+        phone.lookupFails = false;
+        const refused = await runCauseEffect(
+          agents.messaging.outboundTool(
+            sales.id,
+            { threadId: `thread-${sales.id}`, turnId: `turn-${sales.id}` },
+            "messaging_post",
+            { connection: connectionId(agents), place: jid, text: "Nobody gets this." },
+            () => Effect.succeed([]),
+          ),
+        );
+        const text = refused.contentItems[0]?.text ?? "";
+        assert.ok(text.includes("OpenBot sent nothing"), `The agent was not told that the post failed: ${text}`);
+        assert.ok(text.includes("country code"), "The agent was not told about the country code.");
+        assert.equal(phone.textsTo(jid).length, 1, "A post to a number with no account went out.");
+        await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: FRIEND, kind: "contact", name: "Ewa" }));
+        const friendJid = `${FRIEND}@s.whatsapp.net`;
+        const lookupsBefore = phone.lookups.filter((number) => number === FRIEND).length;
+        await postAs(agents, sales.id, friendJid, "First post.");
+        await postAs(agents, sales.id, friendJid, "Second post.");
+        assert.equal(phone.textsTo(friendJid).length, 2, "A post to a contact with an account did not go out.");
+        assert.equal(
+          phone.lookups.filter((number) => number === FRIEND).length - lookupsBefore,
+          1,
+          "OpenBot asked WhatsApp again about a contact it already checked on this connection.",
+        );
+        const contacts = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
+        assert.ok(contacts.includes(NO_COUNTRY_CODE), "OpenBot removed the saved contact.");
+        return { refused: true, lookupsPerContact: 1 };
+      } finally {
+        phone.lookupFails = false;
+        phone.noAccount.clear();
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, NO_COUNTRY_CODE));
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, FRIEND));
+      }
     });
 
     await step("own chat: the owner's message reaches the orchestrator and gets 👀", async () => {
