@@ -156,6 +156,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "غروب قديم الطراز",
   "mobile.settings.appearance.backdrop.snowfall": "تساقط الثلج",
   "mobile.settings.appearance.backdrop.fireflies": "اليراعات",
+  "mobile.settings.appearance.backdrop.coast": "ساحل النيون",
   "mobile.settings.appearance.backdrop.agentPage": "صفحة الوكيل",
   "mobile.settings.appearance.backdrop.agentPageNote": "عيّنها وكيل",
   "mobile.settings.appearance.backdrop.photo": "صورة",

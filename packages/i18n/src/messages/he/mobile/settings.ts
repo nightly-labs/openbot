@@ -141,6 +141,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "שקיעה רטרו",
   "mobile.settings.appearance.backdrop.snowfall": "שלג יורד",
   "mobile.settings.appearance.backdrop.fireflies": "גחליליות",
+  "mobile.settings.appearance.backdrop.coast": "חוף ניאון",
   "mobile.settings.appearance.backdrop.agentPage": "דף הסוכן",
   "mobile.settings.appearance.backdrop.agentPageNote": "הוגדר על ידי סוכן",
   "mobile.settings.appearance.backdrop.photo": "תמונה",

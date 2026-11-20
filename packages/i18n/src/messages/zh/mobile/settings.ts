@@ -138,6 +138,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "复古日落",
   "mobile.settings.appearance.backdrop.snowfall": "飘雪",
   "mobile.settings.appearance.backdrop.fireflies": "萤火虫",
+  "mobile.settings.appearance.backdrop.coast": "霓虹海岸",
   "mobile.settings.appearance.backdrop.agentPage": "助手页面",
   "mobile.settings.appearance.backdrop.agentPageNote": "由助手设置",
   "mobile.settings.appearance.backdrop.photo": "照片",
