@@ -28,6 +28,7 @@ export class ChannelRequestReturns {
   readonly #mailbox: MailboxStore;
   readonly #hooks: ChannelRequestReturnHooks;
   readonly #handled = new Set<string>();
+  readonly #noted = new Set<string>();
   #restored = false;
 
   constructor(channels: ChannelService, mailbox: MailboxStore, hooks: ChannelRequestReturnHooks) {
@@ -38,7 +39,11 @@ export class ChannelRequestReturns {
 
   restore(): void {
     for (const channelId of this.#channels.store.ids())
-      for (const task of this.#channels.store.tasks(channelId)) if (returned(task)) this.#handled.add(returnKey(task));
+      for (const task of this.#channels.store.tasks(channelId))
+        if (returned(task)) {
+          this.#handled.add(returnKey(task));
+          this.#noted.add(task.id);
+        }
     this.#restored = true;
   }
 
@@ -63,16 +68,30 @@ export class ChannelRequestReturns {
 
   #pending(channelId: string): PendingReturn[] {
     return this.#channels.store.tasks(channelId).flatMap((task) => {
-      if (!returned(task)) return [];
+      if (!returned(task)) {
+        this.#noted.delete(task.id);
+        return [];
+      }
       const key = returnKey(task);
       if (this.#handled.has(key)) return [];
       this.#handled.add(key);
-      const request = this.#channels.store.message(channelId, task.requestMessageId);
-      if (request && movedToOpenTask(task, request)) return [];
+      if (task.state === "paused" && this.#noted.has(task.id)) return [];
+      this.#noted.add(task.id);
+      const routed = this.#channels.store.message(channelId, task.requestMessageId);
+      if (routed && movedToOpenTask(task, routed)) return [];
+      const request = this.#handoffRequest(channelId, task);
       const requesterId = request ? channelHandoffSenderAgentId(request) : null;
       if (!request || !requesterId) return [];
       return [{ key, task, request, requesterId }];
     });
+  }
+
+  #handoffRequest(channelId: string, task: ChannelTask): ChannelMessage | null {
+    for (const id of new Set([task.requestMessageId, ...task.sourceMessageIds.toReversed()])) {
+      const message = this.#channels.store.message(channelId, id);
+      if (message && channelHandoffSenderAgentId(message)) return message;
+    }
+    return null;
   }
 
   readonly #send = Effect.fn("ChannelRequestReturns.send")(function* (

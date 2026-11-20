@@ -301,7 +301,10 @@ the lead) to that agent, with `replyToMessageId` set to the channel request id a
 assignment of the task, or else the newest completed answer after the request, with its attachments.
 A failed or cancelled task gives a blocked note with the task error. A paused task (a person
 stopped it, or OpenBot paused it) gives a paused note that tells the agent not to send the request
-again: when the task continues and finishes, a new result comes back. The idempotency key holds the task id, revision and state, so a task that is resumed and
+again: when the task continues and finishes, a new result comes back. A paused note is not sent
+when the task already sent a note and did not run again, so archive or Stop on a failed or paused
+task sends nothing. When a person continues the task, its request message changes, so the return
+finds the request in the newest `agent:<agentId>` message of the task sources and replies to it. The idempotency key holds the task id, revision and state, so a task that is resumed and
 finishes again sends a new result. At start, the tasks that are already finished are marked as
 handled, so an upgrade or a restart sends no old results. A send that fails is reported
 (`channel_request_return_failed`) and is not tried again. The reply goes to the main chat of the
