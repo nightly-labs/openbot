@@ -1068,21 +1068,13 @@ export function LibraryPage(props: LibraryPageProps) {
                 />
               }
             >
-              <ul class="library-grid" data-layout={view()}>
+              <ul ref={mosaic.attach} class="library-grid" data-layout={view()}>
                 <For each={shown()} keyed={(file) => file.id}>
                   {(file) => {
                     const id = untrack(() => file().id);
-                    let tile: HTMLLIElement | undefined;
-                    onCleanup(() => {
-                      thumbnails.delete(id);
-                      if (tile) mosaic.forget(tile);
-                    });
+                    onCleanup(() => thumbnails.delete(id));
                     return (
                       <li
-                        ref={(element) => {
-                          tile = element;
-                          mosaic.track(element);
-                        }}
                         class="library-tile"
                         data-kind={isPicture(file()) ? "image" : "file"}
                         data-selected={isSelected(file()) ? "true" : undefined}
