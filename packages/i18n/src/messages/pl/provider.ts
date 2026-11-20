@@ -361,4 +361,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Nie udało się usunąć pobranych plików.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot wylogowuje {provider} na tym komputerze. CLI {provider} w terminalu pozostaje zalogowane.",
+  "provider.settings.updateAll": "Aktualizuj wszystkie",
 } as const satisfies PartialTranslation<typeof source>;

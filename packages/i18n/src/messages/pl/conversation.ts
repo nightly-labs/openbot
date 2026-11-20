@@ -113,6 +113,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "Czekanie. Ten komputer wykonuje tyle tur, na ile pozwala jego pamięć.",
   "conversation.threads.hold.agentBusy": "Czekanie na zakończenie innej pracy tego agenta.",
   "conversation.threads.hold.oneTurn": "Czekanie. Dostawca tego agenta wykonuje jedną turę naraz.",
+  "conversation.threads.hold.signIn": "Czekanie. Dostawca tego agenta wymaga zalogowania.",
   "conversation.sidePanel.closePanel": "Zamknij panel",
   "conversation.threads.view.failedBody": "Dostawca nie podał przyczyny. Wyślij wiadomość, aby spróbować ponownie.",
   "conversation.threads.deleteUndo.action": "Cofnij",

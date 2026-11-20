@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { AgentEvent, AgentRuntimeSnapshot, AgentSummary } from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentProviderState, AgentRuntimeSnapshot, AgentSummary } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -11,6 +11,7 @@ import { encodeLiveActivityBytes, LIVE_ACTIVITY_SECRET_BYTES } from "@openbot/te
 import { pushNotificationKeys } from "@openbot/team-client/push-notification-seal";
 import { Effect } from "effect";
 import { openSealedLiveActivity } from "../apps/mobile/src/features/live-activity/model/live-activity-open";
+import { ProviderSignInWaits } from "../src/backend/agent/provider-sign-in-waits";
 import { LiveActivityPushService } from "../src/main/live-activity-push";
 import {
   type NotificationRelayRequest,
@@ -124,8 +125,11 @@ const liveActivity = new LiveActivityPushService({
   randomBytes: (size) => new Uint8Array(randomBytes(size)),
 });
 
+const signInWaits = new ProviderSignInWaits((agentId) => agentId === AGENT_A || agentId === AGENT_B);
+
 const phones = new PushNotificationService({
   agents,
+  signInWaits,
   store: { list: () => [], replace: () => Effect.void },
   send: (request) =>
     Effect.suspend(() => {
@@ -151,7 +155,12 @@ const secrets = new Map([ANDROID, IPHONE].map((session) => [session, randomBytes
 const androidSecret = encodeLiveActivityBytes(secrets.get(ANDROID) ?? new Uint8Array());
 const iphoneSecret = encodeLiveActivityBytes(secrets.get(IPHONE) ?? new Uint8Array());
 
-function opened(request: NotificationRelayRequest): string {
+function openedContent(request: NotificationRelayRequest): {
+  kind: string;
+  agentId: string;
+  title: string;
+  body: string;
+} {
   const secret = secrets.get(request.push.sessionId);
   assert.ok(secret, "A send went to an unknown phone.");
   const keys = pushNotificationKeys(secret);
@@ -161,9 +170,17 @@ function opened(request: NotificationRelayRequest): string {
     encodeLiveActivityBytes(keys.tag),
   );
   assert.ok(text, "The phone cannot open the send.");
-  const content: { kind: string; agentId: string } = JSON.parse(text);
+  return JSON.parse(text);
+}
+
+function opened(request: NotificationRelayRequest): string {
+  const content = openedContent(request);
   return `${content.kind} ${content.agentId}`;
 }
+
+const providerState = (state: AgentProviderState) => ({
+  providers: [{ id: "codex" as const, state, version: null, message: null }],
+});
 
 function registerAndroid(away: boolean, capabilities: string[] = []): void {
   phones.register(
@@ -384,13 +401,48 @@ try {
     assert.deepEqual(said, [`reply ${AGENT_A}`, `failed ${AGENT_A}`]);
     return { said };
   });
+
+  await step(
+    "queued work that waits for provider sign-in sends one push to each phone until the provider is available again",
+    async () => {
+      state.failedTurns = [];
+      const from = sent.length;
+      signInWaits.note(AGENT_A, "codex");
+      signInWaits.note(AGENT_A, "codex");
+      signInWaits.statusChanged(providerState("checking"));
+      signInWaits.statusChanged(providerState("sign-in-required"));
+      signInWaits.note(AGENT_A, "codex");
+      events.emit("event", failure(AGENT_B, "turn-sign-in-1"));
+      const first = await sendsUntil(ANDROID, from, `failed ${AGENT_B}`);
+      assert.deepEqual(first, [`sign-in ${AGENT_A}`, `failed ${AGENT_B}`]);
+      const iphoneFirst = await sendsUntil(IPHONE, from, `sign-in ${AGENT_A}`);
+      assert.deepEqual(
+        iphoneFirst.filter((said) => said.startsWith("sign-in")),
+        [`sign-in ${AGENT_A}`],
+      );
+      const content = sent
+        .slice(from)
+        .map(openedContent)
+        .find((item) => item.kind === "sign-in");
+      assert.equal(content?.title, "Agent A");
+      assert.equal(content?.body, "Waits for ChatGPT sign-in.");
+      const again = sent.length;
+      signInWaits.statusChanged(providerState("available"));
+      signInWaits.statusChanged(providerState("sign-in-required"));
+      signInWaits.note(AGENT_A, "codex");
+      events.emit("event", failure(AGENT_B, "turn-sign-in-2"));
+      const second = await sendsUntil(ANDROID, again, `failed ${AGENT_B}`);
+      assert.deepEqual(second, [`sign-in ${AGENT_A}`, `failed ${AGENT_B}`]);
+      return { first, iphoneFirst, second, content };
+    },
+  );
   passed = true;
 } catch {
   passed = false;
 } finally {
   await Effect.runPromise(phones.dispose());
   await Effect.runPromise(liveActivity.dispose());
-  const listenersRemaining = events.listenerCount("event");
+  const listenersRemaining = events.listenerCount("event") + signInWaits.listenerCount("signInWait");
   if (listenersRemaining !== 0) passed = false;
   mkdirSync(OUT, { recursive: true });
   writeFileSync(

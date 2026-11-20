@@ -112,6 +112,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "ממתין. המחשב הזה מריץ מספר תורים לפי הזיכרון שלו.",
   "conversation.threads.hold.agentBusy": "ממתין לסיום עבודה אחרת של הסוכן הזה.",
   "conversation.threads.hold.oneTurn": "ממתין. הספק של הסוכן הזה מריץ תור אחד בכל פעם.",
+  "conversation.threads.hold.signIn": "ממתין. הספק של הסוכן הזה דורש התחברות.",
   "conversation.sidePanel.closePanel": "סגירת הפאנל",
   "conversation.threads.view.failedBody": "הספק לא מסר סיבה. יש לשלוח הודעה כדי לנסות שוב.",
   "conversation.threads.deleteUndo.action": "ביטול",
