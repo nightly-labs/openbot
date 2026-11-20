@@ -1,10 +1,20 @@
 import { join, posix } from "node:path";
+import type { InstalledSkill } from "@openbot/contracts/ipc";
 import { registerPublicValues } from "@openbot/logging";
 import { Effect } from "effect";
 import type { LocalSkillTools } from "../backend/agent/skill-tools";
 import { ToolOperationFailed, toToolOperationFailed } from "../backend/agent/tool-operation";
 import { MANAGED_SKILL_FOLDERS } from "./managed-skill-service";
 import type { SkillMarketplaceService } from "./skill-marketplace-service";
+
+export const keepSkillIdsReadable = (installed: readonly InstalledSkill[]) =>
+  Effect.sync(() =>
+    registerPublicValues(
+      installed
+        .filter((skill) => skill.origin !== "workspace")
+        .flatMap((skill) => [skill.skillId, ...skill.skillId.split(":")]),
+    ),
+  );
 
 export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTools {
   const library = skills.requireLocalLibrary();
@@ -34,13 +44,18 @@ export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTool
         );
         return skill;
       }),
-    install: (input) => skills.installLocal(input).pipe(toToolOperationFailed),
-    listInstalled: (agentId) =>
-      skills.listInstalled(agentId).pipe(
-        Effect.tap((installed) => Effect.sync(() => registerPublicValues(installed.map((skill) => skill.skillId)))),
+    install: (input) =>
+      skills.installLocal(input).pipe(
+        Effect.tap((skill) => keepSkillIdsReadable([skill])),
         toToolOperationFailed,
       ),
-    setEnabled: (input) => skills.setEnabled(input).pipe(toToolOperationFailed),
+    listInstalled: (agentId) =>
+      skills.listInstalled(agentId).pipe(Effect.tap(keepSkillIdsReadable), toToolOperationFailed),
+    setEnabled: (input) =>
+      skills.setEnabled(input).pipe(
+        Effect.tap((skill) => keepSkillIdsReadable([skill])),
+        toToolOperationFailed,
+      ),
     uninstall: (input) => skills.uninstall(input).pipe(toToolOperationFailed),
     create: (input) =>
       Effect.gen(function* () {
