@@ -32,6 +32,7 @@ import { copyToClipboard } from "@/features/chat/components/use-copy-message";
 import { type CodePreviewEntry, codePreview } from "@/features/chat/model/code-preview-store";
 import { type MarkdownPreviewPart, markdownPreviewSeries } from "@/features/chat/model/markdown-preview-parts";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
+import { webLink } from "@/features/chat/model/message-file-target";
 import { textPreviewParts } from "@/features/chat/model/text-preview-parts";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
@@ -54,15 +55,6 @@ const TITLE_ENTER = new Keyframe({
 const HEADER_OFFSET = 8;
 const HEADER_HEIGHT = 48;
 const PART_BAR_OFFSET = 8;
-
-function webLink(href: string): string | null {
-  try {
-    const url = new URL(href);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
-  } catch {
-    return null;
-  }
-}
 
 export function CodePreviewScreen() {
   const { previewId } = useLocalSearchParams<{ previewId: string }>();
