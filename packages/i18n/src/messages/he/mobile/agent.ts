@@ -316,6 +316,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "אין מודלים זמינים לספק הזה.",
   "mobile.agent.runtime.searchModels": "חיפוש מודלים",
   "mobile.agent.runtime.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "הספק הזה לא עובד עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בו, שנו קודם את „הרשאות”.",
   "mobile.agent.runtime.usageLimit": "הגעת למגבלת השימוש",

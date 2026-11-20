@@ -350,6 +350,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "لا نماذج متاحة لهذا المزوّد.",
   "mobile.agent.runtime.searchModels": "البحث في النماذج",
   "mobile.agent.runtime.noMatches": "لا نماذج تطابق بحثك.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "لا توجد نماذج تطابق بحثك. يمكن أن تخفي إعدادات الخصوصية والمزوّدين والحواجز الوقائية في openrouter.ai بعض النماذج من هذه القائمة.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "لا يعمل هذا المزوّد مع «مساحة العمل فقط» على Windows وLinux. لاستخدامه، غيّر «الأذونات» أولًا.",
   "mobile.agent.runtime.usageLimit": "تم بلوغ حد الاستخدام",

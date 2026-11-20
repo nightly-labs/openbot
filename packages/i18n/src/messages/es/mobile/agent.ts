@@ -322,6 +322,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "No hay modelos disponibles para este proveedor.",
   "mobile.agent.runtime.searchModels": "Buscar modelos",
   "mobile.agent.runtime.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Ningún modelo coincide con tu búsqueda. Tus ajustes de privacidad, proveedores y guardrails en openrouter.ai pueden ocultar modelos de esta lista.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Este proveedor no funciona con «Solo espacio de trabajo» en Windows y Linux. Para usarlo, cambia primero los «Permisos».",
   "mobile.agent.runtime.usageLimit": "Límite de uso alcanzado",

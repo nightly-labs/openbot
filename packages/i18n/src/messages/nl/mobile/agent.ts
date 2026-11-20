@@ -324,6 +324,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Geen modellen beschikbaar voor deze aanbieder.",
   "mobile.agent.runtime.searchModels": "Modellen zoeken",
   "mobile.agent.runtime.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Deze provider werkt niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig eerst ‘Machtigingen’ om hem te gebruiken.",
   "mobile.agent.runtime.usageLimit": "Gebruikslimiet bereikt",

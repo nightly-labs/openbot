@@ -134,6 +134,8 @@ export const messages = {
   "provider.picker.download": "Pobieranie {name}",
   "provider.picker.search": "Szukaj modeli",
   "provider.picker.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "provider.picker.openrouterNoMatches":
+    "Żaden model nie pasuje do wyszukiwania. Twoje ustawienia prywatności, dostawców i zabezpieczeń (guardrails) w openrouter.ai mogą ukrywać modele na tej liście.",
   "provider.picker.workspaceOnlyUnavailable":
     "Te modele nie działają z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby ich użyć, zmień „Dostęp” w ustawieniach agenta.",
   "provider.picker.olderModels": "Starsze modele",

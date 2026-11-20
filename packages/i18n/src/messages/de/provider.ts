@@ -121,6 +121,8 @@ export const messages = {
   "provider.picker.download": "Download von {name}",
   "provider.picker.search": "Modelle suchen",
   "provider.picker.noMatches": "Keine Modelle entsprechen deiner Suche.",
+  "provider.picker.openrouterNoMatches":
+    "Keine Modelle entsprechen deiner Suche. Deine Einstellungen für Datenschutz, Anbieter und Guardrails auf openrouter.ai können Modelle aus dieser Liste ausblenden.",
   "provider.picker.workspaceOnlyUnavailable":
     "Diese Modelle funktionieren unter Windows und Linux nicht mit „Nur Arbeitsbereich“. Ändere dafür „Zugriff“ in den Agenteneinstellungen.",
   "provider.picker.olderModels": "Ältere Modelle",
