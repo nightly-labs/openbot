@@ -60,6 +60,7 @@ interface DockWindow {
   rendererId: number;
   displayId: number;
   shape?: AgentDockInputRect[];
+  interactive?: boolean;
   keyboard?: boolean;
 }
 
@@ -169,8 +170,8 @@ export class AgentDockWindowController {
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
     const { window } = entry;
-    if (this.#options.windowKind !== "x11")
-      letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
+    entry.interactive = input.interactive;
+    if (this.#options.windowKind !== "x11") this.#letPointerThrough(entry);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
     if (keyboard && !entry.keyboard && !window.isFocused()) {
@@ -191,7 +192,15 @@ export class AgentDockWindowController {
     if (!entry.shape) return;
     const rects = entry.shape.map((rect) => zoomedRect(rect, this.#zoom()));
     if (this.#options.windowKind === "x11") entry.window.setShape(rects);
-    else this.#options.pointerForwarding?.setZone(entry.window, rects);
+    if (this.#options.windowKind !== "tool") return;
+    if (rects.length > 0) entry.window.setShape(rects);
+    this.#letPointerThrough(entry);
+    if (rects.length === 0) entry.window.setShape([]);
+  }
+
+  #letPointerThrough(entry: DockWindow): void {
+    const fixedRegion = this.#options.windowKind === "tool" && (entry.shape?.length ?? 0) > 0;
+    letPointerThrough(this.#options.pointerForwarding, entry.window, !fixedRegion && entry.interactive !== true);
   }
 
   drag(rendererId: number, phase: AgentDockDragPhase): void {
