@@ -35,6 +35,7 @@ import {
   systemPreferences,
 } from "electron";
 import { localTimezone } from "../backend/agent/routine-tools";
+import { replaceInvalidLinuxSystemLanguages } from "../backend/browser-policy";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { LATEST_SCHEMA_VERSION, NewerDatabaseError } from "../backend/openbot-database-schema";
@@ -1402,6 +1403,7 @@ if (!hasSingleInstanceLock) {
     .whenReady()
     .then(async () => {
       performance.mark("openbot:when-ready");
+      replaceInvalidLinuxSystemLanguages();
       powerMonitor.on("suspend", () => runMarker?.suspend());
       powerMonitor.on("resume", () => runMarker?.resume());
       powerMonitor.on("shutdown", () => {

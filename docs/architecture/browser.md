@@ -135,7 +135,12 @@ tokens. They keep the installed Chromium major version and host platform, and gi
 parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
 Electron sends. The `Accept-Language` header adds the base language of each regional language
 (`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
-a page sets on its own request stays: a site can sign that header. Requests to `accounts.google.com`
+a page sets on its own request stays: a site can sign that header. The header leaves out a system
+language that is not a valid language tag. On Linux, Electron gives `c` for the `C.UTF-8` locale and
+`posix` for `POSIX`, and adds them to `navigator.languages` of each page, where `Intl` throws on them.
+When the system gives only such values, the main process sets `LANGUAGE` to the app locale
+(`en_US`) at `ready`, before the first window, so pages get `["en-US","en"]`. Child processes
+inherit this `LANGUAGE`. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and

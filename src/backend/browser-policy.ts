@@ -58,7 +58,7 @@ export function browserRequestHeaders(
 }
 
 export function preferredBrowserLanguageCodes(): string {
-  const languages = app.getPreferredSystemLanguages();
+  const languages = validLanguageTags(app.getPreferredSystemLanguages());
   const codes = languages.length > 0 ? languages : [app.getLocale()];
   const base = (code: string) => code.split("-")[0] ?? code;
   const expanded: string[] = [];
@@ -69,6 +69,24 @@ export function preferredBrowserLanguageCodes(): string {
       expanded.push(base(code));
   }
   return expanded.join(",");
+}
+
+export function replaceInvalidLinuxSystemLanguages(): void {
+  if (process.platform !== "linux") return;
+  const languages = app.getPreferredSystemLanguages();
+  if (languages.length === 0 || validLanguageTags(languages).length > 0) return;
+  const [locale = "en-US"] = validLanguageTags([app.getLocale()]);
+  process.env.LANGUAGE = locale.replaceAll("-", "_");
+}
+
+function validLanguageTags(values: readonly string[]): string[] {
+  return values.filter((value) => {
+    try {
+      return /^[a-z]{2,3}(?:-|$)/.test(Intl.getCanonicalLocales(value)[0] ?? "");
+    } catch {
+      return false;
+    }
+  });
 }
 
 function setRequestHeader(headers: Record<string, string>, name: string, value: string): void {
