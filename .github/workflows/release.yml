@@ -289,6 +289,11 @@ jobs:
           bun run test:desktop -- --maxWorkers=2
           NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
 
+  # Each architecture builds on a runner of its own kind. The install scripts run every provider
+  # runtime they download, and the voice runtime and the remote desktop runtime are downloaded or
+  # verified for the runner's architecture, so one runner cannot produce both. The ARM64 job keeps
+  # the asset names every earlier release used, and it alone builds the Host PKG, which is Apple
+  # silicon only.
   macos:
     name: Build signed macOS ${{ matrix.label }} release
     needs: validate
@@ -302,13 +307,11 @@ jobs:
           - arch: arm64
             label: ARM64
             os: macos-15
-            toolchain_architecture: ""
             app_dir: mac-arm64
             suffix: macos
           - arch: x64
             label: x64
-            os: macos-15
-            toolchain_architecture: x64
+            os: macos-15-intel
             app_dir: mac
             suffix: macos-x64
     environment: release
@@ -329,7 +332,6 @@ jobs:
         uses: ./.github/actions/setup-bun
         with:
           install: none
-          architecture: ${{ matrix.toolchain_architecture }}
 
       - name: Require signing and notarization credentials
         shell: bash

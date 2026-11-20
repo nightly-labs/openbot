@@ -611,11 +611,11 @@ The workflow:
 2. installs and verifies the pinned remote desktop runtime without CMake or Cargo;
 3. runs the complete offline repository check on its own macOS runner, in parallel with the builds;
 4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on a GitHub Apple silicon runner,
-   and signed and notarized x64 DMG and ZIP artifacts on a second Apple silicon runner. That job
-   installs the x64 Bun and Node (`architecture: x64` of `.github/actions/setup-bun`), which run
-   under Rosetta, so every script sees `process.arch` `x64` as on an Intel Mac. Each
+   and signed and notarized x64 DMG and ZIP artifacts on a GitHub Intel runner (`macos-15-intel`). Each
    architecture builds on its own runner, because the voice runtime and the remote desktop runtime
-   are prepared for the architecture of the build toolchain. The Host PKG is ARM64 only.
+   are prepared for the architecture of the build machine. The Host PKG is ARM64 only. The x64 job
+   does not run on an Apple silicon runner under Rosetta: there, the packaged app checks take about
+   ten times longer, and the upgrade check does not finish.
    When `hdiutil create` fails with "Device not configured" or "Resource busy", or a network
    connection drops, the app build of each architecture starts again, up to 3 attempts, because
    these runner errors are not caused by the app;
