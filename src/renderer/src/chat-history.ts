@@ -12,8 +12,8 @@ function sameEntry(a: ChatHistoryEntry | undefined, b: ChatHistoryEntry | undefi
   return sameChat(a, b) && a?.thread === b?.thread;
 }
 
-function completes(held: ChatHistoryEntry | undefined, entry: ChatHistoryEntry): boolean {
-  return sameChat(held, entry) && (held?.thread === undefined || held.thread === entry.thread);
+function completes(held: ChatHistoryEntry | undefined, entry: ChatHistoryEntry | undefined): boolean {
+  return sameChat(held, entry) && (held?.thread === undefined || held.thread === entry?.thread);
 }
 
 export function createChatHistory(exists: (entry: ChatHistoryEntry) => boolean) {
@@ -23,7 +23,7 @@ export function createChatHistory(exists: (entry: ChatHistoryEntry) => boolean) 
     const open = state.entries[state.index];
     for (let index = state.index + offset; index >= 0 && index < state.entries.length; index += offset) {
       const entry = state.entries[index];
-      if (entry && exists(entry) && !sameEntry(entry, open)) return index;
+      if (entry && exists(entry) && !sameEntry(entry, open) && !completes(entry, open)) return index;
     }
     return -1;
   }
@@ -41,8 +41,9 @@ export function createChatHistory(exists: (entry: ChatHistoryEntry) => boolean) 
         });
         return;
       }
-      if (sameEntry(state.entries[state.index], entry)) return;
-      if (completes(state.entries[state.index], entry)) {
+      const held = state.entries[state.index];
+      if (sameEntry(held, entry)) return;
+      if (completes(held, entry) || (sameChat(held, entry) && held && !exists(held))) {
         setState((draft) => {
           draft.entries[draft.index] = entry;
         });
