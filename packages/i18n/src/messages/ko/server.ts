@@ -233,6 +233,21 @@ export const messages = {
   "server.rail.delete": "서버 삭제",
   "server.rail.hide": "서버 숨기기",
   "server.rail.showLocal": "{name} 표시",
+  "server.plan.daysLeft": {
+    other: "{count}일",
+  },
+  "server.plan.ended": "플랜 종료",
+  "server.plan.status": "플랜 종료, {date}에 삭제",
+  "server.plan.deletedOn": "{date}에 삭제",
+  "server.plan.dialogTitle": "에이전트를 떠나보내지 마세요",
+  "server.plan.dialogDescription":
+    "{name}의 플랜 요금이 결제되지 않아 서버가 멈췄어요. {date}에 OpenBot이 에이전트와 모든 채팅, 파일을 삭제해요.",
+  "server.plan.dialogDaysLeft": {
+    other: "{count}일 남음",
+  },
+  "server.plan.later": "나중에",
+  "server.plan.keepAgents": "에이전트 지키기",
+  "server.plan.ownerRenews": "서버 소유자가 플랜을 갱신할 때까지 {name}의 에이전트를 사용할 수 없습니다.",
   "server.select.failedTitle": "서버를 선택할 수 없어요",
   "server.select.failedDescription": "서버를 전환할 수 없었어요. 다시 시도해 주세요.",
   "server.select.openAgentFailed": "{name}을(를) 열 수 없었어요. 사이드바에서 찾아 주세요.",

@@ -7,6 +7,7 @@ import {
   ServerPanelLoadNotice,
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { serverPlanBlocks } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
@@ -28,11 +29,13 @@ import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutine
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
 import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
+import { openServerPlanCheckout } from "./features/servers/ServerPlanReminder";
 import { serverCanAdminister } from "./features/servers/server-capabilities";
 import { createServerConnectionToast } from "./features/servers/server-connection-toast";
 import { useServerScope } from "./features/servers/server-scope";
 import { followsServerUpdate, ServerUpdateDialogHost } from "./features/servers/server-update-flow";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
@@ -74,6 +77,7 @@ export function WorkspaceShell(props: {
     serversLoaded,
     serversLoadFailed,
     refreshServers,
+    planDeletesAt,
   } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const agentDockPlacement = useAgentDockPlacement();
@@ -139,10 +143,18 @@ export function WorkspaceShell(props: {
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
     if (server?.kind !== "remote" || server.hostedSleep) return null;
-    return server.state === "incompatible" || (server.issue && server.issue.code !== "network_unavailable")
+    return server.state === "incompatible" ||
+      serverPlanBlocks(server, planDeletesAt(server.id)) ||
+      (server.issue && server.issue.code !== "network_unavailable")
       ? server
       : null;
   });
+  const planScreenShown = () => {
+    const server = blockedRemoteServer();
+    return server !== null && serverPlanBlocks(server, planDeletesAt(server.id));
+  };
+  const renewPlan = (serverId: string) =>
+    openServerPlanCheckout((id) => serversPort().hostedServers.openCheckout(id), serverId);
   const activePeopleEnabled = createMemo(
     () => platform.peopleEnabled && activeServerSupportsCapability("direct-messages"),
   );
@@ -337,11 +349,15 @@ export function WorkspaceShell(props: {
           hidden={remoteDesktopWorkspaceVisible()}
           blockedServer={blockedRemoteServer()}
           onRetryServer={retryServerConnection}
+          planDeletesAt={planDeletesAt}
+          onRenewPlan={renewPlan}
           windowPage={windowPage.page()}
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
-              <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
+              <Show when={!planScreenShown()}>
+                <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
+              </Show>
             </Show>
           }
           page={<WindowPageView />}

@@ -227,6 +227,23 @@ export const messages = {
   "server.rail.delete": "Sunucuyu sil",
   "server.rail.hide": "Sunucuyu gizle",
   "server.rail.showLocal": "{name} sunucusunu göster",
+  "server.plan.daysLeft": {
+    one: "{count} gün",
+    other: "{count} gün",
+  },
+  "server.plan.ended": "Plan sona erdi",
+  "server.plan.status": "plan sona erdi, {date} tarihinde silinecek",
+  "server.plan.deletedOn": "{date} tarihinde silinecek",
+  "server.plan.dialogTitle": "Ajanlarını kaybetme",
+  "server.plan.dialogDescription":
+    "{name}, planı ödenmediği için durdu. OpenBot {date} tarihinde ajanlarını tüm sohbetleri ve dosyalarıyla birlikte siler.",
+  "server.plan.dialogDaysLeft": {
+    one: "{count} gün kaldı",
+    other: "{count} gün kaldı",
+  },
+  "server.plan.later": "Sonra",
+  "server.plan.keepAgents": "Ajanlarımı koru",
+  "server.plan.ownerRenews": "Sunucu sahibi planı yenileyene kadar {name} ajanları kullanılamaz.",
   "server.select.failedTitle": "Sunucu seçilemedi",
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",

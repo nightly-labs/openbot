@@ -240,6 +240,23 @@ export const messages = defineMessages("server", {
   "server.rail.delete": "Delete server",
   "server.rail.hide": "Hide server",
   "server.rail.showLocal": "Show {name}",
+  "server.plan.daysLeft": {
+    one: "{count} day",
+    other: "{count} days",
+  },
+  "server.plan.ended": "Plan ended",
+  "server.plan.status": "plan ended, deleted on {date}",
+  "server.plan.deletedOn": "Deleted on {date}",
+  "server.plan.dialogTitle": "Don't let your agents go",
+  "server.plan.dialogDescription":
+    "{name} stopped because its plan was not paid. On {date}, OpenBot deletes its agents, with all their chats and files.",
+  "server.plan.dialogDaysLeft": {
+    one: "{count} day left",
+    other: "{count} days left",
+  },
+  "server.plan.later": "Later",
+  "server.plan.keepAgents": "Keep my agents",
+  "server.plan.ownerRenews": "The agents of {name} are not available until the server owner renews the plan.",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
   "server.select.openAgentFailed": "Could not open {name}. Find it in the sidebar.",

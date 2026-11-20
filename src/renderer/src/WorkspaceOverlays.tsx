@@ -52,6 +52,7 @@ import {
 } from "./features/servers/hosted-server-upsell-controller";
 import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import { ServerPlanReminder } from "./features/servers/ServerPlanReminder";
 import type { ServerCopyOptions } from "./features/servers/ServerTransferPanel";
 import { useServerActions } from "./features/servers/server-actions";
 import {
@@ -110,6 +111,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <CreateLocalServer />
       <InstallServer />
       <HostedUpsell account={props.account} />
+      <PlanReminder />
       <LeaveServer />
       <RestartServer />
       <ServerSettings />
@@ -179,6 +181,17 @@ export function SkillsMarketplace() {
       mcpSignInRequest={pendingMcpSignIn()}
       onMcpSignInRequestHandled={() => setPendingMcpSignIn(null)}
       onMcpSignIns={(serverId, states) => setMcpSignIns({ serverId, states })}
+    />
+  );
+}
+
+function PlanReminder() {
+  const { orderedServers, callbacks } = useServerActions();
+  return (
+    <ServerPlanReminder
+      servers={orderedServers()}
+      planDeletesAt={callbacks.planDeletesAt}
+      onRenew={callbacks.onRenewPlan}
     />
   );
 }

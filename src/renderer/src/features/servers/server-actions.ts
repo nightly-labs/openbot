@@ -6,10 +6,12 @@ import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
 import { useSettings } from "../settings/settings-context";
+import { openServerPlanCheckout } from "./ServerPlanReminder";
 import { serverSupportsCapability } from "./server-capabilities";
 import { useServerSelection } from "./server-selection";
 import { useServerSettings } from "./server-settings";
 import { useServers } from "./servers-context";
+import { serversPort } from "./servers-port";
 
 export function useServerActions() {
   const platform = usePlatform();
@@ -24,6 +26,7 @@ export function useServerActions() {
     hostedServersAvailable,
     hostedServerIds,
     hostedServersLoaded,
+    planDeletesAt,
     refreshHostedServersAvailable,
     localServerHidden,
     setLocalServerHidden,
@@ -119,6 +122,8 @@ export function useServerActions() {
     },
     onHide: (serverId) => void hideLocal(serverId),
     canHide: () => remoteServers().length > 0,
+    planDeletesAt,
+    onRenewPlan: (serverId) => openServerPlanCheckout((id) => serversPort().hostedServers.openCheckout(id), serverId),
   } satisfies ServerActionCallbacks;
 
   return {

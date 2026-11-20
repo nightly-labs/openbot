@@ -4,6 +4,7 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
+import { serverPlanDeletionDates } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
@@ -45,6 +46,8 @@ const Servers = createSimpleContext({
     const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
     const [hostedServerIds, setHostedServerIds] = createSignal<ReadonlySet<string>>(new Set());
     const [hostedServersLoaded, setHostedServersLoaded] = createSignal(false);
+    const [planDeletesAtById, setPlanDeletesAtById] = createSignal<ReadonlyMap<string, number>>(new Map());
+    const planDeletesAt = (serverId: string) => planDeletesAtById().get(serverId) ?? null;
     const [serverLoadRequest, setServerLoadRequest] = createSignal<{
       serverId: string;
       nonce: number;
@@ -252,13 +255,19 @@ const Servers = createSimpleContext({
         else {
           setHostedServersAvailable(false);
           setHostedServerIds(new Set<string>());
+          setPlanDeletesAtById(new Map());
           setHostedServersLoaded(false);
         }
       });
+      const refreshEndedPlans = () => {
+        if (untrack(planDeletesAtById).size > 0) void refreshHostedServersAvailable();
+      };
+      window.addEventListener("focus", refreshEndedPlans);
       return () => {
         unsubscribeServers();
         unsubscribeHost();
         unsubscribeAuth();
+        window.removeEventListener("focus", refreshEndedPlans);
       };
     });
 
@@ -269,6 +278,7 @@ const Servers = createSimpleContext({
       if (!list) return hostedServersAvailable();
       setHostedServersAvailable(list.available);
       setHostedServerIds(new Set(list.servers.map((server) => server.serverId)));
+      setPlanDeletesAtById(serverPlanDeletionDates(list.servers));
       setHostedServersLoaded(true);
       return list.available;
     }
@@ -395,6 +405,7 @@ const Servers = createSimpleContext({
       hostedServersAvailable,
       hostedServerIds,
       hostedServersLoaded,
+      planDeletesAt,
       refreshHostedServersAvailable,
       reorderServers,
       localServerHidden,
