@@ -21,6 +21,14 @@ import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { type ServerActionCallbacks, ServerActionItems } from "./ServerActionItems";
 import {
+  ServerPlanBanner,
+  ServerPlanChip,
+  ServerPlanCount,
+  serverPlanDaysLeft,
+  serverPlanEnds,
+  serverPlanStatusLabels,
+} from "./ServerPlanEnd";
+import {
   addServerLabel,
   type HiddenLocalServer,
   ServerMark,
@@ -75,7 +83,7 @@ function CheckCircle(props: { checked: boolean }) {
 let lastShown: { id: string | undefined; name: string } | undefined;
 
 export function ServerMenu(props: ServerMenuProps) {
-  const { t } = useText();
+  const { t, format } = useText();
   const [menuOpen, setMenuOpen] = createSignal(false);
   const rail = untrack(() => props.rail === true);
   let anchor: HTMLElement | undefined;
@@ -85,6 +93,12 @@ export function ServerMenu(props: ServerMenuProps) {
   const activeSleep = () => {
     const server = activeServer();
     return server ? serverHostedSleep(server) : null;
+  };
+  const planEnds = () => serverPlanEnds(props.servers, props.planDeletesAt);
+  const planDeletesAt = (serverId: string) => props.planDeletesAt?.(serverId) ?? null;
+  const planCount = () => {
+    const first = props.view === "menu" ? planEnds()[0] : undefined;
+    return first ? serverPlanDaysLeft(first.deleteAt) : null;
   };
   const triggerTitle = () => {
     const sleep = activeSleep();
@@ -131,6 +145,12 @@ export function ServerMenu(props: ServerMenuProps) {
         t("server.menu.open", { name: props.serverName }),
         ...(activeSleep() === "sleeping" ? [t("server.state.sleeping")] : []),
         ...(activeSleep() === "waking" ? [t("server.state.waking")] : []),
+        ...(props.view === "menu"
+          ? planEnds().flatMap((end) => [
+              end.server.name,
+              ...serverPlanStatusLabels(end.server, end.deleteAt, t, format),
+            ])
+          : []),
       ].join(", ")}
       aria-hidden={props.compact ? "true" : undefined}
       aria-keyshortcuts="Shift+F10"
@@ -180,6 +200,7 @@ export function ServerMenu(props: ServerMenuProps) {
         </Show>
         <ChevronsUpDown class="sidebar-server-name-chevron" aria-hidden="true" />
       </Show>
+      <Show when={planCount()}>{(count) => <ServerPlanCount count={count()} class="server-plan-trigger-count" />}</Show>
     </DropdownMenu.Trigger>
   );
 
@@ -222,6 +243,13 @@ export function ServerMenu(props: ServerMenuProps) {
                 </Show>
               }
             >
+              <Show when={props.onRenewPlan}>
+                {(onRenewPlan) => (
+                  <For each={planEnds()} keyed={(end) => end.server.id}>
+                    {(end) => <ServerPlanBanner menu={DropdownMenu} end={end()} onRenew={onRenewPlan()} />}
+                  </For>
+                )}
+              </Show>
               <div class="ui-menu-label" aria-hidden="true">
                 {t("server.rail.label")}
               </div>
@@ -230,7 +258,11 @@ export function ServerMenu(props: ServerMenuProps) {
                   <DropdownMenu.Sub>
                     <DropdownMenu.SubTrigger
                       class="server-menu-row"
-                      aria-label={[server().name, ...serverStatusLabels(server(), t)].join(", ")}
+                      aria-label={[
+                        server().name,
+                        ...serverStatusLabels(server(), t),
+                        ...serverPlanStatusLabels(server(), planDeletesAt(server().id), t, format),
+                      ].join(", ")}
                       aria-current={server().active ? "true" : undefined}
                       data-cuelume-navigate=""
                       onClick={() => selectServer(server())}
@@ -245,6 +277,7 @@ export function ServerMenu(props: ServerMenuProps) {
                       <Show when={server().notificationsMuted}>
                         <BellOff class="server-menu-muted size-3" aria-hidden="true" />
                       </Show>
+                      <ServerPlanChip server={server()} deleteAt={planDeletesAt(server().id)} />
                       <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
                     </DropdownMenu.SubTrigger>
                     <DropdownMenu.Portal>

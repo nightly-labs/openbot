@@ -18,10 +18,16 @@ const ICE_ROUTE = /^[a-z]{1,8}\/[a-z]{1,8} -> [a-z]{1,8}\/[a-z]{1,8}$/u;
 interface IceCandidateStats {
   candidateType?: string;
   protocol?: string;
+  relayProtocol?: string;
+}
+
+function candidateProtocol(candidate: IceCandidateStats | null | undefined): string {
+  const relayed = candidate?.candidateType === "relay" ? candidate.relayProtocol : undefined;
+  return relayed ?? candidate?.protocol ?? "unknown";
 }
 
 function candidateRoute(candidate: IceCandidateStats | null | undefined): string {
-  return `${candidate?.candidateType ?? "unknown"}/${candidate?.protocol ?? "unknown"}`;
+  return `${candidate?.candidateType ?? "unknown"}/${candidateProtocol(candidate)}`;
 }
 
 export function iceCandidateRoute(
