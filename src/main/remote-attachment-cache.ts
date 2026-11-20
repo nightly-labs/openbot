@@ -91,7 +91,7 @@ export class RemoteAttachmentCache {
       return entry.attachment;
     }
     const pending = this.#pending.get(key);
-    if (pending && (queued || !pending.waiting)) return yield* Deferred.await(pending.request);
+    if (pending && (queued || !preview || !pending.waiting)) return yield* Deferred.await(pending.request);
     const generation = this.#generation(serverId);
     if (pending) {
       pending.waiting = false;
