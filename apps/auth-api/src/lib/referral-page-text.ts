@@ -4,7 +4,7 @@ import { REFERRAL_CODE_MAX_AGE_DAYS } from "@openbot/contracts/referral";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { slot } from "./text-slots";
 
-export const REFERRAL_SLOTS = {
+const REFERRAL_SLOTS = {
   name: slot("name"),
   percent: slot("percent"),
   amount: slot("amount"),

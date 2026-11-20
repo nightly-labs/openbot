@@ -386,7 +386,14 @@ export function ReferralPage(props: {
               <ButtonLink to={path("/download")} variant="primary" size="lg" icon="download">
                 {props.text.download}
               </ButtonLink>
-              <ButtonLink to="/app" variant="secondary" size="lg" icon="arrow-right" class="landing-button-glass">
+              <ButtonLink
+                to="/app"
+                reloadDocument
+                variant="secondary"
+                size="lg"
+                icon="arrow-right"
+                class="landing-button-glass"
+              >
                 {props.text.browser}
               </ButtonLink>
             </div>
