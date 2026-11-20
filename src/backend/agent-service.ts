@@ -4915,6 +4915,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return !ownChatLinks.has(linkId) && provider !== undefined && agentProviderDescriptor(provider).concurrentTurns;
       });
       this.#mcp.migrateCatalogRows();
+      this.#channelRequestReturns.restore();
       this.channels.restoreDeliveryLinks();
       this.channels.removeDeletedMembers(new Set(this.#store.list().map((agent) => agent.id)));
     });

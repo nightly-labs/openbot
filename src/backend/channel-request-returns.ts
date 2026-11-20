@@ -28,20 +28,25 @@ export class ChannelRequestReturns {
   readonly #mailbox: MailboxStore;
   readonly #hooks: ChannelRequestReturnHooks;
   readonly #handled = new Set<string>();
+  #restored = false;
 
   constructor(channels: ChannelService, mailbox: MailboxStore, hooks: ChannelRequestReturnHooks) {
     this.#channels = channels;
     this.#mailbox = mailbox;
     this.#hooks = hooks;
-    for (const channelId of channels.store.ids())
-      for (const task of channels.store.tasks(channelId)) if (returned(task)) this.#handled.add(returnKey(task));
+  }
+
+  restore(): void {
+    for (const channelId of this.#channels.store.ids())
+      for (const task of this.#channels.store.tasks(channelId)) if (returned(task)) this.#handled.add(returnKey(task));
+    this.#restored = true;
   }
 
   readonly reconcile = Effect.fn("ChannelRequestReturns.reconcile")(function* (
     this: ChannelRequestReturns,
     channelId: string,
   ) {
-    if (!this.#channels.store.exists(channelId)) return;
+    if (!this.#restored || !this.#channels.store.exists(channelId)) return;
     const pending = this.#pending(channelId);
     if (!pending.length) return;
     const channel = this.#channels.store.get(channelId);
