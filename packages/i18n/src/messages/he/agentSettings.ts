@@ -233,6 +233,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "לאפשר לסוכן להתחיל צ'אט חדש כשהצ'אט שלו מתארך. קודם הוא שומר הערות.",
   "agentSettings.quickAcknowledgement.title": "הצגת התוכנית לפני משימות ארוכות",
   "agentSettings.quickAcknowledgement.description": "לפני משימה ארוכה, הסוכן מציג את התוכנית שלו.",
+  "agentSettings.builtinMemory.title": "הזיכרון של OpenBot",
+  "agentSettings.builtinMemory.description":
+    "הסוכן שומר וקורא את הזיכרונות שלו. כבו כדי להשתמש רק באפליקציית זיכרון, כמו Mem0. הזיכרונות השמורים נשארים.",
   "agentSettings.browserProfile.label": "פרופיל דפדפן",
   "agentSettings.browserProfile.shared": "משותף",
   "agentSettings.browserProfile.agent": "רק הסוכן הזה",

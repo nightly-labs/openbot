@@ -317,7 +317,7 @@ export class BillingService {
         }
         const entry: HostedServerCatalogPlan = {
           id: plan.id,
-          diskGb: plan.storageGb,
+          diskGb: storageTierGb(plan.id, 0),
           memberLimit: plan.memberLimit,
           relativeSpeed: plan.relativeSpeed,
           prices: planPrices,

@@ -400,6 +400,9 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.planCard.label": "Show the plan before long tasks",
   "mobile.agent.planCard.footer":
     "Before a long task, the agent shows its plan. It starts after 10 s, or when you press Start.",
+  "mobile.agent.builtinMemory.label": "OpenBot memory",
+  "mobile.agent.builtinMemory.footer":
+    "The agent saves and reads its own memories. Turn off to use only a memory app, such as Mem0. Saved memories stay.",
   "mobile.agent.workspace.title": "Workspace folder",
   "mobile.agent.workspace.footer": "The folder of this agent on the host computer.",
   "mobile.agent.advanced.behavior": "Behavior",

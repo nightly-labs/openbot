@@ -243,7 +243,7 @@ export const messages = {
   "server.plan.deletedOn": "Usunięcie {date}",
   "server.plan.dialogTitle": "Nie pozwól odejść swoim agentom",
   "server.plan.dialogDescription":
-    "Serwer {name} zatrzymał się, bo jego plan nie został opłacony. {date} OpenBot usunie jego agentów razem ze wszystkimi czatami i plikami.",
+    "Serwer {name} zatrzymał się, bo jego plan się zakończył. {date} OpenBot usunie jego agentów razem ze wszystkimi czatami i plikami.",
   "server.plan.dialogDaysLeft": {
     one: "Został {count} dzień",
     few: "Zostały {count} dni",

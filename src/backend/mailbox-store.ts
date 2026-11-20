@@ -1108,6 +1108,20 @@ export class MailboxStore {
     });
   }
 
+  awaitsTeammate(agentId: string, taskId: string | null): boolean {
+    const messages = this.#messagesById();
+    return this.#state.deliveries.some((delivery) => {
+      if (!isActiveDelivery(delivery) || delivery.recipientAgentId === agentId) return false;
+      const request = messages.get(delivery.messageId);
+      return (
+        request?.sender.kind === "agent" &&
+        request.sender.agentId === agentId &&
+        request.expectsReply !== false &&
+        (request.senderTaskId ?? null) === taskId
+      );
+    });
+  }
+
   taskRequesterIds(taskId: string): string[] {
     const ids = new Set<string>();
     for (const message of this.#state.messages)

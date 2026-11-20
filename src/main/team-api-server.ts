@@ -35,6 +35,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
@@ -343,6 +344,7 @@ import { routeAgentActiveQueues } from "./team-api/route-agent-active-queues";
 import {
   routeAgentAdmin,
   routeAgentBackupModels,
+  routeAgentBuiltinMemory,
   routeAgentDefaults,
   routeAgentFastMode,
   routeAgentHostSettings,
@@ -1198,6 +1200,7 @@ export class TeamApiServer {
       if ((await routeAgentTaskLimit(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentNewChat(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentPlanCard(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentBuiltinMemory(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentDefaults(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFastMode(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentSpeed(context, this.#options.admin, hidden)) === "handled") return;
@@ -2710,6 +2713,7 @@ export class TeamApiServer {
         if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === AGENT_NEW_CHAT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === AGENT_PLAN_CARD_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+        if (capability === AGENT_BUILTIN_MEMORY_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === AGENT_DEFAULTS_CAPABILITY) return this.#options.admin?.agentDefaults !== undefined;
         if (capability === AGENT_FAST_MODE_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === AGENT_SPEED_CAPABILITY) return this.#options.admin?.agentHost !== undefined;

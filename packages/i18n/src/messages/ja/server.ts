@@ -230,7 +230,7 @@ export const messages = {
   "server.plan.deletedOn": "{date}に削除",
   "server.plan.dialogTitle": "エージェントを失わないで",
   "server.plan.dialogDescription":
-    "{name}はプランの支払いがないため停止しました。{date}に、OpenBotはエージェントとそのすべてのチャットとファイルを削除します。",
+    "{name}はプランが終了したため停止しました。{date}に、OpenBotはエージェントとそのすべてのチャットとファイルを削除します。",
   "server.plan.dialogDaysLeft": {
     other: "残り{count}日",
   },

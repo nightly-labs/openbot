@@ -221,6 +221,7 @@ export interface ConversationProps {
   agentAutoApproves?: boolean | undefined;
   remoteBackupModelsLoaded?: boolean | undefined;
   remotePlanCardLoaded?: boolean | undefined;
+  remoteBuiltinMemoryLoaded?: boolean | undefined;
   remoteComputerUseLoaded?: boolean | undefined;
   remoteNewChatLoaded?: boolean | undefined;
   remoteBusyMessageModeLoaded?: boolean | undefined;

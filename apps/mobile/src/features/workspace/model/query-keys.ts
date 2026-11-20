@@ -13,6 +13,7 @@ type AgentRecordPart =
   | "task-limit"
   | "new-chat"
   | "plan-card"
+  | "builtin-memory"
   | "fast-mode"
   | "instructions"
   | "publish"
@@ -26,6 +27,7 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "task-limit",
   "new-chat",
   "plan-card",
+  "builtin-memory",
   "fast-mode",
   "session-settings",
   "provider-accounts",

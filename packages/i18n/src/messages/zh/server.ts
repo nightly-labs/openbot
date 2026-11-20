@@ -234,7 +234,7 @@ export const messages = {
   "server.plan.deletedOn": "将于 {date} 删除",
   "server.plan.dialogTitle": "别让你的智能体离开",
   "server.plan.dialogDescription":
-    "{name} 已停止，因为套餐未付款。{date}，OpenBot 将删除它的智能体及其所有聊天和文件。",
+    "{name} 已停止，因为套餐已结束。{date}，OpenBot 将删除它的智能体及其所有聊天和文件。",
   "server.plan.dialogDaysLeft": {
     one: "还剩 {count} 天",
     other: "还剩 {count} 天",

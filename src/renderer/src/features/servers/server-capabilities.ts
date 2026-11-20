@@ -66,6 +66,7 @@ export function serverSupportsCapability(
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
       capability === "agent-plan-card-v1" ||
+      capability === "agent-builtin-memory-v1" ||
       capability === "agent-defaults-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||

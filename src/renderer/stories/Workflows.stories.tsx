@@ -86,6 +86,11 @@ export const InApp: Story = {
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
 };
 
+export const InAppOpening: Story = {
+  name: "In app, opening",
+  render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} opening />,
+};
+
 export const HiggsfieldVideo: Story = {
   name: "Higgsfield video",
   render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
@@ -351,6 +356,29 @@ export const VideoCustomLength: Story = {
     >
       <ImageNode id="listed" prompt="A drone shot over a coastal town at sunrise" />
       <ImageNode id="custom" prompt="A drone shot over a coastal town at sunrise" />
+    </NodeGallery>
+  ),
+};
+
+const STORY_CLIP = new URL("../../../packages/ui/src/assets/plush/fishing.webm", import.meta.url).href;
+
+export const VideoWithClip: Story = {
+  name: "Video, with a clip",
+  render: () => (
+    <NodeGallery
+      selected="clip"
+      catalogs={{
+        ...STORY_CATALOGS,
+        imageModels: [RANGE_VIDEO_MODEL, ...STORY_CATALOGS.imageModels],
+        media: (value, kind) => (kind === "video" && value === "plush-clip" ? STORY_CLIP : undefined),
+      }}
+      fields={{
+        empty: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 6 },
+        clip: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 6 },
+      }}
+    >
+      <ImageNode id="empty" prompt="A plush toy fishing from a small wooden pier at sunset" />
+      <ImageNode id="clip" image="plush-clip" prompt="A plush toy fishing from a small wooden pier at sunset" />
     </NodeGallery>
   ),
 };

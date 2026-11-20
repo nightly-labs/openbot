@@ -10,6 +10,7 @@ import type {
   AgentAnalyticsInput,
   AgentBackupModelSettings,
   AgentBrowserProfile,
+  AgentBuiltinMemorySettings,
   AgentDefaultsOverview,
   AgentExclusionChange,
   AgentFolderBrowse,
@@ -153,6 +154,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
+  UpdateAgentBuiltinMemoryInput,
   UpdateAgentDefaultsInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
@@ -630,6 +632,12 @@ export interface MobileWorkspaceContextValue {
   canManageAgentPlanCard: (serverId: string) => boolean;
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  canManageAgentBuiltinMemory: (serverId: string) => boolean;
+  loadAgentBuiltinMemory: (agentId: string, serverId: string) => Promise<AgentBuiltinMemorySettings | null>;
+  updateAgentBuiltinMemory: (
+    input: UpdateAgentBuiltinMemoryInput,
+    serverId: string,
+  ) => Promise<AgentBuiltinMemorySettings>;
   canManageAgentDefaults: (serverId: string) => boolean;
   loadAgentDefaults: (serverId: string) => Promise<AgentDefaultsOverview | null>;
   updateAgentDefaults: (input: UpdateAgentDefaultsInput, serverId: string) => Promise<AgentDefaultsOverview>;
@@ -873,6 +881,7 @@ type ServerCheckKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentBuiltinMemory"
   | "canManageAgentDefaults"
   | "canManageBackgroundProcesses"
   | "canManageAgentInstructions"

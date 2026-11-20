@@ -236,7 +236,7 @@ export const messages = {
   "server.plan.deletedOn": "Excluído em {date}",
   "server.plan.dialogTitle": "Não deixe seus agentes irem embora",
   "server.plan.dialogDescription":
-    "{name} parou porque o plano não foi pago. Em {date}, o OpenBot exclui os agentes, com todos os chats e arquivos.",
+    "{name} parou porque o plano terminou. Em {date}, o OpenBot exclui os agentes, com todos os chats e arquivos.",
   "server.plan.dialogDaysLeft": {
     one: "Falta {count} dia",
     other: "Faltam {count} dias",

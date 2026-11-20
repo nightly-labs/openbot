@@ -751,7 +751,12 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
                 >
                   <Show when={!result.failed} fallback={<CircleX class="wfn-strip-failed" aria-hidden="true" />}>
                     <Show when={props.thumb?.(result)} fallback={<span class="wfn-strip-number">{at() + 1}</span>}>
-                      {(src) => <img src={src()} alt="" />}
+                      {(src) => (
+                        <>
+                          <img class="wfn-strip-tint" src={src()} alt="" aria-hidden="true" />
+                          <img class="wfn-strip-picture" src={src()} alt="" />
+                        </>
+                      )}
                     </Show>
                   </Show>
                 </LabelTooltipTrigger>

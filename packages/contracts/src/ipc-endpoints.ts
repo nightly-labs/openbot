@@ -25,6 +25,7 @@ import type {
   AddedAgent,
   AgentAdminSettings,
   AgentBackupModelSettings,
+  AgentBuiltinMemorySettings,
   AgentDefaultsOverview,
   AgentFastModeSettings,
   AgentHostSettings,
@@ -33,6 +34,7 @@ import type {
   SetAgentDefaultChoiceInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
+  UpdateAgentBuiltinMemoryInput,
   UpdateAgentDefaultsInput,
   UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
@@ -1795,6 +1797,10 @@ export const IPC_ENDPOINTS = {
     getAgentPlanCard: scopedRequest<string, AgentPlanCardSettings>()("agent:admin:get-plan-card"),
     updateAgentPlanCard: scopedRequest<UpdateAgentPlanCardInput, AgentPlanCardSettings>()(
       "agent:admin:update-plan-card",
+    ),
+    getAgentBuiltinMemory: scopedRequest<string, AgentBuiltinMemorySettings>()("agent:admin:get-builtin-memory"),
+    updateAgentBuiltinMemory: scopedRequest<UpdateAgentBuiltinMemoryInput, AgentBuiltinMemorySettings>()(
+      "agent:admin:update-builtin-memory",
     ),
     getAgentFastMode: scopedRequest<string, AgentFastModeSettings>()("agent:admin:get-fast-mode"),
     updateAgentFastMode: scopedRequest<UpdateAgentFastModeInput, AgentFastModeSettings>()(

@@ -448,6 +448,7 @@ export const messages = {
 
   "workflow.canvas.label": "ワークフローキャンバス: {name}",
   "workflow.canvas.untitled": "無題のワークフロー",
+  "workflow.canvas.opening": "ワークフローを開いています…",
   "workflow.canvas.copyOf": "{name} のコピー",
   "workflow.canvas.step": "ステップ",
   "workflow.canvas.kind.note": "付箋",

@@ -1200,8 +1200,8 @@ A machine of the pool is not the boat image:
   server downloads the CLI of each provider that an agent uses and that is not off. The user
   downloads the CLI of another provider in OpenBot.
 - It has no Docker and no boat desktop. OpenBot uses its own virtual displays.
-- It shows the storage of a moved server (25, 75 and 150 GB), which is more than the plan table of
-  the pricing page.
+- It shows the storage of a moved server (25, 75 and 150 GB). The pricing page shows the same
+  numbers (`storageTierGb(plan, 0)`).
 - The clients show no restart action, and the server does not stop when it is not in use.
 
 Measured on the test Worker with a real Leaseweb VPS 2 (smoke, 2026-11-13): `prepare` of a clean
@@ -1482,7 +1482,8 @@ The VPS is not the same machine as the sandbox:
   sends the number in the server list, the hosting list and the billing state from the moment of the
   row `UPDATE`, so the storage meter, the storage alerts, Billing and the plan change offer show it.
   The host reads it at its start, for the instructions of its agents. The pricing page and the order
-  form keep the plan table, because a new server can start in a boat sandbox. A client or a host from
+  form show the same numbers since 2026-11-20 (`storageTierGb(plan, 0)`). A server that starts in a
+  boat sandbox when the pool has no free VPS gets less (`HOSTED_BOAT_PLAN_SIZE` disk). A client or a host from
   before this number shows the plan table. A rollback gives the server the plan table again, so a
   server that used more on the VPS shows a full disk.
 - The number is not a limit that the machine enforces. A host with `storage-user-files-v1` measures

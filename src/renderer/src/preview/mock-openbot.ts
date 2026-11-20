@@ -54,6 +54,7 @@ import {
   agentDefaultChoiceValues,
   agentExclusionCoverage,
   agentFolderCoverage,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   agentTaskLimit,
@@ -2300,6 +2301,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentPlanCard: async (input) => {
         await api.agent.updateAgent(input);
         return api.agent.getAgentPlanCard(input.agentId);
+      },
+      getAgentBuiltinMemory: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { memory: agentMemoryEnabled(agent) };
+      },
+      updateAgentBuiltinMemory: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentBuiltinMemory(input.agentId);
       },
       getAgentFastMode: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);

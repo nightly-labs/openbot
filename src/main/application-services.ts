@@ -5,7 +5,11 @@ import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
-import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  isKeyOnlyProvider,
+  isManagedRuntimeProvider,
+  type ManagedProviderId,
+} from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
@@ -25,6 +29,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentBrowserProfile,
+  agentMemoryEnabled,
   type ChannelCommand,
   DEFAULT_APP_LANGUAGE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
@@ -1309,11 +1314,15 @@ export async function createApplicationServices({
   let agentBrowserProfiles: BrowserProfileService | null = null;
   let crmHandle: CrmHandle | null = null;
   const agentThreads = new AgentThreadStore(store.database);
+  const agentMemoryOn = (agentId: string) => {
+    const agent = store.get(agentId);
+    return agent === undefined || agentMemoryEnabled(agent);
+  };
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
     browserProfile: (agentId) => {
-      const agent = store.list().find((candidate) => candidate.id === agentId);
+      const agent = store.get(agentId);
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
@@ -1324,13 +1333,15 @@ export async function createApplicationServices({
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
     pagePreload: join(__dirname, "../preload/browserPage.cjs"),
     siteMemories: (agentId, hostname) =>
-      siteMemoryStore
-        .forHost(agentId, hostname)
-        .flatMap(({ id, site, text }) => (site ? [{ id, site, text: redactSecrets(text) }] : [])),
+      agentMemoryOn(agentId)
+        ? siteMemoryStore
+            .forHost(agentId, hostname)
+            .flatMap(({ id, site, text }) => (site ? [{ id, site, text: redactSecrets(text) }] : []))
+        : [],
     userBrowsing: {
       enabled: () => browsingMemory.get().enabled,
       record: (agentId, step) => {
-        Effect.runFork(userBrowsing.record(agentId, step));
+        if (agentMemoryOn(agentId)) Effect.runFork(userBrowsing.record(agentId, step));
       },
     },
     hideFromWindowSwitchers: hidePanelFromWindowSwitchers,
@@ -2507,7 +2518,10 @@ export async function createApplicationServices({
   };
   const trackSystemCliVersions = (status: AgentStatus): void => {
     let copyInUse = false;
-    const agentProviders = hostedServer === null ? null : new Set(service.listAgents().map((agent) => agent.provider));
+    const agentProviders =
+      hostedServer === null
+        ? null
+        : new Set(service.listAgents().map((agent) => (isKeyOnlyProvider(agent.provider) ? "pi" : agent.provider)));
     for (const provider of status.providers ?? []) {
       if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;

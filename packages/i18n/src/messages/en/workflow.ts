@@ -451,6 +451,7 @@ export const messages = defineMessages("workflow", {
 
   "workflow.canvas.label": "Workflow canvas: {name}",
   "workflow.canvas.untitled": "Untitled workflow",
+  "workflow.canvas.opening": "Opening workflow…",
   "workflow.canvas.copyOf": "{name} copy",
   "workflow.canvas.step": "Step",
   "workflow.canvas.kind.note": "Sticky note",

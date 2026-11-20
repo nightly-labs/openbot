@@ -8,6 +8,7 @@ import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKGROUND_WORK_CAPABILITY } from "./agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "./agent-builtin-memory-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "./agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
@@ -283,6 +284,7 @@ export {
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKGROUND_WORK_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
@@ -786,6 +788,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [LIVE_VOICE_ACCOUNT_CAPABILITY, V10],
   [SIDE_QUESTION_THREADS_CAPABILITY, V10],
   [WORKFLOW_FOLDERS_CAPABILITY, V10],
+  [AGENT_BUILTIN_MEMORY_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
