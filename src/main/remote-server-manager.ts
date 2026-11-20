@@ -2391,6 +2391,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId = this.#store.activeServerId,
       preview = false,
       size?: number,
+      queued = preview,
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const progress = size === undefined ? undefined : this.#attachmentProgress(server.id, attachmentId, size);
@@ -2421,6 +2422,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
             }).pipe((download) => (stoppable ? this.#stoppable(server.id, attachmentId, download) : download)),
           ),
         preview,
+        queued,
       );
       return yield* stoppable ? this.#stoppable(server.id, attachmentId, load) : load;
     },

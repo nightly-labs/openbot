@@ -76,6 +76,7 @@ export class RemoteAttachmentCache {
     attachmentId: string,
     download: () => Effect.Effect<RemoteAttachment, RemoteWorkflowError>,
     preview = false,
+    queued = preview,
   ) {
     this.#removeExpired();
     const key = JSON.stringify([serverId, attachmentId]);
@@ -91,7 +92,7 @@ export class RemoteAttachmentCache {
     const generation = this.#generation(serverId);
     const request = Deferred.makeUnsafe<RemoteAttachment, RemoteWorkflowError>();
     this.#pending.set(key, { serverId, request });
-    const transfer = preview ? this.#downloadPermits(serverId).withPermit(download()) : download();
+    const transfer = queued ? this.#downloadPermits(serverId).withPermit(download()) : download();
     return yield* transfer.pipe(
       Effect.tap((attachment) =>
         Effect.sync(() => {

@@ -32,6 +32,7 @@ import { serverCanAdminister, serverCanManageMcp, serverSupportsCapability } fro
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
+import { openedAttachmentUrl } from "./attachment-preview";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
@@ -571,7 +572,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 onOpenWorkspaceFile={previewWorkspaceAgentId() ? openWorkspaceFolderEntry : undefined}
                 onOpenWorkspaceFolder={openWorkspaceFolder}
                 onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
-                sourceUrl={attached()?.previewUrl ?? null}
+                sourceUrl={openedAttachmentUrl(attached()?.previewUrl)}
                 pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
                 pageHtml={props.runtime?.visualPage ? htmlAttachmentPageHtml(attached(), file().preview) : undefined}
                 fileKey={previewFileKey()}
