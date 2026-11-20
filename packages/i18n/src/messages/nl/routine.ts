@@ -313,7 +313,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "Geven",
   "routine.webhook.giveSecretFailed": "Kan het ondertekeningsgeheim niet aan {name} geven.",
   "routine.webhook.secretGiven": "{name} heeft het nieuwe ondertekeningsgeheim.",
-  "routine.webhook.statusFailed": "Kan niet controleren of de host met de relay verbonden is.",
   "routine.webhook.stepDone": "Klaar",
   "routine.webhook.stepUrl": "Kopieer het endpoint naar de verzendende dienst",
   "routine.webhook.stepUrlHint": "De afzender doet een POST-verzoek met een JSON-body van maximaal 64 KiB.",

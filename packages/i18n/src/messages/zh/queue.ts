@@ -8,6 +8,7 @@ export const messages = {
   "queue.hold.named": "等待中 - {name} 正在 {channel} 中工作",
   "queue.hold.unnamed": "等待中 - 该助手正在 {channel} 中工作",
   "queue.hold.providerRestart": "等待中 - {provider} 将在运行中的任务结束后重启",
+  "queue.hold.signIn": "等待中 - {provider} 需要登录",
   "queue.item.label": "排队消息 {position}：{preview}",
   "queue.item.labelEditing": "排队消息 {position}，编辑中：{preview}",
   "queue.item.editing": "编辑中",

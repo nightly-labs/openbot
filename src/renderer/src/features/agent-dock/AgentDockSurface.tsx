@@ -7,6 +7,7 @@ import type {
   AgentDockSeatRef as AgentDockSeatContract,
   AgentRuntimeApproval,
 } from "@openbot/contracts/ipc";
+import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AgentDock,
@@ -284,6 +285,7 @@ export function AgentDockSurface() {
       });
       return true;
     },
+    takeoverDone: ({ request }) => server === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, server),
     usageLimitSend: async (limit, option, remember) => {
       await perform({

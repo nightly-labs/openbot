@@ -370,8 +370,9 @@ Later operations keep the current process's files. Local files selected by the u
 
 ### Routine flows
 
-`routine-flows-v1` serves the routine canvas (see [Routine flows](agents.md#routine-flows)) to a
-joined desktop and to the web client. Its routes are `POST /v1/routine-flows/canvas`,
+`routine-flows-v1` serves the routine canvas (see [Routine flows](agents.md#routine-flows)) to older
+clients in the support window. Current clients do not show the canvas and do not call these routes.
+Its routes are `POST /v1/routine-flows/canvas`,
 `/positions/save`, `/positions/remove`, `/links/connect`, `/links/disconnect` and `/links/update`,
 with the input in the body. Any member who can see the agents can read and change a canvas, as with
 the agent routine routes; it is not an admin capability. A member sees a routine only when every
@@ -381,13 +382,11 @@ output and error cross with at most 4,000 characters each, and the host empties 
 routines with the oldest runs first when a canvas would pass three quarters of one WebRTC frame. The
 optional event `routine-flows-changed { agentId }` names the canvas that changed; the host sends it
 only to a connection with the capability and never for a hidden agent. Webhook config, secret
-rotation and webhook test runs stay on `events-v1`. A client without the capability shows a notice
-in the Routines view; the web client shows the view switch only when the host serves it.
+rotation and webhook test runs stay on `events-v1`.
 
 `routine-flow-stop-v1` adds `POST /v1/routine-flows/runs/stop { routineId, runId }`, which stops a run
 that has not ended and answers `{}`. The member needs manage access to each agent of the routine and
-of the run's steps, and every one of them must be visible. A client without the capability shows no
-Stop.
+of the run's steps, and every one of them must be visible.
 
 ### Workflows
 

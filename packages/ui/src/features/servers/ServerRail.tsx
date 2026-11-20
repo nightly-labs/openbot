@@ -16,6 +16,7 @@ import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
 import { useText } from "../../text";
 import { type ServerActionCallbacks, ServerActionItems, serverMuteDescription } from "./ServerActionItems";
+import { ServerPlanCount, serverPlanDaysLeft, serverPlanStatusLabels } from "./ServerPlanEnd";
 
 const SERVER_RAIL_TOOLTIP_OPEN_DELAY = 150;
 
@@ -292,6 +293,7 @@ export function ServerRail(props: ServerRailProps) {
               canHide={props.canHide}
               onSetMuted={props.onSetMuted}
               onOpenNotificationSettings={props.onOpenNotificationSettings}
+              deleteAt={props.planDeletesAt?.(server().id) ?? null}
             />
           )}
         </For>
@@ -346,6 +348,7 @@ export function ServerRail(props: ServerRailProps) {
                     canHide={props.canHide}
                     onSetMuted={props.onSetMuted}
                     onOpenNotificationSettings={props.onOpenNotificationSettings}
+                    deleteAt={props.planDeletesAt?.(server().id) ?? null}
                     onMove={(direction) => moveServer(server().id, direction)}
                   />
                 </li>
@@ -479,6 +482,7 @@ function ServerRailAddMenu(props: {
 function ServerRailButton(
   props: ServerActionCallbacks & {
     server: ServerSummary;
+    deleteAt: number | null;
     onSelect: (serverId: string) => void;
     onMove?: (direction: -1 | 1) => void;
   },
@@ -487,7 +491,12 @@ function ServerRailButton(
   const [overlay, setOverlay] = createStore({ tooltipOpen: false, menuOpen: false });
   let trigger: HTMLElement | null = null;
   const buttonLabel = () =>
-    [t("server.rail.buttonLabel", { name: props.server.name }), ...serverStatusLabels(props.server, t)].join(", ");
+    [
+      t("server.rail.buttonLabel", { name: props.server.name }),
+      ...serverStatusLabels(props.server, t),
+      ...planLabels(),
+    ].join(", ");
+  const planLabels = () => serverPlanStatusLabels(props.server, props.deleteAt, t, format);
   const muteDescription = () => serverMuteDescription(props.server, t, format);
   const sleepLabel = () => {
     const sleep = serverHostedSleep(props.server);
@@ -563,6 +572,9 @@ function ServerRailButton(
             <Show when={props.server.notificationsMuted}>
               <BellOff class="server-rail-muted size-3" aria-hidden="true" />
             </Show>
+            <Show when={props.deleteAt}>
+              {(deleteAt) => <ServerPlanCount count={serverPlanDaysLeft(deleteAt())} class="server-plan-rail-count" />}
+            </Show>
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label={t("server.rail.actions")}>
@@ -593,6 +605,7 @@ function ServerRailButton(
           {props.server.thisComputer ? ` · ${t("server.rail.thisComputer")}` : ""}
           {sleepLabel() ? ` · ${sleepLabel()}` : ""}
           {props.server.notificationsMuted ? ` · ${muteDescription()}` : ""}
+          {planLabels().length > 0 ? ` · ${planLabels().join(", ")}` : ""}
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>

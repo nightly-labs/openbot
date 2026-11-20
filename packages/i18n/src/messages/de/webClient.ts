@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Die Anmeldeantwort ist ungültig.",
   "webClient.pane.navigation": "Arbeitsbereich-Navigation",
   "webClient.pane.chat": "Chat",
-  "webClient.pane.routines": "Routinen",
   "webClient.pane.workspace": "Arbeitsbereich",
   "webClient.phoneApp.title": "Nutze die OpenBot-App",
   "webClient.phoneApp.description":

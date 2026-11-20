@@ -4,11 +4,13 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
+import { serverPlanDeletionDates } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
+import { refreshEndedPlansOnFocus } from "./ServerPlanReminder";
 import {
   olderAppSide,
   remoteUpdateServer,
@@ -45,6 +47,8 @@ const Servers = createSimpleContext({
     const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
     const [hostedServerIds, setHostedServerIds] = createSignal<ReadonlySet<string>>(new Set());
     const [hostedServersLoaded, setHostedServersLoaded] = createSignal(false);
+    const [planDeletesAtById, setPlanDeletesAtById] = createSignal<ReadonlyMap<string, number>>(new Map());
+    const planDeletesAt = (serverId: string) => planDeletesAtById().get(serverId) ?? null;
     const [serverLoadRequest, setServerLoadRequest] = createSignal<{
       serverId: string;
       nonce: number;
@@ -252,26 +256,45 @@ const Servers = createSimpleContext({
         else {
           setHostedServersAvailable(false);
           setHostedServerIds(new Set<string>());
+          setPlanDeletesAtById(new Map());
           setHostedServersLoaded(false);
         }
       });
+      const stopPlanRefresh = refreshEndedPlansOnFocus(
+        () => untrack(planDeletesAtById).size > 0,
+        refreshHostedServersAvailable,
+      );
       return () => {
         unsubscribeServers();
         unsubscribeHost();
         unsubscribeAuth();
+        stopPlanRefresh();
       };
     });
 
+    let hostedListRequest = 0;
     async function refreshHostedServersAvailable(): Promise<boolean> {
+      const request = ++hostedListRequest;
       const list = await serversPort()
         .hostedServers.list()
         .catch(() => null);
       if (!list) return hostedServersAvailable();
+      if (request !== hostedListRequest) return list.available;
       setHostedServersAvailable(list.available);
       setHostedServerIds(new Set(list.servers.map((server) => server.serverId)));
+      setPlanDeletesAtById(serverPlanDeletionDates(list.servers));
       setHostedServersLoaded(true);
       return list.available;
     }
+
+    createEffect(
+      () =>
+        hostedServersLoaded() &&
+        servers().some((server) => server.hostedIssue === "plan_ended" && !planDeletesAtById().has(server.id)),
+      (dateMissing) => {
+        if (dateMissing) void refreshHostedServersAvailable();
+      },
+    );
 
     createEffect(
       () => {
@@ -395,6 +418,7 @@ const Servers = createSimpleContext({
       hostedServersAvailable,
       hostedServerIds,
       hostedServersLoaded,
+      planDeletesAt,
       refreshHostedServersAvailable,
       reorderServers,
       localServerHidden,

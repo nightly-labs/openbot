@@ -341,4 +341,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "No se pudo quitar la descarga.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} en tu terminal mantiene su propia sesión.",
+  "provider.settings.updateAll": "Actualizar todo",
 } as const satisfies PartialTranslation<typeof source>;

@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "로그인 응답이 올바르지 않아요.",
   "webClient.pane.navigation": "워크스페이스 탐색",
   "webClient.pane.chat": "채팅",
-  "webClient.pane.routines": "루틴",
   "webClient.pane.workspace": "워크스페이스",
   "webClient.phoneApp.title": "OpenBot 앱 사용하기",
   "webClient.phoneApp.description": "휴대폰에서는 앱에서 OpenBot이 가장 잘 작동합니다. 같은 이메일로 로그인하세요.",

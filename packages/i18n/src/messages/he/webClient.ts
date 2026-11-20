@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "תשובת ההתחברות אינה תקינה.",
   "webClient.pane.navigation": "ניווט בסביבת העבודה",
   "webClient.pane.chat": "צ'אט",
-  "webClient.pane.routines": "שגרות",
   "webClient.pane.workspace": "סביבת עבודה",
   "webClient.phoneApp.title": "השתמשו באפליקציית OpenBot",
   "webClient.phoneApp.description": "בטלפון, OpenBot עובד הכי טוב באפליקציה. התחברו עם אותו אימייל.",
