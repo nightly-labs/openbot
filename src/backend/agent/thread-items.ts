@@ -132,6 +132,10 @@ function isClearedAntigravityHistory(provider: AgentProvider, message: string): 
   );
 }
 
+function isStuckAcpTurn(provider: AgentProvider, message: string): boolean {
+  return (provider === "mistral" || provider === "acp") && /\bA turn is already running\b/.test(message);
+}
+
 function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
@@ -184,6 +188,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
   if (isClearedAntigravityHistory(provider, message)) return sourceText("error.provider.antigravityHistoryUnreadable");
+  if (isStuckAcpTurn(provider, message))
+    return sourceText("error.provider.acpTurnStuck", { provider: providerLabel(provider) });
   if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");

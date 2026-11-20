@@ -79,7 +79,8 @@ import { AgentMemoryStore } from "../backend/agent-memory-store";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
 import { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
-import { BrowserHost } from "../backend/browser-host";
+import { AgentThreadStore } from "../backend/agent-threads/agent-thread-store";
+import { type BrowserAgentChat, BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
 import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
 import { CodexCliError, resolveClaudeCli, resolveCodexCli } from "../backend/cli";
@@ -399,7 +400,7 @@ import {
 } from "./remote-session-reuse-preference-store";
 import { remoteSyncProfileFile } from "./remote-sync-profile-file";
 import { sendToRenderer } from "./renderer-ipc";
-import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { HOSTED_UPDATE_MAXIMUM_IDLE_WAIT_MS, RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
 import { RequiredUpdate } from "./required-update";
 import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
@@ -1309,6 +1310,7 @@ export async function createApplicationServices({
   let browserProxyStatusChanged = () => {};
   let agentBrowserProfiles: BrowserProfileService | null = null;
   let crmHandle: CrmHandle | null = null;
+  const agentThreads = new AgentThreadStore(store.database);
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
@@ -1317,7 +1319,7 @@ export async function createApplicationServices({
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
-    agentChat: (threadId) => store.ownsThread(threadId),
+    agentChat: (threadId) => browserAgentChat(store, agentThreads, threadId),
     profileProxy: (profileId) => browserProxyConnection(browserProxyStore, browserProxyCipher, profileId),
     onProxyStatusChanged: () => browserProxyStatusChanged(),
     computerExit: (memberId) => browserEgress.exit(memberId),
@@ -3977,6 +3979,9 @@ export async function createApplicationServices({
     log: (message) => logger.info(message),
     announce: (state, version) => host.announceRestart(state, version),
     clientInUse: hostedServer ? clientInUseSinceStart : undefined,
+    maximumIdleWait: hostedServer
+      ? { afterMs: HOSTED_UPDATE_MAXIMUM_IDLE_WAIT_MS, providerOperationPending: () => service.hasProviderOperation() }
+      : undefined,
   });
   const remoteUpdate = requestedUpdate;
   teardown.push(TEARDOWN_ORDER.requestedUpdate, "the requested update", () =>
@@ -4262,4 +4267,11 @@ export async function createApplicationServices({
     appliedAccount: signedInState,
     centralAuthInitialization,
   };
+}
+
+function browserAgentChat(store: AgentStore, threads: AgentThreadStore, threadId: string): BrowserAgentChat | null {
+  const mainAgentId = store.mainThreadAgentId(threadId);
+  if (mainAgentId !== null) return { agentId: mainAgentId, sideThread: null };
+  const thread = threads.taskForThread(threadId);
+  return thread ? { agentId: thread.agentId, sideThread: { taskId: thread.taskId, title: thread.title } } : null;
 }

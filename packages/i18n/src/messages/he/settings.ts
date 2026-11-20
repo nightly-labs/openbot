@@ -56,6 +56,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "שקיעה רטרו",
   "settings.chatBackdrop.snowfall": "שלג יורד",
   "settings.chatBackdrop.fireflies": "גחליליות",
+  "settings.chatBackdrop.coast": "חוף ניאון",
   "settings.chatBackdrop.upload": "העלאת תמונה…",
   "settings.chatBackdrop.uploadRefused": "יש להשתמש בתמונת PNG,‏ JPEG,‏ GIF,‏ WebP או AVIF בגודל של עד 20 MB.",
   "settings.chatBackdrop.saveFailed": "הרקע לא נשמר.",

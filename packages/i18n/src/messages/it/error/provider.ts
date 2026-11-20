@@ -336,6 +336,8 @@ export const messages = {
     "Gemini ha rifiutato questa richiesta senza indicarne la causa. Può dipendere da un elemento della cronologia della chat, come un’immagine aperta dall’agente. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini non è riuscito a leggere la cronologia salvata di questa chat. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Invia di nuovo il messaggio.",
+  "error.provider.acpTurnStuck":
+    "{provider} non ha terminato il turno precedente, quindi non ha accettato questo messaggio. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Invia di nuovo il messaggio.",
   "error.provider.antigravityLocationUnsupported":
     "Google non consente a Gemini di funzionare dalla posizione di rete del computer che esegue questo agente. Usa Gemini su un altro computer oppure scegli un altro provider per questo agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
