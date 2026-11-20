@@ -55,6 +55,7 @@ export interface BrowserHostTab {
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
   idleUnloadNoted?: Set<string>;
   lastUsedAt: number;
+  lastToolChat?: { threadId: string; at: number } | undefined;
   focusOnVisible: boolean;
   focusOnCommit?: boolean | undefined;
   focusedAtPageClose?: boolean | undefined;

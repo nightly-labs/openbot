@@ -215,6 +215,7 @@ const SKILL_LEARNER: SkillLearner = {
 
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,

@@ -102,6 +102,13 @@ const registry = new AttentionRegistry({
   },
   browser: {
     listTabs: () => tabs,
+    toolCanUseTab: (params, tabId) =>
+      tabs.some(
+        (candidate) =>
+          candidate.id === tabId &&
+          candidate.ownerAgentId === params.ownerAgentId &&
+          candidate.ownerThreadId === params.threadId,
+      ),
     prepareSecret: () => Effect.sync(preparedSecret),
     beginTakeover: (tabId) =>
       Effect.sync(() => {
@@ -318,7 +325,18 @@ try {
             snapshot.revision += 1;
           },
         },
-        browser: { listTabs: () => tabs, beginTakeover: () => Effect.void, endTakeover: () => {} },
+        browser: {
+          listTabs: () => tabs,
+          toolCanUseTab: (params, tabId) =>
+            tabs.some(
+              (candidate) =>
+                candidate.id === tabId &&
+                candidate.ownerAgentId === params.ownerAgentId &&
+                candidate.ownerThreadId === params.threadId,
+            ),
+          beginTakeover: () => Effect.void,
+          endTakeover: () => {},
+        },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
         routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
         emit: (event) => events.push(event),
@@ -437,6 +455,13 @@ try {
         },
         browser: {
           listTabs: () => tabs,
+          toolCanUseTab: (params, tabId) =>
+            tabs.some(
+              (candidate) =>
+                candidate.id === tabId &&
+                candidate.ownerAgentId === params.ownerAgentId &&
+                candidate.ownerThreadId === params.threadId,
+            ),
           prepareSecret: () =>
             Effect.sync(() => ({
               ...preparedSecret(),
