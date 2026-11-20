@@ -1026,7 +1026,9 @@ block of a steer. Claude Code shows a steer to its model next to the result of t
 the header and rules of a teammate prompt, Claude Haiku took a steered teammate message for text in
 the tool result and ignored it. For Claude, `QueueControls.steer` therefore sets `steerFramedAsUser`,
 and `deliveryPromptInput` sends a teammate message as plain words (`userFramedTeammateText`): the
-sender, the text, and for a request the `send_message` reply rule. The steer's uuid is the delivery
+sender, the text, the `send_message` reply rule for a request, and the `routine_no_update` rule for a
+message that needs no answer. Without that tool, a turn that ends with no text gets a Claude Code
+prompt for visible output, and the agent writes a filler line. The steer's uuid is the delivery
 ID, so the history import finds the delivery without `teammatePrompts`. A routine run gets no block. A slash command from the person gets none, as at the
 start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
 block.

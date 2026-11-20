@@ -71,10 +71,12 @@ import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { CHANNEL_TOOL_DEFINITIONS } from "./channel-tools";
 import { claudeContextCategories } from "./claude-context-categories";
 import {
+  CLAUDE_NO_RESPONSE_TEXT,
   type ClaudeHistoryOptions,
   claudeHistoryFromMessages,
   claudeHistoryReader,
   claudeTaskTurnId,
+  isClaudeNoResponsePlaceholder,
 } from "./claude-history";
 import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
 import {
@@ -1960,7 +1962,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (message.type === "assistant") {
-      if (message.parent_tool_use_id !== null || !message.uuid) return;
+      if (message.parent_tool_use_id !== null || !message.uuid || isClaudeNoResponsePlaceholder(message.message))
+        return;
       const turn = this.#outputTurn(runtime);
       const text = messageText(message.message);
       if (message.error === "rate_limit") {
@@ -2155,7 +2158,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
-      if (!turn.seenText && fallback && !apiError) this.#bufferText(runtime, fallback);
+      if (!turn.seenText && fallback && fallback !== CLAUDE_NO_RESPONSE_TEXT && !apiError)
+        this.#bufferText(runtime, fallback);
     }
     const status = interrupted ? "interrupted" : message.subtype === "success" && !apiError ? "completed" : "failed";
     yield* this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : apiError ? fallback : null);
@@ -2554,7 +2558,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         currentThinking = null;
         currentAnswer = null;
       } else if (message.type === "assistant") {
-        if (skippingCompaction) continue;
+        if (skippingCompaction || isClaudeNoResponsePlaceholder(message.message)) continue;
         const thinking = messageThinking(message.message);
         const endsStep = messageToolCalls(message.message).length > 0;
         if (!thinking && !text && !endsStep) continue;

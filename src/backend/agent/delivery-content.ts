@@ -274,7 +274,7 @@ function userFramedTeammateText(
     ].join("\n");
   if (delivery.expectsReply === false)
     return [
-      `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement.`,
+      `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement. When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
       displayText,
     ].join("\n");
   return [
