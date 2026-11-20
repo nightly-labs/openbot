@@ -2198,7 +2198,17 @@ export class TurnLifecycle {
         !channelTurn &&
         !routineSession &&
         (!taskTurn || laneTaskId !== null) &&
-        !this.#mailbox.awaitsTeammate(agentId, laneTaskId, turnId)
+        !this.#mailbox.awaitsTeammate(
+          agentId,
+          laneTaskId,
+          new Set([
+            turnId,
+            ...deliveries.flatMap(({ resumeAfterUsageLimit, planContinuation }) => [
+              ...(resumeAfterUsageLimit?.previousTurnIds ?? []),
+              ...(planContinuation?.turnIds ?? []),
+            ]),
+          ]),
+        )
           ? this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text)
           : "no";
       const continueMode: FinishCheckMode =
