@@ -100,6 +100,8 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
     return () => stop(item.id);
   };
   const settled = () => props.items.every((item) => item.state === "replied" || item.state === "failed");
+  const failed = () => props.items.filter((item) => item.state === "failed").length;
+  const ended = () => settled() && failed() > 0;
   return (
     <section
       style={{ "--task-list-play-state": playState() }}
@@ -113,10 +115,19 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
           panelId={panelId}
           done={done()}
           total={total()}
-          title={props.title ?? t("chat.awaiting.title")}
+          title={ended() ? t("chat.awaiting.ended") : (props.title ?? t("chat.awaiting.title"))}
           active={active()}
-          summary={t("chat.awaiting.summary", { done: done(), total: total() })}
-          count={t("chat.awaiting.count", { done: done(), total: total() })}
+          summary={
+            ended()
+              ? t("chat.awaiting.endedSummary", { done: done(), failed: failed() })
+              : t("chat.awaiting.summary", { done: done(), total: total() })
+          }
+          count={
+            ended()
+              ? t("chat.awaiting.endedCount", { done: done(), failed: failed() })
+              : t("chat.awaiting.count", { done: done(), total: total() })
+          }
+          mark={ended() ? "failed" : undefined}
         />
         <Show when={settled() && props.onDismiss}>
           {(dismiss) => (
