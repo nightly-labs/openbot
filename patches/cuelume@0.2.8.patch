@@ -63,3 +63,63 @@ index 7b82d07e841ad7944a799caac2cdcf306f501626..b6a0393401407dd08778555432d95b9d
      const bus = getBus();
      const { output, room } = bus;
      const master = context.createGain();
+diff --git a/dist/interactions/bind.js b/dist/interactions/bind.js
+index ceb62a8..ac6ac10 100644
+--- a/dist/interactions/bind.js
++++ b/dist/interactions/bind.js
+@@ -39,6 +39,12 @@ const HOVER_GAP_MS = 150;
+ const TYPE_GAP_MS = 40;
+ /** Chrome reports keydowns that belong to an IME composition with this code. */
+ const IME_KEY_CODE = 229;
++/**
++ * Keys that write or erase a character, by their place on the keyboard. A Korean, Japanese or
++ * Chinese IME takes nearly every keydown into its composition and reports it as "Process", so
++ * only the code still says what the key does.
++ */
++const IME_TYPING_CODE = /^(Key[A-Z]|Digit\d|Numpad\d|Space|Backspace|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Backquote|Comma|Period|Slash|IntlBackslash|IntlRo|IntlYen)$/;
+ const CLICK_CUES = {
+     "data-cuelume-tap": "tap",
+     "data-cuelume-select": "select",
+@@ -82,6 +88,15 @@ function deletes(event, field) {
+         return true;
+     return event.key === "Backspace" ? start > 0 : end < value.length;
+ }
++function isImeKey(event) {
++    return event.isComposing || event.keyCode === IME_KEY_CODE;
++}
++/** The key a keydown types. An IME key reads "Process", so Space and Backspace come from its code. */
++function typedKey(event) {
++    if (isImeKey(event) && (event.code === "Space" || event.code === "Backspace"))
++        return event.code === "Space" ? " " : "Backspace";
++    return event.key;
++}
+ function keyRole(key) {
+     if (key === " ")
+         return "space";
+@@ -146,10 +161,15 @@ function switched(element, beforeClick = false) {
+     return state === "false" ? 1 : undefined;
+ }
+ function isTypingKey(event, field) {
+-    if (event.isComposing || event.keyCode === IME_KEY_CODE)
+-        return false;
+     if (field.type === "password")
+         return false;
++    // A key an IME takes edits its composition. Enter, Tab, Escape and the arrows pick or confirm
++    // a candidate there instead, and only Backspace keeps editing while held.
++    if (isImeKey(event))
++        return (IME_TYPING_CODE.test(event.code) &&
++            !event.metaKey &&
++            !event.ctrlKey &&
++            (!event.repeat || event.code === "Backspace"));
+     // Deleting is an edit with any modifier (word, line) and keeps going while held.
+     if (event.key === "Backspace" || event.key === "Delete")
+         return deletes(event, field);
+@@ -281,7 +301,7 @@ export function bind(root) {
+             return null;
+         typed.add(key.code);
+         const [element, attr, fallback] = found;
+-        return [element, attr, fallback, { key: keyRole(key.key) }, "press"];
++        return [element, attr, fallback, { key: keyRole(typedKey(key)) }, "press"];
+     });
+     listen(scope, signal, "keyup", (event) => {
+         // the key is done wherever it lifts, even if focus left the field
