@@ -3561,6 +3561,7 @@ try {
       ["error.agent.deletionBusy", 409],
       ["error.agent.deleteWhenFolderFree", 409],
       ["error.agent.deleteIncomplete", 500],
+      ["error.agent.deleteFolderLocked", 500],
     ] as const) {
       deleteFailure = sourceText(key);
       const loggedBefore = logged.length;

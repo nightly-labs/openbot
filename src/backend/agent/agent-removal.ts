@@ -189,7 +189,7 @@ export class AgentRemoval {
   ) {
     yield* this.#deleteWithRevokedApproval(agent.id, () => this.#removeAgentDataEffect(agent)).pipe(
       Effect.mapError((failure) =>
-        failure.cause instanceof AgentFolderInUse
+        failure.cause instanceof AgentFolderInUse || failure.cause instanceof AgentFolderLocked
           ? failure
           : new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) }),
       ),
@@ -265,8 +265,14 @@ export class AgentRemoval {
       Effect.mapError((failure) => {
         const code = removalErrorCode(failure);
         this.#logger.warn("Agent deletion failed.", { stage, ...code });
-        if (stage === "agent-files-and-record" && processKeptForWork && code.code === "EBUSY")
-          return new AgentRemovalFailed({ cause: new AgentFolderInUse(sourceText("error.agent.deleteFolderInUse")) });
+        if (stage === "agent-files-and-record" && code.code === "EBUSY") {
+          if (processKeptForWork)
+            return new AgentRemovalFailed({ cause: new AgentFolderInUse(sourceText("error.agent.deleteFolderInUse")) });
+          if (process.platform === "win32")
+            return new AgentRemovalFailed({
+              cause: new AgentFolderLocked(sourceText("error.agent.deleteFolderLocked")),
+            });
+        }
         return new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) });
       }),
     );
@@ -319,6 +325,8 @@ export class AgentRemovalFailed extends Schema.TaggedError<AgentRemovalFailed>()
 const { sync: removalStep, rewrap: toAgentRemovalFailed } = causeHelpers(AgentRemovalFailed);
 
 class AgentFolderInUse extends Error {}
+
+class AgentFolderLocked extends Error {}
 
 const isFolderInUse = (failure: unknown): boolean =>
   failure instanceof AgentRemovalFailed && failure.cause instanceof AgentFolderInUse;

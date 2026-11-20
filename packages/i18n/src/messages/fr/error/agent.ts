@@ -137,6 +137,8 @@ export const messages = {
     "Les données de l’agent n’ont pas pu être entièrement supprimées. Relancez la suppression de l’agent.",
   "error.agent.deleteFolderInUse":
     "Le travail d'un autre agent utilise encore le dossier de cet agent. Supprimez à nouveau cet agent quand ce travail se termine, ou après avoir redémarré OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Un autre programme utilise encore le dossier de cet agent, par exemple un programme que l’agent a lancé. Fermez ce programme ou redémarrez l’ordinateur sur lequel cet agent fonctionne, puis supprimez à nouveau l’agent.",
   "error.agent.deleteWhenFolderFree":
     "Le travail d'un autre agent utilise encore le dossier de cet agent. OpenBot supprime cet agent quand ce travail se termine.",
   "error.agent.duplicationBusy": "Cet agent est déjà en cours de duplication.",
