@@ -1986,8 +1986,13 @@ export class HostService extends EventEmitter<HostEvents> {
   #currentAgentReaderId(): string {
     const accountReaderId = `local-user:${this.#options.getSignedInUser().id}`;
     const memberId = this.#findCurrentMemberId();
+    this.#adoptReadsOnce(accountReaderId, memberId);
+    return memberId ?? accountReaderId;
+  }
+
+  #adoptReadsOnce(accountReaderId: string, memberId: string | null): void {
     const readerKey = `${accountReaderId}\n${memberId ?? ""}`;
-    if (this.#adoptedReaderKey === readerKey) return memberId ?? accountReaderId;
+    if (this.#adoptedReaderKey === readerKey) return;
     this.#adoptedReaderKey = null;
     if (!memberId) {
       this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, accountReaderId);
@@ -1997,7 +2002,6 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, memberId);
     }
     this.#adoptedReaderKey = readerKey;
-    return memberId ?? accountReaderId;
   }
 
   #findCurrentMemberId(): string | null {
