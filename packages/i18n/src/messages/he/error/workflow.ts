@@ -28,6 +28,17 @@ export const messages = {
   "error.workflow.modelUnavailable": "המודל של השלב הזה לא זמין. יש לבחור מודל אחר לשלב הזה.",
   "error.workflow.providerBusy": "הספק עמוס. יש להמתין כמה דקות ואז להריץ את השלב שוב.",
   "error.workflow.providerOffline": "ל-OpenBot אין גישה לספק. יש לבדוק את החיבור לאינטרנט ואז להריץ את השלב שוב.",
+  "error.workflow.providerBilling":
+    "בחשבון אצל הספק אין יתרה, או שהתוכנית שלו לא מאפשרת את המודל הזה. יש לבדוק את תוכנית החשבון, או לבחור מודל אחר לשלב הזה.",
+  "error.workflow.modelRefused": "הספק לא מאפשר את המודל הזה לחשבון הזה. יש לבחור מודל אחר לשלב הזה.",
+  "error.workflow.modelRefusedReason": 'הספק לא מאפשר את המודל הזה לחשבון הזה: "{reason}". יש לבחור מודל אחר לשלב הזה.',
+  "error.workflow.contentBlocked": "הספק חסם את הקלט של השלב הזה. יש לשנות את הקלט או את ההנחיה ואז להריץ את השלב שוב.",
+  "error.workflow.inputTooLong":
+    "הקלט של השלב הזה ארוך מדי בשביל המודל. יש לקצר את הקלט, או לבחור מודל שקורא יותר טקסט.",
+  "error.workflow.requestRefused": "הספק לא קיבל את השלב הזה. יש לבחור מודל אחר לשלב הזה.",
+  "error.workflow.requestRefusedReason": 'הספק לא קיבל את השלב הזה: "{reason}". יש לבחור מודל אחר לשלב הזה.',
+  "error.workflow.providerRefused":
+    'הספק דחה את השלב הזה: "{reason}". יש לבחור מודל אחר לשלב הזה, או להריץ את השלב שוב.',
   "error.workflow.modelBusy": "בקשה אחרת למודל רצה כעת. יש להריץ את השלב שוב בעוד רגע.",
   "error.workflow.mediaFailed": "המודל לא הצליח ליצור את התמונה או את הווידאו. יש להריץ את השלב שוב.",
   "error.workflow.pictureMissing": "התמונה כבר לא בשרת. יש לשלוח אותה שוב.",

@@ -31,6 +31,20 @@ export const messages = {
   "error.workflow.providerBusy": "Sağlayıcı meşgul. Birkaç dakika bekleyin, sonra adımı yeniden çalıştırın.",
   "error.workflow.providerOffline":
     "OpenBot sağlayıcıya ulaşamadı. İnternet bağlantısını kontrol edin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.providerBilling":
+    "Sağlayıcı hesabında kredi yok ya da planı bu modele izin vermiyor. Hesap planını kontrol edin ya da bu adım için başka bir model seçin.",
+  "error.workflow.modelRefused": "Sağlayıcı bu hesap için bu modele izin vermiyor. Bu adım için başka bir model seçin.",
+  "error.workflow.modelRefusedReason":
+    'Sağlayıcı bu hesap için bu modele izin vermiyor: "{reason}". Bu adım için başka bir model seçin.',
+  "error.workflow.contentBlocked":
+    "Sağlayıcı bu adımın girdisini engelledi. Girdiyi ya da istemi değiştirin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.inputTooLong":
+    "Bu adımın girdisi model için çok uzun. Girdiyi kısaltın ya da daha fazla metin okuyan bir model seçin.",
+  "error.workflow.requestRefused": "Sağlayıcı bu adımı kabul etmedi. Bu adım için başka bir model seçin.",
+  "error.workflow.requestRefusedReason":
+    'Sağlayıcı bu adımı kabul etmedi: "{reason}". Bu adım için başka bir model seçin.',
+  "error.workflow.providerRefused":
+    'Sağlayıcı bu adımı reddetti: "{reason}". Bu adım için başka bir model seçin ya da adımı yeniden çalıştırın.',
   "error.workflow.modelBusy": "Başka bir model isteği çalışıyor. Adımı birazdan yeniden çalıştırın.",
   "error.workflow.mediaFailed": "Model görseli veya videoyu oluşturamadı. Adımı yeniden çalıştırın.",
   "error.workflow.pictureMissing": "Görsel artık sunucuda değil. Yeniden gönderin.",

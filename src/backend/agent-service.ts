@@ -177,7 +177,7 @@ import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/con
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
@@ -2861,7 +2861,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             failed(
               failure instanceof GenerationUsageLimitError
                 ? sourceText("error.provider.usageLimitReached")
-                : workflowGenerationError(failure.cause, provider),
+                : workflowGenerationError(failure.cause, provider, (text) => redactText(this.#mcp.redact(text))),
             ),
           ),
         );

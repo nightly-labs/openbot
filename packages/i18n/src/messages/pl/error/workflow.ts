@@ -31,6 +31,20 @@ export const messages = {
   "error.workflow.providerBusy": "Dostawca jest zajęty. Poczekaj kilka minut, a potem uruchom krok ponownie.",
   "error.workflow.providerOffline":
     "OpenBot nie mógł połączyć się z dostawcą. Sprawdź połączenie z internetem, a potem uruchom krok ponownie.",
+  "error.workflow.providerBilling":
+    "Konto u dostawcy nie ma środków albo jego plan nie pozwala na ten model. Sprawdź plan konta albo wybierz inny model dla tego kroku.",
+  "error.workflow.modelRefused": "Dostawca nie pozwala na ten model dla tego konta. Wybierz inny model dla tego kroku.",
+  "error.workflow.modelRefusedReason":
+    'Dostawca nie pozwala na ten model dla tego konta: "{reason}". Wybierz inny model dla tego kroku.',
+  "error.workflow.contentBlocked":
+    "Dostawca zablokował dane wejściowe tego kroku. Zmień dane wejściowe lub prompt, a potem uruchom krok ponownie.",
+  "error.workflow.inputTooLong":
+    "Dane wejściowe tego kroku są za długie dla modelu. Skróć dane wejściowe albo wybierz model, który czyta więcej tekstu.",
+  "error.workflow.requestRefused": "Dostawca nie przyjął tego kroku. Wybierz inny model dla tego kroku.",
+  "error.workflow.requestRefusedReason":
+    'Dostawca nie przyjął tego kroku: "{reason}". Wybierz inny model dla tego kroku.',
+  "error.workflow.providerRefused":
+    'Dostawca odrzucił ten krok: "{reason}". Wybierz inny model dla tego kroku albo uruchom krok ponownie.',
   "error.workflow.modelBusy": "Trwa inne zapytanie do modelu. Uruchom krok ponownie za chwilę.",
   "error.workflow.mediaFailed": "Model nie mógł utworzyć obrazu ani wideo. Uruchom krok ponownie.",
   "error.workflow.pictureMissing": "Obrazu nie ma już na serwerze. Wyślij go ponownie.",
