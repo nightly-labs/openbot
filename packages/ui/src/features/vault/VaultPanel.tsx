@@ -1407,24 +1407,22 @@ function ItemDialog(props: {
       <Match when={apiKeyDraft()}>
         {(apiKey) => (
           <div class="vault-fields">
-            <Show when={!props.fromChat}>
-              <Field label={t("vault.field.variableName")} description={t("vault.variableNameHint")} class="vault-wide">
-                <Input
-                  placeholder={t("vault.placeholder.variableName")}
-                  autocomplete="off"
-                  spellcheck={false}
-                  maxlength={64}
-                  value={apiKey().name}
-                  onInput={(event) => {
-                    const input = event.currentTarget;
-                    const { selectionStart, selectionEnd } = input;
-                    input.value = input.value.toUpperCase();
-                    input.setSelectionRange(selectionStart, selectionEnd);
-                    set(apiKey(), { name: input.value });
-                  }}
-                />
-              </Field>
-            </Show>
+            <Field label={t("vault.field.variableName")} description={t("vault.variableNameHint")} class="vault-wide">
+              <Input
+                placeholder={t("vault.placeholder.variableName")}
+                autocomplete="off"
+                spellcheck={false}
+                maxlength={64}
+                value={apiKey().name}
+                onInput={(event) => {
+                  const input = event.currentTarget;
+                  const { selectionStart, selectionEnd } = input;
+                  input.value = input.value.toUpperCase();
+                  input.setSelectionRange(selectionStart, selectionEnd);
+                  set(apiKey(), { name: input.value });
+                }}
+              />
+            </Field>
             <Field label={t("vault.field.apiKey")} class="vault-wide">
               <SecretInput
                 {...secretProps("key")}
@@ -1433,16 +1431,14 @@ function ItemDialog(props: {
                 onChange={(key) => set(apiKey(), { key })}
               />
             </Field>
-            <Show when={!props.fromChat}>
-              <Field label={t("vault.field.notes")} class="vault-wide">
-                <Textarea
-                  rows={2}
-                  maxlength={VAULT_NOTES_LIMIT}
-                  value={apiKey().notes}
-                  onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
-                />
-              </Field>
-            </Show>
+            <Field label={t("vault.field.notes")} class="vault-wide">
+              <Textarea
+                rows={2}
+                maxlength={VAULT_NOTES_LIMIT}
+                value={apiKey().notes}
+                onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
+              />
+            </Field>
             {agentsField()}
           </div>
         )}

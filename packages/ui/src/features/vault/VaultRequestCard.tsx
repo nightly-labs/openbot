@@ -43,8 +43,7 @@ const ADD_LABEL = {
   login: "vault.request.addLogin",
   card: "vault.request.addCard",
   contact: "vault.request.addContact",
-  apiKey: "vault.request.addApiKey",
-} as const satisfies Record<VaultItemKind, AppTextKey>;
+} as const satisfies Record<Exclude<VaultItemKind, "apiKey">, AppTextKey>;
 
 const text = (values: Readonly<Record<string, UiBlockValue>> | undefined, key: string) => {
   const value = values?.[key];
@@ -224,21 +223,23 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
       onSkip={props.onSkip}
       actions={
         <Show
-          when={props.kind === "apiKey"}
+          when={props.kind !== "apiKey" ? props.kind : undefined}
           fallback={
-            <Button size="sm" disabled={!props.onSave || props.busy} onClick={() => setDialogOpen(true)}>
-              {t(ADD_LABEL[props.kind])}
+            <Button
+              type="submit"
+              size="sm"
+              form={formId}
+              disabled={!props.onSave || props.busy || apiKey().trim() === ""}
+            >
+              {props.submitLabel ?? t("common.save")}
             </Button>
           }
         >
-          <Button
-            type="submit"
-            size="sm"
-            form={formId}
-            disabled={!props.onSave || props.busy || apiKey().trim() === ""}
-          >
-            {props.submitLabel ?? t("common.save")}
-          </Button>
+          {(kind) => (
+            <Button size="sm" disabled={!props.onSave || props.busy} onClick={() => setDialogOpen(true)}>
+              {t(ADD_LABEL[kind()])}
+            </Button>
+          )}
         </Show>
       }
     >
