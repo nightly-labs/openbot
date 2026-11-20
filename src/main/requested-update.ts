@@ -15,7 +15,7 @@ import { Effect, Exit, Schema, Scope } from "effect";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { PreferenceFileFailure } from "./preference-file";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
-import type { RestartReadiness } from "./update-readiness";
+import { blockersAfterMaximumWait, type RestartReadiness } from "./update-readiness";
 import type { UpdateOperationFailure } from "./update-service";
 
 export type RequestedUpdateRefusalReason = "disabled" | "managed" | "unsupported" | "restarting";
@@ -56,13 +56,23 @@ export interface RequestedUpdateOptions {
   pollMs?: number;
   graceMs?: number;
   clientInUse?: (() => boolean) | undefined;
+  maximumIdleWait?: RequestedUpdateMaximumIdleWait | undefined;
 }
+
+export interface RequestedUpdateMaximumIdleWait {
+  afterMs: number;
+  providerOperationPending: () => boolean;
+}
+
+export const HOSTED_UPDATE_MAXIMUM_IDLE_WAIT_MS = 24 * 60 * 60 * 1000;
 
 interface Schedule {
   memberId: string | null;
   requestedBy: string | null;
   mode: UpdateRestartMode;
   waitingFor: string[];
+  waitingSince: number | null;
+  pastMaximumWait: boolean;
 }
 
 const DEFAULT_POLL_MS = 5_000;
@@ -80,6 +90,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #allowed: boolean;
   #autoInstall: boolean;
   readonly #clientInUse: (() => boolean) | null;
+  readonly #maximumIdleWait: RequestedUpdateMaximumIdleWait | null;
   #required = false;
   #declinedVersion: string | null = null;
   #schedule: Schedule | null = null;
@@ -102,6 +113,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     this.#allowed = options.preference.allowRemoteUpdates;
     this.#autoInstall = options.preference.autoInstall;
     this.#clientInUse = options.clientInUse ?? null;
+    this.#maximumIdleWait = options.maximumIdleWait ?? null;
     this.#pollMs = options.pollMs ?? DEFAULT_POLL_MS;
     this.#graceMs = options.graceMs ?? DEFAULT_GRACE_MS;
     this.#updater.on("status", this.#onStatus);
@@ -143,7 +155,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     if (status.phase === "error" && status.errorCode === "install_failed") return this.snapshot();
     this.#installError = null;
     this.#declinedVersion = null;
-    this.#schedule = { memberId: member.id, requestedBy: member.name, mode, waitingFor: [] };
+    this.#schedule = newSchedule(member.id, member.name, mode);
     this.#log(`Member ${member.id} asked for an update restart (${mode}).`);
     this.#publish();
     if (status.phase === "ready") this.#scheduleAttempt(this.#graceMs);
@@ -256,7 +268,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     if (status.phase === "available")
       yield* Effect.forkIn(this.#updater.downloadUpdate(), this.#workScope, { startImmediately: true });
     else if (status.phase === "ready") {
-      this.#schedule = { memberId: null, requestedBy: null, mode: "when-idle", waitingFor: [] };
+      this.#schedule = newSchedule(null, null, "when-idle");
       this.#log(`Scheduled the automatic restart into ${status.availableVersion}.`);
       this.#publish();
       this.#scheduleAttempt(this.#graceMs);
@@ -275,18 +287,22 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   readonly #attemptEffect = Effect.fn("RequestedUpdate.attempt")(function* (this: RequestedUpdate) {
     const schedule = this.#schedule;
     if (!schedule || this.#updater.getStatus().phase !== "ready") return;
-    if (schedule.mode === "when-idle") {
-      const { safeToRestart, reasons } = this.#describeReadiness();
-      const clientUse = schedule.memberId === null && this.#clientInUse?.() === true;
-      if (!safeToRestart || clientUse) {
-        const waitingFor = [...new Set(clientUse ? [...reasons, "client-use"] : reasons)];
-        if (waitingFor.join() !== schedule.waitingFor.join()) {
-          schedule.waitingFor = waitingFor;
-          this.#publish();
-        }
-        this.#scheduleAttempt(this.#pollMs);
-        return;
+    const waitingFor = schedule.mode === "when-idle" ? this.#waitingFor(schedule) : [];
+    const blockers = waitingFor.length > 0 ? this.#blockers(schedule, waitingFor) : [];
+    if (blockers.length > 0) {
+      if (blockers.join() !== schedule.waitingFor.join()) {
+        schedule.waitingFor = blockers;
+        this.#log(`The update restart that ${describe(schedule)} asked for waits for: ${blockers.join(", ")}.`);
+        this.#publish();
       }
+      this.#scheduleAttempt(this.#pollMs);
+      return;
+    }
+    if (schedule.waitingSince !== null) {
+      const ignored = waitingFor.length > 0 ? ` It ignored: ${waitingFor.join(", ")}.` : "";
+      this.#log(
+        `The update restart that ${describe(schedule)} asked for stopped waiting after ${secondsSince(schedule.waitingSince)} s.${ignored}`,
+      );
     }
     if (schedule.waitingFor.length > 0) {
       schedule.waitingFor = [];
@@ -317,6 +333,26 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
         ),
       );
   });
+
+  #waitingFor(schedule: Schedule): string[] {
+    const { safeToRestart, reasons } = this.#describeReadiness();
+    const clientUse = schedule.memberId === null && this.#clientInUse?.() === true;
+    if (safeToRestart && !clientUse) return [];
+    return [...new Set(clientUse ? [...reasons, "client-use"] : reasons)];
+  }
+
+  #blockers(schedule: Schedule, waitingFor: string[]): string[] {
+    schedule.waitingSince ??= Date.now();
+    const maximumWait = this.#maximumIdleWait;
+    if (!maximumWait || Date.now() - schedule.waitingSince < maximumWait.afterMs) return waitingFor;
+    if (!schedule.pastMaximumWait) {
+      schedule.pastMaximumWait = true;
+      this.#log(
+        `The update restart that ${describe(schedule)} asked for waited ${secondsSince(schedule.waitingSince)} s. It now waits only for agent work, file transfers, provider operations, the updater and agent setup.`,
+      );
+    }
+    return blockersAfterMaximumWait(waitingFor, maximumWait.providerOperationPending());
+  }
 
   #installsAutomatically(): boolean {
     return this.#autoInstall || this.#clientInUse !== null;
@@ -362,6 +398,14 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
       this.#publishing = false;
     }
   }
+}
+
+function newSchedule(memberId: string | null, requestedBy: string | null, mode: UpdateRestartMode): Schedule {
+  return { memberId, requestedBy, mode, waitingFor: [], waitingSince: null, pastMaximumWait: false };
+}
+
+function secondsSince(time: number): number {
+  return Math.round((Date.now() - time) / 1000);
 }
 
 function describe(schedule: Schedule): string {

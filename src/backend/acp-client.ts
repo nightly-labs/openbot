@@ -66,7 +66,7 @@ import {
   type SubagentChange,
   stopSubagents,
 } from "./agent/subagent-updates";
-import { visibleDynamicTools, withCatalogTools } from "./agent/tool-catalog";
+import { visibleDynamicTools, withCatalogTools, withChannelTools } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
 import {
   AgentProcessExitError,
@@ -879,10 +879,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     tool: string,
     args: McpToolArguments,
   ): Effect.Effect<RelayedMcpToolOutcome | null> {
+    return this.#relayFor(externalThreadId, config)?.callTool(tool, args) ?? Effect.succeed(null);
+  }
+
+  relaysMcpServer(externalThreadId: string, config: McpServerConfig): boolean {
+    return this.#relayFor(externalThreadId, config) !== undefined;
+  }
+
+  #relayFor(externalThreadId: string, config: McpServerConfig): StdioMcpRelay | undefined {
     const thread = this.#threads.get(externalThreadId);
-    if (!thread || thread.relayed.byName.size === 0) return Effect.succeed(null);
-    const name = acpMcpServerName(config, thread.relayed.own, this.#flavor.mcpServerName);
-    return thread.relayed.byName.get(name)?.callTool(tool, args) ?? Effect.succeed(null);
+    if (!thread || thread.relayed.byName.size === 0) return undefined;
+    return thread.relayed.byName.get(acpMcpServerName(config, thread.relayed.own, this.#flavor.mcpServerName));
   }
 
   readonly releaseThread = Effect.fn("AcpAgentClient.releaseThread")(function* (
@@ -1606,7 +1613,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return yield* providerFailure(new Error(`Unknown ACP session: ${requestedThreadId}`));
     }
     const cwd = yield* providerSync(() => requiredString(params, "cwd"));
-    const given = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
+    const listed = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
+    const given = isRecord(params) && params.channelTools === true ? withChannelTools(listed) : listed;
     const dynamicTools = this.#flavor.catalogAsMcpTools ? withCatalogTools(given, this.provider) : given;
     const computerUse = computerUseParam(params);
     const agentId = mcpAgentParam(params);

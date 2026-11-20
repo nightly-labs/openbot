@@ -186,7 +186,7 @@ import type { NotificationChat } from "../desktop-notifications";
 import type { HostService } from "../host-service";
 import type { LibraryFoldersService } from "../library-folders-service";
 import { runMessageDelete } from "../message-delete-refusal";
-import { type MessageLinkRelay, openHttpLink } from "../message-link-relay";
+import { type MessageLinkRelay, openMessageLink } from "../message-link-relay";
 import { runMessagePin } from "../message-pin-refusal";
 import type { ModelVisibility } from "../model-visibility";
 import {
@@ -1013,7 +1013,7 @@ export function agentIpcHandlers({
       }),
       openMessageLink: scopedHandler(parseOpenMessageLink, {
         local: async ({ url }) => {
-          await openHttpLink(url, openExternal);
+          await openMessageLink(url, openExternal);
           return null;
         },
         remote: ({ agentId, url }, serverId) => runCauseEffect(messageLinks.open(serverId, agentId, url)),

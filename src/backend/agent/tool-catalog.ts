@@ -3,6 +3,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { BROWSER_DYNAMIC_TOOLS, BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
+import { CHANNEL_TOOL_DEFINITIONS } from "../channel-tools";
 import type { DynamicToolNamespace } from "../local-mcp-bridge";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
 import { type DynamicToolCallParams, isRecord, qualifiedToolName } from "../protocol";
@@ -202,6 +203,21 @@ export function withCatalogTools(
       .filter((entry) => entry.namespace === namespace.name && !names.has(entry.tool))
       .flatMap((entry) => tools.get(entry.name) ?? []);
     return { ...namespace, tools: [...listed, ...added] };
+  });
+}
+
+const CHANNEL_TOOL_NAMES: ReadonlySet<string> = new Set(
+  CHANNEL_TOOL_DEFINITIONS.map((definition) => `${OPENBOT_DYNAMIC_TOOLS.name}.${definition.name}`),
+);
+
+export function withChannelTools(namespaces: readonly DynamicToolNamespace[]): DynamicToolNamespace[] {
+  const tools = mcpCatalogs.get(BUILTIN_TOOL_CATALOG) ?? mcpCatalogTools(BUILTIN_TOOL_CATALOG);
+  mcpCatalogs.set(BUILTIN_TOOL_CATALOG, tools);
+  const channelTools = [...tools].flatMap(([name, tool]) => (CHANNEL_TOOL_NAMES.has(name) ? [tool] : []));
+  return namespaces.map((namespace) => {
+    if (namespace.name !== OPENBOT_DYNAMIC_TOOLS.name) return namespace;
+    const names = new Set(namespace.tools.map((tool) => tool.name));
+    return { ...namespace, tools: [...namespace.tools, ...channelTools.filter((tool) => !names.has(tool.name))] };
   });
 }
 

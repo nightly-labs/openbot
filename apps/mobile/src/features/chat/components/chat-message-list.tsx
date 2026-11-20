@@ -52,7 +52,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
-import { ChatAppSuggestion } from "@/features/chat/components/chat-app-suggestion";
+import { ChatAppSuggestion, ChatMcpSignIn } from "@/features/chat/components/chat-app-suggestion";
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
 import { ChatMarkdown, chatMarkdownHasTable } from "@/features/chat/components/chat-markdown";
@@ -775,6 +775,8 @@ const MessageRow = memo(function MessageRow({
       <ContextResetMarkerRow key={message.id} muted={muted} />
     ) : message.kind === "app-suggestion" ? (
       <ChatAppSuggestion key={message.id} serverId={serverId} messageId={message.id} appId={message.appId} />
+    ) : message.kind === "mcp-sign-in" ? (
+      <ChatMcpSignIn key={message.id} serverId={serverId} messageId={message.id} mcpServerId={message.mcpServerId} />
     ) : message.kind === "exchange-group" ? (
       <ChatExchangeGroup key={message.id} group={message} agents={agents} agentsById={agentsById} />
     ) : message.kind === "exchange" || message.kind === "channel-routing" ? (

@@ -31,10 +31,20 @@ export interface PlanLimitWindow {
   resetsAt: number | null;
 }
 
+export interface PlanLimitGroup {
+  name: string;
+  windowCount: number;
+}
+
+export interface PlanLimitListedWindow extends PlanLimitWindow {
+  group: PlanLimitGroup | null;
+}
+
 export interface PlanLimitRow {
   provider: AgentProviderId;
   accountId: string | null;
   windows: readonly PlanLimitWindow[];
+  listedWindows: readonly PlanLimitListedWindow[];
   remainingPercent: number;
   tone: PlanLimitTone;
 }
@@ -98,25 +108,37 @@ export function reportedUsageWindows(
     );
 }
 
+function planLimitWindow(window: AccountUsageWindow): PlanLimitWindow {
+  const remainingPercent = usageRemainingPercent(window.usedPercent);
+  return {
+    durationMins: window.windowDurationMins,
+    remainingPercent,
+    tone: usageTone(remainingPercent),
+    resetsAt: window.resetsAt,
+  };
+}
+
 export function planLimitRows(usage: AccountUsage | null | undefined): PlanLimitRow[] {
   const rows: PlanLimitRow[] = [];
   for (const limit of usage?.limits ?? []) {
     if (!isAgentProvider(limit.id)) continue;
-    const windows = reportedUsageWindows(limit).map((window): PlanLimitWindow => {
-      const remainingPercent = usageRemainingPercent(window.usedPercent);
-      return {
-        durationMins: window.windowDurationMins,
-        remainingPercent,
-        tone: usageTone(remainingPercent),
-        resetsAt: window.resetsAt,
-      };
-    });
+    const windows = reportedUsageWindows(limit).map(planLimitWindow);
     if (windows.length === 0) continue;
     const remainingPercent = Math.min(...windows.map((window) => window.remainingPercent));
+    const groupWindows = (limit.groups ?? []).flatMap((group) => {
+      const reported = reportedUsageWindows(group);
+      return reported.map(
+        (window): PlanLimitListedWindow => ({
+          ...planLimitWindow(window),
+          group: { name: group.name, windowCount: reported.length },
+        }),
+      );
+    });
     rows.push({
       provider: limit.id,
       accountId: limit.accountId ?? null,
       windows,
+      listedWindows: groupWindows.length > 0 ? groupWindows : windows.map((window) => ({ ...window, group: null })),
       remainingPercent,
       tone: usageTone(remainingPercent),
     });

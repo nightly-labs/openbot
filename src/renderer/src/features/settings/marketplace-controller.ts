@@ -1278,6 +1278,17 @@ export function createMarketplaceController(
     return apps().find(holds)?.id ?? null;
   }
 
+  function signInPluginServer(id: string): void {
+    for (const app of apps()) {
+      if (app.kind !== "plugin") continue;
+      const entry = app.plugin.apps.find((candidate) => heldApps(candidate).some((row) => row.id === id));
+      if (entry) {
+        void reconnectPluginApp(app.plugin, entry.id, id);
+        return;
+      }
+    }
+  }
+
   createEffect(
     () => {
       const serverId = serversReadFor();
@@ -1798,5 +1809,6 @@ export function createMarketplaceController(
     copySignInLink: () => (calls().copySignInLink ? copySignInLink : undefined),
     openPluginUrl,
     mcpServerApp,
+    signInPluginServer,
   };
 }

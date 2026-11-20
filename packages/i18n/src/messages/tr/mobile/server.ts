@@ -1259,6 +1259,9 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Bağlandı · {count} araç", other: "Bağlandı · {count} araç" },
   "mobile.server.mcp.signInOnComputer":
     "Bu MCP sunucusu oturum açmanızı istiyor. Bir bilgisayardaki OpenBot'tan oturum açın, sonra yeniden test edin.",
+  "mobile.server.mcp.signIn": "Oturum aç",
+  "mobile.server.mcp.signInHere":
+    "Bu MCP sunucusu oturum açmanızı istiyor. Oturum aç'a dokunun, sonra yeniden test edin.",
   "mobile.server.mcp.signedInDescription": "{server} bu MCP sunucusunda oturum açtı.",
   "mobile.server.mcp.signOut": "Oturumu kapat",
   "mobile.server.mcp.saveFailed": "Değişiklik kaydedilemedi. Tekrar deneyin.",
@@ -1309,6 +1312,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 saatlik",
   "mobile.server.planLimits.window.hours": { one: "{count} saatlik", other: "{count} saatlik" },
   "mobile.server.planLimits.window.minutes": "{minutes} dk",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Güncellemeler",
   "mobile.server.settings.updateAvailable": "Güncelleme var",
   "mobile.server.route.updates": "Güncellemeler",
@@ -1643,4 +1647,39 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Kopyalanan ajanlar {server} sunucusunun onay kurallarını kullanır.",
   "mobile.server.transfer.copyNoServer":
     "Ajanları kopyalamak için başka bir sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.route.ownerTransfer": "Sahipliği devret",
+  "mobile.server.ownerTransfer.unavailable": "Sahipliği devretmek için bu sunucuya sahibi olarak bağlanın.",
+  "mobile.server.ownerTransfer.hosted": "Bu sunucuyu OpenBot barındırıyor, bu yüzden sahibi değiştirilemez.",
+  "mobile.server.ownerTransfer.lede":
+    "Yeni sahip bir e-posta alır ve bu e-postayla oturum açmışken kabul etmelidir. Ardından bu sunucudan çıkarılırsınız.",
+  "mobile.server.ownerTransfer.email": "Yeni sahibin e-postası",
+  "mobile.server.ownerTransfer.send": "Gönder",
+  "mobile.server.ownerTransfer.sending": "Gönderiliyor…",
+  "mobile.server.ownerTransfer.stays":
+    "Ajanlar, sohbetler, rutinler, sağlayıcı oturumları, kayıtlı anahtarlar, Vault girişleri, tarayıcı oturumları ve bağlı uygulamalar sunucuda kalır. Yeni sahip bunları kullanabilir.",
+  "mobile.server.ownerTransfer.expiry": "İstek 7 gün sonra sona erer.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} sahip yapılsın mı?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "{email} kabul ettiğinde {server} sunucusunun sahibi olur ve siz erişimi kaybedersiniz. Veriler sunucuda kalır. İstek 7 gün sonra sona erer.",
+  "mobile.server.ownerTransfer.confirm": "Devret",
+  "mobile.server.ownerTransfer.sendFailed": "İstek gönderilmedi.",
+  "mobile.server.ownerTransfer.loadFailed": "Bekleyen devir okunamadı.",
+  "mobile.server.ownerTransfer.pending": "Yeni sahip bekleniyor",
+  "mobile.server.ownerTransfer.expires": "Sona erme: {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} bu e-postayla oturum açmışken kabul etmelidir. O zamana kadar sahip sizsiniz.",
+  "mobile.server.ownerTransfer.cancel": "İptal et",
+  "mobile.server.ownerTransfer.cancelTitle": "Devir iptal edilsin mi?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} artık kabul edemez.",
+  "mobile.server.ownerTransfer.keep": "Koru",
+  "mobile.server.ownerTransfer.cancelFailed": "Devir iptal edilmedi.",
+  "mobile.server.ownerTransfer.incomingTitle": "{server} sunucusunun sahibi olunsun mu?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} sizi {server} sunucusunun sahibi yapmak istiyor. Sunucunun tam denetimini alırsınız; ajanları, sohbetleri, rutinleri ve kayıtlı oturumları sunucuda kalır. {name} erişimi kaybeder. Sunucuyu çalıştıran bilgisayarda hâlâ oturum açabilen herkes OpenBot hesabınızı kullanabilir. O bilgisayarın parolalarını ve SSH anahtarlarını değiştirin.",
+  "mobile.server.ownerTransfer.accept": "Kabul et",
+  "mobile.server.ownerTransfer.decline": "Reddet",
+  "mobile.server.ownerTransfer.accepted": "Artık {server} sunucusunun sahibisiniz.",
+  "mobile.server.ownerTransfer.acceptFailed": "Devir kabul edilemedi",
+  "mobile.server.ownerTransfer.declineFailed": "Devir reddedilemedi",
+  "mobile.server.ownerTransfer.tryAgain": "Daha sonra tekrar deneyin.",
 } as const satisfies PartialTranslation<typeof source>;

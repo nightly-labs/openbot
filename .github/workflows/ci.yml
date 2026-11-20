@@ -455,6 +455,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:update-host-takeover
 
+      - name: Run the hosted update idle wait E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:hosted-update-idle-wait
+
       - name: Run the messaging pause and resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-pause-resume
@@ -832,6 +836,7 @@ jobs:
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/agent-create-retry-e2e/
             .openbot-build/update-host-takeover-e2e/
+            .openbot-build/hosted-update-idle-wait-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/

@@ -68,6 +68,7 @@ describe("server site limits migration", () => {
       { server_id: "host-1" },
       { server_id: "hosted-1" },
     ]);
+    database.exec(migration("0060_remote_owner_transfers.sql"));
     for (const bucket of [
       { kind: "shared", serverId: "host-1", limit: 3 },
       { kind: "server", serverId: "host-1", limit: 3, custom: false },

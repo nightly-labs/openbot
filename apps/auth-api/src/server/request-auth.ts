@@ -16,7 +16,12 @@ import type { ContactMessageServices } from "./contact-message";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
-import { createContactMessageDelivery, createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
+import {
+  createContactMessageDelivery,
+  createEmailCodeDelivery,
+  createOwnerTransferEmailDelivery,
+  createTeamInviteEmailDelivery,
+} from "./email-delivery";
 import {
   COUNT_FEEDBACK,
   DELETE_EARLIER_FEEDBACK_DAYS,
@@ -49,7 +54,12 @@ import {
 } from "./remote-control-plane";
 import { SkillMarketplace, SkillMarketplaceError } from "./skill-marketplace";
 import { SlackAppError, SlackAppService } from "./slack-app";
-import { requireWorkerBindings, type TeamInviteEmailDelivery, type WorkerBindings } from "./types";
+import {
+  type OwnerTransferEmailDelivery,
+  requireWorkerBindings,
+  type TeamInviteEmailDelivery,
+  type WorkerBindings,
+} from "./types";
 
 function accountAnalytics(bindings: WorkerBindings): AccountAnalytics {
   return createAccountAnalytics({
@@ -403,6 +413,11 @@ export function requestContactMessageServices(): ContactMessageServices {
 export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null {
   const bindings = requireWorkerBindings(env);
   return createTeamInviteEmailDelivery(bindings, accountAnalytics(bindings));
+}
+
+export function requestOwnerTransferEmailDelivery(): OwnerTransferEmailDelivery | null {
+  const bindings = requireWorkerBindings(env);
+  return createOwnerTransferEmailDelivery(bindings, accountAnalytics(bindings));
 }
 
 export function requestRemoteControlPlane(): RemoteControlPlane {

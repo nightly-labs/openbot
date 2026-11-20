@@ -8,6 +8,7 @@ import {
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { Marked, type Token, type TokensList } from "marked";
+import { nextPhoneNumberIndex, phoneNumberAtStart } from "./chat-phone-number";
 
 const markdown = new Marked({
   gfm: true,
@@ -67,6 +68,24 @@ const markdown = new Marked({
         const reference = chatTagReferences(source)[0];
         if (reference?.start === 0 && (reference.kind === "skill" || reference.kind === "mcp"))
           return { type: "skillMention", raw: source.slice(0, reference.end) };
+      },
+    },
+    {
+      name: "phoneNumber",
+      level: "inline",
+      start: nextPhoneNumberIndex,
+      tokenizer(source, tokens) {
+        if (this.lexer.state.inLink) return;
+        const phone = phoneNumberAtStart(source, tokens.at(-1)?.raw.at(-1) ?? "");
+        if (!phone) return;
+        return {
+          type: "link",
+          raw: phone.text,
+          href: phone.href,
+          title: null,
+          text: phone.text,
+          tokens: [{ type: "text", raw: phone.text, text: phone.text, escaped: false }],
+        };
       },
     },
     {

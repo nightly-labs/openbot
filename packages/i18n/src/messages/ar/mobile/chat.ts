@@ -774,6 +774,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "تراجع",
   "mobile.chat.appSuggestion.notAllowed": "يمكن لمالك الخادم أو المسؤول فقط ربط {name}.",
   "mobile.chat.appSuggestion.unavailable": "لا يمكن لهذا الخادم ربط {name}.",
+  "mobile.chat.mcpSignIn.signInNamed": "تسجيل الدخول إلى {name}",
+  "mobile.chat.mcpSignIn.signedIn": "تم تسجيل الدخول",
   "mobile.chat.context.label": "السياق ممتلئ بنسبة {percent}",
   "mobile.chat.context.labelEstimated": "السياق ممتلئ بنسبة {percent} تقريبًا",
   "mobile.chat.context.labelCompacting": "جارٍ ضغط السياق",
