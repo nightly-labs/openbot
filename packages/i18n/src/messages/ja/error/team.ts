@@ -90,6 +90,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "この接続ではルーティンの実行を停止できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
   "error.team.libraryFoldersUnsupported": "この接続ではライブラリのフォルダーを使用できません。",
+  "error.team.workflowFoldersUnsupported": "この接続はワークフローのフォルダーに対応していません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
   "error.team.sidebarPinsUnsupported":

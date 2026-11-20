@@ -91,6 +91,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "To połączenie nie może zatrzymać uruchomienia rutyny.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.libraryFoldersUnsupported": "To połączenie nie obsługuje folderów Biblioteki.",
+  "error.team.workflowFoldersUnsupported": "To połączenie nie obsługuje folderów przepływów pracy.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.sidebarPinsUnsupported":

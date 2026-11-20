@@ -586,6 +586,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:library-folders
 
+      - name: Run the workflow folders E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-folders
+
       - name: Run the agent workflow gate E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-workflow-gate
@@ -870,6 +874,7 @@ jobs:
             .openbot-build/agent-channel-manage-e2e/
             .openbot-build/agent-channel-create-e2e/
             .openbot-build/library-folders-e2e/
+            .openbot-build/workflow-folders-e2e/
             .openbot-build/agent-workflow-gate-e2e/
             .openbot-build/pinned-message-agent-tool-e2e/
             .openbot-build/messaging-owner-card-e2e/

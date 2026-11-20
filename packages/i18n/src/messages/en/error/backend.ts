@@ -340,6 +340,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.libraryFolderGone": "The folder does not exist or is already deleted.",
   "error.backend.libraryFolderOtherAgent": "A file can go only into a folder of its agent.",
   "error.backend.libraryFolderMoveInvalid": "This folder cannot go there.",
+  "error.backend.workflowFolderLimit": "A server can have up to {limit} workflow folders.",
+  "error.backend.workflowFolderPlacementLimit": "Too many workflows are in folders.",
   "error.backend.sectionNameDuplicate": "Section names must be unique.",
   "error.backend.directMessageRequired": "Write a message first.",
   "error.backend.directMessageTooLong": "A direct message can have up to {limit} characters.",

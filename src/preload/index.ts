@@ -376,6 +376,7 @@ import {
 import { decodeVaultCodes, decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
 import {
   decodeWorkflowDetail,
+  decodeWorkflowFoldersSnapshotFromMain,
   decodeWorkflowGitHubCatalog,
   decodeWorkflowGitHubHistory,
   decodeWorkflowGitHubOptions,
@@ -921,6 +922,8 @@ const openbotApi: OpenBotDesktopApi = {
     mediaCredits: decodeWorkflowMediaCredits,
     mediaCatalog: decodeWorkflowMediaCatalog,
     mediaPrice: decodeWorkflowMediaPrice,
+    folders: decodeWorkflowFoldersSnapshotFromMain,
+    folderAction: decodeWorkflowFoldersSnapshotFromMain,
   }),
   crm: bridgeGroup(IPC_ENDPOINTS.crm, {
     overview: decodeCrmOverview,

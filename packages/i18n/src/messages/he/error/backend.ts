@@ -316,6 +316,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "התיקייה אינה קיימת או שכבר נמחקה.",
   "error.backend.libraryFolderOtherAgent": "אפשר להעביר קובץ רק לתיקייה של הסוכן שלו.",
   "error.backend.libraryFolderMoveInvalid": "אי אפשר להעביר את התיקייה הזו לשם.",
+  "error.backend.workflowFolderLimit": "בשרת יכולות להיות לכל היותר {limit} תיקיות של תהליכי עבודה.",
+  "error.backend.workflowFolderPlacementLimit": "יש יותר מדי תהליכי עבודה בתיקיות.",
   "error.backend.sectionNameDuplicate": "שמות החלקים חייבים להיות ייחודיים.",
   "error.backend.directMessageRequired": "יש לכתוב הודעה קודם.",
   "error.backend.directMessageTooLong": "הודעה ישירה יכולה להכיל עד {limit} תווים.",

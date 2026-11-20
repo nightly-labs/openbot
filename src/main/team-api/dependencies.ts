@@ -98,6 +98,7 @@ import type { SkillLearningPreferenceStore } from "../skill-learning-preference-
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import type { TeamStore } from "../team-store";
 import type { VaultService } from "../vault-service";
+import type { WorkflowFoldersService } from "../workflow-folders-service";
 
 type TeamApiAgentMethods = Pick<
   AgentService,
@@ -288,6 +289,7 @@ export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
 
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk" | "diskUse">;
 export type TeamApiLibraryFolders = Pick<LibraryFoldersService, "snapshot" | "change" | "removeAgent" | "removeFiles">;
+export type TeamApiWorkflowFolders = Pick<WorkflowFoldersService, "read" | "change">;
 export type TeamApiMachine = Pick<
   MachineAlertMonitor,
   "metrics" | "alerts" | "setAlerts" | "canBeResponsible" | "pending" | "subscribe"
@@ -614,6 +616,7 @@ export interface TeamApiOptions {
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
   libraryFolders?: TeamApiLibraryFolders;
+  workflowFolders?: TeamApiWorkflowFolders;
   machine?: TeamApiMachine;
   backgroundProcesses?: TeamApiBackgroundProcesses;
   liveVoice?: TeamApiLiveVoice;

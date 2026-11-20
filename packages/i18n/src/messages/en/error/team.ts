@@ -90,6 +90,7 @@ export const messages = defineMessages("error.team", {
   "error.team.routineFlowStopUnsupported": "This connection cannot stop a routine run.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
   "error.team.libraryFoldersUnsupported": "Library folders are not supported by this connection.",
+  "error.team.workflowFoldersUnsupported": "Workflow folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
     "This server cannot keep your own notification level for each agent. Update OpenBot on the computer that runs it.",
   "error.team.sidebarPinsUnsupported":

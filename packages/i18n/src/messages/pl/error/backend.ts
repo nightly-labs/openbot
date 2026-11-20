@@ -339,6 +339,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Folder nie istnieje lub został już usunięty.",
   "error.backend.libraryFolderOtherAgent": "Plik można przenieść tylko do folderu jego agenta.",
   "error.backend.libraryFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
+  "error.backend.workflowFolderLimit": "Serwer może mieć maksymalnie {limit} folderów przepływów pracy.",
+  "error.backend.workflowFolderPlacementLimit": "W folderach jest za dużo przepływów pracy.",
   "error.backend.sectionNameDuplicate": "Nazwy sekcji muszą być unikalne.",
   "error.backend.directMessageRequired": "Najpierw napisz wiadomość.",
   "error.backend.directMessageTooLong": "Wiadomość prywatna może mieć maksymalnie {limit} znaków.",

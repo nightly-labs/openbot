@@ -91,6 +91,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "لا يمكن لهذا الاتصال إيقاف تشغيل مهمة دورية.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
   "error.team.libraryFoldersUnsupported": "مجلدات المكتبة غير مدعومة في هذا الاتصال.",
+  "error.team.workflowFoldersUnsupported": "لا يدعم هذا الاتصال مجلدات مسارات العمل.",
   "error.team.agentNotificationLevelsUnsupported":
     "لا يمكن لهذا الخادم حفظ مستوى الإشعارات الخاص بك لكل وكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.sidebarPinsUnsupported":

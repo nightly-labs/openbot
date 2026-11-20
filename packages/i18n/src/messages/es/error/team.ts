@@ -97,6 +97,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Esta conexión no puede detener una ejecución de rutina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.libraryFoldersUnsupported": "Esta conexión no permite carpetas de la Biblioteca.",
+  "error.team.workflowFoldersUnsupported": "Esta conexión no admite carpetas de flujos de trabajo.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
   "error.team.sidebarPinsUnsupported":
