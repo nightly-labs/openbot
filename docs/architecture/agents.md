@@ -942,10 +942,12 @@ Nothing else wakes the requester, so a turn of teammate results that ends with n
 step stopped the whole team (#7225). Codex ends such a turn as completed. `TurnLifecycle` fails it
 with the `empty_answer` cause, as an ACP turn with no answer fails, unless the turn wants no answer
 (a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
-by the user. A turn whose results each repeat, with the same text and files, an answer of the same
-teammate to the same request that an earlier finished turn already took
-(`MailboxStore.repeatsHandledReply`) also ends quietly. The repeated answer stays in the chat. An
-answer with new text to the same request still fails as above (#13130). The error waits for the end
+by the user. A turn whose results each come after an answer of the same teammate to the same
+request that an earlier finished turn already took (`MailboxStore.answersHandledRequest`) also ends
+quietly, with the same or new text (#13130, #13746): the requester already had a result to act on,
+and an empty turn means that it has nothing to add, as OpenClaw and Hermes Agent treat an empty turn
+for a sub-agent result. The later answer stays in the chat. An OpenBot note for a failed request does
+not count as an earlier answer, so the first real result after it still fails as above. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
 error. With no backup, a turn that only teammate results started runs once more on the same model.
 A thread turn does the same: a backup model runs it again, and with no backup it runs once more on
