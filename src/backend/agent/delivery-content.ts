@@ -115,6 +115,7 @@ export interface DeliveryPromptSources {
   answeredRoutine?: AnsweredRoutine | null;
   liveVoice?: LiveVoiceRelayed | null;
   steerFramedAsUser?: boolean;
+  steersQuietTurn?: boolean;
   externalChat?: boolean;
 }
 
@@ -263,6 +264,7 @@ function userFramedTeammateText(
   senderAgentId: string,
   agentNames: ReadonlyMap<string, string>,
   displayText: string,
+  steersQuietTurn: boolean,
 ): string {
   const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
   const teammate = `Your teammate ${senderName} (${senderAgentId})`;
@@ -274,9 +276,14 @@ function userFramedTeammateText(
     ].join("\n");
   if (delivery.expectsReply === false)
     return [
-      `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement. When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
+      `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement.`,
+      steersQuietTurn
+        ? `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`
+        : null,
       displayText,
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
   return [
     `${teammate} sent you this request through OpenBot:`,
     displayText,
@@ -352,7 +359,13 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     sources.steerFramedAsUser &&
     !(delivery.replyToMessageId && sources.answeredRoutine)
   ) {
-    text = userFramedTeammateText(delivery, delivery.sender.agentId, agentNames, displayText);
+    text = userFramedTeammateText(
+      delivery,
+      delivery.sender.agentId,
+      agentNames,
+      displayText,
+      sources.steersQuietTurn === true,
+    );
   } else if (delivery.sender.kind === "agent") {
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
