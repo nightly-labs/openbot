@@ -107,6 +107,7 @@ import {
   decodeWebhookSecret,
   decodeWebhookTestResult,
 } from "@openbot/contracts/ipc-events";
+import { decodeAcceptedOwnerTransfer, decodeOwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -204,6 +205,8 @@ import {
   decodeNotificationPreference,
   decodeNullablePath,
   decodeOnePasswordConnectorStatus,
+  decodeOwnerTransferList,
+  decodeOwnerTransferOrNull,
   decodePendingAgentTemplate,
   decodePendingListing,
   decodePendingMarketplaceListing,
@@ -723,6 +726,9 @@ const serversGroup = bridgeGroup(IPC_ENDPOINTS.servers, {
   listInvites: decodeTeamInvites,
   revokeInvite: decodeVoid,
   createInvite: decodeInviteSummary,
+  getOwnerTransfer: decodeOwnerTransferOrNull,
+  startOwnerTransfer: decodeOwnerTransfer,
+  cancelOwnerTransfer: decodeVoid,
   setTyping: decodeVoid,
   scopedPresence: decodeScopedTeamPresence,
   listDirectThreads: decodeDirectThreads,
@@ -1003,7 +1009,11 @@ const openbotApi: OpenBotDesktopApi = {
     removeCompanySignIn: decodeCompanySignInSettings,
     createCompanySignInScimToken: decodeCompanySignInScimToken,
     revokeCompanySignInScimToken: decodeCompanySignInSettings,
+    listOwnerTransfers: decodeOwnerTransferList,
+    acceptOwnerTransfer: decodeAcceptedOwnerTransfer,
+    declineOwnerTransfer: decodeVoid,
     event: decodeCentralAuthState,
+    ownerTransfersChanged: decodeVoid,
   }),
   skills: bridgeGroup(IPC_ENDPOINTS.skills, {
     localList: decodeSkillDetails,

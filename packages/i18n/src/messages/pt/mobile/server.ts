@@ -1663,4 +1663,40 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Os agentes copiados usam as regras de aprovação de {server}.",
   "mobile.server.transfer.copyNoServer":
     "Conecte-se a outro servidor como proprietário ou administrador para copiar agentes para ele.",
+  "mobile.server.route.ownerTransfer": "Transferir propriedade",
+  "mobile.server.ownerTransfer.unavailable":
+    "Conecte-se a este servidor como proprietário para transferir a propriedade.",
+  "mobile.server.ownerTransfer.hosted": "O OpenBot hospeda este servidor, então o proprietário não pode mudar.",
+  "mobile.server.ownerTransfer.lede":
+    "O novo proprietário recebe um e-mail e precisa aceitar com a sessão iniciada nesse e-mail. Depois disso, você é removido deste servidor.",
+  "mobile.server.ownerTransfer.email": "E-mail do novo proprietário",
+  "mobile.server.ownerTransfer.send": "Enviar",
+  "mobile.server.ownerTransfer.sending": "Enviando…",
+  "mobile.server.ownerTransfer.stays":
+    "Agentes, chats, rotinas, logins de provedores, chaves salvas, logins do Vault, logins do navegador e apps conectados ficam no servidor. O novo proprietário pode usá-los.",
+  "mobile.server.ownerTransfer.expiry": "O pedido expira após 7 dias.",
+  "mobile.server.ownerTransfer.confirmTitle": "Tornar {email} o proprietário?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Quando {email} aceitar, essa pessoa passa a ser proprietária de {server} e você perde o acesso. Os dados ficam no servidor. O pedido expira após 7 dias.",
+  "mobile.server.ownerTransfer.confirm": "Transferir",
+  "mobile.server.ownerTransfer.sendFailed": "O pedido não foi enviado.",
+  "mobile.server.ownerTransfer.loadFailed": "Não foi possível ler a transferência pendente.",
+  "mobile.server.ownerTransfer.pending": "Aguardando o novo proprietário",
+  "mobile.server.ownerTransfer.expires": "Expira em {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} precisa aceitar com a sessão iniciada neste e-mail. Até lá, você continua como proprietário.",
+  "mobile.server.ownerTransfer.cancel": "Cancelar",
+  "mobile.server.ownerTransfer.cancelTitle": "Cancelar a transferência?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} não poderá mais aceitá-la.",
+  "mobile.server.ownerTransfer.keep": "Manter",
+  "mobile.server.ownerTransfer.cancelFailed": "A transferência não foi cancelada.",
+  "mobile.server.ownerTransfer.incomingTitle": "Ser proprietário de {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} quer tornar você proprietário de {server}. Você terá controle total do servidor, e os agentes, chats, rotinas e logins salvos continuam nele. {name} perde o acesso. Quem ainda consegue entrar no computador que executa o servidor pode usar sua conta OpenBot. Troque as senhas e chaves SSH dele.",
+  "mobile.server.ownerTransfer.accept": "Aceitar",
+  "mobile.server.ownerTransfer.decline": "Recusar",
+  "mobile.server.ownerTransfer.accepted": "Agora você é proprietário de {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Não foi possível aceitar a transferência",
+  "mobile.server.ownerTransfer.declineFailed": "Não foi possível recusar a transferência",
+  "mobile.server.ownerTransfer.tryAgain": "Tente novamente mais tarde.",
 } as const satisfies PartialTranslation<typeof source>;

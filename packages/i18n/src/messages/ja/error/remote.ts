@@ -216,6 +216,11 @@ export const messages = {
   "error.remote.formUnavailable": "このフォームは利用できなくなりました。",
   "error.remote.hostedServerRemoval": "ホスト型サーバーを削除するには「お支払い」を使用してください。",
   "error.remote.hostRemoved": "所有者がこのサーバーをアカウントから削除しました。",
+  "error.remote.ownerTransferSelf":
+    "このサーバーはすでにあなたのものです。新しい所有者のメールアドレスを入力してください。",
+  "error.remote.ownerTransferHosted": "OpenBot がホストするサーバーは所有者を変更できません。",
+  "error.remote.ownerTransferInvalid":
+    "この所有権の移行は利用できなくなりました。所有者にもう一度送るよう依頼してください。",
   "error.remote.channelsUnsupported": "チャンネルを使うには、このデスクトップサーバーを更新してください。",
   "error.remote.channelDeleteUnsupported": "チャンネルを削除するには、このデスクトップサーバーを更新してください。",
   "error.remote.historyRefreshFailed": "メッセージは送信されましたが、チャット履歴を更新できませんでした。",

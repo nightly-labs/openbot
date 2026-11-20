@@ -15,6 +15,7 @@ import type {
   BrowserDisplayState,
   CapabilityState,
   CentralAuthState,
+  CentralAuthUser,
   ComputerUseState,
   ProviderRuntimeSnapshot,
   SpeechModelStatus,
@@ -3151,6 +3152,7 @@ export async function createApplicationServices({
             },
           }
         : {}),
+      ...(serverModeEnvironment && !hostedServer ? { ownerTransfer: true as const } : {}),
       personality: serverPersonality,
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,
@@ -3234,6 +3236,14 @@ export async function createApplicationServices({
     onKeyRotated: () => remoteServers.requestDirectoryRefresh(),
     issueRemoteHostTicket: (hostId, home) =>
       centralAuth.issueRemoteHostTicket(hostId, home).pipe(toRemoteWorkflowError),
+    ...(serverModeEnvironment && !hostedServer
+      ? {
+          requestTransferredOwnerSession: (hostId: string) =>
+            centralAuth.requestTransferredOwnerSession(hostId).pipe(toRemoteWorkflowError),
+          applyTransferredOwnerSession: (hostId: string, session: { sessionToken: string; user: CentralAuthUser }) =>
+            centralAuth.applyTransferredOwnerSession(hostId, session).pipe(toRemoteWorkflowError),
+        }
+      : {}),
     sendLiveActivityPush: (hostId, push) => centralAuth.sendLiveActivityPush(hostId, push).pipe(toRemoteWorkflowError),
     sendPushNotification: (hostId, push) => centralAuth.sendPushNotification(hostId, push).pipe(toRemoteWorkflowError),
     pushNotificationStore,

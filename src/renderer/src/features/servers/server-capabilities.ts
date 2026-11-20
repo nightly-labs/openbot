@@ -161,6 +161,7 @@ export function serverSupportsCapability(
       capability === "provider-environment-v1" ||
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
+      capability === "owner-transfer-v1" ||
       capability === "provider-detection-v1") &&
     server?.kind === "remote"
   ) {

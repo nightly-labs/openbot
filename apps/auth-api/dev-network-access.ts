@@ -14,6 +14,7 @@ const MOBILE_LAN_PATHS = new Set([
   "/v2/remote/sessions/",
   "/v2/remote/invites/preview",
   "/v2/remote/invites/accept",
+  "/v2/remote/owner-transfers/",
   "/v2/hosting/plans",
   "/v2/hosting/servers/",
 ]);
@@ -72,7 +73,16 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
     segments[1] === "remote" &&
     segments[2] === "hosts" &&
     segments[3] &&
-    (segments[4] === "logo" || segments[4] === "appearance")
+    (segments[4] === "logo" || segments[4] === "appearance" || segments[4] === "owner-transfer")
+  )
+    return true;
+  if (
+    segments.length === 5 &&
+    segments[0] === "v2" &&
+    segments[1] === "remote" &&
+    segments[2] === "owner-transfers" &&
+    segments[3] &&
+    (segments[4] === "accept" || segments[4] === "decline")
   )
     return true;
   if (

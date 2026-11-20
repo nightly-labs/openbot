@@ -274,6 +274,7 @@ try {
     teamIpcHandlers({
       host,
       localServers: null,
+      ownerTransfers: { pendingOwnerTransfer: unused, startOwnerTransfer: unused, cancelOwnerTransfer: unused },
       remoteDesktop: new RemoteDesktopManager(manager),
       remoteServers: manager,
       takePendingInvite: () => null,

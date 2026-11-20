@@ -229,6 +229,7 @@ import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/messag
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -2718,6 +2719,7 @@ export class TeamApiServer {
         if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
         if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
         if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
+        if (capability === OWNER_TRANSFER_CAPABILITY) return this.#options.admin?.ownerTransfer === true;
         if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
         if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
         if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
