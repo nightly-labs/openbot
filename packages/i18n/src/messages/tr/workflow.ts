@@ -476,6 +476,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "Buraya düğüm ekle",
   "workflow.canvas.action.deleteConnection": "Bağlantıyı sil",
   "workflow.canvas.action.selectAll": "Tümünü seç",
+  "workflow.canvas.action.tidy": "Düzenle",
   "workflow.canvas.action.undo": "Geri al",
   "workflow.canvas.action.redo": "Yinele",
   "workflow.canvas.action.search": "Ara",

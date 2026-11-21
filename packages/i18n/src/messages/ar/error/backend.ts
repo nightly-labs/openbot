@@ -212,7 +212,8 @@ export const messages = {
     "لدى هذا الوكيل بالفعل {count} انتظارات مفتوحة. أغلق انتظارًا باستخدام openbot.close_wait قبل فتح انتظار آخر.",
   "error.backend.agentWaitGone": "هذا الانتظار غير مفتوح. أغلقه الوكيل، أو ألغاه شخص ما.",
   "error.backend.agentWaitNoRequest": "يحتاج الانتظار إلى رسالة للمتابعة. لا توجد رسالة في هذا الدور.",
-  "error.backend.agentWaitOwnChatOnly": "افتح انتظارًا في دردشتك فقط. لا يمكن لمهمة قناة أو مراسلة أن تنتظر.",
+  "error.backend.agentWaitOwnChatOnly":
+    "افتح انتظارًا في دردشتك أو في سلسلة جانبية. لا يمكن لمحادثة قناة أو مراسلة أن تنتظر.",
   "error.backend.agentWaitNoteRequired": "اكتب ملاحظة قصيرة توضح سبب الانتظار.",
   "error.backend.agentWaitRoutineGone": "ليس لدى هذا الوكيل مهمة دورية بهذا المعرّف.",
   "error.backend.agentWaitNoRoutine":

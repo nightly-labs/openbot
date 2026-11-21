@@ -513,6 +513,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "Dodaj tu węzeł",
   "workflow.canvas.action.deleteConnection": "Usuń połączenie",
   "workflow.canvas.action.selectAll": "Zaznacz wszystko",
+  "workflow.canvas.action.tidy": "Uporządkuj",
   "workflow.canvas.action.undo": "Cofnij",
   "workflow.canvas.action.redo": "Ponów",
   "workflow.canvas.action.search": "Szukaj",

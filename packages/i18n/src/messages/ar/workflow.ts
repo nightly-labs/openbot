@@ -530,6 +530,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "إضافة عقدة هنا",
   "workflow.canvas.action.deleteConnection": "حذف الاتصال",
   "workflow.canvas.action.selectAll": "تحديد الكل",
+  "workflow.canvas.action.tidy": "ترتيب",
   "workflow.canvas.action.undo": "تراجع",
   "workflow.canvas.action.redo": "إعادة",
   "workflow.canvas.action.search": "بحث",

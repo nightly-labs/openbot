@@ -62,6 +62,13 @@ interface Report {
   turnEnded?: { installs: number; version: string | null | undefined; holdsNewTurns: boolean; resumed: number };
   askedAgain?: { installs: number; maxConcurrentInstalls: number; holdsNewTurns: boolean };
   cancelled?: { failure: string | undefined; installs: number; holdsNewTurns: boolean; resumed: number };
+  settingsChanged?: {
+    restartPending: boolean;
+    holdsNewTurns: boolean;
+    holdsAfterRestartAsked: boolean;
+    restartedWhenIdle: boolean;
+    holdsAfterRestart: boolean;
+  };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-update-busy-e2e-"));
@@ -245,7 +252,32 @@ try {
   assert.equal(report.cancelled.holdsNewTurns, false);
   assert.equal(report.cancelled.resumed, 1);
   assert.equal(row()?.state, "available");
+
+  await runCauseEffect(providers.startSettingsChanged("antigravity"));
+  const restartPending = row()?.restartPending === true;
+  const holdsNewTurns = providers.isReplacingCli("antigravity");
+  assert.ok(restartPending, "the restart waits for the running turn");
+  assert.equal(holdsNewTurns, false, "other agents keep starting turns while the restart waits");
+  await runCauseEffect(providers.restartProviderWhenIdle("antigravity"));
+  const holdsAfterRestartAsked = providers.isReplacingCli("antigravity");
+  assert.ok(holdsAfterRestartAsked, "a restart that holds turns still holds them when it joins the wait");
+  providers.cancelProviderRestart("antigravity");
+  assert.equal(providers.isReplacingCli("antigravity"), false);
+  await runCauseEffect(providers.startSettingsChanged("antigravity"));
+  const spawnsBefore = (await readFile(log, "utf8")).split("\n").filter(Boolean).length;
   busy = false;
+  await waitFor("the restart to run when no turn runs", () => row()?.restartPending !== true);
+  const restartedWhenIdle = (await readFile(log, "utf8")).split("\n").filter(Boolean).length > spawnsBefore;
+  report.settingsChanged = {
+    restartPending,
+    holdsNewTurns,
+    holdsAfterRestartAsked,
+    restartedWhenIdle,
+    holdsAfterRestart: providers.isReplacingCli("antigravity"),
+  };
+  assert.ok(restartedWhenIdle, "the provider restarts with the new settings");
+  assert.equal(report.settingsChanged.holdsAfterRestart, false);
+  assert.equal(row()?.state, "available");
 
   await checkProviderAccountReload();
   report.passed = true;

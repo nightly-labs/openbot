@@ -229,7 +229,7 @@ export const messages = {
   "error.backend.agentWaitGone": "To oczekiwanie nie jest otwarte. Agent je zamknął albo ktoś je anulował.",
   "error.backend.agentWaitNoRequest": "Oczekiwanie potrzebuje wiadomości, aby kontynuować. Ta tura nie ma wiadomości.",
   "error.backend.agentWaitOwnChatOnly":
-    "Otwieraj oczekiwanie tylko we własnym czacie. Zadanie kanału lub komunikatora nie może czekać.",
+    "Otwieraj oczekiwanie we własnym czacie lub w wątku bocznym. Rozmowa kanału lub komunikatora nie może czekać.",
   "error.backend.agentWaitNoteRequired": "Podaj krótką notatkę, na co jest to oczekiwanie.",
   "error.backend.agentWaitRoutineGone": "Ten agent nie ma rutyny o tym identyfikatorze.",
   "error.backend.agentWaitNoRoutine":

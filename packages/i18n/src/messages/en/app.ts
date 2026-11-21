@@ -31,7 +31,7 @@ export const messages = defineMessages("app", {
   "app.provider.restartFailed": "Could not restart {name}",
   "app.provider.included": "{name} is included with OpenBot.",
   "app.clipboard.copyFailed": "Could not copy the text.",
-  "app.voice.tooLong": "Voice recordings are limited to two minutes.",
+  "app.voice.tooLong": "Voice recordings are limited to 10 minutes.",
   "app.avatar.type": "Choose a PNG, JPEG, GIF, or WebP image.",
   "app.avatar.size": "Choose an image smaller than 10 MB.",
   "app.avatar.processingUnavailable": "Image processing is unavailable.",

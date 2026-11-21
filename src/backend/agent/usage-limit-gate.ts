@@ -149,6 +149,22 @@ export class UsageLimitGate {
     return this.#failures.get(limitKey(limit.provider, limit.accountId, limit.model))?.spent === true;
   }
 
+  backupWaitEnd(backups: readonly UsageLimitKey[]): number | null {
+    const now = Date.now();
+    const ends = backups.flatMap((limit) => {
+      const key = limitKey(limit.provider, limit.accountId, limit.model);
+      const reached = this.#limits.get(key);
+      const failure = this.#failures.get(key);
+      if (!reached && !failure) return [];
+      const endsAt = Math.max(
+        failure?.endsAt ?? 0,
+        reached ? (reached.resetsAt ?? Number.POSITIVE_INFINITY) * 1_000 : 0,
+      );
+      return endsAt > now ? [endsAt] : [];
+    });
+    return ends.length > 0 ? Math.ceil(Math.min(now + PROVIDER_FAILURE_HOLD_MS, ...ends) / 1_000) : null;
+  }
+
   failed(agentId: string, model: string | null = null, resetDelayMs: number | null = null, spent = false): void {
     const agent = this.#agent(agentId);
     if (!agent) return;

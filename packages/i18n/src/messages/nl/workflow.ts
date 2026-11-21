@@ -459,6 +459,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "Node hier toevoegen",
   "workflow.canvas.action.deleteConnection": "Verbinding verwijderen",
   "workflow.canvas.action.selectAll": "Alles selecteren",
+  "workflow.canvas.action.tidy": "Opruimen",
   "workflow.canvas.action.undo": "Ongedaan maken",
   "workflow.canvas.action.redo": "Opnieuw doen",
   "workflow.canvas.action.search": "Zoeken",

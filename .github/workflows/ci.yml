@@ -442,6 +442,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-waits-tools
 
+      - name: Run the side-thread open-wait E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-waits-side-thread
+
       - name: Run the browser takeover deadline E2E test
         if: ${{ !cancelled() }}
         run: bun run test:browser-takeover-deadline
@@ -569,6 +573,10 @@ jobs:
       - name: Run the routine failure report E2E test
         if: ${{ !cancelled() }}
         run: bun run test:routine-report-failure
+
+      - name: Run the routine skipped runs report E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:routine-skipped-runs-report
 
       - name: Run the agent webhook routine E2E test
         if: ${{ !cancelled() }}
@@ -839,6 +847,7 @@ jobs:
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
             .openbot-build/agent-waits-tools-e2e/
+            .openbot-build/agent-waits-side-thread-e2e/
             .openbot-build/browser-takeover-deadline-e2e/
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/agent-create-retry-e2e/
@@ -870,6 +879,7 @@ jobs:
             .openbot-build/usage-read-pacing-e2e/
             .openbot-build/routine-fresh-session-e2e/
             .openbot-build/routine-report-failure-e2e/
+            .openbot-build/routine-skipped-runs-report-e2e/
             .openbot-build/agent-webhook-routine-e2e/
             .openbot-build/agent-channel-manage-e2e/
             .openbot-build/agent-channel-create-e2e/

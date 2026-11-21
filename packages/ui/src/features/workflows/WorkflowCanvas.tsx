@@ -37,6 +37,7 @@ import {
   Lock,
   LockOpen,
   MousePointer2,
+  Network,
   Pencil,
   Play,
   Plus,
@@ -113,7 +114,7 @@ import { type WorkflowCanvasTabs, type WorkflowTab, WorkflowTabs } from "./Workf
 import { TextNode } from "./WorkflowTextNode";
 import { TriggerNode } from "./WorkflowTriggerNode";
 import { WorkflowVersionBar } from "./WorkflowVersionBar";
-import { WorkflowZoomMenu } from "./WorkflowZoomMenu";
+import { TIDY_KEYS, WorkflowZoomMenu } from "./WorkflowZoomMenu";
 import {
   BoardProvider,
   createBoard,
@@ -204,6 +205,7 @@ import {
   type WorkflowPresence,
 } from "./workflow-presence";
 import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./workflow-run-view";
+import { type TidyUnit, tidyLayout } from "./workflow-tidy";
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
 export interface WorkflowCanvasProps {
@@ -335,6 +337,10 @@ const DUPLICATE_OFFSET = 32;
 const NEW_NODE = { width: 300, height: 240 };
 const PICTURE_ROW = 4;
 const PLACE_STEP = 40;
+const TIDY_LABELS: ReadonlySet<WorkflowNodeKind> = new Set(["text", "note", "shape"]);
+const TIDY_REACH = 160;
+const TIDY_CLEAR_GAP = 24;
+const TIDY_MOTION_MS = 320;
 const SEARCH_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   trigger: [],
   prompt: ["text"],
@@ -669,9 +675,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   });
   const [sketchPoints, setSketchPoints] = createSignal<readonly WfnPoint[]>([], { equals: false });
 
+  let tidyGoals: ReadonlyMap<string, WfnPoint> | undefined;
+  let tidyFrame = 0;
   const capture = (): CanvasSnapshot => ({
     nodes: nodes(),
-    positions: Object.fromEntries(Object.entries(positions).map(([id, at]) => [id, { ...at }])),
+    positions: Object.fromEntries(Object.entries(positions).map(([id, at]) => [id, { ...(tidyGoals?.get(id) ?? at) }])),
     sizes: Object.fromEntries(Object.entries(sizes).map(([id, size]) => [id, { ...size }])),
     board: canvas.snapshot(),
     strokes: strokes(),
@@ -687,6 +695,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
   const apply = (saved: CanvasSnapshot) => {
+    endTidy(false);
     scheduleEdit = undefined;
     const ids = new Set(saved.nodes.map((node) => node.id));
     const later = nodes().filter((node) => !ids.has(node.id));
@@ -703,7 +712,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       scheduleEdit = undefined;
     },
   });
-  const { steps, commit } = edits;
+  const { steps } = edits;
+  const commit = () => {
+    edits.commit();
+    endTidy(true);
+  };
 
   const frames = new Map<number, () => void>();
   const afterLayout = (run: () => void, drop: () => void = () => {}) => {
@@ -989,6 +1002,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const reset = (next: WorkflowGraph, same: boolean) => {
     const before = same ? (liveCanvas ?? capture()) : undefined;
+    endTidy(false);
     const snapshot = snapshotFromGraph(next);
     baseGraph = graphFromSnapshot(snapshot);
     savedGraph = stableJson(baseGraph);
@@ -1326,6 +1340,149 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     if (byUser) glideTo(next, "flight");
     else moveCamera(next, false);
+  };
+
+  const endTidy = (land: boolean) => {
+    const goals = tidyGoals;
+    if (!goals) return;
+    tidyGoals = undefined;
+    cancelAnimationFrame(tidyFrame);
+    if (land)
+      setPositions((draft) => {
+        for (const [id, at] of goals) if (draft[id]) draft[id] = { ...at };
+      });
+    setGesturing(false);
+  };
+  onCleanup(() => cancelAnimationFrame(tidyFrame));
+  const glidePlaces = (goals: ReadonlyMap<string, WfnPoint>) => {
+    const starts = new Map([...goals.keys()].flatMap((id) => (positions[id] ? [[id, { ...positions[id] }]] : [])));
+    tidyGoals = goals;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      endTidy(true);
+      fitView(true);
+      return;
+    }
+    setGesturing(true);
+    const begin = performance.now();
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - begin) / TIDY_MOTION_MS);
+      if (progress >= 1) {
+        endTidy(true);
+        fitView(true);
+        return;
+      }
+      const eased = 1 - (1 - progress) ** 3;
+      setPositions((draft) => {
+        for (const [id, goal] of goals) {
+          const start = starts.get(id);
+          if (start && draft[id])
+            draft[id] = { x: start.x + (goal.x - start.x) * eased, y: start.y + (goal.y - start.y) * eased };
+        }
+      });
+      tidyFrame = requestAnimationFrame(step);
+    };
+    tidyFrame = requestAnimationFrame(step);
+  };
+  const tidyPlaces = (): Map<string, WfnPoint> => {
+    const edges = canvas.edges().filter((edge) => !board.isRemoved(edge.from) && !board.isRemoved(edge.to));
+    const linked = new Set(edges.flatMap((edge) => [edge.from, edge.to]));
+    const members = new Map<string, readonly string[]>();
+    const units: TidyUnit[] = [];
+    const labels: { id: string; box: Box }[] = [];
+    for (const entry of nodeGroups()) {
+      const box = frameOf(entry);
+      if (!box || entry.members.some((id) => board.isLocked(id))) continue;
+      units.push({ id: entry.id, box });
+      members.set(entry.id, entry.members);
+    }
+    for (const node of live()) {
+      const box = boxOf(node.id);
+      if (!box || groupIndex().has(node.id) || board.isLocked(node.id)) continue;
+      if (TIDY_LABELS.has(node.kind) && !linked.has(node.id)) labels.push({ id: node.id, box });
+      else {
+        units.push({ id: node.id, box });
+        members.set(node.id, [node.id]);
+      }
+    }
+    const unitOf = (id: string) => groupIndex().get(id)?.id ?? id;
+    const layout = tidyLayout(
+      units,
+      edges.map((edge) => ({ from: unitOf(edge.from), to: unitOf(edge.to) })),
+    );
+    const labelIds = new Set(labels.map((label) => label.id));
+    const moving = new Set([...members.values()].flat());
+    const fixed = live().flatMap((node) => {
+      const box = boxOf(node.id);
+      return box && !moving.has(node.id) && !labelIds.has(node.id) ? [box] : [];
+    });
+    const below = (hit: Box) => Math.ceil((hit.y + hit.height + TIDY_CLEAR_GAP) / SNAP) * SNAP;
+    const placed = units.flatMap((unit) => {
+      const at = layout.get(unit.id);
+      return at ? [{ unit, box: { ...unit.box, ...snapPoint(at) } }] : [];
+    });
+    const dropPast = (drop: number) => {
+      for (const { box } of placed) {
+        const hit = fixed.find((other) => overlaps({ ...box, y: box.y + drop }, other));
+        if (hit) return below(hit) - box.y;
+      }
+      return undefined;
+    };
+    let drop = 0;
+    for (let next = dropPast(drop); next !== undefined; next = dropPast(drop)) drop = next;
+    const shifts = new Map(
+      placed.map(({ unit, box }) => [unit.id, { x: box.x - unit.box.x, y: box.y + drop - unit.box.y }]),
+    );
+    const goals = new Map<string, WfnPoint>();
+    const move = (id: string, shift: WfnPoint) => {
+      const at = positions[id];
+      if (at) goals.set(id, { x: at.x + shift.x, y: at.y + shift.y });
+    };
+    for (const unit of units) {
+      const shift = shifts.get(unit.id);
+      if (shift) for (const id of members.get(unit.id) ?? []) move(id, shift);
+    }
+    const gap = (one: Box, other: Box) =>
+      Math.hypot(
+        Math.max(0, one.x - (other.x + other.width), other.x - (one.x + one.width)),
+        Math.max(0, one.y - (other.y + other.height), other.y - (one.y + one.height)),
+      );
+    const shifted = (box: Box, shift: WfnPoint): Box => ({ ...box, x: box.x + shift.x, y: box.y + shift.y });
+    const taken: Box[] = [...units.map((unit) => shifted(unit.box, shifts.get(unit.id) ?? { x: 0, y: 0 })), ...fixed];
+    const clearSpot = (box: Box): Box => {
+      let spot = box;
+      for (
+        let hit = taken.find((other) => overlaps(spot, other));
+        hit;
+        hit = taken.find((other) => overlaps(spot, other))
+      )
+        spot = { ...spot, y: below(hit) };
+      return spot;
+    };
+    for (const label of [...labels].sort((one, other) => one.box.y - other.box.y)) {
+      const nearest = units
+        .map((unit) => ({ unit, distance: gap(label.box, unit.box) }))
+        .filter((entry) => entry.distance <= TIDY_REACH)
+        .sort((one, other) => one.distance - other.distance)[0];
+      const follow = nearest && shifts.get(nearest.unit.id);
+      const spot = clearSpot(follow ? { ...label.box, ...snapPoint(shifted(label.box, follow)) } : label.box);
+      taken.push(spot);
+      if (spot.x !== label.box.x || spot.y !== label.box.y) goals.set(label.id, { x: spot.x, y: spot.y });
+    }
+    return goals;
+  };
+  const canTidy = () => !editsBlocked() && !deleted() && live().length > 1;
+  const tidyUp = () => {
+    if (!canTidy() || tidyGoals) return;
+    stopGesture();
+    dropFrames();
+    const goals = tidyPlaces();
+    const moved = [...goals].some(([id, at]) => positions[id]?.x !== at.x || positions[id]?.y !== at.y);
+    if (!moved) {
+      fitView(true);
+      return;
+    }
+    commit();
+    glidePlaces(goals);
   };
 
   const canRun = () => !props.readOnly && live().some((node) => isWorkflowStepKind(node.kind));
@@ -3043,6 +3200,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
               )
               ?.focus();
         if (event.shiftKey && event.code === "Digit1") return () => fitView(true);
+        if (event.shiftKey && event.code === "KeyT") return tidyUp;
         if (event.key === "Escape" && ui.search) return closeSearch;
         if (event.key === "Escape" && (ui.tool === "draw" || placing()) && !inMenu) return () => setTool("select");
         if (event.key === "Escape" && following() && !inMenu) return stopFollow;
@@ -3567,6 +3725,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                       keys={["⇧", "1"]}
                       onSelect={() => fitView(true)}
                     />
+                    <Show when={canTidy()}>
+                      <MenuItem
+                        icon={<Network />}
+                        label={t("workflow.canvas.action.tidy")}
+                        keys={TIDY_KEYS}
+                        onSelect={tidyUp}
+                      />
+                    </Show>
                     <MenuItem
                       icon={ui.hidden ? <Eye /> : <EyeOff />}
                       label={ui.hidden ? t("workflow.canvas.hud.show") : t("workflow.canvas.hud.hide")}
@@ -3855,6 +4021,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           minScale={MIN_SCALE}
           maxScale={MAX_SCALE}
           minimap={ui.minimap}
+          canTidy={canTidy()}
+          onTidy={tidyUp}
           onZoom={(action) => {
             if (action === "in") zoomBy(ZOOM_STEP);
             else if (action === "out") zoomBy(1 / ZOOM_STEP);

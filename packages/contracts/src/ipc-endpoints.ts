@@ -5,6 +5,7 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
+import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -46,6 +47,7 @@ import type {
   AgentDockAction,
   AgentDockDisplayInfo,
   AgentDockDragPhase,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockOffset,
   AgentDockPresentation,
@@ -920,6 +922,7 @@ export const IPC_ENDPOINTS = {
     action: event<AgentDockAction>()("agent-dock:action"),
     setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
     setInputRegion: request<AgentDockInputRect[], void>()("agent-dock:set-input-region"),
+    setExtent: request<AgentDockExtent | null, void>()("agent-dock:set-extent"),
     setXWayland: request<SetAgentDockXWaylandInput, void>()("agent-dock:set-xwayland"),
     closeChat: event<undefined>()("agent-dock:close-chat"),
     listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
@@ -1370,6 +1373,9 @@ export const IPC_ENDPOINTS = {
     plans: request<undefined, HostedServerCatalog>()("hosted-servers:plans"),
     create: request<CreateHostedServerInput, HostedServerSummary>()("hosted-servers:create"),
     openCheckout: request<string, HostedServerSummary>()("hosted-servers:open-checkout"),
+    openCustomCheckout: request<CustomServerCheckoutRequest, CustomServerCheckoutResult>()(
+      "hosted-servers:open-custom-checkout",
+    ),
     delete: request<DeleteHostedServerInput, void>()("hosted-servers:delete"),
     lifecycle: request<HostedServerLifecycleInput, void>()("hosted-servers:lifecycle"),
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),

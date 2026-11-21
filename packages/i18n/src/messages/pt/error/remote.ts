@@ -26,6 +26,8 @@ export const messages = {
     "O computador anfitrião não permitiu que o OpenBot grave a tela. Conceda a permissão de gravação de tela no computador anfitrião e tente novamente.",
   "error.remote.windowsSessionDisconnected":
     "A sessão do Windows no computador anfitrião está desconectada, então não há tela para compartilhar. Entre no Windows na tela do computador anfitrião e tente novamente.",
+  "error.remote.windowsCaptureDenied":
+    "O Windows no computador anfitrião não permite que o OpenBot grave a tela. Desbloqueie o Windows na tela do computador anfitrião, feche qualquer aviso de administrador e tente novamente. Se o problema continuar, reinicie o computador anfitrião.",
   "error.remote.macScreenLocked":
     "O Mac está bloqueado, então não pode compartilhar a tela. Desbloqueie o Mac na tela dele e tente novamente.",
   "error.remote.streamTooSlowLowerQuality":

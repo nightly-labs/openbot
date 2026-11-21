@@ -474,6 +474,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "ここにノードを追加",
   "workflow.canvas.action.deleteConnection": "接続を削除",
   "workflow.canvas.action.selectAll": "すべて選択",
+  "workflow.canvas.action.tidy": "整列",
   "workflow.canvas.action.undo": "元に戻す",
   "workflow.canvas.action.redo": "やり直し",
   "workflow.canvas.action.search": "検索",

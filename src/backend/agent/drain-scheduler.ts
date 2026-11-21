@@ -914,14 +914,17 @@ export class DrainScheduler {
             const { resumeAfterUsageLimit, ...rest } = item;
             const repeated = resumeAfterUsageLimit !== undefined && continued.has(resumeAfterUsageLimit.turnId);
             if (resumeAfterUsageLimit) continued.add(resumeAfterUsageLimit.turnId);
+            const routineRun =
+              item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null;
             return deliveryPromptInput(repeated ? rest : item, {
               agentNames,
               snapshot,
-              routineRun:
-                item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null,
+              routineRun,
+              skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 item.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(item.delivery.id) : null,
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
+              continuesWait: item.delivery.sender.kind === "routine" && this.#routines.continuesWait(item.delivery.id),
               routineTimezone:
                 item.delivery.sender.kind === "routine"
                   ? this.#routines.timezoneForDelivery(item.delivery.id)

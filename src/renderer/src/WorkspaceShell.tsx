@@ -7,9 +7,11 @@ import {
   ServerPanelLoadNotice,
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { createServerPaywall } from "@openbot/ui/features/servers/ServerPaywall";
 import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { appPort } from "./app-port";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
 import { AgentDockHost, useAgentDockPlacement } from "./features/agent-dock/AgentDockHost";
 import { useAgents } from "./features/agents/agents-context";
@@ -34,6 +36,7 @@ import { createServerConnectionToast } from "./features/servers/server-connectio
 import { useServerScope } from "./features/servers/server-scope";
 import { followsServerUpdate, ServerUpdateDialogHost } from "./features/servers/server-update-flow";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
@@ -58,7 +61,7 @@ export function WorkspaceShell(props: {
 }) {
   const platform = usePlatform();
   const chatWindow = platform.chatWindow !== null;
-  const { sourceText, t } = useText();
+  const { sourceText, t, errorMessage } = useText();
   const scope = useServerScope();
   const settings = useSettings();
   const channels = useChannels();
@@ -140,7 +143,16 @@ export function WorkspaceShell(props: {
       if (unsupported) usage.closeUsage();
     },
   );
+  const paywall = createServerPaywall({
+    server: activeServer,
+    subscribe: (request) => serversPort().hostedServers.openCustomCheckout(request),
+    billingDetails: appPort().billing,
+    errorMessage: (error) => errorMessage(error, t("server.paywall.checkoutFailed")),
+  });
+  const fullScreenServer = () => planScreenShown() || paywall.server() !== null;
   const blockedRemoteServer = createMemo(() => {
+    const paywallServer = paywall.server();
+    if (paywallServer) return paywallServer;
     const server = activeServer();
     if (server?.kind !== "remote" || server.hostedSleep) return null;
     return server.state === "incompatible" ||
@@ -348,6 +360,7 @@ export function WorkspaceShell(props: {
           }
           hidden={remoteDesktopWorkspaceVisible()}
           blockedServer={blockedRemoteServer()}
+          paywall={paywall}
           onRetryServer={retryBlockedServer}
           planDeletesAt={planDeletesAt}
           onRenewPlan={renewServerPlan}
@@ -355,7 +368,7 @@ export function WorkspaceShell(props: {
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
-              <Show when={!planScreenShown()}>
+              <Show when={!fullScreenServer()}>
                 <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
               </Show>
             </Show>

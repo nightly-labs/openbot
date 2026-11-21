@@ -475,6 +475,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "在此添加节点",
   "workflow.canvas.action.deleteConnection": "删除连接",
   "workflow.canvas.action.selectAll": "全选",
+  "workflow.canvas.action.tidy": "整理",
   "workflow.canvas.action.undo": "撤销",
   "workflow.canvas.action.redo": "重做",
   "workflow.canvas.action.search": "搜索",

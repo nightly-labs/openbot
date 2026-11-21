@@ -23,6 +23,8 @@ export const messages = {
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",
   "error.remote.windowsSessionDisconnected":
     "Ana makinedeki Windows oturumunun bağlantısı kesik, bu yüzden paylaşılacak ekran yok. Ana makinenin ekranında Windows'ta oturum açın, ardından tekrar deneyin.",
+  "error.remote.windowsCaptureDenied":
+    "Ana makinedeki Windows, OpenBot'un ekranı kaydetmesine izin vermiyor. Ana makinenin ekranında Windows'un kilidini açın, yönetici onay pencerelerini kapatın, ardından tekrar deneyin. Sorun devam ederse ana makineyi yeniden başlatın.",
   "error.remote.macScreenLocked":
     "Mac kilitli, bu yüzden ekranını paylaşamıyor. Mac'in kilidini kendi ekranında açın, ardından tekrar deneyin.",
   "error.remote.streamTooSlowLowerQuality":

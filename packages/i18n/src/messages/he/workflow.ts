@@ -470,6 +470,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "הוספת צומת כאן",
   "workflow.canvas.action.deleteConnection": "מחיקת החיבור",
   "workflow.canvas.action.selectAll": "בחירת הכול",
+  "workflow.canvas.action.tidy": "סידור",
   "workflow.canvas.action.undo": "ביטול",
   "workflow.canvas.action.redo": "ביצוע חוזר",
   "workflow.canvas.action.search": "חיפוש",

@@ -513,6 +513,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "Добавить узел сюда",
   "workflow.canvas.action.deleteConnection": "Удалить связь",
   "workflow.canvas.action.selectAll": "Выбрать всё",
+  "workflow.canvas.action.tidy": "Упорядочить",
   "workflow.canvas.action.undo": "Отменить",
   "workflow.canvas.action.redo": "Вернуть",
   "workflow.canvas.action.search": "Поиск",

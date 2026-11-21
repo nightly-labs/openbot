@@ -284,6 +284,8 @@ export class QueueControls {
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
     const note = steerNoteFor(providerForAgent(agent), context.delivery.sender, context.delivery.text);
+    const routineRun =
+      context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null;
     const turnDeliveries = this.#mailbox
       .findDeliveriesByTurn(agent.id, turnId)
       .filter(({ delivery }) => delivery.id !== input.deliveryId);
@@ -304,11 +306,13 @@ export class QueueControls {
             ...deliveryPromptInput(context, {
               agentNames: agentNamesById(this.#store.list()),
               snapshot,
-              routineRun:
-                context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
+              routineRun,
+              skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 context.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(input.deliveryId) : null,
               wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
+              continuesWait:
+                context.delivery.sender.kind === "routine" && this.#routines.continuesWait(input.deliveryId),
               routineTimezone:
                 context.delivery.sender.kind === "routine"
                   ? this.#routines.timezoneForDelivery(input.deliveryId)

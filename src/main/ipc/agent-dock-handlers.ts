@@ -5,6 +5,7 @@ import { type AgentDockWindowController, requireAgentDockSender } from "../agent
 import {
   parseAgentDockAction,
   parseAgentDockDragPhase,
+  parseAgentDockExtent,
   parseAgentDockInputRegion,
   parseAgentDockInteractive,
   parseAgentDockPresentation,
@@ -22,6 +23,7 @@ export interface AgentDockIpcDependencies {
     | "performAction"
     | "setInteractive"
     | "setInputRegion"
+    | "setExtent"
     | "listDisplays"
     | "drag"
   >;
@@ -54,6 +56,9 @@ export function agentDockIpcHandlers({
       ),
       setInputRegion: authorizedHandler(fromDockRenderer, parseAgentDockInputRegion, (event, rects) =>
         agentDock.setInputRegion(event.sender.id, rects),
+      ),
+      setExtent: authorizedHandler(fromDockRenderer, parseAgentDockExtent, (event, extent) =>
+        agentDock.setExtent(event.sender.id, extent),
       ),
       drag: authorizedHandler(fromDockRenderer, parseAgentDockDragPhase, (event, phase) =>
         agentDock.drag(event.sender.id, phase),

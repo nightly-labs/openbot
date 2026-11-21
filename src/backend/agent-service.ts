@@ -812,6 +812,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         requireKnownAgent: (agentId) => {
           this.#conversation.requireKnownAgent(agentId);
         },
+        isSideThread: (agentId, taskId) => this.#tasks.isSideThread(agentId, taskId),
       },
     });
     this.#routines = new RoutineScheduler({
@@ -839,6 +840,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isRunning: () => this.#initialized && !this.#stopping,
         usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId) && this.#waitsForLimit(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
+        waitThread: (agentId, taskId) => this.#tasks.waitThread(agentId, taskId),
         routineDeleted: (agentId, routineId) => {
           const keys = options.agentApiKeys;
           const removeKey = keys ? removeWebhookSecretKey(keys, agentId, routineId) : Effect.void;
@@ -1861,6 +1863,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
+        backupReadyAt: (agentId) => this.#backupReadyAt(agentId),
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
@@ -4107,6 +4110,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId);
   }
 
+  #backupReadyAt(agentId: string): number | null {
+    const agent = this.#store.get(agentId);
+    if (!agent?.backupModels?.automatic || this.#mayFailOver(agentId)) return null;
+    const current = agentModelChoice(agent);
+    const returnTo = agent.usageLimitReturn;
+    return this.#usageLimits.backupWaitEnd(
+      (returnTo ? [...agent.backupModels.order, returnTo] : agent.backupModels.order)
+        .filter(
+          (choice) =>
+            !sameAgentModelChoice(choice, current) &&
+            this.#modelChoiceReady(choice) &&
+            !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
+        )
+        .map(usageLimitOf),
+    );
+  }
+
   #waitsForLimit(agentId: string): boolean {
     return !this.#mayFailOver(agentId);
   }
@@ -5622,6 +5642,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
     const clients = [...(yield* this.#providers.dispose()), ...this.#profileClients.release()];
+    for (const client of clients) client.markTurnsStoppedForShutdown?.();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
       const agent = this.#store.get(agentId);
