@@ -459,8 +459,10 @@ task takes fewer turns.
 
 `run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
 `type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
-`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
-helper sends one step to the host. The script returns a JSON value of at most 64 KB. An `evaluate`
+`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. `action`
+is one of the `browserStepSchema` actions in `src/backend/browser-tools.ts`, and the `run_script`
+description lists them. Other tools, such as `screenshot`, do not work in a script. Each helper
+sends one step to the host. The script returns a JSON value of at most 64 KB. An `evaluate`
 step gives its value to the script, not to the model, so it can return up to 1 MB, such as the whole
 text of a page.
 
