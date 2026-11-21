@@ -697,6 +697,10 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
               )
               .max(INPUT_LIMITS.promptOptions)
               .optional(),
+            multiSelect: z
+              .boolean()
+              .optional()
+              .describe("Lets the user choose more than one option. Leave it out for a single choice."),
           }),
         )
         .min(1)
