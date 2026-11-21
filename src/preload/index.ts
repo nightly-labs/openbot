@@ -109,6 +109,7 @@ import {
   decodeWebhookTestResult,
 } from "@openbot/contracts/ipc-events";
 import { decodeAcceptedOwnerTransfer, decodeOwnerTransfer } from "@openbot/contracts/owner-transfer";
+import { decodeChannelCompactAvailability } from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -629,6 +630,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   clearChannelContext: decodeVoid,
   deleteChannelHistory: decodeVoid,
   compactChannelContext: decodeVoid,
+  channelCompactAvailability: decodeChannelCompactAvailability,
   getSidebarLayout: decodeSidebarLayout,
   mutateSidebarLayout: decodeSidebarLayout,
   getSidebarPins: decodeSidebarPinsFromMain,

@@ -301,7 +301,7 @@ import {
 } from "./agent/workflow-generation-error";
 import { confinedWritesAllowed } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, fixedContextCompaction } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import {
   AgentHistoryTransfer,
@@ -4768,8 +4768,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  channelCompactAvailable(channelId: string): boolean {
+    const members = new Set(this.channels.store.get(channelId).members.map((member) => member.agentId));
+    return this.#store.list().some((agent) => members.has(agent.id) && this.#mayCompactOnRequest(agent));
+  }
+
   #mayCompactOnRequest(agent: AgentSummary): boolean {
-    const mode = this.#providers.lastCompactionMode(agent);
+    const mode = this.#providers.lastCompactionMode(agent) ?? fixedContextCompaction(agent.provider);
     return mode === undefined || compactsOnRequest(mode);
   }
 

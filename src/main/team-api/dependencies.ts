@@ -183,6 +183,7 @@ type TeamApiAgentMethods = Pick<
   | "deleteAgentHistory"
   | "clearChannelContext"
   | "compactChannelContext"
+  | "channelCompactAvailable"
   | "deleteChannelHistory"
   | "compactAgentContext"
   | "compactTaskContext"

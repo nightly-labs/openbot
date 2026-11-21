@@ -63,6 +63,7 @@ import { TurnContext } from "./agent/turn-context";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import {
   type AgentProvider,
+  CLAUDE_CONTEXT_COMPACTION,
   MissingClaudeSessionError,
   ProviderTurnActiveError,
   RequestTimeoutError,
@@ -567,7 +568,7 @@ function claudeSignInSettings(parsed: DynamicRecord): Settings {
 const CLAUDE_LISTED_MODELS = new Set<string>();
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
-  readonly contextCompaction = "native";
+  readonly contextCompaction = CLAUDE_CONTEXT_COMPACTION;
   readonly turnContext = true;
   readonly userInputNote = true;
   readonly imageInput = (): boolean => true;

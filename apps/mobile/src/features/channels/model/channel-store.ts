@@ -20,6 +20,11 @@ import {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
+import {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_PICTURE_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
@@ -49,6 +54,7 @@ export interface ChannelState {
   canCancelTasks: boolean;
   canSetPicture: boolean;
   canUseContextActions: boolean;
+  canCheckCompact: boolean;
   loading: boolean;
   listed: boolean;
   error: { cause: unknown } | null;
@@ -60,6 +66,7 @@ const FLAG_KEYS: readonly (keyof ChannelFlags)[] = [
   "canCancelTasks",
   "canSetPicture",
   "canUseContextActions",
+  "canCheckCompact",
   "loading",
   "listed",
   "error",
@@ -80,6 +87,7 @@ const EMPTY: ChannelState = {
   canCancelTasks: false,
   canSetPicture: false,
   canUseContextActions: false,
+  canCheckCompact: false,
   loading: false,
   listed: false,
   error: null,
@@ -201,6 +209,7 @@ export class MobileChannelStore {
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
+      canCheckCompact: capabilities.includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY),
       ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
   }
@@ -214,6 +223,7 @@ export class MobileChannelStore {
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
+      canCheckCompact: capabilities.includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY),
       channels,
       pages: new Map(pages.filter((page) => ids.has(page.channel.id)).map((page) => [page.channel.id, page])),
     });
@@ -668,6 +678,17 @@ export class MobileChannelStore {
   }
   async compactContext(serverId: string, channelId: string) {
     await this.contextAction(serverId, CHAT_HISTORY_ROUTES.channelCompact, channelId, false);
+  }
+  async compactAvailable(serverId: string, channelId: string): Promise<boolean> {
+    if (!this.entry(serverId).state.canCheckCompact) return true;
+    const answer = await this.request(
+      "POST",
+      CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+      decodeChannelCompactAvailability,
+      { channelId },
+      serverId,
+    );
+    return answer.available;
   }
   async deleteHistory(serverId: string, channelId: string) {
     await this.contextAction(serverId, CHAT_HISTORY_ROUTES.channelDelete, channelId);
