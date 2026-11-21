@@ -90,9 +90,7 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
       systems.push(
         (parsed.messages ?? [])
           .filter((message) => message.role === "system")
-          .map(({ content }) =>
-            typeof content === "string" ? content : (content ?? []).map((part) => part.text).join(""),
-          )
+          .map(messageText)
           .join(NL),
       );
       const toolMessages = (parsed.messages ?? []).filter((message) => message.role === "tool");
