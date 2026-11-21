@@ -88,7 +88,9 @@ import {
   isDetectedAcpAgent,
   isDetectedModelServer,
   isDiscoverModelsResult,
+  isElevenLabsAgentVoiceIds,
   isElevenLabsSpeechVoice,
+  isElevenLabsVoiceId,
   isPlanStartAfterMs,
   isProviderDetectionSettings,
   isRemoteDesktopSetupStatus,
@@ -620,11 +622,23 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice, turnPauseMs } = settings;
+  const {
+    modelId,
+    voice,
+    elevenLabsVoice,
+    elevenLabsCustomVoiceId,
+    elevenLabsAgentVoiceIds,
+    xaiVoice,
+    speed,
+    codexLiveVoice,
+    turnPauseMs,
+  } = settings;
   if (
     !isSpeechModelId(modelId) ||
     !isSpeechVoice(voice) ||
     !isElevenLabsSpeechVoice(elevenLabsVoice) ||
+    !(elevenLabsCustomVoiceId === null || isElevenLabsVoiceId(elevenLabsCustomVoiceId)) ||
+    !isElevenLabsAgentVoiceIds(elevenLabsAgentVoiceIds) ||
     !isXaiSpeechVoice(xaiVoice) ||
     !isSpeechSpeed(speed) ||
     !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice)) ||
@@ -636,6 +650,8 @@ export function decodeSpeechSettings(value: unknown): SpeechSettings {
     modelId,
     voice,
     elevenLabsVoice,
+    elevenLabsCustomVoiceId,
+    elevenLabsAgentVoiceIds: { ...elevenLabsAgentVoiceIds },
     xaiVoice,
     speed,
     codexLive: requiredBoolean(settings, "codexLive"),

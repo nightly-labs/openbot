@@ -388,6 +388,15 @@ export function cloudSpeechModel(id: SpeechModelId): CloudSpeechModelInfo | unde
 export const ELEVENLABS_SPEECH_VOICES = ["alice", "chris", "eric", "george", "jessica", "sarah"] as const;
 export type ElevenLabsSpeechVoice = (typeof ELEVENLABS_SPEECH_VOICES)[number];
 
+export const ELEVENLABS_CUSTOM_VOICE_ID_MAX_LENGTH = 128;
+export const ELEVENLABS_CUSTOM_VOICE_ID_PATTERN = /^[A-Za-z0-9_-]+$/u;
+export const ELEVENLABS_AGENT_VOICE_IDS_LIMIT = 500;
+export const SPEECH_AGENT_KEY_MAX_LENGTH = 320;
+
+export function speechAgentKey(serverId: string, agentId: string): string {
+  return `${serverId}:${agentId}`;
+}
+
 export const XAI_SPEECH_VOICES = ["eve", "ara", "leo", "rex", "sal"] as const;
 export type XaiSpeechVoice = (typeof XAI_SPEECH_VOICES)[number];
 
@@ -456,6 +465,8 @@ export interface SpeechSettings {
   modelId: SpeechModelId;
   voice: SpeechVoice;
   elevenLabsVoice: ElevenLabsSpeechVoice;
+  elevenLabsCustomVoiceId: string | null;
+  elevenLabsAgentVoiceIds: Record<string, string>;
   xaiVoice: XaiSpeechVoice;
   speed: SpeechSpeed;
   codexLive: boolean;
@@ -468,6 +479,8 @@ export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
   modelId: SPEECH_MODEL_ID,
   voice: "F1",
   elevenLabsVoice: "alice",
+  elevenLabsCustomVoiceId: null,
+  elevenLabsAgentVoiceIds: {},
   xaiVoice: "eve",
   speed: 1,
   codexLive: false,
@@ -542,6 +555,13 @@ export const SPEECH_LIMITS = {
 export interface SpeechInput {
   text: string;
   language: SpeechLanguage;
+  agentKey?: string;
+  elevenLabsVoiceId?: string;
+}
+
+export interface AgentElevenLabsVoiceInput {
+  agentKey: string;
+  voiceId: string | null;
 }
 
 export interface SpeechAudio {
@@ -563,6 +583,31 @@ export function isSpeechKeyProvider(value: unknown): value is SpeechKeyProvider 
 
 export function isElevenLabsSpeechVoice(value: unknown): value is ElevenLabsSpeechVoice {
   return isOneOf(ELEVENLABS_SPEECH_VOICES, value);
+}
+
+export function isElevenLabsVoiceId(value: unknown): value is string {
+  return (
+    isBoundedString(value, ELEVENLABS_CUSTOM_VOICE_ID_MAX_LENGTH) &&
+    value.length > 0 &&
+    ELEVENLABS_CUSTOM_VOICE_ID_PATTERN.test(value)
+  );
+}
+
+export function isSpeechAgentKey(value: unknown): value is string {
+  if (!isBoundedString(value, SPEECH_AGENT_KEY_MAX_LENGTH) || /[\s\p{Cc}]/u.test(value)) return false;
+  const separator = value.indexOf(":");
+  return separator > 0 && separator < value.length - 1;
+}
+
+export function isElevenLabsAgentVoiceIds(value: unknown): value is Record<string, string> {
+  if (!isDynamicRecord(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  const entries = Object.entries(value);
+  return (
+    entries.length <= ELEVENLABS_AGENT_VOICE_IDS_LIMIT &&
+    entries.every(([agentKey, voiceId]) => isSpeechAgentKey(agentKey) && isElevenLabsVoiceId(voiceId))
+  );
 }
 
 export function isXaiSpeechVoice(value: unknown): value is XaiSpeechVoice {

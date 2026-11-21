@@ -33,6 +33,7 @@ import { agentRequest } from "./agent-inputs";
 import { eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import {
+  parseAgentElevenLabsVoiceInput,
   parseSpeechApiKey,
   parseSpeechInput,
   parseSpeechSettings,
@@ -165,6 +166,11 @@ export function voiceIpcHandlers({
       setSpeechSettings: payloadHandler(
         parseSpeechSettings,
         (settings): Promise<SpeechSettings> => runCauseEffect(speech.setSettings(settings)),
+      ),
+      setAgentElevenLabsVoiceId: payloadHandler(
+        parseAgentElevenLabsVoiceInput,
+        ({ agentKey, voiceId }): Promise<SpeechSettings> =>
+          runCauseEffect(speech.setAgentElevenLabsVoiceId(agentKey, voiceId)),
       ),
       getSpeechModelStatus: handler((): Promise<SpeechModelStatus> => runCauseEffect(speech.getModelStatus())),
       setSpeechApiKey: payloadHandler(parseSpeechApiKey, async ({ provider, key }): Promise<SpeechModelStatus> => {

@@ -3,6 +3,7 @@ import {
   type ConversationMessage,
   latestTurnAnswer,
   type SpeechLanguage,
+  speechAgentKey,
 } from "@openbot/contracts/ipc";
 import { speechLanguageOf } from "@openbot/contracts/speech-language";
 import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
@@ -77,7 +78,7 @@ function readAfterReadings(
   fallback: SpeechLanguage,
   trigger: SpeechTrigger,
 ): Promise<void> {
-  const waiting = speechInput(markdown, fallback);
+  const waiting = speechInput(markdown, fallback, speechAgentKey(source.serverId, source.agentId));
   if (waiting) {
     waitingReadings.push(waiting);
     if (waitingReadings.length === 1) setUpcomingReading(waiting);
@@ -363,10 +364,10 @@ function serverLanguage(fallback: SpeechLanguage): SpeechLanguage | null {
   return voiceServer()?.routes.speech ? fallback : null;
 }
 
-function speechInput(markdown: string, fallback: SpeechLanguage): UpcomingReading | undefined {
+function speechInput(markdown: string, fallback: SpeechLanguage, agentKey?: string): UpcomingReading | undefined {
   const text = markdown ? speechTextFromMarkdown(markdown) : "";
   const language = text ? (speechLanguageOf(text, fallback) ?? serverLanguage(fallback)) : null;
-  return language ? { text, language } : undefined;
+  return language ? { text, language, ...(agentKey ? { agentKey } : {}) } : undefined;
 }
 
 async function speak(

@@ -1,4 +1,4 @@
-import type { SpeechAudio, SpeechLanguage } from "@openbot/contracts/ipc";
+import { type SpeechAudio, type SpeechLanguage, speechAgentKey } from "@openbot/contracts/ipc";
 import { createStore } from "solid-js";
 import { speechPort } from "./speech-port";
 import { partBudget, SpeechParts } from "./speech-text";
@@ -61,6 +61,8 @@ interface SpokenPart {
 export interface UpcomingReading {
   text: string;
   language: SpeechLanguage;
+  agentKey?: string;
+  voiceGeneration?: number;
   first?: Promise<SpeechAudio>;
 }
 
@@ -70,6 +72,7 @@ let reading: Reading | undefined;
 let upcoming: UpcomingReading | undefined;
 let heldAgent: SpeechAgent | undefined;
 let replyRate = 1;
+let voiceGeneration = 0;
 const [state, setState] = createStore<{
   reading: SpeechReading | null;
   recordings: Record<string, VoiceRecordingSummary>;
@@ -206,6 +209,19 @@ export function seekSpeech(seconds: number): void {
   else own.seekTo = to;
 }
 
+export function clearSpokenAudioCache(): void {
+  voiceGeneration += 1;
+  spokenAudio.clear();
+  if (upcoming) {
+    upcoming.first = undefined;
+    upcoming.voiceGeneration = undefined;
+  }
+  if (reading?.reply) stopSpeech();
+  setState((draft) => {
+    draft.spokenReplies = {};
+  });
+}
+
 export function setUpcomingReading(next: UpcomingReading | undefined): void {
   upcoming = next;
   if (reading?.lastPartAsked) prepareUpcoming();
@@ -216,7 +232,12 @@ function prepareUpcoming(): void {
   if (!next || next.first) return;
   const first = new SpeechParts(next.text, next.language).next();
   if (first === undefined) return;
-  next.first = speechPort().voice.speak({ text: first, language: next.language });
+  next.voiceGeneration = voiceGeneration;
+  next.first = speechPort().voice.speak({
+    text: first,
+    language: next.language,
+    ...(next.agentKey ? { agentKey: next.agentKey } : {}),
+  });
   next.first.catch(() => undefined);
 }
 
@@ -247,6 +268,7 @@ export async function readAloud(
   language: SpeechLanguage,
   source: SpeechSource | null = null,
   prepared?: UpcomingReading,
+  elevenLabsVoiceId?: string | null,
 ): Promise<ReadAloudResult> {
   const calledAt = performance.now();
   const result: ReadAloudResult = { completed: false, firstAudioMs: null, seconds: 0 };
@@ -272,10 +294,26 @@ export async function readAloud(
     };
   });
   const voice = speechPort().voice;
-  const preparedFirst = prepared?.text === text && prepared.language === language ? prepared.first : undefined;
+  const startVoiceGeneration = voiceGeneration;
+  const agentKey = source ? speechAgentKey(source.serverId, source.agentId) : undefined;
+  const preparedFirst =
+    !elevenLabsVoiceId &&
+    prepared?.text === text &&
+    prepared.language === language &&
+    prepared.agentKey === agentKey &&
+    prepared.voiceGeneration === startVoiceGeneration
+      ? prepared.first
+      : undefined;
   const ask = (part: string): Promise<SpokenPart> => {
     const askedAt = performance.now();
-    return voice.speak({ text: part, language }).then((audio) => ({ audio, synthesisMs: performance.now() - askedAt }));
+    return voice
+      .speak({
+        text: part,
+        language,
+        ...(agentKey ? { agentKey } : {}),
+        ...(elevenLabsVoiceId ? { elevenLabsVoiceId } : {}),
+      })
+      .then((audio) => ({ audio, synthesisMs: performance.now() - askedAt }));
   };
   const queue: Promise<SpokenPart & { text: string; seconds: number }>[] = [];
   let ahead = 0;
@@ -334,7 +372,7 @@ export async function readAloud(
       if (own.stopped) return result;
     }
     const messageId = source?.messageId;
-    if (messageId) keepSpokenAudio(messageId, own.played);
+    if (messageId && voiceGeneration === startVoiceGeneration) keepSpokenAudio(messageId, own.played);
     result.completed = true;
     return result;
   } finally {

@@ -246,4 +246,9 @@ export const messages = defineMessages("agentSettings", {
     "Site sign-ins stay in the old profile. The agent must sign in to these sites again.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "The whole {provider} process runs in a sandbox, so a write outside fails. Available on macOS only.",
+  "agentSettings.elevenLabsVoice.title": "ElevenLabs voice ID",
+  "agentSettings.elevenLabsVoice.description": "Optional custom ElevenLabs voice ID for this teammate on this device.",
+  "agentSettings.elevenLabsVoice.inactiveDescription": "Used when ElevenLabs is the speech model in Settings → Voice.",
+  "agentSettings.elevenLabsVoice.invalid": "Use letters, numbers, hyphens, or underscores only.",
+  "agentSettings.elevenLabsVoice.placeholder": "Use default voice",
 });

@@ -14,6 +14,8 @@ export const messages = defineMessages("error.voice", {
   "error.voice.cloud.keyRequired": "Add your {provider} API key in Settings → Voice.",
   "error.voice.cloud.keyRejected": "{provider} did not accept the API key. Check the key in Settings → Voice.",
   "error.voice.cloud.quotaExceeded": "Your {provider} quota is used up.",
+  "error.voice.cloud.voiceNotFound":
+    "{provider} could not find that voice ID. Check the voice ID in Settings or Agent settings.",
   "error.voice.cloud.rateLimited": "{provider} is busy. Try again in a moment.",
   "error.voice.cloud.termsRequired": "Accept the ElevenLabs terms in your ElevenLabs account, then try again.",
   "error.voice.cloud.streamEnded": "The dictation stream ended. Record again.",
@@ -23,6 +25,7 @@ export const messages = defineMessages("error.voice", {
   "error.voice.speech.modelRequired": "Download the speech model in Settings → Voice.",
   "error.voice.speech.timedOut": "Reading the reply aloud timed out.",
   "error.voice.speech.failed": "OpenBot could not read the reply aloud.",
+  "error.voice.speech.agentOverrideLimit": "You can set custom ElevenLabs voice IDs for at most {limit} agents.",
   "error.voice.speech.providerFailed": "{provider} did not send the audio. Try again.",
   "error.voice.speech.providerRefused": "{provider} refused to make the audio: {reason}",
   "error.voice.speech.providerUnreachable": "Could not connect to {provider}. Check the connection.",

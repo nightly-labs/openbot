@@ -5,6 +5,8 @@ export interface SpeechPort {
     OpenBotDesktopApi["voice"],
     | "getSpeechSettings"
     | "setSpeechSettings"
+    | "setAgentElevenLabsVoiceId"
+    | "onSpeechSettings"
     | "getSpeechModelStatus"
     | "downloadSpeechModel"
     | "onSpeechModelStatus"

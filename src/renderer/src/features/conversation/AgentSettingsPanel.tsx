@@ -5,9 +5,13 @@ import {
   type BrowserProfileSummary,
   type BrowserProxyComputer,
   type BrowserProxySummary,
+  cloudSpeechModel,
   DEFAULT_AGENT_DEFAULTS,
   type FilePreview,
+  isSpeechLanguage,
+  LOCAL_SERVER_ID,
   type ServerNotificationLevel,
+  speechAgentKey,
   type TestRoutineInput,
   userAssignedSkills,
 } from "@openbot/contracts/ipc";
@@ -26,13 +30,14 @@ import {
 } from "@openbot/ui/features/conversation/AgentSessionSettings";
 import SharedAgentSettingsPanel, {
   type AgentBrowserProfileOptions,
+  type AgentElevenLabsVoiceOptions,
   type AgentNotificationLevelOptions,
   type AgentSettingsPanelProps as SharedAgentSettingsPanelProps,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
-import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createStore, Show, untrack } from "solid-js";
+import { currentText, useText } from "@openbot/ui/text";
+import { createEffect, createMemo, createSignal, createStore, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { createSidePanelWidth, readSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
 import type { SkillCatalogCalls } from "../../skills-port";
@@ -42,6 +47,10 @@ import { createBrowserProfilesStore } from "../browser/stores/browser-profiles-s
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
 import { filesPort } from "../files/files-port";
 import { createStorageUsage } from "../files/storage-usage";
+import { speechModelReady } from "../speech/speech-model";
+import { readAloud, stopSpeech } from "../speech/speech-playback";
+import { setAgentElevenLabsVoiceId, speechSettings } from "../speech/speech-settings-update";
+import { voiceServer } from "../speech/voice-server";
 import { AgentMemoriesSettings } from "./AgentMemoriesSettings";
 import { AgentRoutinesSettings, type DetailLeaveGuard, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
@@ -475,12 +484,70 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     return null;
   }
 
+  const [listeningAgentVoice, setListeningAgentVoice] = createSignal(false);
+  createEffect(currentAgentId, () => {
+    if (untrack(listeningAgentVoice)) stopSpeech();
+  });
+  onCleanup(() => {
+    if (untrack(listeningAgentVoice)) stopSpeech();
+  });
+  const elevenLabsVoiceOptions = (): AgentElevenLabsVoiceOptions | undefined => {
+    if (props.remoteClient || voiceServer()?.routes.speech === true) return undefined;
+    const settings = speechSettings();
+    const serverId = props.skillsServerId ?? LOCAL_SERVER_ID;
+    const agentKey = speechAgentKey(serverId, props.agent.id);
+    const active = cloudSpeechModel(settings.modelId)?.provider === "elevenlabs";
+    const voiceId = Object.hasOwn(settings.elevenLabsAgentVoiceIds, agentKey)
+      ? (settings.elevenLabsAgentVoiceIds[agentKey] ?? null)
+      : null;
+    if (!active && voiceId === null) return undefined;
+    const canListen = active && speechModelReady();
+    return {
+      agentKey,
+      voiceId,
+      active,
+      canListen,
+      listening: listeningAgentVoice(),
+      onSave: async (nextVoiceId) => {
+        try {
+          await setAgentElevenLabsVoiceId(agentKey, nextVoiceId);
+          return true;
+        } catch (error) {
+          actionToast.error(errorMessage(error, t("settings.voice.saveFailed")));
+          return false;
+        }
+      },
+      onListen: async (previewVoiceId) => {
+        if (listeningAgentVoice()) {
+          stopSpeech();
+          return;
+        }
+        const locale = currentText().locale();
+        setListeningAgentVoice(true);
+        try {
+          await readAloud(
+            t("settings.voice.speech.sample"),
+            isSpeechLanguage(locale) ? locale : "en",
+            null,
+            undefined,
+            previewVoiceId,
+          );
+        } catch (error) {
+          actionToast.error(errorMessage(error, t("settings.voice.speech.listenFailed")));
+        } finally {
+          setListeningAgentVoice(false);
+        }
+      },
+    };
+  };
+
   return (
     <SharedAgentSettingsPanel
       {...props}
       reveal={panelReveal()}
       browserProfiles={browserProfileOptions()}
       notificationLevel={notificationLevelOptions()}
+      elevenLabsVoice={elevenLabsVoiceOptions()}
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSidePanelWidth}

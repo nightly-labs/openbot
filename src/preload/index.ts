@@ -970,6 +970,8 @@ const openbotApi: OpenBotDesktopApi = {
     streamTranscript: decodeVoiceStreamTranscript,
     getSpeechSettings: decodeSpeechSettings,
     setSpeechSettings: decodeSpeechSettings,
+    setAgentElevenLabsVoiceId: decodeSpeechSettings,
+    speechSettings: decodeSpeechSettings,
     getSpeechModelStatus: decodeSpeechModelStatus,
     setSpeechApiKey: decodeSpeechModelStatus,
     downloadSpeechModel: decodeSpeechModelStatus,

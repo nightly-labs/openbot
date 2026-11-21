@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import { agentRequest } from "./agent-inputs";
 import { eventPayloadHandler, handler, payloadHandler, registerIpcGroup } from "./define-ipc-group";
 import {
+  parseAgentElevenLabsVoiceInput,
   parseSpeechApiKey,
   parseSpeechInput,
   parseSpeechSettings,
@@ -86,6 +87,7 @@ function registerVoice(
     cancelStream: payloadHandler(parseVoiceStream, () => undefined),
     getSpeechSettings: handler(() => DEFAULT_SPEECH_SETTINGS),
     setSpeechSettings: payloadHandler(parseSpeechSettings, (settings) => settings),
+    setAgentElevenLabsVoiceId: payloadHandler(parseAgentElevenLabsVoiceInput, () => DEFAULT_SPEECH_SETTINGS),
     getSpeechModelStatus: handler(() => SPEECH_READY),
     setSpeechApiKey: payloadHandler(parseSpeechApiKey, () => SPEECH_READY),
     downloadSpeechModel: handler(() => SPEECH_READY),

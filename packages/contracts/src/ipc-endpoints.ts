@@ -608,6 +608,7 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
+  AgentElevenLabsVoiceInput,
   SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
@@ -878,6 +879,10 @@ export const IPC_ENDPOINTS = {
     streamTranscript: event<VoiceStreamTranscript>()("voice:stream-transcript"),
     getSpeechSettings: request<undefined, SpeechSettings>()("voice:get-speech-settings"),
     setSpeechSettings: request<SpeechSettings, SpeechSettings>()("voice:set-speech-settings"),
+    setAgentElevenLabsVoiceId: request<AgentElevenLabsVoiceInput, SpeechSettings>()(
+      "voice:set-agent-elevenlabs-voice-id",
+    ),
+    speechSettings: event<SpeechSettings>()("voice:speech-settings"),
     getSpeechModelStatus: request<undefined, SpeechModelStatus>()("voice:get-speech-model-status"),
     setSpeechApiKey: request<SpeechApiKeyInput, SpeechModelStatus>()("voice:set-speech-api-key"),
     downloadSpeechModel: request<undefined, SpeechModelStatus>()("voice:download-speech-model"),

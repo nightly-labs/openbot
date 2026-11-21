@@ -5,9 +5,11 @@ import {
   type CodexLiveVoice,
   cloudSpeechModel,
   type DictationKeyProvider,
+  ELEVENLABS_CUSTOM_VOICE_ID_MAX_LENGTH,
   ELEVENLABS_SPEECH_VOICES,
   ELEVENLABS_VOICE_MODEL_ID,
   isElevenLabsSpeechVoice,
+  isElevenLabsVoiceId,
   isSpeechVoice,
   isVoiceModelId,
   isXaiSpeechVoice,
@@ -34,6 +36,7 @@ import { shortVoiceServerModel, voiceServerHost } from "@openbot/contracts/voice
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
+  Input,
   Item,
   ItemActions,
   ItemContent,
@@ -52,7 +55,7 @@ import {
 } from "@openbot/ui";
 import { TalkKeyRecorder } from "@openbot/ui/features/settings/TalkKeyRecorder";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Show } from "solid-js";
 import { setVoiceTalkKey, useVoiceTalkKey } from "../conversation/voice-talk-key";
 import type { CodexLiveAccess } from "../speech/codex-live-access";
 import { type LiveVoiceAccountChoice, LiveVoiceAccountRow } from "./LiveVoiceAccountRow";
@@ -93,9 +96,11 @@ const SPEECH_CHOICES: readonly ModelChoice<SpeechModelId>[] = [
   ...CLOUD_SPEECH_MODELS.map((model) => ({ id: model.id, name: model.name, place: model.provider })),
 ];
 
+const CUSTOM_ELEVENLABS_VOICE_CHOICE = "custom";
+
 const VOICE_OPTIONS: Record<"local" | SpeechKeyProvider, string[]> = {
   local: [...SPEECH_VOICES],
-  elevenlabs: [...ELEVENLABS_SPEECH_VOICES],
+  elevenlabs: [...ELEVENLABS_SPEECH_VOICES, CUSTOM_ELEVENLABS_VOICE_CHOICE],
   xai: [...XAI_SPEECH_VOICES],
 };
 
@@ -329,22 +334,114 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
     return id ? SPEECH_MODEL_DESCRIPTION[id] : "settings.voice.speech.model.description";
   };
 
+  const [customVoice, setCustomVoice] = createStore({ selected: false, draft: "", saving: false });
+  let previousSavedCustomId: string | null | undefined;
+
+  createEffect(
+    () => speech().settings?.elevenLabsCustomVoiceId ?? null,
+    (savedId) => {
+      if (savedId === previousSavedCustomId) return;
+      if (savedId !== null) {
+        setCustomVoice((draft) => {
+          draft.selected = true;
+          draft.draft = savedId;
+        });
+      } else if (previousSavedCustomId !== undefined && previousSavedCustomId !== null) {
+        setCustomVoice((draft) => {
+          draft.selected = false;
+          draft.draft = "";
+        });
+      }
+      previousSavedCustomId = savedId;
+    },
+  );
+
+  const usingElevenLabs = () => speechCloud()?.provider === "elevenlabs";
+  createEffect(usingElevenLabs, (active) => {
+    if (!active && (speech().settings?.elevenLabsCustomVoiceId ?? null) === null) {
+      setCustomVoice((draft) => {
+        draft.selected = false;
+        draft.draft = "";
+      });
+    }
+  });
+
+  const showCustomVoiceRow = () =>
+    usingElevenLabs() &&
+    !serverSpeaks() &&
+    (customVoice.selected || speech().settings?.elevenLabsCustomVoiceId !== null);
+  const trimmedCustomVoice = () => customVoice.draft.trim();
+  const customVoiceValid = () => isElevenLabsVoiceId(trimmedCustomVoice());
+  const customVoiceDirty = () => trimmedCustomVoice() !== (speech().settings?.elevenLabsCustomVoiceId ?? "");
+
+  async function saveCustomVoice(): Promise<void> {
+    const next = trimmedCustomVoice();
+    if (!isElevenLabsVoiceId(next) || customVoice.saving) return;
+    setCustomVoice((draft) => {
+      draft.saving = true;
+    });
+    try {
+      await props.store.setElevenLabsCustomVoiceId(next);
+    } finally {
+      setCustomVoice((draft) => {
+        draft.saving = false;
+      });
+    }
+  }
+
+  async function clearCustomVoice(): Promise<void> {
+    if (customVoice.saving) return;
+    setCustomVoice((draft) => {
+      draft.saving = true;
+    });
+    try {
+      const saved = await props.store.setElevenLabsCustomVoiceId(null);
+      if (saved) {
+        setCustomVoice((draft) => {
+          draft.selected = false;
+          draft.draft = "";
+        });
+      }
+    } finally {
+      setCustomVoice((draft) => {
+        draft.saving = false;
+      });
+    }
+  }
+
   const voiceOptions = (): string[] => VOICE_OPTIONS[speechCloud()?.provider ?? "local"];
   const chosenVoice = (): string | null => {
     const saved = speech().settings;
     if (!saved) return null;
     const provider = speechCloud()?.provider;
-    if (provider === "elevenlabs") return saved.elevenLabsVoice;
+    if (provider === "elevenlabs") {
+      return customVoice.selected || saved.elevenLabsCustomVoiceId !== null
+        ? CUSTOM_ELEVENLABS_VOICE_CHOICE
+        : saved.elevenLabsVoice;
+    }
     if (provider === "xai") return saved.xaiVoice;
     return saved.voice;
   };
-  const anyVoiceName = (voice: string) =>
-    isSpeechVoice(voice) ? voiceName(voice) : voice.charAt(0).toUpperCase() + voice.slice(1);
+  const anyVoiceName = (voice: string) => {
+    if (voice === CUSTOM_ELEVENLABS_VOICE_CHOICE) return t("settings.voice.speech.elevenLabsCustom.option");
+    return isSpeechVoice(voice) ? voiceName(voice) : voice.charAt(0).toUpperCase() + voice.slice(1);
+  };
   const chooseVoice = (voice: string) => {
     if (voice === chosenVoice()) return;
+    if (voice === CUSTOM_ELEVENLABS_VOICE_CHOICE) {
+      setCustomVoice((draft) => {
+        draft.selected = true;
+      });
+      return;
+    }
     if (isSpeechVoice(voice)) props.store.setSpeechVoice(voice);
-    else if (isElevenLabsSpeechVoice(voice)) props.store.setElevenLabsVoice(voice);
-    else if (isXaiSpeechVoice(voice)) props.store.setXaiVoice(voice);
+    else if (isElevenLabsSpeechVoice(voice)) {
+      setCustomVoice((draft) => {
+        draft.selected = false;
+        draft.draft = "";
+      });
+      props.store.setElevenLabsVoice(voice);
+    } else if (isXaiSpeechVoice(voice)) props.store.setXaiVoice(voice);
   };
 
   const downloads = createMemo((): ModelDownload[] => {
@@ -531,8 +628,13 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   variant="ghost"
                   size="sm"
                   type="button"
-                  disabled={!speechReady()}
-                  onClick={() => void props.store.listen(t("settings.voice.speech.sample"))}
+                  disabled={!speechReady() || (showCustomVoiceRow() && !customVoiceValid())}
+                  onClick={() =>
+                    void props.store.listen(
+                      t("settings.voice.speech.sample"),
+                      showCustomVoiceRow() && customVoiceValid() ? trimmedCustomVoice() : undefined,
+                    )
+                  }
                 >
                   <Show when={speech().listening} fallback={<Play size={14} aria-hidden="true" />}>
                     <Square size={14} aria-hidden="true" />
@@ -560,6 +662,65 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   </SelectTrigger>
                   <SelectContent mount={props.selectMount} />
                 </Select>
+              </ItemActions>
+            </Item>
+          </Show>
+          <Show when={showCustomVoiceRow()}>
+            <Item data-settings-row="settings.voice.speech.elevenLabsCustom.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{t("settings.voice.speech.elevenLabsCustom.title")}</ItemTitle>
+                <ItemDescription>
+                  {trimmedCustomVoice() && !customVoiceValid()
+                    ? t("settings.voice.speech.elevenLabsCustom.invalid")
+                    : t("settings.voice.speech.elevenLabsCustom.description")}
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <div class="settings-voice-model-actions">
+                  <Show when={speech().settings?.elevenLabsCustomVoiceId !== null}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      disabled={customVoice.saving}
+                      onClick={() => void clearCustomVoice()}
+                    >
+                      {t("common.remove")}
+                    </Button>
+                  </Show>
+                  <Show when={customVoiceDirty() && customVoiceValid()}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      disabled={customVoice.saving}
+                      onClick={() => void saveCustomVoice()}
+                    >
+                      {t("common.save")}
+                    </Button>
+                  </Show>
+                  <div class="settings-modal-link-select settings-voice-key-field">
+                    <Input
+                      type="text"
+                      size="sm"
+                      autocomplete="off"
+                      spellcheck={false}
+                      maxlength={ELEVENLABS_CUSTOM_VOICE_ID_MAX_LENGTH}
+                      aria-label={t("settings.voice.speech.elevenLabsCustom.title")}
+                      placeholder={t("settings.voice.speech.elevenLabsCustom.placeholder")}
+                      value={customVoice.draft}
+                      disabled={customVoice.saving}
+                      onValueChange={(value) =>
+                        setCustomVoice((draft) => {
+                          draft.draft = value;
+                        })
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void saveCustomVoice();
+                      }}
+                    />
+                  </div>
+                </div>
               </ItemActions>
             </Item>
           </Show>

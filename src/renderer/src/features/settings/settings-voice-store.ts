@@ -25,7 +25,13 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { readAloud, stopSpeech } from "../speech/speech-playback";
-import { changeSpeechSpeed, speechSpeed, updateSpeechSettings } from "../speech/speech-speed";
+import {
+  latestSpeechSettings,
+  loadSpeechSettings,
+  speechSettingsLoaded,
+  updateSpeechSettings,
+} from "../speech/speech-settings-update";
+import { changeSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { voicePort } from "./voice-port";
 
 interface SettingsVoiceState {
@@ -82,6 +88,19 @@ export function createSettingsVoiceStore(active: () => boolean) {
     });
   };
 
+  let speechSaveGeneration = 0;
+  let pendingSpeechSaves = 0;
+
+  createEffect(
+    () => (active() && speechSettingsLoaded() ? latestSpeechSettings() : null),
+    (synced) => {
+      if (!synced || pendingSpeechSaves > 0) return;
+      setState((draft) => {
+        draft.speech.settings = synced;
+      });
+    },
+  );
+
   createEffect(active, (isActive) => {
     if (!isActive) return;
     const voice = voicePort().voice;
@@ -92,15 +111,15 @@ export function createSettingsVoiceStore(active: () => boolean) {
       voice.getModelStatuses(),
       voice.getSettings(),
       voice.getSpeechModelStatus(),
-      voice.getSpeechSettings(),
+      loadSpeechSettings(),
       voice.getServer(),
     ])
-      .then(([statuses, settings, speechStatus, speechSettings, server]) => {
+      .then(([statuses, settings, speechStatus, loadedSpeechSettings, server]) => {
         for (const status of statuses) setStatus(status);
         setState((draft) => {
           draft.settings = settings;
           draft.speech.status = speechStatus;
-          draft.speech.settings = speechSettings;
+          if (pendingSpeechSaves === 0 && loadedSpeechSettings) draft.speech.settings = loadedSpeechSettings;
           draft.server = server;
         });
       })
@@ -202,23 +221,37 @@ export function createSettingsVoiceStore(active: () => boolean) {
   function saveSpeech(patch: Partial<SpeechSettings>): Promise<boolean> {
     const current = state.speech.settings;
     if (!current) return Promise.resolve(false);
+    const generation = ++speechSaveGeneration;
+    pendingSpeechSaves += 1;
     const next = { ...current, ...patch };
     setState((draft) => {
       draft.speech.settings = next;
     });
     return updateSpeechSettings(voicePort().voice, patch)
-      .then((saved) => {
-        setState((draft) => {
-          draft.speech.settings = saved;
-        });
+      .then(() => {
+        if (generation === speechSaveGeneration) {
+          setState((draft) => {
+            draft.speech.settings = latestSpeechSettings();
+          });
+        }
         return true;
       })
       .catch((error: unknown) => {
-        setState((draft) => {
-          draft.speech.settings = current;
-        });
+        if (generation === speechSaveGeneration) {
+          setState((draft) => {
+            draft.speech.settings = speechSettingsLoaded() ? latestSpeechSettings() : current;
+          });
+        }
         fail(error, "settings.voice.saveFailed");
         return false;
+      })
+      .finally(() => {
+        pendingSpeechSaves -= 1;
+        if (pendingSpeechSaves === 0 && speechSettingsLoaded()) {
+          setState((draft) => {
+            draft.speech.settings = latestSpeechSettings();
+          });
+        }
       });
   }
 
@@ -314,7 +347,7 @@ export function createSettingsVoiceStore(active: () => boolean) {
     });
   }
 
-  async function listen(sample: string): Promise<void> {
+  async function listen(sample: string, elevenLabsVoiceId?: string | null): Promise<void> {
     if (state.speech.listening) {
       stopSpeech();
       return;
@@ -324,7 +357,7 @@ export function createSettingsVoiceStore(active: () => boolean) {
       draft.speech.listening = true;
     });
     try {
-      await readAloud(sample, isSpeechLanguage(locale) ? locale : "en");
+      await readAloud(sample, isSpeechLanguage(locale) ? locale : "en", null, undefined, elevenLabsVoiceId);
     } catch (error) {
       fail(error, "settings.voice.speech.listenFailed");
     } finally {
@@ -349,7 +382,9 @@ export function createSettingsVoiceStore(active: () => boolean) {
     removeSpeechApiKey: (provider: SpeechKeyProvider) => setSpeechApiKey(provider, null),
     saveDictationApiKey: (provider: DictationKeyProvider, key: string) => setDictationApiKey(provider, key),
     removeDictationApiKey: (provider: DictationKeyProvider) => setDictationApiKey(provider, null),
-    setElevenLabsVoice: (elevenLabsVoice: ElevenLabsSpeechVoice) => void saveSpeech({ elevenLabsVoice }),
+    setElevenLabsVoice: (elevenLabsVoice: ElevenLabsSpeechVoice) =>
+      void saveSpeech({ elevenLabsVoice, elevenLabsCustomVoiceId: null }),
+    setElevenLabsCustomVoiceId: (elevenLabsCustomVoiceId: string | null) => saveSpeech({ elevenLabsCustomVoiceId }),
     setXaiVoice: (xaiVoice: XaiSpeechVoice) => void saveSpeech({ xaiVoice }),
     setReadReplies,
     setCodexLive,

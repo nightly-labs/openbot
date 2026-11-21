@@ -16,7 +16,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Scope, Semaphore } from "effect";
 import type { SpeechPreferenceStore } from "./speech-preference-store";
 import { savedKeyError, type VoiceApiKeyStore } from "./voice-api-key-store";
-import { type SpeechFetch, speakInCloud } from "./voice-cloud-speech";
+import { resolveElevenLabsVoiceId, type SpeechFetch, speakInCloud } from "./voice-cloud-speech";
 import {
   SPEECH_HOST_THREADS,
   SPEECH_SESSION_CONFIG,
@@ -33,6 +33,7 @@ const HOST_IDLE_MS = 60_000;
 
 interface VoiceSpeechEvents {
   modelStatus: [status: SpeechModelStatus];
+  settings: [settings: SpeechSettings];
 }
 
 interface VoiceSpeechServiceOptions {
@@ -98,10 +99,21 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
   ) {
     const before = this.#preferences.get().modelId;
     const saved = yield* this.#preferences.set(settings);
+    this.emit("settings", saved);
     if (saved.modelId !== before) {
       if (before === SPEECH_MODEL_ID) yield* this.#model.cancel();
       yield* this.announceStatus();
     }
+    return this.#preferences.get();
+  }).bind(this);
+
+  readonly setAgentElevenLabsVoiceId = Effect.fn("VoiceSpeech.setAgentElevenLabsVoiceId")(function* (
+    this: VoiceSpeechService,
+    agentKey: string,
+    voiceId: string | null,
+  ) {
+    const saved = yield* this.#preferences.setAgentElevenLabsVoiceId(agentKey, voiceId);
+    this.emit("settings", saved);
     return saved;
   }).bind(this);
 
@@ -156,6 +168,7 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
         text: input.text,
         language: input.language,
         elevenLabsVoice: settings.elevenLabsVoice,
+        elevenLabsVoiceId: resolveElevenLabsVoiceId(input, settings),
         xaiVoice: settings.xaiVoice,
       }).pipe(
         Effect.tapError(() =>

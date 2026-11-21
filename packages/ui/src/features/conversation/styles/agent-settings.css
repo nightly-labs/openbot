@@ -1527,6 +1527,26 @@
   line-height: 15px;
 }
 
+.agent-settings-voice-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.agent-settings-voice-row div > span {
+  max-width: none;
+}
+
+.agent-settings-voice-controls {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.agent-settings-voice-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
+}
+
 .agent-settings-page [data-search-match] {
   background: var(--openbot-bg-control-active);
 }

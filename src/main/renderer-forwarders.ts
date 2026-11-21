@@ -570,6 +570,10 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.speechModelStatus, status);
   }
 
+  function forwardSpeechSettings(settings: import("@openbot/contracts/ipc").SpeechSettings): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.speechSettings, settings);
+  }
+
   function forwardVoiceServerSettings(settings: VoiceServerSettings | null): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.serverSettings, settings);
   }
@@ -694,6 +698,7 @@ export function createRendererForwarders({
     forwardVoiceStreamTranscript,
     forwardVoiceLiveEvent,
     forwardSpeechModelStatus,
+    forwardSpeechSettings,
     forwardVoiceServerSettings,
     forwardProviderRuntimeStatus,
     forwardGitHubConnectorStatus,

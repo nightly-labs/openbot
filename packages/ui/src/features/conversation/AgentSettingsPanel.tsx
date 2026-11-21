@@ -36,6 +36,8 @@ import {
   DEFAULT_AGENT_ACCESS,
   DEFAULT_AGENT_DEFAULTS,
   DEFAULT_BUSY_MESSAGE_MODE,
+  ELEVENLABS_CUSTOM_VOICE_ID_MAX_LENGTH,
+  isElevenLabsVoiceId,
   type ProviderRuntimeStatus,
   type ServerNotificationLevel,
   type UpdateAgentAdminSettingsInput,
@@ -197,6 +199,17 @@ export interface AgentSettingsPanelProps {
   onUnshownSaveError?: ((message: string) => void) | undefined;
   onStartNewChat?: (() => Promise<void>) | undefined;
   onDeleteHistory?: (() => Promise<void>) | undefined;
+  elevenLabsVoice?: AgentElevenLabsVoiceOptions | undefined;
+}
+
+export interface AgentElevenLabsVoiceOptions {
+  agentKey: string;
+  voiceId: string | null;
+  active: boolean;
+  canListen: boolean;
+  listening: boolean;
+  onSave: (voiceId: string | null) => Promise<boolean>;
+  onListen: (voiceId: string) => Promise<void>;
 }
 
 export interface AgentBrowserProfileOptions {
@@ -1639,6 +1652,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   />
                 </div>
               </Show>
+              <Show when={props.elevenLabsVoice !== undefined}>
+                <AgentElevenLabsVoiceRow options={() => props.elevenLabsVoice} />
+              </Show>
               <Show when={props.browserProfiles}>
                 {(options) => (
                   <div class="agent-settings-notifications">
@@ -1719,6 +1735,128 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       </Show>
       {props.children}
     </SettingsPanel>
+  );
+}
+
+function AgentElevenLabsVoiceRow(props: { options: () => AgentElevenLabsVoiceOptions | undefined }) {
+  const { t } = useText();
+  const initial = untrack(() => props.options());
+  const [state, setState] = createStore({ draft: initial?.voiceId ?? "", saving: false });
+  let syncedKey = initial?.agentKey ?? "";
+  let syncedVoice = initial?.voiceId ?? null;
+
+  createEffect(
+    () => {
+      const current = props.options();
+      return current ? (`${current.agentKey}\0${current.voiceId ?? ""}` as const) : null;
+    },
+    (signature) => {
+      if (!signature) return;
+      const current = untrack(() => props.options());
+      if (!current) return;
+      if (current.agentKey === syncedKey && current.voiceId === syncedVoice) return;
+      syncedKey = current.agentKey;
+      syncedVoice = current.voiceId;
+      setState((draft) => {
+        draft.draft = current.voiceId ?? "";
+      });
+    },
+  );
+
+  const trimmed = () => state.draft.trim();
+  const valid = () => isElevenLabsVoiceId(trimmed());
+  const dirty = () => trimmed() !== (props.options()?.voiceId ?? "");
+  const description = () => {
+    if (trimmed() && !valid()) return t("agentSettings.elevenLabsVoice.invalid");
+    if (props.options()?.active === false) return t("agentSettings.elevenLabsVoice.inactiveDescription");
+    return t("agentSettings.elevenLabsVoice.description");
+  };
+
+  async function save(): Promise<void> {
+    const current = props.options();
+    if (!current || state.saving) return;
+    const next = trimmed();
+    if (next && !isElevenLabsVoiceId(next)) return;
+    setState((draft) => {
+      draft.saving = true;
+    });
+    try {
+      await current.onSave(next || null);
+    } finally {
+      setState((draft) => {
+        draft.saving = false;
+      });
+    }
+  }
+
+  async function remove(): Promise<void> {
+    const current = props.options();
+    if (!current || state.saving) return;
+    const targetKey = current.agentKey;
+    setState((draft) => {
+      draft.saving = true;
+    });
+    try {
+      const saved = await current.onSave(null);
+      if (saved && props.options()?.agentKey === targetKey) {
+        setState((draft) => {
+          draft.draft = "";
+        });
+      }
+    } finally {
+      setState((draft) => {
+        draft.saving = false;
+      });
+    }
+  }
+
+  return (
+    <div class="agent-settings-notifications agent-settings-voice-row">
+      <div>
+        <strong>{t("agentSettings.elevenLabsVoice.title")}</strong>
+        <span>{description()}</span>
+      </div>
+      <div class="agent-settings-voice-controls">
+        <Input
+          type="text"
+          size="sm"
+          autocomplete="off"
+          spellcheck={false}
+          maxlength={ELEVENLABS_CUSTOM_VOICE_ID_MAX_LENGTH}
+          aria-label={t("agentSettings.elevenLabsVoice.title")}
+          placeholder={t("agentSettings.elevenLabsVoice.placeholder")}
+          value={state.draft}
+          disabled={state.saving}
+          onValueChange={(value) =>
+            setState((draft) => {
+              draft.draft = value;
+            })
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void save();
+          }}
+        />
+        <div class="agent-settings-voice-actions">
+          <Show when={props.options()?.listening === true || (valid() && props.options()?.canListen === true)}>
+            <Button variant="ghost" size="sm" type="button" onClick={() => void props.options()?.onListen(trimmed())}>
+              {props.options()?.listening
+                ? t("settings.voice.speech.voice.stop")
+                : t("settings.voice.speech.voice.listen")}
+            </Button>
+          </Show>
+          <Show when={props.options()?.voiceId !== null && !dirty()}>
+            <Button variant="ghost" size="sm" type="button" disabled={state.saving} onClick={() => void remove()}>
+              {t("common.remove")}
+            </Button>
+          </Show>
+          <Show when={dirty() && (!trimmed() || valid())}>
+            <Button variant="outline" size="sm" type="button" disabled={state.saving} onClick={() => void save()}>
+              {t("common.save")}
+            </Button>
+          </Show>
+        </div>
+      </div>
+    </div>
   );
 }
 

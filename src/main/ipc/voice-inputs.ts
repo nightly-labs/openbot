@@ -1,7 +1,11 @@
 import {
+  type AgentElevenLabsVoiceInput,
   isCodexLiveVoice,
   isDictationKeyProvider,
+  isElevenLabsAgentVoiceIds,
   isElevenLabsSpeechVoice,
+  isElevenLabsVoiceId,
+  isSpeechAgentKey,
   isSpeechKeyProvider,
   isSpeechLanguage,
   isSpeechModelId,
@@ -135,6 +139,8 @@ export function parseSpeechSettings(input: unknown): SpeechSettings {
     !isSpeechModelId(input.modelId) ||
     !isSpeechVoice(input.voice) ||
     !isElevenLabsSpeechVoice(input.elevenLabsVoice) ||
+    !(input.elevenLabsCustomVoiceId === null || isElevenLabsVoiceId(input.elevenLabsCustomVoiceId)) ||
+    !isElevenLabsAgentVoiceIds(input.elevenLabsAgentVoiceIds) ||
     !isXaiSpeechVoice(input.xaiVoice) ||
     !isSpeechSpeed(input.speed) ||
     typeof input.codexLive !== "boolean" ||
@@ -148,6 +154,8 @@ export function parseSpeechSettings(input: unknown): SpeechSettings {
     modelId: input.modelId,
     voice: input.voice,
     elevenLabsVoice: input.elevenLabsVoice,
+    elevenLabsCustomVoiceId: input.elevenLabsCustomVoiceId,
+    elevenLabsAgentVoiceIds: { ...input.elevenLabsAgentVoiceIds },
     xaiVoice: input.xaiVoice,
     speed: input.speed,
     codexLive: input.codexLive,
@@ -169,11 +177,36 @@ export function parseVoiceLiveStop(input: unknown): VoiceLiveStop {
   return { sessionId: input.sessionId };
 }
 
+export function parseAgentElevenLabsVoiceInput(input: unknown): AgentElevenLabsVoiceInput {
+  if (
+    !isObject(input) ||
+    !isSpeechAgentKey(input.agentKey) ||
+    !(input.voiceId === null || isElevenLabsVoiceId(input.voiceId))
+  ) {
+    throw new Error("Agent ElevenLabs voice needs a valid agent key and voice ID.");
+  }
+  return { agentKey: input.agentKey, voiceId: input.voiceId };
+}
+
 export function parseSpeechInput(input: unknown): SpeechInput {
   if (!isObject(input) || typeof input.text !== "string" || !input.text.trim() || !isSpeechLanguage(input.language))
     throw new Error("Speech needs text and a known language.");
   if (input.text.length > SPEECH_LIMITS.maximumTextLength) throw new Error("The speech text is too long.");
-  return { text: input.text, language: input.language };
+  const agentKey = input.agentKey === undefined ? undefined : isSpeechAgentKey(input.agentKey) ? input.agentKey : null;
+  if (agentKey === null) throw new Error("Speech agent key is invalid.");
+  const elevenLabsVoiceId =
+    input.elevenLabsVoiceId === undefined
+      ? undefined
+      : isElevenLabsVoiceId(input.elevenLabsVoiceId)
+        ? input.elevenLabsVoiceId
+        : null;
+  if (elevenLabsVoiceId === null) throw new Error("ElevenLabs voice ID is invalid.");
+  return {
+    text: input.text,
+    language: input.language,
+    ...(agentKey === undefined ? {} : { agentKey }),
+    ...(elevenLabsVoiceId === undefined ? {} : { elevenLabsVoiceId }),
+  };
 }
 
 export function parseVoiceServerConnection(input: unknown): VoiceServerConnection {

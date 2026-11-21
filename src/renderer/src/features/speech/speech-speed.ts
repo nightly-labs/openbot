@@ -1,28 +1,19 @@
-import { nextSpeechSpeed, type OpenBotDesktopApi, type SpeechSettings, type SpeechSpeed } from "@openbot/contracts/ipc";
+import { nextSpeechSpeed, type SpeechSpeed } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
 import { setReplyPlaybackRate } from "./speech-playback";
 import { speechPort } from "./speech-port";
+import { loadSpeechSettings, updateSpeechSettings } from "./speech-settings-update";
 
 const [speed, setSpeed] = createSignal<SpeechSpeed>(1);
 let loading: Promise<void> | undefined;
 let changed = false;
 let saved: SpeechSpeed = 1;
-let saving: Promise<unknown> = Promise.resolve();
 
 function apply(next: SpeechSpeed): void {
   setSpeed(next);
   setReplyPlaybackRate(next);
-}
-
-export function updateSpeechSettings(
-  voice: Pick<OpenBotDesktopApi["voice"], "getSpeechSettings" | "setSpeechSettings">,
-  patch: Partial<SpeechSettings>,
-): Promise<SpeechSettings> {
-  const next = saving.then(async () => voice.setSpeechSettings({ ...(await voice.getSpeechSettings()), ...patch }));
-  saving = next.catch(() => undefined);
-  return next;
 }
 
 export function speechSpeed(): SpeechSpeed {
@@ -31,18 +22,15 @@ export function speechSpeed(): SpeechSpeed {
 }
 
 export function loadSpeechSpeed(): Promise<void> {
-  loading ??= speechPort()
-    .voice.getSpeechSettings()
-    .then(
-      (settings) => {
-        if (changed) return;
-        saved = settings.speed;
-        apply(settings.speed);
-      },
-      () => {
-        loading = undefined;
-      },
-    );
+  loading ??= loadSpeechSettings().then((settings) => {
+    if (!settings) {
+      loading = undefined;
+      return;
+    }
+    if (changed) return;
+    saved = settings.speed;
+    apply(settings.speed);
+  });
   return loading;
 }
 

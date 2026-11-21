@@ -634,6 +634,7 @@ export interface ApplicationServiceContext {
   forwardVoiceModelStatus: (status: VoiceModelStatus) => void;
   forwardVoiceStreamTranscript: (transcript: VoiceStreamTranscript) => void;
   forwardSpeechModelStatus: (status: SpeechModelStatus) => void;
+  forwardSpeechSettings: (settings: import("@openbot/contracts/ipc").SpeechSettings) => void;
   forwardVoiceServerSettings: (settings: VoiceServerSettings | null) => void;
   forwardWorkflowNotice: (notice: WorkflowNotice) => void;
   prepareForUpdateInstall: () => Promise<void>;
@@ -993,6 +994,7 @@ export async function createApplicationServices({
   forwardVoiceModelStatus,
   forwardVoiceStreamTranscript,
   forwardSpeechModelStatus,
+  forwardSpeechSettings,
   forwardVoiceServerSettings,
   forwardWorkflowNotice,
   prepareForUpdateInstall,
@@ -3864,6 +3866,7 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.speech, "speech", () => Effect.runPromise(speech.shutdown()));
   speech.on("modelStatus", forwardSpeechModelStatus);
+  speech.on("settings", forwardSpeechSettings);
   const voiceServerPreferences = createVoiceServerPreferenceStore(join(app.getPath("userData"), "voice-server.json"));
   await runCauseEffect(voiceServerPreferences.load());
   const voiceServerKeys = new VoiceApiKeyStore({

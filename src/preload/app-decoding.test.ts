@@ -1,15 +1,17 @@
-import type {
-  AccountSession,
-  AppAppearancePreference,
-  AppInfo,
-  ApprovalAutomationPreference,
-  AppSetupState,
-  AppThemePalette,
-  CentralAuthState,
-  MobileConnectedDevice,
-  NotificationOpenedEvent,
-  UpdateStatus,
-  WorkflowNotificationOpenedEvent,
+import {
+  type AccountSession,
+  type AppAppearancePreference,
+  type AppInfo,
+  type ApprovalAutomationPreference,
+  type AppSetupState,
+  type AppThemePalette,
+  type CentralAuthState,
+  DEFAULT_SPEECH_SETTINGS,
+  type MobileConnectedDevice,
+  type NotificationOpenedEvent,
+  type SpeechSettings,
+  type UpdateStatus,
+  type WorkflowNotificationOpenedEvent,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
@@ -39,6 +41,7 @@ import {
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
   decodeSentMessageStats,
+  decodeSpeechSettings,
   decodeUpdatePreference,
   decodeUpdateStatus,
   decodeVoiceServerProbe,
@@ -133,6 +136,15 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     { launchAtLogin: true, keepRunningInBackground: false, keepAwake: null, keepAwakeOnBattery: null, quitGuard: null },
   ],
   ["a voice server", decodeVoiceServerSettings, voiceServer],
+  [
+    "speech settings with custom ElevenLabs voice IDs",
+    decodeSpeechSettings,
+    {
+      ...DEFAULT_SPEECH_SETTINGS,
+      elevenLabsCustomVoiceId: "JBFqnCBsd6RMkjVDRZzb",
+      elevenLabsAgentVoiceIds: { "local:agent-1": "21m00Tcm4TlvDq8ikWAM" },
+    } satisfies SpeechSettings,
+  ],
   ["no voice server", decodeVoiceServerSettings, null],
   [
     "a voice server test that found models",
@@ -426,6 +438,21 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     { name: "OpenBot", version: "1.0.0", platform: "linux", variant: "production", dynamicIslandUnavailable: "yes" },
   ],
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
+  [
+    "speech settings with a path in the custom ElevenLabs voice ID",
+    decodeSpeechSettings,
+    { ...DEFAULT_SPEECH_SETTINGS, elevenLabsCustomVoiceId: "../bad" },
+  ],
+  [
+    "speech settings with a Map as agent ElevenLabs voices",
+    decodeSpeechSettings,
+    { ...DEFAULT_SPEECH_SETTINGS, elevenLabsAgentVoiceIds: new Map() },
+  ],
+  [
+    "speech settings with an unscoped agent voice key",
+    decodeSpeechSettings,
+    { ...DEFAULT_SPEECH_SETTINGS, elevenLabsAgentVoiceIds: { constructor: "21m00Tcm4TlvDq8ikWAM" } },
+  ],
   [
     "a voice server that dictates with no model",
     decodeVoiceServerSettings,

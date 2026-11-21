@@ -3,7 +3,9 @@ import {
   type CloudSpeechModelInfo,
   type ElevenLabsSpeechVoice,
   type SpeechAudio,
+  type SpeechInput,
   type SpeechLanguage,
+  type SpeechSettings,
   VOICE_KEY_PROVIDER_NAMES,
   type XaiSpeechVoice,
 } from "@openbot/contracts/ipc";
@@ -90,7 +92,19 @@ export interface CloudSpeechRequest {
   text: string;
   language: SpeechLanguage;
   elevenLabsVoice: ElevenLabsSpeechVoice;
+  elevenLabsVoiceId?: string | null;
   xaiVoice: XaiSpeechVoice;
+}
+
+export function resolveElevenLabsVoiceId(
+  input: Pick<SpeechInput, "agentKey" | "elevenLabsVoiceId">,
+  settings: Pick<SpeechSettings, "elevenLabsAgentVoiceIds" | "elevenLabsCustomVoiceId">,
+): string | null {
+  const agentVoiceId =
+    input.agentKey && Object.hasOwn(settings.elevenLabsAgentVoiceIds, input.agentKey)
+      ? (settings.elevenLabsAgentVoiceIds[input.agentKey] ?? null)
+      : null;
+  return input.elevenLabsVoiceId ?? agentVoiceId ?? settings.elevenLabsCustomVoiceId;
 }
 
 export function speakInCloud(
@@ -111,11 +125,11 @@ export function speakInCloud(
   }
   const model = ELEVENLABS_MODELS[request.model.id];
   if (!model) return Effect.fail(failure(request, "error.voice.speech.providerFailed"));
-  const voiceId = ELEVENLABS_VOICE_IDS[request.elevenLabsVoice];
+  const voiceId = request.elevenLabsVoiceId ?? ELEVENLABS_VOICE_IDS[request.elevenLabsVoice];
   return exchange(
     fetcher,
     request,
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_${SAMPLE_RATE}`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=pcm_${SAMPLE_RATE}`,
     {
       headers: { "xi-api-key": request.key },
       body: {
@@ -177,6 +191,7 @@ function failure(request: CloudSpeechRequest, key: CloudSpeechErrorKey): VoiceOp
 type CloudSpeechErrorKey =
   | "error.voice.cloud.keyRejected"
   | "error.voice.cloud.quotaExceeded"
+  | "error.voice.cloud.voiceNotFound"
   | "error.voice.cloud.rateLimited"
   | "error.voice.speech.providerFailed"
   | "error.voice.speech.providerUnreachable";
@@ -194,6 +209,7 @@ function errorAnswer(
         `${request.model.provider} refused speech with HTTP ${response.status}${status ? ` (${status})` : ""}.`,
       );
       if (status === "quota_exceeded") return Effect.fail(fail("error.voice.cloud.quotaExceeded"));
+      if (status === "voice_not_found") return Effect.fail(fail("error.voice.cloud.voiceNotFound"));
       if (response.status === 401 || response.status === 403) return Effect.fail(fail("error.voice.cloud.keyRejected"));
       if (response.status === 429) return Effect.fail(fail("error.voice.cloud.rateLimited"));
       if (reason) return Effect.fail(refused(request, reason));
