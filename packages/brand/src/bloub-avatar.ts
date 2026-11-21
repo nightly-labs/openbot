@@ -18,8 +18,11 @@ export interface BloubAvatarProfile {
 
 const AUTOMATIC_COLORS = ["rouge", "orange", "ambre", "vert", "turquoise", "bleu", "violet", "rose"] as const;
 const UNSUPPORTED_AVATAR_SILHOUETTE = "goutte" as const satisfies ShapeId;
-const isSupportedSilhouette = (silhouette: ShapeId): silhouette is SupportedAvatarSilhouetteId =>
-  silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE;
+function isSupportedSilhouette<Silhouette extends ShapeId>(
+  silhouette: Silhouette,
+): silhouette is Exclude<Silhouette, typeof UNSUPPORTED_AVATAR_SILHOUETTE> {
+  return silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE;
+}
 export const SUPPORTED_AVATAR_SILHOUETTES = SHAPES.map((option) => option.id).filter(isSupportedSilhouette);
 const SEEDED_AVATAR_SILHOUETTES = [
   "cercle",
@@ -37,9 +40,7 @@ const SEEDED_AVATAR_SILHOUETTES = [
 type SeededSilhouette = (typeof SEEDED_AVATAR_SILHOUETTES)[number];
 type SeededSupportedSilhouette = Exclude<SeededSilhouette, typeof UNSUPPORTED_AVATAR_SILHOUETTE>;
 type NamedSilhouette = Exclude<ShapeId, SeededSilhouette>;
-const SEEDED_SUPPORTED_SILHOUETTES = SEEDED_AVATAR_SILHOUETTES.filter(
-  (silhouette): silhouette is SeededSupportedSilhouette => silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE,
-);
+const SEEDED_SUPPORTED_SILHOUETTES = SEEDED_AVATAR_SILHOUETTES.filter(isSupportedSilhouette);
 const NAMED_SILHOUETTE_LOOKALIKES: Readonly<Record<NamedSilhouette, SeededSupportedSilhouette>> = {
   fantome: "squircle",
   meduse: "galet",
@@ -250,11 +251,16 @@ export function avatarSeedForFace(
   face: { shape: SupportedAvatarSilhouetteId; expression: ExpressionId },
   style: AvatarStyle = "plush",
 ): string {
-  const prefix = isNamedSilhouette(face.shape) ? `${agentId}:${face.shape}` : agentId;
+  const named = isNamedSilhouette(face.shape) ? face.shape : null;
+  const prefix = named ? `${agentId}:${named}` : agentId;
   const seededShape = seededLookalike(face.shape);
   for (let index = 0; index < FACE_SEED_TRIES; index += 1) {
     const candidate = `${prefix}:${STYLE_SEED_SEGMENT[style]}:${index}`;
-    if (seededSilhouette(candidate) === seededShape && seededExpression(candidate) === face.expression) {
+    if (
+      namedSilhouette(candidate) === named &&
+      seededSilhouette(candidate) === seededShape &&
+      seededExpression(candidate) === face.expression
+    ) {
       return candidate;
     }
   }
