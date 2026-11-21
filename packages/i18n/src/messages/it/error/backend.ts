@@ -297,6 +297,8 @@ export const messages = {
     "Il suo strumento {tool} ha un formato di input che questo provider non riesce a leggere. Gli agenti con altri provider ricevono ancora il server.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} non è riuscito a usare il server MCP {name} perché il server chiede l’accesso. Apri {name} in Marketplace, App, e scegli Accedi.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} non è riuscito a usare il server MCP {name} perché il server chiede una chiave. Apri {name} in Marketplace, App, scegli Modifica e inserisci la chiave corretta in Header.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} non è riuscito ad avviare il server MCP {name}. Apri {name} in Marketplace, App, e scegli Prova la connessione per vedere la causa.",
   "error.backend.mcpServerFailedInProvider":

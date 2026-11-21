@@ -271,6 +271,8 @@ export const messages = {
     "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Sign in.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש מפתח. יש לפתוח את {name} בחנות, אפליקציות, לבחור עריכה ולהזין את המפתח הנכון בכותרות.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Test connection כדי לראות את הסיבה.",
   "error.backend.mcpServerFailedInProvider":

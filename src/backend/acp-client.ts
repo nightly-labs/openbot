@@ -3040,6 +3040,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           provider: agentProviderName(this.provider),
           name: saved,
         }),
+        ...(kind === "sign_in" ? { signIn: true } : {}),
       },
     ]);
   }

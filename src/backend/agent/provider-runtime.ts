@@ -330,6 +330,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #usageLimitRefreshes = new WeakSet<AgentClient>();
   readonly #mcpHandoff: McpHandoffLog;
   readonly #redactMcp: (text: string) => string;
+  readonly #reportMcpSignIn: ((provider: AgentProvider, server: string, signInText: string) => void) | null;
   readonly #configRevisions = new WeakMap<AgentClient, number>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   readonly #cliSources = new Map<AgentProvider, Pick<AgentCliInfo, "source" | "incomplete">>();
@@ -419,6 +420,7 @@ export class ProviderRuntime implements ProviderPort {
     credentials: ProviderClientContext;
     mcpHandoff?: McpHandoffLog;
     redactMcp: (text: string) => string;
+    reportMcpSignIn?: (provider: AgentProvider, server: string, signInText: string) => void;
     accounts?: ProviderAccountStore;
   }) {
     this.#off = new Set(options.offProviders);
@@ -438,6 +440,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#credentials = options.credentials;
     this.#mcpHandoff = options.mcpHandoff ?? new McpHandoffLog();
     this.#redactMcp = options.redactMcp;
+    this.#reportMcpSignIn = options.reportMcpSignIn ?? null;
     this.#codexLogin = new CodexLoginFlow({
       bundledExecutable: () => this.#bundledExecutables.codex,
       installedChosen: () => this.#installedChosen.has("codex") || this.#installedFallback.has("codex"),
@@ -4279,10 +4282,9 @@ export class ProviderRuntime implements ProviderPort {
     const key = [provider, server, kind].join("\u0000");
     if (this.#reportedMcpFailures.has(key)) return;
     this.#reportedMcpFailures.add(key);
-    this.#emitError(
-      "mcp_server_not_started",
-      sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server }),
-    );
+    const text = sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server });
+    if (kind === "sign_in" && this.#reportMcpSignIn) this.#reportMcpSignIn(provider, server, text);
+    else this.#emitError("mcp_server_not_started", text);
   }
 
   #reportGitHubToolsFailure(provider: AgentProvider): void {
