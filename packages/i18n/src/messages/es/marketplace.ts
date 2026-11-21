@@ -670,6 +670,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Instala {name} en el equipo donde se ejecutan estos agentes: su app requiere iniciar sesión en un navegador.",
   "marketplace.error.appInvalid": "No se puede añadir {name}: {reason}",
+  "marketplace.error.appNotConnected": "No se pudo conectar {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Selecciona un servidor local para desinstalar un plugin.",
   "marketplace.error.uninstallPartial": "No se pudieron eliminar algunas partes de {name}. {failures}",
   "marketplace.error.actionFailed": "No se pudo completar la acción del marketplace. Inténtalo de nuevo.",

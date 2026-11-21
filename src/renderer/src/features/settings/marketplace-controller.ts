@@ -231,7 +231,7 @@ export function createMarketplaceController(
   props: MarketplaceControllerProps,
   serverSlots?: (tools: McpServerTools) => MarketplaceServerSlots,
 ) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const calls = () => props.calls ?? desktopMarketplaceCalls();
   const skillCalls = () => calls().agentSkills(props.hostServerId);
   const agents = createMemo(() => props.agents);
@@ -1015,7 +1015,7 @@ export function createMarketplaceController(
     const here = flowsHere(app);
     const saved = savedKeyFlow(here, row);
     const [first, ...rest] = saved ? [saved, ...here.filter((flow) => flow !== saved)] : here;
-    if (!first) return Promise.resolve(config);
+    if (!first) return startedApp(app, config);
     return new Promise((resolve) => {
       setConnecting({
         subject: { name: app.name, iconUrl: app.iconUrl, config },
@@ -1033,6 +1033,13 @@ export function createMarketplaceController(
     const serverId = props.pluginServerId;
     if (!serverId) throw new Error(t("marketplace.error.connectNoServer"));
     return calls().mcp.testMcpServer({ config }, serverId);
+  }
+
+  async function startedApp(app: MarketplacePluginApp, config: McpServerConfig): Promise<McpServerConfig | null> {
+    const result = await testPluginApp(config);
+    if (!result.error) return config;
+    setError(t("marketplace.error.appNotConnected", { name: app.name, reason: sourceText(result.error) }));
+    return null;
   }
 
   const signInRelay = () => (props.pluginSignInRelay ? calls().signInRelay : undefined);
