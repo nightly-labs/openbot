@@ -1,6 +1,6 @@
 import { unzipOfficeXml } from "@openbot/contracts/office-zip";
 
-export const WORD_DOCUMENT_MAX_BLOCKS = 5000;
+const WORD_DOCUMENT_MAX_BLOCKS = 5000;
 const MAX_STYLE_DEPTH = 16;
 const DOCX_XML_ENTRY = /^word\/(?:document|styles|numbering)\.xml$/u;
 const RUN_CONTAINERS = new Set([
@@ -26,7 +26,7 @@ export interface WordRun {
   strike: boolean;
 }
 
-export interface WordTableCell {
+interface WordTableCell {
   paragraphs: WordRun[][];
   columnSpan: number;
 }
@@ -38,7 +38,7 @@ export interface WordTableRow {
 
 const WORD_HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
 
-export type WordHeadingLevel = (typeof WORD_HEADING_LEVELS)[number];
+type WordHeadingLevel = (typeof WORD_HEADING_LEVELS)[number];
 
 export type WordBlock =
   | { kind: "heading"; level: WordHeadingLevel; runs: WordRun[] }
