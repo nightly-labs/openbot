@@ -232,7 +232,7 @@ export class RoutineScheduler implements RoutineDueSource {
 
   quietRunForDelivery(deliveryId: string): boolean {
     const run = this.#routines.runForDelivery(deliveryId);
-    return run !== null && quietRoutineRun(run);
+    return run === null ? this.workflowRunSource(deliveryId) !== null : quietRoutineRun(run);
   }
 
   retriesAfterRestart(deliveryId: string): boolean {
