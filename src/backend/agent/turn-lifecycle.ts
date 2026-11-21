@@ -141,6 +141,8 @@ function modelAtCapacity(error: DynamicRecord | null, details: string | null): b
   return error?.codexErrorInfo === "serverOverloaded" || (details !== null && MODEL_AT_CAPACITY.test(details));
 }
 const ENDED_TURN_LIMIT = 256;
+const SELF_STARTED_ORIGIN_LIMIT = 4096;
+const REQUEST_SEARCH_TURN_LIMIT = 64;
 
 function keepNewest(turns: Set<string>, turnId: string): void {
   turns.add(turnId);
@@ -379,6 +381,7 @@ export class TurnLifecycle {
     }
   >();
   readonly #unreadReports = new Map<string, Map<string, string>>();
+  readonly #selfStartedOrigins = new Map<string, readonly string[]>();
   readonly #lastResults = new Map<string, { turnIds: readonly string[]; requests: readonly DeliveryContext[] }>();
   readonly #deliveryStarts = new Map<string, DeliveryStart>();
   readonly #turnTimings = new Map<string, TurnTiming>();
@@ -542,6 +545,7 @@ export class TurnLifecycle {
     this.#capacityNotices.clear();
     this.#limitedTurns.clear();
     this.#unreadReports.clear();
+    this.#selfStartedOrigins.clear();
     this.#lastResults.clear();
     this.#quietTurns.clear();
     this.#followUpTurns.clear();
@@ -1024,17 +1028,50 @@ export class TurnLifecycle {
     }
     const deliveries: DeliveryContext[] = [];
     const continuations = new Map<string, UsageLimitContinuation>();
-    for (const [earlier, lines] of reports)
-      for (const context of this.#mailbox.completedDeliveriesOfTurn(agentId, earlier)) {
+    for (const [earlier, lines] of reports) {
+      const { requests, turns } = this.#requestsBehindTurn(agentId, earlier);
+      for (const context of requests) {
         if (context.channelId !== undefined || context.delivery.sender.kind === "routine") continue;
-        deliveries.push(context);
+        const known = continuations.get(context.delivery.id);
+        if (!known) deliveries.push(context);
         continuations.set(context.delivery.id, {
-          turnId: earlier,
-          previousTurnIds: [earlier, turnId],
-          workSteps: lines.join("\n\n").slice(-6000),
+          turnId: known?.turnId ?? earlier,
+          previousTurnIds: [
+            ...new Set([...(known?.previousTurnIds ?? [context.delivery.turnId ?? earlier]), ...turns, turnId]),
+          ],
+          workSteps: [known?.workSteps, ...lines].filter(Boolean).join("\n\n").slice(-6000),
         });
       }
+    }
     return deliveries.length > 0 ? { deliveries, continuations } : null;
+  }
+
+  #requestsBehindTurn(agentId: string, turnId: string): { requests: DeliveryContext[]; turns: string[] } {
+    const requests: DeliveryContext[] = [];
+    const turns = new Set<string>();
+    let pending = [turnId];
+    while (pending.length > 0 && turns.size < REQUEST_SEARCH_TURN_LIMIT) {
+      const origins: string[] = [];
+      for (const candidate of pending) {
+        if (turns.has(candidate)) continue;
+        turns.add(candidate);
+        const found = this.#mailbox.completedDeliveriesOfTurn(agentId, candidate);
+        if (found.length > 0) requests.push(...found);
+        else origins.push(...(this.#selfStartedOrigins.get(candidate) ?? []));
+      }
+      pending = origins;
+    }
+    return { requests, turns: [...turns] };
+  }
+
+  #noteSelfStartedOrigins(turnId: string, origins: readonly string[]): void {
+    this.#selfStartedOrigins.delete(turnId);
+    if (origins.length === 0) return;
+    this.#selfStartedOrigins.set(turnId, origins);
+    for (const oldest of this.#selfStartedOrigins.keys()) {
+      if (this.#selfStartedOrigins.size <= SELF_STARTED_ORIGIN_LIMIT) break;
+      this.#selfStartedOrigins.delete(oldest);
+    }
   }
 
   #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
@@ -1185,6 +1222,7 @@ export class TurnLifecycle {
         this.#unreadReports.delete(reportsKey);
         const started = this.#runningTurns.get(turnId);
         if (started && reports && unprompted) started.reports = reports;
+        if (started?.unprompted) this.#noteSelfStartedOrigins(turnId, started.continues);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
         if (laneId === null || laneId === MESSAGING_LANE) this.#failedTurns.delete(agentId);
@@ -1389,10 +1427,13 @@ export class TurnLifecycle {
         return;
       }
       case "openbot/turn-continues": {
-        const running = this.#runningTurns.get(getString(params, "turnId") ?? "");
+        const turnId = getString(params, "turnId") ?? "";
+        const running = this.#runningTurns.get(turnId);
         if (!running) return;
         const origin = isRecord(params) && isString(params.continues) ? params.continues : null;
         running.continues = origin !== null && running.continues.length > 0 ? [...running.continues, origin] : [];
+        if (origin !== null)
+          this.#noteSelfStartedOrigins(turnId, [...(this.#selfStartedOrigins.get(turnId) ?? []), origin]);
         return;
       }
       case "openbot/background-work": {
