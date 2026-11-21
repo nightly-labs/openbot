@@ -1,8 +1,8 @@
-import { parseWordDocument, type WordBlock, type WordRun, type WordTableRow } from "@openbot/contracts/word-document";
 import { Dynamic, type JSX } from "@solidjs/web";
 import { createMemo, For, Show } from "solid-js";
 import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
+import { parseWordDocument, type WordBlock, type WordRun, type WordTableRow } from "./word-document";
 
 export interface WordFilePreviewProps {
   bytes: Uint8Array | null;

@@ -81,7 +81,7 @@
     "./signal-protocol/webhook-route": "./src/signal-protocol/webhook-route.ts",
     "./slack-app": "./src/slack-app.ts",
     "./spreadsheet-workbook": "./src/spreadsheet-workbook.ts",
-    "./word-document": "./src/word-document.ts",
+    "./office-zip": "./src/office-zip.ts",
     "./slack-workspace-grant": "./src/slack-workspace-grant.ts",
     "./web-messaging-install": "./src/web-messaging-install.ts",
     "./telegram-app": "./src/telegram-app.ts",

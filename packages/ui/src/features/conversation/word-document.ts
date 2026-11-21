@@ -1,5 +1,4 @@
-import { strFromU8 } from "fflate";
-import { unzipOfficeXml } from "./office-zip";
+import { unzipOfficeXml } from "@openbot/contracts/office-zip";
 
 export const WORD_DOCUMENT_MAX_BLOCKS = 5000;
 const MAX_STYLE_DEPTH = 16;
@@ -75,7 +74,7 @@ interface DocumentContext {
 
 function xmlDocument(bytes: Uint8Array | undefined): Document | null {
   if (!bytes) return null;
-  const document = new DOMParser().parseFromString(strFromU8(bytes), "application/xml");
+  const document = new DOMParser().parseFromString(new TextDecoder().decode(bytes), "application/xml");
   if (document.getElementsByTagName("parsererror").length > 0) {
     throw new Error("The document contains invalid XML.");
   }
@@ -334,9 +333,10 @@ function addParagraph(context: DocumentContext, paragraph: Element): void {
 
 function cellParagraphs(context: DocumentContext, parent: Element, paragraphs: WordRun[][]): void {
   for (const child of childElements(parent)) {
+    if (context.truncated) return;
     if (child.localName === "p") {
       const runs = paragraphRuns(context, child, paragraphStyleChain(context, child));
-      if (hasText(runs)) paragraphs.push(runs);
+      if (hasText(runs) && reserveUnit(context)) paragraphs.push(runs);
     } else if (child.localName === "tbl") {
       for (const row of childElements(child, "tr")) {
         for (const cell of childElements(row, "tc")) cellParagraphs(context, cell, paragraphs);
