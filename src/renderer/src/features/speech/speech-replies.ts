@@ -9,6 +9,7 @@ import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { desktopAnalytics } from "../../analytics";
+import { speechModelFindsLanguage } from "./speech-model";
 import {
   loadRecording,
   pauseSpeech,
@@ -359,14 +360,14 @@ function startRecording(messageId: string, url: string, from: number): void {
   });
 }
 
-function serverLanguage(fallback: SpeechLanguage): SpeechLanguage | null {
-  return voiceServer()?.routes.speech ? fallback : null;
-}
-
 function speechInput(markdown: string, fallback: SpeechLanguage): UpcomingReading | undefined {
   const text = markdown ? speechTextFromMarkdown(markdown) : "";
-  const language = text ? (speechLanguageOf(text, fallback) ?? serverLanguage(fallback)) : null;
-  return language ? { text, language } : undefined;
+  if (!text) return undefined;
+  const language = speechLanguageOf(text, fallback);
+  if (language) return { text, language };
+  if (voiceServer()?.routes.speech) return { text, language: fallback };
+  if (speechModelFindsLanguage()) return { text, language: null };
+  return undefined;
 }
 
 async function speak(

@@ -88,7 +88,7 @@ export interface CloudSpeechRequest {
   model: CloudSpeechModelInfo;
   key: string;
   text: string;
-  language: SpeechLanguage;
+  language: SpeechLanguage | null;
   elevenLabsVoice: ElevenLabsSpeechVoice;
   xaiVoice: XaiSpeechVoice;
 }
@@ -98,7 +98,7 @@ export function speakInCloud(
   request: CloudSpeechRequest,
 ): Effect.Effect<SpeechAudio, VoiceOperationError> {
   if (request.model.provider === "xai") {
-    const language = XAI_LANGUAGES[request.language] ?? "auto";
+    const language = (request.language && XAI_LANGUAGES[request.language]) ?? "auto";
     return exchange(fetcher, request, "https://api.x.ai/v1/tts", {
       headers: { Authorization: `Bearer ${request.key}` },
       body: {
@@ -121,7 +121,7 @@ export function speakInCloud(
       body: {
         text: request.text,
         model_id: model.modelId,
-        ...(model.languageCode && !ELEVENLABS_UNLISTED_LANGUAGES.has(request.language)
+        ...(model.languageCode && request.language && !ELEVENLABS_UNLISTED_LANGUAGES.has(request.language)
           ? { language_code: request.language }
           : {}),
       },
