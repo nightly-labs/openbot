@@ -78,6 +78,7 @@ const waits = new AgentWaits({
     requireKnownAgent: (agentId) => {
       conversation.requireKnownAgent(agentId);
     },
+    isSideThread: () => false,
   },
 });
 

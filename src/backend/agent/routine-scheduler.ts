@@ -102,6 +102,7 @@ export interface RoutineHooks {
   isRunning(): boolean;
   usageLimited(agentId: string): boolean;
   routineThread(agentId: string, routineId: string, routineName: string): { taskId: string; threadId: string } | null;
+  waitThread(agentId: string, taskId: string): { taskId: string; threadId: string } | null;
   routineDeleted(agentId: string, routineId: string): Effect.Effect<void>;
 }
 
@@ -228,6 +229,13 @@ export class RoutineScheduler implements RoutineDueSource {
 
   wokenWaits(deliveryId: string): AgentWait[] {
     return this.#waits.wokenBy(deliveryId);
+  }
+
+  continuesWait(deliveryId: string): boolean {
+    const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (delivery?.sender.kind !== "routine" || this.#mailbox.taskIdForDelivery(deliveryId) === null) return false;
+    const run = this.#routines.run(delivery.sender.runId);
+    return run?.agentId === delivery.recipientAgentId && run.deliveryId !== null && run.deliveryId !== deliveryId;
   }
 
   quietRunForDelivery(deliveryId: string): boolean {
@@ -1044,9 +1052,12 @@ export class RoutineScheduler implements RoutineDueSource {
     const agent = yield* this.#store.getOrCreate(run.agentId).pipe(toRoutineOperationFailed);
     return yield* Effect.gen({ self: this }, function* () {
       yield* routineStep(validateRecipient);
-      const thread = yield* routineStep(() =>
-        record?.runIn === "thread" ? this.#hooks.routineThread(agent.id, run.routineId, run.routineName) : null,
-      );
+      const thread = yield* routineStep(() => {
+        const waitTaskId = waitId ? this.#waits.sideThreadOfWait(agent.id, waitId) : null;
+        const waitThread = waitTaskId ? this.#hooks.waitThread(agent.id, waitTaskId) : null;
+        if (waitThread) return waitThread;
+        return record?.runIn === "thread" ? this.#hooks.routineThread(agent.id, run.routineId, run.routineName) : null;
+      });
       const receipt = yield* this.#mailbox
         .enqueue({
           ...(thread ? { taskId: thread.taskId } : {}),
@@ -1087,7 +1098,11 @@ export class RoutineScheduler implements RoutineDueSource {
         yield* routineStep(() => this.#hooks.emitQueue(agent.id));
         return queued ?? { ...run, status: "cancelled" as const };
       }
-      yield* routineStep(() => this.#waits.wakeForRun(run, deliveryId, waitId));
+      const inSideThreads = yield* routineStep(() =>
+        this.#waits.wakeForRun(run, deliveryId, waitId, thread?.taskId ?? null),
+      );
+      for (const [taskId, waitIds] of inSideThreads)
+        yield* this.#wakeInSideThread(run, agent.id, taskId, waitIds, deliveryId);
       if (thread) {
         yield* routineStep(() => {
           this.#hooks.emitQueue(agent.id);
@@ -1120,6 +1135,47 @@ export class RoutineScheduler implements RoutineDueSource {
       ),
     );
   }, Effect.uninterruptible);
+
+  readonly #wakeInSideThread = Effect.fn("RoutineScheduler.wakeInSideThread")(function* (
+    this: RoutineScheduler,
+    run: RoutineRun,
+    agentId: string,
+    taskId: string,
+    waitIds: readonly string[],
+    runDeliveryId: string,
+  ) {
+    const keepInRun = (failure: { cause: unknown }) =>
+      Effect.sync(() => {
+        logger.warn("Could not continue open waits in their side thread.", { agentId, error: failure.cause });
+        return runDeliveryId;
+      });
+    const wokenIn = yield* Effect.gen({ self: this }, function* () {
+      const thread = yield* routineStep(() => this.#hooks.waitThread(agentId, taskId));
+      if (!thread) return runDeliveryId;
+      const receipt = yield* this.#mailbox.enqueue({
+        taskId: thread.taskId,
+        sender: {
+          kind: "routine",
+          routineId: run.routineId,
+          runId: run.id,
+          routineName: run.routineName,
+          scheduledFor: run.scheduledFor,
+        },
+        recipientAgentIds: [agentId],
+        text: run.instruction,
+        draftIds: [],
+        replyToMessageId: null,
+        idempotencyKey: `routine-wait:${runDeliveryId}:${thread.taskId}`,
+      });
+      return receipt.deliveries[0]?.id ?? runDeliveryId;
+    }).pipe(Effect.catch(keepInRun));
+    yield* routineStep(() => {
+      this.#waits.markWoken(agentId, waitIds, wokenIn);
+      if (wokenIn === runDeliveryId) return;
+      this.#hooks.emitQueue(agentId);
+      this.#hooks.scheduleDrain(agentId);
+    }).pipe(Effect.catch(keepInRun));
+  });
 
   #runsToCancelOnDeletion(agentId: string, routineId: string, interruptedRuns: RoutineRun[]): RoutineRun[] {
     const current = new Map(this.#routines.activeRuns(agentId, routineId).map((run) => [run.id, run]));

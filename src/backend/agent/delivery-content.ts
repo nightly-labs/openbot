@@ -112,6 +112,7 @@ export interface DeliveryPromptSources {
   workflowRunSource?: WorkflowRunSource | null;
   routineTimezone?: string | undefined;
   wokenWaits?: readonly AgentWait[];
+  continuesWait?: boolean;
   executionText?: string | undefined;
   tags?: TagReferenceSource | undefined;
   answeredRoutine?: AnsweredRoutine | null;
@@ -484,7 +485,19 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       .filter(Boolean)
       .join("\n");
   }
-  if (delivery.sender.kind === "routine") {
+  const wokenWaits = sources.wokenWaits ?? [];
+  if (delivery.sender.kind === "routine" && sources.continuesWait) {
+    text = [
+      "An event of an existing OpenBot routine continues a wait that you opened in this thread.",
+      `Routine name: ${delivery.sender.routineName}`,
+      "The routine run does the routine task in its own chat. Do not do the routine task here, and do not create, update, delete, or test routines.",
+      "Continue the work of this thread with the event, then give your answer as usual.",
+      ROUTINE_TASK_START,
+      displayText,
+      ROUTINE_TASK_END,
+      wokenWaitsPromptText(wokenWaits) ?? "The wait closed before this message. Do nothing more for it.",
+    ].join("\n");
+  } else if (delivery.sender.kind === "routine") {
     const run = sources.routineRun;
     const testRun = run !== null && !quietRoutineRun(run);
     const runKind = testRun
@@ -530,7 +543,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       ROUTINE_TASK_START,
       displayText,
     ].join("\n");
-    const waits = wokenWaitsPromptText(sources.wokenWaits ?? []);
+    const waits = wokenWaitsPromptText(wokenWaits);
     if (waits) text += `\n\n${waits}`;
   }
   if (delivery.sender.kind === "user" && sources.executionText === undefined) {

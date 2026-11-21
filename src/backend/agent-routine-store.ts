@@ -168,6 +168,11 @@ export class AgentRoutineStore extends RoutineStore {
     const run = this.runForHandleRow(deliveryId);
     return run ? toRun(run) : null;
   }
+
+  run(runId: string): RoutineRun | null {
+    const run = this.runRow(runId);
+    return run ? toRun(run) : null;
+  }
 }
 
 function toRoutine({ ownerId, ...fields }: OwnedRoutine): Routine {

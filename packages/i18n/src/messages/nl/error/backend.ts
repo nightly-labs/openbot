@@ -235,7 +235,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Een wachtpunt heeft een bericht nodig om verder te gaan. Deze beurt heeft geen bericht.",
   "error.backend.agentWaitOwnChatOnly":
-    "Open een wachtpunt alleen in je eigen chat. Een kanaal- of berichtentaak kan niet wachten.",
+    "Open een wachtpunt in je eigen chat of in een zijthread. Een kanaal- of berichtengesprek kan niet wachten.",
   "error.backend.agentWaitNoteRequired": "Geef een korte notitie die zegt waarvoor het wachtpunt is.",
   "error.backend.agentWaitRoutineGone": "Deze agent heeft geen routine met deze id.",
   "error.backend.agentWaitNoRoutine":
