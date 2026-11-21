@@ -274,6 +274,7 @@ export class MailboxStore {
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
+  #taskRunsInProvider: (agentId: string, taskId: string) => boolean = () => false;
   #keptConversationIndex: ConversationIndex | undefined;
   #keptMessagesById: KeptIndex<StoredMessage, ReadonlyMap<string, StoredMessage>> | undefined;
   #keptDeliveriesByRecipient: KeptIndex<StoredDelivery, ReadonlyMap<string, StoredDelivery[]>> | undefined;
@@ -1181,6 +1182,14 @@ export class MailboxStore {
     );
   }
 
+  useTaskRunsInProvider(probe: (agentId: string, taskId: string) => boolean): void {
+    this.#taskRunsInProvider = probe;
+  }
+
+  taskRunsInProvider(agentId: string, taskId: string): boolean {
+    return this.#taskRunsInProvider(agentId, taskId);
+  }
+
   heldRequestIdsOf(messageId: string): string[] {
     return this.#messagesById().get(messageId)?.heldRequestIds ?? [];
   }
@@ -1200,7 +1209,7 @@ export class MailboxStore {
     return (
       taskIds.length > 0 &&
       !this.hasReplyFrom(agentId, requestId) &&
-      taskIds.some((taskId) => this.#taskStillWorks(agentId, taskId))
+      taskIds.some((taskId) => this.taskStillWorks(agentId, taskId))
     );
   }
 
@@ -1219,9 +1228,9 @@ export class MailboxStore {
     return holders;
   }
 
-  #taskStillWorks(agentId: string, taskId: string): boolean {
+  taskStillWorks(agentId: string, taskId: string): boolean {
     return (
-      this.#taskHasOwnWork(agentId, taskId) ||
+      this.#taskWorksItself(agentId, taskId) ||
       this.awaitedThreadRequests().some((request) => request.taskId === taskId && request.senderAgentId === agentId)
     );
   }
@@ -1238,8 +1247,12 @@ export class MailboxStore {
     });
   }
 
+  #taskWorksItself(agentId: string, taskId: string): boolean {
+    return this.#taskHasOwnWork(agentId, taskId) || this.#taskRunsInProvider(agentId, taskId);
+  }
+
   #heldByOwnWork(agentId: string, requestId: string, holders: ReadonlyMap<string, ReadonlySet<string>>): boolean {
-    return [...(holders.get(`${agentId}:${requestId}`) ?? [])].some((taskId) => this.#taskHasOwnWork(agentId, taskId));
+    return [...(holders.get(`${agentId}:${requestId}`) ?? [])].some((taskId) => this.#taskWorksItself(agentId, taskId));
   }
 
   deleteTaskMessages = Effect.fn("MailboxStore.deleteTaskMessages")(function* (

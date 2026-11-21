@@ -1363,6 +1363,11 @@ export class DrainScheduler {
   taskReportWaiting(context: DeliveryContext): string[] {
     const { sender, recipientAgentId, messageId } = context.delivery;
     if (!context.senderTaskId || sender.kind !== "agent" || sender.agentId !== recipientAgentId) return [];
+    if (
+      this.#mailbox.taskBusy(recipientAgentId, context.senderTaskId) ||
+      this.#mailbox.taskRunsInProvider(recipientAgentId, context.senderTaskId)
+    )
+      return [];
     return [
       ...new Set(
         this.#mailbox

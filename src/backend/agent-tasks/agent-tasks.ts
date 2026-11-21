@@ -693,6 +693,17 @@ export class AgentTasks implements TaskLanes {
     if (queued) this.#hooks.queued(task.agentId);
   });
 
+  readonly releaseAfterLostWork = Effect.fn("AgentTasks.releaseAfterLostWork")(function* (
+    this: AgentTasks,
+    taskId: string,
+  ): Effect.fn.Return<void> {
+    const task = this.#store.task(taskId);
+    if (!task || task.closedAt !== null || this.#mailbox.requestsLeftByTask(task.agentId, taskId).length === 0) return;
+    this.#store.setOutcome(taskId, "interrupted");
+    this.changed(task.agentId);
+    yield* this.releaseHeldRequests(task);
+  });
+
   changed(agentId: string): void {
     this.#cancelProgressPublish(agentId);
     this.#hooks.emit({ type: "agent-tasks-changed", snapshot: this.snapshot(agentId) });

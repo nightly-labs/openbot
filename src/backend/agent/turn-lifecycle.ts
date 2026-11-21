@@ -265,6 +265,7 @@ export interface TurnHooks {
   inMessagingLane(agentId: string, threadId: string): boolean;
   isRoutineThread(threadId: string): boolean;
   taskOpen(taskId: string): boolean;
+  taskBackgroundLost(taskId: string): void;
   taskFailed(taskId: string, message: string): void;
   conversationTurnEnded(
     agentId: string,
@@ -437,6 +438,7 @@ export class TurnLifecycle {
     this.#usageLimits = options.usageLimits;
     this.#planContinuation = options.planContinuation;
     this.#hooks = options.hooks;
+    this.#mailbox.useTaskRunsInProvider((agentId, taskId) => this.#taskRunsInProvider(agentId, taskId));
   }
 
   failedTurns(): ReadonlyMap<string, string> {
@@ -597,10 +599,9 @@ export class TurnLifecycle {
         this.#codexChildTurns.delete(threadId);
         endedChildren.push(threadId);
       }
-    let backgroundEnded = false;
-    for (const [threadId, work] of this.#waitingThreads)
-      if (work.client === client) backgroundEnded = this.#waitingThreads.delete(threadId);
-    if (backgroundEnded) this.#hooks.emitRuntimeSnapshot();
+    const lostThreads = [...this.#waitingThreads].filter(([, work]) => work.client === client);
+    for (const [threadId, work] of lostThreads) this.#loseBackgroundWork(threadId, work.agentId);
+    if (lostThreads.length > 0) this.#hooks.emitRuntimeSnapshot();
     for (const [turnId, turn] of this.#runningTurns) {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
@@ -661,6 +662,21 @@ export class TurnLifecycle {
   #taskForThread(agentId: string, externalThreadId: string): string | null {
     const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
     return this.#conversation.isTaskThread(threadId) ? this.#hooks.taskForThread(threadId) : null;
+  }
+
+  #loseBackgroundWork(threadId: string, agentId: string): void {
+    this.#waitingThreads.delete(threadId);
+    const taskId = this.#taskForThread(agentId, threadId);
+    if (taskId !== null && this.#hooks.taskOpen(taskId)) this.#hooks.taskBackgroundLost(taskId);
+  }
+
+  #taskRunsInProvider(agentId: string, taskId: string): boolean {
+    if (!this.#hooks.taskOpen(taskId)) return false;
+    const threadIds = [
+      ...[...this.#waitingThreads].flatMap(([threadId, work]) => (work.agentId === agentId ? [threadId] : [])),
+      ...[...this.#runningTurns.values()].flatMap((turn) => (turn.agentId === agentId ? [turn.threadId] : [])),
+    ];
+    return threadIds.some((threadId) => this.#taskForThread(agentId, threadId) === taskId);
   }
 
   #laneForThread(agentId: string, externalThreadId: string): string | null {
@@ -1456,7 +1472,9 @@ export class TurnLifecycle {
         if (runs)
           for (const turn of this.#runningTurns.values())
             if (turn.threadId === threadId && turn.client === source) turn.startedBackgroundWork = true;
-        if (runs === this.#waitingThreads.has(threadId)) return;
+        const waited = this.#waitingThreads.has(threadId);
+        if (!runs && isRecord(params) && params.closed === true) this.#loseBackgroundWork(threadId, agentId);
+        if (runs === waited) return;
         if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
         else this.#waitingThreads.delete(threadId);
         this.#hooks.emitRuntimeSnapshot();
@@ -2903,6 +2921,7 @@ export class TurnLifecycle {
         senderTaskId && delivery.sender.kind === "agent" && delivery.sender.agentId === agentId ? [senderTaskId] : [],
       ),
     );
+    if ([...reportedTaskIds].some((taskId) => this.#mailbox.taskStillWorks(agentId, taskId))) return;
     const requestIds = new Set(
       [...reportedTaskIds].flatMap((taskId) => this.#mailbox.requestsHeldByTask(agentId, taskId)),
     );
