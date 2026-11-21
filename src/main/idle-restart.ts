@@ -70,7 +70,9 @@ export class IdleRestart {
   }
 
   restartNow(): UpdateStatus {
-    if (this.#restarting) throw new Error(sourceText("error.update.alreadyRestarting"));
+    if (this.#restarting || this.#updater.getStatus().phase === "installing") {
+      throw new Error(sourceText("error.update.alreadyRestarting"));
+    }
     const status = this.#status;
     if (!status || status.error) return this.#updater.getStatus();
     this.#clearTimer();
