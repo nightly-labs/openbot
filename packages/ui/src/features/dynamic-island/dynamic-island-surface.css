@@ -879,6 +879,18 @@ div.dynamic-island-surface-context-line span {
   min-width: 0;
 }
 
+.dynamic-island-surface-question-detail {
+  max-height: calc(var(--openbot-leading-sm) * 3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 0 6px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
 .dynamic-island-surface-question-actions {
   align-items: center;
 }

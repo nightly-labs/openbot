@@ -1439,6 +1439,9 @@ function QuestionContent(props: {
       />
       <div data-island-motion-content>
         <div ref={questionStep} class="dynamic-island-surface-question-step">
+          <Show when={currentQuestion()?.detail}>
+            {(detail) => <p class="dynamic-island-surface-question-detail">{detail()}</p>}
+          </Show>
           <Show when={directAnswerAvailable()}>
             <ul class="dynamic-island-surface-question-options" aria-label={t("island.question.suggestedAnswers")}>
               <For each={currentQuestion()?.options ?? []}>
