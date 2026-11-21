@@ -461,7 +461,8 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
         Effect.mapError(({ cause }) => new PasswordVaultError({ cause })),
       );
     const found = yield* matching(INDEX_MS);
-    return found.length > 0 ? found : yield* matching(MISSED_ORIGIN_INDEX_MS);
+    if (found.length > 0) return found;
+    return yield* matching(MISSED_ORIGIN_INDEX_MS).pipe(Effect.orElseSucceed(() => found));
   }).bind(this);
 
   readonly secretFor = Effect.fn("ProtonPass.secretFor")(function* (
