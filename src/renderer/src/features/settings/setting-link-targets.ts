@@ -60,11 +60,11 @@ export function appSettingLinkTarget(
 }
 
 export function appSettingRowOpener(
-  window: () => { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
+  surface: () => { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
   openRow: (tab: SettingsTab, row: AppTextKey) => void,
 ): (settingId: AppSettingLinkId) => (() => void) | undefined {
   return (settingId) => {
-    const current = window();
+    const current = surface();
     const target = appSettingLinkTarget(settingId, current.platform);
     return settingsTabShown(target.tab, current) ? () => openRow(target.tab, target.row) : undefined;
   };
