@@ -91,14 +91,13 @@ function ShortcutRow(props: ShortcutRowProps): JSX.Element {
       setPressed(heldModifiers(event));
       return;
     }
-    const key: TalkKey = { ...talkKeyOfEvent(event), code: shortcutCodeOfEvent(event) };
-    const refused = shortcutRefusal(props.command, key, props.overrides, props.environment);
-    if (refused || key.code === null) {
-      setPressed(key);
-      setRefusal(refused ?? { kind: "invalid" });
+    const chord: ShortcutChord = { ...talkKeyOfEvent(event), code: shortcutCodeOfEvent(event) };
+    const refused = shortcutRefusal(props.command, chord, props.overrides, props.environment);
+    if (refused) {
+      setPressed(chord);
+      setRefusal(refused);
       return;
     }
-    const chord: ShortcutChord = { ...key, code: key.code };
     stop();
     if (sameShortcut(chord, current())) return;
     props.onChange(sameShortcut(chord, defaultShortcut(props.command, props.environment)) ? null : chord);

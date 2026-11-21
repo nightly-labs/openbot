@@ -197,6 +197,7 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import { matchesShortcut } from "../../keyboard-shortcut-preference";
 import { queuedDeliveriesInOrder } from "../../queue-reconciliation";
 import { backgroundWorkKey } from "../conversation/background-work-key";
 import "katex/contrib/copy-tex";
@@ -205,7 +206,6 @@ import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { collectThreadMessageMatches, formatMessageTime, toAgentMessage } from "../../app-message-projection";
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
-import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
 import {
   AgentUsagePanel,
@@ -834,7 +834,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   } | null>(null);
   onSettled(() => {
     const toggleSearch = (event: KeyboardEvent) => {
-      if (!isGlobalSearchShortcut(event)) return;
+      if (!matchesShortcut(event, "globalSearch")) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       setSearchOpen((open) => !open);
