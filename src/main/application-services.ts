@@ -318,6 +318,7 @@ import { localSkillTools } from "./local-skill-tools";
 import { createLoginItem } from "./login-item";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
+import { restartFromInstalledCopy } from "./mac-installed-copy";
 import { hidePanelFromWindowSwitchers } from "./mac-panel-activation";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { MACHINE_ALERTS_PREFERENCE_FILE, MachineAlertMonitor, MachineAlertPreferenceStore } from "./machine-alerts";
@@ -3953,6 +3954,7 @@ export async function createApplicationServices({
             readNotInstalledUpdate(join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE), app.getVersion()),
           ),
           appBundlePath: join(app.getPath("exe"), "..", "..", ".."),
+          restartFromInstalledCopy: (bundlePath: string) => restartFromInstalledCopy(app, bundlePath, currentVersion),
         }
       : {}),
     appImagePath,
