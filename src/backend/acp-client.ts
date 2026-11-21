@@ -2469,6 +2469,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         !turn.stopped
       )
         sent = yield* send();
+      if (
+        Result.isFailure(sent) &&
+        this.#flavor.staleSession?.(sent.failure.cause) &&
+        this.#closesSessions &&
+        this.#supportsSessionResume &&
+        thread.activeTurn === turn &&
+        !turn.stopped
+      )
+        sent = yield* this.#sendAfterStaleSession(thread, turn, params, send);
       let response = providerResult(sent);
       if (!thread.transport) this.#promptAnswered = true;
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
@@ -2841,6 +2850,40 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#configuration.applyConfig(thread, model, null, this.#models);
     yield* this.#applyTurnSettings(thread, params);
     this.#publishSessionSettings(thread);
+  });
+
+  readonly #sendAfterStaleSession = Effect.fn("AcpAgentClient.sendAfterStaleSession")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    turn: AcpTurn,
+    params: unknown,
+    send: () => Effect.Effect<Result.Result<PromptResponse, ProviderClientOperationError>>,
+  ): Effect.fn.Return<Result.Result<PromptResponse, ProviderClientOperationError>> {
+    logger.warn("An ACP agent refused a prompt because its session changed on disk. OpenBot opens it again.", {
+      provider: this.provider,
+    });
+    yield* providerCall(() => this.#sessionConnection(thread).closeSession({ sessionId: thread.id })).pipe(
+      this.#backgroundTimeout("session/close"),
+      Effect.ignore,
+    );
+    const reopened = yield* Effect.result(
+      this.#resumeWithTurnSettings(thread, thread.restore, params).pipe(this.#backgroundTimeout("session/resume")),
+    );
+    if (thread.activeTurn !== turn || turn.stopped)
+      return Result.succeed({ stopReason: "cancelled" } satisfies PromptResponse);
+    if (Result.isSuccess(reopened)) {
+      const sent = yield* send();
+      if (Result.isSuccess(sent) || !this.#flavor.staleSession?.(sent.failure.cause)) return sent;
+    } else {
+      thread.needsResume = true;
+      logger.warn("OpenBot could not open again a session that changed on disk.", {
+        provider: this.provider,
+        reason: this.#redact(failureText(reopened.failure.cause)),
+      });
+    }
+    return Result.fail(
+      providerFailure(sourceText("error.provider.acpSessionStale", { provider: this.#providerName(thread) })),
+    );
   });
 
   readonly #discardLostTurns = Effect.fn("AcpAgentClient.discardLostTurns")(function* (
