@@ -141,7 +141,8 @@ function modelAtCapacity(error: DynamicRecord | null, details: string | null): b
   return error?.codexErrorInfo === "serverOverloaded" || (details !== null && MODEL_AT_CAPACITY.test(details));
 }
 const ENDED_TURN_LIMIT = 256;
-const SELF_STARTED_ORIGIN_LIMIT = 256;
+const SELF_STARTED_ORIGIN_LIMIT = 4096;
+const REQUEST_SEARCH_TURN_LIMIT = 64;
 
 function keepNewest(turns: Set<string>, turnId: string): void {
   turns.add(turnId);
@@ -1049,7 +1050,7 @@ export class TurnLifecycle {
     const requests: DeliveryContext[] = [];
     const turns = new Set<string>();
     let pending = [turnId];
-    while (pending.length > 0 && turns.size < SELF_STARTED_ORIGIN_LIMIT) {
+    while (pending.length > 0 && turns.size < REQUEST_SEARCH_TURN_LIMIT) {
       const origins: string[] = [];
       for (const candidate of pending) {
         if (turns.has(candidate)) continue;
@@ -1431,7 +1432,8 @@ export class TurnLifecycle {
         if (!running) return;
         const origin = isRecord(params) && isString(params.continues) ? params.continues : null;
         running.continues = origin !== null && running.continues.length > 0 ? [...running.continues, origin] : [];
-        this.#noteSelfStartedOrigins(turnId, running.continues);
+        if (origin !== null)
+          this.#noteSelfStartedOrigins(turnId, [...(this.#selfStartedOrigins.get(turnId) ?? []), origin]);
         return;
       }
       case "openbot/background-work": {
