@@ -12,6 +12,7 @@ import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget, VoiceLiveTranscript } from "../conversation-types";
 import { voiceCaptureError, voiceTranscriptionError } from "../voice-status";
+import { conversationOwnerId } from "./composer-store";
 
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_000;
 const STREAM_INTERVAL_MS = 250;
@@ -49,10 +50,6 @@ type VoiceStoreProps = Pick<ConversationProps, "runtime"> & {
   channel?: Pick<NonNullable<ConversationProps["channel"]>, "id"> | undefined;
   server: Pick<NonNullable<ConversationProps["server"]>, "id"> | undefined;
 };
-
-function recordingOwnerId(props: VoiceStoreProps): string | undefined {
-  return props.channel?.id ?? props.agent?.id;
-}
 
 export interface VoiceStoreDeps {
   props: VoiceStoreProps;
@@ -115,7 +112,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   let stoppedAtLimit = false;
 
   async function startVoiceRecording(threadKey?: string): Promise<void> {
-    const agentId = recordingOwnerId(deps.props);
+    const agentId = conversationOwnerId(deps.props);
     const serverId = deps.props.server?.id ?? "local";
     if (!agentId || deps.voicePhase() !== "idle") return;
     deps.setVoiceThreadKey(threadKey);
@@ -477,7 +474,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
         const key = composerDraftKey(recordingTarget);
         deps.setDrafts((current) => ({ ...current, [key]: transcribedDraft }));
         if (atLimit) deps.setVoiceLimitReached?.(recordingTarget, true);
-        if (recordingOwnerId(deps.props) === targetAgentId && (deps.props.server?.id ?? "local") === targetServerId) {
+        if (
+          conversationOwnerId(deps.props) === targetAgentId &&
+          (deps.props.server?.id ?? "local") === targetServerId
+        ) {
           deps.setComposerFocusRequest((current) => current + 1);
         }
       }
