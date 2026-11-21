@@ -448,16 +448,30 @@ export class ChannelService {
   ) {
     const channel = yield* channelSync(() => this.store.get(channelId));
     if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
-    yield* this.#requireIdle(channelId, "error.backend.channelWaitBeforeCompact");
     return yield* channelSync(() => this.store.contexts(channelId));
   });
 
+  compactionBlocked(channelId: string): boolean {
+    return (
+      this.store.tasks(channelId).some((task) => task.state === "running") ||
+      this.store
+        .assignments(channelId)
+        .some(
+          (assignment) =>
+            assignment.state === "running" ||
+            (assignment.state === "starting" && this.#deliveryStarted(assignment.deliveryId)),
+        )
+    );
+  }
+
+  #deliveryStarted(deliveryId: string | null): boolean {
+    const status = deliveryId ? this.mailbox.getDelivery(deliveryId)?.delivery.status : undefined;
+    return status === "starting" || status === "running";
+  }
+
   #requireIdle(
     channelId: string,
-    key:
-      | "error.backend.channelWaitBeforeNewConversation"
-      | "error.backend.channelWaitBeforeCompact"
-      | "error.backend.channelWaitBeforeDeleteHistory",
+    key: "error.backend.channelWaitBeforeNewConversation" | "error.backend.channelWaitBeforeDeleteHistory",
   ): Effect.Effect<void, ChannelOperationError> {
     return channelSync(() => this.store.tasks(channelId)).pipe(
       Effect.flatMap((tasks) =>

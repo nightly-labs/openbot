@@ -92,6 +92,8 @@ export const messages = {
     "De leden van dit kanaal hebben nog geen gesprek om te comprimeren. Comprimeer het nadat een lid in het kanaal heeft geantwoord.",
   "error.backend.channelCompactNotSupported":
     "Geen lid van dit kanaal kan op verzoek comprimeren. Leden die het ondersteunen, comprimeren hun context automatisch als die bijna vol is.",
+  "error.backend.channelCompactProviderUnavailable":
+    "De aanbieder van de kanaalleden werkt nu niet. Vernieuw de aanbieders en comprimeer het kanaal daarna opnieuw.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
   "error.backend.channelArchiveRunning": "Stop het lopende werk in dit kanaal en verwijder het daarna.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",

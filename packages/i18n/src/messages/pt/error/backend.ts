@@ -96,6 +96,8 @@ export const messages = {
     "Os membros deste canal ainda não têm uma conversa para compactar. Compacte depois que um membro responder no canal.",
   "error.backend.channelCompactNotSupported":
     "Nenhum membro deste canal pode compactar sob demanda. Os membros que suportam isso compactam o contexto automaticamente quando ele está quase cheio.",
+  "error.backend.channelCompactProviderUnavailable":
+    "O provedor dos membros do canal não está funcionando agora. Atualize os provedores e compacte o canal de novo.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
   "error.backend.channelArchiveRunning": "Pare o trabalho em andamento neste canal e depois exclua-o.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",

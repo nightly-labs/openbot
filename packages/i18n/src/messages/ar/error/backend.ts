@@ -84,6 +84,8 @@ export const messages = {
     "لا توجد لأعضاء هذه القناة محادثة لضغطها بعد. اضغطها بعد أن يرد عضو في القناة.",
   "error.backend.channelCompactNotSupported":
     "لا يمكن لأي عضو في هذه القناة الضغط عند الطلب. الأعضاء الذين يدعمونه يضغطون سياقهم تلقائيًا عندما يكاد يمتلئ.",
+  "error.backend.channelCompactProviderUnavailable":
+    "مزوّد أعضاء القناة لا يعمل الآن. حدّث المزوّدين، ثم اضغط سياق القناة مرة أخرى.",
   "error.backend.channelArchived": "استعد هذه القناة قبل إرسال الرسائل أو تغيير المهام.",
   "error.backend.channelArchiveRunning": "أوقف العمل الجاري في هذه القناة، ثم احذفها.",
   "error.backend.channelReferenceUnavailable": "رسالة القناة المشار إليها غير متاحة.",

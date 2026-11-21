@@ -88,6 +88,8 @@ export const messages = {
     "Bu kanalın üyelerinin henüz sıkıştırılacak bir konuşması yok. Bir üye kanalda yanıt verdikten sonra sıkıştırın.",
   "error.backend.channelCompactNotSupported":
     "Bu kanalın hiçbir üyesi istek üzerine sıkıştıramaz. Bunu destekleyen üyeler, bağlamları neredeyse dolduğunda otomatik olarak sıkıştırır.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Kanal üyelerinin sağlayıcısı şu anda çalışmıyor. Sağlayıcıları yenileyin, ardından kanalı yeniden sıkıştırın.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",
   "error.backend.channelArchiveRunning": "Bu kanaldaki devam eden işi durdurun, ardından kanalı silin.",
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
