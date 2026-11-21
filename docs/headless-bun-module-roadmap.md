@@ -186,6 +186,32 @@ Effect runtime the desktop host uses today. The audit of transitive Electron imp
 `src/backend/*` is the remaining unknown; if it is shallow, B is realistic, if deep, A
 is the practical end state.
 
+### Authentication audit result (subagent, 2026-11-21, measured on the host)
+
+- **The session does not need a keyring.** `~/.config/OpenBot/openbot-central-auth-v1.bin`
+  is the app's own `obk1` container: base64 of `obk1` + IV(12) + GCM tag(16) +
+  ciphertext, AES-256-GCM keyed by `secret-storage.key` (the app's fallback cipher,
+  `src/main/secret-storage-cipher.ts`). The host's Chromium cookies store is empty of
+  auth. A Bun module reproduces read/write with `node:crypto` and stays
+  **byte-compatible with the packaged server** — either side can read the other's
+  session.
+- **Login is an opaque Bearer token** against `api.openbot.run`:
+  `POST /v1/auth/email/start` `{email}` (Idempotency-Key) -> `{challengeId}`; then
+  `POST /v1/auth/email/verify` `{challengeId, code}` -> `{sessionToken, user}`;
+  `GET /v1/me` with `Authorization: Bearer`; `POST /v1/auth/logout` to revoke.
+  No OAuth, no cookie, no Electron.
+- **Control socket verified live:** `/run/openbot/control.sock` answers `GET /v1/status`
+  with `key=value` lines (version, account, server, memory_level, `turn_limit=16`).
+  The bash CLI parses exactly that — a Bun server answering the same shape keeps the
+  existing CLI working with zero changes.
+- **Scope of "the app sees the agents":** beyond login, the host needs the TeamStore
+  identity (`openbot-team-server-v2.json`: serverId + keypair), host `register` +
+  `ticket` against the account API, a signal WebSocket, and a **WebRTC data channel**
+  that carries the team API to the phone (the app never talks TCP to the host). The
+  WebRTC host peer is the heaviest piece of option B and the main remaining risk;
+  CLI login + status + team API on loopback is reachable without it, but the server
+  shows offline in the app until it exists.
+
 ### Architecture audit result (subagent, 2026-11-21) — verdict: B is viable
 
 - **Reusable as-is:** `ServerMode` (control socket + `/v1/*`, pure `node:http`/`fs`/`net`,

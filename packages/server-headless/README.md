@@ -12,17 +12,27 @@ it changes no runtime behavior of the shipped server.
 
 1. Expose the same control socket as the packaged server (`/run/openbot/control.sock`,
    `GET /v1/status`, `POST /v1/login/{start,verify,claim}`, `/v1/name`,
-   `/v1/mobile-connect`, `/v1/logout`) so the existing `openbot` CLI keeps working
-   unchanged.
+   `/v1/mobile-connect`, `/v1/logout`) with `key=value` responses, so the existing
+   `openbot` CLI keeps working unchanged.
 2. Serve the team API on `127.0.0.1` (the surface in `src/main/team-api/`, 122 routes,
    zero Electron imports) so the mobile app sees agents, chats, routines and waits.
 3. Run agent turns through the ACP provider runtime (opencode) the same way
    `AgentService` does, with the provider sessions persisted under the same
    `~/.config/OpenBot` tree the desktop host uses on this machine.
-4. Authenticate the owner with email + code from the terminal, storing the session in a
-   plain file (the `--password-store=basic` equivalent), never a keyring.
-5. Drop, explicitly: `openbot_browser`, Computer Use, tray/dock, desktop notifications,
-   deep links, every hidden window. A phone or SBC host does not miss them.
+4. Authenticate the owner with email + code from the terminal. **Confirmed by audit:**
+   the session is an opaque Bearer token from `api.openbot.run`
+   (`/v1/auth/email/start` -> `/v1/auth/email/verify`), persisted as
+   `openbot-central-auth-v1.bin` in the app's own `obk1` format (AES-256-GCM keyed by
+   `secret-storage.key`) — no keyring involved, so Bun + `node:crypto` reproduces it
+   exactly, and the packaged server can read the session this module writes (and
+   vice-versa).
+5. Publish the host for the mobile app: TeamStore identity
+   (`openbot-team-server-v2.json`, serverId + keypair), host `register` + `ticket`
+   against the account API, signal WebSocket, and a **WebRTC data channel** carrying
+   the team API to the phone. Without this gateway the account signs in, but the server
+   shows offline in the app.
+6. Drop, explicitly: `openbot_browser`, Computer Use, tray/dock, desktop notifications,
+   deep links, every hidden window, Xvfb, dbus, gnome-keyring.
 
 ## Why it is plausible
 
