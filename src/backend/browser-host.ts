@@ -1085,6 +1085,7 @@ export class BrowserHost {
     tabId: string,
     direction: BrowserNavigationDirection,
   ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaveSilentPage(tabId);
     yield* this.#enqueue(tabId, (tab) =>
       Effect.gen({ self: this }, function* () {
         yield* untilStopped(
@@ -1101,6 +1102,7 @@ export class BrowserHost {
     url: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
+    yield* this.#leaveSilentPage(tabId);
     yield* this.#enqueue(
       tabId,
       (tab) =>
@@ -1128,6 +1130,7 @@ export class BrowserHost {
     this: BrowserHost,
     tabId: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaveSilentPage(tabId);
     yield* this.#enqueue(
       tabId,
       (tab) =>
@@ -2856,6 +2859,7 @@ export class BrowserHost {
   ) {
     const { url, direction } = args;
     if (!url && !direction) return yield* browserFailure(new Error("navigate requires url or direction."));
+    yield* this.#leaveSilentPage(tabId);
     return yield* this.#runAction(
       tabId,
       "navigate",
@@ -3729,6 +3733,10 @@ export class BrowserHost {
     contents.on("page-title-updated", changed);
     contents.on("render-process-gone", (_event, details) => {
       if (tab.closing || tab.contents !== contents || contents.isDestroyed() || details.reason === "clean-exit") return;
+      if (tab.endingSilentPage) {
+        tab.endingSilentPage = false;
+        return;
+      }
       tab.crashes = (tab.crashes ?? 0) + 1;
       if (tab.secret) return;
       const reload =
@@ -4288,6 +4296,23 @@ export class BrowserHost {
     return { title: tab.engine.scrubText(title), url: tab.engine.scrubText(url) };
   }
 
+  readonly #leaveSilentPage = Effect.fn("BrowserHost.leaveSilentPage")(function* (this: BrowserHost, tabId: string) {
+    const tab = this.#tabs.get(tabId);
+    if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return;
+    if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return;
+    logger.warn("Ending the renderer of a browser tab whose page does not answer before it navigates");
+    const contents = tab.contents;
+    yield* Effect.callback<void>((resume) => {
+      const gone = () => resume(Effect.void);
+      contents.once("render-process-gone", gone);
+      tab.endingSilentPage = true;
+      contents.forcefullyCrashRenderer();
+      return Effect.sync(() => {
+        if (!contents.isDestroyed()) contents.off("render-process-gone", gone);
+      });
+    }).pipe(Effect.timeoutOption(SILENT_PAGE_EXIT_WAIT_MS));
+  });
+
   readonly #enqueue = Effect.fn("BrowserHost.enqueue")(function* <T>(
     this: BrowserHost,
     tabId: string,
@@ -4504,6 +4529,8 @@ function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolea
   return page.url === current.url && page.document === current.document && page.generation === current.generation;
 }
 const CRASH_RELOAD_TIMEOUT_MS = 30_000;
+
+const SILENT_PAGE_EXIT_WAIT_MS = 5_000;
 
 const reloadCrashedPage = Effect.fn("BrowserHost.reloadCrashedPage")(function* (tab: BrowserHostTab) {
   const url = currentTabUrl(tab);
