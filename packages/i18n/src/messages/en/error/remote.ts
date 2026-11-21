@@ -22,6 +22,8 @@ export const messages = defineMessages("error.remote", {
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
   "error.remote.windowsSessionDisconnected":
     "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
+  "error.remote.windowsCaptureDenied":
+    "Windows on the host does not let OpenBot record its screen. Unlock Windows at the screen of the host and close any administrator prompt, then try again. If this continues, restart the host.",
   "error.remote.macScreenLocked":
     "The Mac is locked, so it cannot share its screen. Unlock the Mac at its screen, then try again.",
   "error.remote.streamTooSlowLowerQuality":
