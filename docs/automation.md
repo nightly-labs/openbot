@@ -101,8 +101,9 @@ OpenBot quits, OpenBot stops listening and deletes the files.
 
 Each request needs `Authorization: Bearer <token>`.
 
-Responses remove secrets from text, but IDs (`id`, `agentId`, `threadId`, `turnId`, `requestId`,
-`deliveryId` and similar) are always the real values.
+Responses remove secrets from text. These ID fields always have their real values: `id`, `agentId`,
+`recipientAgentId`, `threadId`, `turnId`, `requestId`, `messageId`, `deliveryId`, `runId` and
+`providerAccountId`.
 
 ### `GET /v1/agents`
 
