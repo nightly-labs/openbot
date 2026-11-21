@@ -48,6 +48,7 @@ import { WindowBackdrop } from "./features/window/WindowBackdrop";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
 import { useWindowPage } from "./features/window/window-page-context";
+import { useWorkspaceShortcuts } from "./features/window/workspace-shortcuts";
 import { useLayout } from "./layout";
 import { usePlatform } from "./platform";
 import { startupLoadingScene } from "./startup-animation-preference";
@@ -85,7 +86,8 @@ export function WorkspaceShell(props: {
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const agentDockPlacement = useAgentDockPlacement();
   const windowAgentDock = () => agentDockPlacement() === "window" && activeServer() !== undefined;
-  const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled } = useAgents();
+  const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled, openAgentSetup } =
+    useAgents();
   const { conversations, retryConversation } = useConversation();
   const activeConversation = () => conversations[activeAgent()?.id ?? ""];
   const { activeDirectMember } = useDirectMessages();
@@ -323,6 +325,23 @@ export function WorkspaceShell(props: {
         : [],
     );
   if (!chatWindow) {
+    useWorkspaceShortcuts({
+      newAgent: () => {
+        if (!activeServer() || platform.landingPreview) return false;
+        channels.close();
+        openAgentSetup();
+        return true;
+      },
+      toggleSidebar: () => {
+        if (layout.sidebarClosed()) layout.expandSidebar();
+        else layout.setSidebarClosed(true);
+        return true;
+      },
+      showShortcuts: () => {
+        settings.openAppSettings(undefined, "keyboard");
+        return true;
+      },
+    });
     createHostRestartToasts(() => remoteHosts().filter((host) => !followsServerUpdate(host.id)));
     createRoutineTimezonePrompt(() => desktopRoutineZoneTargets(servers()));
   }

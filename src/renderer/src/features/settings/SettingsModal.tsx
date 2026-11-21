@@ -59,6 +59,7 @@ import { renderProfileShareImage } from "./profile-share-image";
 import { type AgentDockSettingsModel, SettingsAgentDockTab } from "./SettingsAgentDockTab";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
+import { SettingsKeyboardTab } from "./SettingsKeyboardTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
 import { SettingsVoiceTab } from "./SettingsVoiceTab";
 import { dynamicIslandSettingsShown, navItem, navItems, type SettingsTab, settingsTabShown } from "./settings-tabs";
@@ -197,6 +198,7 @@ export function SettingsModal(props: SettingsModalProps) {
         value === "app-behavior" ||
         value === "notifications" ||
         value === "voice" ||
+        value === "keyboard" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
         (value === "agent-dock" && agentDockShown()) ||
         value === "computer-use" ||
@@ -354,6 +356,10 @@ export function SettingsModal(props: SettingsModalProps) {
             liveVoiceAccount={props.liveVoiceAccount}
             platform={props.appInfo?.platform}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="keyboard" class="settings-modal-tab-panel" data-tab="keyboard">
+          <SettingsKeyboardTab />
         </Tabs.Content>
 
         <Show when={dynamicIslandShown()}>
