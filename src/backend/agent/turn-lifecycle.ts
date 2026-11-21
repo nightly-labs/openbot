@@ -1649,6 +1649,7 @@ export class TurnLifecycle {
           errorTurnId !== null &&
           this.#runningTurns.has(errorTurnId) &&
           POOL_PASS_OVER_CAUSES.has(context.causeCode) &&
+          !isRefusedGeminiToken(source.provider, message) &&
           this.#hooks.poolHasOtherAccount(agentId)
         )
           this.#markFailed(agentId, context.model, { message, context });
