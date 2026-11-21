@@ -372,6 +372,7 @@ interface ActiveTurn {
   unprompted: boolean;
   prompt: { requestedId: string | null; message: SDKUserMessage; retries: number } | null;
   messageIds: Set<string>;
+  untakenSteerIds: Set<string>;
   promptStarted: boolean;
   lastActivityAt: number;
   stalled: boolean;
@@ -1632,6 +1633,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       unprompted,
       prompt: null,
       messageIds: new Set<string>(),
+      untakenSteerIds: new Set<string>(),
       promptStarted: false,
       lastActivityAt: Date.now(),
       stalled: false,
@@ -1688,12 +1690,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const messageId = promptUuid(runtime, clientId);
     takePrompt(runtime, messageId);
     runtime.activeTurn.messageIds.add(messageId);
+    const stopsRunningTools = runtime.activeTurn.toolCalls.size > 0;
+    if (stopsRunningTools) runtime.activeTurn.untakenSteerIds.add(messageId);
     runtime.input.push({
       type: "user",
       message: { role: "user", content: readInputText(params) },
       parent_tool_use_id: null,
       uuid: messageId,
       session_id: threadId,
+      ...(stopsRunningTools ? { priority: "now" as const } : {}),
     });
     return { turnId: runtime.activeTurn.id };
   });
@@ -2151,6 +2156,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const turn = runtime.activeTurn;
     if (turn?.prompt && !interrupted && isOtherTurnResult(message, turn.messageIds)) {
       queryLogger.info("Claude ended a turn of its own before the message's turn.", { threadId: runtime.id });
+      return;
+    }
+    if (turn) for (const uuid of takenMessageIds(message)) turn.untakenSteerIds.delete(uuid);
+    if (turn && interrupted && !turn.stopRequested && turn.untakenSteerIds.size > 0) {
+      for (const [toolCallId, { name }] of turn.toolCalls) {
+        this.#emitToolCall(runtime, toolCallId, name, true);
+      }
+      turn.toolCalls.clear();
+      queryLogger.info("Claude stopped its running tools to take a steered message.", { threadId: runtime.id });
       return;
     }
     const apiError = message.subtype === "success" && message.is_error === true;
@@ -3328,9 +3342,13 @@ function takePrompt(runtime: ThreadRuntime, uuid: string): void {
   }
 }
 
-function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet<string>): boolean {
+function takenMessageIds(message: ClaudeStreamMessage): string[] {
   const listed = Array.isArray(message.user_message_uuids) ? message.user_message_uuids.filter(isString) : [];
-  const taken = listed.length > 0 ? listed : message.user_message_uuid ? [message.user_message_uuid] : [];
+  return listed.length > 0 ? listed : message.user_message_uuid ? [message.user_message_uuid] : [];
+}
+
+function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet<string>): boolean {
+  const taken = takenMessageIds(message);
   if (taken.length > 0) return !taken.some((uuid) => messageIds.has(uuid));
   return (
     isRecord(message.origin) &&
