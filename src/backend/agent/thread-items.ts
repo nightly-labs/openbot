@@ -1,4 +1,5 @@
 import { RequestError } from "@agentclientprotocol/sdk";
+import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentStepActivity,
@@ -10,6 +11,7 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { classifyFailure } from "@openbot/telemetry";
 import {
   type AgentProvider,
   MissingClaudeSessionError,
@@ -169,6 +171,10 @@ function isClaudeContextOverflow(provider: AgentProvider, message: string): bool
   return provider === "claude" && /^Prompt is too long\b/.test(message);
 }
 
+function isPiContextOverflow(provider: AgentProvider, message: string): boolean {
+  return (provider === "pi" || isKeyOnlyProvider(provider)) && classifyFailure(message) === "context_too_long";
+}
+
 export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
@@ -200,6 +206,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
   if (isClaudeContextOverflow(provider, message)) return sourceText("error.provider.claudeContextFull");
+  if (isPiContextOverflow(provider, message))
+    return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });
   return null;
 }
 
