@@ -2483,6 +2483,122 @@ fieldset.wfn-picker-group {
   height: var(--openbot-icon-sm);
 }
 
+.wfn-strip-take {
+  position: relative;
+  overflow: visible;
+  border-color: transparent;
+  background: var(--wfn-glass);
+  cursor: default;
+}
+
+.wfn-strip-take:hover {
+  scale: 1;
+}
+
+.wfn-take-ring {
+  position: absolute;
+  inset: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  rotate: -90deg;
+  pointer-events: none;
+}
+
+.wfn-take-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.wfn-take-track {
+  stroke: var(--wfn-ring-strong);
+}
+
+.wfn-take-fill {
+  stroke: color-mix(in srgb, var(--wfn-kind) 90%, transparent);
+  stroke-dasharray: 28 72;
+  stroke-linecap: round;
+}
+
+.wfn-strip-take .wfn-take-ring {
+  animation: wfn-take-spin 1.4s linear infinite;
+}
+
+@keyframes wfn-take-spin {
+  from {
+    rotate: -90deg;
+  }
+
+  to {
+    rotate: 270deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-strip-take .wfn-take-ring {
+    animation: none;
+  }
+}
+
+.wfn-take-label {
+  display: grid;
+  place-items: center;
+  color: var(--openbot-text-secondary);
+  font-size: var(--wfn-small);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfn-run-takes {
+  margin-inline-start: var(--openbot-space-0-5);
+  color: color-mix(in srgb, currentcolor 70%, transparent);
+}
+
+.wfn-media-failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-4);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+}
+
+.wfn-media-failed-icon {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  color: var(--openbot-danger-text);
+}
+
+.wfn-media-failed-reason {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.wfn-media-retry-price {
+  display: inline-flex;
+  gap: var(--openbot-space-0-5);
+  align-items: center;
+  margin-inline-start: var(--openbot-space-1);
+  padding-inline-start: var(--openbot-space-2);
+  border-inline-start: 1px solid var(--wfn-ring-strong);
+  color: var(--openbot-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-media-retry .wfn-media-retry-price svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  fill: currentcolor;
+}
+
 :is(.wfn-menu-icon, .wfn-picker-tile, .wfn-node, .wfn-minimap-node)[data-kind="text"] {
   --wfn-kind: var(--openbot-file-teal);
 }
