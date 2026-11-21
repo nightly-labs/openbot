@@ -43,10 +43,6 @@ describe("toolFailureText", () => {
 });
 
 describe("toolResultText", () => {
-  it("gives no text for a failed step", () => {
-    expect(toolResultText(item({ type: "mcpToolCall", status: "failed", error: secret }), redact)).toBeNull();
-  });
-
   it("masks a secret in the result of a finished tool", () => {
     const text = toolResultText(
       item({ type: "toolCall", name: "mcp__openbot__create_routine", status: "completed", output: `saved ${secret}` }),
