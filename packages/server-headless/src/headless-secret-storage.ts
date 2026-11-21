@@ -1,77 +1,75 @@
 // Headless secret storage: the file-key fallback of src/main/secret-storage-cipher.ts,
 // without Electron safeStorage. Produces the SAME artifacts on disk:
-//   ~/.config/OpenBot/secret-storage.key      (base64 32B key, 0600)
-//   ~/.config/OpenBot/openbot-central-auth-v1.bin  (base64 "obk1" + IV + GCM tag + ciphertext)
+//   <userData>/secret-storage.key           (base64 32B key, 0600)
+//   <userData>/openbot-central-auth-v1.bin   (base64("obk1" + IV + GCM tag + ciphertext), 0600)
 // so the packaged server and this module can read each other's session.
 //
-// Copy of the audit: on Linux keyFileFallback is true (secret-storage-cipher.ts:44-45);
-// keyForWrite (:100-107) prefers userData/secret-storage.key; createKey (:61-98) writes
-// a random 32B key with mode 0600. This module always takes the file path — identical
-// to --password-store=basic behavior (safeStorage unavailable -> file key).
+// Contract copied from src/main/secret-storage-cipher.ts (SecretStorageCipher):
+//   encrypt: (value: string) => Buffer   — returns raw obk1 container bytes
+//   decrypt: (value: Buffer) => string   — takes raw obk1 container bytes
+//   canPersist: boolean
+// The CentralAuthManager does the base64 dance itself when reading/writing the file
+// (central-auth-manager.ts:2378-2417 write, :1538-1560 restore).
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 
-const PREFIX = "obk1";
+const KEY_FILE_FORMAT = Buffer.from("obk1", "ascii");
 const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
 
-export interface HeadlessSecretStorage {
-  cipher(reason: () => string): {
-    encrypt(value: string): Promise<string>;
-    decrypt(container: string): Promise<string>;
-    canPersist: boolean;
-    madeKeyFile(): boolean;
-  };
-  madeKeyFile(): boolean;
+export interface HeadlessSecretStorageCipher {
+  encrypt: (value: string) => Buffer;
+  decrypt: (value: Buffer) => string;
+  canPersist: boolean;
 }
 
-export function createHeadlessSecretStorage({ keyPath }: { keyPath: string }): HeadlessSecretStorage {
+export function createHeadlessSecretStorage({ keyPath }: { keyPath: string }): {
+  cipher: (unavailableMessage: () => string) => HeadlessSecretStorageCipher;
+  madeKeyFile(): boolean;
+} {
   let madeKeyFile = false;
 
   function loadOrCreateKey(): Buffer {
     mkdirSync(dirname(keyPath), { recursive: true });
-    if (existsSync(keyPath)) {
-      const raw = readFileSync(keyPath, "utf8").trim();
-      return Buffer.from(raw, "base64");
-    }
+    if (existsSync(keyPath)) return Buffer.from(readFileSync(keyPath, "utf8").trim(), "base64");
     const key = randomBytes(32);
-    const temp = mkdtempSync(dirname(keyPath));
-    const tempPath = join(temp, "key");
+    const tempDir = mkdtempSync(join(dirname(keyPath), ".key-"));
+    const tempPath = join(tempDir, "key");
     writeFileSync(tempPath, key.toString("base64"));
     chmodSync(tempPath, 0o600);
     renameSync(tempPath, keyPath);
-    rmSync(temp, { recursive: true });
+    rmSync(tempDir, { recursive: true, force: true });
     madeKeyFile = true;
     return key;
   }
 
-  // Same container format as secret-storage-cipher.ts: base64(prefix || iv || tag || ct).
-  function cipher(reason: () => string) {
-    const key = loadOrCreateKey();
-    return {
-      canPersist: true,
-      async encrypt(value: string): Promise<string> {
-        const iv = randomBytes(IV_LENGTH);
-        const cipher = createCipheriv("aes-256-gcm", key, iv);
-        const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-        const tag = cipher.getAuthTag();
-        return Buffer.concat([Buffer.from(PREFIX, "ascii"), iv, tag, ciphertext]).toString("base64");
-      },
-      async decrypt(container: string): Promise<string> {
-        const raw = Buffer.from(container, "base64");
-        if (raw.subarray(0, 4).toString("ascii") !== PREFIX) throw new Error(reason());
-        const iv = raw.subarray(4, 4 + IV_LENGTH);
-        const tag = raw.subarray(4 + IV_LENGTH, 4 + IV_LENGTH + TAG_LENGTH);
-        const ciphertext = raw.subarray(4 + IV_LENGTH + TAG_LENGTH);
-        const decipher = createDecipheriv("aes-256-gcm", key, iv);
-        decipher.setAuthTag(tag);
-        return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
-      },
-      madeKeyFile: () => madeKeyFile,
-    };
-  }
-
-  return { cipher, madeKeyFile: () => madeKeyFile };
+  return {
+    madeKeyFile: () => madeKeyFile,
+    cipher(unavailableMessage: () => string) {
+      const key = loadOrCreateKey();
+      return {
+        canPersist: true,
+        encrypt(value: string): Buffer {
+          const iv = randomBytes(IV_LENGTH);
+          const cipher = createCipheriv("aes-256-gcm", key, iv);
+          const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+          return Buffer.concat([KEY_FILE_FORMAT, iv, cipher.getAuthTag(), encrypted]);
+        },
+        decrypt(container: Buffer): string {
+          if (!container.subarray(0, KEY_FILE_FORMAT.length).equals(KEY_FILE_FORMAT)) {
+            throw new Error(unavailableMessage());
+          }
+          const iv = container.subarray(KEY_FILE_FORMAT.length, KEY_FILE_FORMAT.length + IV_LENGTH);
+          const tagStart = KEY_FILE_FORMAT.length + IV_LENGTH;
+          const decipher = createDecipheriv("aes-256-gcm", key, iv);
+          decipher.setAuthTag(container.subarray(tagStart, tagStart + 16));
+          return Buffer.concat([
+            decipher.update(container.subarray(tagStart + 16)),
+            decipher.final(),
+          ]).toString("utf8");
+        },
+      };
+    },
+  };
 }
