@@ -208,6 +208,9 @@ export function WorkflowsCanvas(props: {
     get upload() {
       return props.host.mediaSupported() ? workflows.uploadPicture : undefined;
     },
+    get download() {
+      return props.host.mediaSupported() ? workflows.downloadMedia : undefined;
+    },
     get self() {
       return props.self;
     },
