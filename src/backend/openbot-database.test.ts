@@ -1152,7 +1152,7 @@ describe("OpenBotDatabase", () => {
     database.close();
   });
 
-  it("keeps the stored chat when the streamed message is outside the loaded window", async () => {
+  it("keeps the stored chat and its order when a stream flush has only the loaded window", async () => {
     const database = await createDatabase();
     const agent = testAgent();
     database.replaceAgents("agents-import", [agent], "agents.imported");
@@ -1160,17 +1160,32 @@ describe("OpenBotDatabase", () => {
     const snapshot = streamingSnapshot(agent, 2);
     database.persistConversation(snapshot, "turn.started", { turnId: "turn-1" });
     const stored = database.readConversation(agent.id, agent.threadId);
+    const storedOrdinals = () =>
+      database.connection
+        .prepare("SELECT message_id, ordinal FROM projection_thread_messages WHERE thread_id = ? ORDER BY message_id")
+        .all(agent.threadId ?? "");
+    const ordinalsBefore = storedOrdinals();
+    const outsideWindow = stored.messages[0];
+    if (!outsideWindow) throw new Error("The stored chat has no messages.");
     snapshot.messages = snapshot.messages.slice(-1);
 
     const revision = database.persistStreamingMessage({
       snapshot,
-      messageId: "message-outside-window",
+      messageId: outsideWindow.id,
       eventType: "response.delta-flushed",
     });
+    expect(revision).toBe(stored.revision);
+    expect(database.readConversation(agent.id, agent.threadId)).toEqual(stored);
+
+    const streamed = snapshot.messages[0];
+    if (!streamed) throw new Error("The streaming message is missing.");
+    streamed.text = "An answer that streamed in.";
+    database.persistStreamingMessage({ snapshot, messageId: streamed.id, eventType: "response.delta-flushed" });
 
     const conversation = database.readConversation(agent.id, agent.threadId);
-    expect(revision).toBe(stored.revision);
     expect(conversation.messages.map((message) => message.id)).toEqual(stored.messages.map((message) => message.id));
+    expect(conversation.messages.at(-1)).toMatchObject({ id: streamed.id, text: "An answer that streamed in." });
+    expect(storedOrdinals()).toEqual(ordinalsBefore);
     database.close();
   });
 

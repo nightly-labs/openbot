@@ -64,6 +64,13 @@ function message(index: number, start: number, status: ConversationMessage["stat
   };
 }
 
+function storedOrdinal(database: OpenBotDatabase, messageId: string): number {
+  const row = database.connection
+    .prepare("SELECT ordinal FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?")
+    .get(THREAD_ID, messageId);
+  return Number(row?.ordinal);
+}
+
 function seed(database: OpenBotDatabase): { messages: number; events: number } {
   const start = Date.now() - (TARGET_EVENTS + 1_000) * 1_000;
   let events = 0;
@@ -99,26 +106,28 @@ function seed(database: OpenBotDatabase): { messages: number; events: number } {
 
 const root = await mkdtemp(join(tmpdir(), "openbot-large-chat-"));
 const timings: Timing[] = [];
+let database: OpenBotDatabase | undefined;
 try {
   mkdirSync(OUT, { recursive: true });
   const userData = join(root, "user-data");
   const cachedSeed = join(OUT, `seed-${TARGET_EVENTS}`);
   const seeded = { messages: Math.ceil(TARGET_EVENTS / 2), events: Math.ceil(TARGET_EVENTS / 2) * 2 };
-  let database: OpenBotDatabase;
   if (process.argv.includes("--reuse-seed") && existsSync(cachedSeed)) {
     cpSync(cachedSeed, userData, { recursive: true });
     print(`Reused the seeded chat in ${cachedSeed}.`);
   } else {
-    database = new OpenBotDatabase(userData);
-    await runCauseEffect(database.initialize());
-    database.replaceAgents("large-chat:agent", [agentSummary()], "agent.created");
+    const seeding = new OpenBotDatabase(userData);
+    database = seeding;
+    await runCauseEffect(seeding.initialize());
+    seeding.replaceAgents("large-chat:agent", [agentSummary()], "agent.created");
     Object.assign(
       seeded,
-      timed(timings, "seed", () => seed(database)),
+      timed(timings, "seed", () => seed(seeding)),
     );
     print(`Seeded ${seeded.messages} messages and ${seeded.events} chat events.`);
-    database.connection.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-    database.close();
+    seeding.connection.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    seeding.close();
+    database = undefined;
     if (process.argv.includes("--reuse-seed")) {
       cpSync(userData, cachedSeed, { recursive: true });
       rmSync(join(cachedSeed, "openbot.db-wal"), { force: true });
@@ -126,9 +135,10 @@ try {
     }
   }
 
-  database = new OpenBotDatabase(userData);
+  const opened = new OpenBotDatabase(userData);
+  database = opened;
   const openStarted = performance.now();
-  await runCauseEffect(database.initialize());
+  await runCauseEffect(opened.initialize());
   timings.push({ operation: "open database", ms: Math.round((performance.now() - openStarted) * 10) / 10 });
   const now = Date.now();
   const fresh: ConversationMessage = {
@@ -141,7 +151,7 @@ try {
     status: "streaming",
   };
   timed(timings, "append message", () =>
-    database.appendConversationMessage({
+    opened.appendConversationMessage({
       agentId: AGENT_ID,
       threadId: THREAD_ID,
       activeTurnId: fresh.turnId ?? null,
@@ -149,10 +159,11 @@ try {
       eventType: "item.started",
     }),
   );
+  const appendedOrdinal = storedOrdinal(opened, fresh.id);
   for (let delta = 1; delta <= 3; delta += 1) {
     const streamed = { ...fresh, text: `${FILLER.slice(0, delta * 40)}` };
     timed(timings, `stream delta ${delta}`, () =>
-      database.persistStreamingMessage({
+      opened.persistStreamingMessage({
         snapshot: {
           agentId: AGENT_ID,
           threadId: THREAD_ID,
@@ -165,8 +176,9 @@ try {
       }),
     );
   }
+  assert.equal(storedOrdinal(opened, fresh.id), appendedOrdinal, "A stream flush moved the message in the chat.");
   timed(timings, "complete message", () =>
-    database.persistConversationChanges({
+    opened.persistConversationChanges({
       agentId: AGENT_ID,
       threadId: THREAD_ID,
       activeTurnId: null,
@@ -176,12 +188,12 @@ try {
     }),
   );
   const latest = timed(timings, "read latest page", () =>
-    database.readConversationPage(AGENT_ID, THREAD_ID, { type: "latest" }, 100),
+    opened.readConversationPage(AGENT_ID, THREAD_ID, { type: "latest" }, 100),
   );
-  const full = timed(timings, "read full chat", () => database.readConversation(AGENT_ID, THREAD_ID));
+  const full = timed(timings, "read full chat", () => opened.readConversation(AGENT_ID, THREAD_ID));
   const revisionBefore = full.revision;
   const revisionAfter = timed(timings, "stream a message outside the loaded window", () =>
-    database.persistStreamingMessage({
+    opened.persistStreamingMessage({
       snapshot: {
         agentId: AGENT_ID,
         threadId: THREAD_ID,
@@ -193,11 +205,11 @@ try {
       eventType: "response.delta-flushed",
     }),
   );
-  const kept = database.readConversation(AGENT_ID, THREAD_ID);
+  const kept = opened.readConversation(AGENT_ID, THREAD_ID);
   assert.equal(kept.messages.length, full.messages.length, "A stream flush outside the window removed messages.");
   assert.equal(revisionAfter, revisionBefore, "A stream flush outside the window wrote an event.");
   timed(timings, "delete one message", () =>
-    database.persistConversationChanges({
+    opened.persistConversationChanges({
       agentId: AGENT_ID,
       threadId: THREAD_ID,
       activeTurnId: null,
@@ -206,16 +218,18 @@ try {
       eventType: "message.deleted",
     }),
   );
-  timed(timings, "has history event", () => database.threadHasEvent(THREAD_ID, "thread.history-imported"));
-  timed(timings, "latest summary", () => database.latestThreadSummary(THREAD_ID));
-  timed(timings, "compact chat events", () => database.compactThreadEvents());
-  database.close();
+  timed(timings, "has history event", () => opened.threadHasEvent(THREAD_ID, "thread.history-imported"));
+  timed(timings, "latest summary", () => opened.latestThreadSummary(THREAD_ID));
+  timed(timings, "compact chat events", () => opened.compactThreadEvents());
+  opened.close();
+  database = undefined;
 
   const report = {
     name: NAME,
     createdAt: new Date().toISOString(),
     targetEvents: TARGET_EVENTS,
     seeded,
+    appendedOrdinal,
     fullChatMessages: full.messages.length,
     latestPageMessages: latest.messages.length,
     messagesAfterWindowFlush: kept.messages.length,
@@ -225,5 +239,6 @@ try {
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   print(`Report: ${reportPath}`);
 } finally {
+  database?.close();
   await rm(root, { recursive: true, force: true });
 }
