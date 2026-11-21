@@ -447,6 +447,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Nie można odtworzyć tego pliku audio.",
   "mobile.chat.browserSecret.password": "Hasło",
   "mobile.chat.browserSecret.authenticatorCode": "Kod z aplikacji uwierzytelniającej",
+  "mobile.chat.browserSecret.ended": "To żądanie logowania zostało zakończone. Poproś agenta o ponowną próbę.",
   "mobile.chat.browserSecret.oneTimeCode": "Kod jednorazowy",
   "mobile.chat.browserSecret.takeoverTitle": "Przejęcie przeglądarki",
   "mobile.chat.browserSecret.takeoverBody": "Wykonaj ten krok w przeglądarce na komputerze z OpenBot.",

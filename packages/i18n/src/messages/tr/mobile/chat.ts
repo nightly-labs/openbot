@@ -378,6 +378,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Bu ses dosyası oynatılamıyor.",
   "mobile.chat.browserSecret.password": "Şifre",
   "mobile.chat.browserSecret.authenticatorCode": "Doğrulama kodu",
+  "mobile.chat.browserSecret.ended": "Bu oturum açma isteği sona erdi. Ajandan tekrar denemesini isteyin.",
   "mobile.chat.browserSecret.oneTimeCode": "Tek kullanımlık kod",
   "mobile.chat.browserSecret.takeoverTitle": "Tarayıcı devralma",
   "mobile.chat.browserSecret.takeoverBody": "Bu adımı OpenBot çalıştıran bilgisayardaki tarayıcıda tamamlayın.",

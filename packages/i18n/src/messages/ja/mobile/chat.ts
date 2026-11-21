@@ -378,6 +378,8 @@ export const messages = {
   "mobile.chat.audio.unplayable": "この音声ファイルは再生できません。",
   "mobile.chat.browserSecret.password": "パスワード",
   "mobile.chat.browserSecret.authenticatorCode": "認証コード",
+  "mobile.chat.browserSecret.ended":
+    "このサインインのリクエストは終了しました。エージェントにもう一度試すよう依頼してください。",
   "mobile.chat.browserSecret.oneTimeCode": "ワンタイムコード",
   "mobile.chat.browserSecret.takeoverTitle": "ブラウザーの引き継ぎ",
   "mobile.chat.browserSecret.takeoverBody":

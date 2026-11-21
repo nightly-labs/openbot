@@ -99,6 +99,7 @@ export const messages = {
   "browser.secret.submitting": "Versturen…",
   "browser.secret.takeOver": "Overnemen",
   "browser.secret.failed": "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer het opnieuw.",
+  "browser.secret.ended": "Dit aanmeldverzoek is beëindigd. Vraag de agent het nog eens te proberen.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent een script op deze pagina heeft uitgevoerd. Vraag de agent de pagina opnieuw te laden en het nog eens te proberen.",
   "browser.secret.vaultSkip.fieldKind":

@@ -92,6 +92,7 @@ export const messages = {
   "browser.secret.submitting": "Gönderiliyor…",
   "browser.secret.takeOver": "Devral",
   "browser.secret.failed": "İstek tamamlanamadı. Bağlantıyı kontrol edin ve tekrar deneyin.",
+  "browser.secret.ended": "Bu oturum açma isteği sona erdi. Ajandan tekrar denemesini isteyin.",
   "browser.secret.vaultSkip.agentScript":
     "Ajan bu sayfada bir betik çalıştırdığı için OpenBot kayıtlı oturum bilgilerinizi kullanmadı. Kullanmak için ajandan sayfayı yeniden yüklemesini ve tekrar denemesini isteyin.",
   "browser.secret.vaultSkip.fieldKind":

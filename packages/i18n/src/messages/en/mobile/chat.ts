@@ -371,6 +371,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.audio.unplayable": "Cannot play this audio file.",
   "mobile.chat.browserSecret.password": "Password",
   "mobile.chat.browserSecret.authenticatorCode": "Authenticator code",
+  "mobile.chat.browserSecret.ended": "This sign-in request has ended. Ask the agent to try again.",
   "mobile.chat.browserSecret.oneTimeCode": "One-time code",
   "mobile.chat.browserSecret.takeoverTitle": "Browser takeover",
   "mobile.chat.browserSecret.takeoverBody": "Complete this step in the browser on the computer running OpenBot.",
