@@ -17,7 +17,7 @@ export const messages = {
   "error.remote.sessionCapacity": "Ana makinede zaten dört etkin oturum var.",
   "error.remote.linuxNeedsX11": "Linux'ta uzak masaüstü bir X11 oturumuna ihtiyaç duyar. Wayland desteklenmez.",
   "error.remote.runtimeMissing":
-    "Sunshine ve Moonlight Web çalışma zamanı eksik veya bu ana makinede desteklenmiyor. Mac, Windows x64 veya Linux x64 ana makinesine tam OpenBot sürümünü yükleyin, ardından OpenBot'u yeniden başlatın.",
+    "Sunshine ve Moonlight Web çalışma zamanı eksik veya bu ana makinede desteklenmiyor. Mac, Windows x64 veya Linux ana makinesine tam OpenBot sürümünü yükleyin, ardından OpenBot'u yeniden başlatın.",
   "error.remote.testActive": "Bir uzak masaüstü testi etkin. Bittiğinde tekrar deneyin.",
   "error.remote.screenRecordingDenied":
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",

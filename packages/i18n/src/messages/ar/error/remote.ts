@@ -17,7 +17,7 @@ export const messages = {
   "error.remote.sessionCapacity": "لدى المضيف بالفعل أربع جلسات نشطة.",
   "error.remote.linuxNeedsX11": "يحتاج سطح المكتب البعيد على Linux إلى جلسة X11. Wayland غير مدعوم.",
   "error.remote.runtimeMissing":
-    "بيئة تشغيل Sunshine وMoonlight Web مفقودة أو غير مدعومة على هذا المضيف. ثبّت إصدار OpenBot الكامل على Mac أو مضيف Windows x64 أو مضيف Linux x64، ثم أعد تشغيل OpenBot.",
+    "بيئة تشغيل Sunshine وMoonlight Web مفقودة أو غير مدعومة على هذا المضيف. ثبّت إصدار OpenBot الكامل على Mac أو مضيف Windows x64 أو مضيف Linux، ثم أعد تشغيل OpenBot.",
   "error.remote.testActive": "يوجد اختبار نشط لسطح المكتب البعيد. أعد المحاولة عند انتهائه.",
   "error.remote.screenRecordingDenied":
     "لم يسمح المضيف لـ OpenBot بتسجيل شاشته. امنح إذن تسجيل الشاشة على المضيف، ثم أعد المحاولة.",
