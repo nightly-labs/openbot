@@ -1435,6 +1435,7 @@ export const messages = defineMessages("mobile.server", {
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "mobile.server.providers.codexKeyAlternative":
     "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "mobile.server.providers.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "mobile.server.providers.sectionUse": "Use",
   "mobile.server.providers.unused": "No agent uses it",
   "mobile.server.providers.usedByCount": { one: "1 agent uses it", other: "{count} agents use it" },

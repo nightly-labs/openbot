@@ -579,6 +579,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Tura Muse nie powiodła się.",
   "error.provider.museModelUnavailable":
     "Muse nie może użyć tego modelu. Muse może być niedostępny w kraju, w którym działa ten agent, albo to konto nie ma dostępu do modelu. Wybierz inny model i spróbuj ponownie.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse nie mógł ukończyć tego żądania. Muse używa zapisanego klucza Meta API, a nie Twojego logowania. Zastąp klucz lub usuń go w Ustawieniach, aby używać logowania.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse nie może wygenerować profilu bez dostępu do zewnętrznych narzędzi. Wygeneruj profil innym dostawcą, a potem wybierz Muse dla agenta.",
   "error.provider.museAuthUnverified":

@@ -587,6 +587,8 @@ export const messages = {
   "error.provider.museTurnFailed": "O turno do Muse falhou.",
   "error.provider.museModelUnavailable":
     "O Muse não pode usar este modelo. O Muse pode não estar disponível no país onde este agente é executado, ou esta conta não tem acesso ao modelo. Escolha outro modelo e tente novamente.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "O Muse não conseguiu concluir esta solicitação. O Muse usa a chave de API da Meta salva, não o seu login. Substitua a chave ou remova-a nas Configurações para usar o seu login.\n{detail}",
   "error.provider.museProfileUnsupported":
     "O Muse não consegue gerar um perfil sem acesso a ferramentas externas. Use outro provedor para gerar o perfil e depois selecione o Muse para o agente.",
   "error.provider.museAuthUnverified":

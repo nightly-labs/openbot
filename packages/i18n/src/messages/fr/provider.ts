@@ -270,6 +270,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
   "provider.settings.geminiKeyReplacesAccount":
     "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
+  "provider.settings.museKeyInUse":
+    "Muse utilise cette clé, pas votre connexion. Pour utiliser votre connexion, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",

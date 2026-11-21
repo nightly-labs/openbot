@@ -268,6 +268,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
   "provider.settings.geminiKeyReplacesAccount":
     "保存された Gemini API キーが Google のサインインの代わりに使われます。Google のプランとそのモデルを使うには、キーを削除してください。",
+  "provider.settings.museKeyInUse":
+    "Muse はサインインではなく、このキーを使います。サインインを使うには、キーを削除してください。",
   "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 自分でインストール",

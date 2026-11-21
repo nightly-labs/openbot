@@ -316,6 +316,7 @@ export const messages = {
   "provider.settings.codexKeyInUse":
     "ChatGPT משתמש במפתח הזה, ולא בתוכנית ChatGPT שלך. OpenAI מחייבת כל בקשה במפתח. השימוש בתוכנית לא מוצג.",
   "provider.settings.codexKeyAlternative": "או להתחבר עם מפתח OpenAI API. OpenAI מחייבת כל בקשה במפתח.",
+  "provider.settings.museKeyInUse": "Muse משתמש במפתח הזה, לא בהתחברות שלך. כדי להשתמש בהתחברות, יש להסיר את המפתח.",
   "provider.settings.addKey": "הוספת מפתח",
   "provider.settings.changeKey": "החלפת מפתח",
   "provider.settings.runtime": "סביבת ריצה",

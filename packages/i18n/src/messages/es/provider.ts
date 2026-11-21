@@ -271,6 +271,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
   "provider.settings.geminiKeyReplacesAccount":
     "Se usa una clave de API de Gemini guardada en lugar de un inicio de sesión de Google. Para usar un plan de Google y sus modelos, elimina la clave.",
+  "provider.settings.museKeyInUse":
+    "Muse usa esta clave, no tu inicio de sesión. Para usar tu inicio de sesión, elimina la clave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
   "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sin usar: {version} · instalada por ti",

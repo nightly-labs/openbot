@@ -607,6 +607,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse のターンに失敗しました。",
   "error.provider.museModelUnavailable":
     "Muse はこのモデルを使用できません。このエージェントが動作している国では Muse を利用できないか、このアカウントにモデルへのアクセス権がない可能性があります。別のモデルを選択してから、もう一度お試しください。\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse はこのリクエストを完了できませんでした。Muse はサインインではなく、保存された Meta API キーを使います。キーを置き換えるか、設定でキーを削除してサインインを使ってください。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse は外部ツールにアクセスできないため、プロフィールを生成できません。別のプロバイダーでプロフィールを生成してから、エージェントに Muse を選択してください。",
   "error.provider.museAuthUnverified":

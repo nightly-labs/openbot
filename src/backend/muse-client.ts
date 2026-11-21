@@ -109,6 +109,10 @@ interface MuseThread {
   replayed: Set<string>;
 }
 
+const MUSE_MODEL_UNAVAILABLE = /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu;
+const MUSE_CREDENTIAL_FAILURE =
+  /\b(?:40[123]|unauthori[sz]ed|forbidden|payment required|billing|invalid[ _-]?(?:api[ _-]?)?key|api[ _-]?key)\b/iu;
+
 export class MuseAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "muse";
@@ -433,6 +437,13 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
 
   #redact(value: string): string {
     return redactMcpValues(redactText(value), this.#redactionValues());
+  }
+  #turnFailureText(message: string, unexplained: boolean): string {
+    if (MUSE_MODEL_UNAVAILABLE.test(message))
+      return sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) });
+    if (this.#options.apiKey() && (unexplained || MUSE_CREDENTIAL_FAILURE.test(message)))
+      return sourceText("error.provider.museSavedKeyFailed", { detail: shownFailureDetail(message) });
+    return message;
   }
   #fail(_error: unknown): void {
     if (!this.#running) return;
@@ -895,11 +906,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         this.#emit("error", {
           threadId: thread.id,
           turnId: terminal.turnId,
-          error: {
-            message: /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu.test(message)
-              ? sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) })
-              : message,
-          },
+          error: { message: this.#turnFailureText(message, !terminal.error && !terminal.reason) },
           willRetry: false,
         });
       }
