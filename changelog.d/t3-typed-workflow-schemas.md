@@ -8,7 +8,7 @@
 - A condition can test answer fields with **Check**, for example `priority = high and count > 2`.
   A check makes no model call, so it is fast and free.
 - Write `{{name}}` in an agent task, a model prompt or an approval question to put the value of an
-  answer field there. Text from a webhook comes in quotes, and a name that no step before gives
+  answer field there. Text values come in quotes, and a name that no step before gives
   stays as it is. The step shows a warning when a name or a check does not match the steps before
   it. Agents that build workflows get the same warnings. To test a webhook workflow by hand, give
   the trigger's fields as the run input, for example `{"priority":"high"}`. On a joined server, the

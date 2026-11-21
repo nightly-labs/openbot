@@ -379,8 +379,8 @@ changed, on this computer and on a joined host.
   with `and` and `or`) tests the answers before it and makes no model call. `{{name}}` in an agent
   task, a model prompt or system text, or an approval question takes the value of that field. Only
   the names that a connected step before it declares are replaced; other `{{...}}` text stays as it
-  is. Text and list values from a webhook trigger come in JSON quotes, because the sender is outside
-  OpenBot. A step reads the answers of the connected steps before it, through conditions and
+  is. Text and list values come in JSON quotes, because they can hold text from outside OpenBot, also
+  when a model or an agent copies webhook text into its answer. A step reads the answers of the connected steps before it, through conditions and
   approvals, in run order (`workflowAnswerSources`); an output shows them as `name: value` lines.
   In a manual run, the trigger reads its answer from the run input as a JSON object.
   `edit_workflow` refuses an edit that adds an answer problem (`workflowAnswerProblems`) and tells

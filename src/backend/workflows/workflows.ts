@@ -501,8 +501,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               idempotencyKey: `workflow-step:${step.id}:answer`,
             })
             .pipe(Effect.option);
-          if (Option.isNone(sent) || sent.value === deliveryId) return false;
-          return runs.replaceDelivery(step.id, deliveryId, sent.value, now());
+          if (Option.isNone(sent)) return "failed" as const;
+          return sent.value !== deliveryId && runs.replaceDelivery(step.id, deliveryId, sent.value, now())
+            ? ("sent" as const)
+            : ("repeated" as const);
         });
 
         const settleFromDelivery = Effect.fn("Workflows.settleFromDelivery")(function* (step: StoredWorkflowStep) {
@@ -520,10 +522,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if (fields.length === 0) return settle(step, { status: "done", output });
             const read = readAnswer(fields, output);
             if ("output" in read) return settle(step, { status: "done", output: read.output });
-            if (yield* askAnswerFix(step, step.agentId, step.deliveryId, answerFixAsk(fields, read.problems))) {
+            const fix = yield* askAnswerFix(step, step.agentId, step.deliveryId, answerFixAsk(fields, read.problems));
+            if (fix === "sent") {
               changed(step.workflowId);
               return false;
             }
+            if (fix === "failed")
+              return settle(step, { status: "failed", error: sourceText("error.workflow.handoffFailed") });
             return settle(step, {
               status: "failed",
               error: sourceText("error.workflow.answerInvalid", { fields: answerProblemNames(read.problems) }),
@@ -600,24 +605,24 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               settle(step, { status: "failed", error: result.failure.message });
             } else if (fields.length > 0) {
               const first = readAnswer(fields, result.success);
-              const read =
+              const fixed =
                 "output" in first
-                  ? first
+                  ? Result.succeed(first)
                   : yield* generated(
                       `${request.prompt}\n\n--- your answer ---\n${result.success}\n\n${answerFixAsk(fields, first.problems)}`,
                     ).pipe(
                       Effect.map((text) => readAnswer(fields, text)),
-                      Effect.orElseSucceed(() => first),
+                      Effect.result,
                     );
-              settle(
-                step,
-                "output" in read
-                  ? { status: "done", output: read.output }
-                  : {
-                      status: "failed",
-                      error: sourceText("error.workflow.answerInvalid", { fields: answerProblemNames(read.problems) }),
-                    },
-              );
+              if (Result.isFailure(fixed)) settle(step, { status: "failed", error: fixed.failure.message });
+              else if ("output" in fixed.success) settle(step, { status: "done", output: fixed.success.output });
+              else
+                settle(step, {
+                  status: "failed",
+                  error: sourceText("error.workflow.answerInvalid", {
+                    fields: answerProblemNames(fixed.success.problems),
+                  }),
+                });
             } else if (!condition) {
               settle(step, { status: "done", output: result.success });
             } else {

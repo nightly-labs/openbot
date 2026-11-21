@@ -56,7 +56,7 @@ export function stepAnswer(
   return Object.fromEntries(givenAnswers(graph, nodeId, latest).flatMap(({ answer }) => Object.entries(answer)));
 }
 
-const OUTSIDE_TEXT_TYPES: ReadonlySet<WorkflowAnswerField["type"]> = new Set(["text", "list"]);
+const QUOTED_TYPES: ReadonlySet<WorkflowAnswerField["type"]> = new Set(["text", "list"]);
 
 export function templateValues(
   graph: WorkflowGraph,
@@ -69,8 +69,7 @@ export function templateValues(
     for (const field of source.fields) {
       if (!Object.hasOwn(answer, field.name)) continue;
       const text = workflowAnswerValueText(answer[field.name]);
-      const outside = source.node.kind === "trigger" && OUTSIDE_TEXT_TYPES.has(field.type);
-      values.set(field.name, outside ? JSON.stringify(text) : text);
+      values.set(field.name, QUOTED_TYPES.has(field.type) ? JSON.stringify(text) : text);
     }
   return values;
 }

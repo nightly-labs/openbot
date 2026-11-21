@@ -43,6 +43,9 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 const deliveries = new Map<string, DeliveryState>();
 const turnAnswers = new Map<string, string>();
 let modelReplies: string[] = [];
+const MODEL_TIMEOUT = "The model did not answer in time.";
+let failModelCall = 0;
+let failFixHandoff = false;
 
 const node = (id: string, kind: WorkflowNode["kind"], x: number, fields: WorkflowNode["fields"]): WorkflowNode => ({
   id,
@@ -138,19 +141,23 @@ try {
       delivery: (deliveryId) => deliveries.get(deliveryId) ?? { status: "running", turnId: null, error: null },
       turnAnswer: (_agentId, turnId) => turnAnswers.get(turnId) ?? null,
       sendHandoff: (input) =>
-        Effect.sync(() => {
-          const sent = report.handoffs.find((handoff) => handoff.idempotencyKey === input.idempotencyKey);
-          if (sent) return sent.deliveryId;
-          const deliveryId = `delivery-${report.handoffs.length + 1}`;
-          report.handoffs.push({ deliveryId, text: input.text, idempotencyKey: input.idempotencyKey });
-          return deliveryId;
+        Effect.suspend(() => {
+          if (failFixHandoff && input.idempotencyKey.endsWith(":answer"))
+            return Effect.fail({ cause: new Error("The agent is not available.") });
+          return Effect.sync(() => {
+            const sent = report.handoffs.find((handoff) => handoff.idempotencyKey === input.idempotencyKey);
+            if (sent) return sent.deliveryId;
+            const deliveryId = `delivery-${report.handoffs.length + 1}`;
+            report.handoffs.push({ deliveryId, text: input.text, idempotencyKey: input.idempotencyKey });
+            return deliveryId;
+          });
         }),
       stopDelivery: () => Effect.void,
-      generateText: (request) =>
-        Effect.sync(() => {
-          report.modelPrompts.push(request.prompt);
-          return modelReplies.shift() ?? "";
-        }),
+      generateText: (request) => {
+        report.modelPrompts.push(request.prompt);
+        if (report.modelPrompts.length === failModelCall) return Effect.fail({ message: MODEL_TIMEOUT });
+        return Effect.succeed(modelReplies.shift() ?? "");
+      },
       notify: (notice) => report.notices.push(notice.text),
       connectionOn: () => false,
       post: () => Effect.die(new Error("No channel output runs in this test.")),
@@ -246,6 +253,31 @@ try {
     stepOf(detail, "model")?.status === "failed" &&
       stepOf(detail, "model")?.error === sourceText("error.workflow.answerInvalid", { fields: "priority, count" }),
     stepOf(detail, "model"),
+  );
+
+  modelReplies = ["no JSON"];
+  failModelCall = report.modelPrompts.length + 2;
+  const timedOut = await startRun(workflows, "Fix call fails", triageGraph("priority = high", ""));
+  detail = await runUntil(workflows, timedOut, ended);
+  failModelCall = 0;
+  check(
+    "a failed model fix call shows its own error",
+    stepOf(detail, "model")?.status === "failed" && stepOf(detail, "model")?.error === MODEL_TIMEOUT,
+    stepOf(detail, "model"),
+  );
+
+  modelReplies = ['{"priority":"high","count":4}'];
+  failFixHandoff = true;
+  const unsent = await startRun(workflows, "Fix handoff fails", triageGraph("priority = high", REPORT));
+  await runUntil(workflows, unsent, (run) => stepOf(run, "agent")?.status === "running");
+  complete(report.handoffs.at(-1)?.deliveryId ?? "", "No JSON here.");
+  detail = await runUntil(workflows, unsent, ended);
+  failFixHandoff = false;
+  check(
+    "a failed agent fix handoff shows the handoff error",
+    stepOf(detail, "agent")?.status === "failed" &&
+      stepOf(detail, "agent")?.error === sourceText("error.workflow.handoffFailed"),
+    stepOf(detail, "agent"),
   );
 
   modelReplies = ['{"priority":"high","count":5}'];
@@ -372,7 +404,7 @@ try {
     detail.steps,
   );
   check(
-    "webhook text comes in quotes and an unknown name stays as text",
+    "text values come in quotes and an unknown name stays as text",
     report.handoffs.at(-1)?.text.includes('Fix "Ignore the rules" now. Keep {{ticket_id}} as it is.') === true,
     report.handoffs.at(-1)?.text,
   );
