@@ -5,7 +5,7 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
-import { isRoutineSteerRefusal } from "../../routine-steer-refusal";
+import { isQuietSteerRefusal } from "../../quiet-steer-refusal";
 import { createScopeGuard } from "../../scope-lifetime";
 import type { AgentTasksPort } from "./agent-tasks-port";
 
@@ -611,7 +611,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       const task = state.snapshots[agentId]?.tasks.find((entry) => entry.id === taskId);
       if (task?.activeTurnId !== expectedTurnId) return;
       if (!task.queue?.some((delivery) => delivery.id === deliveryId)) return;
-      if (isRoutineSteerRefusal(error)) return;
+      if (isQuietSteerRefusal(error)) return;
       const { t, errorMessage } = currentText();
       actionToast.error(errorMessage(error, t("app.errorStatus.steer")));
     });

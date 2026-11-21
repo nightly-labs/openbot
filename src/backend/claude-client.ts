@@ -1671,10 +1671,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     params: unknown,
   ): Effect.fn.Return<{ turnId: string }, ProviderClientOperationError> {
     const threadId = yield* providerSync(() => requiredString(params, "threadId"));
-    const runtime = yield* providerSync(() => this.#requireThread(threadId));
     const expectedTurnId = yield* providerSync(() => requiredString(params, "expectedTurnId"));
-    if (!runtime.activeTurn || runtime.activeTurn.id !== expectedTurnId) {
-      return yield* providerFailure(new Error("The active Claude turn changed before steering was accepted."));
+    const runtime = this.#threads.get(threadId);
+    if (!runtime?.activeTurn || runtime.activeTurn.id !== expectedTurnId) {
+      return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
     }
     const clientId = getString(params, "clientUserMessageId");
     const messageId = promptUuid(runtime, clientId);
