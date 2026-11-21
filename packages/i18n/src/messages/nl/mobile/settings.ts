@@ -83,7 +83,7 @@ export const messages = {
     "Dit beëindigt ook de actieve externe verbindingen van het account. Het apparaat kan opnieuw inloggen.",
   "mobile.settings.sessions.disconnect": "Ontkoppelen",
   "mobile.settings.dictation.footer":
-    "De taal die je tegen de spraakherkenning van de telefoon spreekt, in een spraakgesprek en bij het dicteren. Automatisch gebruikt de eerste ondersteunde taal uit de instellingen van je telefoon.",
+    "De taal die je tegen de spraakherkenning van de telefoon spreekt, in een spraakgesprek en bij het dicteren. Automatisch gebruikt de taal van het toetsenbord waarmee je typt, en anders de eerste ondersteunde taal uit de instellingen van je telefoon.",
   "mobile.settings.dictation.automatic": "Automatisch",
   "mobile.settings.appearance.title": "Weergave",
   "mobile.settings.appearance.footer": "Systeem volgt de weergave van je apparaat.",

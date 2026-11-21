@@ -79,7 +79,7 @@ export const messages = {
   "mobile.settings.sessions.disconnectBody": "这也会结束该账号的活跃远程连接。该设备可以重新登录。",
   "mobile.settings.sessions.disconnect": "断开连接",
   "mobile.settings.dictation.footer":
-    "在语音对话和听写中，你对手机语音识别说的语言。“自动”会使用手机设置中第一个受支持的语言。",
+    "在语音对话和听写中，你对手机语音识别说的语言。“自动”会使用你打字所用键盘的语言，其次是手机设置中第一个受支持的语言。",
   "mobile.settings.dictation.automatic": "自动",
   "mobile.settings.appearance.title": "外观",
   "mobile.settings.appearance.footer": "“系统”会跟随设备外观。",
