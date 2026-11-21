@@ -697,6 +697,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
               )
               .max(INPUT_LIMITS.promptOptions)
               .optional(),
+            multiSelect: z.boolean().optional(),
           }),
         )
         .min(1)

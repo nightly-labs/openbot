@@ -484,7 +484,7 @@ function AgentTaskChat({
     Keyboard.dismiss();
     void haptics.impact();
     if (answersQuestion && files.length === 0) {
-      if (!questionForm.disabled) questionForm.answer([mentionDraft(text).text]);
+      if (!questionForm.disabled) questionForm.answerText(mentionDraft(text).text);
       return;
     }
     const withFiles = <R,>(deliver: (attachmentDraftIds: string[]) => Promise<R>) =>
