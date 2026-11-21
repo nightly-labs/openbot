@@ -899,6 +899,7 @@ export function createConversationViewScope(props: ConversationProps) {
   });
   const messagePins = createMessagePinsStore({ props });
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
+  const [besideFocusRequest, setBesideFocusRequest] = createSignal(0);
   const requestThreadFocus = () => setThreadFocusRequest((current) => current + 1);
   const voice = createVoiceStore({
     props,
@@ -934,7 +935,7 @@ export function createConversationViewScope(props: ConversationProps) {
       besideDraftKey,
       appendTranscript: (key, text) => {
         threadComposer.setText(key, appendVoiceTranscript(threadComposer.draft(key).text, text));
-        if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+        requestDraftFocus(key);
       },
       send: async (key) => {
         flush();
@@ -948,7 +949,7 @@ export function createConversationViewScope(props: ConversationProps) {
           await threadComposer.importsEnded(key);
           await threadQueue.save(key);
         } else await threadComposer.send(destination, threadComposer.draft(key).text.trim(), key);
-        if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+        requestDraftFocus(key);
       },
       reportError: (message) => actionToast.error(message),
       reportLimit: () => toast.warning(currentText().t("composer.voice.limitReached")),
@@ -971,6 +972,10 @@ export function createConversationViewScope(props: ConversationProps) {
   function besideDraftKey(): string | undefined {
     const id = activeRightPanel() === "thread" ? shownPanelThreadId() : null;
     return id === null ? undefined : threadComposer.sideDraftKey(id);
+  }
+  function requestDraftFocus(key: string): void {
+    if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+    else if (besideDraftKey() === key) setBesideFocusRequest((current) => current + 1);
   }
   const threadDraftShown = (key: string | undefined) =>
     key === threadComposer.openDraftKey() || (key !== undefined && key === besideDraftKey());
@@ -2343,6 +2348,7 @@ export function createConversationViewScope(props: ConversationProps) {
     threadComposer,
     threadQueue,
     threadFocusRequest,
+    besideFocusRequest,
     requestThreadFocus,
     branchThread,
     startNewThread,

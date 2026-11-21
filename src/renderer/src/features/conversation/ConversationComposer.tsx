@@ -153,6 +153,7 @@ export function ConversationComposer() {
   } = useConversationViewScope();
   const { t, format, errorMessage, sourceText: localizeSourceText } = useText();
   const voicePhase = () => (voiceThreadKey() === undefined ? sharedVoicePhase() : "idle");
+  const threadVoiceBusy = () => voiceThreadKey() !== undefined && sharedVoicePhase() !== "idle";
   const messageLabel = () =>
     channel
       ? t("channel.composer.placeholder", { name: channel.name() })
@@ -465,6 +466,7 @@ export function ConversationComposer() {
         submitting() ||
         !agentReady() ||
         Boolean(providerUpdateRequired()) ||
+        threadVoiceBusy() ||
         voicePhase() === "preparing" ||
         voicePhase() === "requesting" ||
         voicePhase() === "transcribing"
@@ -879,7 +881,7 @@ export function ConversationComposer() {
                   levels={voiceLevels()}
                   elapsedSeconds={voiceElapsedSeconds()}
                   modelProgress={voiceModelProgress()}
-                  blocked={!props.agent || !agentReady() || sharedVoicePhase() !== "idle"}
+                  blocked={!props.agent || !agentReady() || threadVoiceBusy()}
                   onStart={() => void startVoiceRecording()}
                   onCancel={cancelVoiceRecording}
                   onFinish={stopVoiceRecording}
