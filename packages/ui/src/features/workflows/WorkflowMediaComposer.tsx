@@ -143,7 +143,7 @@ export function WorkflowMediaComposer(props: {
   });
 
   const pictures = () => step.inputs().filter((source) => step.inputUrl(source) !== undefined);
-  const ready = () => !step.run.running() && step.runnable() && !step.locked() && step.model() !== undefined;
+  const ready = () => !step.busy() && step.runnable() && !step.locked() && step.model() !== undefined;
   takeKey(
     isEscape,
     (target) => section?.contains(target) === true,
@@ -535,12 +535,12 @@ function PickTile<T extends string>(props: {
 function RunButton(props: { step: MediaStep; id: string; ready: boolean }) {
   const { t } = useText();
   const step = props.step;
-  const seconds = useElapsed(step.run.running);
+  const seconds = useElapsed(step.busy);
   const making = () =>
     t(step.kind() === "video" ? "workflow.video.making" : "workflow.image.making", { time: clock(seconds()) });
   return (
     <>
-      <Show when={step.run.running()}>
+      <Show when={step.busy()}>
         <span class="wfn-composer-elapsed" role="timer" aria-label={making()}>
           {clock(seconds())}
         </span>
@@ -550,7 +550,7 @@ function RunButton(props: { step: MediaStep; id: string; ready: boolean }) {
         fallback={
           <Button
             class="wfn-composer-generate"
-            loading={step.run.running()}
+            loading={step.busy()}
             disabled={!props.ready}
             aria-keyshortcuts="Meta+Enter Control+Enter"
             aria-label={step.runLabel()}

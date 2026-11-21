@@ -345,6 +345,7 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   const voiceText = () => voiceName() ?? t("workflow.video.voiceAuto");
   const [locked, setLocked] = useLocked(key);
   const run = useStepRun(id);
+  const busy = () => run.running() || board.pending(id).length > 0;
   const orFile = (made: string | null | undefined, value: string) => orStoredPicture(board, made, value);
   const pictureUrl = (value: string) => storedPictureUrl(board, value);
   const inputUrl = (source: string) => {
@@ -392,7 +393,8 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     locked,
     setLocked,
     run,
-    specsDisabled: () => locked() || run.running(),
+    busy,
+    specsDisabled: () => locked() || busy(),
     orFile,
     pictureUrl,
     inputUrl,

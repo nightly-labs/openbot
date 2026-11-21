@@ -141,7 +141,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const [w = 1, h = 1] = specs().aspect.split(":").map(Number);
     return { css: aspectRatio(specs().aspect), value: w / h };
   };
-  const seconds = useElapsed(run.running);
+  const seconds = useElapsed(step.busy);
   const urlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
     return step.orFile(board.catalogs().media?.(value, kind()), value);
@@ -184,7 +184,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const index = images.findIndex((entry) => entry.id === shown?.id);
     setViewer({ images, index: Math.max(0, index), origin: media });
   };
-  const busy = () => run.running() || board.pending(props.id).length > 0;
   const making = () => {
     const first = board.pending(props.id)[0];
     if (!first) return run.running();
@@ -356,7 +355,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                   <Button
                     size="xs"
                     class="wfn-run-pill"
-                    loading={busy()}
+                    loading={step.busy()}
                     disabled={!step.runnable() || step.locked() || !model()}
                     aria-label={step.runLabel()}
                   >

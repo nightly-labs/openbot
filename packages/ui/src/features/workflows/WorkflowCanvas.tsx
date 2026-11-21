@@ -607,7 +607,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
     error: (id) => runIndex().get(id)?.error,
     resultsOf: (id) => runIndex().get(id)?.results ?? [],
-    pendingOf: (id) => runIndex().get(id)?.pending ?? [],
+    pendingOf: (id) => (kindOf(id) === "image" ? (runIndex().get(id)?.pending ?? []) : []),
     duplicate: (id) => duplicateNodes([id]),
     resetSize: (id) => resetSize(id),
     beforeChange: () => commit(),
