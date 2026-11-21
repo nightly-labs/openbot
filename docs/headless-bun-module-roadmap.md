@@ -124,6 +124,43 @@ which backend services import Electron transitively.
 - Can a local-only Bun module (no account/Signal) be useful on this phone even if it
   cannot join the maintainer's network?
 
+## Granular RAM audit of the current host (2026-11-21, measured, PSS)
+
+From `/proc/<pid>/smaps_rollup` on the running server, arm64 phone, zram active.
+PSS is what the kernel actually bills to each process.
+
+| Process | Role | PSS | RSS | Swap |
+| --- | --- | --- | --- | --- |
+| `run.openbot.mobile` (Android app, outside the tree) | the actual UI the owner uses | 519 MB (dumpsys: 834 MB TOTAL PSS) | 715 MB | 122 MB |
+| `opencode serve` (provider runtime) | agent sessions backend | 356 MB | 369 MB | 29 MB |
+| `openbot.real` (Electron main) | wires all services, control socket, team API | 276 MB | 312 MB | 127 MB |
+| `opencode acp` | ACP stdio bridge for the active turn | 92 MB | 106 MB | 22 MB |
+| renderer `--type=renderer` (about:blank + WebRTC window) | **discardable in headless** | 50 MB | 85 MB | 17 MB |
+| `opencode-pty daemon` | terminal sessions for agents | 28 MB | 30 MB | 18 MB |
+| `--type=utility NetworkService` | Chromium network stack | 13.5 MB | 38 MB | 11 MB |
+| `--type=utility NodeService` | Node bridge inside Electron | 9.3 MB | 38 MB | 36 MB |
+| renderer #2 | second hidden window | 4.8 MB | 26 MB | 15 MB |
+| `--type=gpu-process` | GPU for the hidden window | 4.2 MB | 22 MB | 18 MB |
+| 2x `--type=zygote` | Chromium forking base | 2.9 MB | 24 MB | 21 MB |
+| `--type=broker` | sandbox broker | 0.4 MB | 4 MB | 11 MB |
+| 2x `cua-driver` | Computer Use driver (**discardable**) | 0.6 MB | 4 MB | 17 MB |
+
+What this says for the Bun module:
+
+- The **Electron-side overhead** (main + renderers + gpu + zygote + utilities + broker)
+  is about **362 MB PSS**, of which ~82 MB is pure Chromium subprocesses that a Bun
+  process would not have at all. The 276 MB main is Node services (Effect graph,
+  SQLite, team API, control socket) — a Bun process must reproduce those, so the
+  realistic saving from B is the Chromium subprocesses plus whatever the main
+  process slims down to without the window/IPC wiring.
+- `opencode serve` (356 MB) is the real working memory of the agents and stays in any
+  scenario; it is outside Electron's tree and already shares one process for all
+  sessions.
+- Computer Use (`cua-driver`) is 0.6 MB PSS but needs a display; a headless host drops
+  it with no memory cost.
+- On this phone the app Android is the biggest single consumer (519 MB PSS) — it is the
+  product's face, so the module's job is to keep it working against a leaner server.
+
 ## Viability recommendation (ordered by feasibility)
 
 Based on the evidence above. Item 3 and the transitive Electron audit are still being
