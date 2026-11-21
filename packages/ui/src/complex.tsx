@@ -25,10 +25,7 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
   let restoreTarget: HTMLElement | null = null;
   return (open) => {
     if (open) {
-      restoreTarget =
-        document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-          ? document.activeElement
-          : null;
+      restoreTarget = focusedElement();
     } else {
       const openTrigger = Array.from(
         document.querySelectorAll<HTMLElement>('[aria-haspopup][aria-expanded="true"][aria-controls]'),
@@ -69,8 +66,6 @@ function focusedElement(): HTMLElement | null {
 function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; onOpenChange?: OpenChangeHandler }) {
   let content: HTMLElement | undefined;
   let open = untrack(() => props.open ?? props.defaultOpen ?? false);
-  // A closed menu takes the focused element when it opens. Taken at mount, it could be the message box
-  // of the chat before, which would then keep that whole chat in memory (#12219).
   let target = open ? focusedElement() : null;
   let epoch = 0;
   let selection: (() => void) | undefined;
