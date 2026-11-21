@@ -217,7 +217,7 @@ export function ConversationComposer() {
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
   const waitsVisible = () => waitItems().length > 0 && Boolean(props.onCancelWait);
   const queueRows = () => (queueOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
-  const voiceAvailable = () => !channel && !props.runtime;
+  const voiceAvailable = () => !props.runtime;
   const speaking = () => {
     const reading = speechReading();
     return reading &&
@@ -877,7 +877,7 @@ export function ConversationComposer() {
                   levels={voiceLevels()}
                   elapsedSeconds={voiceElapsedSeconds()}
                   modelProgress={voiceModelProgress()}
-                  blocked={!props.agent || !agentReady()}
+                  blocked={!(props.agent || channel) || !agentReady()}
                   onStart={() => void startVoiceRecording()}
                   onCancel={cancelVoiceRecording}
                   onFinish={stopVoiceRecording}
