@@ -260,6 +260,8 @@
     "./features/servers/ServerMenu": "./src/features/servers/ServerMenu.tsx",
     "./features/servers/ServerPlanEnd": "./src/features/servers/ServerPlanEnd.tsx",
     "./features/servers/server-plan-end.css": "./src/features/servers/server-plan-end.css",
+    "./features/servers/ServerPaywall": "./src/features/servers/ServerPaywall.tsx",
+    "./features/servers/server-paywall.css": "./src/features/servers/server-paywall.css",
     "./features/servers/ServerUpdateDialog": "./src/features/servers/ServerUpdateDialog.tsx",
     "./features/servers/server-update-dialog.css": "./src/features/servers/server-update-dialog.css",
     "./features/servers/ServerConnectionNotice": "./src/features/servers/ServerConnectionNotice.tsx",

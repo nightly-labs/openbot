@@ -23,6 +23,7 @@ import { withSuggestedCountry } from "./billing-tax";
 import { companySignInApiOrigin, inviteLinkOrigin } from "./canonical-redirect";
 import { CompanySignInError, type CompanySignInService, WEB_RETURN_PATH } from "./company-sign-in";
 import { randomToken, sha256 } from "./crypto";
+import type { CustomServerOffers } from "./custom-server-offers";
 import { runApiResponse } from "./effect-runtime";
 import type { readHostLogo } from "./host-logo";
 import type { HostedServerService } from "./hosted-server-service";
@@ -86,6 +87,7 @@ export interface BrowserApiServices {
     HostedServerService,
     "list" | "plans" | "create" | "checkout" | "delete" | "wake" | "restart" | "status" | "lifecycle"
   >;
+  customServerOffers: () => CustomServerOffers;
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   ownerTransferEmailDelivery: () => OwnerTransferEmailDelivery | null;
   schedule: (work: Effect.Effect<void>) => void;
@@ -315,6 +317,21 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   if (removedHostId !== undefined && request.method === "DELETE") {
     yield* services.remote.removeOwnedHost(user.id, decodeURIComponent(removedHostId));
     return new Response(null, { status: 204 });
+  }
+  const [, checkoutHostId] = /^v2\/remote\/hosts\/([^/]+)\/checkout$/u.exec(path) ?? [];
+  if (checkoutHostId !== undefined && request.method === "POST") {
+    const body = yield* readJsonObject(request);
+    return yield* Effect.map(
+      services
+        .customServerOffers()
+        .checkout(
+          user,
+          decodeURIComponent(checkoutHostId),
+          { target: "web", origin: new URL(request.url).origin },
+          { earlyStart: body.earlyStart },
+        ),
+      json,
+    ).pipe(refuseWith(BillingError));
   }
   const [, encodedLogoHostId] = /^v2\/remote\/hosts\/([^/]+)\/logo$/u.exec(path) ?? [];
   if (encodedLogoHostId !== undefined && request.method === "GET") {
