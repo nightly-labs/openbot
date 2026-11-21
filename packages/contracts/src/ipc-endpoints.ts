@@ -255,6 +255,12 @@ import type {
 } from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
 import type {
+  BrowseChannelFoldersInput,
+  ChannelFolderChange,
+  ChannelFolderInput,
+  ChannelFolderList,
+} from "./ipc-channel-folders";
+import type {
   ChannelMemory,
   CreateChannelMemoryInput,
   DeleteChannelMemoryInput,
@@ -1603,6 +1609,13 @@ export const IPC_ENDPOINTS = {
     deleteChannelMemory: scopedRequest<DeleteChannelMemoryInput, void>()("agent:channel-memories:delete"),
     clearChannelMemories: scopedRequest<string, void>()("agent:channel-memories:clear"),
   },
+  channelFolders: {
+    listChannelFolders: scopedRequest<string, ChannelFolderList>()("agent:channel-folders:list"),
+    chooseChannelFolder: request<string, ChannelFolderChange>()("agent:channel-folders:choose"),
+    addChannelFolder: scopedRequest<ChannelFolderInput, ChannelFolderChange>()("agent:channel-folders:add"),
+    removeChannelFolder: scopedRequest<ChannelFolderInput, ChannelFolderChange>()("agent:channel-folders:remove"),
+    browseChannelFolders: scopedRequest<BrowseChannelFoldersInput, AgentFolderBrowse>()("agent:channel-folders:browse"),
+  },
   channelRoutines: {
     listChannelRoutines: scopedRequest<string, ChannelRoutine[]>()("agent:channel-routines:list"),
     createChannelRoutine: scopedRequest<CreateChannelRoutineInput, ChannelRoutine>()("agent:channel-routines:create"),
@@ -2032,6 +2045,7 @@ export const IPC_GROUP_PATHS = {
   agentRoutines: "agent",
   channelMemories: "agent",
   channelRoutines: "agent",
+  channelFolders: "agent",
   agentAttachments: "agent",
   agentFolders: "agent",
   agentInstructions: "agent",

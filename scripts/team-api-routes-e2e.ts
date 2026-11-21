@@ -32,6 +32,7 @@ import {
   type BitwardenConnectorStatus,
   type CentralAuthUser,
   CHANNEL_CHATS_CAPABILITY,
+  type Channel,
   type ChannelMessage,
   type ChannelRoutine,
   type ConversationMessage,
@@ -201,6 +202,10 @@ import {
   BROWSING_MEMORY_CAPABILITY,
   BROWSING_MEMORY_ROUTES,
 } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import {
+  CHANNEL_FOLDERS_CAPABILITY,
+  CHANNEL_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/channel-folders-v1";
 import {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_PICTURE_ROUTES,
@@ -509,6 +514,7 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "../src/main/busy-message-mode-preference-store";
+import { createChannelFolders } from "../src/main/channel-folders";
 import {
   claudeCompactWindowControl,
   createClaudeCompactWindowPreferenceStore,
@@ -807,6 +813,22 @@ const agents = [
   agent("agent-oc", "Oscar", "opencode", "anthropic/claude-sonnet-4-5"),
   agent("agent-pi", "Pia", "pi", "anthropic/claude-sonnet-4-5"),
 ];
+const folderChannels = new Map<string, Channel>([
+  [
+    "channel-shared",
+    {
+      id: "channel-shared",
+      name: "shared",
+      title: "",
+      instructions: "",
+      members: [{ agentId: "agent-ada" }],
+      leadAgentId: null,
+      archived: false,
+      revision: 1,
+      createdAt: "2026-11-01T00:00:00.000Z",
+    },
+  ],
+]);
 const transferAgent = agent("agent-transfer", "Tess", "claude", "claude-sonnet-4-5");
 mkdirSync(transferAgent.workspacePath, { recursive: true });
 writeFileSync(join(transferAgent.workspacePath, "random.bin"), randomBytes(INSTANCE_TRANSFER_CHUNK_BYTES + 4096));
@@ -2479,6 +2501,49 @@ try {
   libraryStore.onChanged(() => {
     for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
   });
+  const agentFolders = createAgentFolders({
+    service: {
+      listAgents: () => agents,
+      sharedRoot: join(root, "OpenBot", "Shared"),
+      updateAgent: (input) =>
+        Effect.sync(() => {
+          record("updateAgentFolders", input);
+          const target = agents.find((item) => item.id === input.agentId);
+          if (!target) throw new Error("Agent not found.");
+          if (input.additionalFolders) target.additionalFolders = input.additionalFolders;
+          if (input.excludedFolders) target.excludedFolders = input.excludedFolders;
+          return target;
+        }),
+    },
+    userDataPath: join(root, "user-data"),
+  });
+  const channelFolders = createChannelFolders({
+    service: {
+      listAgents: () => agents,
+      sharedRoot: join(root, "OpenBot", "Shared"),
+      channels: {
+        store: {
+          get: (channelId) => {
+            const channel = folderChannels.get(channelId);
+            if (!channel) throw new Error("Channel not found.");
+            return channel;
+          },
+          exists: (channelId) => folderChannels.has(channelId),
+        },
+        setFolders: (channelId, folders) =>
+          Effect.sync(() => {
+            record("setChannelFolders", channelId, [...folders]);
+            const channel = folderChannels.get(channelId);
+            if (!channel) throw new Error("Channel not found.");
+            const updated = { ...channel, folders: [...folders] };
+            folderChannels.set(channelId, updated);
+            return updated;
+          }),
+      },
+    },
+    userDataPath: join(root, "user-data"),
+    browse: (path) => agentFolders.browse(path),
+  });
   server = new TeamApiServer({
     appVersion: APP_VERSION,
     agentImport,
@@ -2512,22 +2577,8 @@ try {
             return customAgentResult();
           }),
       },
-      folders: createAgentFolders({
-        service: {
-          listAgents: () => agents,
-          sharedRoot: join(root, "OpenBot", "Shared"),
-          updateAgent: (input) =>
-            Effect.sync(() => {
-              record("updateAgentFolders", input);
-              const target = agents.find((item) => item.id === input.agentId);
-              if (!target) throw new Error("Agent not found.");
-              if (input.additionalFolders) target.additionalFolders = input.additionalFolders;
-              if (input.excludedFolders) target.excludedFolders = input.excludedFolders;
-              return target;
-            }),
-        },
-        userDataPath: join(root, "user-data"),
-      }),
+      folders: agentFolders,
+      channelFolders,
       instructions: createAgentInstructionsFiles({
         listAgents: () => agents,
         instructionsSaving: (agentId, text) => {
@@ -4173,6 +4224,145 @@ try {
       "an empty folder path gets 400, and the host writes nothing",
       emptyPath.status === 400 && callsOf("updateAgentFolders").length === writes + 4,
       summary(emptyPath),
+    );
+  }
+
+  {
+    const v10 = { capabilities: [CHANNEL_FOLDERS_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const shared = join(root, "channel-shared-work");
+    mkdirSync(join(shared, "docs"), { recursive: true });
+    const work = realpathSync(shared);
+    const docs = realpathSync(join(shared, "docs"));
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises channel-folders-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CHANNEL_FOLDERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CHANNEL_FOLDERS_CAPABILITY),
+      [summary(compatibility).status, list(field(older.body, "capabilities")).length],
+    );
+    const writes = callsOf("setChannelFolders").length;
+    const unsupported = await call("POST", CHANNEL_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { channelId: "channel-shared" },
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the channel folder routes without the capability get 400 channelFoldersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.channelFoldersUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", CHANNEL_FOLDERS_ROUTES.read, {
+      token: bobToken,
+      json: { channelId: "channel-shared" },
+      ...v10,
+    });
+    const memberBrowse = await call("POST", CHANNEL_FOLDERS_ROUTES.browse, {
+      token: bobToken,
+      json: { channelId: "channel-shared", path: null },
+      ...v10,
+    });
+    const memberAdd = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: bobToken,
+      json: { channelId: "channel-shared", path: work },
+      ...v10,
+    });
+    check(
+      "a member cannot read, browse or change the folders of a group chat",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberBrowse, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberAdd, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("setChannelFolders").length === writes,
+      [summary(memberRead), summary(memberBrowse), summary(memberAdd)],
+    );
+    const browse = await call("POST", CHANNEL_FOLDERS_ROUTES.browse, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: work },
+      ...v10,
+    });
+    check(
+      "an admin lists the folders in a host folder for a group chat",
+      browse.status === 200 &&
+        field(browse.body, "path") === work &&
+        isDeepStrictEqual(field(browse.body, "entries"), [{ name: "docs", path: docs }]),
+      summary(browse),
+    );
+    const added = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: work },
+      ...v10,
+    });
+    const readBack = await call("POST", CHANNEL_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { channelId: "channel-shared" },
+      ...v10,
+    });
+    check(
+      "an admin adds a host folder to a group chat and reads it back",
+      added.status === 200 &&
+        field(added.body, "outcome") === "added" &&
+        isDeepStrictEqual(field(readBack.body, "folders"), [{ path: work, found: true }]) &&
+        isDeepStrictEqual(callsOf("setChannelFolders").at(-1), ["channel-shared", [work]]),
+      [summary(added), summary(readBack)],
+    );
+    const covered = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: docs },
+      ...v10,
+    });
+    const userData = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: join(root, "user-data") },
+      ...v10,
+    });
+    const memberWorkspace = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: join(root, "workspaces", "agent-ada") },
+      ...v10,
+    });
+    const gone = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: join(shared, "gone") },
+      ...v10,
+    });
+    check(
+      "the host does not add a folder in an added folder, the app data, a member workspace, or a missing folder, and writes nothing",
+      field(covered.body, "outcome") === "covered" &&
+        field(covered.body, "folder") === work &&
+        field(userData.body, "refusal") === "protected" &&
+        field(memberWorkspace.body, "refusal") === "protected" &&
+        field(gone.body, "refusal") === "missing" &&
+        callsOf("setChannelFolders").length === writes + 1,
+      [summary(covered), summary(userData), summary(memberWorkspace), summary(gone)],
+    );
+    const removed = await call("POST", CHANNEL_FOLDERS_ROUTES.remove, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: work },
+      ...v10,
+    });
+    check(
+      "an admin removes the folder from the group chat",
+      field(removed.body, "outcome") === "removed" &&
+        isDeepStrictEqual(field(removed.body, "list", "folders"), []) &&
+        isDeepStrictEqual(callsOf("setChannelFolders").at(-1), ["channel-shared", []]),
+      summary(removed),
+    );
+    const missing = await call("POST", CHANNEL_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { channelId: "channel-none" },
+      ...v10,
+    });
+    const emptyPath = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: "" },
+      ...v10,
+    });
+    check(
+      "an unknown group chat gets 404 channelNotFound, an empty path gets 400, and the host writes nothing",
+      errorIs(missing, 404, sourceText("error.backend.channelNotFound")) &&
+        emptyPath.status === 400 &&
+        callsOf("setChannelFolders").length === writes + 2,
+      [summary(missing), summary(emptyPath)],
     );
   }
 

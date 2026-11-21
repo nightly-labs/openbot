@@ -133,6 +133,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Это подключение не поддерживает места отправки рутин.",
   "error.team.agentMemoryLimitUnsupported": "Это подключение не поддерживает лимит памяти агентов.",
   "error.team.agentFoldersUnsupported": "Это подключение не поддерживает папки агентов.",
+  "error.team.channelFoldersUnsupported": "Это подключение не поддерживает папки каналов.",
   "error.team.folderUnavailable": "Эта папка недоступна на компьютере хоста.",
   "error.team.memoryReviewUnsupported": "Это подключение не поддерживает проверку памяти.",
   "error.team.skillLearningUnsupported": "Это подключение не поддерживает обучение навыкам.",

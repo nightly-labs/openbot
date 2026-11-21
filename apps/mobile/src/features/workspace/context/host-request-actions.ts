@@ -116,6 +116,7 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
@@ -221,8 +222,10 @@ import {
 } from "@openbot/team-client/routines-once";
 import {
   addAgentFolder,
+  addChannelFolder,
   bitwardenConnectorRequest,
   browseAgentFolders,
+  browseChannelFolders,
   cancelHostUpdate,
   cancelSignInRelay,
   checkHostForUpdate,
@@ -288,7 +291,9 @@ import {
   publishAgentTemplate,
   readAgentFolders,
   readAgentSessionSettings,
+  readChannelFolders,
   removeAgentFolder,
+  removeChannelFolder,
   removeMcpServer,
   requestHostRestart,
   resetAgentSessionSetting,
@@ -509,6 +514,10 @@ type HostRequestActions = Pick<
   | "excludeAgentFolder"
   | "includeAgentFolder"
   | "browseAgentFolders"
+  | "loadChannelFolders"
+  | "addChannelFolder"
+  | "removeChannelFolder"
+  | "browseChannelFolders"
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
@@ -768,6 +777,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, AGENT_SESSION_SETTINGS_CAPABILITY, "mobile.agent.session.unsupported");
   const foldersAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_FOLDERS_CAPABILITY, "mobile.agent.folders.unsupported");
+  const channelFoldersAdmin = (serverId: string) =>
+    capabilityApi(serverId, CHANNEL_FOLDERS_CAPABILITY, "error.team.channelFoldersUnsupported");
   const tasksApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
   const queueTaskApi = (serverId: string) =>
@@ -1087,6 +1098,13 @@ export function createHostRequestActions({
     includeAgentFolder: async (input, serverId) => runTeamRequest(includeAgentFolder(foldersAdmin(serverId), input)),
     browseAgentFolders: async (agentId, path, serverId) =>
       runTeamRequest(browseAgentFolders(foldersAdmin(serverId), { agentId, path })),
+    loadChannelFolders: async (channelId, serverId) =>
+      runTeamRequest(readChannelFolders(channelFoldersAdmin(serverId), channelId)),
+    addChannelFolder: async (input, serverId) => runTeamRequest(addChannelFolder(channelFoldersAdmin(serverId), input)),
+    removeChannelFolder: async (input, serverId) =>
+      runTeamRequest(removeChannelFolder(channelFoldersAdmin(serverId), input)),
+    browseChannelFolders: async (channelId, path, serverId) =>
+      runTeamRequest(browseChannelFolders(channelFoldersAdmin(serverId), { channelId, path })),
     setAgentSessionSetting: async (input, serverId) =>
       runTeamRequest(setAgentSessionSetting(sessionSettingsAdmin(serverId), input)),
     resetAgentSessionSetting: async (input, serverId) =>

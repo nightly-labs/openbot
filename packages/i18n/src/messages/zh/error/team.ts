@@ -125,6 +125,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "当前连接不支持自动化任务的结果去向。",
   "error.team.agentMemoryLimitUnsupported": "当前连接不支持助手记忆上限。",
   "error.team.agentFoldersUnsupported": "当前连接不支持助手的文件夹。",
+  "error.team.channelFoldersUnsupported": "当前连接不支持频道的文件夹。",
   "error.team.folderUnavailable": "此文件夹在主机电脑上不可用。",
   "error.team.memoryReviewUnsupported": "当前连接不支持记忆整理。",
   "error.team.skillLearningUnsupported": "此连接不支持技能学习。",

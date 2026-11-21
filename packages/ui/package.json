@@ -106,6 +106,7 @@
     "./features/channels/ChannelActivityIndicator": "./src/features/channels/ChannelActivityIndicator.tsx",
     "./features/channels/ChannelAvatar": "./src/features/channels/ChannelAvatar.tsx",
     "./features/channels/ChannelContextActions": "./src/features/channels/ChannelContextActions.tsx",
+    "./features/channels/ChannelFolders": "./src/features/channels/ChannelFolders.tsx",
     "./features/channels/ChannelMemberRow": "./src/features/channels/ChannelMemberRow.tsx",
     "./features/channels/ChannelPictureEditor": "./src/features/channels/ChannelPictureEditor.tsx",
     "./features/channels/ChannelStoppedTasks": "./src/features/channels/ChannelStoppedTasks.tsx",

@@ -299,7 +299,7 @@ import {
   workflowMediaAnswerError,
   workflowMediaError,
 } from "./agent/workflow-generation-error";
-import { confinedWritesAllowed } from "./agent/workspace-sandbox";
+import { confinedWritesAllowed, effectiveAgentFolders } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
@@ -1566,6 +1566,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       queueHoldChanged: () => {
         for (const agent of this.#store.list())
           if (this.#mailbox.queuedDeliveryIds(agent.id).length) this.#mailboxSync.emitQueue(agent.id);
+      },
+      memberFoldersChanged: (agentIds) => {
+        for (const agentId of agentIds) this.#conversation.unloadAgentThreads(agentId);
       },
       error: (error) => this.#emitError("channel_coordination_failed", error),
       routingFailed: ({ channelId, taskId, lead, error }) =>
@@ -7201,5 +7204,5 @@ function failureMessages(error: unknown): string[] {
 }
 
 function localWorkspaceAccess(agent: AgentSummary): { allowOutside: boolean; allowedRoots: readonly string[] } {
-  return { allowOutside: !workspaceAccessEnforced(agent), allowedRoots: agent.additionalFolders ?? [] };
+  return { allowOutside: !workspaceAccessEnforced(agent), allowedRoots: effectiveAgentFolders(agent) };
 }

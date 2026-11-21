@@ -135,6 +135,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Deze verbinding ondersteunt geen bestemmingen voor routines.",
   "error.team.agentMemoryLimitUnsupported": "Deze verbinding ondersteunt de geheugenlimiet van agents niet.",
   "error.team.agentFoldersUnsupported": "Deze verbinding ondersteunt de mappen van agents niet.",
+  "error.team.channelFoldersUnsupported": "Deze verbinding ondersteunt de mappen van kanalen niet.",
   "error.team.folderUnavailable": "Deze map is niet beschikbaar op de hostcomputer.",
   "error.team.memoryReviewUnsupported": "Deze verbinding ondersteunt de geheugencontrole niet.",
   "error.team.skillLearningUnsupported": "Vaardigheden leren wordt niet ondersteund door deze verbinding.",

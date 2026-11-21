@@ -25,6 +25,8 @@ import {
   decodeBrowserProxySummary,
   decodeBrowserTabProfiles,
   decodeChannel,
+  decodeChannelFolderChangeFromMain,
+  decodeChannelFolderListFromMain,
   decodeChannelMemories,
   decodeChannelMemory,
   decodeChannelPage,
@@ -1493,6 +1495,13 @@ const openbotApi: OpenBotDesktopApi = {
       listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     ...agentFoldersGroup,
+    ...bridgeGroup(IPC_ENDPOINTS.channelFolders, {
+      listChannelFolders: decodeChannelFolderListFromMain,
+      chooseChannelFolder: decodeChannelFolderChangeFromMain,
+      addChannelFolder: decodeChannelFolderChangeFromMain,
+      removeChannelFolder: decodeChannelFolderChangeFromMain,
+      browseChannelFolders: decodeAgentFolderBrowse,
+    }),
     ...bridgeGroup(IPC_ENDPOINTS.agentInstructions, {
       readAgentInstructions: decodeAgentInstructionsFileFromMain,
       saveAgentInstructions: decodeAgentInstructionsFileFromMain,

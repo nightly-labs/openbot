@@ -85,6 +85,7 @@ import { billingIpcHandlers } from "./ipc/billing-handlers";
 import { bitwardenConnectorIpcHandlers } from "./ipc/bitwarden-connector-handlers";
 import { browserDockIpcHandlers } from "./ipc/browser-dock-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
+import { channelFolderIpcHandlers } from "./ipc/channel-folder-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
@@ -724,6 +725,7 @@ function registerIpcHandlers({
   agentHostSettings,
   agentDefaultsSettings,
   agentFolders,
+  channelFolders,
   agentInstructions,
   browserProfiles,
   language,
@@ -889,6 +891,12 @@ function registerIpcHandlers({
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
+      remoteServers,
+      getMainWindow: getDialogParent,
+      translate: language.translate,
+    }),
+    ...channelFolderIpcHandlers({
+      folders: channelFolders,
       remoteServers,
       getMainWindow: getDialogParent,
       translate: language.translate,

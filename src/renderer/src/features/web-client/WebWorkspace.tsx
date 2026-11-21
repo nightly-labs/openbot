@@ -54,6 +54,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHAT_HISTORY_CAPABILITY } from "@openbot/contracts/team-protocol/chat-history-v1";
@@ -1916,6 +1917,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     deletesAnyMessage: () => canAdministerServer(workspace.state.host?.role),
     pictureSupported: () => workspace.state.capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
     contextActionsSupported: () => workspace.state.capabilities.includes(CHAT_HISTORY_CAPABILITY),
+    foldersMode: () =>
+      workspace.state.capabilities.includes(CHANNEL_FOLDERS_CAPABILITY) &&
+      canAdministerServer(workspace.state.host?.role)
+        ? "remote"
+        : null,
     beforeOpen: () => {
       setCreating(false);
       setHostPage(null);

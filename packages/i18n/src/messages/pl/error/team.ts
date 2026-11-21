@@ -131,6 +131,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "To połączenie nie obsługuje miejsc docelowych rutyn.",
   "error.team.agentMemoryLimitUnsupported": "To połączenie nie obsługuje limitu wspomnień agentów.",
   "error.team.agentFoldersUnsupported": "To połączenie nie obsługuje folderów agentów.",
+  "error.team.channelFoldersUnsupported": "To połączenie nie obsługuje folderów kanałów.",
   "error.team.folderUnavailable": "Ten folder nie jest dostępny na komputerze hosta.",
   "error.team.memoryReviewUnsupported": "To połączenie nie obsługuje przeglądu wspomnień.",
   "error.team.skillLearningUnsupported": "To połączenie nie obsługuje uczenia się umiejętności.",
