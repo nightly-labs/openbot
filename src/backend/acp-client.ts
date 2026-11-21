@@ -377,6 +377,16 @@ export const OPENBOT_ACP_CLIENT_CAPABILITIES = {
 
 export const OPENBOT_ACP_CLIENT_INFO = { name: "openbot", title: "OpenBot", version: "0.1.0" } as const;
 
+const START_MODELS_PARAM = "openbotStartModels";
+
+export function withStartModels(params: unknown): DynamicRecord {
+  return { ...(isRecord(params) ? params : {}), [START_MODELS_PARAM]: true };
+}
+
+function asksForStartModels(params: unknown): boolean {
+  return isRecord(params) && params[START_MODELS_PARAM] === true;
+}
+
 export interface AcpSavedSignInCheck {
   refusedAfterEmptyAnswer(model: string | null): Effect.Effect<"lasting" | "turn" | null>;
   refusedAtStart(): Effect.Effect<boolean>;
@@ -1124,7 +1134,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
       case "model/list":
         yield* this.#ensureInitializedEffect();
-        if (this.#signedIn) {
+        if (this.#signedIn && !asksForStartModels(params)) {
           try {
             const models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
             if (models.length === 0 && this.#flavor.keepModelsOnRefreshFailure && !this.options.allowNoModels)

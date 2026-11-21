@@ -6,7 +6,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
-import type { AcpHistoryPersistence } from "./acp-client";
+import { type AcpHistoryPersistence, withStartModels } from "./acp-client";
 import { type AcpFlavor, customAgentFlavor } from "./acp-flavor";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
@@ -639,6 +639,15 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       : redacted;
   }
 
+  readonly #discoveryChild = Effect.fn("CustomAcp.discoveryChild")(function* (
+    this: CustomAcpAgentsClient,
+    agentId: string,
+  ) {
+    const started = !this.#children.has(childKey(agentId, null));
+    const child = yield* this.#child(agentId, null);
+    return { child, started };
+  });
+
   readonly #listModels = Effect.fn("CustomAcp.listModels")(function* (
     this: CustomAcpAgentsClient,
     params: unknown,
@@ -648,12 +657,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     const lists = yield* Effect.forEach(
       configs,
       (config) =>
-        this.#child(config.id, null)
+        this.#discoveryChild(config.id)
           .pipe(toProviderClientOperationError)
           .pipe(
-            Effect.flatMap((child) =>
+            Effect.flatMap(({ child, started }) =>
               child
-                .request("model/list", params, decodeModelListResponse, timeoutMs)
+                .request("model/list", started ? withStartModels(params) : params, decodeModelListResponse, timeoutMs)
                 .pipe(toProviderClientOperationError),
             ),
             Effect.timeoutOrElse({
