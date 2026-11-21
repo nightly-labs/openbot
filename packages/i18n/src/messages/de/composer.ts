@@ -67,6 +67,7 @@ export const messages = {
   "composer.voice.stop": "Sprachaufnahme stoppen",
   "composer.voice.cancel": "Sprachaufnahme abbrechen",
   "composer.voice.preparing": "Sprachmodell wird heruntergeladen",
+  "composer.voice.starting": "Sprachaufnahme wird gestartet",
   "composer.voice.requesting": "Mikrofonzugriff wird angefordert",
   "composer.voice.transcribing": "Sprachanweisung wird transkribiert",
   "composer.voice.start": "Anweisung per Sprache erstellen",
