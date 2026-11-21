@@ -840,12 +840,19 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         init?.method === "POST" && registrationUrl !== null && new URL(String(input)).href === registrationUrl;
       if (!registering) return fetch(input, init);
       const request = this.#withOfflineAccessRegistration(init);
+      let sent = request;
       let response = await fetch(input, request);
       for (const retry of this.#withOtherRedirectNames(request)) {
         if (!(await refusesRedirectAddress(response))) break;
+        sent = retry;
         response = await fetch(input, retry);
       }
-      const callback = response.status === 401 || response.status === 403 ? this.#withCallbackPath(request) : null;
+      const callback =
+        response.status === 401 || response.status === 403
+          ? this.#withCallbackPath(request)
+          : (await replacesRedirectAddress(response, sent))
+            ? this.#withCallbackPath(sent)
+            : null;
       const retried = callback ? await fetch(input, callback) : null;
       if (retried?.ok) response = retried;
       this.#registrationStatus = response.status;
@@ -1310,6 +1317,22 @@ const registrationBodySchema = z.looseObject({
 });
 
 const registrationErrorSchema = z.looseObject({ error: z.string() });
+
+const registeredClientSchema = z.looseObject({ redirect_uris: z.array(z.string()) });
+
+async function replacesRedirectAddress(response: Response, sent: RequestInit): Promise<boolean> {
+  if (!response.ok || typeof sent.body !== "string") return false;
+  const asked = registrationBodySchema.parse(JSON.parse(sent.body)).redirect_uris;
+  const address = asked?.length === 1 ? asked[0] : undefined;
+  if (!address) return false;
+  const client = registeredClientSchema.safeParse(
+    await response
+      .clone()
+      .json()
+      .catch(() => null),
+  );
+  return client.success && !registersAddress(client.data.redirect_uris, address);
+}
 
 async function refusesRedirectAddress(response: Response): Promise<boolean> {
   const error = await registrationErrorCode(response);
