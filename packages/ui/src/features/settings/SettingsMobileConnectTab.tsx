@@ -39,6 +39,7 @@ interface SettingsMobileConnectTabProps {
   canRevokeDevice: boolean;
   canSetRoute: boolean;
   installRequest?: MobileInstallRequest | null;
+  onInstallRequestHandled?: (() => void) | undefined;
 }
 
 const IOS_PLATFORM_LABEL = "iOS";
@@ -48,13 +49,14 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
   const { t } = useText();
   const [adding, setAdding] = createSignal(false);
   const [linkOpen, setLinkOpen] = createSignal(false);
-  let handledInstallNonce = 0;
+  const [dialogInstallRequest, setDialogInstallRequest] = createSignal<MobileInstallRequest | null>(null);
   createEffect(
     () => (props.canCreateTicket ? props.installRequest : null),
     (request) => {
-      if (!request || request.nonce === handledInstallNonce) return;
-      handledInstallNonce = request.nonce;
+      if (!request) return;
+      setDialogInstallRequest(request);
       setAdding(true);
+      props.onInstallRequestHandled?.();
     },
   );
   const devices = () => props.store.state.devices.devices;
@@ -132,7 +134,7 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
         open={adding()}
         store={props.store}
         canCancelTicket={props.canCancelTicket}
-        installRequest={props.canCreateTicket ? props.installRequest : null}
+        installRequest={dialogInstallRequest()}
         onClose={() => setAdding(false)}
       />
       <Show when={props.canManageLink}>

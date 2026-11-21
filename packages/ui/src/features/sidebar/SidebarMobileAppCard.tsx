@@ -10,14 +10,17 @@ type CrewAgent = Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarColor" |
 
 const CREW_SIZE = 5;
 const LEAD_INDEX = Math.floor(CREW_SIZE / 2);
+const CENTER_FIRST_PLACES = [2, 1, 3, 0, 4];
 
-const STAND_IN_CREW: readonly { seed: string; hue: AvatarHue }[] = [
-  { seed: "research", hue: 215 },
-  { seed: "inbox", hue: 30 },
-  { seed: "planner", hue: 150 },
-  { seed: "design", hue: 320 },
-  { seed: "writer", hue: 280 },
-];
+const STAND_IN_CREW: readonly CrewAgent[] = (
+  [
+    { seed: "research", hue: 215 },
+    { seed: "inbox", hue: 30 },
+    { seed: "planner", hue: 150 },
+    { seed: "design", hue: 320 },
+    { seed: "writer", hue: 280 },
+  ] satisfies { seed: string; hue: AvatarHue }[]
+).map((member) => ({ avatarSeed: member.seed, avatarHue: member.hue, avatarColor: null, avatarUrl: null }));
 
 const PLATFORMS: readonly {
   platform: MobilePlatformLogoVariant;
@@ -28,14 +31,11 @@ const PLATFORMS: readonly {
 ];
 
 function crewMembers(agents: readonly CrewAgent[]): CrewAgent[] {
-  const own = agents.slice(0, CREW_SIZE);
-  const standIns = STAND_IN_CREW.slice(own.length).map((member) => ({
-    avatarSeed: member.seed,
-    avatarHue: member.hue,
-    avatarColor: null,
-    avatarUrl: null,
-  }));
-  return [...own, ...standIns];
+  const crew = [...STAND_IN_CREW];
+  agents.slice(0, CREW_SIZE).forEach((agent, order) => {
+    crew[CENTER_FIRST_PLACES[order] ?? order] = agent;
+  });
+  return crew;
 }
 
 export function SidebarMobileAppCard(props: {

@@ -114,6 +114,7 @@ export interface SettingsModalProps {
   onConnectCodex?: (() => void) | undefined;
   hostedServerDeleteRequest?: { serverId: string; nonce: number } | null;
   mobileInstallRequest?: MobileInstallRequest | null;
+  onMobileInstallRequestHandled?: (() => void) | undefined;
   onTestNotification?: () => void | Promise<void>;
   onOpenNotificationSettings?: () => void | Promise<void>;
   restoreFocusTarget?: HTMLElement | null;
@@ -426,6 +427,7 @@ export function SettingsModal(props: SettingsModalProps) {
             canRevokeDevice={Boolean(props.onRevokeMobileConnectedDevice)}
             canSetRoute={Boolean(props.onSetRemoteNetworkRoute)}
             installRequest={props.open ? props.mobileInstallRequest : null}
+            onInstallRequestHandled={props.onMobileInstallRequestHandled}
           />
         </Tabs.Content>
 

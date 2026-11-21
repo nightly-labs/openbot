@@ -312,7 +312,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             <Show when={!platform.landingPreview && !alertCards.shown() && !mobileAppDismissed()}>
               <SidebarMobileAppCard
                 agents={agentList()}
-                onInstall={(platform) => openMobileInstall(platform)}
+                onInstall={(phone) => openMobileInstall(phone)}
                 onDismiss={() => {
                   window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
                   setMobileAppDismissed(true);

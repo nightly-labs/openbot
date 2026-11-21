@@ -121,6 +121,8 @@ const Settings = createSimpleContext({
     let notificationFocusNonce = 0;
     const [appSettingRowRequest, setAppSettingRowRequest] = createSignal<AppSettingRowRequest | null>(null);
     let appSettingRowNonce = 0;
+    const [mobileInstallRequest, setMobileInstallRequest] = createSignal<MobileInstallRequest | null>(null);
+    let mobileInstallNonce = 0;
     createEffect(appSettingsOpen, (open) => {
       if (open) return;
       setNotificationFocusRequest(null);
@@ -132,8 +134,6 @@ const Settings = createSimpleContext({
       nonce: number;
     } | null>(null);
     let hostedServerDeleteNonce = 0;
-    const [mobileInstallRequest, setMobileInstallRequest] = createSignal<MobileInstallRequest | null>(null);
-    let mobileInstallNonce = 0;
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(
       {
         ...DEFAULT_GENERAL_SETTINGS,
@@ -464,6 +464,10 @@ const Settings = createSimpleContext({
       openAppSettings(trigger, "mobile-connect");
     }
 
+    function clearMobileInstallRequest(): void {
+      setMobileInstallRequest(null);
+    }
+
     onSettled(() => {
       const handleSettingsShortcut = (event: KeyboardEvent) => {
         if (!isOpenSettingsShortcut(event)) return;
@@ -697,6 +701,7 @@ const Settings = createSimpleContext({
       openHostedServerDelete,
       mobileInstallRequest,
       openMobileInstall,
+      clearMobileInstallRequest,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,

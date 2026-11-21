@@ -245,7 +245,7 @@ function GeneratedAvatar(props: {
     return amount ? { ...props.style, "--agent-avatar-breathe": amount } : props.style;
   };
   const animated = () =>
-    props.followPointer ||
+    (props.followPointer && documentFocused() && onScreen()) ||
     (plushMood().busy && ambientMotion()) ||
     (!STATIC_MOTIONS.has(props.motion) && documentFocused()) ||
     interacting();

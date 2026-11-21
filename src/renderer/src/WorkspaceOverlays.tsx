@@ -1022,6 +1022,7 @@ function AppSettings(props: AccountProps) {
     appSettingsTab,
     hostedServerDeleteRequest,
     mobileInstallRequest,
+    clearMobileInstallRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -1099,6 +1100,7 @@ function AppSettings(props: AccountProps) {
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
         mobileInstallRequest={mobileInstallRequest()}
+        onMobileInstallRequestHandled={clearMobileInstallRequest}
       />
     </Loading>
   );

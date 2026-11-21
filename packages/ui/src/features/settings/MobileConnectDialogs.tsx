@@ -171,12 +171,10 @@ export function MobileConnectAddPhoneDialog(props: {
   const { t } = useText();
   const [screen, setScreen] = createSignal<AddScreen>("ask");
   const [platform, setPlatform] = createSignal<MobilePlatformLogoVariant>("ios");
-  let handledInstallNonce = 0;
   createEffect(
     () => props.installRequest,
     (request) => {
-      if (!request || request.nonce === handledInstallNonce) return;
-      handledInstallNonce = request.nonce;
+      if (!request) return;
       setPlatform(request.platform);
       setScreen("install");
     },
