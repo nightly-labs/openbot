@@ -84,6 +84,7 @@ export interface AcpFlavor {
   lostServerUntilRestart?(error: unknown): boolean;
   serverLost?(error: unknown): boolean;
   sessionBusy?(error: unknown): boolean;
+  sessionStillActive?(error: unknown): boolean;
   staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
   processWideModel?: true;
@@ -448,6 +449,12 @@ function customSessionNotFound(error: RequestError, sessionId: string): boolean 
   return geminiCliSessionNotFound(error, sessionId) ?? ompSessionNotFound(error, sessionId);
 }
 
+function customSessionStillActive(error: unknown): boolean {
+  return (
+    error instanceof RequestError && error.code === -32602 && /\bsession is already active\b/iu.test(errorText(error))
+  );
+}
+
 function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
   return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
 }
@@ -481,6 +488,7 @@ const OMP_ACP_FLAVOR: AcpFlavor = {
 
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: customSessionNotFound,
+  sessionStillActive: customSessionStillActive,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,
   failureCause: customFailureCause,
