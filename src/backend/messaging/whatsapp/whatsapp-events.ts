@@ -260,6 +260,8 @@ function contextOf(content: proto.IMessage): proto.IContextInfo | null {
     content.videoMessage?.contextInfo ??
     content.documentMessage?.contextInfo ??
     content.audioMessage?.contextInfo ??
+    content.contactMessage?.contextInfo ??
+    content.contactsArrayMessage?.contextInfo ??
     null
   );
 }
