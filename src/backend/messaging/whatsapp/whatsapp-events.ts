@@ -291,7 +291,7 @@ function vcardFields(vcard: string | null | undefined): { name: string; phones: 
   let fullName = "";
   let structuredName = "";
   const phones: string[] = [];
-  for (const line of (vcard ?? "").split(/\r?\n/u)) {
+  for (const line of (vcard ?? "").replace(/\r?\n[ \t]/gu, "").split(/\r?\n/u)) {
     const colon = line.indexOf(":");
     if (colon < 0) continue;
     const key = line.slice(0, colon).split(";")[0]?.split(".").pop()?.trim().toUpperCase();
