@@ -211,8 +211,10 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-compact
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     --conversation-header-shift: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
   }
 
@@ -227,8 +229,10 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"]
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     max-width: calc(100% - var(--conversation-header-shift, 0px));
     margin-inline-start: var(--conversation-header-shift, 0px);
     transition:
@@ -268,8 +272,10 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-closed
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     --conversation-header-shift: var(--top-row-tabs-start);
   }
 
