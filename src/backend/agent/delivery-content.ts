@@ -490,6 +490,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             `A failure or a blocker, such as a file or a service that you cannot reach, is not a stop condition: keep this routine on, and call the ${ROUTINE_REPORT_FAILURE_TOOL} tool.`,
           ]
         : ["Do not create, update, delete, or test routines during this run."]),
+      `When the task asks for a routine change that this run cannot make, do not stop: do the rest of the task, then call the ${ROUTINE_REPORT_FAILURE_TOOL} tool and tell the user to ask you for that change in a chat.`,
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
       "Nobody answers you during this run. Do all of the task in this turn: do not stop after a step to report progress or to ask whether to continue.",
       `A request to a teammate is not a failure: finish the parts that do not need its reply, then end this turn. The reply starts a turn that continues this task. Do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool only because a reply has not come yet.`,
