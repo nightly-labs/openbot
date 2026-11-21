@@ -1,15 +1,10 @@
-import type {
-  BrowserControlSession,
-  BrowserTabAgent,
-  BrowserTabLabel,
-  BrowserWindowAction,
-  BrowserWindowModel,
-  BrowserWindowTabDetails,
-} from "@openbot/contracts/ipc";
-import { createEffect, onCleanup, snapshot } from "solid-js";
+import type { BrowserWindowAction, BrowserWindowModel } from "@openbot/contracts/ipc";
+import { createEffect, onCleanup, onSettled, snapshot } from "solid-js";
 import { browserSessionHistory, canReopenBrowserTab } from "../browser/browser-tab-session";
+import { browserWindowTabDetails } from "../browser/browser-window-model";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { createBrowserFullViewControls } from "./browser-full-view-controls";
+import { useConversationController } from "./conversation-controller-context";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -27,6 +22,11 @@ export default function BrowserWindowBridge() {
   } = useConversationViewScope();
   const controls = createBrowserFullViewControls();
   const runtime = conversationRuntime(props);
+  const { setChatBrowserWindowBridges } = useConversationController();
+  onSettled(() => {
+    setChatBrowserWindowBridges((count) => count + 1);
+    return () => setChatBrowserWindowBridges((count) => count - 1);
+  });
 
   const model = (): BrowserWindowModel => {
     const tabs = controls.tabs();
@@ -35,7 +35,7 @@ export default function BrowserWindowBridge() {
       tabs,
       activeTabId: activeBrowserTab()?.id ?? null,
       details: tabs.map((tab) =>
-        tabDetails(
+        browserWindowTabDetails(
           tab.id,
           browserControlForTab(tab),
           browserControllerForTab(tab),
@@ -98,31 +98,4 @@ export default function BrowserWindowBridge() {
   );
 
   return null;
-}
-
-function tabDetails(
-  tabId: string,
-  control: BrowserControlSession | undefined,
-  controller: BrowserTabAgent | undefined,
-  owner: BrowserTabAgent | undefined,
-  profile: BrowserTabLabel | undefined,
-): BrowserWindowTabDetails {
-  return {
-    tabId,
-    ...(control ? { control } : {}),
-    ...(controller ? { controller: tabAgent(controller) } : {}),
-    ...(owner ? { owner: tabAgent(owner) } : {}),
-    ...(profile ? { profile } : {}),
-  };
-}
-
-function tabAgent(agent: BrowserTabAgent): BrowserTabAgent {
-  return {
-    id: agent.id,
-    name: agent.name,
-    avatarSeed: agent.avatarSeed,
-    avatarHue: agent.avatarHue,
-    ...(agent.avatarColor === undefined ? {} : { avatarColor: agent.avatarColor }),
-    avatarUrl: agent.avatarUrl,
-  };
 }

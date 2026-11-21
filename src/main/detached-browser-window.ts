@@ -139,9 +139,19 @@ export class DetachedBrowserWindow {
     this.#options.onEvent({ type: "dock" });
   }
 
-  publishModel(senderId: number, model: BrowserWindowModel): void {
+  requireMainRenderer(senderId: number): void {
     const mainContents = this.#options.mainWindow.webContents;
-    if (mainContents.isDestroyed() || senderId !== mainContents.id) return;
+    if (mainContents.isDestroyed() || senderId !== mainContents.id) {
+      throw new Error("Rejected browser window IPC request outside the main renderer.");
+    }
+  }
+
+  requireWindowRenderer(senderId: number): void {
+    if (!this.#sentByWindow(senderId))
+      throw new Error("Rejected browser window IPC request outside the browser window.");
+  }
+
+  publishModel(model: BrowserWindowModel): void {
     this.#model = model;
     const window = this.#window;
     if (window && !window.isDestroyed()) this.#options.onModel(window, model);
@@ -151,8 +161,8 @@ export class DetachedBrowserWindow {
     return this.#sentByWindow(senderId) ? this.#model : null;
   }
 
-  sendAction(senderId: number, action: BrowserWindowAction): void {
-    if (this.#sentByWindow(senderId)) this.#options.onEvent({ type: "action", action });
+  sendAction(action: BrowserWindowAction): void {
+    this.#options.onEvent({ type: "action", action });
   }
 
   destroy(): void {

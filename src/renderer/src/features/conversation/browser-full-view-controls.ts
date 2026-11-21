@@ -1,21 +1,43 @@
-import type { BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserTab, ServerSummary } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSER_NEW_TAB_URL } from "@openbot/ui/features/browser/browser-suggestions";
 import { createEffect, createMemo, untrack } from "solid-js";
 import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import {
+  closeBrowserTabsInOrder,
   moveBrowserTab,
   orderedBrowserTabs,
   placeNextBrowserTab,
   recordBrowserPages,
-  rememberClosedBrowserTab,
   syncBrowserTabOrder,
   takeClosedBrowserTab,
 } from "../browser/browser-tab-session";
 import { createBrowserTabProfiles, readTabProfilesWithProxies } from "../browser/stores/browser-tab-profiles";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useConversationViewScope } from "./conversation-scope";
+
+export function desktopTabProfilesReader(server: ServerSummary | undefined) {
+  if (!server || !serverSupportsCapability(server, BROWSER_PROFILES_CAPABILITY)) return undefined;
+  const calls = desktopBrowserProfileCalls(server.id);
+  return serverRoleCanAdminister(server) && serverSupportsCapability(server, BROWSER_PROXIES_CAPABILITY)
+    ? readTabProfilesWithProxies(calls)
+    : calls.tabProfiles;
+}
+
+export function followBrowserTabSession(serverId: () => string, allBrowserTabs: () => readonly BrowserTab[]) {
+  createEffect(
+    () => ({ id: serverId(), listed: allBrowserTabs() }),
+    ({ id, listed }) => untrack(() => syncBrowserTabOrder(id, listed)),
+  );
+  createEffect(
+    () => ({
+      id: serverId(),
+      pages: allBrowserTabs().map((tab) => ({ tabId: tab.id, url: tab.url, title: tab.title })),
+    }),
+    ({ id, pages }) => recordBrowserPages(id, pages),
+  );
+}
 
 export function createBrowserFullViewControls() {
   const {
@@ -32,31 +54,12 @@ export function createBrowserFullViewControls() {
   const serverId = () => props.server?.id ?? "";
   const tabs = createMemo(() => orderedBrowserTabs(serverId(), allBrowserTabs()));
   const readTabProfiles = createMemo(() => {
-    if (props.runtime) {
-      const calls = props.runtime.browserProfiles;
-      return calls && readTabProfilesWithProxies(calls);
-    }
-    const server = props.server;
-    if (!server || !serverSupportsCapability(server, BROWSER_PROFILES_CAPABILITY)) return undefined;
-    const calls = desktopBrowserProfileCalls(server.id);
-    return serverRoleCanAdminister(server) && serverSupportsCapability(server, BROWSER_PROXIES_CAPABILITY)
-      ? readTabProfilesWithProxies(calls)
-      : calls.tabProfiles;
+    if (!props.runtime) return desktopTabProfilesReader(props.server);
+    const calls = props.runtime.browserProfiles;
+    return calls && readTabProfilesWithProxies(calls);
   });
   const profileForTab = createBrowserTabProfiles(readTabProfiles, allBrowserTabs);
-
-  createEffect(
-    () => ({ id: serverId(), listed: allBrowserTabs() }),
-    ({ id, listed }) => untrack(() => syncBrowserTabOrder(id, listed)),
-  );
-
-  createEffect(
-    () => ({
-      id: serverId(),
-      pages: allBrowserTabs().map((tab) => ({ tabId: tab.id, url: tab.url, title: tab.title })),
-    }),
-    ({ id, pages }) => recordBrowserPages(id, pages),
-  );
+  followBrowserTabSession(serverId, allBrowserTabs);
 
   async function openTab(url: string, placement: { afterId?: string; index?: number }) {
     placeNextBrowserTab(serverId(), placement);
@@ -78,18 +81,7 @@ export function createBrowserFullViewControls() {
   }
 
   function closeTabs(tabIds: readonly string[]) {
-    const order = tabs();
-    const closing = tabIds
-      .map((tabId) => ({
-        tab: order.find((tab) => tab.id === tabId),
-        index: order.findIndex((tab) => tab.id === tabId),
-      }))
-      .filter((entry): entry is { tab: BrowserTab; index: number } => entry.tab !== undefined)
-      .sort((left, right) => right.index - left.index);
-    for (const { tab, index } of closing) {
-      rememberClosedBrowserTab(serverId(), tab, index);
-      void closeBrowserTab(tab.id);
-    }
+    closeBrowserTabsInOrder(serverId(), tabs(), tabIds, (tabId) => void closeBrowserTab(tabId));
   }
 
   return {

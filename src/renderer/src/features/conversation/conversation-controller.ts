@@ -475,6 +475,7 @@ export function createServerConversationState(keepSidePanelFiles = false) {
   const [chatSearchTotal, setChatSearchTotal] = createSignal(0);
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
+  const [chatBrowserWindowBridges, setChatBrowserWindowBridges] = createSignal(0);
   const voiceSessions = createVoiceSessions();
 
   return {
@@ -530,6 +531,8 @@ export function createServerConversationState(keepSidePanelFiles = false) {
     setHiddenAwaitingReplyIds,
     sideQuestions,
     setSideQuestions,
+    chatBrowserWindowBridges,
+    setChatBrowserWindowBridges,
     voiceSessions,
   };
 }
@@ -552,9 +555,13 @@ export function followBrowserWindowEvents(
   );
 }
 
-export function closeBrowserWindowWithServerScope(state: Pick<StableConversationState, "browserWindowOpen">) {
+export function closeBrowserWindowWithServerScope(
+  state: Pick<StableConversationState, "browserWindowOpen" | "setBrowserWindowOpen">,
+) {
   onCleanup(() => {
-    if (untrack(state.browserWindowOpen)) void conversationPort().browser.closeWindow();
+    if (!untrack(state.browserWindowOpen)) return;
+    state.setBrowserWindowOpen(false);
+    void conversationPort().browser.closeWindow();
   });
 }
 

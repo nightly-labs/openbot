@@ -102,6 +102,22 @@ export function rememberClosedBrowserTab(serverId: string, tab: BrowserTab, inde
   });
 }
 
+export function closeBrowserTabsInOrder(
+  serverId: string,
+  order: readonly BrowserTab[],
+  tabIds: readonly string[],
+  close: (tabId: string) => void,
+) {
+  const closing = tabIds
+    .map((tabId) => ({ tab: order.find((tab) => tab.id === tabId), index: order.findIndex((tab) => tab.id === tabId) }))
+    .filter((entry): entry is { tab: BrowserTab; index: number } => entry.tab !== undefined)
+    .sort((left, right) => right.index - left.index);
+  for (const { tab, index } of closing) {
+    rememberClosedBrowserTab(serverId, tab, index);
+    close(tab.id);
+  }
+}
+
 export function takeClosedBrowserTab(serverId: string): ClosedTab | undefined {
   const [last] = session(serverId).closed;
   if (!last) return undefined;
