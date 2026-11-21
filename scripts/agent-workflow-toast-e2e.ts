@@ -52,6 +52,10 @@ try {
   const agent = wanted ? agents.find((entry) => entry.name === wanted) : agents[0];
   assert.ok(agent, wanted ? `No agent named ${wanted}.` : "The server has no agent.");
   report.agent = agent.name;
+  await page
+    .getByRole("navigation", { name: english("app.rail.label") })
+    .getByRole("button", { name: english("app.rail.agents"), exact: true })
+    .click({ timeout: UI_WAIT_MS });
   const before = new Set((await page.evaluate(() => window.openbot.workflows.list())).map((entry) => entry.id));
 
   await page
