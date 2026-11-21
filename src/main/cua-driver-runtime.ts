@@ -304,7 +304,11 @@ export class CuaDriverRuntime {
         ? { status: "permissions-required", permissions, message: null }
         : this.#restartRequired
           ? restartRequiredState(permissions)
-          : { status: "ready", permissions, message: null },
+          : {
+              status: "ready",
+              permissions,
+              message: waylandInputRefused ? sourceText("status.computerUse.inputRefused") : null,
+            },
     );
     if (!granted) yield* this.stop().pipe(Effect.catch(() => Effect.void));
     return state;

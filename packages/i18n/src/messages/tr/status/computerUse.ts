@@ -8,6 +8,8 @@ export const messages = {
   "status.computerUse.driverStopped": "Bilgisayar Kullanımı sürücüsü durdu.",
   "status.computerUse.unsupported": "Bilgisayar Kullanımı macOS, Windows ve Linux üzerinde kullanılabilir.",
   "status.computerUse.driverMissing": "OpenBot'un bu derlemesi bir Bilgisayar Kullanımı sürücüsü içermiyor.",
+  "status.computerUse.inputRefused":
+    "Bu masaüstünde OpenBot diğer uygulamalarda yazamaz veya tıklayamaz. Web sitelerindeki görevler için ajandan OpenBot tarayıcısını kullanmasını isteyin.",
   "status.computerUse.progressActing": "Bu bilgisayardaki bir uygulama kullanılıyor…",
   "status.computerUse.progressDeciding": "Uygulamadaki sonraki adıma karar veriliyor…",
 } as const satisfies PartialTranslation<typeof source>;
