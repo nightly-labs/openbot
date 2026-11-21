@@ -45,6 +45,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     openTaggedReference,
     threadComposer,
     threadQueue,
+    threadVoice,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
@@ -204,6 +205,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
                 ? void previewAttachment(attachment)
                 : attachmentAction(attachment, "open")
             }
+            voice={threadVoice(draftKey())}
             mediaSource={view.runtime?.attachmentMedia}
             downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
