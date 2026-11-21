@@ -586,6 +586,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse turu başarısız oldu.",
   "error.provider.museModelUnavailable":
     "Muse bu modeli kullanamıyor. Muse, bu ajanın çalıştığı ülkede kullanılamıyor olabilir ya da bu hesabın modele erişimi olmayabilir. Başka bir model seçip yeniden deneyin.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse bu isteği tamamlayamadı. Muse oturum açmanızı değil, kayıtlı Meta API anahtarınızı kullanır. Anahtarı değiştirin veya oturum açmanızı kullanmak için Ayarlar'da kaldırın.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse, harici araçlara erişim olmadan profil oluşturamaz. Profili oluşturmak için başka bir sağlayıcı kullanın, ardından ajan için Muse'u seçin.",
   "error.provider.museAuthUnverified":

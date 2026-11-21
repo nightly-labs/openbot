@@ -350,6 +350,7 @@ export const messages = {
   "provider.settings.codexKeyInUse":
     "يستخدم ChatGPT هذا المفتاح، لا خطة ChatGPT. تحتسب OpenAI كل طلب على المفتاح. لا يُعرض استخدام الخطة.",
   "provider.settings.codexKeyAlternative": "أو سجّل الدخول بمفتاح OpenAI API. تحتسب OpenAI كل طلب على المفتاح.",
+  "provider.settings.museKeyInUse": "يستخدم Muse هذا المفتاح، لا تسجيل دخولك. لاستخدام تسجيل الدخول، أزل المفتاح.",
   "provider.settings.addKey": "إضافة مفتاح",
   "provider.settings.changeKey": "تغيير المفتاح",
   "provider.settings.runtime": "بيئة التشغيل",

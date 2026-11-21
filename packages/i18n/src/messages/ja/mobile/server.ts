@@ -1174,6 +1174,8 @@ export const messages = {
     "ChatGPT は ChatGPT のプランではなく、このキーを使います。OpenAI は各リクエストをキーに課金します。プランの使用量は表示されません。",
   "mobile.server.providers.codexKeyAlternative":
     "または OpenAI の API キーでログインします。OpenAI は各リクエストをキーに課金します。",
+  "mobile.server.providers.museKeyInUse":
+    "Muse はサインインではなく、このキーを使います。サインインを使うには、キーを削除してください。",
   "mobile.server.providers.sectionUse": "使用",
   "mobile.server.providers.unused": "使用しているエージェントはありません",
   "mobile.server.providers.usedByCount": { other: "{count} 個のエージェントが使用中" },

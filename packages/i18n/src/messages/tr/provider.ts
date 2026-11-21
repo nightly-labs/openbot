@@ -267,6 +267,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot sunucuda {provider} oturumunu kapatır.",
   "provider.settings.geminiKeyReplacesAccount":
     "Google oturumu yerine kayıtlı bir Gemini API anahtarı kullanılıyor. Bir Google planını ve modellerini kullanmak için anahtarı kaldır.",
+  "provider.settings.museKeyInUse":
+    "Muse oturum açmanızı değil, bu anahtarı kullanır. Oturum açmanızı kullanmak için anahtarı kaldırın.",
   "provider.settings.versionInstalledByUser": "{version} · senin yüklediğin",
   "provider.settings.versionDownloaded": "{version} · OpenBot tarafından indirildi",
   "provider.settings.otherVersionInstalledByUser": "Kullanılmıyor: {version} · senin yüklediğin",

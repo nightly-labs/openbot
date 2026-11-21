@@ -1212,6 +1212,8 @@ export const messages = {
     "ChatGPT utilise cette clé, pas votre forfait ChatGPT. OpenAI facture chaque requête sur la clé. L’usage du forfait n’est pas affiché.",
   "mobile.server.providers.codexKeyAlternative":
     "Ou connectez-vous avec une clé API OpenAI. OpenAI facture chaque requête sur la clé.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse utilise cette clé, pas votre connexion. Pour utiliser votre connexion, supprimez la clé.",
   "mobile.server.providers.sectionUse": "Utilisation",
   "mobile.server.providers.unused": "Aucun agent ne l’utilise",
   "mobile.server.providers.usedByCount": { one: "1 agent l’utilise", other: "{count} agents l’utilisent" },

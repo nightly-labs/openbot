@@ -512,6 +512,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse 本轮对话失败。",
   "error.provider.museModelUnavailable":
     "Muse 无法使用此模型。Muse 可能在此智能体运行的国家或地区不可用，或者此账号无权访问该模型。请选择其他模型，然后重试。\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse 无法完成此请求。Muse 使用已保存的 Meta API 密钥，而不是你的登录。请更换该密钥，或在设置中移除它以使用你的登录。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse 在无法使用外部工具时无法生成资料。请改用其他服务商生成资料，然后为该助手选择 Muse。",
   "error.provider.museAuthUnverified": "Muse 身份验证尚未确认。请在主机电脑上连接，或设置 Meta API 密钥。",

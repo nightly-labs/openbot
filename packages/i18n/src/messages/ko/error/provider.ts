@@ -578,6 +578,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse 턴에 실패했어요.",
   "error.provider.museModelUnavailable":
     "Muse에서 이 모델을 사용할 수 없어요. 이 에이전트가 실행되는 국가에서 Muse를 사용할 수 없거나, 이 계정에 모델 접근 권한이 없을 수 있어요. 다른 모델을 선택한 다음 다시 시도하세요.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse가 이 요청을 완료하지 못했어요. Muse는 로그인이 아닌 저장된 Meta API 키를 사용해요. 키를 교체하거나, 설정에서 키를 제거해 로그인을 사용하세요.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse는 외부 도구에 접근하지 않고는 프로필을 생성할 수 없어요. 다른 제공자로 프로필을 생성한 후 에이전트에 Muse를 선택하세요.",
   "error.provider.museAuthUnverified":
