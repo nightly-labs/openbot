@@ -6,6 +6,12 @@ export const messages = {
     "De geschiedenis is niet beschikbaar voor dit verzoek. Lees de recente geschiedenis opnieuw, of gebruik channel_history voor werk in een kanaal.",
   "error.agent.historyArgumentsInvalid":
     "Onjuiste geschiedenisargumenten: {detail} Corrigeer de argumenten en probeer het opnieuw. openbot.tool_describe geeft het schema.",
+  "error.agent.browserArgumentsInvalid":
+    "Onjuiste browserargumenten voor {tool}: {detail} {hint}Corrigeer de argumenten en probeer het opnieuw. openbot.tool_describe geeft het schema.",
+  "error.agent.browserArgumentsInvalidUser":
+    "De agent gebruikte ongeldige browserargumenten. Hij corrigeert de aanroep en gaat verder.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "Voor een nieuwe pagina roep open aan met alleen url. Voor een bestaand tabblad roep list_tabs aan, daarna navigate met tabId en url. ",
   "error.agent.toolRequestInvalid":
     "Ongeldige argumenten voor het zoeken naar tools. Gebruik het opgegeven schema en een oorspronkelijke, volledige toolnaam.",
   "error.agent.toolCallArgumentsNotObject":

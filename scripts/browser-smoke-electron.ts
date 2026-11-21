@@ -3847,9 +3847,19 @@ async function runToolBoundaryScenario(browser: BrowserHost, origin: string): Pr
     ] as const;
     for (const [tool, argumentsValue] of invalidToolArguments) {
       const invalidResult = await callBrowserTool(browser, tool, argumentsValue);
-      if (invalidResult.success || !toolError(invalidResult).includes("Invalid browser tool arguments")) {
-        throw new Error(`Dynamic browser tool accepted invalid ${tool} arguments: ${toolError(invalidResult)}`);
+      const failure = toolError(invalidResult);
+      if (invalidResult.success || !failure.includes("Incorrect browser arguments for")) {
+        throw new Error(`Dynamic browser tool accepted invalid ${tool} arguments: ${failure}`);
       }
+    }
+    const urlOnlyTab = await callBrowserTool(browser, "snapshot", { url: `${origin}/cookie` });
+    const urlOnlyFailure = toolError(urlOnlyTab);
+    if (
+      urlOnlyTab.success ||
+      !urlOnlyFailure.includes("Incorrect browser arguments for snapshot") ||
+      !urlOnlyFailure.includes("call open with url only")
+    ) {
+      throw new Error(`Expected an actionable browser argument hint for url without tabId: ${urlOnlyFailure}`);
     }
     process.stdout.write("BrowserHost: runtime tool argument schemas passed.\n");
     const scopedTabsResult = await runCauseEffect(

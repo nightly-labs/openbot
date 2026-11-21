@@ -168,6 +168,7 @@ import {
   browserInputAction,
   browserToolTimeout,
 } from "./browser-tool-actions";
+import { browserToolFailureText } from "./browser-tool-errors";
 import { repairBrowserToolInput } from "./browser-tool-input";
 import {
   BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS,
@@ -2638,10 +2639,11 @@ export class BrowserHost {
           Effect.sync((): { result: DynamicToolResult } | { heldTabId: string } => {
             const error = operationFailure.cause;
             if (error instanceof BrowserUserControlHeld) return { heldTabId: error.tabId };
+            const failureText = browserToolFailureText(error);
             return {
               result: {
                 success: false,
-                contentItems: [{ type: "inputText", text: redactText(String(error)) }],
+                contentItems: [{ type: "inputText", text: failureText }],
               },
             };
           }),

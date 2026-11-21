@@ -6,6 +6,12 @@ export const messages = {
     "История недоступна для этого запроса. Прочитайте недавнюю историю ещё раз или используйте channel_history для работы с каналом.",
   "error.agent.historyArgumentsInvalid":
     "Неверные аргументы истории: {detail} Исправь аргументы и повтори попытку. openbot.tool_describe возвращает схему.",
+  "error.agent.browserArgumentsInvalid":
+    "Неверные аргументы браузера для {tool}: {detail} {hint}Исправь аргументы и повтори попытку. openbot.tool_describe возвращает схему.",
+  "error.agent.browserArgumentsInvalidUser":
+    "Агент передал неверные аргументы браузера. Он исправит вызов и продолжит.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "Чтобы открыть новую страницу, вызови open только с url. Чтобы загрузить URL во вкладке, вызови list_tabs, затем navigate с tabId и url. ",
   "error.agent.toolRequestInvalid":
     "Некорректные аргументы поиска инструментов. Используйте объявленную схему и исходное полное имя инструмента.",
   "error.agent.toolCallArgumentsNotObject":

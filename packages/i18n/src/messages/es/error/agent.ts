@@ -6,6 +6,12 @@ export const messages = {
     "El historial no está disponible para esta solicitud. Vuelve a leer el historial reciente o usa channel_history para el trabajo en canales.",
   "error.agent.historyArgumentsInvalid":
     "Argumentos de historial incorrectos: {detail} Corrige los argumentos y vuelve a intentarlo. openbot.tool_describe da el esquema.",
+  "error.agent.browserArgumentsInvalid":
+    "Argumentos del navegador incorrectos para {tool}: {detail} {hint}Corrige los argumentos y vuelve a intentarlo. openbot.tool_describe da el esquema.",
+  "error.agent.browserArgumentsInvalidUser":
+    "El agente usó argumentos de navegador no válidos. Corregirá la llamada y continuará.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "Para abrir una página nueva, llama a open solo con url. Para cargar una URL en una pestaña existente, llama a list_tabs y luego a navigate con tabId y url. ",
   "error.agent.toolRequestInvalid":
     "Los argumentos de descubrimiento de herramientas no son válidos. Usa el esquema declarado y un nombre de herramienta cualificado original.",
   "error.agent.toolCallArgumentsNotObject":

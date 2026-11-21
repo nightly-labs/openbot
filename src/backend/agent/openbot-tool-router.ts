@@ -87,8 +87,9 @@ import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { attachmentCall, attachmentFailure } from "../attachment-effects";
+import { isBrowserToolArgumentsError } from "../browser-tool-errors";
 import { repairBrowserToolInput } from "../browser-tool-input";
-import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
+import { OPENBOT_BROWSER_NAMESPACE, parseBrowserToolCall } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { CrmHandle } from "../crm/crm";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -631,6 +632,18 @@ export class OpenBotToolRouter {
     );
     const reportFailure = (error: unknown) =>
       Effect.sync(() => {
+        if (isBrowserToolArgumentsError(error)) {
+          if (client.running) {
+            try {
+              client.respond(request.id, openBotToolFailure(error.message));
+            } catch {}
+          }
+          if (request.method === "item/tool/call" && isDynamicToolCall(request.params)) {
+            const agentId = this.#conversation.agentForThread(request.params.threadId);
+            if (agentId) this.#hooks.emitError("browser_tool_arguments_invalid", error, agentId);
+          }
+          return;
+        }
         if (client.running) {
           try {
             client.respondError(request.id, { code: -32603, message: String(error) });
@@ -820,6 +833,17 @@ export class OpenBotToolRouter {
               client.respond(toolRequest.id, channelRefusal);
               return;
             }
+            const browserCallArgs = repairBrowserToolInput(toolRequest.params.tool, toolRequest.params.arguments).value;
+            try {
+              parseBrowserToolCall(toolRequest.params.tool, browserCallArgs);
+            } catch (error) {
+              if (isBrowserToolArgumentsError(error)) {
+                client.respond(toolRequest.id, openBotToolFailure(error.message));
+                this.#hooks.emitError("browser_tool_arguments_invalid", error, agentId);
+                return;
+              }
+              throw error;
+            }
             if (toolRequest.params.tool === "request_takeover" || toolRequest.params.tool === "submit_secret") {
               const result = yield* this.#attention.surfaceBrowserTakeover(client, toolRequest);
               if (client.running) client.respond(toolRequest.id, result);
@@ -839,8 +863,8 @@ export class OpenBotToolRouter {
               threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
               ownerAgentId: agentId,
             };
-            const callArgs = repairBrowserToolInput(params.tool, params.arguments).value;
-            const callTabId = isRecord(callArgs) && isString(callArgs.tabId) ? callArgs.tabId : undefined;
+            const callTabId =
+              isRecord(browserCallArgs) && isString(browserCallArgs.tabId) ? browserCallArgs.tabId : undefined;
             if (this.#attention.browserTakeoverBlocks(agentId, params.threadId, callTabId)) {
               client.respond(toolRequest.id, {
                 success: false,

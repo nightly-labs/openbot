@@ -5,6 +5,12 @@ export const messages = defineMessages("error.agent", {
     "History is unavailable for this request. Read recent history again, or use channel_history for channel work.",
   "error.agent.historyArgumentsInvalid":
     "Incorrect history arguments: {detail} Correct the arguments and try again. openbot.tool_describe gives the schema.",
+  "error.agent.browserArgumentsInvalid":
+    "Incorrect browser arguments for {tool}: {detail} {hint}Correct the arguments and try again. openbot.tool_describe gives the schema.",
+  "error.agent.browserArgumentsInvalidUser":
+    "The agent used invalid browser arguments. It will correct the call and continue.",
+  "error.agent.browserArgumentsHintUrlWithoutTab":
+    "To open a new page, call open with url only. To load a URL in an existing tab, call list_tabs, then navigate with tabId and url. ",
   "error.agent.toolRequestInvalid":
     "Invalid tool discovery arguments. Use the declared schema and an original qualified tool name.",
   "error.agent.toolCallArgumentsNotObject":

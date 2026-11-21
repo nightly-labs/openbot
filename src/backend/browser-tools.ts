@@ -15,6 +15,7 @@ import {
   BROWSER_FILL_FIELDS_MAX_TEXT_BYTES,
   BROWSER_FILL_FIELDS_MAX_TIMEOUT_MS,
 } from "./browser-fill-fields";
+import { formatBrowserToolArgumentFailure } from "./browser-tool-errors";
 import { repairBrowserStep, repairBrowserToolInput } from "./browser-tool-input";
 
 export const OPENBOT_BROWSER_NAMESPACE = "openbot_browser";
@@ -93,7 +94,7 @@ function browserTool<const Name extends string, Shape extends z.ZodRawShape>(def
     schema,
     parse(value: unknown) {
       const result = schema.safeParse(value);
-      if (!result.success) throw new Error(`Invalid browser tool arguments: ${z.prettifyError(result.error)}`);
+      if (!result.success) throw formatBrowserToolArgumentFailure(definition.name, value, result.error);
       return { tool: definition.name, args: result.data };
     },
   };
