@@ -20,6 +20,8 @@ export const messages = {
   "server.connection.planHint": "افتح إعدادات الحساب للتحقق من خطة الخادم.",
   "server.connection.loadingHint": "يمكنك اختيار خادم آخر أثناء تحميل هذا الخادم.",
   "server.connection.cachedHint": "يُحتفظ بالمحتوى المحمّل والمسودات. ستُستأنف إجراءات الخادم بعد إعادة الاتصال.",
+  "server.connection.computerOffline":
+    "{name} غير متصل. تأكد من أن حاسوبه يعمل، وأن OpenBot مفتوح، وأن نشر هذا الخادم مفعّل في إعدادات الخادم > الأعضاء.",
   "server.connection.conversationFailed": "تعذّر تحميل المحادثة. أعد المحاولة.",
   "server.connection.panelsFailed": "تعذّر تحميل بعض لوحات مساحة العمل. أعد المحاولة.",
   "server.connection.retry": "إعادة المحاولة",

@@ -19,6 +19,8 @@ export const messages = {
   "server.connection.planHint": "계정 설정을 열어 서버 요금제를 확인하세요.",
   "server.connection.loadingHint": "서버를 불러오는 동안 다른 서버를 선택할 수 있어요.",
   "server.connection.cachedHint": "불러온 내용과 초안은 유지돼요. 다시 연결되면 서버 작업이 재개돼요.",
+  "server.connection.computerOffline":
+    "{name}이(가) 오프라인이에요. 그 컴퓨터가 켜져 있고 OpenBot이 열려 있는지, 서버 설정 > 멤버에서 이 서버 게시가 켜져 있는지 확인하세요.",
   "server.connection.conversationFailed": "대화를 불러올 수 없었어요. 다시 시도해 주세요.",
   "server.connection.panelsFailed": "일부 워크스페이스 패널을 불러올 수 없었어요. 다시 시도해 주세요.",
   "server.connection.retry": "다시 시도",
