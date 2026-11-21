@@ -43,12 +43,6 @@ interface ModelGroup<Id extends string> {
   ids: Id[];
 }
 
-function shortName(choice: ModelChoice<string>): string {
-  if (choice.place === "local") return choice.name;
-  const provider = `${VOICE_KEY_PROVIDER_NAMES[choice.place]} `;
-  return choice.name.startsWith(provider) ? choice.name.slice(provider.length) : choice.name;
-}
-
 function fullName(choice: ModelChoice<string>): string {
   if (choice.place === "local") return choice.name;
   const provider = VOICE_KEY_PROVIDER_NAMES[choice.place];
@@ -154,7 +148,7 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
               <SelectSection>{groupName(sectionProps.section.rawValue.place)}</SelectSection>
             )}
             itemComponent={(selectProps) => (
-              <SelectItem item={selectProps.item}>{modelShortName(choiceOf(selectProps.item.rawValue))}</SelectItem>
+              <SelectItem item={selectProps.item}>{modelFullName(choiceOf(selectProps.item.rawValue))}</SelectItem>
             )}
           >
             <SelectTrigger size="sm" aria-label={t("settings.voice.model.title")}>
@@ -166,10 +160,6 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
       </ItemActions>
     </Item>
   );
-}
-
-function modelShortName(choice: ModelChoice<string> | undefined): string {
-  return choice ? shortName(choice) : "";
 }
 
 function modelFullName(choice: ModelChoice<string> | undefined): string {
