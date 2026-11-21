@@ -209,7 +209,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         chatHistory={{
           back: backTarget(),
           forward: chatName(chatHistory.next()),
-          keys: chatHistoryKeys(platform.appInfo()?.platform === "darwin"),
+          keys: chatHistoryKeys(t),
           onBack: chatHistory.goBack,
           onForward: chatHistory.goForward,
         }}

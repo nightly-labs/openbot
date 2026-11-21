@@ -5,6 +5,7 @@ import {
   CircleArrowDown,
   CreditCard,
   Gift,
+  Keyboard,
   Mic,
   MousePointer2,
   Palette,
@@ -23,6 +24,7 @@ export type SettingsTab =
   | "app-behavior"
   | "notifications"
   | "voice"
+  | "keyboard"
   | "dynamic-island"
   | "agent-dock"
   | "computer-use"
@@ -130,6 +132,25 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
         titleKey: "settings.voice.speech.codexLive.title",
         descriptionKey: "settings.voice.speech.codexLive.description",
       },
+    ],
+  },
+  {
+    value: "keyboard",
+    titleKey: "settings.tab.keyboard.title",
+    descriptionKey: "settings.tab.keyboard.description",
+    icon: Keyboard,
+    rows: [
+      { titleKey: "settings.shortcuts.command.newThread" },
+      { titleKey: "settings.shortcuts.command.previousThread" },
+      { titleKey: "settings.shortcuts.command.nextThread" },
+      { titleKey: "settings.shortcuts.command.newAgent" },
+      { titleKey: "settings.shortcuts.command.globalSearch" },
+      { titleKey: "settings.shortcuts.command.searchChat" },
+      { titleKey: "settings.shortcuts.command.focusComposer" },
+      { titleKey: "settings.shortcuts.command.back" },
+      { titleKey: "settings.shortcuts.command.forward" },
+      { titleKey: "settings.shortcuts.command.toggleSidebar" },
+      { titleKey: "settings.shortcuts.command.showShortcuts" },
     ],
   },
   {

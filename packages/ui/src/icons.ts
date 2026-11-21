@@ -93,6 +93,7 @@ export { default as Inbox } from "lucide-solid/icons/inbox";
 export { default as Info } from "lucide-solid/icons/info";
 export { default as KeyRound } from "lucide-solid/icons/key-round";
 export { default as KeySquare } from "lucide-solid/icons/key-square";
+export { default as Keyboard } from "lucide-solid/icons/keyboard";
 export { default as Layers } from "lucide-solid/icons/layers";
 export { default as LayoutDashboard } from "lucide-solid/icons/layout-dashboard";
 export { default as LayoutGrid } from "lucide-solid/icons/layout-grid";

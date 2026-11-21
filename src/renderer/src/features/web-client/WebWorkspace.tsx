@@ -328,6 +328,7 @@ import {
 } from "../window/SettingsPageFrame";
 import { WindowBackdrop } from "../window/WindowBackdrop";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
+import { useWorkspaceShortcuts } from "../window/workspace-shortcuts";
 import { workflowAgentProgress } from "../workflows/workflow-agent-progress";
 import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -805,8 +806,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     nonce: number;
   } | null>(null);
   let notificationFocusNonce = 0;
+  const [keyboardFocusRequest, setKeyboardFocusRequest] = createSignal<number | null>(null);
+  let keyboardFocusNonce = 0;
   createEffect(accountSettingsOpen, (open) => {
-    if (!open) setNotificationFocusRequest(null);
+    if (open) return;
+    setNotificationFocusRequest(null);
+    setKeyboardFocusRequest(null);
   });
   function openNotificationSettings(serverId: string): void {
     setNotificationFocusRequest({ serverId, nonce: ++notificationFocusNonce });
@@ -2639,6 +2644,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     showAgents();
     setCreating(true);
   }
+  useWorkspaceShortcuts({
+    newAgent: () => {
+      if (!createSupported()) return false;
+      startCreate();
+      return true;
+    },
+    toggleSidebar: () => {
+      if (phone()) return false;
+      if (layout.sidebarClosed()) layout.expandSidebar();
+      else closeSidebar();
+      return true;
+    },
+    showShortcuts: () => {
+      setKeyboardFocusRequest(++keyboardFocusNonce);
+      openAccountSettings();
+      return true;
+    },
+  });
   const railPage = (): PageRailPage | null => {
     const current = page();
     if (current === "agents") return "agents";
@@ -3299,6 +3322,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onSignOut={signOut}
                         notifications={notificationSettings}
                         notificationFocusRequest={notificationFocusRequest()}
+                        keyboardFocusRequest={keyboardFocusRequest()}
                       />
                     </Loading>
                   </Show>

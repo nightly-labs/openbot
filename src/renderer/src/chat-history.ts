@@ -1,4 +1,7 @@
+import type { AppTextKey } from "@openbot/i18n";
+import type { ShortcutKeyEvent } from "@openbot/ui/features/settings/keyboard-shortcuts";
 import { createStore } from "solid-js";
+import { matchesShortcut, shortcutLabel } from "./keyboard-shortcut-preference";
 
 export type ChatHistoryEntry = { kind: "agent" | "channel" | "person"; id: string };
 
@@ -42,25 +45,11 @@ export function createChatHistory(exists: (entry: ChatHistoryEntry) => boolean) 
   };
 }
 
-export function chatHistoryShortcut(
-  event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "target">,
-  mac: boolean,
-): "back" | "forward" | undefined {
-  if (event.shiftKey) return undefined;
-  if (mac) {
-    if (!event.metaKey || event.altKey || event.ctrlKey) return undefined;
-    return event.key === "[" ? "back" : event.key === "]" ? "forward" : undefined;
-  }
-  if (!event.altKey || event.metaKey || event.ctrlKey || editableTarget(event.target)) return undefined;
-  return event.key === "ArrowLeft" ? "back" : event.key === "ArrowRight" ? "forward" : undefined;
+export function chatHistoryShortcut(event: ShortcutKeyEvent): "back" | "forward" | undefined {
+  if (matchesShortcut(event, "back")) return "back";
+  return matchesShortcut(event, "forward") ? "forward" : undefined;
 }
 
-function editableTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
-  );
-}
-
-export function chatHistoryKeys(mac: boolean) {
-  return mac ? { back: "⌘[", forward: "⌘]" } : { back: "Alt+←", forward: "Alt+→" };
+export function chatHistoryKeys(translate: (key: AppTextKey) => string) {
+  return { back: shortcutLabel("back", translate), forward: shortcutLabel("forward", translate) };
 }
