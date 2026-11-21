@@ -511,6 +511,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.usage.noModels": "No model usage recorded in this range.",
   "mobile.agent.usage.partial":
     "Partial data: {missingUsage} turns without usage, {incomplete} incomplete records, {unpriced} records without a cost estimate.",
+  "mobile.agent.usage.cursorPerTurnUnavailable":
+    "Cursor does not report per-turn tokens or cost through its CLI. Plan usage is on Plan limits.",
   "mobile.agent.usage.costNote":
     "API-equivalent cost in USD. This estimate excludes subscription charges, tools, and media fees.",
   "mobile.agent.usage.tokensNote":

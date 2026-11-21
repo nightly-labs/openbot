@@ -1103,7 +1103,10 @@ after the first (`supports` of the driver). A key account has no browser sign-in
 sign-out and no usage reading, and it is not in an account pool. A joined server adds one through
 `provider-account-keys-v1`; the released sign-in routes of `provider-accounts-v1` refuse it.
 
-The CLI reports no usage over ACP. The driver's `readRateLimits` (`src/backend/cursor-usage.ts`)
+The CLI reports no usage over ACP on most turns. When a turn sends `usage` or `_meta.usage` on the
+prompt response, or token counts in `_meta` on a `usage_update`, OpenBot records them like any other
+ACP provider (`CURSOR_ACP_FLAVOR.promptUsage` and `meteredUsageFromUpdate` in `acp-client.ts`). Agent
+Usage does not count unmetered Cursor turns as missing. The driver's `readRateLimits` (`src/backend/cursor-usage.ts`)
 sends the request that the CLI sends itself, `aiserver.v1.DashboardService/GetCurrentPeriodUsage`
 as Connect JSON to `https://api2.cursor.sh` or `CURSOR_API_ENDPOINT`, with the CLI's access token.
 The token comes from where the CLI keeps it: on macOS the login Keychain item `cursor-access-token`

@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { accountUsageCoversModel, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import {
+  accountUsageCoversModel,
+  agentProviderReportsPerTurnUsage,
+  isKeyOnlyProvider,
+} from "@openbot/contracts/agent-providers";
 import { type AgentSummary, isAgentModel, type UsageTokens, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -127,6 +131,24 @@ export function collectProviderUsage(
     });
     return;
   }
+  const sessionCost = session.provider === "pi" || isKeyOnlyProvider(session.provider);
+  if (session.provider === "cursor") {
+    const tokens = acpTokens(value);
+    const reportedCost = isDynamicRecord(params) ? cost(params.cost) : null;
+    if (!usageTokensPresent(tokens) && reportedCost === null) return;
+    usage.record({
+      agentId: agent.id,
+      sessionId: session.id,
+      turnId,
+      provider: session.provider,
+      model,
+      counterId: `${session.id}:cursor:${turnId}`,
+      baseline: session.createdAt < usage.collectionStartedAt(),
+      tokens,
+      reportedCost,
+    });
+    return;
+  }
   if (session.provider === "grok") {
     const ticks = cost(value.costUsdTicks);
     usage.record({
@@ -158,8 +180,11 @@ export function collectProviderUsage(
     });
     return;
   }
-  const sessionCost = session.provider === "pi" || isKeyOnlyProvider(session.provider);
   const reportedCost = sessionCost && isDynamicRecord(params) ? cost(params.cost) : null;
+  const tokens = acpTokens(value);
+  if (!agentProviderReportsPerTurnUsage(session.provider) && !usageTokensPresent(tokens) && reportedCost === null) {
+    return;
+  }
   usage.record({
     agentId: agent.id,
     sessionId: session.id,
@@ -168,7 +193,7 @@ export function collectProviderUsage(
     model,
     counterId: `${session.id}:grok`,
     baseline: session.createdAt < usage.collectionStartedAt(),
-    tokens: acpTokens(value),
+    tokens,
     reportedCost,
     zeroCostUnpriced: sessionCost,
   });
@@ -204,6 +229,15 @@ export function sideSessionUsageObserver(
       logger.warn("Could not save the usage of a side session.", { kind, provider, error });
     }
   };
+}
+
+function usageTokensPresent(tokens: UsageTokens): boolean {
+  return (
+    tokens.uncachedInput !== null ||
+    tokens.cachedInput !== null ||
+    tokens.cacheCreation !== null ||
+    tokens.output !== null
+  );
 }
 
 function acpTokens(value: DynamicRecord): UsageTokens {

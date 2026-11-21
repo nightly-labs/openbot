@@ -3094,6 +3094,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             tokenUsage: { last: { totalTokens: update.used }, modelContextWindow: update.size },
           },
         });
+      const metered = meteredUsageFromUpdate(update);
+      if (thread.activeTurn && metered) {
+        const turn = thread.activeTurn;
+        this.emit("notification", {
+          method: "openbot/usage",
+          params: {
+            threadId: thread.id,
+            turnId: turn.id,
+            promptId: randomUUID(),
+            usage: metered,
+            ...(turn.reportedCost === null ? {} : { cost: turn.reportedCost }),
+          },
+        });
+      }
       return;
     }
     if (update.sessionUpdate === "compaction_update") {
@@ -4575,6 +4589,23 @@ function failureText(error: unknown): string {
 }
 
 const HARNESS_ERROR_CHUNK = /^\s*API Error: [^\n]*The response above may be incomplete\.\s*$/u;
+
+function meteredUsageFromUpdate(update: SessionUpdate): DynamicRecord | null {
+  if (update.sessionUpdate !== "usage_update") return null;
+  const meta = isRecord(update) && isRecord(update._meta) ? update._meta : null;
+  const usage = meta && isRecord(meta.usage) ? meta.usage : meta;
+  if (!usage) return null;
+  const input = usage.inputTokens;
+  const output = usage.outputTokens;
+  if (typeof input !== "number" && typeof output !== "number") return null;
+  return {
+    ...(typeof input === "number" ? { inputTokens: input } : {}),
+    ...(typeof output === "number" ? { outputTokens: output } : {}),
+    ...(typeof usage.cachedReadTokens === "number" ? { cachedReadTokens: usage.cachedReadTokens } : {}),
+    ...(typeof usage.cachedWriteTokens === "number" ? { cachedWriteTokens: usage.cachedWriteTokens } : {}),
+    ...(typeof usage.cacheCreationTokens === "number" ? { cacheCreationTokens: usage.cacheCreationTokens } : {}),
+  };
+}
 
 function isAuthenticationError(error: unknown): boolean {
   if (error instanceof RequestError && error.code === -32000) return true;

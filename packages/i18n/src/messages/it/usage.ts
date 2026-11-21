@@ -28,6 +28,8 @@ export const messages = {
   "usage.empty": "Nessun utilizzo registrato in questo intervallo.",
   "usage.partial":
     "Dati parziali · {turns} turni non hanno un utilizzo riportato; {unpriced} record non hanno una stima del costo; {incomplete} record hanno dati sui token incompleti.",
+  "usage.cursorPerTurnUnavailable":
+    "Cursor non riporta token né costo per turno tramite la CLI. La quota del piano è in Limiti piano.",
   "usage.summary": "Riepilogo dell'utilizzo",
   "usage.sessions": { one: "{sessions} sessione", other: "{sessions} sessioni" },
   "usage.costEstimate": "Stima API · USD",
