@@ -272,6 +272,57 @@ is the practical end state.
   Electron. The complexity lives in the `AgentService` options bag and the mobile
   WebRTC bridge, not in the control socket or the team API.
 
+### Code review and quality gates (2026-11-21, two subagents + live tests)
+
+- **Memory leaks:** none on the active path (measured: fds stable 8-10, PSS returns
+  to baseline after a 5,000-request stress; 93 -> 150 MB peak -> 112 MB after GC).
+  Found and fixed lifecycle issues instead: unconditional `rmSync` of the socket path,
+  second instance stealing the socket, missing SIGHUP, no socket cleanup on shutdown,
+  missing `centralAuth.dispose()`. All fixed in `main.ts` (gate-verified).
+- **Errors found and fixed:** boot blocked the control socket on the account API
+  (60-90 s with a degraded API; now the socket binds first, native order); the stub
+  missed `safeStorage.getSelectedStorageBackend()` so the first boot logged a
+  TypeError and the real file-key never activated (now `"basic_text"`, verified by
+  gate 4); the status dialect used MiB where the native CLI expects BYTES (broke the
+  official CLI; now byte-exact: `memory_limit=11394830336`); CLI spoke the old dialect.
+- **Dead code removed:** the milestone-1 reimplementations (control-socket,
+  headless-auth, headless-secret-storage) had 9 measured divergences from the native
+  flow and nothing imports them. Deleted.
+- **Parity verdict after fixes (per surface):** routes/format of `/v1` **in parity**
+  (same native module); login/auth **in parity** (real manager, atomic persistence,
+  rate limit with Retry-After); status lines **in parity** (bytes + dynamic turn
+  limit + thresholds); lifecycle **in parity** (gates 8/9); publish/mobile/WebRTC
+  **below by declared TODO** (host adapter); database host **below by declared TODO**.
+- **Quality gates** (`scripts/quality-gates.ts`, all PASS): Bun pin 1.4.5; 8/8 real
+  modules import; real cipher round-trip; real manager restores `signed_in`; socket
+  answers in 666 ms; parity keys byte-exact with turn limit by RAM (16 here);
+  **latency p50 1.42 ms** (native measured ~1.6 ms); second instance refuses;
+  SIGTERM exits in 16 ms and removes the socket.
+- **Latency benchmark (50 requests, connection per request):** headless p50 1.8 ms /
+  p90 3.26 ms vs native p50 1.575 ms / p90 3.045 ms under live load — same order of
+  magnitude; the headless max was lower.
+- **Startup:** ~0.9-1.1 s warm, 1.96 s cold (imports of all real modules included).
+- **RAM:** headless process 106.7 MiB PSS vs ~240 MiB for the Electron main; the
+  Chromium subprocesses (~85 MiB PSS) do not exist here.
+- **Languages:** nothing in the headless path needs Rust/Go/Python. TS/JS under Bun
+  plus the already-installed opencode binary; `node:sqlite` is built into Bun;
+  `@agentclientprotocol/sdk` is dependency-free compiled TS. Python only appears for
+  optional custom ACP registry installs (uvx), not the main path.
+- **Compile:** `bun build --compile` produces a 115 MB standalone binary (1,321
+  modules bundled) that boots the server with no Bun on PATH — startup and
+  distribution option for the phone.
+- **ACP path for the next milestone (ordered):** 1) stub fix (done in this commit);
+  2) real TeamStore + HostService with `startLoopbackOnly` (needs only file JSON
+  stores, SQLite, the HeadlessBrowserHost and centralAuth picks; no WebRTC);
+  3) real AgentService phase 1 (store+mailbox SQLite, credentials via
+  ProviderCredentialStore file-key, `bundledExecutables` pointing at the opencode
+  2.2.5 the phone already runs in ACP today, `tables: null` first); 4) first real ACP
+  turn through the loopback team API; 5) database host as a Bun child process;
+  6) AcpRegistry.
+- **Environment note:** the electron shim lives in the Bun global cache and in
+  `node_modules/electron/index.js` (original saved beside it); any `bun install`
+  resets them, so re-apply from the README instructions.
+
 ### What is already wired in this fork
 
 `packages/server-headless/src/`:
