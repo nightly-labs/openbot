@@ -704,14 +704,7 @@ export class AgentTasks implements TaskLanes {
     taskId: string,
   ): Effect.fn.Return<void> {
     const task = this.#store.task(taskId);
-    if (
-      !task ||
-      task.closedAt !== null ||
-      this.#mailbox
-        .requestsLeftByTask(task.agentId, taskId)
-        .every((requestId) => this.#mailbox.heardFromSince(task.agentId, requestId))
-    )
-      return;
+    if (!task || task.closedAt !== null || this.#mailbox.requestsLeftByTask(task.agentId, taskId).length === 0) return;
     this.#store.setOutcome(taskId, "interrupted");
     this.changed(task.agentId);
     yield* this.releaseHeldRequests(task);

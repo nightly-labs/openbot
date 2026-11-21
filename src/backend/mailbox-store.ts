@@ -1196,25 +1196,6 @@ export class MailboxStore {
     return this.#messagesById().get(messageId)?.heldRequestIds ?? [];
   }
 
-  heardFromSince(agentId: string, requestId: string): boolean {
-    const request = this.#messagesById().get(requestId);
-    if (request?.sender.kind !== "agent") return false;
-    const requesterId = request.sender.agentId;
-    const later = new Set(
-      this.#state.messages
-        .filter(
-          (message) =>
-            message.sender.kind === "agent" &&
-            message.sender.agentId === agentId &&
-            message.createdAt > request.createdAt,
-        )
-        .map((message) => message.id),
-    );
-    return this.#state.deliveries.some(
-      (delivery) => delivery.recipientAgentId === requesterId && later.has(delivery.messageId),
-    );
-  }
-
   requestSenderAgentId(requestId: string): string | null {
     const request = this.#state.messages.find((message) => message.id === requestId);
     return request?.sender.kind === "agent" ? request.sender.agentId : null;
