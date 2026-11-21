@@ -69,6 +69,8 @@ export const messages = {
   "files.library.agents": "Ajanlar",
   "files.library.allAgents": { one: "{count} ajan", other: "Tüm {count} ajan" },
   "files.library.folders": "Klasörler",
+  "files.library.workflows": "İş akışları",
+  "files.library.workflowsOf": "{name} içindeki iş akışları",
   "files.library.favorite": "{name} favorilere",
   "files.folder.new": "Yeni klasör",
   "files.folder.name": "Klasör adı",

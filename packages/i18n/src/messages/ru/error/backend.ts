@@ -228,7 +228,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Это ожидание не открыто. Агент закрыл его, или кто-то его отменил.",
   "error.backend.agentWaitNoRequest": "Для продолжения ожиданию нужно сообщение. В этом ходе нет сообщения.",
   "error.backend.agentWaitOwnChatOnly":
-    "Открывайте ожидание только в своём чате. Задача канала или мессенджера не может ждать.",
+    "Открывайте ожидание в своём чате или в боковой ветке. Разговор канала или мессенджера не может ждать.",
   "error.backend.agentWaitNoteRequired": "Кратко укажите, для чего это ожидание.",
   "error.backend.agentWaitRoutineGone": "У этого агента нет регулярной задачи с таким id.",
   "error.backend.agentWaitNoRoutine":

@@ -235,7 +235,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Un'attesa ha bisogno di un messaggio per continuare. Questo turno non ha messaggi.",
   "error.backend.agentWaitOwnChatOnly":
-    "Apri un'attesa solo nella tua chat. Un canale o un'attività di messaggistica non può attendere.",
+    "Apri un'attesa nella tua chat o in un thread laterale. Una conversazione di canale o di messaggistica non può attendere.",
   "error.backend.agentWaitNoteRequired": "Scrivi una breve nota che spieghi a cosa serve l'attesa.",
   "error.backend.agentWaitRoutineGone": "Questo agente non ha una routine con questo id.",
   "error.backend.agentWaitNoRoutine":

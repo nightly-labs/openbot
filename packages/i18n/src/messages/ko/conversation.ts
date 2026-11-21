@@ -148,6 +148,8 @@ export const messages = {
   "conversation.voice.key.metaWin": "Win",
   "conversation.voice.key.metaLinux": "Super",
   "conversation.voice.key.enter": "Enter",
+  "conversation.voice.key.tab": "Tab",
+  "conversation.voice.key.escape": "Esc",
   "conversation.voice.interrupt": "끼어들기",
   "conversation.voice.start": "음성 대화 시작",
   "conversation.voice.end": "음성 대화 종료",

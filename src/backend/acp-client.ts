@@ -217,6 +217,7 @@ interface AcpTurn {
   signInLost: boolean;
   failureCause: CauseCode | null;
   accountLink: string | null;
+  accountVerification: boolean;
   sessionLost: boolean;
   sdkFailureAt: number | null;
   retryNotices: string;
@@ -418,6 +419,7 @@ export interface AcpProviderOptions {
   ): Effect.Effect<void, ProviderClientOperationError>;
   savedKeyRefusedMessage?: () => string | null;
   savedKeyLimitMessage?: (detail: string, error?: unknown) => string | null;
+  readVerificationLink?: () => Effect.Effect<string | null>;
   authBlockedMessage?: () => string | null;
   savedSignInCheck?: AcpSavedSignInCheck;
   readAccount?(
@@ -720,6 +722,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   get #label(): string {
     return this.options.label ?? agentProviderName(this.provider);
+  }
+
+  #readVerificationLink(): Effect.Effect<string | null> {
+    return this.options.readVerificationLink?.() ?? Effect.succeed(null);
   }
 
   #redact(text: string): string {
@@ -2400,6 +2406,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       signInLost: false,
       failureCause: null,
       accountLink: null,
+      accountVerification: false,
       sessionLost: false,
       sdkFailureAt: null,
       retryNotices: "",
@@ -2599,13 +2606,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           turn.text = failure ? turn.text.slice(0, failureAt) : "";
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
             turn.accountLink = sdkHarness.accountLink?.(detail, this.options.argv, thread.id) ?? null;
+            turn.accountVerification =
+              turn.accountLink !== null || sdkHarness.accountVerification?.test(detail) === true;
             const rawCause = classifyFailure(detail);
-            turn.failureCause =
-              turn.accountLink || sdkHarness.accountVerification?.test(detail)
-                ? "authentication"
-                : rawCause === "unknown"
-                  ? (sdkHarness.fallbackCause?.(detail) ?? rawCause)
-                  : rawCause;
+            turn.failureCause = turn.accountVerification
+              ? "authentication"
+              : rawCause === "unknown"
+                ? (sdkHarness.fallbackCause?.(detail) ?? rawCause)
+                : rawCause;
             turn.providerError =
               this.#mcpLoadFailureMessage(thread, detail) ??
               this.options.savedKeyLimitMessage?.(detail) ??
@@ -3966,6 +3974,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#completeMessage(thread, turn, "final_answer", failureReport);
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
+      if (turn.accountVerification || this.#flavor.sdkHarness?.accountVerification?.test(detail)) {
+        turn.accountLink = (yield* this.#readVerificationLink()) ?? turn.accountLink;
+        turn.failureCause ??= "authentication";
+      }
       const message =
         this.options.savedKeyLimitMessage?.(detail, error) ??
         this.#flavor.turnFailure?.(

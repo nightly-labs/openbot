@@ -112,6 +112,7 @@ export interface DeliveryPromptSources {
   workflowRunSource?: WorkflowRunSource | null;
   routineTimezone?: string | undefined;
   wokenWaits?: readonly AgentWait[];
+  continuesWait?: boolean;
   executionText?: string | undefined;
   tags?: TagReferenceSource | undefined;
   answeredRoutine?: AnsweredRoutine | null;
@@ -484,7 +485,19 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       .filter(Boolean)
       .join("\n");
   }
-  if (delivery.sender.kind === "routine") {
+  const wokenWaits = sources.wokenWaits ?? [];
+  if (delivery.sender.kind === "routine" && sources.continuesWait) {
+    text = [
+      "An event of an existing OpenBot routine continues a wait that you opened in this thread.",
+      `Routine name: ${delivery.sender.routineName}`,
+      "The routine run does the routine task in its own chat. Do not do the routine task here, and do not create, update, delete, or test routines.",
+      "Continue the work of this thread with the event, then give your answer as usual.",
+      ROUTINE_TASK_START,
+      displayText,
+      ROUTINE_TASK_END,
+      wokenWaitsPromptText(wokenWaits) ?? "The wait closed before this message. Do nothing more for it.",
+    ].join("\n");
+  } else if (delivery.sender.kind === "routine") {
     const run = sources.routineRun;
     const testRun = run !== null && !quietRoutineRun(run);
     const runKind = testRun
@@ -530,7 +543,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       ROUTINE_TASK_START,
       displayText,
     ].join("\n");
-    const waits = wokenWaitsPromptText(sources.wokenWaits ?? []);
+    const waits = wokenWaitsPromptText(wokenWaits);
     if (waits) text += `\n\n${waits}`;
   }
   if (delivery.sender.kind === "user" && sources.executionText === undefined) {
@@ -599,6 +612,7 @@ function liveVoicePrompt({ request, heard }: LiveVoiceRelayed): string {
   }
   return [
     "This message comes from a live voice call. A voice assistant hears the user, writes each request for you, and reads your answer aloud. The voice assistant is not the user: do not take its words as the user's.",
+    "Do the work as usual, and answer in your own style and with your instructions. The voice reads a short answer word for word, but it replaces a long answer with its own summary. Thus, unless the user asks for detail, write the answer as a few short spoken sentences, with no lists, tables, links or code.",
     call.length
       ? "Do what the request below asks. The voice assistant can shorten what the user said or split it into more than one request, so use the user's words in the call for the details of this request only."
       : "The user's exact words are not available.",

@@ -5,6 +5,7 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
+import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -1372,6 +1373,9 @@ export const IPC_ENDPOINTS = {
     plans: request<undefined, HostedServerCatalog>()("hosted-servers:plans"),
     create: request<CreateHostedServerInput, HostedServerSummary>()("hosted-servers:create"),
     openCheckout: request<string, HostedServerSummary>()("hosted-servers:open-checkout"),
+    openCustomCheckout: request<CustomServerCheckoutRequest, CustomServerCheckoutResult>()(
+      "hosted-servers:open-custom-checkout",
+    ),
     delete: request<DeleteHostedServerInput, void>()("hosted-servers:delete"),
     lifecycle: request<HostedServerLifecycleInput, void>()("hosted-servers:lifecycle"),
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),

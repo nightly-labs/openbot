@@ -1612,6 +1612,7 @@ export function createRemoteTeamPeer(
                     channelTaskWaits: true,
                     mcpManyServers: true,
                     routineResultsWhatsApp: true,
+                    storageWorkflowFiles: true,
                   }),
                 )
               : yield* peerDecode(() =>

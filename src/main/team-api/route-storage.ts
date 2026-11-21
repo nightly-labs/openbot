@@ -5,6 +5,7 @@ import {
   parseGetStorageUsageInput,
   STORAGE_CAPABILITY,
   type StorageUsage,
+  type StoredFileRow,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import {
@@ -33,6 +34,7 @@ export async function routeStorage(
   channels: Pick<ChannelService, "store"> | undefined,
   hiddenAgentIds: ReadonlySet<string>,
   agentIds: () => ReadonlySet<string>,
+  workflowIds: () => Promise<ReadonlySet<string>>,
   libraryFolders?: Pick<TeamApiLibraryFolders, "removeFiles">,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
@@ -89,7 +91,10 @@ export async function routeStorage(
       const input = parseGetStorageUsageInput(body);
       requireVisibleBodyAgent(body, hiddenAgentIds);
       const living = canAdministerServer(member.role) ? null : agentIds();
-      return json(200, visibleStorage(await runCauseEffect(storage.usage(input)), hiddenAgentIds, living));
+      return json(
+        200,
+        await visibleStorage(await runCauseEffect(storage.usage(input)), hiddenAgentIds, living, workflowIds),
+      );
     }
     if (deleteFile) {
       const { fileId } = parseDeleteStoredFileInput(body);
@@ -103,18 +108,29 @@ export async function routeStorage(
   return json(200, {});
 }
 
-function visibleStorage(
+async function visibleStorage(
   usage: StorageUsage,
   hiddenAgentIds: ReadonlySet<string>,
   livingAgentIds: ReadonlySet<string> | null,
-): StorageUsage {
-  if (hiddenAgentIds.size === 0 && livingAgentIds === null) return usage;
+  workflowIds: () => Promise<ReadonlySet<string>>,
+): Promise<StorageUsage> {
+  const filtersAgents = hiddenAgentIds.size > 0 || livingAgentIds !== null;
+  const tagged = usage.files.some((file) => file.workflow !== undefined);
+  if (!filtersAgents && !tagged) return usage;
+  const shownWorkflows = tagged ? await workflowIds() : new Set<string>();
   const visible = (agentId: string | null) =>
-    agentId !== null && !hiddenAgentIds.has(agentId) && (livingAgentIds === null || livingAgentIds.has(agentId));
+    !filtersAgents ||
+    (agentId !== null && !hiddenAgentIds.has(agentId) && (livingAgentIds === null || livingAgentIds.has(agentId)));
   return {
     ...usage,
     agents: usage.agents.filter((row) => visible(row.agentId)),
     conversations: usage.conversations.filter((row) => visible(row.agentId)),
-    files: usage.files.filter((file) => visible(file.agentId)),
+    files: usage.files.flatMap((file) => visibleFile(file, visible(file.agentId), shownWorkflows)),
   };
+}
+
+function visibleFile(file: StoredFileRow, agentVisible: boolean, shownWorkflows: ReadonlySet<string>): StoredFileRow[] {
+  const { workflow, ...untagged } = file;
+  if (workflow && shownWorkflows.has(workflow.id) && (file.agentId === null || agentVisible)) return [file];
+  return agentVisible ? [untagged] : [];
 }

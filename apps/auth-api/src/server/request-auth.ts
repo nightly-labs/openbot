@@ -13,6 +13,7 @@ import { AuthOperationError, AuthService, AuthServiceError } from "./auth-servic
 import { BillingError, type BillingService } from "./billing-service";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
+import { CustomServerOffers } from "./custom-server-offers";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
@@ -155,6 +156,10 @@ export function requestReferrals(): Referrals {
 
 export function requestBillingService(): BillingService | null {
   return requestHostedBilling().billing;
+}
+
+export function requestCustomServerOffers(): CustomServerOffers {
+  return new CustomServerOffers({ database: requireWorkerBindings(env).DB, billing: requestBillingService() });
 }
 
 export function billingErrorResponse(error: unknown): Response {

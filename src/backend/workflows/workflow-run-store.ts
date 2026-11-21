@@ -57,6 +57,12 @@ export function isOpenStep(step: Pick<WorkflowStep, "status">): boolean {
 }
 const OPEN_RUN_STATUSES = ["running", "approval", "stopping"] as const satisfies readonly WorkflowRunStatus[];
 
+export interface WorkflowMediaOutput {
+  attachmentId: string;
+  workflowId: string;
+  endedAt: string | null;
+}
+
 export interface WorkflowWebhookReceipt {
   workflowId: string;
   nodeId: string;
@@ -290,6 +296,22 @@ export class WorkflowRunStore {
         .all(workflowId),
     ).map(toStep);
     return new Map(rows.map((step) => [step.nodeId, step]));
+  }
+
+  mediaOutputs(): WorkflowMediaOutput[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `SELECT output, workflow_id, ended_at FROM workflow_steps
+           WHERE kind = 'image' AND status = 'done' AND output IS NOT NULL
+           ORDER BY created_at, step_id`,
+        )
+        .all(),
+    ).map((row) => ({
+      attachmentId: requiredStringColumn(row, "output"),
+      workflowId: requiredStringColumn(row, "workflow_id"),
+      endedAt: optionalStringColumn(row, "ended_at"),
+    }));
   }
 
   addStep(input: NewWorkflowStep, now = new Date()): StoredWorkflowStep {

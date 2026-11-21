@@ -66,6 +66,8 @@ export const messages = {
   "files.library.agents": "智能体",
   "files.library.allAgents": { one: "{count} 个智能体", other: "全部 {count} 个智能体" },
   "files.library.folders": "文件夹",
+  "files.library.workflows": "工作流",
+  "files.library.workflowsOf": "{name} 中的工作流",
   "files.library.favorite": "收藏 {name}",
   "files.folder.new": "新建文件夹",
   "files.folder.name": "文件夹名称",

@@ -68,6 +68,8 @@ export const messages = defineMessages("files", {
   "files.library.agents": "Agents",
   "files.library.allAgents": { one: "{count} agent", other: "All {count} agents" },
   "files.library.folders": "Folders",
+  "files.library.workflows": "Workflows",
+  "files.library.workflowsOf": "Workflows in {name}",
   "files.library.favorite": "Favorite {name}",
   "files.folder.new": "New folder",
   "files.folder.name": "Folder name",

@@ -212,7 +212,8 @@ export const messages = {
     "לסוכן הזה כבר יש {count} המתנות פתוחות. יש לסגור המתנה עם openbot.close_wait לפני שפותחים אחרת.",
   "error.backend.agentWaitGone": "ההמתנה הזו אינה פתוחה. הסוכן סגר אותה, או שמישהו ביטל אותה.",
   "error.backend.agentWaitNoRequest": "המתנה צריכה הודעה כדי להמשיך. לתור הזה אין הודעה.",
-  "error.backend.agentWaitOwnChatOnly": "יש לפתוח המתנה רק בצ'אט שלך. משימת ערוץ או הודעות אינה יכולה להמתין.",
+  "error.backend.agentWaitOwnChatOnly":
+    "יש לפתוח המתנה בצ'אט שלך או בשרשור צדדי. שיחת ערוץ או הודעות אינה יכולה להמתין.",
   "error.backend.agentWaitNoteRequired": "יש לכתוב הערה קצרה שאומרת בשביל מה ההמתנה.",
   "error.backend.agentWaitRoutineGone": "לסוכן הזה אין שגרה עם המזהה הזה.",
   "error.backend.agentWaitNoRoutine":

@@ -171,6 +171,7 @@ import { type ImageFitter, READ_IMAGE_MAX_FILE_BYTES, readImageToolSchema } from
 import {
   type AgentLibraryFolders,
   libraryFileAgents,
+  libraryFileWorkflows,
   listLibraryFolders,
   listLibraryFoldersToolSchema,
   organizeLibrary,
@@ -1984,8 +1985,16 @@ export class OpenBotToolRouter {
       if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
       const storedFiles = this.#mailbox.listStoredFiles();
       const fileAgents = yield* libraryFileAgents(libraryFolders, storedFiles);
+      const fileWorkflows = yield* libraryFileWorkflows(libraryFolders, storedFiles);
       return openBotToolResult(
-        listLibraryFolders(libraryFolders.getSnapshot(), storedFiles, fileAgents, senderAgentId, args.folder),
+        listLibraryFolders(
+          libraryFolders.getSnapshot(),
+          storedFiles,
+          fileAgents,
+          fileWorkflows,
+          senderAgentId,
+          args.folder,
+        ),
       );
     }
 
@@ -2328,7 +2337,11 @@ export class OpenBotToolRouter {
         !(callerTaskId !== null && this.#tasks.isRoutineThread(callerTaskId)),
       requesterIds: this.#memberRequesters(senderAgentId, params.turnId),
     };
-    const waitResult = this.#waits.handleTool(params, caller);
+    const waitResult = this.#waits.handleTool(params, {
+      agentId: senderAgentId,
+      inExecutionThread:
+        caller.inExecutionThread && !(callerTaskId !== null && this.#tasks.isSideThread(senderAgentId, callerTaskId)),
+    });
     if (waitResult) return waitResult;
 
     const taskResult = yield* this.#tasks.handleTool(params, caller);
