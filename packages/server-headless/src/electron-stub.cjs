@@ -119,7 +119,13 @@ const ipcRenderer = {
   on() {},
   send() {},
 };
-const safeStorage = { isEncryptionAvailable: () => false };
+// "basic_text" mirrors --password-store=basic: the file-key path of the real
+// secret-storage-cipher (createKey logs the selected backend; without this the
+// first boot logs a TypeError and canPersist() stays false).
+const safeStorage = {
+  isEncryptionAvailable: () => false,
+  getSelectedStorageBackend: () => "basic_text",
+};
 const desktopCapturer = { getSources: () => Promise.resolve([]) };
 const Menu = { buildFromTemplate: () => null, setApplicationMenu() {}, popup() {} };
 const Notification = { isSupported: () => false };

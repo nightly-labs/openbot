@@ -7,9 +7,13 @@
   "bin": {
     "openbot-headless": "./src/main.ts"
   },
+  "engines": {
+    "bun": "1.4.5"
+  },
   "scripts": {
     "start": "bun src/main.ts",
-    "status": "bun src/cli.ts status"
+    "status": "bun src/cli.ts status",
+    "quality-gates": "bun scripts/quality-gates.ts"
   },
   "dependencies": {
     "@openbot/contracts": "workspace:*",

@@ -5,7 +5,9 @@
 //   bun packages/server-headless/src/cli.ts login you@example.com
 //   bun packages/server-headless/src/cli.ts logout
 //
-// The login prints the challenge, waits for the emailed code, and verifies it.
+// Speaks the native dialect: memory_available/memory_limit arrive in BYTES and the CLI
+// prints MiB, like the packaged CLI. Error lines keep the official wording where a
+// direct equivalent exists.
 
 import { join } from "node:path";
 
@@ -18,20 +20,20 @@ function fail(message: string): never {
 }
 
 async function control(method: string, path: string, body?: URLSearchParams): Promise<Map<string, string>> {
-  // curl handles unix sockets cleanly; reuse the same tooling as the packaged CLI.
   const payload = body ? [...body.entries()].map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&") : "";
   const args = ["-sS", "--max-time", "120", "--unix-socket", socketPath];
   if (body) args.push("-X", method, "--data-binary", "@-", "-H", "content-type: application/x-www-form-urlencoded");
   else args.push("-X", method);
   args.push(`http://openbot${path}`);
-  const proc = Bun.spawn(["curl", ...args], {
-    stdin: payload ? "pipe" : "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  let proc;
+  try {
+    proc = Bun.spawn(["curl", ...args], { stdin: payload ? "pipe" : "ignore", stdout: "pipe", stderr: "pipe" });
+  } catch {
+    fail("The headless server does not answer. Start it with: bun packages/server-headless/src/main.ts");
+  }
   if (payload) {
-    proc.stdin.write(payload);
-    proc.stdin.end();
+    proc.stdin!.write(payload);
+    proc.stdin!.end();
   }
   const text = await new Response(proc.stdout).text();
   const code = await proc.exited;
@@ -44,6 +46,22 @@ async function control(method: string, path: string, body?: URLSearchParams): Pr
   return lines;
 }
 
+const MIB = 1024 * 1024;
+
+function accountMessage(lines: Map<string, string>): string {
+  const error = lines.get("error");
+  switch (error) {
+    case "invalid_email":
+      return "Enter a valid email address.";
+    case "invalid_request":
+      return "Enter the sign-in code.";
+    case "signed_in":
+      return "This server is signed in. To use another account, run: openbot-headless logout";
+    default:
+      return `OpenBot refused the request (${error ?? "unknown"}).`;
+  }
+}
+
 const command = process.argv[2] ?? "status";
 
 switch (command) {
@@ -51,15 +69,18 @@ switch (command) {
     const s = await control("GET", "/v1/status");
     console.log(`openbot-headless ${s.get("version") ?? "?"}`);
     console.log(`Account: ${s.get("account") ?? "?"}${s.get("email") ? ` (${s.get("email")})` : ""}`);
-    console.log(`Server: ${s.get("server_name") ?? "?"} (${s.get("server") ?? "?"})`);
-    console.log(`Memory: ${s.get("memory_free_mib")} MiB free of ${s.get("memory_total_mib")} MiB (${s.get("memory_level")})`);
+    console.log(`Server: ${s.get("server_name") ?? "(no name)"} (${s.get("server") ?? "?"})`);
+    const free = Number(s.get("memory_available") ?? "0") / MIB;
+    const total = Number(s.get("memory_limit") ?? "0") / MIB;
+    console.log(`Memory: ${Math.round(free)} MiB free of ${Math.round(total)} MiB (${s.get("memory_level")})`);
+    console.log(`Turns at the same time: at most ${s.get("turn_limit") ?? "?"}`);
     break;
   }
   case "login": {
     const email = process.argv[3];
     if (!email) fail("Usage: cli.ts login <email>");
     const started = await control("POST", "/v1/login/start", new URLSearchParams({ email }));
-    if (started.get("error")) fail(`Login failed: ${started.get("error")}`);
+    if (started.get("error")) fail(accountMessage(started));
     const challenge = started.get("challenge") ?? fail("No challenge from the server.");
     console.log(`A sign-in code was sent to ${email}.`);
     process.stdout.write("Enter the code: ");
@@ -68,8 +89,10 @@ switch (command) {
     const verified = await control("POST", "/v1/login/verify", new URLSearchParams({ challenge, code }));
     if (verified.get("account") === "signed_in") {
       console.log(`Signed in as ${verified.get("email")}.`);
+    } else if (verified.get("error")) {
+      fail(accountMessage(verified));
     } else {
-      fail(`Sign-in failed: ${verified.get("error") ?? verified.get("account") ?? "unknown"}`);
+      fail(`Sign-in did not complete: ${verified.get("account") ?? "unknown"}`);
     }
     break;
   }
