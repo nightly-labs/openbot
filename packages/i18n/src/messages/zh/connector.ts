@@ -313,7 +313,8 @@ export const messages = {
   "connector.whatsapp.numbersTitle": "号码",
   "connector.whatsapp.linkNumber": "关联号码",
   "connector.whatsapp.ownNumberNote": "你的“给自己发消息”聊天和你允许的人可以联系 OpenBot。",
-  "connector.whatsapp.dedicatedNote": "你允许的人可以联系 OpenBot。其他人会收到一个代码，需要把它交给你。",
+  "connector.whatsapp.dedicatedNote":
+    "你的“给自己发消息”聊天和你允许的人可以联系 OpenBot。其他人会收到一个代码，需要把它交给你。",
   "connector.whatsapp.helpLoggedOut": "WhatsApp 已把这台电脑从已关联的设备中移除。请重新关联该号码。",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp 已把这台服务器从已关联的设备中移除。请重新关联该号码。",
   "connector.whatsapp.helpError": "OpenBot 无法通过该号码连接 WhatsApp。请重新连接，或断开该号码。",

@@ -1130,7 +1130,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Your “Message yourself” chat and the people you allow reach OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "The people you allow reach OpenBot. Other people get a code to give you.",
+    "Your “Message yourself” chat and the people you allow reach OpenBot. Other people get a code to give you.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp removed this server from the linked devices. Link the number again.",
   "mobile.server.connectors.whatsapp.helpError":

@@ -876,7 +876,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "De mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
+    "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.helpError":

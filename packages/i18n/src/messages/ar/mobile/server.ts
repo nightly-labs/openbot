@@ -1201,7 +1201,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkNumber": "ربط رقم",
   "mobile.server.connectors.whatsapp.ownNumberNote": "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "يصل الأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
+    "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.helpError":
