@@ -1085,7 +1085,7 @@ export class BrowserHost {
     tabId: string,
     direction: BrowserNavigationDirection,
   ): Effect.fn.Return<void, BrowserOperationError> {
-    yield* this.#leaveSilentPage(tabId);
+    yield* this.#leaveSilentPage(tabId, direction);
     yield* this.#enqueue(tabId, (tab) =>
       Effect.gen({ self: this }, function* () {
         yield* untilStopped(
@@ -2859,7 +2859,9 @@ export class BrowserHost {
   ) {
     const { url, direction } = args;
     if (!url && !direction) return yield* browserFailure(new Error("navigate requires url or direction."));
-    yield* this.#leaveSilentPage(tabId);
+    if (url) yield* browserSync(() => normalizeBrowserUrl(url));
+    if (!this.#takeoverTabIds.has(tabId) && !this.#userControlTabIds.has(tabId))
+      yield* this.#leaveSilentPage(tabId, url ? undefined : direction);
     return yield* this.#runAction(
       tabId,
       "navigate",
@@ -4296,9 +4298,15 @@ export class BrowserHost {
     return { title: tab.engine.scrubText(title), url: tab.engine.scrubText(url) };
   }
 
-  readonly #leaveSilentPage = Effect.fn("BrowserHost.leaveSilentPage")(function* (this: BrowserHost, tabId: string) {
+  readonly #leaveSilentPage = Effect.fn("BrowserHost.leaveSilentPage")(function* (
+    this: BrowserHost,
+    tabId: string,
+    direction?: BrowserNavigationDirection | "reload",
+  ) {
     const tab = this.#tabs.get(tabId);
     if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return;
+    if (direction === "back" && !hasHistoryEntry(tab.contents, -1)) return;
+    if (direction === "forward" && !hasHistoryEntry(tab.contents, 1)) return;
     if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return;
     logger.warn("Ending the renderer of a browser tab whose page does not answer before it navigates");
     const contents = tab.contents;
@@ -4310,7 +4318,14 @@ export class BrowserHost {
       return Effect.sync(() => {
         if (!contents.isDestroyed()) contents.off("render-process-gone", gone);
       });
-    }).pipe(Effect.timeoutOption(SILENT_PAGE_EXIT_WAIT_MS));
+    }).pipe(
+      Effect.timeoutOption(SILENT_PAGE_EXIT_WAIT_MS),
+      Effect.ensuring(
+        Effect.sync(() => {
+          tab.endingSilentPage = false;
+        }),
+      ),
+    );
   });
 
   readonly #enqueue = Effect.fn("BrowserHost.enqueue")(function* <T>(
