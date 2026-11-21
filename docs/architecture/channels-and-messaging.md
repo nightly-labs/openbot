@@ -417,8 +417,10 @@ to its parallel thread limit (`agentTaskLimit`, the `channelTurnLimit` hook). At
 scheduler holds the other channel lanes (`channel-turn`), the channel `busy` hook starts no further
 assignment, and the waiting task shows `agent-busy` with one channel where the agent works. The
 limit counts channels with an active assignment, so two channels that start at the same time do not
-go over it. The work of other agents does not hold it. A channel turn takes no task slot: the task
-limit and the channel limit are counted apart. When the provider of the
+go over it. The work of other agents does not hold it. Tasks and channel turns share the limit in
+`DrainScheduler`: a second channel turn starts only while running tasks and channel turns are less
+than the limit, and a task counts each channel turn after the first. So one channel turn can always
+run beside full tasks, as before, and the agent runs at most the limit plus one side turn. When the provider of the
 agent runs one turn at a time (`concurrentTurns: false`), nothing runs in parallel: its chat and task
 turns count as busy, and `ChannelService.mayDrain` holds its main lane during an active assignment. Only declared `browser` and `workspace:<path>` resources are
 serialized: the same browser, or two workspaces where one path contains the other. An empty list,

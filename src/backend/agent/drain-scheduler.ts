@@ -269,6 +269,18 @@ export class DrainScheduler {
     ];
   }
 
+  #runningChannelTurns(agentId: string, exceptLaneId: string | null): number {
+    return this.#lanesOf(agentId).filter(
+      (other) => other.taskId !== exceptLaneId && laneChannelId(other.taskId) !== null && this.#laneRunning(other),
+    ).length;
+  }
+
+  #runningTasks(agentId: string, exceptTaskId: string | null): number {
+    return this.#tasks
+      .openTaskIds(agentId)
+      .filter((other) => other !== exceptTaskId && this.#laneRunning({ agentId, taskId: other })).length;
+  }
+
   #laneRunning(lane: Lane): boolean {
     return (
       this.#drainingLanes.has(laneKey(lane)) ||
@@ -360,20 +372,16 @@ export class DrainScheduler {
     )
       return "one-turn";
     const channelId = laneChannelId(taskId);
-    if (
-      channelId !== null &&
-      this.#lanesOf(agentId).filter(
-        (other) => other.taskId !== taskId && laneChannelId(other.taskId) !== null && this.#laneRunning(other),
-      ).length >= this.#tasks.limit(agentId)
-    )
-      return "channel-turn";
+    if (channelId !== null) {
+      const otherChannels = this.#runningChannelTurns(agentId, taskId);
+      if (otherChannels > 0 && otherChannels + this.#runningTasks(agentId, null) >= this.#tasks.limit(agentId))
+        return "channel-turn";
+    }
     const ownTaskId = laneTaskId(lane);
     if (ownTaskId !== null) {
       if (this.#tasks.threadId(ownTaskId) === null) return "task-closed";
-      const running = this.#tasks
-        .openTaskIds(agentId)
-        .filter((other) => other !== ownTaskId && this.#laneRunning({ agentId, taskId: other })).length;
-      if (running >= this.#tasks.limit(agentId)) return "task-limit";
+      const extraChannelTurns = Math.max(0, this.#runningChannelTurns(agentId, null) - 1);
+      if (this.#runningTasks(agentId, ownTaskId) + extraChannelTurns >= this.#tasks.limit(agentId)) return "task-limit";
     }
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (
