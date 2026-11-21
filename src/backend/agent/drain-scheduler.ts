@@ -976,7 +976,7 @@ export class DrainScheduler {
         snapshot.messages.push({
           id: item.id,
           author: item.sender.kind === "agent" ? "agent" : "user",
-          source: item.sender.kind === "agent" ? "agent" : "user",
+          source: item.sender.kind === "agent" ? "agent" : item.sender.kind === "routine" ? "routine" : "user",
           ...(item.sender.kind === "agent" ? { senderAgentId: item.sender.agentId } : {}),
           replyToMessageId: item.replyToMessageId,
           attachments: item.attachments,
@@ -995,6 +995,17 @@ export class DrainScheduler {
                 channelDelivery && this.#channels?.resumesAfterSubtasks(item.id)
                 ? { itemType: CHANNEL_RESUME_ITEM_TYPE }
                 : {}),
+          ...(item.sender.kind === "routine"
+            ? {
+                itemType: "routine",
+                routine: {
+                  routineId: item.sender.routineId,
+                  runId: item.sender.runId,
+                  name: item.sender.routineName,
+                  scheduledFor: item.sender.scheduledFor,
+                },
+              }
+            : {}),
         });
       }
       this.#conversation.emitConversation(snapshot);
