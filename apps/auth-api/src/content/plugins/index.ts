@@ -2,6 +2,7 @@ import { AAVE_PLUGIN_GUIDE } from "./aave";
 import { AIRTABLE_PLUGIN_GUIDE } from "./airtable";
 import { ATLASSIAN_PLUGIN_GUIDE } from "./atlassian";
 import { BRAVE_SEARCH_PLUGIN_GUIDE } from "./brave-search";
+import { BULKPUBLISH_PLUGIN_GUIDE } from "./bulkpublish";
 import { CANVA_PLUGIN_GUIDE } from "./canva";
 import { CLICKUP_PLUGIN_GUIDE } from "./clickup";
 import { COBRAIN_PLUGIN_GUIDE } from "./cobrain";
@@ -63,6 +64,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   omnisend: OMNISEND_PLUGIN_GUIDE,
   postiz: POSTIZ_PLUGIN_GUIDE,
   trypost: TRYPOST_PLUGIN_GUIDE,
+  bulkpublish: BULKPUBLISH_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,
   gitlab: GITLAB_PLUGIN_GUIDE,
   stripe: STRIPE_PLUGIN_GUIDE,

@@ -1690,6 +1690,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "bulkpublish",
+    name: "BulkPublish",
+    tagline: "Social media scheduling",
+    description:
+      "BulkPublish lets agents list your connected social media channels, upload images and video, and draft, schedule or publish posts on 15 networks, such as Instagram, TikTok, YouTube, LinkedIn, X and Pinterest. Agents can also read post analytics, and read and answer comments, direct messages and reviews in the Inbox. Sign in to your BulkPublish account through the browser. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "BulkPublish",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-channels", text: "Which social media channels are connected to BulkPublish?" },
+      { id: "prompt-week", text: "Which posts are scheduled for next week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+    ],
+    websiteUrl: "https://www.bulkpublish.com",
+    privacyPolicyUrl: "https://www.bulkpublish.com/privacy/",
+    termsUrl: "https://www.bulkpublish.com/terms/",
+    featured: false,
+    apps: [
+      {
+        id: "app-bulkpublish-mcp",
+        name: "BulkPublish",
+        description:
+          "Channels, posts, media, analytics and the Inbox, over BulkPublish's MCP server with browser sign-in.",
+        server: {
+          name: "bulkpublish",
+          transport: "http",
+          url: "https://mcp.bulkpublish.com/mcp",
+          auth: [{ id: "bulkpublish-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "composio",
     name: "Composio",
     tagline: "Gmail, Slack, GitHub and 1,000+ more apps",
