@@ -339,7 +339,7 @@ const PICTURE_ROW = 4;
 const PLACE_STEP = 40;
 const TIDY_LABELS: ReadonlySet<WorkflowNodeKind> = new Set(["text", "note", "shape"]);
 const TIDY_REACH = 160;
-const TIDY_LABEL_GAP = 24;
+const TIDY_CLEAR_GAP = 24;
 const TIDY_MOTION_MS = 320;
 const SEARCH_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   trigger: [],
@@ -1409,13 +1409,28 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       units,
       edges.map((edge) => ({ from: unitOf(edge.from), to: unitOf(edge.to) })),
     );
+    const labelIds = new Set(labels.map((label) => label.id));
+    const moving = new Set([...members.values()].flat());
+    const fixed = live().flatMap((node) => {
+      const box = boxOf(node.id);
+      return box && !moving.has(node.id) && !labelIds.has(node.id) ? [box] : [];
+    });
+    const below = (hit: Box) => Math.ceil((hit.y + hit.height + TIDY_CLEAR_GAP) / SNAP) * SNAP;
+    const placed = units.flatMap((unit) => {
+      const at = layout.get(unit.id);
+      return at ? [{ unit, box: { ...unit.box, ...snapPoint(at) } }] : [];
+    });
+    const dropPast = (drop: number) => {
+      for (const { box } of placed) {
+        const hit = fixed.find((other) => overlaps({ ...box, y: box.y + drop }, other));
+        if (hit) return below(hit) - box.y;
+      }
+      return undefined;
+    };
+    let drop = 0;
+    for (let next = dropPast(drop); next !== undefined; next = dropPast(drop)) drop = next;
     const shifts = new Map(
-      units.flatMap((unit) => {
-        const at = layout.get(unit.id);
-        if (!at) return [];
-        const goal = snapPoint(at);
-        return [[unit.id, { x: goal.x - unit.box.x, y: goal.y - unit.box.y }]];
-      }),
+      placed.map(({ unit, box }) => [unit.id, { x: box.x - unit.box.x, y: box.y + drop - unit.box.y }]),
     );
     const goals = new Map<string, WfnPoint>();
     const move = (id: string, shift: WfnPoint) => {
@@ -1432,15 +1447,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         Math.max(0, one.y - (other.y + other.height), other.y - (one.y + one.height)),
       );
     const shifted = (box: Box, shift: WfnPoint): Box => ({ ...box, x: box.x + shift.x, y: box.y + shift.y });
-    const labelIds = new Set(labels.map((label) => label.id));
-    const taken: Box[] = [
-      ...units.map((unit) => shifted(unit.box, shifts.get(unit.id) ?? { x: 0, y: 0 })),
-      ...live().flatMap((node) => {
-        const box = boxOf(node.id);
-        return box && !goals.has(node.id) && !labelIds.has(node.id) ? [box] : [];
-      }),
-    ];
-    const below = (hit: Box) => Math.ceil((hit.y + hit.height + TIDY_LABEL_GAP) / SNAP) * SNAP;
+    const taken: Box[] = [...units.map((unit) => shifted(unit.box, shifts.get(unit.id) ?? { x: 0, y: 0 })), ...fixed];
     const clearSpot = (box: Box): Box => {
       let spot = box;
       for (
