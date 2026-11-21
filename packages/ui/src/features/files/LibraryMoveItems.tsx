@@ -8,7 +8,7 @@ interface LibraryMoveEntry {
   depth: number;
 }
 
-export interface LibraryMoveGroup {
+interface LibraryMoveGroup {
   id: string;
   name: string;
   folders: readonly LibraryMoveEntry[];

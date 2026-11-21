@@ -61,7 +61,7 @@ function actionTargets(
   }
 }
 
-export interface AgentlessFile {
+interface AgentlessFile {
   id: string;
   workflowId: string | null;
 }
