@@ -283,6 +283,8 @@ export const messages = {
     "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeModelNotServed":
     "モデルのプロバイダーは現在、このモデルをあなたのアカウントに提供していません。別のモデルを選んでから、メッセージをもう一度送信してください。",
+  "error.provider.opencodeSafetyBlocked":
+    "モデルのプロバイダーが安全ルールによりこのメッセージをブロックしました。別の言葉でもう一度リクエストを送ってください。次のメッセージもブロックされる場合は、新しいチャットを始めるか、別のモデルを選んでください。",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
   "error.provider.codexStateBusy":

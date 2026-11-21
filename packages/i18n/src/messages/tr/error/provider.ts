@@ -276,6 +276,8 @@ export const messages = {
     "OpenCode bu efor düzeyinde bu modelin akıl yürütmesini okuyamadı. Daha düşük bir efor ya da başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.opencodeModelNotServed":
     "Model sağlayıcısı bu modeli şu anda hesabınıza sunmuyor. Başka bir model seçin, ardından mesajınızı yeniden gönderin.",
+  "error.provider.opencodeSafetyBlocked":
+    "Model sağlayıcısı, güvenlik kuralları nedeniyle bu mesajı engelledi. İsteğinizi farklı kelimelerle yeniden gönderin. Sonraki mesajlarınızı da engellerse yeni bir sohbet başlatın veya başka bir model seçin.",
   "error.provider.opencodeNetwork":
     "OpenCode model sağlayıcısına bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını kontrol edin, ardından tekrar deneyin.\n{detail}",
   "error.provider.codexStateBusy":
