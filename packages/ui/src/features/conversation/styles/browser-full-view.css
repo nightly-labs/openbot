@@ -143,6 +143,10 @@ body[data-browser-full-view] .app-frame {
   container-type: size;
 }
 
+.browser-full-surface[data-live][data-docked] {
+  padding-bottom: calc(var(--openbot-space-4) + var(--openbot-space-2) + 72px);
+}
+
 .browser-full-surface[data-live] .browser-live-view {
   position: relative;
   inset: auto;
