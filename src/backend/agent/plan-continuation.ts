@@ -147,6 +147,20 @@ function stoppedBeforeNextStep(answer: string | undefined): boolean {
   return ANNOUNCES_WORK.test(plain) || STATES_WORK.test(plain) || PT_ANNOUNCES_WORK.test(plain);
 }
 
+const PROMISES_WORK =
+  /(?:^|[^\p{L}'’])(?:i['’]ll|i\s+will|let\s+me|i['’]m\s+going\s+to|i\s+am\s+going\s+to|(?:eu\s+)?vou|(?:eu\s+)?irei|deix[ae](?:-me|\s+eu))\s+(?!(?:know|wait|hold|pause|stop|be\s+here|aguardar|esperar|ficar\s+(?:aguardando|esperando|no\s+aguardo))(?!\p{L}))\p{L}/iu;
+
+export function promisesWork(answer: string | undefined): boolean {
+  const text = answer?.trim() ?? "";
+  if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX || waitsForUser(answer)) return false;
+  const plain = text
+    .replace(/[*_`>#]/g, "")
+    .trimEnd()
+    .replace(NOTHING_FROM_USER, "");
+  const lastSentence = plain.split(/(?<=[.!…])\s+|\n+/u).at(-1) ?? "";
+  return PROMISES_WORK.test(lastSentence);
+}
+
 interface ContinuationCount {
   current: number;
   limit: number;
