@@ -108,6 +108,7 @@ import {
   grokHomeDirectory,
   hermesHome,
   hermesStatePaths,
+  kimiCodeStatePaths,
   kimiStatePaths,
   mistralHomeDirectory,
   mistralStatePaths,
@@ -1077,7 +1078,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         env: { ...KIMI_ENV },
         ...(confinement
-          ? { confine: (target) => confineWithState(target, confinement, kimiStatePaths, context.agentEnvironment?.()) }
+          ? {
+              confine: (target) =>
+                confineWithState(
+                  target,
+                  confinement,
+                  isPythonKimiCli(cli) ? kimiStatePaths : kimiCodeStatePaths,
+                  context.agentEnvironment?.(),
+                ),
+            }
           : {}),
         extraEnv: () => kimiProcessEnv(cli, context.agentEnvironment?.()),
         signInMessage: sourceText("error.provider.kimiSignIn"),
