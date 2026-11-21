@@ -1473,6 +1473,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const canTidy = () => !editsBlocked() && !deleted() && live().length > 1;
   const tidyUp = () => {
     if (!canTidy() || tidyGoals) return;
+    stopGesture();
+    dropFrames();
     const goals = tidyPlaces();
     const moved = [...goals].some(([id, at]) => positions[id]?.x !== at.x || positions[id]?.y !== at.y);
     if (!moved) {
