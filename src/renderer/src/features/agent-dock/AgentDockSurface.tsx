@@ -7,7 +7,7 @@ import type {
   AgentDockSeatRef as AgentDockSeatContract,
   AgentRuntimeApproval,
 } from "@openbot/contracts/ipc";
-import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import { AGENT_DOCK_LIMITS, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AgentDock,
@@ -113,7 +113,14 @@ export function AgentDockSurface() {
   function tuckedStrip(body: DOMRect | undefined, reach: number): AgentDockShapeRect {
     const width = body ? AGENT_DOCK_STRIP_WIDTH + reach : EDGE_STRIP;
     const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
-    if (!body) return { x, y: 0, width, height: window.innerHeight };
+    if (!body) {
+      return {
+        x,
+        y: window.innerHeight / 2 - AGENT_DOCK_LIMITS.inputExtent,
+        width,
+        height: AGENT_DOCK_LIMITS.inputExtent * 2,
+      };
+    }
     return {
       x,
       y: Math.round(body.top + (body.height * (1 - AGENT_DOCK_STRIP_REST)) / 2) - reach,
