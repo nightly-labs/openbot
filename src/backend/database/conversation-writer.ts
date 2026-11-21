@@ -203,10 +203,9 @@ export class ConversationWriter {
     if (threadId && isDeletedThreadMessage(this.#core.connection, threadId, messageId)) {
       return this.#threadRevision(threadId);
     }
-    const ordinal = threadId ? snapshot.messages.findIndex((message) => message.id === messageId) : -1;
-    if (!threadId || ordinal < 0) {
-      return this.persistConversation(snapshot, input.eventType, input.detail ?? {}, input.commandId).revision;
-    }
+    if (!threadId) return snapshot.revision;
+    const ordinal = snapshot.messages.findIndex((message) => message.id === messageId);
+    if (ordinal < 0) return this.#threadRevision(threadId);
     const message = snapshot.messages[ordinal];
     if (!message) throw new Error(`Streamed message is missing from the snapshot: ${messageId}`);
     return this.#core.dispatch(
