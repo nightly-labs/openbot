@@ -4113,15 +4113,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!agent?.backupModels?.automatic || this.#mayFailOver(agentId)) return null;
     const current = agentModelChoice(agent);
     const returnTo = agent.usageLimitReturn;
-    const ends = (returnTo ? [...agent.backupModels.order, returnTo] : agent.backupModels.order)
-      .filter(
-        (choice) =>
-          !sameAgentModelChoice(choice, current) &&
-          this.#modelChoiceReady(choice) &&
-          !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
-      )
-      .flatMap((choice) => this.#usageLimits.heldUntil(usageLimitOf(choice)) ?? []);
-    return ends.length > 0 ? Math.ceil(Math.min(...ends) / 1_000) : null;
+    return this.#usageLimits.backupWaitEnd(
+      (returnTo ? [...agent.backupModels.order, returnTo] : agent.backupModels.order)
+        .filter(
+          (choice) =>
+            !sameAgentModelChoice(choice, current) &&
+            this.#modelChoiceReady(choice) &&
+            !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
+        )
+        .map(usageLimitOf),
+    );
   }
 
   #waitsForLimit(agentId: string): boolean {
