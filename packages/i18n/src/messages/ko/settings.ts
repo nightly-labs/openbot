@@ -52,7 +52,7 @@ export const messages = {
   "settings.chatBackground.default": "기본값",
   "settings.chatBackdrop.title": "창 배경",
   "settings.chatBackdrop.description":
-    '이 기기에서 창 전체 뒤에 보이는 장면, 이미지 또는 GIF입니다. 에이전트에게 장면을 만들어 달라고 한 뒤 답장에서 "배경으로 사용"을 선택하세요.',
+    '이 기기에서 창 전체 뒤에 보이는 장면, 이미지, GIF 또는 동영상입니다. 에이전트에게 장면을 만들어 달라고 한 뒤 답장에서 "배경으로 사용"을 선택하세요.',
   "settings.chatBackdrop.none": "없음",
   "settings.chatBackdrop.pond": "잉어 연못",
   "settings.chatBackdrop.jellyfish": "해파리",
@@ -60,8 +60,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "눈 내리는 밤",
   "settings.chatBackdrop.fireflies": "반딧불이",
   "settings.chatBackdrop.coast": "네온 해안",
-  "settings.chatBackdrop.upload": "이미지 업로드…",
-  "settings.chatBackdrop.uploadRefused": "20MB 이하의 PNG, JPEG, GIF, WebP 또는 AVIF 이미지를 사용하세요.",
+  "settings.chatBackdrop.upload": "업로드…",
+  "settings.chatBackdrop.uploadRefused":
+    "20MB 이하의 PNG, JPEG, GIF, WebP 또는 AVIF 이미지나 100MB 이하의 MP4 또는 WebM 동영상을 사용하세요.",
   "settings.chatBackdrop.saveFailed": "배경을 저장하지 못했습니다.",
   "settings.chatBackdrop.removeFailed": "배경을 제거하지 못했습니다.",
   "settings.chatColor.title": "채팅 색상",

@@ -9,6 +9,7 @@ import { documentColorScheme } from "../../document-color-scheme";
 
 export type CustomBackdropSource =
   | { kind: "image"; url: string }
+  | { kind: "video"; url: string }
   | { kind: "page"; src: string }
   | { kind: "page"; html: string };
 
@@ -17,8 +18,26 @@ export function CustomBackdrop(props: { source: CustomBackdropSource; title: str
   return (
     <div class="chat-backdrop chat-backdrop-custom" aria-hidden="true">
       <Switch>
-        <Match when={"url" in props.source ? props.source.url : undefined}>
+        <Match when={props.source.kind === "image" ? props.source.url : undefined}>
           {(url) => <img class="chat-backdrop-media" src={url()} alt="" draggable={false} />}
+        </Match>
+        <Match when={props.source.kind === "video" ? props.source.url : undefined}>
+          {(url) => (
+            <video
+              ref={(element) => {
+                element.muted = true;
+              }}
+              class="chat-backdrop-media"
+              src={url()}
+              muted
+              autoplay
+              loop
+              playsinline
+              disablepictureinpicture
+              disableremoteplayback
+              tabindex={-1}
+            />
+          )}
         </Match>
         <Match when={"src" in props.source ? props.source.src : undefined}>
           {(src) => (

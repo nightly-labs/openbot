@@ -54,7 +54,7 @@ export const messages = {
   "settings.chatBackground.default": "Predefinito",
   "settings.chatBackdrop.title": "Sfondo della finestra",
   "settings.chatBackdrop.description":
-    "Una scena, un’immagine o una GIF dietro tutta la finestra su questo dispositivo. Chiedi una scena a un agente, poi scegli «Usa come sfondo» nella sua risposta.",
+    "Una scena, un’immagine, una GIF o un video dietro tutta la finestra su questo dispositivo. Chiedi una scena a un agente, poi scegli «Usa come sfondo» nella sua risposta.",
   "settings.chatBackdrop.none": "Nessuno",
   "settings.chatBackdrop.pond": "Laghetto koi",
   "settings.chatBackdrop.jellyfish": "Meduse",
@@ -62,8 +62,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "Nevicata",
   "settings.chatBackdrop.fireflies": "Lucciole",
   "settings.chatBackdrop.coast": "Costa al neon",
-  "settings.chatBackdrop.upload": "Carica immagine…",
-  "settings.chatBackdrop.uploadRefused": "Usa un’immagine PNG, JPEG, GIF, WebP o AVIF di 20 MB al massimo.",
+  "settings.chatBackdrop.upload": "Carica…",
+  "settings.chatBackdrop.uploadRefused":
+    "Usa un’immagine PNG, JPEG, GIF, WebP o AVIF di 20 MB al massimo, o un video MP4 o WebM di 100 MB al massimo.",
   "settings.chatBackdrop.saveFailed": "Lo sfondo non è stato salvato.",
   "settings.chatBackdrop.removeFailed": "Lo sfondo non è stato rimosso.",
   "settings.chatColor.title": "Colore della chat",

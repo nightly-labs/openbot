@@ -53,7 +53,7 @@ export const messages = {
   "settings.chatBackground.default": "Varsayılan",
   "settings.chatBackdrop.title": "Pencere arka planı",
   "settings.chatBackdrop.description":
-    "Bu cihazda tüm pencerenin arkasında bir sahne, resim veya GIF. Bir ajandan sahne isteyin, sonra yanıtında “Arka plan olarak kullan” seçeneğini seçin.",
+    "Bu cihazda tüm pencerenin arkasında bir sahne, resim, GIF veya video. Bir ajandan sahne isteyin, sonra yanıtında “Arka plan olarak kullan” seçeneğini seçin.",
   "settings.chatBackdrop.none": "Yok",
   "settings.chatBackdrop.pond": "Koi göleti",
   "settings.chatBackdrop.jellyfish": "Denizanaları",
@@ -61,8 +61,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "Kar yağışı",
   "settings.chatBackdrop.fireflies": "Ateş böcekleri",
   "settings.chatBackdrop.coast": "Neon sahil",
-  "settings.chatBackdrop.upload": "Resim yükle…",
-  "settings.chatBackdrop.uploadRefused": "En fazla 20 MB boyutunda bir PNG, JPEG, GIF, WebP veya AVIF resmi kullanın.",
+  "settings.chatBackdrop.upload": "Yükle…",
+  "settings.chatBackdrop.uploadRefused":
+    "En fazla 20 MB boyutunda bir PNG, JPEG, GIF, WebP veya AVIF resmi ya da en fazla 100 MB boyutunda bir MP4 veya WebM videosu kullanın.",
   "settings.chatBackdrop.saveFailed": "Arka plan kaydedilmedi.",
   "settings.chatBackdrop.removeFailed": "Arka plan kaldırılmadı.",
   "settings.chatColor.title": "Sohbet rengi",

@@ -53,7 +53,7 @@ export const messages = {
   "settings.chatBackground.default": "Domyślne",
   "settings.chatBackdrop.title": "Tło okna",
   "settings.chatBackdrop.description":
-    "Scena, obraz lub GIF za całym oknem na tym urządzeniu. Poproś agenta o scenę, a potem wybierz „Użyj jako tła” przy jego odpowiedzi.",
+    "Scena, obraz, GIF lub film za całym oknem na tym urządzeniu. Poproś agenta o scenę, a potem wybierz „Użyj jako tła” przy jego odpowiedzi.",
   "settings.chatBackdrop.none": "Brak",
   "settings.chatBackdrop.pond": "Staw z karpiami koi",
   "settings.chatBackdrop.jellyfish": "Meduzy",
@@ -61,8 +61,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "Opady śniegu",
   "settings.chatBackdrop.fireflies": "Świetliki",
   "settings.chatBackdrop.coast": "Neonowe wybrzeże",
-  "settings.chatBackdrop.upload": "Prześlij obraz…",
-  "settings.chatBackdrop.uploadRefused": "Użyj obrazu PNG, JPEG, GIF, WebP lub AVIF o rozmiarze do 20 MB.",
+  "settings.chatBackdrop.upload": "Prześlij…",
+  "settings.chatBackdrop.uploadRefused":
+    "Użyj obrazu PNG, JPEG, GIF, WebP lub AVIF o rozmiarze do 20 MB albo filmu MP4 lub WebM o rozmiarze do 100 MB.",
   "settings.chatBackdrop.saveFailed": "Tło nie zostało zapisane.",
   "settings.chatBackdrop.removeFailed": "Tło nie zostało usunięte.",
   "settings.chatColor.title": "Kolor czatu",

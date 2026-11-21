@@ -49,7 +49,7 @@ export const messages = {
   "settings.chatBackground.default": "默认",
   "settings.chatBackdrop.title": "窗口背景",
   "settings.chatBackdrop.description":
-    "在此设备上显示在整个窗口后面的场景、图片或 GIF。让智能体制作一个场景，然后在它的回复上选择“用作背景”。",
+    "在此设备上显示在整个窗口后面的场景、图片、GIF 或视频。让智能体制作一个场景，然后在它的回复上选择“用作背景”。",
   "settings.chatBackdrop.none": "无",
   "settings.chatBackdrop.pond": "锦鲤池",
   "settings.chatBackdrop.jellyfish": "水母",
@@ -57,8 +57,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "飘雪",
   "settings.chatBackdrop.fireflies": "萤火虫",
   "settings.chatBackdrop.coast": "霓虹海岸",
-  "settings.chatBackdrop.upload": "上传图片…",
-  "settings.chatBackdrop.uploadRefused": "请使用 20 MB 以内的 PNG、JPEG、GIF、WebP 或 AVIF 图片。",
+  "settings.chatBackdrop.upload": "上传…",
+  "settings.chatBackdrop.uploadRefused":
+    "请使用 20 MB 以内的 PNG、JPEG、GIF、WebP 或 AVIF 图片，或 100 MB 以内的 MP4 或 WebM 视频。",
   "settings.chatBackdrop.saveFailed": "背景未保存。",
   "settings.chatBackdrop.removeFailed": "背景未移除。",
   "settings.chatColor.title": "聊天颜色",

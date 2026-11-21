@@ -50,7 +50,7 @@ export const messages = defineMessages("settings", {
   "settings.chatBackground.default": "Default",
   "settings.chatBackdrop.title": "Backdrop",
   "settings.chatBackdrop.description":
-    "A scene, picture or GIF behind the whole window on this device. Ask an agent to make a scene, then choose Use as backdrop on its reply.",
+    "A scene, picture, GIF or video behind the whole window on this device. Ask an agent to make a scene, then choose Use as backdrop on its reply.",
   "settings.chatBackdrop.none": "None",
   "settings.chatBackdrop.pond": "Koi pond",
   "settings.chatBackdrop.jellyfish": "Jellyfish",
@@ -58,8 +58,9 @@ export const messages = defineMessages("settings", {
   "settings.chatBackdrop.snowfall": "Snowfall",
   "settings.chatBackdrop.fireflies": "Fireflies",
   "settings.chatBackdrop.coast": "Neon coast",
-  "settings.chatBackdrop.upload": "Upload image…",
-  "settings.chatBackdrop.uploadRefused": "Use a PNG, JPEG, GIF, WebP or AVIF image of 20 MB or less.",
+  "settings.chatBackdrop.upload": "Upload…",
+  "settings.chatBackdrop.uploadRefused":
+    "Use a PNG, JPEG, GIF, WebP or AVIF image of 20 MB or less, or an MP4 or WebM video of 100 MB or less.",
   "settings.chatBackdrop.saveFailed": "The backdrop was not saved.",
   "settings.chatBackdrop.removeFailed": "The backdrop was not removed.",
   "settings.chatColor.title": "Chat color",
