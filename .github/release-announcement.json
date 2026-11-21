@@ -1,10 +1,10 @@
 {
-  "version": "0.75.0",
+  "version": "0.76.0",
   "highlights": [
-    "Update your joined servers to this version too, so that the new workflow tools, owner transfer and the agent fixes work there.",
-    "Talk to your agents with push to talk: hold the talk button or the talk key while you speak.",
-    "Start a workflow again from one step, and see the settings that made each step result.",
-    "Give your server to another OpenBot account in Server Settings > Members.",
-    "Restart for an update now waits until your agents are idle, and stuck \"working\" agents start their waiting messages again."
+    "Update your joined servers to this version too, so that parallel tasks, workflow folders, typed workflow answers and up to 20 provider accounts work there.",
+    "Agents can split unrelated work into tasks that run at the same time and combine the results for you.",
+    "Change any keyboard shortcut in the new Keyboard tab of Settings.",
+    "Workflows open in tabs, and workflow steps can give typed answers that later steps use.",
+    "Use an MP4 or WebM video as the window backdrop."
   ]
 }
