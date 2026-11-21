@@ -3,6 +3,7 @@ import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, onCleanup } from "solid-js";
 import type { ChatSearchMatch } from "../chat-search";
 import { clearChatSearchHighlights, findChatSearchMatches, renderChatSearchHighlights } from "../chat-search";
+import { type ChatSearchShortcutPlatform, chatSearchCommand } from "../chat-search-shortcut";
 import type { ConversationProps } from "../conversation-types";
 
 export interface SearchStoreDeps {
@@ -22,6 +23,8 @@ export interface SearchStoreDeps {
   setChatSearchMessageIds: (ids: string[]) => void;
   setChatSearchTotal: (total: number) => void;
   setActiveChatSearchIndex: (update: number | ((current: number) => number)) => void;
+  /** The platform of the keyboard: the search opens on Cmd on macOS and on Ctrl elsewhere. */
+  shortcutPlatform: () => ChatSearchShortcutPlatform;
 }
 
 export function createSearchStore(deps: SearchStoreDeps) {
@@ -185,18 +188,15 @@ export function createSearchStore(deps: SearchStoreDeps) {
 
   function handleChatSearchShortcut(event: KeyboardEvent): void {
     if (event.defaultPrevented) return;
-    const primaryModifier = event.metaKey || event.ctrlKey;
-    const key = event.key.toLocaleLowerCase();
-    if (primaryModifier && !event.altKey && !event.shiftKey && key === "f") {
-      event.preventDefault();
-      event.stopPropagation();
-      openChatSearch();
-      return;
-    }
-    if (!deps.chatSearchOpen() || !primaryModifier || event.altKey || key !== "g") return;
+    const command = chatSearchCommand(event, deps.shortcutPlatform(), deps.chatSearchOpen());
+    if (!command) return;
     event.preventDefault();
     event.stopPropagation();
-    moveChatSearch(event.shiftKey ? -1 : 1);
+    if (command === "open") {
+      openChatSearch();
+    } else {
+      moveChatSearch(command === "prev" ? -1 : 1);
+    }
   }
 
   const setChatSearchInputElement = (element: HTMLInputElement) => {

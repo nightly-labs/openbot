@@ -35,6 +35,7 @@ import {
 import { actionToast } from "../../action-toast";
 import { holdNativeBrowserPage } from "../../native-browser-page";
 import { createScopeGuard } from "../../scope-lifetime";
+import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
@@ -836,6 +837,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setChatSearchMessageIds,
     setChatSearchTotal,
     setActiveChatSearchIndex,
+    shortcutPlatform: () => (currentDevicePlatform() === "darwin" ? "mac" : "pc"),
   });
   const { closeChatSearch, moveChatSearch, setChatSearchInputElement } = search;
   const [threadSearchOpen, setThreadSearchOpen] = createSignal(false);
@@ -863,6 +865,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setChatSearchMessageIds: setThreadSearchMessageIds,
     setChatSearchTotal: () => undefined,
     setActiveChatSearchIndex: setActiveThreadSearchIndex,
+    shortcutPlatform: () => (currentDevicePlatform() === "darwin" ? "mac" : "pc"),
   });
   createEffect(
     () => {
