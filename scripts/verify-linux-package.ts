@@ -126,23 +126,21 @@ for (const [path, name] of [
     throw new Error(`The ${name} host must import nothing but node: builtins.`);
   }
 }
-if (architecture === "x64") {
-  await Promise.all(
-    ["sunshine", "web-server", "streamer", "static/stream.html"].map((name) =>
-      access(resolve(resourcesPath, "remote-desktop-runtime/linux/x64", name)),
-    ),
-  );
-  await Promise.all(
-    ["darwin", "win32"].map((name) =>
-      assertAbsent(resolve(resourcesPath, "remote-desktop-runtime", name), "Only this platform's runtime ships"),
-    ),
-  );
-} else {
-  await assertAbsent(
-    resolve(resourcesPath, "remote-desktop-runtime"),
-    "Remote desktop is not available on Linux arm64",
-  );
-}
+await Promise.all(
+  ["sunshine", "web-server", "streamer", "static/stream.html"].map((name) =>
+    access(resolve(resourcesPath, `remote-desktop-runtime/linux/${architecture}`, name)),
+  ),
+);
+await Promise.all(
+  ["sunshine", "web-server", "streamer"].map((name) =>
+    assertElfMachine(resolve(resourcesPath, `remote-desktop-runtime/linux/${architecture}`, name)),
+  ),
+);
+await Promise.all(
+  ["darwin", "win32", `linux/${architecture === "x64" ? "arm64" : "x64"}`].map((name) =>
+    assertAbsent(resolve(resourcesPath, "remote-desktop-runtime", name), "Only this platform's runtime ships"),
+  ),
+);
 
 await Promise.all(
   ["codex", "claude", "grok", "cloudflared"].map((name) =>

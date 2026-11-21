@@ -177,9 +177,9 @@ exact corresponding source for both GPL components with every binary release. A 
 a binary, license, source manifest, checksum, platform signature, or notarization result is missing.
 
 Use this source build only to make or reproduce a runtime version. The
-`.github/workflows/remote-desktop-runtime.yml` workflow builds macOS ARM64, macOS x64, Windows x64 and Linux x64
+`.github/workflows/remote-desktop-runtime.yml` workflow builds macOS ARM64, macOS x64, Windows x64, Linux x64 and Linux ARM64
 when the recipe or a pinned input changes. It publishes an immutable GitHub prerelease named
-`remote-desktop-runtime-<input-digest>`. The prerelease contains the four deterministic archives, SPDX
+`remote-desktop-runtime-<input-digest>`. The prerelease contains the five deterministic archives, SPDX
 SBOMs, build provenance, and `remote-desktop-runtime-manifest.json`. It is not an OpenBot application
 update and it must never contain `latest.yml`.
 
@@ -250,7 +250,7 @@ with the tray off, and OpenBot gives Sunshine no file capabilities.
 
 ### Linux runtime (recipe 16)
 
-The `linux-x64` target builds on Ubuntu 24.04 with GCC 14, X11 capture and software encoding only
+The `linux-x64` and `linux-arm64` targets build on Ubuntu 24.04 with GCC 14, X11 capture and software encoding only
 (CUDA, DRM, KWin, VAAPI, Vulkan, Wayland, portal and tray are off). The OpenBot patch adds an XTest
 input backend, because Xvfb does not read uinput devices. It also links libcap when DRM is off and
 adds a `vaMapBuffer2` shim, because the prebuilt FFmpeg needs libva 2.21 and Ubuntu 24.04 has 2.20.
@@ -260,7 +260,6 @@ Boost.Locale has no ICU backend, and the runtime carries `lib/libminiupnpc.so.17
 licence, because Ubuntu 26.04 has only `libminiupnpc21`. Sunshine finds it through its RUNPATH
 `$ORIGIN/lib`. The build job checks with `ldd` that each executable finds all its libraries on
 Ubuntu 26.04.
-Linux arm64 builds only for local development and has no release artifact.
 
 ## Pin the Gemini CLI
 
@@ -685,8 +684,7 @@ check, download, or restart reports an actionable error and can be retried in pl
 
 The voice runtime (the sherpa-onnx N-API addon and ONNX Runtime, from the pinned `sherpa-onnx-*`
 npm packages) is part of the macOS, Windows and Linux applications, in `voice/runtime`. Each Linux
-AppImage carries the runtime of its architecture. The Linux arm64 AppImage ships no remote desktop
-runtime. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
+AppImage carries the runtime of its architecture. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
 artifact. OpenBot downloads its four pinned files on first voice use, checks the size and SHA-256 of
 each, and keeps the verified files in `runtimes/parakeet-tdt-0.6b-v3-int8` in the user data directory
 for later offline use. The Whisper large-v3 turbo model (an int8 encoder and a full-precision

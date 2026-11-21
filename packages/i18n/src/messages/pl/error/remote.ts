@@ -17,7 +17,7 @@ export const messages = {
   "error.remote.sessionCapacity": "Host ma już cztery aktywne sesje.",
   "error.remote.linuxNeedsX11": "Zdalny pulpit w systemie Linux wymaga sesji X11. Wayland nie jest obsługiwany.",
   "error.remote.runtimeMissing":
-    "Brakuje środowiska Sunshine i Moonlight Web lub nie jest ono obsługiwane na tym hoście. Zainstaluj pełne wydanie OpenBot na Macu, hoście Windows x64 lub hoście Linux x64, a następnie uruchom ponownie OpenBot.",
+    "Brakuje środowiska Sunshine i Moonlight Web lub nie jest ono obsługiwane na tym hoście. Zainstaluj pełne wydanie OpenBot na Macu, hoście Windows x64 lub hoście Linux, a następnie uruchom ponownie OpenBot.",
   "error.remote.testActive": "Test zdalnego pulpitu jest aktywny. Spróbuj ponownie po jego zakończeniu.",
   "error.remote.screenRecordingDenied":
     "Host nie zezwolił OpenBot na nagrywanie ekranu. Przyznaj na hoście uprawnienie do nagrywania ekranu, a następnie spróbuj ponownie.",

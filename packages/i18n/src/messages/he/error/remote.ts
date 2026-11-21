@@ -17,7 +17,7 @@ export const messages = {
   "error.remote.sessionCapacity": "במארח כבר יש ארבעה סשנים פעילים.",
   "error.remote.linuxNeedsX11": "שולחן עבודה מרוחק ב-Linux דורש סשן X11. Wayland אינו נתמך.",
   "error.remote.runtimeMissing":
-    "סביבת הריצה של Sunshine ו-Moonlight Web חסרה או שאינה נתמכת במארח הזה. יש להתקין את גרסת OpenBot המלאה ב-Mac, במארח Windows x64 או במארח Linux x64, ואז להפעיל מחדש את OpenBot.",
+    "סביבת הריצה של Sunshine ו-Moonlight Web חסרה או שאינה נתמכת במארח הזה. יש להתקין את גרסת OpenBot המלאה ב-Mac, במארח Windows x64 או במארח Linux, ואז להפעיל מחדש את OpenBot.",
   "error.remote.testActive": "בדיקת שולחן עבודה מרוחק פעילה. יש לנסות שוב כשהיא תסתיים.",
   "error.remote.screenRecordingDenied":
     "המארח לא אישר ל-OpenBot להקליט את המסך שלו. יש לאשר הקלטת מסך במארח ולנסות שוב.",
