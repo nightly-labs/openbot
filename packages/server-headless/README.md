@@ -61,3 +61,32 @@ The reference host is the arm64 phone described in
 `docs/headless-server-mode-update-2026-11-21.md` (POCO X7 Pro / `rodin`, Arch chroot,
 KernelSU, zram). Native modules (SQLite, crypto) must be verified under Bun on arm64
 before anything here is trusted.
+
+## Verified on the phone (2026-11-21)
+
+- `node:sqlite` with WAL works under Bun/arm64.
+- The obk1 cipher round-trips (headless copy and cross-instance read).
+- The control socket serves `key=value` and the CLI parses it.
+- **The repository's own server modules load under Bun** (`server-mode`,
+  `central-auth-manager`, `team-api-server`, `host-service`, `agent-service`,
+  `secret-storage-cipher`, `team-store`, `automation-server`) once Electron is aliased
+  to `src/electron-stub.cjs`.
+
+### The Electron alias (how to apply and revert)
+
+Bun resolves `electron` from its global cache, not from `node_modules`. The shim:
+
+```sh
+CACHE=$(bun pm cache dir)/electron@<version>@@@1   # e.g. electron@45.3.4@@@1
+cp "$CACHE/index.js" "$CACHE/index.js.electron-original"   # once
+printf 'module.exports = require("/home/deivi/Projetos/openbot/packages/server-headless/src/electron-stub.cjs");\n' > "$CACHE/index.js"
+```
+
+Revert:
+
+```sh
+cp "$CACHE/index.js.electron-original" "$CACHE/index.js"
+```
+
+The same shim exists at `node_modules/electron/index.js` (with the original saved as
+`index.js.electron-original`). Both are local, reversible, and outside git.
