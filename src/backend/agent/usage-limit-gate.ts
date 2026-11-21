@@ -14,6 +14,8 @@ const RESET_GRACE_MS = 30_000;
 
 const PROVIDER_FAILURE_HOLD_MS = 10 * 60_000;
 
+const REFUSED_CREDENTIAL_HOLD_MAX_MS = 60 * 60_000;
+
 const MAX_TIMER_MS = 2_147_483_647;
 
 const RETURN_READ_TIMEOUT_MS = 10_000;
@@ -45,7 +47,13 @@ export interface UsageLimitKey {
 interface ProviderFailure extends UsageLimitKey {
   endsAt: number;
   spent: boolean;
+  refused: boolean;
   timer: ReturnType<typeof setTimeout>;
+}
+
+interface Refusal {
+  count: number;
+  endsAt: number;
 }
 
 interface UsageLimit extends UsageLimitKey {
@@ -68,6 +76,7 @@ export class UsageLimitGate {
   #scope = Scope.makeUnsafe();
   readonly #announced = new Set<AgentProvider>();
   readonly #failures = new Map<string, ProviderFailure>();
+  readonly #refusals = new Map<string, Refusal>();
   readonly #tries = new Map<string, string>();
   readonly #readReleased = new Map<string, number>();
   readonly #seen = new Set<string>();
@@ -165,7 +174,13 @@ export class UsageLimitGate {
     return ends.length > 0 ? Math.ceil(Math.min(now + PROVIDER_FAILURE_HOLD_MS, ...ends) / 1_000) : null;
   }
 
-  failed(agentId: string, model: string | null = null, resetDelayMs: number | null = null, spent = false): void {
+  failed(
+    agentId: string,
+    model: string | null = null,
+    resetDelayMs: number | null = null,
+    spent = false,
+    refused = false,
+  ): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
     const provider = providerForAgent(agent);
@@ -176,7 +191,12 @@ export class UsageLimitGate {
     if (this.#tries.get(agentId) === key) this.#tries.delete(agentId);
     const previous = this.#failures.get(key);
     if (previous) clearTimeout(previous.timer);
-    const hold = Math.max(PROVIDER_FAILURE_HOLD_MS, (resetDelayMs ?? 0) + RESET_GRACE_MS);
+    const hold = Math.max(
+      refused
+        ? this.#refusedHold(key, previous?.refused === true && previous.endsAt > Date.now())
+        : PROVIDER_FAILURE_HOLD_MS,
+      (resetDelayMs ?? 0) + RESET_GRACE_MS,
+    );
     const endsAt = Math.max(previous?.endsAt ?? 0, Date.now() + hold);
     this.#failures.set(key, {
       provider,
@@ -184,10 +204,20 @@ export class UsageLimitGate {
       model: turnModel,
       endsAt,
       spent: spent || previous?.spent === true,
+      refused: refused || previous?.refused === true,
       timer: this.#armFailure(key, endsAt),
     });
     if (dropped) this.#wakeReturning(key);
     this.#hooks.emitRuntimeSnapshot();
+  }
+
+  #refusedHold(key: string, held: boolean): number {
+    const now = Date.now();
+    const last = this.#refusals.get(key);
+    const count = !last || last.endsAt + REFUSED_CREDENTIAL_HOLD_MAX_MS < now ? 1 : held ? last.count : last.count + 1;
+    const hold = Math.min(REFUSED_CREDENTIAL_HOLD_MAX_MS, PROVIDER_FAILURE_HOLD_MS * 2 ** (count - 1));
+    this.#refusals.set(key, { count, endsAt: Math.max(last?.endsAt ?? 0, now + hold) });
+    return hold;
   }
 
   #armFailure(key: string, endsAt: number): ReturnType<typeof setTimeout> {
@@ -283,6 +313,7 @@ export class UsageLimitGate {
     const provider = providerForAgent(agent);
     const key = limitKey(provider, accountOf(agent), model ?? agent.model);
     this.#readReleased.delete(key);
+    this.#refusals.delete(key);
     if (this.#forgetReturnHold(key))
       yield* this.#hooks.released({ provider, accountId: accountOf(agent), model: model ?? agent.model });
     if (this.#limits.has(key)) yield* this.#release(key);
@@ -304,11 +335,23 @@ export class UsageLimitGate {
       if (limit.provider === provider && limit.accountId === accountId) yield* this.#release(key, true);
   }).bind(this);
 
+  readonly credentialChanged = Effect.fn("UsageLimitGate.credentialChanged")(function* (
+    this: UsageLimitGate,
+    provider: AgentProvider,
+    accountId: string | null,
+  ) {
+    const account = limitKey(provider, accountId, "");
+    for (const key of [...this.#refusals.keys()]) if (key.startsWith(account)) this.#refusals.delete(key);
+    for (const [key, failure] of [...this.#failures])
+      if (failure.refused && key.startsWith(account)) yield* this.#releaseFailure(key);
+  }).bind(this);
+
   readonly dispose = Effect.fn("UsageLimitGate.dispose")(function* (this: UsageLimitGate) {
     for (const limit of this.#limits.values()) if (limit.timer) clearTimeout(limit.timer);
     this.#limits.clear();
     for (const failure of this.#failures.values()) clearTimeout(failure.timer);
     this.#failures.clear();
+    this.#refusals.clear();
     this.#tries.clear();
     this.#readReleased.clear();
     for (const hold of this.#returnHolds.values()) if (hold.timer) clearTimeout(hold.timer);

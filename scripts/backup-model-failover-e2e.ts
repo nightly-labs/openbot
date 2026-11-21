@@ -181,6 +181,14 @@ const turn = (message) => {
     result({ is_error: true, result: "You've hit your limit. Try again later." });
     return;
   }
+  if (input.includes("refused-key") && model === ${JSON.stringify(PRIMARY)}) {
+    const refused = "Invalid API key · Please run /login";
+    write({ type: "assistant", error: "authentication_failed", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "text", text: refused }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+      parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    result({ is_error: true, result: refused });
+    return;
+  }
   if (fails) {
     if (acts) assistant("Partial answer.");
     result({ is_error: true, result: ${JSON.stringify(PROVIDER_ERROR)} });
@@ -1551,6 +1559,33 @@ try {
     assert.equal(agent.model, PRIMARY, "The agent stays on the chosen model.");
     assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
     return { failedModels, workedModels };
+  });
+
+  await check("a refused sign-in moves to the backup and tells the user", async () => {
+    await restart();
+    const agent = await withBackup("Refused");
+    failing([]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "refused-key work");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const models = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(models, [PRIMARY, BACKUP], "The refused model fails once, then the backup answers.");
+    assert.equal(agentOf(agent.id).model, BACKUP, "The refused sign-in moved the agent to its backup.");
+    const shown = errorsFor(agent.id, since).map((event) => (event.type === "error" ? event.message : ""));
+    assert.equal(shown.length, 1, "The user sees why the agent left its model.");
+    assert.ok(shown[0], "The shown reason has text.");
+
+    const next = turns().length;
+    const again = await send(agent.id, "refused-key again");
+    assert.equal(again.status, "completed", `The next message completes: ${again.error}`);
+    const nextModels = turns()
+      .slice(next)
+      .map((turn) => turn.model);
+    assert.deepEqual(nextModels, [BACKUP], "The next message does not try the refused sign-in again.");
+    return { models, shown, nextModels };
   });
 
   report.passed = true;

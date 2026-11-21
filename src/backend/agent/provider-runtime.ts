@@ -287,6 +287,7 @@ export interface ProviderHooks {
   releasePersonWaits?(provider: AgentProvider): void;
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
+  onAccountSignedIn?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   onAccountsChanged?(): void;
   onProvidersUnready?(): void;
   captureConfigRevision(): number;
@@ -567,6 +568,7 @@ export class ProviderRuntime implements ProviderPort {
               Effect.forkIn(this.#scope),
               Effect.asVoid,
             ),
+          signedIn: (provider, accountId) => this.#hooks.onAccountSignedIn?.(provider, accountId) ?? Effect.void,
           usageChanged: (limit) => this.#emit({ type: "usage-changed", usage: { limits: [structuredClone(limit)] } }),
           redact: (text) => this.#redactMcp(redactText(text)),
         })
