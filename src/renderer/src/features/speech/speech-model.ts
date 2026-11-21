@@ -8,16 +8,19 @@ const [status, setStatus] = createSignal<SpeechModelStatus | null>(null, {
 });
 let following = false;
 
+export function followSpeechModel(): void {
+  if (following) return;
+  following = true;
+  const voice = speechPort().voice;
+  voice.onSpeechModelStatus((next) => setStatus(next));
+  void voice.getSpeechModelStatus().then(
+    (next) => setStatus((current) => current ?? next),
+    () => undefined,
+  );
+}
+
 function speechModelStatus(): SpeechModelStatus | null {
-  if (!following) {
-    following = true;
-    const voice = speechPort().voice;
-    voice.onSpeechModelStatus((next) => setStatus(next));
-    void voice.getSpeechModelStatus().then(
-      (next) => setStatus((current) => current ?? next),
-      () => undefined,
-    );
-  }
+  followSpeechModel();
   return status();
 }
 

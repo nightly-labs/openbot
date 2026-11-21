@@ -9,7 +9,7 @@ import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { desktopAnalytics } from "../../analytics";
-import { speechModelFindsLanguage } from "./speech-model";
+import { followSpeechModel, speechModelFindsLanguage } from "./speech-model";
 import {
   loadRecording,
   pauseSpeech,
@@ -118,6 +118,7 @@ export function noteDictatedMessage(
     always: options?.always ?? false,
     progressUpdate: options?.progressUpdate,
   });
+  followSpeechModel();
   void warmSpeech(options?.always ?? false);
 }
 
