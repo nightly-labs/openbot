@@ -50,6 +50,114 @@
   white-space: nowrap;
 }
 
+.sidebar-mobile-app-crew {
+  position: relative;
+  gap: var(--openbot-space-1);
+  overflow: hidden;
+  border-color: transparent;
+  background:
+    radial-gradient(110% 80% at 50% 0%, color-mix(in srgb, var(--openbot-paper) 40%, transparent), transparent 70%),
+    var(--openbot-logo-production);
+  padding-top: 0;
+  color: var(--openbot-logo-eye);
+  text-align: center;
+}
+
+.sidebar-mobile-app-crew > .sidebar-mobile-app-dismiss {
+  position: absolute;
+  z-index: 2;
+  top: var(--openbot-space-1-5);
+  right: var(--openbot-space-1-5);
+  margin: 0;
+  color: color-mix(in srgb, var(--openbot-logo-eye) 60%, transparent);
+}
+
+.sidebar-mobile-app-crew > .sidebar-mobile-app-dismiss:hover {
+  background: color-mix(in srgb, var(--openbot-logo-eye) 10%, transparent);
+  color: var(--openbot-logo-eye);
+}
+
+.sidebar-mobile-app-crew-stage {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100px;
+  margin: 0 calc(var(--openbot-space-3) * -1) var(--openbot-space-2);
+  pointer-events: none;
+}
+
+.sidebar-mobile-app-crew-member {
+  position: relative;
+  z-index: 0;
+  margin-inline: -7px;
+  animation: sidebar-mobile-app-crew-peek 3.6s ease-in-out infinite;
+  animation-delay: calc(var(--sidebar-crew-index) * -0.45s);
+}
+
+.sidebar-mobile-app-crew-member[data-lead] {
+  z-index: 1;
+}
+
+.sidebar-mobile-app-crew-member > .sidebar-mobile-app-crew-avatar {
+  width: 56px;
+  height: 56px;
+}
+
+.sidebar-mobile-app-crew-member[data-lead] > .sidebar-mobile-app-crew-avatar {
+  width: 72px;
+  height: 72px;
+}
+
+.sidebar-mobile-app-crew-title {
+  margin-bottom: var(--openbot-space-2);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-lg);
+  text-wrap: balance;
+}
+
+.sidebar-mobile-app-platforms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--openbot-space-2);
+}
+
+.sidebar-mobile-app-platforms > .ui-button {
+  min-width: 0;
+  height: 36px;
+  gap: var(--openbot-space-1-5);
+  border-color: var(--openbot-logo-eye);
+  background: var(--openbot-logo-eye);
+  color: var(--openbot-logo-production);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.sidebar-mobile-app-platforms > .ui-button:hover {
+  background: color-mix(in srgb, var(--openbot-logo-eye) 86%, var(--openbot-logo-production));
+}
+
+.sidebar-mobile-app-platform-logo {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes sidebar-mobile-app-crew-peek {
+  0%,
+  100% {
+    transform: translateY(6px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-mobile-app-crew-member {
+    animation: none;
+  }
+}
+
 .sidebar-community-actions {
   display: flex;
   gap: var(--openbot-space-1-5);

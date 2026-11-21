@@ -19,11 +19,17 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
-import { MobileConnectAddPhoneDialog, MobileConnectLinkDialog } from "./MobileConnectDialogs";
+import {
+  MobileConnectAddPhoneDialog,
+  MobileConnectLinkDialog,
+  type MobileInstallRequest,
+} from "./MobileConnectDialogs";
 import { RemoteNetworkRouteChoice } from "./RemoteNetworkRouteChoice";
 import type { SettingsMobileConnectStore } from "./stores/mobile-connect-store";
+
+export type { MobileInstallRequest };
 
 interface SettingsMobileConnectTabProps {
   store: SettingsMobileConnectStore;
@@ -32,6 +38,7 @@ interface SettingsMobileConnectTabProps {
   canManageLink: boolean;
   canRevokeDevice: boolean;
   canSetRoute: boolean;
+  installRequest?: MobileInstallRequest | null;
 }
 
 const IOS_PLATFORM_LABEL = "iOS";
@@ -41,6 +48,15 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
   const { t } = useText();
   const [adding, setAdding] = createSignal(false);
   const [linkOpen, setLinkOpen] = createSignal(false);
+  let handledInstallNonce = 0;
+  createEffect(
+    () => (props.canCreateTicket ? props.installRequest : null),
+    (request) => {
+      if (!request || request.nonce === handledInstallNonce) return;
+      handledInstallNonce = request.nonce;
+      setAdding(true);
+    },
+  );
   const devices = () => props.store.state.devices.devices;
   const addButton = () => (
     <Button
@@ -116,6 +132,7 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
         open={adding()}
         store={props.store}
         canCancelTicket={props.canCancelTicket}
+        installRequest={props.canCreateTicket ? props.installRequest : null}
         onClose={() => setAdding(false)}
       />
       <Show when={props.canManageLink}>

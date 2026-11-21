@@ -40,6 +40,7 @@ import {
   SettingsNavGroupLabel,
   type SettingsPagePlacement,
 } from "@openbot/ui/features/settings/SettingsDialogShell";
+import type { MobileInstallRequest } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -112,6 +113,7 @@ export interface SettingsModalProps {
   liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   onConnectCodex?: (() => void) | undefined;
   hostedServerDeleteRequest?: { serverId: string; nonce: number } | null;
+  mobileInstallRequest?: MobileInstallRequest | null;
   onTestNotification?: () => void | Promise<void>;
   onOpenNotificationSettings?: () => void | Promise<void>;
   restoreFocusTarget?: HTMLElement | null;
@@ -423,6 +425,7 @@ export function SettingsModal(props: SettingsModalProps) {
             canManageLink={Boolean(props.onCreateMobileConnectLink && props.onRevokeMobileConnectLink)}
             canRevokeDevice={Boolean(props.onRevokeMobileConnectedDevice)}
             canSetRoute={Boolean(props.onSetRemoteNetworkRoute)}
+            installRequest={props.open ? props.mobileInstallRequest : null}
           />
         </Tabs.Content>
 

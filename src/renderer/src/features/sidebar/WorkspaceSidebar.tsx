@@ -67,7 +67,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   );
   const { openServerSettings, serverSettingsOpen } = useServerSettings();
   const serverActions = useServerActions();
-  const { openAppSettings, setSkillsMarketplaceOpen } = useSettings();
+  const { openMobileInstall, setSkillsMarketplaceOpen } = useSettings();
   const {
     agentList,
     agentListConnecting,
@@ -311,7 +311,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             />
             <Show when={!platform.landingPreview && !alertCards.shown() && !mobileAppDismissed()}>
               <SidebarMobileAppCard
-                onOpenInstall={() => openAppSettings(null, "mobile-connect")}
+                agents={agentList()}
+                onInstall={(platform) => openMobileInstall(platform)}
                 onDismiss={() => {
                   window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
                   setMobileAppDismissed(true);

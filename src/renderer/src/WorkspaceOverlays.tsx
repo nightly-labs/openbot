@@ -1021,6 +1021,7 @@ function AppSettings(props: AccountProps) {
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
+    mobileInstallRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -1097,6 +1098,7 @@ function AppSettings(props: AccountProps) {
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
+        mobileInstallRequest={mobileInstallRequest()}
       />
     </Loading>
   );
