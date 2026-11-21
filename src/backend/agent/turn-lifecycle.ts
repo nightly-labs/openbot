@@ -255,6 +255,7 @@ export interface TurnHooks {
   emitToolUsage(usage: ToolUsageSignal): void;
   turnModel(agentId: string, turnId: string): string | null;
   mayFailOver(agentId: string): boolean;
+  backupReadyAt(agentId: string): number | null;
   poolHasOtherAccount(agentId: string): boolean;
   mayContinueOnBackup(agentId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
@@ -1540,6 +1541,17 @@ export class TurnLifecycle {
             this.#safetyBlockedTurns.add(errorTurnId);
             return;
           }
+        }
+        if (
+          notification.method === "error" &&
+          causeCode === "rate_limit" &&
+          agentId &&
+          errorTurnId !== null &&
+          this.#runningTurns.has(errorTurnId) &&
+          !this.#limitedTurns.has(errorTurnId)
+        ) {
+          const backupReadyAt = this.#hooks.backupReadyAt(agentId);
+          if (backupReadyAt !== null) this.#limitedTurns.set(errorTurnId, backupReadyAt);
         }
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
