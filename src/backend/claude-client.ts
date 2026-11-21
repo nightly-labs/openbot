@@ -105,6 +105,7 @@ import {
 import { runCauseEffect } from "./effect-boundary";
 import { skillFolderNames } from "./home-skills";
 import { IdleThreadPool } from "./idle-thread-pool";
+import { MCP_STDIO_PROBE_TIMEOUT_MS } from "./mcp-probe";
 import {
   agentMcpServers,
   type ClaudeMcpServer,
@@ -1451,6 +1452,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           mcpServers,
           env: {
             ...withClaudeClientLabels(cliEnvironment),
+            ...(handoff ? claudeMcpStartupEnvironment(cliEnvironment) : {}),
             ...(resume && cliEnvironment.MCP_CONNECTION_NONBLOCKING === undefined
               ? { MCP_CONNECTION_NONBLOCKING: "0" }
               : {}),
@@ -3017,6 +3019,11 @@ function spawnClaudeProcessGroup(
   child.once("error", release);
   if (signal.aborted) abort();
   return child;
+}
+
+function claudeMcpStartupEnvironment(env: NodeJS.ProcessEnv): Record<string, string> {
+  if (env.MCP_TIMEOUT?.trim()) return {};
+  return { MCP_TIMEOUT: String(MCP_STDIO_PROBE_TIMEOUT_MS) };
 }
 
 function claudeEnvironment(cli: ClaudeCliInfo): NodeJS.ProcessEnv {
