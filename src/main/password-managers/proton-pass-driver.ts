@@ -312,6 +312,7 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
   #executable: string | null = null;
   #signedIn = false;
   #index: { readAt: number; logins: Map<string, IndexedLogin> } | null = null;
+  #missedOriginReadAt = Number.NEGATIVE_INFINITY;
   #error: string | null = null;
   #errorCode: PasswordManagerErrorCode | null = null;
 
@@ -461,8 +462,14 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
         Effect.mapError(({ cause }) => new PasswordVaultError({ cause })),
       );
     const found = yield* matching(INDEX_MS);
-    if (found.length > 0) return found;
-    return yield* matching(MISSED_ORIGIN_INDEX_MS).pipe(Effect.orElseSucceed(() => found));
+    if (found.length > 0 || this.#now() - this.#missedOriginReadAt < MISSED_ORIGIN_INDEX_MS) return found;
+    this.#missedOriginReadAt = this.#now();
+    return yield* matching(MISSED_ORIGIN_INDEX_MS).pipe(
+      Effect.tapError(({ cause }) =>
+        Effect.sync(() => logger.warn("The Proton Pass logins could not be read again.", { cause: toLogValue(cause) })),
+      ),
+      Effect.orElseSucceed(() => found),
+    );
   }).bind(this);
 
   readonly secretFor = Effect.fn("ProtonPass.secretFor")(function* (
