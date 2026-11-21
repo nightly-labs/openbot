@@ -1,4 +1,5 @@
 import { isString } from "@openbot/contracts/runtime-values";
+import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import {
   decodeLiveVoiceAccount,
   LIVE_VOICE_ACCOUNT_CAPABILITY,
@@ -67,6 +68,17 @@ export function requireRoomForAccount(
   if (!accounts || accountId !== null || capabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY)) return;
   const held = accounts.list().providers.find((row) => row.provider === provider)?.accounts.length ?? 0;
   requireProviderAccountsFit(capabilities, held + 1);
+}
+
+export function requireRoomForKeyAccount(
+  capabilities: ReadonlySet<string>,
+  accounts: ProviderAccountList | undefined,
+  provider: string,
+): void {
+  if (provider !== "claude" || !accounts) return;
+  const listed = accounts.list().providers.find((row) => row.provider === provider)?.accounts ?? [];
+  if (listed.some((account) => account.id === CLAUDE_API_KEY_ACCOUNT_ID)) return;
+  requireRoomForAccount(capabilities, accounts, provider, null);
 }
 
 export async function routeProviderAccounts(

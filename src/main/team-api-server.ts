@@ -1287,7 +1287,7 @@ export class TeamApiServer {
       if ((await routeAgentPublish(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAcpRegistry(context, this.#options.admin)) === "handled") return;
       if ((await routeCustomAgents(context, this.#options.admin)) === "handled") return;
-      if ((await routeProviders(context, this.#options.admin)) === "handled") return;
+      if ((await routeProviders(context, this.#options.admin, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUse(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAppearance(context, this.#options.admin)) === "handled") return;

@@ -1718,9 +1718,9 @@ keep their frozen shapes.
 | Peer | Rule |
 | --- | --- |
 | Client with the capability | Reads and sends lists of up to 20 accounts of one provider. Settings allows 20 accounts. |
-| Client without it | Works while each provider has 10 accounts or fewer. When a list would hold more, or a sign-in, a code sign-in, a key or a relay sign-in would add the 11th account, the host refuses it with 409 `error.team.providerAccountListNeedsUpdate` before it changes anything (`requireProviderAccountsFit` in [`route-provider-accounts.ts`](../../src/main/team-api/route-provider-accounts.ts)). |
+| Client without it | Works while each provider has 10 accounts or fewer. When a list would hold more, or a sign-in, a code sign-in, a key, a saved Claude API key or a relay sign-in would add the 11th account, the host refuses it with 409 `error.team.providerAccountListNeedsUpdate` before it changes anything (`requireProviderAccountsFit` in [`route-provider-accounts.ts`](../../src/main/team-api/route-provider-accounts.ts)). |
 | Current client, host without it | Settings allows 10 accounts, and the host keeps its own limit of 10. |
-| Older app on the same computer | Keeps an account file with more than 10 accounts; its store reads the `accounts` list without a limit and adds no more. If a pool leaves out more than 10 accounts, that store opens the file read-only and does not change or delete it. |
+| Older app on the same computer | Does not delete or change an account file with more than 10 accounts: its store reads the `accounts` list without a limit, and opens the file read-only if a pool leaves out more than 10 accounts. But its preload decoder refuses an agent status with more than 10 accounts of one provider ("Invalid agent status response."), so that app cannot show agent status until it is updated again. |
 
 Run `bun run test:provider-many-accounts` to check the limits through the Team API and the account store.
 

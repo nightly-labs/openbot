@@ -7,6 +7,7 @@ import { DEFAULT_PROVIDER_ACCOUNT_ID, MAX_PROVIDER_ACCOUNTS } from "@openbot/con
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_APP_VERSION_HEADER, TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol";
+import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { teamCapabilitiesForProtocol, teamCapabilityHeaders } from "@openbot/contracts/team-protocol/current";
 import { PROVIDER_ACCOUNT_CODE_ROUTES } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
@@ -19,6 +20,7 @@ import {
   PROVIDER_MANY_ACCOUNTS_LIMIT,
 } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_USAGE_RESET_ROUTES } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
@@ -34,6 +36,7 @@ import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
 import type {
+  TeamApiAdmin,
   TeamApiBrowser,
   TeamApiProviderAccounts,
   TeamApiProviderUsageResets,
@@ -44,6 +47,7 @@ const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const STEP_DEADLINE_MS = 60_000;
 const PROVIDER = "codex";
+const KEY_PROVIDER = "claude";
 
 plugin({
   name: "provider-many-accounts-electron-boundary",
@@ -177,8 +181,18 @@ interface Host {
 
 let host: Host | null = null;
 
-function accountIds(store: ProviderAccountStore): string[] {
-  return [DEFAULT_PROVIDER_ACCOUNT_ID, ...store.list(PROVIDER).map((account) => account.id)];
+function accountIds(store: ProviderAccountStore, provider: typeof PROVIDER | typeof KEY_PROVIDER = PROVIDER): string[] {
+  return [DEFAULT_PROVIDER_ACCOUNT_ID, ...store.list(provider).map((account) => account.id)];
+}
+
+function accountRows(store: ProviderAccountStore, provider: typeof PROVIDER | typeof KEY_PROVIDER) {
+  return accountIds(store, provider).map((id) => ({
+    id,
+    label: null,
+    email: null,
+    state: "connected" as const,
+    message: null,
+  }));
 }
 
 function accountLimitFailure() {
@@ -194,16 +208,8 @@ function providerAccounts(store: ProviderAccountStore): TeamApiProviderAccounts 
   return {
     list: () => ({
       providers: [
-        {
-          provider: PROVIDER,
-          accounts: accountIds(store).map((id) => ({
-            id,
-            label: null,
-            email: null,
-            state: "connected" as const,
-            message: null,
-          })),
-        },
+        { provider: PROVIDER, accounts: accountRows(store, PROVIDER) },
+        { provider: KEY_PROVIDER, accounts: accountRows(store, KEY_PROVIDER) },
       ],
       agents: [],
     }),
@@ -263,6 +269,41 @@ function providerUsageResets(store: ProviderAccountStore): TeamApiProviderUsageR
   };
 }
 
+function providersAdmin(store: ProviderAccountStore, agents: AgentService): TeamApiAdmin {
+  return {
+    providers: {
+      service: {
+        startProviderCodeLogin: unused,
+        submitProviderCodeLogin: notUsed,
+        cancelProviderCodeLogin: unused,
+        changeProviderCredential: (provider, change) =>
+          change().pipe(
+            Effect.andThen(
+              provider === KEY_PROVIDER
+                ? store.ensure(provider, CLAUDE_API_KEY_ACCOUNT_ID).pipe(Effect.orDie)
+                : Effect.void,
+            ),
+            Effect.map(() => agents.getStatus()),
+          ),
+        clearProviderCredential: unused,
+        signInCodexWithApiKey: unused,
+        getStatus: () => agents.getStatus(),
+        setProviderOn: unused,
+      },
+      credentials: { status: () => "missing", set: () => Effect.void, clear: unused },
+      runtimes: {
+        getStatus: notUsed,
+        download: unused,
+        cancel: unused,
+        checkForUpdates: unused,
+        startKeyProviderCli: () => Effect.succeed(false),
+      },
+      customProviders: { list: notUsed, save: unused, peerUpdate: unused, peerHarnessUpdate: unused, remove: unused },
+      pasteSignIn: false,
+    },
+  };
+}
+
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -289,6 +330,7 @@ async function startHost(): Promise<Host> {
     appVersion: HOST_VERSION,
     providerAccounts: providerAccounts(accountStore),
     providerUsageResets: providerUsageResets(accountStore),
+    admin: providersAdmin(accountStore, agents),
   });
   const port = await Effect.runPromise(server.start());
   return { database, agents, accountStore, server, port };
@@ -437,6 +479,23 @@ try {
     for (const [label, reply] of Object.entries(tries)) needsUpdate(reply, label);
     assert.equal(heldAccounts(), PROVIDER_FROZEN_ACCOUNTS_LIMIT, "A refused add was stored.");
     return Object.fromEntries(Object.entries(tries).map(([label, reply]) => [label, reply.status]));
+  });
+
+  await step("the host refuses a released client a saved Claude key that would add the 11th account", async () => {
+    const store = current().accountStore;
+    while (accountIds(store, KEY_PROVIDER).length < PROVIDER_FROZEN_ACCOUNTS_LIMIT)
+      await runCauseEffect(store.create(KEY_PROVIDER));
+    const body = { provider: KEY_PROVIDER, key: "e2e-claude-key" };
+    const refused = await call(PROVIDERS_ADMIN_ROUTES.apiKeySet, { token, released: true, body });
+    needsUpdate(refused, "apiKeySet");
+    assert.equal(store.get(KEY_PROVIDER, CLAUDE_API_KEY_ACCOUNT_ID), null, "A refused key added an account.");
+    const saved = await call(PROVIDERS_ADMIN_ROUTES.apiKeySet, { token, body });
+    assert.equal(saved.status, 200, `apiKeySet returned ${saved.status}: ${JSON.stringify(saved.body)}`);
+    const held = accountIds(store, KEY_PROVIDER);
+    assert.equal(held.includes(CLAUDE_API_KEY_ACCOUNT_ID), true, "The saved key has no account.");
+    const again = await call(PROVIDERS_ADMIN_ROUTES.apiKeySet, { token, body });
+    assert.equal(again.status, 200, "A current client could not replace the saved key.");
+    return { refused: refused.status, saved: saved.status, claudeAccounts: held.length };
   });
 
   await step("a current client adds accounts up to 20 and reads all of them", async () => {
