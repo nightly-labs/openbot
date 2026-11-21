@@ -103,7 +103,7 @@ export const messages = {
   "composer.voice.recording": "Registrazione vocale",
   "composer.voice.limitSoon": "La registrazione si ferma tra {seconds} secondi.",
   "composer.voice.limitReached":
-    "La registrazione si è fermata al limite di 2 minuti. Quello che hai detto è nel messaggio.",
+    "La registrazione si è fermata al limite di 10 minuti. Quello che hai detto è nel messaggio.",
   "composer.send.saveQueued": "Salva messaggio in coda",
   "composer.send.voice": "Invia messaggio vocale",
   "composer.send.message": "Invia messaggio",

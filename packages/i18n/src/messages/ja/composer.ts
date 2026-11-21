@@ -103,7 +103,7 @@ export const messages = {
   "composer.voice.progress": "音声モデルをダウンロード中 {progress}%",
   "composer.voice.recording": "音声の録音",
   "composer.voice.limitSoon": "あと {seconds} 秒で録音が止まります。",
-  "composer.voice.limitReached": "2 分の上限に達したため録音を停止しました。話した内容はメッセージに入っています。",
+  "composer.voice.limitReached": "10 分の上限に達したため録音を停止しました。話した内容はメッセージに入っています。",
   "composer.send.saveQueued": "キューのメッセージを保存",
   "composer.send.voice": "音声メッセージを送信",
   "composer.send.message": "メッセージを送信",
