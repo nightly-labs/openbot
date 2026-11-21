@@ -944,6 +944,14 @@ export class TurnLifecycle {
       });
       return false;
     }
+    if (deliveries.every((context) => context.restartedResult && answeredRequestId(context.delivery) !== null)) {
+      logger.info("A turn for a teammate result that a restart gave again ended quietly.", {
+        agentId,
+        turnId,
+        provider: source.provider,
+      });
+      return false;
+    }
     if (running.acted) {
       this.#noteNoAnswerAfterSteps(
         agentId,

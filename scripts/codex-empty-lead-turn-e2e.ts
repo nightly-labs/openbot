@@ -127,8 +127,8 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode === "empty-always" || mode === "repeat-new" || (mode === "repeat" && run > 1) || mode === "thread-empty-always" || mode === "chat-empty-always" || mode === "channel-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once" || mode === "channel-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
-    return { kind: "result", mode, calls: [], empty, reply: "Team done." };
+    const empty = mode === "empty-always" || mode === "repeat-new" || (mode === "repeat" && run > 1) || mode === "thread-empty-always" || mode === "chat-empty-always" || mode === "channel-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once" || mode === "channel-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY) || (mode === "restart-replay" && run > 1);
+    return { kind: "result", mode, calls: [], empty, crash: mode === "restart-replay" && run === 1, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
   if (named) return { kind: "calls", calls: JSON.parse(named[1]), empty: false, reply: "Asked." };
@@ -163,6 +163,7 @@ const answer = (message) => {
       appendFileSync(LOG, JSON.stringify({ turnId, model: params.model, kind: turn.kind, mode: turn.mode ?? null, empty: turn.empty }) + "\\n");
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
+      if (turn.crash) return setTimeout(() => process.exit(1), 50);
       return callNext(turn);
     }
     case "turn/interrupt": {
@@ -821,6 +822,24 @@ try {
     assert.equal(outcome.turns.length, 2, `The task runs again only once: ${JSON.stringify(outcome)}`);
     assert.equal(outcome.state, "failed");
     assert.equal(outcome.error, CHANNEL_NO_ANSWER);
+    return outcome;
+  });
+
+  await check("an empty turn for a teammate result that a restart gave again ends quietly", async () => {
+    const outcome = await askTeam(lead.id, [alpha.id], "restart-replay");
+    assert.deepEqual(
+      outcome.turns.map((turn) => turn.empty),
+      [false, true],
+      `The result runs again once after the restart and not after its empty turn: ${JSON.stringify(outcome)}`,
+    );
+    assert.deepEqual(
+      outcome.results.map((result) => result.status),
+      ["completed"],
+    );
+    assert.ok(
+      !outcome.errors.includes(NO_ANSWER),
+      `No error shows for the replayed result: ${JSON.stringify(outcome)}`,
+    );
     return outcome;
   });
 
