@@ -324,6 +324,7 @@ function AgentTaskChat({
     activePrompt?.kind === "question" ? activePrompt : undefined,
     online,
     respond,
+    (text) => setDraft((current) => (current.trim() ? `${current.trimEnd()}\n${text}` : text)),
   );
   const answersQuestion = Boolean(questionForm.question && !questionForm.question.isSecret && questionForm.replyInChat);
   const threadId = conversation.data?.threadId ?? null;

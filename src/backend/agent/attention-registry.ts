@@ -110,6 +110,7 @@ import {
   declinedMcpElicitationText,
   detachedPromptResult,
   dynamicPromptResult,
+  editedPreviewQuestions,
   expiredPromptResult,
   lateAnswerText,
   MCP_TOOL_CONSENT_ALLOW_ONCE,
@@ -778,7 +779,7 @@ export class AttentionRegistry {
         ? ""
         : pending.uiBlock?.vault
           ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
-          : lateAnswerText(pending.questions, answers);
+          : lateAnswerText(editedPreviewQuestions(pending.questions, pending.uiBlock?.spec, preview), answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();

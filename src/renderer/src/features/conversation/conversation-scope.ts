@@ -41,6 +41,7 @@ import { codexLiveAccess } from "../speech/codex-live-access";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import { createChangeMarkerActions } from "./change-marker-actions";
 import type { ChatSearchMatch } from "./chat-search";
+import { appendDraftText, EMPTY_DRAFT } from "./composer-draft";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey, promptRequestKey } from "./conversation-keys";
 import { conversationPort } from "./conversation-port";
@@ -1009,17 +1010,39 @@ export function createConversationViewScope(props: ConversationProps) {
     return () => setPromptComposerAnswer((current) => (current === answer ? undefined : current));
   };
   const openPromptKey = () => promptRequestKey(props.prompt?.turnId, props.prompt?.requestId);
+  const openChatKey = () => {
+    const open = props.threads?.open;
+    return JSON.stringify([
+      agentConversationKey(props.server?.id ?? "local", conversationOwnerId(props) ?? ""),
+      open === undefined ? null : (open?.id ?? ""),
+    ]);
+  };
   const composerHasText = () => Boolean(currentDraft().text.trim() || voiceLiveText().trim());
   const [draftHeldPromptKey, setDraftHeldPromptKey] = createSignal<string | null>(null);
+  let unsentPromptAnswer: { chat: string; key: string; text: string } | undefined;
+  const keepUnsentPromptAnswer = (text: string | undefined) => {
+    const key = openPromptKey();
+    unsentPromptAnswer = text === undefined || key === null ? undefined : { chat: openChatKey(), key, text };
+  };
+  createEffect(
+    () => ({ chat: openChatKey(), key: openPromptKey() }),
+    ({ chat, key }) => {
+      const unsent = unsentPromptAnswer;
+      const target = currentConversationTarget(props);
+      if (!unsent || unsent.chat !== chat || unsent.key === key || !target) return;
+      unsentPromptAnswer = undefined;
+      const draftKey = composerDraftKey(target);
+      setDrafts((current) => ({
+        ...current,
+        [draftKey]: appendDraftText(current[draftKey] ?? EMPTY_DRAFT, unsent.text),
+      }));
+    },
+  );
   let lastOpenPrompt: { chat: string; key: string | null } | undefined;
   createEffect(
     () => {
-      const open = props.threads?.open;
       return {
-        chat: JSON.stringify([
-          agentConversationKey(props.server?.id ?? "local", conversationOwnerId(props) ?? ""),
-          open === undefined ? null : (open?.id ?? ""),
-        ]),
+        chat: openChatKey(),
         key: openPromptKey(),
         hasText: untrack(composerHasText),
       };
@@ -2565,6 +2588,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setOpenReactionMessageId,
     setRequiredInteractionElement,
     registerPromptComposerAnswer,
+    keepUnsentPromptAnswer,
     handleRoutineSettingsRequest,
     setShowComposerActions,
     settingsModel,
