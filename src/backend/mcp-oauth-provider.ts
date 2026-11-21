@@ -199,7 +199,7 @@ export class McpOAuth implements McpOAuthAuthority {
   readonly #exchanges = new Map<string, Deferred.Deferred<boolean>>();
   readonly #attempts = new Map<string, () => void>();
   readonly #pages = new Map<string, McpOAuthClientProvider>();
-  readonly #unanswered = new Map<string, string>();
+  readonly #unanswered = new Map<string, { url: string; openedElsewhere: boolean }>();
   readonly #scope = Scope.makeUnsafe();
   readonly #refreshing = new Map<string, Fiber.Fiber<McpRefreshOutcome>>();
   readonly #generations = new Map<string, number>();
@@ -302,8 +302,9 @@ export class McpOAuth implements McpOAuthAuthority {
     const key = mcpOAuthAccountKey(url);
     if (!key) return null;
     this.#attempts.get(key)?.();
-    const unanswered = this.#unanswered.get(key);
+    const previous = this.#unanswered.get(key);
     this.#unanswered.delete(key);
+    const unanswered = previous?.openedElsewhere === (open !== undefined) ? previous.url : undefined;
     const state = randomUUID();
     const grant = Deferred.makeUnsafe<string, Error>();
     let refused = false;
@@ -324,7 +325,8 @@ export class McpOAuth implements McpOAuthAuthority {
     const provider = this.#provider(key, state, () => abandoned, open, unanswered, deepLinkRedirectUrl);
     const abandon = () => {
       const unansweredNow = provider.openedRedirectUrl ?? unanswered;
-      if (!abandoned && this.#waiting.has(state) && unansweredNow) this.#unanswered.set(key, unansweredNow);
+      if (!abandoned && this.#waiting.has(state) && unansweredNow)
+        this.#unanswered.set(key, { url: unansweredNow, openedElsewhere: open !== undefined });
       abandoned = true;
       this.#waiting.delete(state);
       this.#openedElsewhere.delete(state);
@@ -644,6 +646,9 @@ export class McpOAuth implements McpOAuthAuthority {
       state,
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
+      firstRedirectUrl: open
+        ? this.#options.redirectUrl
+        : (callbackRedirectUrl(this.#options.redirectUrl) ?? this.#options.redirectUrl),
       deepLinkRedirectUrl: open ? () => openedDeepLinkRedirectUrl : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
@@ -660,6 +665,7 @@ interface ClientProviderOptions {
   state: string | null;
   storage: McpOAuthStorage;
   redirectUrl: string;
+  firstRedirectUrl: string;
   deepLinkRedirectUrl?: (() => string | undefined) | undefined;
   openExternal: (url: string) => Promise<void>;
   isAbandoned: () => boolean;
@@ -686,8 +692,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     this.#options = options;
     this.#localhostRedirectUrl = localhostRedirectUrl(options.redirectUrl);
     const { unansweredRedirectUrl: unanswered } = options;
+    const localhostNames = [this.#localhostRedirectUrl, localhostRedirectUrl(options.firstRedirectUrl)];
     this.#deepLinkRedirectUrl =
-      unanswered === this.#localhostRedirectUrl ? (options.deepLinkRedirectUrl?.() ?? null) : null;
+      unanswered && localhostNames.includes(unanswered) ? (options.deepLinkRedirectUrl?.() ?? null) : null;
     this.#retryRedirectUrl = this.#deepLinkRedirectUrl ?? this.#otherRedirectName(unanswered);
   }
 
@@ -698,10 +705,25 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #openedUrl: string | null = null;
 
   #otherRedirectName(redirectUrl: string | null | undefined): string | null {
+    for (const address of new Set([this.#options.firstRedirectUrl, this.#options.redirectUrl])) {
+      const localhost = localhostRedirectUrl(address);
+      if (!localhost) continue;
+      if (redirectUrl === address) return localhost;
+      if (redirectUrl === localhost) return address;
+    }
+    return null;
+  }
+
+  #otherRedirectPath(redirectUrl: string | undefined): string | null {
+    const own = this.#options.redirectUrl;
     const localhost = this.#localhostRedirectUrl;
-    if (!localhost) return null;
-    if (redirectUrl === this.#options.redirectUrl) return localhost;
-    return redirectUrl === localhost ? this.#options.redirectUrl : null;
+    if (redirectUrl === own || redirectUrl === localhost) return callbackRedirectUrl(redirectUrl);
+    const first = this.#options.firstRedirectUrl;
+    if (first === own || !redirectUrl || (redirectUrl !== first && redirectUrl !== localhostRedirectUrl(first)))
+      return null;
+    const url = new URL(redirectUrl);
+    url.pathname = new URL(own).pathname;
+    return url.href;
   }
 
   get redirectUrl(): string {
@@ -732,7 +754,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       client_name: MCP_CLIENT_NAME,
       client_uri: "https://openbot.run",
       logo_uri: "https://openbot.run/icon-512x512.png",
-      redirect_uris: [this.#retryRedirectUrl ?? this.#options.redirectUrl],
+      redirect_uris: [this.#retryRedirectUrl ?? this.#options.firstRedirectUrl],
       application_type: "native",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -789,12 +811,26 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const retry = this.#retryRedirectUrl;
     if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !registersAddress(client.redirect_uris, retry))
       return this.#register();
+    const openedElsewhere = this.#options.firstRedirectUrl === this.#options.redirectUrl;
+    const neverSignedIn = !record.tokens && record.lostAt === undefined;
+    const checksFirstAddress = !retry && client.client_id !== MCP_CLIENT_METADATA_URL;
+    if (checksFirstAddress && (openedElsewhere || neverSignedIn) && !this.#registersFirstAddress(client))
+      return this.#register();
     const scopeAllowed =
       !client.scope ||
       !discovery?.resourceMetadata?.scopes_supported?.length ||
       !scopeWithOfflineAccess(client.scope, discovery.authorizationServerMetadata);
     if (registersAddress(client.redirect_uris, this.redirectUrl) && scopeAllowed) return client;
     return this.#register();
+  }
+
+  #registersFirstAddress(client: OAuthClientInformationFull): boolean {
+    const first = this.#options.firstRedirectUrl;
+    const localhost = localhostRedirectUrl(first);
+    return (
+      registersAddress(client.redirect_uris, first) ||
+      (localhost !== null && registersAddress(client.redirect_uris, localhost))
+    );
   }
 
   get openedRedirectUrl(): string | null {
@@ -845,8 +881,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         if (!(await refusesRedirectAddress(response))) break;
         response = await fetch(input, retry);
       }
-      const callback = response.status === 401 || response.status === 403 ? this.#withCallbackPath(request) : null;
-      const retried = callback ? await fetch(input, callback) : null;
+      const otherPath = response.status === 401 || response.status === 403 ? this.#withOtherPath(request) : null;
+      const retried = otherPath ? await fetch(input, otherPath) : null;
       if (retried?.ok) response = retried;
       this.#registrationStatus = response.status;
       const redirectRefused = (await registrationErrorCode(response)) === "invalid_redirect_uri";
@@ -865,13 +901,12 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     };
   }
 
-  #withCallbackPath(init: RequestInit): RequestInit | null {
+  #withOtherPath(init: RequestInit): RequestInit | null {
     if (typeof init.body !== "string") return null;
     const body = registrationBodySchema.parse(JSON.parse(init.body));
     const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
-    const own = sent === this.#options.redirectUrl || sent === this.#localhostRedirectUrl;
-    const callback = sent && own ? callbackRedirectUrl(sent) : null;
-    return callback ? { ...init, body: JSON.stringify({ ...body, redirect_uris: [callback] }) } : null;
+    const other = this.#otherRedirectPath(sent);
+    return other ? { ...init, body: JSON.stringify({ ...body, redirect_uris: [other] }) } : null;
   }
 
   #documentReplacesRefusal(status: number): boolean {
@@ -889,9 +924,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const body = registrationBodySchema.parse(JSON.parse(init.body));
     const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
     const deepLink = this.#deepLinkRedirectUrl;
-    const other = this.#otherRedirectName(sent);
-    const names = deepLink && sent === deepLink ? [this.#options.redirectUrl, localhost] : other ? [other] : [];
-    return names.map((name) => ({ ...init, body: JSON.stringify({ ...body, redirect_uris: [name] }) }));
+    const first = this.#options.firstRedirectUrl;
+    const firstNames = [first, localhostRedirectUrl(first)];
+    const ownNames = first === this.#options.redirectUrl ? [] : [this.#options.redirectUrl, localhost];
+    const names = deepLink && sent === deepLink ? [...firstNames, ...ownNames] : [this.#otherRedirectName(sent)];
+    if (sent && firstNames.includes(sent)) names.push(...ownNames);
+    return names
+      .filter((name) => name !== null)
+      .map((name) => ({ ...init, body: JSON.stringify({ ...body, redirect_uris: [name] }) }));
   }
 
   #withOfflineAccessRegistration(init: RequestInit): RequestInit {
