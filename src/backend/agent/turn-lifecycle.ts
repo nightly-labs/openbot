@@ -102,7 +102,7 @@ import {
   settleQuietChannelTurn,
   settleQuietRoutineTurn,
   teammateRequest,
-  textAnswersOnly,
+  writesNoAnswer,
 } from "./routine-quiet-runs";
 import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
@@ -3375,7 +3375,7 @@ function answeredRequestTurn(
   return (
     deliveries.length > 0 &&
     deliveries.every(({ delivery }) => teammateRequest(delivery)) &&
-    textAnswersOnly(snapshot, turnId)
+    writesNoAnswer(snapshot, turnId)
   );
 }
 

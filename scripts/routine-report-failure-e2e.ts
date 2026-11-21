@@ -566,14 +566,13 @@ try {
   };
   const textRequest = await requestTurnOf("Check the docs build. TEAMMATE-REQUEST-TEXT");
   pass(
-    "An answered teammate request ends quiet without the no-update tool",
+    "An answered teammate request keeps the agent's text answer in the chat without the no-update tool",
     toolResults(textRequest.turn.turnId, "send_message")[0]?.result?.success === true &&
       toolResults(textRequest.turn.turnId, "routine_no_update").length === 0 &&
       textRequest.event.type === "turn-completed" &&
-      textRequest.event.quiet === true &&
-      textRequest.answers.some((message) => message.text === "The result went to the teammate.") &&
-      textRequest.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
-      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId) === undefined,
+      textRequest.event.quiet !== true &&
+      textRequest.answers.every((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId)?.text === "The result went to the teammate.",
     textRequest,
   );
   const noticeRequest = await requestTurnOf("Check the notice build. TEAMMATE-REQUEST-TEXT NOTICE NO-FINAL");
@@ -605,12 +604,11 @@ try {
   });
   const unansweredDelivery = mailbox.completedDeliveriesOfTurn(checker.id, unanswered.turn.turnId)[0]?.delivery;
   pass(
-    "A teammate request with no reply ends quiet after OpenBot sent its answer to the teammate",
+    "A teammate request with no reply keeps its answer in the chat after OpenBot sent it to the teammate",
     unanswered.event.type === "turn-completed" &&
-      unanswered.event.quiet === true &&
-      unanswered.answers.some((message) => message.text === "All good.") &&
-      unanswered.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
-      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId) === undefined &&
+      unanswered.event.quiet !== true &&
+      unanswered.answers.every((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId)?.text === "All good." &&
       sentResults.length === 1 &&
       sentResults[0]?.text.includes("All good.") === true &&
       unansweredDelivery !== undefined &&

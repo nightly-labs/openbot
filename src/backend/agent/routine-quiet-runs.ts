@@ -145,10 +145,13 @@ export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: s
   return true;
 }
 
-export function textAnswersOnly(snapshot: ConversationSnapshot, turnId: string): boolean {
+export function writesNoAnswer(snapshot: ConversationSnapshot, turnId: string): boolean {
   return snapshot.messages.every(
     (message) =>
-      message.author !== "assistant" || message.turnId !== turnId || isWorkNote(message) || isTextAnswer(message),
+      message.author !== "assistant" ||
+      message.turnId !== turnId ||
+      isWorkNote(message) ||
+      (isTextAnswer(message) && !keptQuietAnswer(message)),
   );
 }
 
