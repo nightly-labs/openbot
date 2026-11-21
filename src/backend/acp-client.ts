@@ -2863,6 +2863,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       provider: this.provider,
     });
     yield* providerCall(() => this.#sessionConnection(thread).closeSession({ sessionId: thread.id })).pipe(
+      this.#backgroundTimeout("session/close"),
       Effect.ignore,
     );
     const reopened = yield* Effect.result(
