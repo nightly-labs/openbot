@@ -192,7 +192,14 @@ quiet, so that text stays and the quality does not change. In the desktop app an
 stall also sets Moonlight's `bitrate` and `fps` to the phone app's Data saver values (3 Mbit/s,
 30 fps) for the streams of that server in the next 24 hours, so Retry shows a picture. The key holds
 the server ID, because one viewer origin shows all joined servers. The phone app keeps the quality
-from its menu. The host serves this script also when it has no clipboard writer, but then without
+from its menu. A Windows host lets Sunshine pick a hardware encoder, and some hardware encoders
+(AMD AMF on some drivers) pass Sunshine's start probe but never send a frame that the viewer can
+decode (#14210). When no frame came before the stall, the script sends `noPicture` with the
+`error` report, and on a Windows host the text says that the next connection uses a different
+video setting. The host then writes the `sunshine-software-encoder` marker in the runtime state
+folder, and the next Sunshine start writes `encoder = software`. When no frame comes with the
+software encoder either, the host removes the marker, because the encoder was not the cause. The
+host serves this script also when it has no clipboard writer, but then without
 the paste part.
 
 The same script also keeps keys from staying down on the host when the viewer runs on a Mac or an

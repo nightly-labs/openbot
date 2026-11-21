@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn as nodeSpawn, type SpawnOptions } from "node:child_process";
 import { createHash, randomBytes, timingSafeEqual, X509Certificate } from "node:crypto";
 import { createSocket } from "node:dgram";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest, type IncomingMessage, type Server } from "node:http";
 import https from "node:https";
 import { createServer as createTcpServer } from "node:net";
@@ -342,6 +342,7 @@ export class SunshineMoonlightRuntime {
   #windowsCaptureDenied = false;
   readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
   #selectedDisplayId: string | null = null;
+  #softwareEncoder = false;
   readonly #lifecycle = new LifecycleGate<SunshineMoonlightRuntimeState, RemoteDesktopOperationError>();
   #stopRequested = false;
   #sunshineBasePort: number | null = null;
@@ -449,6 +450,30 @@ export class SunshineMoonlightRuntime {
     yield* this.#startSunshineOnceEffect();
     if (this.#state) this.#state = { ...this.#state, selectedDisplayId: displayId };
   }).bind(this);
+
+  readonly noPictureReceived = Effect.fn("SunshineMoonlightRuntime.noPictureReceived")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
+    if (this.#options.platform !== "win32") return;
+    const marker = this.#softwareEncoderMarker();
+    if (this.#softwareEncoder) {
+      yield* desktopCall(() => rm(marker, { force: true }));
+      this.#options.onDiagnostic?.(
+        "sunshine",
+        "OpenBot: no picture reached the viewer with the software encoder. The next start uses the default encoder.\n",
+      );
+      return;
+    }
+    yield* desktopCall(() => writeFile(marker, "", { mode: 0o600 }));
+    this.#options.onDiagnostic?.(
+      "sunshine",
+      "OpenBot: no picture reached the viewer with the hardware encoder. The next start uses the software encoder.\n",
+    );
+  }).bind(this);
+
+  #softwareEncoderMarker(): string {
+    return join(this.#options.stateDirectory, "sunshine-software-encoder");
+  }
 
   readonly stop = Effect.fn("SunshineMoonlightRuntime.stop")(() =>
     this.#lifecycle.stop(
@@ -617,6 +642,15 @@ export class SunshineMoonlightRuntime {
     const basePort = this.#sunshineBasePort;
     if (basePort === null) return yield* desktopFailure(new Error("Sunshine ports have not been allocated yet."));
     const directory = windowsShortPath(this.#options.stateDirectory);
+    const marker = this.#softwareEncoderMarker();
+    this.#softwareEncoder =
+      this.#options.platform === "win32" &&
+      (yield* desktopCall(() =>
+        access(marker).then(
+          () => true,
+          () => false,
+        ),
+      ));
     const values = [
       "sunshine_name = OpenBot Remote Desktop",
       `port = ${basePort}`,
@@ -634,6 +668,7 @@ export class SunshineMoonlightRuntime {
       ...(this.#selectedDisplayId ? [`output_name = ${this.#selectedDisplayId}`] : []),
       ...(this.#options.platform === "linux" ? ["capture = x11", "encoder = software"] : []),
       ...(this.#options.platform === "darwin" ? ["system_tray = disabled"] : []),
+      ...(this.#softwareEncoder ? ["encoder = software"] : []),
     ];
     yield* desktopCall(() =>
       Promise.all([

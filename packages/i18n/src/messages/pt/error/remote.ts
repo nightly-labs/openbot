@@ -34,6 +34,8 @@ export const messages = {
     "A conexão com o computador anfitrião está lenta demais para a imagem. Tente novamente: a próxima conexão usará uma qualidade mais baixa.",
   "error.remote.streamTooSlow":
     "A conexão com o computador anfitrião está lenta demais para a imagem. Use uma rede mais rápida e tente novamente.",
+  "error.remote.noPictureSwitchEncoder":
+    "O computador anfitrião não enviou nenhuma imagem. Tente novamente: a próxima conexão usa uma configuração de vídeo que funciona em mais computadores.",
   "error.remote.teamSessionExpired": "A sessão da equipe expirou.",
   "error.remote.finishTestBeforeSwitch": "Conclua o teste de área de trabalho remota antes de trocar de tela.",
   "error.remote.displayNotFound": "Tela remota não encontrada.",
