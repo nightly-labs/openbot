@@ -51,6 +51,10 @@
   --openbot-price-rim-under: rgba(255, 255, 255, 0.1);
 
   --openbot-price-accent: #ec4899;
+  --openbot-credit-basic: #38a8ff;
+  --openbot-credit-plus: #a46cf5;
+  --openbot-credit-max: #ec4899;
+  --openbot-credit-mark: #ffffff;
   --openbot-price-glow: rgba(180, 200, 255, 0.22);
   --openbot-bg-host-inset: #101216;
   --openbot-bg-notch: #000000;

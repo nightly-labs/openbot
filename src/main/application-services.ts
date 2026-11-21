@@ -216,6 +216,8 @@ import {
   liveSession,
   pointerOnDesktop,
 } from "./computer-use-target-window";
+import { createCreditMediaGateway } from "./credit-media-gateway";
+import { CreditsDesktopService } from "./credits-service";
 import { createCrmPreferenceStore, crmSettingsStore } from "./crm-preference-store";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
@@ -730,6 +732,7 @@ export interface ApplicationServices {
   billing: BillingDesktopService;
   referral: ReferralDesktopService;
   license: LicenseDesktopService;
+  credits: CreditsDesktopService;
   hostedServers: HostedServerDesktopService;
   routineFeed: RoutineFeedServer;
   events: HostEventsService;
@@ -1233,6 +1236,7 @@ export async function createApplicationServices({
   const billing = new BillingDesktopService(centralAuth, openLink);
   const referral = new ReferralDesktopService(centralAuth, openLink);
   const license = new LicenseDesktopService(centralAuth, openLink);
+  const credits = new CreditsDesktopService(centralAuth, openLink);
   const hostedServers = new HostedServerDesktopService(
     withHostingDeveloperKey(centralAuth, hostingDeveloperKey),
     openLink,
@@ -2032,6 +2036,11 @@ export async function createApplicationServices({
       hostedServer ? "Hosted server" : serverModeEnvironment || localServerChild ? "Server" : "Desktop app",
     ),
     feedback: feedbackSender(centralAuth),
+    creditMedia: createCreditMediaGateway({
+      auth: centralAuth,
+      hostId: () => teamStore.getIdentity()?.serverId ?? null,
+      serverWallet: Boolean(hostedServer || serverModeEnvironment || localServerChild),
+    }),
     serverClaims: {
       signedIn: () => centralAuth.getState().status === "signed_in",
       create: () => hostedServers.createServerClaim().pipe(toToolOperationFailed),
@@ -4273,6 +4282,7 @@ export async function createApplicationServices({
     billing,
     referral,
     license,
+    credits,
     hostedServers,
     routineFeed,
     events,

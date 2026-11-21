@@ -1,5 +1,6 @@
 import {
   isWorkflowMediaSide,
+  WORKFLOW_CATALOG_SOURCES,
   WORKFLOW_MEDIA_ASPECTS,
   WORKFLOW_MEDIA_CUSTOM_ASPECT,
   WORKFLOW_MEDIA_KINDS,
@@ -22,6 +23,7 @@ import {
   workflowMediaSpecs,
   workflowVideoDurations,
 } from "@openbot/contracts/ipc";
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { AppTextKey } from "@openbot/i18n";
 import { Play, Zap } from "@openbot/ui";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
@@ -301,7 +303,7 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   const durations = () => workflowVideoDurations(model());
   const price = useMediaPrice(() => {
     const chosen = model();
-    if (!chosen?.credits || (chosen.provider !== "sunra" && chosen.provider !== "higgsfield")) return null;
+    if (!chosen?.credits || !isOneOf(WORKFLOW_CATALOG_SOURCES, chosen.provider)) return null;
     const { aspect, duration, resolution, transparent, options } = specs();
     return {
       model: chosen.id,

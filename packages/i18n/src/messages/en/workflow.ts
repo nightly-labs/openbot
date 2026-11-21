@@ -58,7 +58,7 @@ export const messages = defineMessages("workflow", {
   "workflow.node.locked": "Locked",
   "workflow.node.missingInput": "Connect an input to run this step.",
   "workflow.node.run": "Run",
-  "workflow.node.runPriceLabel": "Run for {credits} credits",
+  "workflow.node.runPriceLabel": "Run. Price in credits: {credits}",
   "workflow.node.running": "Running",
   "workflow.node.stop": "Stop",
   "workflow.node.retry": "Retry",

@@ -7,7 +7,7 @@ import {
   type WorkflowMediaModel,
   type WorkflowMediaServiceAccount,
   workflowCatalogMediaModel,
-  workflowCatalogProvider,
+  workflowCatalogSource,
 } from "@openbot/contracts/ipc";
 import { Spinner } from "@openbot/ui";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
@@ -45,6 +45,7 @@ export function WorkflowsCanvas(props: {
   );
   const [sunra, setSunra] = createSignal(false);
   const [higgsfield, setHiggsfield] = createSignal(false);
+  const [openbot, setOpenbot] = createSignal(false);
   const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
   const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
   let disposed = false;
@@ -56,6 +57,7 @@ export function WorkflowsCanvas(props: {
         if (disposed) return;
         setSunra(providers.sunra);
         setHiggsfield(providers.higgsfield);
+        setOpenbot(providers.openbot === true);
         setServiceAccounts(providers.accounts);
       })
       .catch(() => undefined);
@@ -109,7 +111,7 @@ export function WorkflowsCanvas(props: {
         if (shown.ends.has(end)) continue;
         shown.ends.add(end);
         const model = workflow.graph.nodes.find((node) => node.id === step.nodeId)?.fields.model;
-        if (typeof model === "string" && workflowCatalogProvider(model)) ended = true;
+        if (typeof model === "string" && workflowCatalogSource(model)) ended = true;
       }
       if (ended) noteMediaStepEnded();
     },
@@ -147,7 +149,7 @@ export function WorkflowsCanvas(props: {
     get imageModels() {
       if (!props.host.mediaSupported()) return [];
       const fixed = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
-        if (model.provider === "sunra" || model.provider === "higgsfield") return [];
+        if (model.provider === "sunra" || model.provider === "higgsfield" || model.provider === "openbot") return [];
         if (providerTurnedOff(props.status, model.provider)) return [];
         const status = providerAvailability(props.status, props.models, model.provider, currentText().t);
         if (status.state !== "available") return [];
@@ -173,7 +175,12 @@ export function WorkflowsCanvas(props: {
           ...(accounts ? { accounts } : {}),
         }));
       };
-      return [...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
+      const credit = openbot()
+        ? catalog()
+            .filter((entry) => entry.provider === "openbot")
+            .flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
+        : [];
+      return [...credit, ...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
     },
     get mediaPrice() {
       return props.host.mediaSupported() ? props.host.workflows.mediaPrice : undefined;

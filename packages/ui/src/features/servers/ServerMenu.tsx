@@ -19,6 +19,8 @@ import {
 import { SwapLabel } from "@openbot/ui/components/SwapLabel";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { CreditAmount, CreditIcon } from "../credits/CreditIcon";
+import type { CreditsMenu } from "../credits/credits-store";
 import { type ServerActionCallbacks, ServerActionItems } from "./ServerActionItems";
 import {
   ServerPlanBanner,
@@ -64,6 +66,7 @@ export interface ServerMenuProps extends ServerActionCallbacks {
   hiddenLocal?: HiddenLocalServer | undefined;
   compact?: boolean;
   rail?: boolean;
+  credits?: CreditsMenu | undefined;
 }
 
 function isContextMenuKey(event: KeyboardEvent): boolean {
@@ -77,6 +80,48 @@ function CheckCircle(props: { checked: boolean }) {
         <Check />
       </Show>
     </span>
+  );
+}
+
+function CreditsItem(props: { label: string; balance: string; onSelect: () => void }) {
+  return (
+    <DropdownMenu.Item onSelect={props.onSelect}>
+      <CreditIcon class="agent-context-icon size-4" />
+      <span>{props.label}</span>
+      <span class="ui-menu-trailing server-menu-credit-value">{props.balance}</span>
+    </DropdownMenu.Item>
+  );
+}
+
+function CreditsCard(props: { balance: number; onOpen: () => void }) {
+  const { t, format } = useText();
+  return (
+    <div class="server-menu-credits-card">
+      <DropdownMenu.Item
+        class="server-menu-credits-line"
+        aria-label={[
+          t("billing.credits.yours"),
+          t("billing.credits.amount", { count: props.balance, amount: format.number(props.balance) }),
+        ].join(", ")}
+        onSelect={props.onOpen}
+      >
+        <span class="server-menu-credits-label">{t("billing.credits.yours")}</span>
+        <CreditAmount value={format.number(props.balance)} class="ui-menu-trailing server-menu-credit-value" />
+      </DropdownMenu.Item>
+      <div class="server-menu-credits-buy">
+        <CreditIcon class="server-menu-credits-buy-icon" />
+        <span class="server-menu-credits-buy-label" aria-hidden="true">
+          {t("billing.credits.buy")}
+        </span>
+        <DropdownMenu.Item
+          class="server-menu-credits-get"
+          aria-label={t("billing.credits.buy")}
+          onSelect={props.onOpen}
+        >
+          {t("billing.credits.get")}
+        </DropdownMenu.Item>
+      </div>
+    </div>
   );
 }
 
@@ -96,6 +141,29 @@ export function ServerMenu(props: ServerMenuProps) {
   };
   const planEnds = () => serverPlanEnds(props.servers, props.planDeletesAt);
   const planDeletesAt = (serverId: string) => props.planDeletesAt?.(serverId) ?? null;
+  const credits = () => {
+    const state = props.credits?.state;
+    return state?.available ? state : null;
+  };
+  const serverWallet = (serverId: string) => credits()?.servers.find((wallet) => wallet.serverId === serverId) ?? null;
+  const serverCreditLabels = (serverId: string) => {
+    const wallet = serverWallet(serverId);
+    return wallet
+      ? [t("billing.credits.amount", { count: wallet.balance, amount: format.number(wallet.balance) })]
+      : [];
+  };
+  function openCredits(serverId: string | null): void {
+    props.credits?.onOpen(serverId);
+  }
+  const creditsCard = () => (
+    <Show when={credits()}>
+      {(state) => <CreditsCard balance={state().balance} onOpen={() => openCredits(null)} />}
+    </Show>
+  );
+  function changeMenuOpen(open: boolean): void {
+    setMenuOpen(open);
+    if (open) props.credits?.onRefresh();
+  }
   const planCount = () => {
     const first = props.view === "menu" ? planEnds()[0] : undefined;
     return first ? serverPlanDaysLeft(first.deleteAt) : null;
@@ -208,7 +276,7 @@ export function ServerMenu(props: ServerMenuProps) {
     <>
       <DropdownMenu.Root
         open={menuOpen()}
-        onOpenChange={setMenuOpen}
+        onOpenChange={changeMenuOpen}
         placement={rail ? "right-end" : "bottom-start"}
         gutter={rail ? 10 : 6}
       >
@@ -222,25 +290,28 @@ export function ServerMenu(props: ServerMenuProps) {
             <Show
               when={props.view === "menu"}
               fallback={
-                <Show when={props.onOpenSettings ? activeServer() : undefined}>
-                  {(server) => (
-                    <ServerActionItems
-                      menu={DropdownMenu}
-                      server={server()}
-                      trigger={() => trigger ?? null}
-                      onOpenSettings={props.onOpenSettings}
-                      onLeave={props.onLeave}
-                      onDelete={props.onDelete}
-                      canDelete={props.canDelete}
-                      onRestart={props.onRestart}
-                      canRestart={props.canRestart}
-                      onRemove={props.onRemove}
-                      canRemove={props.canRemove}
-                      onHide={props.onHide}
-                      canHide={props.canHide}
-                    />
-                  )}
-                </Show>
+                <>
+                  {creditsCard()}
+                  <Show when={props.onOpenSettings ? activeServer() : undefined}>
+                    {(server) => (
+                      <ServerActionItems
+                        menu={DropdownMenu}
+                        server={server()}
+                        trigger={() => trigger ?? null}
+                        onOpenSettings={props.onOpenSettings}
+                        onLeave={props.onLeave}
+                        onDelete={props.onDelete}
+                        canDelete={props.canDelete}
+                        onRestart={props.onRestart}
+                        canRestart={props.canRestart}
+                        onRemove={props.onRemove}
+                        canRemove={props.canRemove}
+                        onHide={props.onHide}
+                        canHide={props.canHide}
+                      />
+                    )}
+                  </Show>
+                </>
               }
             >
               <Show when={props.onRenewPlan}>
@@ -250,6 +321,7 @@ export function ServerMenu(props: ServerMenuProps) {
                   </For>
                 )}
               </Show>
+              {creditsCard()}
               <div class="ui-menu-label" aria-hidden="true">
                 {t("server.rail.label")}
               </div>
@@ -262,6 +334,7 @@ export function ServerMenu(props: ServerMenuProps) {
                         server().name,
                         ...serverStatusLabels(server(), t),
                         ...serverPlanStatusLabels(server(), planDeletesAt(server().id), t, format),
+                        ...serverCreditLabels(server().id),
                       ].join(", ")}
                       aria-current={server().active ? "true" : undefined}
                       data-cuelume-navigate=""
@@ -278,6 +351,11 @@ export function ServerMenu(props: ServerMenuProps) {
                         <BellOff class="server-menu-muted size-3" aria-hidden="true" />
                       </Show>
                       <ServerPlanChip server={server()} deleteAt={planDeletesAt(server().id)} />
+                      <Show when={serverWallet(server().id)}>
+                        {(wallet) => (
+                          <CreditAmount value={format.number(wallet().balance)} class="server-menu-credits" />
+                        )}
+                      </Show>
                       <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
                     </DropdownMenu.SubTrigger>
                     <DropdownMenu.Portal>
@@ -288,6 +366,18 @@ export function ServerMenu(props: ServerMenuProps) {
                         <div class="ui-menu-label" aria-hidden="true">
                           {server().name}
                         </div>
+                        <Show when={serverWallet(server().id)}>
+                          {(wallet) => (
+                            <>
+                              <CreditsItem
+                                label={t("billing.credits.title")}
+                                balance={format.number(wallet().balance)}
+                                onSelect={() => openCredits(wallet().serverId)}
+                              />
+                              <DropdownMenu.Separator />
+                            </>
+                          )}
+                        </Show>
                         <ServerActionItems
                           menu={DropdownMenu}
                           server={server()}

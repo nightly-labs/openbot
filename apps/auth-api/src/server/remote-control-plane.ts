@@ -2425,8 +2425,41 @@ export class RemoteControlPlane {
     ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
       const now = dependencies.now();
+      const creditMoveId = `server-removed:${crypto.randomUUID()}`;
       yield* remoteCall(() =>
         dependencies.database.batch([
+          dependencies.database
+            .prepare(
+              `INSERT INTO credit_ledger(
+                 entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at
+               )
+               SELECT ?1, NULL, ?2, -balance, 'transfer', ?3, ?2, ?4
+                 FROM (SELECT COALESCE(SUM(amount_tenths), 0) AS balance FROM credit_ledger WHERE server_id = ?2)
+                WHERE balance > 0 AND EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ?2 AND owner_user_id = ?3)`,
+            )
+            .bind(`${creditMoveId}:out`, hostId, ownerUserId, now),
+          dependencies.database
+            .prepare(
+              `INSERT INTO credit_ledger(
+                 entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at
+               )
+               SELECT ?1, ?2, NULL, -amount_tenths, 'transfer', ?2, ?3, ?4 FROM credit_ledger WHERE entry_id = ?5`,
+            )
+            .bind(`${creditMoveId}:in`, ownerUserId, hostId, now, `${creditMoveId}:out`),
+          dependencies.database
+            .prepare(
+              `UPDATE credit_holds SET user_id = ?2, server_id = NULL
+                WHERE server_id = ?1 AND status = 'held'
+                  AND EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ?1 AND owner_user_id = ?2)`,
+            )
+            .bind(hostId, ownerUserId),
+          dependencies.database
+            .prepare(
+              `UPDATE credit_grants SET user_id = ?2, server_id = NULL
+                WHERE server_id = ?1 AND status = 'active'
+                  AND EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ?1 AND owner_user_id = ?2)`,
+            )
+            .bind(hostId, ownerUserId),
           dependencies.database
             .prepare(
               `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)

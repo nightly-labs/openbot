@@ -26,6 +26,7 @@ import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/fe
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { CreditIcon } from "../credits/CreditIcon";
 
 interface RailMenuItem {
   label: string;
@@ -373,6 +374,7 @@ export type PageRailPage =
   | "providers"
   | "crm"
   | "marketplace"
+  | "credits"
   | "settings";
 
 export const PAGE_RAIL_PINNABLE_PAGES = [
@@ -406,6 +408,7 @@ export interface PageRailProps {
   onCrm?: ((button: HTMLElement) => void) | undefined;
   onCrmConnectors?: ((button: HTMLElement) => void) | undefined;
   onMarketplace?: (() => void) | undefined;
+  onCredits?: (() => void) | undefined;
   onSettings: (button: HTMLElement) => void;
   settingsNotice?: string | undefined;
   help: JSX.Element;
@@ -666,6 +669,18 @@ export function PageRail(props: PageRailProps) {
           <For each={props.mediaCredits ?? []} keyed={(row) => row.key}>
             {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
           </For>
+          <Show when={props.onCredits}>
+            {(onCredits) => (
+              <RailButton
+                label={t("app.rail.credits")}
+                class="credit-rail-icon"
+                current={props.current === "credits"}
+                onClick={() => onCredits()()}
+              >
+                <CreditIcon />
+              </RailButton>
+            )}
+          </Show>
           <Show when={props.onMarketplace}>
             {(onMarketplace) => (
               <RailButton

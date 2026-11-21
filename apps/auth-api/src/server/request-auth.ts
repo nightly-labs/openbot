@@ -1,4 +1,5 @@
 import { env, waitUntil } from "cloudflare:workers";
+import { CREDIT_MEDIA_HOST_HEADER, CREDIT_MEDIA_HOST_TOKEN_HEADER } from "@openbot/contracts/credit-media";
 import { FEEDBACK_REPOSITORY } from "@openbot/contracts/feedback";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -13,6 +14,7 @@ import { AuthOperationError, AuthService, AuthServiceError } from "./auth-servic
 import { BillingError, type BillingService } from "./billing-service";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
+import { type CreditMediaPayer, CreditMediaService } from "./credit-media-service";
 import { CustomServerOffers } from "./custom-server-offers";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
@@ -45,6 +47,7 @@ import {
   type MarketplaceMutationKind,
   MarketplaceRateLimitError,
 } from "./marketplace-request-policy";
+import { mediaUpstreamFromBindings } from "./media-upstream";
 import { Referrals } from "./referrals";
 import {
   deliverPendingRemoteAuthEvents,
@@ -152,6 +155,40 @@ export function requestHostedSiteService(): HostedSiteService {
 
 export function requestReferrals(): Referrals {
   return new Referrals({ database: requireWorkerBindings(env).DB });
+}
+
+export function requestCreditMedia(): CreditMediaService {
+  const bindings = requireWorkerBindings(env);
+  return new CreditMediaService({
+    database: bindings.DB,
+    upstream: mediaUpstreamFromBindings(bindings),
+    now: () => Date.now(),
+  });
+}
+
+export const requestCreditMediaPayer = Effect.fn("CreditMedia.requestPayer")(function* (request: Request) {
+  const hostId = request.headers.get(CREDIT_MEDIA_HOST_HEADER);
+  const machineToken = request.headers.get(CREDIT_MEDIA_HOST_TOKEN_HEADER);
+  if (hostId || machineToken) {
+    if (!hostId || !machineToken || hostId.length > 200 || machineToken.length > 512)
+      return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
+    yield* requestRemoteControlPlane().authenticateHost(hostId, machineToken);
+    const payer: CreditMediaPayer = { wallet: "server", serverId: hostId };
+    return { payer, actorUserId: null };
+  }
+  const user = yield* requestUser(request);
+  if (!user) return null;
+  const payer: CreditMediaPayer = { wallet: "personal", userId: user.id };
+  return { payer, actorUserId: user.id };
+});
+
+export function creditMediaErrorResponse(error: unknown): Response {
+  if (error instanceof BillingError) {
+    const response = apiError(error.status, error.code, error.message);
+    if (error.code === "media_busy") response.headers.set("Retry-After", "10");
+    return response;
+  }
+  return remoteControlPlaneErrorResponse(error);
 }
 
 export function requestBillingService(): BillingService | null {

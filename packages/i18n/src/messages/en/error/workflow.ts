@@ -42,6 +42,14 @@ export const messages = defineMessages("error.workflow", {
     "Write a description, or run the steps before this one so that a text or a picture comes in.",
   "error.workflow.mediaInputNotImage":
     "This step takes only pictures, not videos. Remove the connection from the video.",
+  "error.workflow.mediaInputTooLarge":
+    "A picture for this step is too large. Use pictures of 7 MB or less each, and 14 MB or less together.",
+  "error.workflow.mediaInputType":
+    "This model takes only PNG, JPEG and WebP pictures. Connect a picture of one of these types.",
+  "error.workflow.creditMediaPictureRequired":
+    "This model needs a picture. Connect a picture step to this step, then run it again.",
+  "error.workflow.creditMediaPromptRequired":
+    "This model needs a description. Write one in this step, or connect a text step to it.",
   "error.workflow.mediaInputNotClip":
     "This input takes only videos and audio files. Remove the connection from the file.",
   "error.workflow.stepMissing": "This step no longer exists.",

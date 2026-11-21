@@ -1,4 +1,4 @@
-import type { WorkflowMediaInput } from "@openbot/contracts/ipc";
+import { type WorkflowMediaInput, workflowCatalogSource } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { Button, Download, Film, Image, Maximize2, Mic, Square, Textarea } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -131,6 +131,8 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     setViewer({ images, index: Math.max(0, index), origin: media });
   };
   const making = () => run.running();
+  const paidWithCredits = () => workflowCatalogSource(model()?.id ?? "") === "openbot";
+  const stoppable = () => !paidWithCredits() && run.stop();
   const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
   const frameText = () => {
     const size = specs().size;
@@ -284,7 +286,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 onChange={() => undefined}
               />
               <Show
-                when={run.stop()}
+                when={stoppable()}
                 fallback={
                   <Button
                     size="xs"

@@ -1,6 +1,7 @@
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
 import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
+import { type CreditsState, parseCreditsState } from "@openbot/contracts/credits";
 import {
   type CustomServerCheckoutResult,
   parseCustomServerCheckoutResult,
@@ -766,6 +767,12 @@ export function decodeBillingDetails(value: unknown): BillingDetails {
 export function decodeReferralState(value: unknown): ReferralState {
   const state = parseReferralState(value);
   if (!state) throw new Error("Invalid referral state response.");
+  return state;
+}
+
+export function decodeCreditsState(value: unknown): CreditsState {
+  const state = parseCreditsState(value);
+  if (!state) throw new Error("Invalid credits state response.");
   return state;
 }
 

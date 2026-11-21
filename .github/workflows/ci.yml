@@ -738,6 +738,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
 
+      - name: Run the credit media workflow E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-workflow
+
+      - name: Run the workflow paid media E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-paid-media
+
+      - name: Run the credit media payer switch E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-payer-switch
+
       - name: Run the workflow Discord E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-discord
@@ -932,6 +944,9 @@ jobs:
             .openbot-build/antigravity-failing-session-e2e/
             .openbot-build/antigravity-verification-link-e2e/
             .openbot-build/workflow-model-steps-e2e/
+            .openbot-build/credit-media-workflow-e2e/
+            .openbot-build/workflow-paid-media-e2e/
+            .openbot-build/credit-media-payer-switch-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
             .openbot-build/workflow-slack-e2e/
