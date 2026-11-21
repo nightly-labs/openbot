@@ -92,6 +92,11 @@
   margin-inline: -7px;
   animation: sidebar-mobile-app-crew-peek 3.6s ease-in-out infinite;
   animation-delay: calc(var(--sidebar-crew-index) * -0.45s);
+  animation-play-state: paused;
+}
+
+.sidebar-mobile-app-crew[data-pointer-in-sidebar] .sidebar-mobile-app-crew-member {
+  animation-play-state: running;
 }
 
 .sidebar-mobile-app-crew-member[data-lead] {

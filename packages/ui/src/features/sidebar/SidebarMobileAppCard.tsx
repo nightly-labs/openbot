@@ -47,22 +47,23 @@ export function SidebarMobileAppCard(props: {
   const [pointerInSidebar, setPointerInSidebar] = createSignal(false);
   let section: HTMLElement | undefined;
   onSettled(() => {
-    const area = section?.closest<HTMLElement>(".sidebar") ?? section;
-    if (!area) return;
-    const enter = () => setPointerInSidebar(true);
+    const track = (event: PointerEvent) => {
+      const area = section?.closest(".sidebar") ?? section;
+      setPointerInSidebar(event.target instanceof Node && area?.contains(event.target) === true);
+    };
     const leave = () => setPointerInSidebar(false);
-    setPointerInSidebar(area.matches(":hover"));
-    area.addEventListener("pointerenter", enter);
-    area.addEventListener("pointerleave", leave);
+    document.addEventListener("pointerover", track);
+    document.addEventListener("pointerleave", leave);
     return () => {
-      area.removeEventListener("pointerenter", enter);
-      area.removeEventListener("pointerleave", leave);
+      document.removeEventListener("pointerover", track);
+      document.removeEventListener("pointerleave", leave);
     };
   });
   return (
     <section
       ref={section}
       class="sidebar-mobile-app sidebar-mobile-app-crew"
+      data-pointer-in-sidebar={pointerInSidebar() ? "" : undefined}
       aria-labelledby="sidebar-mobile-app-title"
     >
       <IconButton
