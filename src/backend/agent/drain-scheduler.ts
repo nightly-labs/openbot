@@ -449,6 +449,14 @@ export class DrainScheduler {
     return Math.max(1, this.#tasks.limit(agentId) - this.#runningTasks(agentId, null));
   }
 
+  channelTurnFull(agentId: string, channelId: string): boolean {
+    const channelLanes = this.#lanesOf(agentId).filter((lane) => laneChannelId(lane.taskId) !== null);
+    return (
+      channelLanes.some((lane) => laneChannelId(lane.taskId) === channelId) ||
+      channelLanes.length >= this.channelTurnLimit(agentId)
+    );
+  }
+
   ownChatHold(agentId: string): string | null {
     return this.#heldBy({ agentId, taskId: null });
   }
