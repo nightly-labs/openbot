@@ -227,7 +227,7 @@ import {
   type ScreenCaptureRequest,
 } from "./screen-capture";
 import { searchChatPlaces, searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
-import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
+import { type AgentSidebar, handleSidebarTool, SIDEBAR_TOOL_NAMES } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
@@ -954,6 +954,7 @@ export class OpenBotToolRouter {
             const correctableTool =
               PROFILE_TOOL_NAMES.has(tool) ||
               CHANNEL_AGENT_TOOL_NAMES.has(tool) ||
+              SIDEBAR_TOOL_NAMES.has(tool) ||
               tool.startsWith("channel_") ||
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
