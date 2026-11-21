@@ -149,8 +149,14 @@ export interface AgentDockUsageLimit {
   attempt: number;
 }
 
+export interface AgentDockThread {
+  taskId: string;
+  title: string;
+}
+
 export interface AgentDockChat {
   seat: AgentDockSeatRef;
+  thread?: AgentDockThread | null;
   messages: AgentDockMessage[];
   working: boolean;
   wait: AgentDockWaitReason | null;
@@ -230,7 +236,14 @@ export type AgentDockAction =
   | { type: "add"; serverId: string; seat: AgentDockSeatRef }
   | { type: "remove"; serverId: string; seat: AgentDockSeatRef }
   | { type: "move"; serverId: string; seat: AgentDockSeatRef; before: AgentDockSeatRef | null }
-  | { type: "send"; serverId: string; seat: AgentDockSeatRef; text: string; clientMessageId: string }
+  | {
+      type: "send";
+      serverId: string;
+      seat: AgentDockSeatRef;
+      taskId?: string;
+      text: string;
+      clientMessageId: string;
+    }
   | { type: "open-agent"; serverId: string; agentId: string }
   | { type: "open-channel"; serverId: string; channelId: string }
   | { type: "open-window"; serverId: string; agentId: string }
@@ -350,6 +363,7 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "send":
       return (
         isSeatRef(value.seat) &&
+        (value.taskId === undefined || (value.seat.kind === "agent" && isIdentifier(value.taskId))) &&
         isBoundedString(value.text, INPUT_LIMITS.messageText) &&
         value.text.trim().length > 0 &&
         isIdentifier(value.clientMessageId)
@@ -497,6 +511,7 @@ function isChat(value: unknown): value is AgentDockChat {
   return (
     isDynamicRecord(value) &&
     isSeatRef(value.seat) &&
+    (value.thread === undefined || value.thread === null || isThread(value.thread)) &&
     isList(value.messages, AGENT_DOCK_LIMITS.messages, isMessage) &&
     isBoolean(value.working) &&
     (value.wait === null || isOneOf(AGENT_DOCK_WAIT_REASONS, value.wait)) &&
@@ -504,6 +519,15 @@ function isChat(value: unknown): value is AgentDockChat {
     (value.prompt === null || isPrompt(value.prompt)) &&
     (value.takeover === null || isTakeover(value.takeover)) &&
     (value.usageLimit === null || isUsageLimit(value.usageLimit))
+  );
+}
+
+function isThread(value: unknown): value is AgentDockThread {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.taskId) &&
+    isBoundedString(value.title, INPUT_LIMITS.agentTaskTitle) &&
+    value.title.length > 0
   );
 }
 

@@ -51,6 +51,7 @@ const THUMB_HIDE_MS = 900;
 const SCROLL_INPUT_MS = 1000;
 
 export interface AgentDockChatModel {
+  thread?: { taskId: string; title: string } | null | undefined;
   messages: readonly AgentMessage[];
   working: boolean;
   wait: SidebarWaitReason | null;
@@ -143,6 +144,7 @@ export function AgentDockChat(props: {
   const subtitle = () => {
     if (props.chat.wait) return t(SIDEBAR_WAIT_TITLE[props.chat.wait]);
     if (props.chat.working) return t("agent.dock.working");
+    if (props.chat.thread) return t("conversation.threads.current", { title: props.chat.thread.title });
     return props.seat.kind === "agent" ? props.seat.agent.title : props.seat.channel.title;
   };
   const author = (message: AgentMessage): string | undefined => {

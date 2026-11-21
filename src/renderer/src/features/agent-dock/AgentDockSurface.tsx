@@ -58,7 +58,7 @@ export function AgentDockSurface() {
   let sent: { interactive: boolean; keyboard: boolean } | null = null;
   let dockShape: readonly AgentDockShapeRect[] | null = null;
   let sentShape = "";
-  let failed: { seatKey: string; text: string; clientMessageId: string } | null = null;
+  let failed: { seatKey: string; taskId: string | undefined; text: string; clientMessageId: string } | null = null;
 
   const apply = (next: AgentDockPresentation | null) => {
     received = true;
@@ -229,6 +229,7 @@ export function AgentDockSurface() {
         }),
       );
       bySeat.set(agentDockSeatKey(chat.seat), {
+        thread: chat.thread ?? null,
         messages,
         working: chat.working,
         wait: chat.wait,
@@ -362,16 +363,25 @@ export function AgentDockSurface() {
             }}
             onSend={async (seat, text) => {
               const seatKey = agentDockSeatKey(seat);
+              const taskId = presentation()?.chats.find((chat) => agentDockSeatKey(chat.seat) === seatKey)?.thread
+                ?.taskId;
               const clientMessageId =
-                failed && failed.seatKey === seatKey && failed.text === text
+                failed && failed.seatKey === seatKey && failed.taskId === taskId && failed.text === text
                   ? failed.clientMessageId
                   : crypto.randomUUID();
               try {
-                await perform({ type: "send", serverId: server, seat: contractSeat(seat), text, clientMessageId });
+                await perform({
+                  type: "send",
+                  serverId: server,
+                  seat: contractSeat(seat),
+                  ...(taskId ? { taskId } : {}),
+                  text,
+                  clientMessageId,
+                });
                 failed = null;
                 return { messageId: clientMessageId };
               } catch (error) {
-                failed = { seatKey, text, clientMessageId };
+                failed = { seatKey, taskId, text, clientMessageId };
                 return { error: errorMessage(error, t("chat.errorStatus.send")) };
               }
             }}

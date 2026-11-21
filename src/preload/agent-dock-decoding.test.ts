@@ -183,6 +183,25 @@ describe("agent dock decoding", () => {
     );
   });
 
+  it("accepts the thread that an agent chat shows and rejects a thread without a title", () => {
+    const [agentChat, ...others] = PRESENTATION.chats;
+    if (!agentChat) throw new Error("The presentation has no agent chat.");
+    const thread = { taskId: "task-1", title: "Launch checklist" };
+    const shown: AgentDockPresentation = { ...PRESENTATION, chats: [{ ...agentChat, thread }, ...others] };
+    expect(decodeAgentDockPresentation(shown)).toEqual(shown);
+    const untitled = [{ ...agentChat, thread: { ...thread, title: "" } }, ...others];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: untitled })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+    const long = [
+      { ...agentChat, thread: { ...thread, title: "a".repeat(INPUT_LIMITS.agentTaskTitle + 1) } },
+      ...others,
+    ];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: long })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
   it("accepts a temporary seat and rejects a seat that does not say whether it is temporary", () => {
     const temporary: AgentDockPresentation = {
       ...PRESENTATION,
