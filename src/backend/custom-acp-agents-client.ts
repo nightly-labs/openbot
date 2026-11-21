@@ -198,6 +198,11 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     this.#running = true;
   }
 
+  markTurnsStoppedForShutdown(): void {
+    for (const child of new Set([...this.#sessions.values()].map((held) => held.child)))
+      child.markTurnsStoppedForShutdown?.();
+  }
+
   readonly stop = Effect.fn("CustomAcp.stop")(function* (this: CustomAcpAgentsClient) {
     this.#running = false;
     const children = [...this.#children.values()];
