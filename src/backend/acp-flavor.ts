@@ -427,6 +427,16 @@ function ompSessionNotFound(error: RequestError, sessionId: string): boolean | n
     : null;
 }
 
+function geminiCliSessionNotFound(error: RequestError, sessionId: string): true | null {
+  if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
+  const details = error.code === -32603 && isRecord(error.data) ? error.data.details : undefined;
+  return typeof details === "string" && details.startsWith(`Invalid session identifier "${sessionId}"`) ? true : null;
+}
+
+function customSessionNotFound(error: RequestError, sessionId: string): boolean | null {
+  return geminiCliSessionNotFound(error, sessionId) ?? ompSessionNotFound(error, sessionId);
+}
+
 function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
   return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
 }
@@ -459,7 +469,7 @@ const OMP_ACP_FLAVOR: AcpFlavor = {
 };
 
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
-  sessionNotFound: ompSessionNotFound,
+  sessionNotFound: customSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,
   failureCause: customFailureCause,
