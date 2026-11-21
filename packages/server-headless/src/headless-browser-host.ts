@@ -1,40 +1,122 @@
-// HeadlessBrowserHost: implements the AgentBrowserHost surface
-// (src/backend/agent/turn-lifecycle.ts:216-233) with refusals. On a headless phone
-// host there is no Chromium, no display for it, and no browser feature; agent tools
-// that ask for the browser get a clear error instead of a crash.
+// HeadlessBrowserHost: implements every browser surface the server code can reach for
+// — the AgentBrowserHost of src/backend/agent/turn-lifecycle.ts (with its
+// AttentionBrowserHost and BrowserUploadTarget bases) and the TeamApiBrowser pick of
+// src/main/team-api/dependencies.ts — with clear refusals. On a headless phone host
+// there is no Chromium and no display for it: browser tools answer with an error,
+// never a crash, and the 9 Electron-bound files under src/backend/browser-*.ts never
+// load in this process. This is the declared "descarte browser" of the project.
 //
-// This is the explicit "descarte browser" of the project goal: the 9 Electron-bound
-// files under src/backend/browser-*.ts never load in this process.
+// Contract kept: the constructor-time subscriptions (onChanged/onControlChanged/
+// onDocumentChanged) must return an unsubscribe and never throw, or the AgentService
+// boot dies; cleanups are silent no-ops; queries return null; actions refuse.
+
+import { Effect } from "effect";
+
+function refuse(name: string): never {
+  throw new Error(`browser tools are not available on the headless host (${name})`);
+}
+
+function refuseEffect(name: string) {
+  return Effect.try(() => refuse(name));
+}
 
 export class HeadlessBrowserHost {
   readonly headless = true as const;
 
-  private refuse(): never {
-    throw new Error("browser tools are not available on the headless host");
+  // --- constructor-time subscriptions: never throw, return unsubscribe ------------
+  onChanged(): () => void {
+    return () => undefined;
+  }
+  onControlChanged(): () => void {
+    return () => undefined;
+  }
+  onDocumentChanged(): () => void {
+    return () => undefined;
   }
 
-  async listTabs(): Promise<never> {
-    this.refuse();
+  // --- cleanups: silent no-ops ------------------------------------------------------
+  clearControls(): void {}
+  endControl(): void {}
+  shareTab(): void {}
+  unshareThread(): void {}
+  endTakeover(): void {}
+
+  // --- queries: empty answers ---------------------------------------------------------
+  listTabs(): never[] {
+    return [];
   }
-  async open(): Promise<never> {
-    this.refuse();
+  agentTab(): null {
+    return null;
   }
-  async navigate(): Promise<never> {
-    this.refuse();
+  userControlTabFor(): string | null {
+    return null;
   }
-  async close(): Promise<never> {
-    this.refuse();
+  takeoverSignInArrived(): boolean {
+    return false;
   }
-  async screenshot(): Promise<never> {
-    this.refuse();
+  toolCanUseTab(): boolean {
+    return false;
   }
-  async click(): Promise<never> {
-    this.refuse();
+  isPrivate(): boolean {
+    return false;
   }
-  async type(): Promise<never> {
-    this.refuse();
+  getControlState(): { userControl: false } {
+    return { userControl: false };
   }
-  async evaluate(): Promise<never> {
-    this.refuse();
+  getDisplayState(): { visible: false } {
+    return { visible: false };
+  }
+
+  // --- actions: refuse ---------------------------------------------------------------
+  open() {
+    return refuseEffect("open");
+  }
+  activate() {
+    return refuseEffect("activate");
+  }
+  navigate() {
+    return refuseEffect("navigate");
+  }
+  reload() {
+    return refuseEffect("reload");
+  }
+  close() {
+    return refuseEffect("close");
+  }
+  capturePreview() {
+    return refuseEffect("capturePreview");
+  }
+  setVisible() {
+    return refuseEffect("setVisible");
+  }
+  loadUrl() {
+    return refuseEffect("loadUrl");
+  }
+  takeUserControl() {
+    return refuseEffect("takeUserControl");
+  }
+  releaseUserControl() {
+    return refuseEffect("releaseUserControl");
+  }
+  releaseUserControlHeldBy() {
+    return refuseEffect("releaseUserControlHeldBy");
+  }
+  beginTakeover() {
+    return refuseEffect("beginTakeover");
+  }
+  clearAgentSession() {
+    return refuseEffect("clearAgentSession");
+  }
+  awaitUserControlRelease() {
+    return refuseEffect("awaitUserControlRelease");
+  }
+  handleDynamicTool() {
+    return refuseEffect("handleDynamicTool");
+  }
+  prepareSecret() {
+    return refuseEffect("prepareSecret");
+  }
+  resolveUploadTarget() {
+    return refuseEffect("resolveUploadTarget");
   }
 }

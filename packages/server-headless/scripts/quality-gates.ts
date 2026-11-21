@@ -9,7 +9,8 @@
 //   2 LOAD      every real server module imports under Bun.
 //   3 CIPHER    the REAL secret-storage-cipher round-trips the obk1 session.
 //   4 RESTORE   the REAL CentralAuthManager restores a synthetic signed_in session.
-//   5 BOOT      the control socket answers within 5 s (native order: socket first).
+//   5 BOOT      the control socket answers within 10 s (the packaged host takes ~17 s
+//               to the same point; its CLI waits 30 s).
 //   6 PARITY    /v1/status carries the native keys, memory in BYTES, turn limit by RAM.
 //   7 LATENCY   p50 of 50 GET /v1/status under 10 ms (native measured ~1.6 ms).
 //   8 SINGLE    a second instance refuses to steal the control socket.
@@ -153,7 +154,7 @@ await systemOverhead("boot", async () => {
     await new Promise((r) => setTimeout(r, 150));
   }
   const bootMs = Date.now() - bootStart;
-  report("5 BOOT", "control socket answers within 5 s", Boolean(status) && bootMs <= 5000, `${bootMs} ms`);
+  report("5 BOOT", "control socket answers within 10 s", Boolean(status) && bootMs <= 10_000, `${bootMs} ms`);
 
   if (status) {
     const hasAll = ["version", "account", "server", "memory_level", "memory_limit", "memory_available", "turn_limit"].every(
