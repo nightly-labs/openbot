@@ -314,7 +314,7 @@ export class RoutineScheduler implements RoutineDueSource {
     this.stateChanged(agentId);
   }
 
-  resumeAfterFailedRun(
+  resumeAfterRunPause(
     pause: { agentId: string; routineId: string; updatedAt: string },
     params: DynamicToolCallParams,
   ): "resumed" | "kept" | "failed" {
@@ -325,7 +325,7 @@ export class RoutineScheduler implements RoutineDueSource {
       this.update({ agentId, routineId, active: true }, this.#toolMutationOptions(agentId, agentId, params));
       return "resumed";
     } catch (error) {
-      logger.warn("A routine that a failed run paused could not be turned on again.", {
+      logger.warn("A routine that a run paused could not be turned on again.", {
         error: error instanceof Error ? error.message : String(error),
       });
       return "failed";

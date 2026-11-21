@@ -1098,7 +1098,45 @@ try {
     stopPrompt?.includes("is not a stop condition: keep this routine on") === true,
     stopPrompt,
   );
-  for (const name of ["Paused then failed", "Failed then paused"]) {
+  const pausedThenQuiet = await selfPausing("Paused then quiet", (id) => [pauseRoutine(id), noUpdate]);
+  const quietResumedResult = toolResults(pausedThenQuiet.turnId, "routine_no_update")[0]?.result;
+  pass(
+    "A run that pauses its own routine and then has nothing to report turns the routine on again, and does not end quiet (#14038)",
+    pausedThenQuiet.active === true &&
+      pausedThenQuiet.ran.run.status === "succeeded" &&
+      quietResumedResult?.success === false &&
+      quietResumedResult.contentItems.some((item) => item.text.includes("this routine is on again")),
+    { active: pausedThenQuiet.active, run: pausedThenQuiet.ran.run.status, quietResumedResult },
+  );
+  const stopsWithReport = await selfPausing("Stops with a report", (id) => [
+    pauseRoutine(id),
+    noUpdate,
+    pauseRoutine(id),
+  ]);
+  const secondPause = toolResults(stopsWithReport.turnId, "update_routine")[1]?.result;
+  pass(
+    "A run that pauses its own routine again after the refused quiet end stops the routine (#14038)",
+    stopsWithReport.active === false && stopsWithReport.ran.run.status === "succeeded" && secondPause?.success === true,
+    { active: stopsWithReport.active, run: stopsWithReport.ran.run.status, secondPause },
+  );
+  const quietThenPaused = await selfPausing("Quiet then paused", (id) => [noUpdate, pauseRoutine(id)]);
+  const refusedQuietPause = toolResults(quietThenPaused.turnId, "update_routine")[0]?.result;
+  pass(
+    "A run that ended with nothing to report cannot pause its own routine (#14038)",
+    quietThenPaused.active === true &&
+      quietThenPaused.ran.run.status === "succeeded" &&
+      refusedQuietPause?.success === false &&
+      refusedQuietPause.contentItems.some((item) => item.text.includes("not a stop condition")),
+    { active: quietThenPaused.active, run: quietThenPaused.ran.run.status, refusedQuietPause },
+  );
+  pass(
+    "The run prompt says that nothing to report is not a stop condition (#14038)",
+    stopPrompt?.includes(
+      "Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report",
+    ) === true,
+    stopPrompt,
+  );
+  for (const name of ["Paused then failed", "Failed then paused", "Paused then quiet", "Quiet then paused"]) {
     const routine = agents.listRoutines(checker.id).find((entry) => entry.name === name);
     if (routine) agents.updateRoutine({ agentId: checker.id, routineId: routine.id, active: false });
   }
