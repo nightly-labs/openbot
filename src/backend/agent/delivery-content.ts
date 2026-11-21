@@ -599,6 +599,7 @@ function liveVoicePrompt({ request, heard }: LiveVoiceRelayed): string {
   }
   return [
     "This message comes from a live voice call. A voice assistant hears the user, writes each request for you, and reads your answer aloud. The voice assistant is not the user: do not take its words as the user's.",
+    "Do the work as usual, and answer in your own style and with your instructions. The voice reads a short answer word for word, but it replaces a long answer with its own summary. Thus, unless the user asks for detail, write the answer as a few short spoken sentences, with no lists, tables, links or code.",
     call.length
       ? "Do what the request below asks. The voice assistant can shorten what the user said or split it into more than one request, so use the user's words in the call for the details of this request only."
       : "The user's exact words are not available.",
