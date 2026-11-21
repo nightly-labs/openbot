@@ -73,7 +73,7 @@ export function resetShortcuts(): void {
   setOverridesSignal({});
 }
 
-export function currentShortcut(command: ShortcutCommand): ShortcutChord {
+function currentShortcut(command: ShortcutCommand): ShortcutChord {
   return resolveShortcut(command, overrides(), shortcutEnvironment());
 }
 
