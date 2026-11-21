@@ -60,13 +60,18 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
   };
 }
 
+function focusedElement(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+    ? document.activeElement
+    : null;
+}
+
 function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; onOpenChange?: OpenChangeHandler }) {
-  let target =
-    document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-      ? document.activeElement
-      : null;
   let content: HTMLElement | undefined;
   let open = untrack(() => props.open ?? props.defaultOpen ?? false);
+  // A closed menu takes the focused element when it opens. Taken at mount, it could be the message box
+  // of the chat before, which would then keep that whole chat in memory (#12219).
+  let target = open ? focusedElement() : null;
   let epoch = 0;
   let selection: (() => void) | undefined;
   let handedOff = false;
@@ -86,10 +91,7 @@ function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; 
         epoch++;
         selection = undefined;
         handedOff = false;
-        target =
-          document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-            ? document.activeElement
-            : null;
+        target = focusedElement();
       } else {
         target =
           Array.from(
