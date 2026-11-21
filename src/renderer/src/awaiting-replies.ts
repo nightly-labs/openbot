@@ -58,7 +58,13 @@ export function agentAwaitingReplies(input: AgentAwaitingInput): AwaitingReplyIt
       const state = deliveryState(delivery.status);
       if (!state || (state === "failed" && index < lastUserIndex)) continue;
       const wait = state === "failed" ? undefined : input.waits?.[delivery.recipientAgentId];
-      rows.push({ ...rowFor(delivery.recipientAgentId, state, id), ...(wait ? { wait } : {}) });
+      const row = rowFor(delivery.recipientAgentId, state, id);
+      const stoppable = state === "asked" && row.agent !== undefined;
+      rows.push({
+        ...row,
+        ...(wait ? { wait } : {}),
+        ...(stoppable ? { deliveryId: delivery.id } : { stoppable: false }),
+      });
     }
     const exchangeRows = rows.slice(firstRow);
     if (exchangeRows.some((row) => row.state === "asked" || row.state === "working")) {

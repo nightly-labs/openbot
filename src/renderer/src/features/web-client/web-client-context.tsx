@@ -2136,7 +2136,8 @@ export function createWebWorkspace(
     select,
     refresh,
     send,
-    cancelQueued: (deliveryId: string) => changeQueue((agentId) => runtime.cancelQueued({ agentId, deliveryId })),
+    cancelQueued: (deliveryId: string, recipientAgentId?: string) =>
+      changeQueue((agentId) => runtime.cancelQueued({ agentId: recipientAgentId ?? agentId, deliveryId })),
     steerQueued(deliveryId: string) {
       const expectedTurnId = conversation()?.page?.activeTurnId;
       if (!expectedTurnId) return;

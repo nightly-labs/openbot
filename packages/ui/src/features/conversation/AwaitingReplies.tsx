@@ -18,6 +18,7 @@ export interface AwaitingReplyItem {
   detail?: string | undefined;
   deliveryId?: string | undefined;
   wait?: SidebarAgentWait | undefined;
+  stoppable?: boolean | undefined;
 }
 
 export interface AwaitingReplyListProps {
@@ -96,7 +97,7 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
   };
   const stopAction = (item: AwaitingReplyItem) => {
     const stop = props.onStop;
-    if ((item.state !== "asked" && item.state !== "working") || !stop) return undefined;
+    if (item.stoppable === false || (item.state !== "asked" && item.state !== "working") || !stop) return undefined;
     return () => stop(item.id);
   };
   const settled = () => props.items.every((item) => item.state === "replied" || item.state === "failed");

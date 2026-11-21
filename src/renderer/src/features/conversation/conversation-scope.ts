@@ -472,6 +472,10 @@ export function createConversationViewScope(props: ConversationProps) {
     setHiddenAwaitingReplyIds((ids) => new Set([...ids, ...awaitingReplies().map((row) => row.id)]));
     setComposerFocusRequest((value) => value + 1);
   };
+  const stopAwaitingReply = (rowId: string) => {
+    const row = awaitingReplies().find((item) => item.id === rowId);
+    if (row?.agent && row.deliveryId) props.onCancelQueuedMessage(row.deliveryId, row.agent.id);
+  };
   const activity = createActivityStore({
     props,
     activeDeliveries,
@@ -2522,6 +2526,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
+    stopAwaitingReply,
     clearComposerError,
     setComposerErrorForTarget,
     clearChatErrors,
