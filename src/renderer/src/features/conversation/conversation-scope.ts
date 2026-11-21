@@ -1025,10 +1025,9 @@ export function createConversationViewScope(props: ConversationProps) {
     unsentPromptAnswer = text === undefined || key === null ? undefined : { chat: openChatKey(), key, text };
   };
   createEffect(
-    () => ({ chat: openChatKey(), key: openPromptKey() }),
-    ({ chat, key }) => {
+    () => ({ chat: openChatKey(), key: openPromptKey(), target: currentConversationTarget(props) }),
+    ({ chat, key, target }) => {
       const unsent = unsentPromptAnswer;
-      const target = currentConversationTarget(props);
       if (!unsent || unsent.chat !== chat || unsent.key === key || !target) return;
       unsentPromptAnswer = undefined;
       const draftKey = composerDraftKey(target);
