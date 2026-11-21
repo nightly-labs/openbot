@@ -1062,6 +1062,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#emitProviderQueues(provider);
         },
         onProviderHeld: (provider) => this.#emitProviderQueues(provider),
+        onAccountSignedIn: (provider, accountId) => this.#usageLimits.credentialChanged(provider, accountId),
         onAccountsChanged: () => this.#retryHeldMoves(),
         onProvidersUnready: () => this.#refreshHeldAgents(),
       },
