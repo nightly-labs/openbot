@@ -232,15 +232,8 @@ export function ConversationTimeline() {
   };
   const readAloudAction = (message: AgentMessage) => {
     const agentId = props.agent?.id;
-    if (
-      props.runtime ||
-      !agentId ||
-      message.author !== "agent" ||
-      message.streaming ||
-      !speechTextFromMarkdown(message.body)
-    )
-      return;
-    if (!speechModelReady()) return;
+    if (props.runtime || !agentId || message.author !== "agent" || message.streaming || !message.body.trim()) return;
+    if (!speechModelReady() || !speechTextFromMarkdown(message.body)) return;
     return {
       reading: speechReading()?.messageId === message.id,
       onToggle: () =>
