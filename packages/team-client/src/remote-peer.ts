@@ -1611,6 +1611,7 @@ export function createRemoteTeamPeer(
                     channelSeenSubtasks: true,
                     channelTaskWaits: true,
                     mcpManyServers: true,
+                    providerManyAccounts: true,
                     routineResultsWhatsApp: true,
                     storageWorkflowFiles: true,
                   }),
@@ -1772,7 +1773,12 @@ export function createRemoteTeamPeer(
           ? null
           : sideRoute
             ? yield* peerDecode(() =>
-                sideRoute.request(path, body, { channelIsolation: true, channelPicture: true, channelBrowser: true }),
+                sideRoute.request(path, body, {
+                  channelIsolation: true,
+                  channelPicture: true,
+                  channelBrowser: true,
+                  providerManyAccounts: true,
+                }),
               )
             : // A caller names a provider and model on agent creation only when the host advertises
               yield* peerDecode(() =>

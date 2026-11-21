@@ -251,6 +251,7 @@
     "test:memory-changes-wire": "bun scripts/memory-changes-e2e.ts",
     "test:sign-in-relay-paste": "bun scripts/sign-in-relay-paste-e2e.ts",
     "test:mcp-many-servers": "bun scripts/mcp-many-servers-e2e.ts",
+    "test:provider-many-accounts": "bun scripts/provider-many-accounts-e2e.ts",
     "test:mcp-member-access": "bun scripts/mcp-member-access-e2e.ts",
     "test:sign-in-relay-replay": "bun scripts/sign-in-relay-replay-e2e.ts",
     "test:acp-mcp-names": "bun scripts/acp-mcp-server-names-e2e.ts",

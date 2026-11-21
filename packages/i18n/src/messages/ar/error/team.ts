@@ -153,6 +153,8 @@ export const messages = {
   "error.team.mcpUnsupported": "خوادم MCP غير مدعومة في هذا الاتصال.",
   "error.team.mcpServerListNeedsUpdate":
     "حدّث OpenBot على هذا الجهاز لاستخدام أكثر من {limit} من خوادم MCP على هذا الخادم.",
+  "error.team.providerAccountListNeedsUpdate":
+    "حدّث OpenBot على هذا الجهاز لاستخدام أكثر من {limit} من الحسابات لمزوّد واحد على هذا الخادم.",
   "error.team.storageUnsupported": "التخزين غير مدعوم في هذا الاتصال.",
   "error.team.machineResourcesUnsupported": "استخدام الجهاز غير مدعوم في هذا الاتصال.",
   "error.team.machineAlertMemberInvalid": "يمكن فقط لمالك هذا الخادم أو مسؤوله تلقي تنبيهات الجهاز.",

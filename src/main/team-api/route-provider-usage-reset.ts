@@ -10,6 +10,7 @@ import type { TeamApiProviderUsageResets } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
+import { requireProviderAccountsFit } from "./route-provider-accounts";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_USAGE_RESET_ROUTES));
 
@@ -24,8 +25,11 @@ export async function routeProviderUsageReset(
   requireAdmin(member);
   const body = await readJson(request);
   const provider = parseProviderId(body.provider);
-  if (url.pathname === PROVIDER_USAGE_RESET_ROUTES.list)
-    return json(200, { accounts: await runCauseEffect(resets.providerUsageResets(provider)) });
+  if (url.pathname === PROVIDER_USAGE_RESET_ROUTES.list) {
+    const accounts = await runCauseEffect(resets.providerUsageResets(provider));
+    requireProviderAccountsFit(capabilities, accounts.length);
+    return json(200, { accounts });
+  }
   if (!isProviderAccountId(body.accountId)) throw new HttpError(400, "accountId is invalid.");
   return json(200, { outcome: await runCauseEffect(resets.resetProviderUsage(provider, body.accountId)) });
 }

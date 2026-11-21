@@ -154,6 +154,7 @@ import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "./provider-many-accounts-v1";
 import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "./provider-model-source-v1";
 import { PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY } from "./provider-sign-in-relay-v2";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
@@ -794,6 +795,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [AGENT_BUILTIN_MEMORY_CAPABILITY, V10],
   [WORKFLOWS_ANSWERS_CAPABILITY, V10],
   [STORAGE_WORKFLOW_FILES_CAPABILITY, V10],
+  [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
