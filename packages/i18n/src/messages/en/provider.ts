@@ -123,7 +123,8 @@ export const messages = defineMessages("provider", {
     "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
-  "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.noModels":
+    "No {name} models show here. If they are turned off, an admin can turn them on in Server settings > Providers > {name} > Models.",
   "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
   "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":

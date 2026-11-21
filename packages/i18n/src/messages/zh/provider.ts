@@ -123,7 +123,8 @@ export const messages = {
     "在 Windows 和 Linux 上，这些模型无法以“仅工作区”运行。要使用它们，请在助手设置中更改“权限”。",
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
-  "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.noModels":
+    "这里没有显示 {name} 模型。如果它们已关闭，管理员可以在“服务器设置 > 服务商 > {name} > 模型”中开启它们。",
   "provider.picker.endpointModelsInCustom": "{name} 运行你的自定义端点。它们的模型在“自定义”标签页中。",
   "provider.picker.showCustomModels": "查看模型",
   "provider.picker.museNoModels":

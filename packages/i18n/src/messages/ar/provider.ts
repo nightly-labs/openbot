@@ -142,7 +142,8 @@ export const messages = {
     "لا تعمل هذه النماذج مع «مساحة العمل فقط» على Windows وLinux. لاستخدامها، غيّر «الأذونات» في إعدادات الوكيل.",
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
-  "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.noModels":
+    "لا تظهر هنا نماذج من {name}. إذا كانت متوقفة، يمكن للمسؤول تشغيلها في إعدادات الخادم > المزوّدون > {name} > النماذج.",
   "provider.picker.endpointModelsInCustom": "يشغّل {name} نقاط النهاية المخصصة لديك. نماذجها في تبويب مخصص.",
   "provider.picker.showCustomModels": "عرض النماذج",
   "provider.picker.museNoModels":
