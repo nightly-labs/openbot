@@ -215,6 +215,7 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   if (event.type === "turn-started") {
     if (event.origin === "routine" || event.origin === "agent") return;
     if (isSpoken(agent)) stopSpokenReply();
+    if (event.origin === "unknown") return;
     const message = dictated.get(key);
     if (!message || message.turnId) return;
     if (Date.now() - message.dictatedAt > DICTATION_LIFETIME_MS) {
