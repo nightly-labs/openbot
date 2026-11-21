@@ -626,13 +626,16 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
-  const answerProblemsByNode = createMemo(() => {
-    const graph = options.graph?.();
-    const byNode = new Map<string, WorkflowAnswerProblem[]>();
-    for (const problem of graph ? workflowAnswerProblems(graph) : [])
-      byNode.set(problem.nodeId, [...(byNode.get(problem.nodeId) ?? []), problem]);
-    return byNode;
-  });
+  const answerProblemsByNode = createMemo(
+    () => {
+      const graph = options.graph?.();
+      const byNode = new Map<string, WorkflowAnswerProblem[]>();
+      for (const problem of graph ? workflowAnswerProblems(graph) : [])
+        byNode.set(problem.nodeId, [...(byNode.get(problem.nodeId) ?? []), problem]);
+      return byNode;
+    },
+    { lazy: true },
+  );
   const pendingCompanions = createMemo(() => (state.pending ? companions(state.pending) : []));
 
   const isArmed = (port: PortRef) => {
