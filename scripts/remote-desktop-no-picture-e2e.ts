@@ -171,9 +171,18 @@ async function watchUntilError(viewerUrl: string): Promise<ViewerReport> {
     await page.addInitScript(() => {
       addEventListener("message", (event) => window.openbotNoPictureE2eReport?.(event.data));
     });
+    const hostHandledError = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/viewer-state") &&
+        response.request().method() === "POST" &&
+        viewerReportSchema.safeParse(response.request().postDataJSON()).data?.state === "error",
+      { timeout: 120_000 },
+    );
     await page.goto(viewerUrl);
     await page.waitForURL(/\/moonlight\/stream\.html/);
-    return await errorReport;
+    const [report, response] = await Promise.all([errorReport, hostHandledError]);
+    assert.equal(response.status(), 204);
+    return report;
   } finally {
     await page.close();
   }
@@ -191,7 +200,6 @@ try {
     watchUntilError(linuxHost.viewerUrls[0] ?? ""),
     ...sharedWindowsHost.viewerUrls.map(watchUntilError),
   ]);
-  await runCauseEffect(Effect.sleep("1 second"));
 
   assert.equal(windowsReport.noPicture, true);
   assert.equal(windowsReport.message, NO_PICTURE_TEXT);
