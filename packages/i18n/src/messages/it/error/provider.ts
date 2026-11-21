@@ -544,6 +544,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Impossibile leggere la versione della CLI di {provider}.",
   "error.provider.piSessionBusy": "Attendi che il turno attuale di Pi finisca.",
   "error.provider.acpSessionBusy": "{provider} sta ancora finendo un turno interrotto. Riprova tra un attimo.",
+  "error.provider.acpSessionStale":
+    "{provider} non è riuscito a caricare la versione più recente di questa chat. Invia di nuovo il messaggio.",
   "error.provider.acpModelNotOffered":
     "{provider} non offre {model} al momento. Scegli un altro modello per questo agente, poi riprova.",
   "error.provider.piStopped": "Pi non è in esecuzione. Connetti Pi e riprova.",
