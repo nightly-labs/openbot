@@ -477,6 +477,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "Knoten hier hinzufügen",
   "workflow.canvas.action.deleteConnection": "Verbindung löschen",
   "workflow.canvas.action.selectAll": "Alles auswählen",
+  "workflow.canvas.action.tidy": "Aufräumen",
   "workflow.canvas.action.undo": "Rückgängig",
   "workflow.canvas.action.redo": "Wiederherstellen",
   "workflow.canvas.action.search": "Suchen",
