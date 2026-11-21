@@ -30,7 +30,7 @@ interface CheckoutRow extends CustomServerOfferRow {
 export const CUSTOM_SERVER_OFFER_COLUMNS =
   "o.plan_name, o.amount, o.currency, o.billing_interval, o.vcpu, o.memory_gb, o.storage_gb, o.personalized_support, o.subscription_status";
 
-export function customServerPlanOf(row: CustomServerOfferRow): CustomServerPlan | null {
+function customServerPlanOf(row: CustomServerOfferRow): CustomServerPlan | null {
   return parseCustomServerPlan({
     name: row.plan_name,
     amount: row.amount,
@@ -43,7 +43,7 @@ export function customServerPlanOf(row: CustomServerOfferRow): CustomServerPlan 
   });
 }
 
-export function customServerPaid(status: string | null): boolean {
+function customServerPaid(status: string | null): boolean {
   return isOneOf(CUSTOM_SERVER_PAID_STATUSES, status);
 }
 

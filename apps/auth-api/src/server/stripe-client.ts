@@ -108,7 +108,7 @@ const checkoutSessionListSchema = Schema.Struct({
 });
 export type StripeOpenCheckoutSession = (typeof checkoutSessionListSchema.Type)["data"][number];
 
-export interface CheckoutInlinePrice {
+interface CheckoutInlinePrice {
   productName: string;
   amount: number;
   interval: BillingInterval;
