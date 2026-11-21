@@ -1297,13 +1297,6 @@ export class AttentionRegistry {
           if (this.#messagingRequestTurn(agentId, turnId)) {
             pending.resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
-          } else if (pending.request.vaultSkip === "agent-script") {
-            pending.resolve(
-              browserTakeoverError(
-                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
-              ),
-            );
-            this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else if (pending.secret?.withCode) {
             pending.resolve(
               browserTakeoverError(
@@ -1315,6 +1308,13 @@ export class AttentionRegistry {
             pending.resolve(
               browserTakeoverError(
                 `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} On an HTTP page, OpenBot fills only a saved login. Use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.request.vaultSkip === "agent-script") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
