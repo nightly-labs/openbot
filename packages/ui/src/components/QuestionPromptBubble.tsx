@@ -437,6 +437,25 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     return t("prompt.question.answersSent");
   };
 
+  function ClosedOptions(optionsProps: { question: AgentPromptQuestion }) {
+    return (
+      <Show when={optionsProps.question.options?.length}>
+        <ul class="question-prompt-answers">
+          <For each={optionsProps.question.options}>
+            {(option, optionIndex) => (
+              <li class="question-prompt-answer question-prompt-answer-closed">
+                <Kbd class="question-prompt-letter" aria-hidden="true">
+                  {optionLetter(optionIndex())}
+                </Kbd>
+                {option.label}
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
+    );
+  }
+
   function Summary() {
     return (
       <section
@@ -458,12 +477,14 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             <p class="sr-only" role="status">
               {statusTitle()}
             </p>
-            <For each={props.questions}>
-              {(question) => (
-                <section class="question-prompt-section" aria-label={markdownPlainText(question.question)}>
-                  <h2 class="question-prompt-title">
-                    <QuestionText question={question.question} onOpenLink={props.onOpenLink} />
-                  </h2>
+          </Show>
+          <For each={props.questions}>
+            {(question) => (
+              <section class="question-prompt-section" aria-label={markdownPlainText(question.question)}>
+                <h2 class="question-prompt-title">
+                  <QuestionText question={question.question} onOpenLink={props.onOpenLink} />
+                </h2>
+                <Show when={resolution()?.status === "answered"} fallback={<ClosedOptions question={question} />}>
                   <Show
                     when={summaryRows(question)}
                     fallback={
@@ -490,10 +511,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                       </ul>
                     )}
                   </Show>
-                </section>
-              )}
-            </For>
-          </Show>
+                </Show>
+              </section>
+            )}
+          </For>
         </Show>
       </section>
     );
