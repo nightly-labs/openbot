@@ -238,6 +238,22 @@ export const messages = {
   "workflow.condition.rule": "Regel",
   "workflow.condition.rulePlaceholder": "Beschreibe, wann der Lauf Ja nimmt",
   "workflow.condition.taken": "Gewählt",
+  "workflow.answer.title": "Antwortfelder",
+  "workflow.answer.placeholder": "priority: high|normal|low\nsummary: text\ncount?: number",
+  "workflow.answer.problem.name": "Die Zeile „{line}“ hat keinen gültigen Feldnamen.",
+  "workflow.answer.problem.type":
+    "{name} hat einen unbekannten Typ. Nutze text, number, yes/no, list oder Labels wie high|low.",
+  "workflow.answer.problem.labels": "{name} braucht zwei oder mehr Labels, etwa high|low.",
+  "workflow.answer.problem.duplicate": "{name} steht zweimal in der Liste.",
+  "workflow.answer.problem.many": "Nutze höchstens 20 Felder.",
+  "workflow.answer.problem.check":
+    "Die Prüfung ist ungültig. Schreibe Tests wie priority = high und verbinde sie mit and oder or.",
+  "workflow.answer.problem.field": "Kein Schritt davor liefert {name}.",
+  "workflow.answer.problem.test": "{name} kann so nicht verglichen werden.",
+  "workflow.answer.problem.conflict": "Zwei Schritte davor liefern {name} mit verschiedenen Typen.",
+  "workflow.check.title": "Prüfung",
+  "workflow.check.placeholder": "priority = high and count > 2",
+  "workflow.check.fields": "Felder: {names}",
 
   "workflow.output.title": "Ausgabe",
   "workflow.output.name": "Ausgabe",

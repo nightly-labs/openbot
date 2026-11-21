@@ -151,6 +151,10 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return [...this.#sessionChildren()].every((child) => child.canReleaseProcess?.() !== false);
   }
 
+  runsBackgroundWork(): boolean {
+    return [...this.#sessionChildren()].some((child) => child.runsBackgroundWork?.() === true);
+  }
+
   readonly readHistory = Effect.fn("CustomAcp.readHistory")(function* (
     this: CustomAcpAgentsClient,
     request: ProviderHistoryRequest,

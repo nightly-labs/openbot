@@ -238,6 +238,22 @@ export const messages = {
   "workflow.condition.rule": "Règle",
   "workflow.condition.rulePlaceholder": "Décrivez quand l’exécution prend la branche Oui",
   "workflow.condition.taken": "Suivie",
+  "workflow.answer.title": "Champs de réponse",
+  "workflow.answer.placeholder": "priority: high|normal|low\nsummary: text\ncount?: number",
+  "workflow.answer.problem.name": "La ligne « {line} » n’a pas de nom de champ valide.",
+  "workflow.answer.problem.type":
+    "{name} a un type inconnu. Utilisez text, number, yes/no, list ou des libellés comme high|low.",
+  "workflow.answer.problem.labels": "{name} doit avoir au moins deux libellés, comme high|low.",
+  "workflow.answer.problem.duplicate": "{name} figure deux fois dans la liste.",
+  "workflow.answer.problem.many": "Utilisez 20 champs au maximum.",
+  "workflow.answer.problem.check":
+    "La vérification n’est pas valide. Écrivez des tests comme priority = high, puis reliez-les avec and ou or.",
+  "workflow.answer.problem.field": "Aucune étape précédente ne fournit {name}.",
+  "workflow.answer.problem.test": "{name} ne peut pas être comparé ainsi.",
+  "workflow.answer.problem.conflict": "Deux étapes précédentes fournissent {name} avec des types différents.",
+  "workflow.check.title": "Vérification",
+  "workflow.check.placeholder": "priority = high and count > 2",
+  "workflow.check.fields": "Champs : {names}",
 
   "workflow.output.title": "Sortie",
   "workflow.output.name": "sortie",

@@ -17,6 +17,8 @@ export const messages = {
   "error.workflow.agentStepEnded": "ההודעה של הסוכן לשלב הזה הוסרה לפני שהוא ענה.",
   "error.workflow.agentStepStopped": "הסוכן נעצר לפני שענה על השלב הזה. יש להריץ את השלב שוב.",
   "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
+  "error.workflow.answerInvalid": "התשובה לא כללה את השדות שהשלב הזה מבקש: {fields}. יש להריץ את השלב שוב.",
+  "error.workflow.checkInvalid": "הבדיקה של השלב הזה לא תקינה. יש לתקן אותה ולהריץ את השלב שוב.",
   "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
   "error.workflow.modelTimedOut":
     "המודל לא ענה בזמן. יש לבחור רמת מאמץ נמוכה יותר או מודל מהיר יותר לשלב הזה, ואז להריץ אותו שוב.",

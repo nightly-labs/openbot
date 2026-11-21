@@ -1,4 +1,12 @@
-import type { AgentStepActivity, RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
+import {
+  type AgentStepActivity,
+  type RoutineSchedule,
+  type StoredFileRow,
+  type WorkflowAnswerProblem,
+  type WorkflowGraph,
+  workflowAnswerProblems,
+  workflowInputAnswerFields,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -82,6 +90,7 @@ export interface WfnResult {
   at: string;
   value: string;
   failed?: boolean;
+  branch?: string;
 }
 
 export const resultValue = (result: WfnResult | undefined) => (result?.failed ? undefined : result?.value);
@@ -185,6 +194,8 @@ export interface WfnBoard {
   setField: (id: string, key: string, value: WfnFieldValue, typing?: boolean) => void;
   setFields: (id: string, values: WfnFields) => void;
   githubTriggers: (id: string) => string[];
+  answerNames: (id: string) => readonly string[];
+  answerProblems: (id: string) => readonly WorkflowAnswerProblem[];
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
@@ -244,6 +255,7 @@ export function BoardProvider(props: { board: WfnBoard; children: JSX.Element })
 
 export interface BoardOptions {
   catalogs: () => WorkflowCatalogs;
+  graph?: () => WorkflowGraph;
   buildState?: (edgeId: string) => "unbuilt" | "arrived" | undefined;
   selected?: string | undefined;
   edges?: readonly WfnEdge[] | undefined;
@@ -409,6 +421,8 @@ export function inCanvas(root: Element | undefined, element: Element | null): bo
     element.closest("[data-wfn-portal]") !== null
   );
 }
+
+const NO_ANSWER_PROBLEMS: readonly WorkflowAnswerProblem[] = [];
 
 export function createBoard(options: BoardOptions) {
   const { t } = useText();
@@ -612,6 +626,16 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  const answerProblemsByNode = createMemo(
+    () => {
+      const graph = options.graph?.();
+      const byNode = new Map<string, WorkflowAnswerProblem[]>();
+      for (const problem of graph ? workflowAnswerProblems(graph) : [])
+        byNode.set(problem.nodeId, [...(byNode.get(problem.nodeId) ?? []), problem]);
+      return byNode;
+    },
+    { lazy: true },
+  );
   const pendingCompanions = createMemo(() => (state.pending ? companions(state.pending) : []));
 
   const isArmed = (port: PortRef) => {
@@ -804,6 +828,11 @@ export function createBoard(options: BoardOptions) {
       }
       return found;
     },
+    answerNames: (id) => {
+      const graph = options.graph?.();
+      return graph ? [...workflowInputAnswerFields(graph, id).keys()] : [];
+    },
+    answerProblems: (id) => answerProblemsByNode().get(id) ?? NO_ANSWER_PROBLEMS,
     inputs: (id, type) =>
       state.edges.flatMap((edge) =>
         edge.to === id && edge.type === type && !state.removed.includes(edge.from) ? [edge.from] : [],

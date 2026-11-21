@@ -235,6 +235,22 @@ export const messages = {
   "workflow.condition.rule": "ルール",
   "workflow.condition.rulePlaceholder": "実行が「はい」に進む条件を記述してください",
   "workflow.condition.taken": "選択済み",
+  "workflow.answer.title": "回答フィールド",
+  "workflow.answer.placeholder": "priority: high|normal|low\nsummary: text\ncount?: number",
+  "workflow.answer.problem.name": "行「{line}」に有効なフィールド名がありません。",
+  "workflow.answer.problem.type":
+    "{name} の型が不明です。text、number、yes/no、list、または high|low のようなラベルを使ってください。",
+  "workflow.answer.problem.labels": "{name} には high|low のように 2 つ以上のラベルが必要です。",
+  "workflow.answer.problem.duplicate": "{name} がリストに 2 回あります。",
+  "workflow.answer.problem.many": "フィールドは 20 個以下にしてください。",
+  "workflow.answer.problem.check":
+    "チェックが無効です。priority = high のようなテストを書き、and または or でつなげてください。",
+  "workflow.answer.problem.field": "この前のステップに {name} を出すものがありません。",
+  "workflow.answer.problem.test": "{name} はこの方法では比較できません。",
+  "workflow.answer.problem.conflict": "前の 2 つのステップが異なる型の {name} を出しています。",
+  "workflow.check.title": "チェック",
+  "workflow.check.placeholder": "priority = high and count > 2",
+  "workflow.check.fields": "フィールド: {names}",
 
   "workflow.output.title": "出力",
   "workflow.output.name": "出力",

@@ -194,6 +194,7 @@ function isCodexServiceUnreachable(error: unknown): boolean {
   return error instanceof AppServerError && CODEX_SERVICE_UNREACHABLE.has(error.message);
 }
 const PROVIDER_RESTART_POLL_MS = 1_000;
+const PROVIDER_BACKGROUND_WORK_WAIT_MS = 4 * 60 * 60_000;
 const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
 const MODEL_LIST_REREAD_MS = PROVIDER_IDLE_RELEASE_MS;
 const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session table\b/u;
@@ -346,9 +347,11 @@ export class ProviderRuntime implements ProviderPort {
   readonly #released = new Set<AgentProvider>();
   readonly #restartsWhenIdle = new Map<AgentProvider, NodeJS.Timeout | null>();
   readonly #restartsKeepingTurns = new Set<AgentProvider>();
+  readonly #restartWaitsSince = new Map<AgentProvider, number>();
   readonly #updatesWhenIdle = new Set<AgentProvider>();
   #customAgentsReloadPending = false;
   readonly #environmentReloadPending = new Set<AgentProvider>();
+  readonly #environmentReloadWaitsSince = new Map<AgentProvider, number>();
   readonly #lastUsed = new Map<AgentProvider, number>();
   readonly #compactionModes = new Map<AgentProvider, NonNullable<AgentClient["contextCompaction"]>>();
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
@@ -788,7 +791,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #releaseIdleProviders = Effect.fn("ProviderRuntime.releaseIdleProviders")(function* (this: ProviderRuntime) {
     if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
     if (this.#customAgentsReloadPending && !this.#hooks.isProviderBusy("acp")) yield* this.reloadCustomAgents();
-    for (const provider of this.#environmentReloadPending) {
+    for (const provider of [...this.#environmentReloadPending]) {
       if (!this.#hooks.isProviderBusy(provider)) yield* this.#reloadAgentEnvironment(provider);
     }
     const now = Date.now();
@@ -889,6 +892,11 @@ export class ProviderRuntime implements ProviderPort {
   keepsSharedProcess(provider: AgentProvider): boolean {
     const client = this.#clients.get(provider);
     return client !== undefined && (client.canReleaseProcess?.() === false || this.#providerInUse(provider));
+  }
+
+  #holdsBackgroundWork(provider: AgentProvider, waitingSince: number): boolean {
+    if (Date.now() - waitingSince >= PROVIDER_BACKGROUND_WORK_WAIT_MS) return false;
+    return this.#clients.get(provider)?.runsBackgroundWork?.() === true;
   }
 
   readonly releaseIdleThreads = Effect.fn("ProviderRuntime.releaseIdleThreads")(function* (this: ProviderRuntime) {
@@ -2062,6 +2070,7 @@ export class ProviderRuntime implements ProviderPort {
     harness: CustomProviderHarness,
   ): Effect.fn.Return<CustomProviderRestart> {
     this.#environmentReloadPending.delete(harness);
+    this.#environmentReloadWaitsSince.delete(harness);
     if (!this.#clients.has(harness)) {
       if (this.#released.has(harness))
         yield* this.ensureProvider(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope));
@@ -2096,9 +2105,12 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     if (this.#off.has(provider)) return;
     this.#environmentReloadPending.delete(provider);
+    const waitingSince = this.#environmentReloadWaitsSince.get(provider) ?? Date.now();
+    this.#environmentReloadWaitsSince.delete(provider);
     if (!this.#clients.has(provider)) return;
-    if (this.#hooks.isProviderBusy(provider)) {
+    if (this.#hooks.isProviderBusy(provider) || this.#holdsBackgroundWork(provider, waitingSince)) {
       this.#environmentReloadPending.add(provider);
+      this.#environmentReloadWaitsSince.set(provider, waitingSince);
       return;
     }
     const result = yield* Effect.result(
@@ -2244,8 +2256,9 @@ export class ProviderRuntime implements ProviderPort {
     signal: AbortSignal,
     onWait: () => void,
   ) {
+    const waitingSince = Date.now();
     while (true) {
-      yield* this.#awaitIdleForUpdate(provider, signal, onWait);
+      yield* this.#awaitIdleForUpdate(provider, signal, onWait, waitingSince);
       const status = yield* this.#runProviderConnectionCommand(provider, () =>
         this.#updateProviderCli(provider, install),
       );
@@ -2258,19 +2271,25 @@ export class ProviderRuntime implements ProviderPort {
     provider: AgentProvider,
     signal: AbortSignal,
     onWait: () => void,
+    waitingSince: number,
   ) {
+    let waitShown = false;
     while (true) {
       if (signal.aborted) return yield* new ProviderOperationFailed({ cause: signal.reason });
       if (this.#hooks.isStopping())
         return yield* new ProviderOperationFailed({ cause: new Error(sourceText("error.provider.closing")) });
-      if (!this.#hooks.isProviderBusy(provider)) return;
-      if (!this.#updatesWhenIdle.has(provider)) {
-        this.#updatesWhenIdle.add(provider);
-        this.#hooks.onProviderHeld?.(provider);
-        recordRestartActivity();
-        onWait();
-      }
-      this.#hooks.releasePersonWaits?.(provider);
+      const busy = this.#hooks.isProviderBusy(provider);
+      if (!busy && !this.#holdsBackgroundWork(provider, waitingSince)) return;
+      if (!waitShown && !this.#updatesWhenIdle.has(provider)) onWait();
+      waitShown = true;
+      if (busy) {
+        if (!this.#updatesWhenIdle.has(provider)) {
+          this.#updatesWhenIdle.add(provider);
+          this.#hooks.onProviderHeld?.(provider);
+          recordRestartActivity();
+        }
+        this.#hooks.releasePersonWaits?.(provider);
+      } else if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
       yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
     }
   });
@@ -2328,6 +2347,7 @@ export class ProviderRuntime implements ProviderPort {
           yield* this.#reloadProviderCli(provider, cli, firstInstall);
           this.cancelProviderRestart(provider);
           this.#environmentReloadPending.delete(provider);
+          this.#environmentReloadWaitsSince.delete(provider);
           this.#installedFallback.delete(provider);
           if (this.#installedChosen.delete(provider))
             yield* this.#saveInstalledChoice(provider, false).pipe(
@@ -2633,6 +2653,7 @@ export class ProviderRuntime implements ProviderPort {
     }
     yield* providerStep(() => {
       this.#restartsWhenIdle.set(provider, null);
+      this.#restartWaitsSince.set(provider, Date.now());
       if (holdsTurns) this.#hooks.onProviderHeld?.(provider);
       else this.#restartsKeepingTurns.add(provider);
       recordRestartActivity();
@@ -2689,6 +2710,8 @@ export class ProviderRuntime implements ProviderPort {
     const waiting =
       this.#status.phase !== "ready" ||
       this.#hooks.isProviderBusy(provider) ||
+      (this.#restartsKeepingTurns.has(provider) &&
+        this.#holdsBackgroundWork(provider, this.#restartWaitsSince.get(provider) ?? 0)) ||
       this.#providerStarts.has(provider) ||
       this.#providerConnectionCommands.has(provider) ||
       this.#replacingCli.has(provider) ||
@@ -2728,6 +2751,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #endRestartWhenIdle(provider: AgentProvider): void {
     this.#restartsWhenIdle.delete(provider);
+    this.#restartWaitsSince.delete(provider);
     this.#restartsKeepingTurns.delete(provider);
     this.#setStatus({});
     this.#hooks.onProviderResumed(provider);
