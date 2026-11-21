@@ -2365,6 +2365,7 @@ export class TurnLifecycle {
           for (const delivery of deliveries)
             if (yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, resultText, noResult))
               resulted.push(delivery);
+          yield* this.#relayTaskResults(agentId, turnId, deliveries, resultText ?? noResult);
         }
         if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, { turnIds: [turnId], requests: resulted });
         else this.#lastResults.delete(resultsKey);
@@ -2849,6 +2850,7 @@ export class TurnLifecycle {
       originAgentId === agentId ||
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
+      this.#mailbox.heldByTask(agentId, messageId) ||
       this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
       (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId)) ||
       this.#mailbox.steeredIntoOtherWork(delivery.id)
@@ -2865,7 +2867,14 @@ export class TurnLifecycle {
     noResult: string,
   ) {
     if (!this.#sendsResult(agentId, turnId, delivery.delivery, turnDeliveries, text)) return false;
-    yield* this.#sendResult(agentId, turnId, delivery.delivery, text ?? noResult);
+    if (delivery.delivery.sender.kind !== "agent") return false;
+    yield* this.#sendResult(
+      agentId,
+      turnId,
+      delivery.delivery.messageId,
+      delivery.delivery.sender.agentId,
+      text ?? noResult,
+    );
     return true;
   });
 
@@ -2878,20 +2887,47 @@ export class TurnLifecycle {
   ) {
     if (delivery.sender.kind !== "agent" || !this.#store.has(delivery.sender.agentId)) return false;
     if (this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, delivery.sender.agentId, new Set())) return false;
-    yield* this.#sendResult(agentId, turnId, delivery, text);
+    yield* this.#sendResult(agentId, turnId, delivery.messageId, delivery.sender.agentId, text);
     return true;
+  });
+
+  readonly #relayTaskResults = Effect.fn("TurnLifecycle.relayTaskResults")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    deliveries: readonly DeliveryContext[],
+    text: string,
+  ) {
+    const reportedTaskIds = new Set(
+      deliveries.flatMap(({ delivery, senderTaskId }) =>
+        senderTaskId && delivery.sender.kind === "agent" && delivery.sender.agentId === agentId ? [senderTaskId] : [],
+      ),
+    );
+    const requestIds = new Set(
+      [...reportedTaskIds].flatMap((taskId) => this.#mailbox.requestsHeldByTask(agentId, taskId)),
+    );
+    for (const requestId of requestIds) {
+      const requesterId = this.#mailbox.requestSenderAgentId(requestId);
+      if (
+        !requesterId ||
+        !this.#store.has(requesterId) ||
+        this.#mailbox.hasReplyFrom(agentId, requestId) ||
+        this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, requesterId, new Set()) ||
+        this.#mailbox.heldByTask(agentId, requestId, reportedTaskIds)
+      )
+        continue;
+      yield* this.#sendResult(agentId, turnId, requestId, requesterId, text);
+    }
   });
 
   readonly #sendResult = Effect.fn("TurnLifecycle.sendResult")(function* (
     this: TurnLifecycle,
     agentId: string,
     turnId: string,
-    delivery: QueueDelivery,
+    messageId: string,
+    recipientAgentId: string,
     text: string,
   ) {
-    if (delivery.sender.kind !== "agent") return;
-    const messageId = delivery.messageId;
-    const recipientAgentId = delivery.sender.agentId;
     const answerTaskId = this.#mailbox.answerTaskId(agentId, messageId, [recipientAgentId]);
     const taskId = answerTaskId && this.#hooks.taskOpen(answerTaskId) ? answerTaskId : undefined;
     const receipt = yield* this.#mailbox

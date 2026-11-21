@@ -624,6 +624,7 @@ export class AgentTasks implements TaskLanes {
         sender: { kind: "agent", agentId: caller.agentId },
         requesterIds: caller.requesterIds,
         taskId: task.taskId,
+        heldRequestIds: this.#mailbox.openTeammateRequestIds(caller.agentId, params.turnId),
         recipientAgentIds: [caller.agentId],
         text: input.brief,
         replyToMessageId: null,

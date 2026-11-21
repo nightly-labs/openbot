@@ -80,6 +80,7 @@ interface StoredMessage {
   messagingReturn?: MessagingOrigin;
   taskId?: string;
   senderTaskId?: string;
+  heldRequestIds?: string[];
   id: string;
   sender:
     | { kind: "user" }
@@ -194,6 +195,7 @@ interface EnqueueInput {
   messagingReturn?: MessagingOrigin;
   taskId?: string;
   senderTaskId?: string;
+  heldRequestIds?: readonly string[];
   sender: StoredMessage["sender"];
   senderMember?: ConversationMessageSender;
   requesterIds?: readonly string[];
@@ -649,6 +651,7 @@ export class MailboxStore {
         ...(input.messagingReturn ? { messagingReturn: input.messagingReturn } : {}),
         ...(input.taskId ? { taskId: input.taskId } : {}),
         ...(input.senderTaskId ? { senderTaskId: input.senderTaskId } : {}),
+        ...(input.taskId && input.heldRequestIds?.length ? { heldRequestIds: [...input.heldRequestIds] } : {}),
         id: messageId,
         sender: storedSender(input.sender),
         ...(input.sender.kind === "user" && input.senderMember ? { senderMember: input.senderMember } : {}),
@@ -1132,6 +1135,76 @@ export class MailboxStore {
     return [...ids];
   }
 
+  openTeammateRequestIds(agentId: string, turnId: string): string[] {
+    return this.findDeliveriesByTurn(agentId, turnId).flatMap(({ delivery, channelId }) =>
+      delivery.sender.kind === "agent" &&
+      delivery.sender.agentId !== agentId &&
+      channelId === undefined &&
+      delivery.replyToMessageId === null &&
+      this.expectsReply(delivery.messageId) &&
+      !this.hasReplyFrom(agentId, delivery.messageId)
+        ? [delivery.messageId]
+        : [],
+    );
+  }
+
+  requestsHeldByTask(agentId: string, taskId: string): string[] {
+    const ids = new Set<string>();
+    for (const message of this.#state.messages)
+      if (message.taskId === taskId && message.sender.kind === "agent" && message.sender.agentId === agentId)
+        for (const id of message.heldRequestIds ?? []) ids.add(id);
+    return [...ids];
+  }
+
+  requestSenderAgentId(requestId: string): string | null {
+    const request = this.#state.messages.find((message) => message.id === requestId);
+    return request?.sender.kind === "agent" ? request.sender.agentId : null;
+  }
+
+  heldByTask(
+    agentId: string,
+    requestId: string,
+    exceptTaskIds: ReadonlySet<string> = new Set(),
+    holders: ReadonlyMap<string, ReadonlySet<string>> = this.#requestHolders(),
+  ): boolean {
+    const taskIds = [...(holders.get(`${agentId}:${requestId}`) ?? [])].filter((taskId) => !exceptTaskIds.has(taskId));
+    return (
+      taskIds.length > 0 &&
+      !this.hasReplyFrom(agentId, requestId) &&
+      taskIds.some((taskId) => this.#taskStillWorks(agentId, taskId))
+    );
+  }
+
+  #requestHolders(): Map<string, Set<string>> {
+    const holders = new Map<string, Set<string>>();
+    for (const message of this.#state.messages) {
+      if (!message.taskId || message.sender.kind !== "agent" || !message.heldRequestIds) continue;
+      for (const requestId of message.heldRequestIds) {
+        const key = `${message.sender.agentId}:${requestId}`;
+        const taskIds = holders.get(key) ?? new Set<string>();
+        taskIds.add(message.taskId);
+        holders.set(key, taskIds);
+      }
+    }
+    return holders;
+  }
+
+  #taskStillWorks(agentId: string, taskId: string): boolean {
+    const messages = this.#messagesById();
+    const ownWork = this.#state.deliveries.some((delivery) => {
+      if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
+      const message = messages.get(delivery.messageId);
+      return (
+        message?.taskId === taskId ||
+        (message?.senderTaskId === taskId && message.sender.kind === "agent" && message.sender.agentId === agentId)
+      );
+    });
+    return (
+      ownWork ||
+      this.awaitedThreadRequests().some((request) => request.taskId === taskId && request.senderAgentId === agentId)
+    );
+  }
+
   deleteTaskMessages = Effect.fn("MailboxStore.deleteTaskMessages")(function* (
     this: MailboxStore,
     agentId: string,
@@ -1509,6 +1582,7 @@ export class MailboxStore {
     }
     selectedStoredMessages.reverse();
     const messages: ConversationMessage[] = [];
+    const holders = this.#requestHolders();
     for (const message of selectedStoredMessages) {
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
       if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
@@ -1532,7 +1606,12 @@ export class MailboxStore {
               return {
                 id: delivery.id,
                 recipientAgentId: delivery.recipientAgentId,
-                status: delivery.status,
+                status:
+                  delivery.status === "completed" &&
+                  message.expectsReply !== false &&
+                  this.heldByTask(item.recipientAgentId, message.id, undefined, holders)
+                    ? "running"
+                    : delivery.status,
                 position: delivery.position,
                 error: delivery.error,
               };
@@ -3889,6 +3968,8 @@ function isStoredMessage(value: unknown): value is StoredMessage {
     (value.messagingReturn === undefined || isMessagingOrigin(value.messagingReturn)) &&
     (value.taskId === undefined || isString(value.taskId)) &&
     (value.senderTaskId === undefined || isString(value.senderTaskId)) &&
+    (value.heldRequestIds === undefined ||
+      (Array.isArray(value.heldRequestIds) && value.heldRequestIds.every(isString))) &&
     isString(value.id) &&
     isRecord(value.sender) &&
     (value.sender.kind === "user" ||
