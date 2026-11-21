@@ -52,7 +52,7 @@ export const messages = {
   "settings.chatBackground.default": "デフォルト",
   "settings.chatBackdrop.title": "ウィンドウの背景",
   "settings.chatBackdrop.description":
-    "このデバイスでウィンドウ全体の後ろに表示するシーン、画像、または GIF。エージェントにシーンを作るよう頼み、その返信で「背景に使う」を選びます。",
+    "このデバイスでウィンドウ全体の後ろに表示するシーン、画像、GIF、または動画。エージェントにシーンを作るよう頼み、その返信で「背景に使う」を選びます。",
   "settings.chatBackdrop.none": "なし",
   "settings.chatBackdrop.pond": "鯉の池",
   "settings.chatBackdrop.jellyfish": "クラゲ",
@@ -60,8 +60,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "雪",
   "settings.chatBackdrop.fireflies": "ホタル",
   "settings.chatBackdrop.coast": "ネオンの海岸",
-  "settings.chatBackdrop.upload": "画像をアップロード…",
-  "settings.chatBackdrop.uploadRefused": "20 MB 以下の PNG、JPEG、GIF、WebP、または AVIF 画像を使ってください。",
+  "settings.chatBackdrop.upload": "アップロード…",
+  "settings.chatBackdrop.uploadRefused":
+    "20 MB 以下の PNG、JPEG、GIF、WebP、または AVIF 画像か、100 MB 以下の MP4 または WebM 動画を使ってください。",
   "settings.chatBackdrop.saveFailed": "背景を保存できませんでした。",
   "settings.chatBackdrop.removeFailed": "背景を削除できませんでした。",
   "settings.chatColor.title": "チャットの色",

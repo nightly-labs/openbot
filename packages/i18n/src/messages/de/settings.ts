@@ -54,7 +54,7 @@ export const messages = {
   "settings.chatBackground.default": "Standard",
   "settings.chatBackdrop.title": "Fensterhintergrund",
   "settings.chatBackdrop.description":
-    "Eine Szene, ein Bild oder ein GIF hinter dem ganzen Fenster auf diesem Gerät. Bitte einen Agenten um eine Szene und wähle dann bei seiner Antwort „Als Fensterhintergrund verwenden“.",
+    "Eine Szene, ein Bild, ein GIF oder ein Video hinter dem ganzen Fenster auf diesem Gerät. Bitte einen Agenten um eine Szene und wähle dann bei seiner Antwort „Als Fensterhintergrund verwenden“.",
   "settings.chatBackdrop.none": "Keiner",
   "settings.chatBackdrop.pond": "Koi-Teich",
   "settings.chatBackdrop.jellyfish": "Quallen",
@@ -62,8 +62,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "Schneefall",
   "settings.chatBackdrop.fireflies": "Glühwürmchen",
   "settings.chatBackdrop.coast": "Neonküste",
-  "settings.chatBackdrop.upload": "Bild hochladen…",
-  "settings.chatBackdrop.uploadRefused": "Verwende ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild mit höchstens 20 MB.",
+  "settings.chatBackdrop.upload": "Hochladen…",
+  "settings.chatBackdrop.uploadRefused":
+    "Verwende ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild mit höchstens 20 MB oder ein MP4- oder WebM-Video mit höchstens 100 MB.",
   "settings.chatBackdrop.saveFailed": "Der Fensterhintergrund wurde nicht gespeichert.",
   "settings.chatBackdrop.removeFailed": "Der Fensterhintergrund wurde nicht entfernt.",
   "settings.chatColor.title": "Chatfarbe",

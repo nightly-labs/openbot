@@ -50,7 +50,7 @@ export const messages = {
   "settings.chatBackground.default": "الافتراضي",
   "settings.chatBackdrop.title": "خلفية النافذة",
   "settings.chatBackdrop.description":
-    "مشهد أو صورة أو GIF خلف النافذة كلها على هذا الجهاز. اطلب من وكيل أن يصنع مشهدًا، ثم اختر «استخدام كخلفية» على رده.",
+    "مشهد أو صورة أو GIF أو فيديو خلف النافذة كلها على هذا الجهاز. اطلب من وكيل أن يصنع مشهدًا، ثم اختر «استخدام كخلفية» على رده.",
   "settings.chatBackdrop.none": "بلا",
   "settings.chatBackdrop.pond": "بركة الكوي",
   "settings.chatBackdrop.jellyfish": "قناديل البحر",
@@ -58,8 +58,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "تساقط الثلج",
   "settings.chatBackdrop.fireflies": "اليراعات",
   "settings.chatBackdrop.coast": "ساحل النيون",
-  "settings.chatBackdrop.upload": "رفع صورة…",
-  "settings.chatBackdrop.uploadRefused": "استخدم صورة PNG أو JPEG أو GIF أو WebP أو AVIF حجمها 20 ميغابايت أو أقل.",
+  "settings.chatBackdrop.upload": "رفع…",
+  "settings.chatBackdrop.uploadRefused":
+    "استخدم صورة PNG أو JPEG أو GIF أو WebP أو AVIF حجمها 20 ميغابايت أو أقل، أو فيديو MP4 أو WebM حجمه 100 ميغابايت أو أقل.",
   "settings.chatBackdrop.saveFailed": "لم يتم حفظ الخلفية.",
   "settings.chatBackdrop.removeFailed": "لم تتم إزالة الخلفية.",
   "settings.chatColor.title": "لون الدردشة",
