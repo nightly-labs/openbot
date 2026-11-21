@@ -1240,6 +1240,7 @@ export class TurnLifecycle {
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
         if (laneId === null || laneId === MESSAGING_LANE) this.#failedTurns.delete(agentId);
+        const origin = starting?.sender.kind ?? "unknown";
         if (!unprompted) {
           const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
           this.#turnAssociations.set(turnId, association);
@@ -1262,8 +1263,6 @@ export class TurnLifecycle {
             this.#mailboxSync.syncMailboxMessages(snapshot);
           }
         }
-        const origin =
-          (starting ?? this.#mailbox.findDeliveriesByTurn(agentId, turnId)[0]?.delivery)?.sender.kind ?? "unknown";
         this.#hooks.emit({ type: "turn-started", agentId, threadId: publicThreadId, turnId, origin });
         this.#conversation.emitConversation(snapshot, "turn.started", { turnId });
         const workspace = this.#store.get(agentId)?.workspacePath;
