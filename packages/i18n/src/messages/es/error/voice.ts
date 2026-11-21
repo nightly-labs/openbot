@@ -25,6 +25,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Descarga el modelo de voz en Ajustes → Voz.",
   "error.voice.speech.timedOut": "Se agotó el tiempo al leer la respuesta en voz alta.",
   "error.voice.speech.failed": "OpenBot no pudo leer la respuesta en voz alta.",
+  "error.voice.speech.providerRefused": "{provider} se negó a crear el audio: {reason}",
   "error.voice.recordingNotKept": "OpenBot no pudo guardar la grabación de voz.",
   "error.voice.live.timedOut": "La voz en directo de Codex no se inició a tiempo. Inténtalo de nuevo.",
   "error.voice.live.failed": "La voz en directo se detuvo: {reason}",
