@@ -12,6 +12,8 @@ import { installFakeAgent, readJsonl, startThread, stopClients, xorCipher } from
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-flavor-e2e");
 
 const COMMANDS = ["omp", "other-agent"] as const;
+type Command = (typeof COMMANDS)[number];
+const CUSTOM_AGENT_ONLY: Readonly<Record<Command, boolean>> = { omp: false, "other-agent": true };
 const LOAD_ERRORS = [
   ["unsupported", true],
   ["unsupported-other", false],
@@ -19,6 +21,10 @@ const LOAD_ERRORS = [
   ["session-not-found", true],
   ["session-not-found-other", false],
   ["internal", false],
+  ["invalid-id", CUSTOM_AGENT_ONLY],
+  ["invalid-id-other", false],
+  ["unknown-id", CUSTOM_AGENT_ONLY],
+  ["unknown-id-other", false],
 ] as const;
 type LoadError = (typeof LOAD_ERRORS)[number][0];
 
@@ -41,8 +47,7 @@ const clients: AgentClient[] = [];
 try {
   const workspace = join(root, "workspace");
   await mkdir(workspace);
-  const store = new CustomAgentStore({ path: join(root, "custom-agents.json"), cipher: xorCipher });
-  await runCauseEffect(store.load());
+  const stores: CustomAgentStore[] = [];
   const agents: {
     id: string;
     command: (typeof COMMANDS)[number];
@@ -53,12 +58,15 @@ try {
   for (const command of COMMANDS) {
     const executable = join(root, "bin", command);
     await installFakeAgent(executable, "session-errors");
-    for (const [loadError, missingSession] of LOAD_ERRORS) {
+    const store = new CustomAgentStore({ path: join(root, `${command}-agents.json`), cipher: xorCipher });
+    await runCauseEffect(store.load());
+    stores.push(store);
+    for (const [loadError, expected] of LOAD_ERRORS) {
       const agent = {
         id: `${command}-${loadError}`,
         command,
         loadError,
-        missingSession,
+        missingSession: typeof expected === "boolean" ? expected : expected[command],
         log: join(root, `${command}-${loadError}.jsonl`),
       };
       agents.push(agent);
@@ -83,7 +91,7 @@ try {
     apiKey: () => null,
     customProviders: () => [],
     mcpServers: () => [],
-    customAgents: () => store.configs(),
+    customAgents: () => stores.flatMap((store) => store.configs()),
   };
   const cli = await runCauseEffect(driver.resolveCli());
   const open = () => {
