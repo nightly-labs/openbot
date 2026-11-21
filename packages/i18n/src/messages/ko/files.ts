@@ -66,6 +66,8 @@ export const messages = {
   "files.library.agents": "에이전트",
   "files.library.allAgents": { other: "에이전트 {count}개 모두" },
   "files.library.folders": "폴더",
+  "files.library.workflows": "워크플로",
+  "files.library.workflowsOf": "{name}의 워크플로",
   "files.library.favorite": "{name} 즐겨찾기",
   "files.folder.new": "새 폴더",
   "files.folder.name": "폴더 이름",

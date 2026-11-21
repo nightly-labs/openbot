@@ -288,7 +288,10 @@ export type TeamApiProviderUsageResets = Pick<AgentService, "providerUsageResets
 export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
 
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk" | "diskUse">;
-export type TeamApiLibraryFolders = Pick<LibraryFoldersService, "snapshot" | "change" | "removeAgent" | "removeFiles">;
+export type TeamApiLibraryFolders = Pick<
+  LibraryFoldersService,
+  "snapshot" | "change" | "removeAgent" | "removeFiles" | "workflowFiles"
+>;
 export type TeamApiWorkflowFolders = Pick<WorkflowFoldersService, "read" | "change">;
 export type TeamApiMachine = Pick<
   MachineAlertMonitor,

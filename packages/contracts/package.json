@@ -158,6 +158,7 @@
     "./team-protocol/quiet-turn-v1": "./src/team-protocol/quiet-turn-v1.ts",
     "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts",
     "./team-protocol/storage-v1": "./src/team-protocol/storage-v1.ts",
+    "./team-protocol/storage-workflow-files-v1": "./src/team-protocol/storage-workflow-files-v1.ts",
     "./team-protocol/storage-channel-v1": "./src/team-protocol/storage-channel-v1.ts",
     "./team-protocol/storage-disk-v1": "./src/team-protocol/storage-disk-v1.ts",
     "./team-protocol/storage-user-files-v1": "./src/team-protocol/storage-user-files-v1.ts",

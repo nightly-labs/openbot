@@ -122,6 +122,8 @@ export const messages = {
     other: "كل الوكلاء ({count})",
   },
   "files.library.folders": "المجلدات",
+  "files.library.workflows": "سير العمل",
+  "files.library.workflowsOf": "سير العمل في {name}",
   "files.library.favorite": "تفضيل {name}",
   "files.folder.new": "مجلد جديد",
   "files.folder.name": "اسم المجلد",
