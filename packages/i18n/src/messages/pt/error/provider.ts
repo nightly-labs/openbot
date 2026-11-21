@@ -425,6 +425,8 @@ export const messages = {
     "Este chat ficou grande demais para ser enviado ao modelo. As imagens do chat costumam causar isso. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":
     "O OpenCode recusou a solicitação e não informou a causa. Isso pode acontecer em um chat longo ou depois de trocar de modelo. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo ou um esforço menor.",
+  "error.provider.opencodeInputRefused":
+    "O modelo recusou o conteúdo deste chat e não informou a causa. Um arquivo no chat, como um PDF ou uma imagem, pode causar isso. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Envie sua mensagem de novo sem o arquivo ou escolha outro modelo.",
   "error.provider.opencodeCompactionFailed":
     "O modelo não conseguiu resumir este chat longo para liberar espaço na janela de contexto. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha um modelo mais potente.",
   "error.provider.museMcpStartupFault":

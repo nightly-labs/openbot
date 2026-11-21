@@ -439,6 +439,8 @@ export const messages = {
     "Dieser Chat ist zu groß geworden, um ihn an das Modell zu senden. Oft sind Bilder im Chat die Ursache. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
+  "error.provider.opencodeInputRefused":
+    "Das Modell hat den Inhalt dieses Chats abgelehnt und keinen Grund genannt. Eine Datei im Chat, etwa ein PDF oder ein Bild, kann die Ursache sein. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht ohne die Datei erneut oder wähle ein anderes Modell.",
   "error.provider.opencodeCompactionFailed":
     "Das Modell konnte diesen langen Chat nicht zusammenfassen, um Platz im Kontextfenster zu schaffen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein stärkeres Modell.",
   "error.provider.museMcpStartupFault":

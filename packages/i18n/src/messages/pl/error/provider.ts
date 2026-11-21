@@ -417,6 +417,8 @@ export const messages = {
     "Ten czat stał się za duży, aby wysłać go do modelu. Często powodują to obrazy w czacie. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.opencodeSessionRejected":
     "OpenCode odrzucił żądanie i nie podał przyczyny. Może się to zdarzyć w długim czacie lub po zmianie modelu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz inny model lub niższy wysiłek.",
+  "error.provider.opencodeInputRefused":
+    "Model odrzucił treść tego czatu i nie podał przyczyny. Może to powodować plik w czacie, na przykład PDF lub obraz. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Wyślij wiadomość ponownie bez pliku lub wybierz inny model.",
   "error.provider.opencodeCompactionFailed":
     "Model nie zdołał streścić tego długiego czatu, aby zwolnić miejsce w oknie kontekstu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz mocniejszy model.",
   "error.provider.museMcpStartupFault":

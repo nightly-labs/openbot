@@ -424,6 +424,8 @@ export const messages = {
     "Deze chat is te groot geworden om naar het model te sturen. Afbeeldingen in de chat zijn vaak de oorzaak. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
+  "error.provider.opencodeInputRefused":
+    "Het model heeft de inhoud van deze chat geweigerd zonder de oorzaak te geven. Een bestand in de chat, zoals een pdf of een afbeelding, kan de oorzaak zijn. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw zonder het bestand, of kies een ander model.",
   "error.provider.opencodeCompactionFailed":
     "Het model kon deze lange chat niet samenvatten om ruimte te maken in het contextvenster. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een sterker model.",
   "error.provider.museMcpStartupFault":
