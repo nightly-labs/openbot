@@ -40,10 +40,25 @@ export interface StdioMcpRelay {
 
 type OwnAnswer = (answer: JSONRPCResultResponse | JSONRPCErrorResponse | null) => void;
 
+type ServerAnswer = JSONRPCResultResponse | JSONRPCErrorResponse;
+
+interface Handshake {
+  request: RequestId;
+  reply: RequestId;
+  answer: ServerAnswer | null;
+}
+
+interface ServerOutput {
+  transport: StreamableHTTPServerTransport | null;
+  pending: Set<RequestId>;
+  own: Map<RequestId, OwnAnswer>;
+  handshake: Handshake | null;
+}
+
 interface RunningServer {
   child: ChildProcess;
   initialized: boolean;
-  own: Map<RequestId, OwnAnswer>;
+  output: ServerOutput;
 }
 
 const STOP_GRACE_MS = 2_000;
@@ -57,6 +72,8 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
   const sessions = new Map<string, StreamableHTTPServerTransport>();
   const children = new Set<ChildProcess>();
   const running: RunningServer[] = [];
+  const abandoned = new WeakSet<StreamableHTTPServerTransport>();
+  let starting: RunningServer | null = null;
   let closing = false;
 
   const authorized = (request: IncomingMessage) => {
@@ -64,10 +81,45 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     return header.length === expected.length && timingSafeEqual(header, expected);
   };
 
+  const launchServer = (transport: StreamableHTTPServerTransport) => {
+    const output: ServerOutput = { transport, pending: new Set(), own: new Map(), handshake: null };
+    const child = startServer(launch, output);
+    const entry: RunningServer = { child, initialized: false, output };
+    const forget = () => {
+      children.delete(child);
+      if (starting === entry) starting = null;
+      const index = running.indexOf(entry);
+      if (index >= 0) running.splice(index, 1);
+    };
+    children.add(child);
+    running.push(entry);
+    child.once("exit", forget);
+    child.once("error", forget);
+    return entry;
+  };
+
+  const adoptStartingServer = (transport: StreamableHTTPServerTransport, request: RequestId) => {
+    const entry = starting;
+    const handshake = entry?.output.handshake;
+    if (!entry || !handshake) return null;
+    starting = null;
+    entry.output.transport = transport;
+    handshake.reply = request;
+    if (handshake.answer) void transport.send({ ...handshake.answer, id: request }).catch(() => undefined);
+    else entry.output.pending.add(request);
+    return entry;
+  };
+
+  const keepStarting = (entry: RunningServer) => {
+    if (starting || !entry.output.handshake || !running.includes(entry)) return false;
+    entry.output.transport = null;
+    entry.output.pending.clear();
+    starting = entry;
+    return true;
+  };
+
   const open = () => {
-    let child: ChildProcess | null = null;
     let live: RunningServer | null = null;
-    const pending = new Set<RequestId>();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomBytes(16).toString("hex"),
       onsessioninitialized: (id) => {
@@ -76,31 +128,24 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     });
     transports.add(transport);
     transport.onmessage = (message) => {
-      if (!child) {
-        const own = new Map<RequestId, OwnAnswer>();
-        const started = startServer(launch, transport, pending, own);
-        const entry: RunningServer = { child: started, initialized: false, own };
-        const forget = () => {
-          children.delete(started);
-          const index = running.indexOf(entry);
-          if (index >= 0) running.splice(index, 1);
-        };
-        children.add(started);
-        running.push(entry);
-        started.once("exit", forget);
-        started.once("error", forget);
-        child = started;
-        live = entry;
+      const initialize = isJSONRPCRequest(message) && message.method === "initialize";
+      if (!live && initialize) {
+        live = adoptStartingServer(transport, message.id);
+        if (live) return;
       }
-      if (isJSONRPCRequest(message)) pending.add(message.id);
-      if (live && isJSONRPCNotification(message) && message.method === "notifications/initialized")
-        live.initialized = true;
-      child.stdin?.write(serializeMessage(message));
+      live ??= launchServer(transport);
+      const output = live.output;
+      if (isJSONRPCRequest(message)) output.pending.add(message.id);
+      if (initialize && !output.handshake) output.handshake = { request: message.id, reply: message.id, answer: null };
+      if (isJSONRPCNotification(message) && message.method === "notifications/initialized") live.initialized = true;
+      live.child.stdin?.write(serializeMessage(message));
     };
     transport.onclose = () => {
       transports.delete(transport);
       if (transport.sessionId) sessions.delete(transport.sessionId);
-      if (child) void stopServer(child);
+      if (!live || live.output.transport !== transport) return;
+      if (abandoned.has(transport) && keepStarting(live)) return;
+      void stopServer(live.child);
     };
     return transport;
   };
@@ -122,6 +167,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       response.once("close", () => {
         if (response.writableFinished || closing) return;
         launch.onStartAbandoned?.();
+        abandoned.add(transport);
         void transport.close().catch(() => undefined);
       });
     void transport
@@ -139,15 +185,15 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       const target = running.findLast((entry) => entry.initialized && entry.child.stdin?.writable === true);
       if (closing || !target) return resume(Effect.succeed(null));
       const id = `openbot-${randomBytes(12).toString("hex")}`;
-      target.own.set(id, (answer) => {
-        target.own.delete(id);
+      target.output.own.set(id, (answer) => {
+        target.output.own.delete(id);
         resume(Effect.succeed(relayedOutcome(answer)));
       });
       target.child.stdin?.write(
         serializeMessage({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }),
       );
       signal.addEventListener("abort", () => {
-        if (!target.own.delete(id)) return;
+        if (!target.output.own.delete(id)) return;
         target.child.stdin?.write(
           serializeMessage({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: id } }),
         );
@@ -201,12 +247,7 @@ function relayedOutcome(answer: JSONRPCResultResponse | JSONRPCErrorResponse | n
   return decoded.success ? { result: decoded.data } : { error: boundedError(decoded.error.message) };
 }
 
-function startServer(
-  launch: StdioMcpLaunch,
-  transport: StreamableHTTPServerTransport,
-  pending: Set<RequestId>,
-  own: Map<RequestId, OwnAnswer>,
-): ChildProcess {
+function startServer(launch: StdioMcpLaunch, output: ServerOutput): ChildProcess {
   const target = cliSpawnTarget(launch.command, launch.args);
   const child = spawn(target.command, target.args, {
     ...(launch.cwd ? { cwd: launch.cwd } : {}),
@@ -219,12 +260,15 @@ function startServer(
   endProcessGroupOnExit(child);
   const buffer = new ReadBuffer();
   const end = () => {
-    for (const answer of [...own.values()]) answer(null);
+    for (const answer of [...output.own.values()]) answer(null);
+    const { transport, pending } = output;
+    const ids = [...pending];
+    pending.clear();
+    if (!transport) return;
     const message = sourceText("error.backend.mcpServerStoppedDuringCall");
-    const answers = [...pending].map((id) =>
+    const answers = ids.map((id) =>
       transport.send({ jsonrpc: "2.0", id, error: { code: ErrorCode.InternalError, message } }).catch(() => undefined),
     );
-    pending.clear();
     void Promise.all(answers)
       .then(() => transport.close())
       .catch(() => undefined);
@@ -245,14 +289,21 @@ function startServer(
       }
       if (!message) break;
       if ((isJSONRPCResultResponse(message) || isJSONRPCErrorResponse(message)) && message.id !== undefined) {
-        const ownAnswer = own.get(message.id);
+        const ownAnswer = output.own.get(message.id);
         if (ownAnswer) {
           ownAnswer(message);
           continue;
         }
-        pending.delete(message.id);
+        output.pending.delete(message.id);
+        const handshake = output.handshake;
+        if (handshake && !handshake.answer && message.id === handshake.request) {
+          handshake.answer = message;
+          output.pending.delete(handshake.reply);
+          void output.transport?.send({ ...message, id: handshake.reply }).catch(() => undefined);
+          continue;
+        }
       }
-      void transport.send(message).catch(() => undefined);
+      void output.transport?.send(message).catch(() => undefined);
     }
   });
   child.stdin?.on("error", () => undefined);
