@@ -332,13 +332,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_library_folders",
     description:
-      "List your Library folders by path, with the id, name and stored path of each file in them, your files in no folder, and the files that workflows made, by workflow. Pass folder to list one folder and the folders in it. Change folders and move files with organize_library.",
+      "List your Library folders by path, with the id, name and stored path of each file in them, your files in no folder, and workflow files. Pass folder to list one folder. Change folders and move files with organize_library.",
     shape: listLibraryFoldersToolSchema.shape,
   },
   {
     name: "organize_library",
     description:
-      'Organize your Library folders and their files, by the folder paths and file ids from list_library_folders, such as "Reports/2026". create makes folder and each missing level, and puts files in it. rename gives folder the new name. move puts folder and its subfolders into to, or at the top level with no to. delete removes folder and its subfolders; their files stay in the Library, in no folder. place puts files, also files that workflows made, into to, and makes a missing folder; with no to, it takes files out of their folders. No action changes a file on disk. Delete or rename only a folder that the user asked you to change.',
+      'Organize your Library folders and their files, by the folder paths and file ids from list_library_folders, such as "Reports/2026". create makes folder and each missing level, and puts files in it. rename gives folder the new name. move puts folder and its subfolders into to, or at the top level with no to. delete removes folder and its subfolders; their files stay in the Library, in no folder. place puts files into to, and makes a missing folder; with no to, it takes files out of their folders. No action changes a file on disk. Delete or rename only a folder that the user asked you to change.',
     shape: organizeLibraryToolSchema.shape,
   },
   {
