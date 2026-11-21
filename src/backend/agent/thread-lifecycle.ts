@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  AGENT_INSTRUCTION_FILE_NAMES,
+  type AgentInstructionFileName,
   type AgentSummary,
   agentAutomationAllowed,
   agentComputerUseEnabled,
@@ -81,6 +83,7 @@ import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } f
 import { visibleDynamicTools } from "./tool-catalog";
 import {
   AGENT_INSTRUCTIONS_FILE_BYTES,
+  missingInstructionFileNames,
   type PromptInstructionsFile,
   promptInstructionsFile,
 } from "./workspace-instructions";
@@ -108,6 +111,7 @@ interface InstructionsFileInPrompt {
   fileName: PromptInstructionsFile["fileName"];
   found: PromptInstructionsFile | null;
   file: PromptInstructionsFile | null;
+  hiddenFromCli: AgentInstructionFileName[];
 }
 
 const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
@@ -624,6 +628,7 @@ export class ThreadLifecycle {
       ...this.#computerUseParam(agent, client),
       ...this.#mcpAgentParam(agent, client),
       ...this.#channelToolsParam(client, publicThreadId),
+      ...this.#excludedInstructionFilesParam(instructionsFile),
       ...this.#instructions(
         agent,
         client,
@@ -1215,17 +1220,34 @@ export class ThreadLifecycle {
     agent: AgentSummary,
     client: AgentClient,
   ) {
+    const enforced = workspaceAccessEnforced(agent);
     const read =
-      client.provider === "claude" && workspaceAccessEnforced(agent)
+      client.provider === "claude" && enforced
         ? []
         : agentProviderDescriptor(client.provider).workspaceInstructionFiles;
     const file = yield* promptInstructionsFile(agent.workspacePath, read);
+    const sent = file && !file.readByCli ? file : null;
+    const cliReadsProjectFiles = client.provider === "claude" && !enforced;
+    const missing = cliReadsProjectFiles ? yield* missingInstructionFileNames(agent.workspacePath) : [];
     return {
       fileName: file?.fileName ?? "AGENTS.md",
       found: file,
-      file: file && !file.readByCli ? file : null,
+      file: sent,
+      hiddenFromCli: cliReadsProjectFiles
+        ? AGENT_INSTRUCTION_FILE_NAMES.filter(
+            (fileName) => !read.includes(fileName) && (sent?.fileName === fileName || missing.includes(fileName)),
+          )
+        : [],
     } satisfies InstructionsFileInPrompt;
   });
+
+  #excludedInstructionFilesParam(instructionsFile: InstructionsFileInPrompt): {
+    excludedInstructionFiles?: AgentInstructionFileName[];
+  } {
+    return instructionsFile.hiddenFromCli.length > 0
+      ? { excludedInstructionFiles: instructionsFile.hiddenFromCli }
+      : {};
+  }
 
   readonly threadParams = Effect.fn("ThreadLifecycle.threadParams")(function* (
     this: ThreadLifecycle,
@@ -1239,6 +1261,7 @@ export class ThreadLifecycle {
     yield* checkAgentFolders(agent);
     const configs = this.#agentMcpServers(agent);
     const toolRuntimes = this.#toolRuntimes();
+    const instructionsFile = yield* this.#instructionsFile(agent, client);
     return {
       threadId: externalThreadId,
       model: agent.model,
@@ -1252,6 +1275,7 @@ export class ThreadLifecycle {
       ...this.#computerUseParam(agent, client),
       ...this.#mcpAgentParam(agent, client),
       ...this.#channelToolsParam(client, publicThreadId),
+      ...this.#excludedInstructionFilesParam(instructionsFile),
       ...this.#instructions(
         agent,
         client,
@@ -1260,7 +1284,7 @@ export class ThreadLifecycle {
         yield* this.#homeSkills(agent, client),
         this.#runsBesideOwnChat(agent, publicThreadId),
         configs,
-        yield* this.#instructionsFile(agent, client),
+        instructionsFile,
         yield* this.#workspaceSkills(agent, client),
       ),
       ...(client.provider === "codex" ? {} : { dynamicTools: visibleDynamicTools(client.provider) }),

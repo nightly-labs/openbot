@@ -205,6 +205,7 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
   cwd: string,
   sources: NonNullable<Options["settingSources"]>,
   processEnvironment: NodeJS.ProcessEnv,
+  excludedInstructionFiles: readonly string[],
 ) {
   const projectFiles = [
     ...(sources.includes("project") ? [join(cwd, ".claude", "settings.json")] : []),
@@ -230,6 +231,12 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
     ...CLAUDE_NAME_ONLY_SKILLS.map((skill): [string, "name-only"] => [skill, "name-only"]),
   ];
   const ownAttribution = ownSettings.some((file) => "attribution" in file || "includeCoAuthoredBy" in file);
+  const memoryExcludes = sources.includes("project")
+    ? [
+        ...(sources.includes("user") ? [] : claudeHomeMemoryFiles()),
+        ...claudeWorkspaceInstructionExcludes(cwd, excludedInstructionFiles),
+      ]
+    : [];
   const settings: Settings = {
     ...(ownAttribution ? {} : { attribution: { commit: "", pr: "" } }),
     disableRemoteControl: true,
@@ -237,7 +244,7 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
     ...(firstPartyApi && isClaudeAutoToolSearch(environmentValue("ENABLE_TOOL_SEARCH"))
       ? { env: { ENABLE_TOOL_SEARCH: "true" } }
       : {}),
-    ...(sources.includes("project") && !sources.includes("user") ? { claudeMdExcludes: claudeHomeMemoryFiles() } : {}),
+    ...(memoryExcludes.length > 0 ? { claudeMdExcludes: memoryExcludes } : {}),
   };
   return { settings, firstPartyApi };
 });
@@ -245,6 +252,12 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
 function claudeHomeMemoryFiles(): string[] {
   const userFolder = join(homedir(), ".claude");
   return [join(userFolder, "CLAUDE.md"), join(userFolder, "rules", "**")];
+}
+
+const CLAUDE_EXCLUDE_PATTERN_CHARACTERS = /[*?[\]{}()!]/g;
+
+function claudeWorkspaceInstructionExcludes(cwd: string, fileNames: readonly string[]): string[] {
+  return fileNames.map((fileName) => join(cwd, fileName).replace(CLAUDE_EXCLUDE_PATTERN_CHARACTERS, "?"));
 }
 
 const CLAUDE_OTHER_API_VARIABLES = [
@@ -326,6 +339,7 @@ interface ThreadConfig {
   channelTools: boolean;
   workspaceOnly: boolean;
   excludedFolders: string[];
+  excludedInstructionFiles: string[];
   agentId: string | null;
 }
 
@@ -1344,7 +1358,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             (name) => !(signInSettings.env?.[name] ?? cliEnvironment[name]),
           ),
         }
-      : yield* claudeFlagSettings(userSettingsFile, configDirectory, config.cwd, settingSources, cliEnvironment);
+      : yield* claudeFlagSettings(
+          userSettingsFile,
+          configDirectory,
+          config.cwd,
+          settingSources,
+          cliEnvironment,
+          config.excludedInstructionFiles,
+        );
     const flagSettings: Settings = {
       ...openBotSettings,
       ...nodeOptionsSettings,
@@ -3132,6 +3153,10 @@ function readThreadConfig(params: unknown): ThreadConfig {
     excludedFolders:
       isRecord(params) && Array.isArray(params.excludedFolders)
         ? params.excludedFolders.filter((value): value is string => isString(value))
+        : [],
+    excludedInstructionFiles:
+      isRecord(params) && Array.isArray(params.excludedInstructionFiles)
+        ? params.excludedInstructionFiles.filter((value): value is string => isString(value))
         : [],
     agentId: mcpAgentParam(params),
   };
