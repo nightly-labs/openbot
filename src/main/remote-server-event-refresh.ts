@@ -362,6 +362,9 @@ export class RemoteEventRefresh {
     for (const key of this.#queues.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#queues.delete(key);
     }
+    for (const key of this.#waitReads.keys()) {
+      if (key.startsWith(`${serverId}\0`)) this.#waitReads.delete(key);
+    }
   }
 
   clear(): void {
@@ -379,6 +382,7 @@ export class RemoteEventRefresh {
     this.#generations.clear();
     this.#conversations.clear();
     this.#queues.clear();
+    this.#waitReads.clear();
   }
 
   readonly #refreshConversationPage = Effect.fn("RemoteEvents.refreshConversationPage")(function* (
@@ -424,76 +428,63 @@ export class RemoteEventRefresh {
     );
   });
 
-  readonly #refreshQueue = Effect.fn("RemoteEvents.refreshQueue")(function* (
+  readonly #refreshAgentRead = Effect.fn("RemoteEvents.refreshAgentRead")(function* (
     this: RemoteEventRefresh,
+    reads: Map<string, QueueRefresh>,
     serverId: string,
     agentId: string,
+    read: Effect.Effect<AgentEvent, RemoteWorkflowError>,
   ) {
     const key = `${serverId}\0${agentId}`;
-    const pending = this.#queues.get(key);
+    const pending = reads.get(key);
     if (pending) {
       pending.dirty = true;
       return;
     }
     const request = { dirty: false };
-    this.#queues.set(key, request);
+    reads.set(key, request);
     yield* Effect.gen({ self: this }, function* () {
       do {
         request.dirty = false;
-        const result = yield* this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
-          Effect.result,
-        );
+        const result = yield* read.pipe(Effect.result);
         if (Result.isFailure(result)) {
           if (request.dirty) continue;
           return;
         }
         if (!this.#hasServer(serverId)) return;
-        this.#emit(serverId, { type: "queue-changed", snapshot: result.success });
+        this.#emit(serverId, result.success);
       } while (request.dirty);
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          if (this.#queues.get(key) === request) this.#queues.delete(key);
+          if (reads.get(key) === request) reads.delete(key);
         }),
       ),
     );
   });
 
-  readonly #refreshWaits = Effect.fn("RemoteEvents.refreshWaits")(function* (
-    this: RemoteEventRefresh,
-    serverId: string,
-    agentId: string,
-  ) {
-    const key = `${serverId}\0${agentId}`;
-    const pending = this.#waitReads.get(key);
-    if (pending) {
-      pending.dirty = true;
-      return;
-    }
-    const request = { dirty: false };
-    this.#waitReads.set(key, request);
-    yield* Effect.gen({ self: this }, function* () {
-      do {
-        request.dirty = false;
-        const result = yield* this.#request(serverId, AGENT_WAITS_ROUTES.list, decodeAgentWaitsResponse, {
-          method: "POST",
-          body: { agentId },
-        }).pipe(Effect.result);
-        if (Result.isFailure(result)) {
-          if (request.dirty) continue;
-          return;
-        }
-        if (!this.#hasServer(serverId)) return;
-        this.#emit(serverId, { type: "waits-changed", snapshot: result.success });
-      } while (request.dirty);
-    }).pipe(
-      Effect.ensuring(
-        Effect.sync(() => {
-          if (this.#waitReads.get(key) === request) this.#waitReads.delete(key);
-        }),
+  #refreshQueue(serverId: string, agentId: string) {
+    return this.#refreshAgentRead(
+      this.#queues,
+      serverId,
+      agentId,
+      this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
+        Effect.map((snapshot): AgentEvent => ({ type: "queue-changed", snapshot })),
       ),
     );
-  });
+  }
+
+  #refreshWaits(serverId: string, agentId: string) {
+    return this.#refreshAgentRead(
+      this.#waitReads,
+      serverId,
+      agentId,
+      this.#request(serverId, AGENT_WAITS_ROUTES.list, decodeAgentWaitsResponse, {
+        method: "POST",
+        body: { agentId },
+      }).pipe(Effect.map((snapshot): AgentEvent => ({ type: "waits-changed", snapshot }))),
+    );
+  }
 
   readonly #conversationPageEffect = Effect.fn("RemoteEvents.conversationPage")(
     (serverId: string, agentId: string, limit: number) =>
