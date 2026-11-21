@@ -1,4 +1,4 @@
-import { ArrowLeft, Button, ChevronRight, IconButton } from "@openbot/ui";
+import { ArrowLeft, Button, ChevronRight, IconButton, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { For, onSettled, Show, untrack } from "solid-js";
@@ -29,6 +29,7 @@ export function PageHeader(props: {
   });
   const inWindow = () => props.frame === "window";
   const back = () => (inWindow() ? undefined : props.onBack);
+  const close = () => (inWindow() ? props.onBack : undefined);
   const hostName = () => (inWindow() ? undefined : props.hostName);
   const hasPath = () => (props.path?.length ? "" : undefined);
   const identity = () => (
@@ -101,6 +102,37 @@ export function PageHeader(props: {
         )}
       </Show>
       {props.children}
+      <Show when={close()}>{(closePage) => <PageCloseButton onClose={() => closePage()()} />}</Show>
     </header>
+  );
+}
+
+function PageCloseButton(props: { onClose: () => void }) {
+  const { t } = useText();
+  let button: HTMLButtonElement | undefined;
+  onSettled(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      if (!button?.isConnected || button.closest("[inert]")) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("[role=dialog], [role=alertdialog], [role=menu], [role=listbox]")) return;
+      if (target?.closest("input, textarea, select, [contenteditable]")) return;
+      event.preventDefault();
+      props.onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  });
+  return (
+    <IconButton
+      ref={button}
+      class="page-header-close"
+      variant="ghost"
+      label={t("common.close")}
+      data-cuelume-tap="close"
+      onClick={() => props.onClose()}
+    >
+      <X />
+    </IconButton>
   );
 }
