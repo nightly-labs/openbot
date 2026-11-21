@@ -1,10 +1,10 @@
 import {
   type AgentStepActivity,
-  nodeAnswerProblems,
   type RoutineSchedule,
   type StoredFileRow,
   type WorkflowAnswerProblem,
   type WorkflowGraph,
+  workflowAnswerProblems,
   workflowInputAnswerFields,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -422,6 +422,8 @@ export function inCanvas(root: Element | undefined, element: Element | null): bo
   );
 }
 
+const NO_ANSWER_PROBLEMS: readonly WorkflowAnswerProblem[] = [];
+
 export function createBoard(options: BoardOptions) {
   const { t } = useText();
   const nameOf = (element: Element | null | undefined) => nodeName(element, t("workflow.board.stepFallback"));
@@ -624,6 +626,13 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  const answerProblemsByNode = createMemo(() => {
+    const graph = options.graph?.();
+    const byNode = new Map<string, WorkflowAnswerProblem[]>();
+    for (const problem of graph ? workflowAnswerProblems(graph) : [])
+      byNode.set(problem.nodeId, [...(byNode.get(problem.nodeId) ?? []), problem]);
+    return byNode;
+  });
   const pendingCompanions = createMemo(() => (state.pending ? companions(state.pending) : []));
 
   const isArmed = (port: PortRef) => {
@@ -820,11 +829,7 @@ export function createBoard(options: BoardOptions) {
       const graph = options.graph?.();
       return graph ? [...workflowInputAnswerFields(graph, id).keys()] : [];
     },
-    answerProblems: (id) => {
-      const graph = options.graph?.();
-      const node = graph?.nodes.find((candidate) => candidate.id === id);
-      return graph && node ? nodeAnswerProblems(graph, node) : [];
-    },
+    answerProblems: (id) => answerProblemsByNode().get(id) ?? NO_ANSWER_PROBLEMS,
     inputs: (id, type) =>
       state.edges.flatMap((edge) =>
         edge.to === id && edge.type === type && !state.removed.includes(edge.from) ? [edge.from] : [],

@@ -1,58 +1,51 @@
 import {
-  canGiveWorkflowAnswer,
   checkWorkflowAnswer,
   lastJsonObject,
   parseWorkflowAnswerSpec,
-  plainAnswer,
   WORKFLOW_ANSWER_FIELD,
   type WorkflowAnswer,
   type WorkflowAnswerField,
+  type WorkflowAnswerSource,
   type WorkflowAnswerValueProblem,
   type WorkflowFields,
   type WorkflowGraph,
   type WorkflowNode,
+  workflowAnswerFieldsOf,
   workflowAnswerFixText,
   workflowAnswerInstruction,
   workflowAnswerLines,
+  workflowAnswerSources,
+  workflowAnswerValueText,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { StoredWorkflowStep } from "./workflow-run-store";
-
-const PASS_THROUGH_KINDS: ReadonlySet<WorkflowNode["kind"]> = new Set(["condition", "approval"]);
 
 export function answerFields(fields: WorkflowFields | null | undefined): WorkflowAnswerField[] {
   const spec = fields?.[WORKFLOW_ANSWER_FIELD];
   return typeof spec === "string" && spec.trim() ? parseWorkflowAnswerSpec(spec).fields : [];
 }
 
-export function nodeAnswerFields(node: WorkflowNode): WorkflowAnswerField[] {
-  return canGiveWorkflowAnswer(node) ? answerFields(node.fields) : [];
-}
-
-function answerSources(graph: WorkflowGraph, nodeId: string): WorkflowNode[] {
-  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
-  const sources: WorkflowNode[] = [];
-  const seen = new Set<string>([nodeId]);
-  const visit = (id: string) => {
-    for (const edge of graph.edges) {
-      if (edge.to !== id || edge.type !== "text" || seen.has(edge.from)) continue;
-      seen.add(edge.from);
-      const source = nodes.get(edge.from);
-      if (!source) continue;
-      if (nodeAnswerFields(source).length > 0) sources.push(source);
-      else if (PASS_THROUGH_KINDS.has(source.kind)) visit(source.id);
-    }
-  };
-  visit(nodeId);
-  return sources;
-}
-
-function givenAnswer(node: WorkflowNode, output: string): WorkflowAnswer {
+function givenAnswer({ node, fields }: WorkflowAnswerSource, output: string): WorkflowAnswer {
   const record = lastJsonObject(output);
   if (!record) return {};
-  if (node.kind !== "trigger") return plainAnswer(record);
-  return isDynamicRecord(record.data) ? plainAnswer(record.data) : {};
+  const given = node.kind === "trigger" && Object.hasOwn(record, "data") ? record.data : record;
+  return checkWorkflowAnswer(fields, given).answer;
+}
+
+type GivenAnswer = { source: WorkflowAnswerSource; answer: WorkflowAnswer };
+
+function givenAnswers(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): GivenAnswer[] {
+  return workflowAnswerSources(graph, nodeId)
+    .flatMap((source) => {
+      const step = latest.get(source.node.id);
+      return step?.status === "done" && step.output ? [{ source, step, output: step.output }] : [];
+    })
+    .sort((left, right) => left.step.sequence - right.step.sequence)
+    .map(({ source, output }) => ({ source, answer: givenAnswer(source, output) }));
 }
 
 export function stepAnswer(
@@ -60,13 +53,26 @@ export function stepAnswer(
   nodeId: string,
   latest: ReadonlyMap<string, StoredWorkflowStep>,
 ): WorkflowAnswer {
-  const given = answerSources(graph, nodeId)
-    .flatMap((node) => {
-      const step = latest.get(node.id);
-      return step?.status === "done" && step.output ? [{ node, step, output: step.output }] : [];
-    })
-    .sort((left, right) => left.step.sequence - right.step.sequence);
-  return Object.assign({}, ...given.map(({ node, output }) => givenAnswer(node, output)));
+  return Object.fromEntries(givenAnswers(graph, nodeId, latest).flatMap(({ answer }) => Object.entries(answer)));
+}
+
+const OUTSIDE_TEXT_TYPES: ReadonlySet<WorkflowAnswerField["type"]> = new Set(["text", "list"]);
+
+export function templateValues(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): Map<string, string> {
+  const values = new Map<string, string>();
+  for (const { fields } of workflowAnswerSources(graph, nodeId)) for (const field of fields) values.set(field.name, "");
+  for (const { source, answer } of givenAnswers(graph, nodeId, latest))
+    for (const field of source.fields) {
+      if (!Object.hasOwn(answer, field.name)) continue;
+      const text = workflowAnswerValueText(answer[field.name]);
+      const outside = source.node.kind === "trigger" && OUTSIDE_TEXT_TYPES.has(field.type);
+      values.set(field.name, outside ? JSON.stringify(text) : text);
+    }
+  return values;
 }
 
 export function readableAnswerInputs(
@@ -76,9 +82,9 @@ export function readableAnswerInputs(
   inputs: readonly string[],
 ): string[] {
   const given = new Map(
-    answerSources(graph, nodeId).flatMap((node) => {
-      const output = latest.get(node.id)?.output;
-      return output && node.kind !== "trigger" ? [[output.trim(), givenAnswer(node, output)] as const] : [];
+    workflowAnswerSources(graph, nodeId).flatMap((source) => {
+      const output = latest.get(source.node.id)?.output;
+      return output && source.node.kind !== "trigger" ? [[output.trim(), givenAnswer(source, output)] as const] : [];
     }),
   );
   if (given.size === 0) return [...inputs];
@@ -118,7 +124,7 @@ export function webhookAnswerEvent(
   trigger: WorkflowNode,
   event: ReceivedWebhookEvent,
 ): { event: ReceivedWebhookEvent } | { problems: WorkflowAnswerValueProblem[] } {
-  const fields = nodeAnswerFields(trigger);
+  const fields = workflowAnswerFieldsOf(trigger);
   if (fields.length === 0) return { event };
   const { answer, problems } = checkWorkflowAnswer(fields, event.data);
   if (problems.length > 0) return { problems };

@@ -3,7 +3,7 @@ import { Button, CircleCheck, Play, Split, Textarea } from "@openbot/ui";
 import { createMemo, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { AnswerAction, AnswerProblems, AnswerSummary, useAnswerText } from "./workflow-answer-parts";
-import { BRANCH_NAME, useBoard } from "./workflow-board";
+import { BRANCH_NAME, resultValue, useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
 import {
@@ -53,7 +53,7 @@ export function ConditionNode(props: { id: string; rule?: string }) {
   const taken = () => {
     if (run.running()) return undefined;
     const shown = board.shown(props.id);
-    return shown?.failed ? undefined : (shown?.branch ?? shown?.value);
+    return shown?.branch ?? resultValue(shown);
   };
   return (
     <NodeShell

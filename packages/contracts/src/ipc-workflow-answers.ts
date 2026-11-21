@@ -4,8 +4,7 @@ import { type DynamicRecord, isDynamicRecord } from "./runtime-values";
 export const WORKFLOW_ANSWER_FIELD = "answer";
 export const WORKFLOW_CHECK_FIELD = "check";
 export const WORKFLOW_ANSWER_MAX_FIELDS = 20;
-export const WORKFLOW_ANSWER_TYPES = ["text", "number", "yes/no", "list", "choice"] as const;
-export type WorkflowAnswerType = (typeof WORKFLOW_ANSWER_TYPES)[number];
+export type WorkflowAnswerType = "text" | "number" | "yes/no" | "list" | "choice";
 
 export interface WorkflowAnswerField {
   name: string;
@@ -29,7 +28,7 @@ export interface WorkflowAnswerSpec {
   problems: WorkflowAnswerSpecProblem[];
 }
 
-const FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,39}$/u;
+const FIELD_NAME = /^(?!__)[A-Za-z_][A-Za-z0-9_]{0,39}$/u;
 const TEMPLATE = /\{\{\s*([A-Za-z_][A-Za-z0-9_]{0,39})\s*\}\}/gu;
 const TYPE_WORDS: Readonly<Record<string, WorkflowAnswerType>> = {
   text: "text",
@@ -87,7 +86,8 @@ export function parseWorkflowAnswerSpec(text: string): WorkflowAnswerSpec {
 
 function answerType(text: string): { type: WorkflowAnswerType; labels: readonly string[] } | null {
   const word = text.toLowerCase().replace(/\s+/gu, " ");
-  const known = TYPE_WORDS[word || "text"];
+  const typeWord = word || "text";
+  const known = Object.hasOwn(TYPE_WORDS, typeWord) ? TYPE_WORDS[typeWord] : undefined;
   if (known) return { type: known, labels: [] };
   const listed = word.startsWith("one of ") ? text.trim().slice("one of ".length) : text;
   const separator = listed.includes("|") ? "|" : word.startsWith("one of ") ? "," : null;
@@ -101,15 +101,6 @@ function answerType(text: string): { type: WorkflowAnswerType; labels: readonly 
     ),
   ];
   return { type: "choice", labels };
-}
-
-export function formatWorkflowAnswerSpec(fields: readonly WorkflowAnswerField[]): string {
-  return fields
-    .map(
-      (field) =>
-        `${field.name}${field.optional ? "?" : ""}: ${field.type === "choice" ? field.labels.join("|") : field.type}`,
-    )
-    .join("\n");
 }
 
 export function workflowAnswerFieldsOf(node: WorkflowNode): WorkflowAnswerField[] {
@@ -154,21 +145,21 @@ export function checkWorkflowAnswer(
   value: unknown,
 ): { answer: WorkflowAnswer; problems: WorkflowAnswerValueProblem[] } {
   const record: DynamicRecord = isDynamicRecord(value) ? value : {};
-  const answer: Record<string, WorkflowAnswerValue> = {};
+  const entries: [string, WorkflowAnswerValue][] = [];
   const problems: WorkflowAnswerValueProblem[] = [];
   for (const field of fields) {
-    const raw = record[field.name];
-    if (raw === undefined || raw === null || raw === "") {
-      if (!field.optional) problems.push({ name: field.name, problem: "missing" });
-      continue;
-    }
-    const checked = answerValue(field, raw);
-    if (typeof checked === "object" && checked !== null && "problem" in checked)
+    const raw = Object.hasOwn(record, field.name) ? record[field.name] : undefined;
+    const checked = raw === undefined || raw === null || raw === "" ? undefined : answerValue(field, raw);
+    if (checked !== undefined && typeof checked === "object" && "problem" in checked)
       problems.push({ name: field.name, problem: checked.problem });
-    else answer[field.name] = checked;
+    else if (checked === undefined || isBlank(checked)) {
+      if (!field.optional) problems.push({ name: field.name, problem: "missing" });
+    } else entries.push([field.name, checked]);
   }
-  return { answer, problems };
+  return { answer: Object.fromEntries(entries), problems };
 }
+
+const isBlank = (value: WorkflowAnswerValue) => value === "" || (typeof value === "object" && value.length === 0);
 
 function answerValue(field: WorkflowAnswerField, raw: unknown): WorkflowAnswerValue | { problem: "type" | "label" } {
   switch (field.type) {
@@ -217,7 +208,10 @@ export function lastJsonObject(text: string): DynamicRecord | null {
   let found: DynamicRecord | null = null;
   for (let start = text.indexOf("{"); start >= 0; ) {
     const end = balancedEnd(text, start);
-    if (end < 0) break;
+    if (end < 0) {
+      start = text.indexOf("{", start + 1);
+      continue;
+    }
     const parsed = parseRecord(text.slice(start, end + 1));
     if (parsed) found = parsed;
     start = text.indexOf("{", parsed ? end + 1 : start + 1);
@@ -254,27 +248,6 @@ function balancedEnd(text: string, start: number): number {
   return -1;
 }
 
-export function workflowAnswerOfText(text: string): WorkflowAnswer | null {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
-  const record = parseRecord(trimmed);
-  return record ? plainAnswer(record) : null;
-}
-
-export function plainAnswer(record: DynamicRecord): WorkflowAnswer {
-  const answer: Record<string, WorkflowAnswerValue> = {};
-  for (const [name, value] of Object.entries(record)) {
-    if (
-      typeof value === "string" ||
-      typeof value === "boolean" ||
-      (typeof value === "number" && Number.isFinite(value))
-    )
-      answer[name] = value;
-    else if (Array.isArray(value) && value.every((item) => typeof item === "string")) answer[name] = value;
-  }
-  return answer;
-}
-
 export function workflowAnswerValueText(value: WorkflowAnswerValue | undefined): string {
   if (value === undefined) return "";
   if (typeof value === "boolean") return value ? "yes" : "no";
@@ -292,9 +265,9 @@ export function workflowTemplateNames(text: string): string[] {
   return [...new Set([...text.matchAll(TEMPLATE)].flatMap((match) => (match[1] ? [match[1]] : [])))];
 }
 
-export function fillWorkflowTemplate(text: string, answer: WorkflowAnswer | null): string {
+export function fillWorkflowTemplate(text: string, values: ReadonlyMap<string, string>): string {
   if (!text.includes("{{")) return text;
-  return text.replace(TEMPLATE, (_whole, name: string) => workflowAnswerValueText(answer?.[name]));
+  return text.replace(TEMPLATE, (whole, name: string) => values.get(name) ?? whole);
 }
 
 export const WORKFLOW_TEMPLATE_FIELDS: Readonly<Partial<Record<WorkflowNodeKind, readonly string[]>>> = {
@@ -380,7 +353,9 @@ function splitWords(text: string, word: "and" | "or"): string[] {
 }
 
 export function workflowCheckPasses(check: WorkflowCheck, answer: WorkflowAnswer): boolean {
-  return check.some((group) => group.every((test) => testPasses(test, answer[test.name])));
+  return check.some((group) =>
+    group.every((test) => testPasses(test, Object.hasOwn(answer, test.name) ? answer[test.name] : undefined)),
+  );
 }
 
 function testPasses(test: WorkflowCheckTest, value: WorkflowAnswerValue | undefined): boolean {
@@ -446,22 +421,34 @@ function compareNumbers(operator: WorkflowCheckOperator, left: number, right: nu
 
 const PASS_THROUGH_KINDS: ReadonlySet<WorkflowNodeKind> = new Set(["condition", "approval"]);
 
-export function workflowInputAnswerFields(graph: WorkflowGraph, nodeId: string): Map<string, WorkflowAnswerField[]> {
+export interface WorkflowAnswerSource {
+  node: WorkflowNode;
+  fields: WorkflowAnswerField[];
+}
+
+export function workflowAnswerSources(graph: WorkflowGraph, nodeId: string): WorkflowAnswerSource[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
-  const found = new Map<string, WorkflowAnswerField[]>();
+  const sources: WorkflowAnswerSource[] = [];
   const seen = new Set<string>([nodeId]);
   const visit = (id: string) => {
     for (const edge of graph.edges) {
       if (edge.to !== id || edge.type !== "text" || seen.has(edge.from)) continue;
       seen.add(edge.from);
-      const source = nodes.get(edge.from);
-      if (!source) continue;
-      const fields = workflowAnswerFieldsOf(source);
-      for (const field of fields) found.set(field.name, [...(found.get(field.name) ?? []), field]);
-      if (fields.length === 0 && PASS_THROUGH_KINDS.has(source.kind)) visit(source.id);
+      const node = nodes.get(edge.from);
+      if (!node) continue;
+      const fields = workflowAnswerFieldsOf(node);
+      if (fields.length > 0) sources.push({ node, fields });
+      else if (PASS_THROUGH_KINDS.has(node.kind)) visit(node.id);
     }
   };
   visit(nodeId);
+  return sources;
+}
+
+export function workflowInputAnswerFields(graph: WorkflowGraph, nodeId: string): Map<string, WorkflowAnswerField[]> {
+  const found = new Map<string, WorkflowAnswerField[]>();
+  for (const { fields } of workflowAnswerSources(graph, nodeId))
+    for (const field of fields) found.set(field.name, [...(found.get(field.name) ?? []), field]);
   return found;
 }
 
@@ -556,7 +543,7 @@ export function workflowAnswerProblemText(problem: WorkflowAnswerProblem): strin
     case "test":
       return `check cannot test field ${problem.name} like that: compare a number with = != > >= < <=, a yes/no with = yes or = no, a choice with = and one of its labels, and text or a list with = != or contains.`;
     case "template":
-      return `${problem.field} uses {{${problem.name}}}, but no connected step before it gives that field in its answer.`;
+      return `${problem.field} uses {{${problem.name}}}, but no connected step before it gives that field in its answer, so the text stays as it is.`;
     case "conflict":
       return `two steps before it give the field ${problem.name} with different types. Rename one of them.`;
   }

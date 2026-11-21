@@ -47,6 +47,7 @@ import {
   type WorkflowSummary,
   type WorkflowVersion,
   type WorkflowVersionInput,
+  workflowAnswerFieldsOf,
   workflowCatalogMediaModel,
   workflowCatalogProvider,
   workflowCheckPasses,
@@ -133,10 +134,10 @@ import {
   answerFixAsk,
   answerProblemNames,
   modelAnswerAsk,
-  nodeAnswerFields,
   readAnswer,
   readableAnswerInputs,
   stepAnswer,
+  templateValues,
   webhookAnswerEvent,
 } from "./workflow-answers";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
@@ -516,7 +517,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             const answer = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             const output = answer === null || isNoUpdateAnswer(answer) ? "" : answer;
             const fields = answerFields(step.settings);
-            if (fields.length === 0 || output === "") return settle(step, { status: "done", output });
+            if (fields.length === 0) return settle(step, { status: "done", output });
             const read = readAnswer(fields, output);
             if ("output" in read) return settle(step, { status: "done", output: read.output });
             if (yield* askAnswerFix(step, step.agentId, step.deliveryId, answerFixAsk(fields, read.problems))) {
@@ -567,13 +568,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               yield* requestSweep();
               return;
             }
-            const fields = condition ? [] : nodeAnswerFields(node);
-            const answer = condition ? null : answerOf(step, run);
+            const fields = condition ? [] : workflowAnswerFieldsOf(node);
+            const values = condition ? new Map<string, string>() : templateValuesOf(step, run);
             const prompt = condition
               ? conditionPrompt(fieldText(node, "rule"), step.input)
               : modelStepPrompt(
-                  fillWorkflowTemplate(fieldText(node, "system"), answer),
-                  fillWorkflowTemplate(fieldText(node, "prompt"), answer),
+                  fillWorkflowTemplate(fieldText(node, "system"), values),
+                  fillWorkflowTemplate(fieldText(node, "prompt"), values),
                   step.input,
                 );
             const request: WorkflowTextRequest = {
@@ -1129,7 +1130,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                   kind: "approval",
                   workflowId: step.workflowId,
                   workflowTitle: titleOf(step.workflowId),
-                  text: fillWorkflowTemplate(fieldText(node, "question"), answerOf(step, run)),
+                  text: fillWorkflowTemplate(fieldText(node, "question"), templateValuesOf(step, run)),
                 });
               }
               return;
@@ -1171,11 +1172,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
         });
 
-        const answerOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null) => {
+        const stepGraph = (step: StoredWorkflowStep, run: StoredWorkflowRun | null) => {
           const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
-          return graph
-            ? stepAnswer(graph, step.nodeId, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
-            : {};
+          return graph ? { graph, latest: run ? latestSteps(run.id) : runs.latestDone(step.workflowId) } : null;
+        };
+        const answerOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null) => {
+          const found = stepGraph(step, run);
+          return found ? stepAnswer(found.graph, step.nodeId, found.latest) : {};
+        };
+        const templateValuesOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null) => {
+          const found = stepGraph(step, run);
+          return found ? templateValues(found.graph, step.nodeId, found.latest) : new Map<string, string>();
         };
 
         const stepInput = (
@@ -1189,8 +1196,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (node.kind === "output") return inputText(readableAnswerInputs(graph, node.id, latest, inputs));
           const text = inputText(inputs);
           if (node.kind !== "agent") return text;
-          const task = fillWorkflowTemplate(fieldText(node, "task"), stepAnswer(graph, node.id, latest));
-          const fields = nodeAnswerFields(node);
+          const task = fillWorkflowTemplate(fieldText(node, "task"), templateValues(graph, node.id, latest));
+          const fields = workflowAnswerFieldsOf(node);
           return agentStepText(
             titleOf(workflowId),
             fields.length > 0
