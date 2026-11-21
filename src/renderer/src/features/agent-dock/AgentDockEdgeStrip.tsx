@@ -6,7 +6,7 @@ import { createEffect, onSettled } from "solid-js";
 
 export const AGENT_DOCK_STRIP_WIDTH = 6;
 export const AGENT_DOCK_STRIP_REST = 0.35;
-const AGENT_DOCK_STRIP_FEEL = 160;
+export const AGENT_DOCK_STRIP_FEEL = 160;
 const STRIP_REVEAL = 28;
 const WAVE_REST_MS = 12_000;
 const WAVE_LATER_REST_MS = 30_000;

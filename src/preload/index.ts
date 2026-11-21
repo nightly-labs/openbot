@@ -845,6 +845,7 @@ const openbotApi: OpenBotDesktopApi = {
     action: decodeAgentDockAction,
     setInteractive: decodeVoid,
     setInputRegion: decodeVoid,
+    setExtent: decodeVoid,
     setXWayland: decodeVoid,
     closeChat: decodeVoid,
     listDisplays: decodeAgentDockDisplays,
