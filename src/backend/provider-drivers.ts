@@ -226,6 +226,14 @@ type ProviderCodeSignIn =
   | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand }
   | (Omit<AcpAuthenticateSignIn, "kind"> & { readonly kind: "acp-delegated" });
 
+function antigravityTokenFile(context: ProviderClientContext): string {
+  return join(antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }), ANTIGRAVITY_TOKEN_FILE);
+}
+
+function antigravityUsesSavedKey(context: ProviderClientContext): boolean {
+  return Boolean(context.apiKey("antigravity")) && !context.accountEnvironment;
+}
+
 function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment: boolean) {
   const account = context.accountEnvironment;
   const variables = () => context.providerEnvironment?.("antigravity") ?? {};
@@ -911,30 +919,24 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         mcpEndpoint: context.mcpEndpoint,
         history: context.history?.("antigravity"),
         readAccount: () =>
-          context.apiKey("antigravity") && !context.accountEnvironment
+          antigravityUsesSavedKey(context)
             ? Effect.succeed({ email: null })
-            : readAntigravityEmail(
-                join(antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }), ANTIGRAVITY_TOKEN_FILE),
-              ).pipe(Effect.map((email) => ({ email }))),
+            : readAntigravityEmail(antigravityTokenFile(context)).pipe(Effect.map((email) => ({ email }))),
         readRateLimits: (_connection, model) =>
-          context.apiKey("antigravity") && !context.accountEnvironment
+          antigravityUsesSavedKey(context)
             ? Effect.succeed({ rateLimits: null, rateLimitsByLimitId: null })
             : readAntigravityQuota({
-                tokenFile: join(
-                  antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }),
-                  ANTIGRAVITY_TOKEN_FILE,
-                ),
+                tokenFile: antigravityTokenFile(context),
                 model,
                 ...(context.systemProxyFetch ? { fetch: context.systemProxyFetch } : {}),
               }),
         readVerificationLink: () =>
-          readAntigravityValidationLink({
-            tokenFile: join(
-              antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }),
-              ANTIGRAVITY_TOKEN_FILE,
-            ),
-            fetch: context.systemProxyFetch,
-          }),
+          antigravityUsesSavedKey(context)
+            ? Effect.succeed(null)
+            : readAntigravityValidationLink({
+                tokenFile: antigravityTokenFile(context),
+                fetch: context.systemProxyFetch,
+              }),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {

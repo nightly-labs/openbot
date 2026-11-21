@@ -53,6 +53,11 @@ function handle(message) {
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Please verify your account in your browser to continue:" + NL + ${JSON.stringify(ANSWER_LINK)} } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
+    if (text.includes("NORMAL-ANSWER")) {
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "The site says: " } });
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Verification required for new devices. Verify your account to raise the limit." } });
+      return write({ id: message.id, result: { stopReason: "end_turn" } });
+    }
     if (text.includes("RPC-VERIFY"))
       return write({ id: message.id, error: { code: -32603, message: "Internal error: Verification required. Please complete verification in your browser to continue." } });
     update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } });
@@ -224,7 +229,43 @@ async function runCase(name: string, text: string, needsValidation: boolean): Pr
   report.cases.push(result);
   assert.equal(status, "failed", `${name}: the message fails`);
   assert.ok(result.error?.message.includes(VERIFY_MESSAGE), `${name}: the error asks to verify the account`);
-  assert.ok(result.loadCodeAssistCalls > 0, `${name}: OpenBot asks Google for the verification link`);
+  return result;
+}
+
+async function runNormalAnswer(name: string): Promise<CaseReport> {
+  googleNeedsValidation = true;
+  const agent = await runCauseEffect(
+    agents.createAgent({
+      name,
+      description: "Checks that a normal answer is not an account verification.",
+      avatarSeed: name.replace(/[^a-z]+/gu, "-"),
+      avatarHue: null,
+      provider: "antigravity",
+      model: "gemini-verify",
+      initialMessage: "Hello.",
+    }),
+  );
+  await waitFor(`${name}: the first turn`, () => idle(agent.id));
+  const since = events.length;
+  const receipt = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "NORMAL-ANSWER" }));
+  const deliveryId = receipt.deliveries[0]?.id;
+  assert.ok(deliveryId, `${name}: the message has a delivery`);
+  const status = await waitFor(`${name}: the message to end`, () => {
+    const value = mailbox.getDelivery(deliveryId)?.delivery.status;
+    return value === "completed" || value === "failed" || value === "interrupted" ? value : null;
+  });
+  const error = events.slice(since).find((event) => event.type === "error" && event.agentId === agent.id);
+  const result: CaseReport = {
+    name,
+    googleNeedsValidation: true,
+    status,
+    error: error?.type === "error" ? { message: error.message, link: error.link ?? null } : null,
+    loadCodeAssistCalls: 0,
+    passed: false,
+  };
+  report.cases.push(result);
+  assert.equal(status, "completed", `${name}: a normal answer about verification completes`);
+  assert.equal(result.error, null, `${name}: a normal answer shows no error`);
   return result;
 }
 
@@ -246,6 +287,9 @@ try {
   const rpc = await runCase("JSON-RPC error", "RPC-VERIFY", true);
   assert.equal(rpc.error?.link, GOOGLE_LINK, "A refused prompt also gets the Verify account button.");
   rpc.passed = true;
+
+  const normal = await runNormalAnswer("normal answer about verification");
+  normal.passed = true;
 
   report.passed = true;
 } catch (error) {

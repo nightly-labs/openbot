@@ -14,17 +14,25 @@ const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
 const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could not be re-established: /u;
 const GEMINI_VERIFICATION_ANSWER =
   /(?:^|\n)[^\n]*:\s+(https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
-const GEMINI_ACCOUNT_LINK =
-  /https:\/\/accounts\.google\.com\/signin\/(?:continue\?|[^\s<>"'`)\]]*auth_success_gemini)[^\s<>"'`)\]]*/u;
+const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
+const GEMINI_VERIFICATION_LINK = /https:\/\/accounts\.google\.com\/signin\/continue\?[^\s<>"'`)\]}\\]*/u;
 const GEMINI_LOG_ACCOUNT_LINK =
   /https:\/\/accounts\.google\.com\/signin\/(?:continue\?|[^\s<>"'`)\]}\\]*auth_success_gemini)[^\s<>"'`)\]}\\]*/gu;
-const GEMINI_VERIFICATION_REQUIRED = /\bVerification required\b|\bverify your account\b|\bVALIDATION_REQUIRED\b/iu;
-const GEMINI_VERIFICATION_REQUIRED_ANSWER =
-  /^\s*(?:\u26A0\uFE0F?\s*)?(?:Verification [Rr]equired\b|Please verify your account in your browser\b|Verify your account to continue\b)/u;
+const GEMINI_VERIFICATION_PROMPT =
+  /Verification required\. Please complete verification in your browser\b|Please verify your account in your browser to continue\b|Verify your account to continue\./u;
+const GEMINI_VERIFICATION_REQUIRED_ANSWER = /^\s*(?:\u26A0\uFE0F?\s*)?Verification Required\b/u;
+const GEMINI_VERIFICATION_PROMPT_ANSWER = new RegExp(
+  `^\\s*(?:\\u26A0\\uFE0F?\\s*)?(?:${GEMINI_VERIFICATION_PROMPT.source})`,
+  "u",
+);
+const GEMINI_VERIFICATION_REQUIRED = new RegExp(
+  `${GEMINI_VERIFICATION_REQUIRED_ANSWER.source}|${GEMINI_VERIFICATION_PROMPT.source}|\\bVALIDATION_REQUIRED\\b`,
+  "u",
+);
 const GEMINI_WARNING_ANSWER = /^\n\u26A0 /u;
 const GEMINI_RETRY_NOTICE = /^\n?⚠ API error \(attempt (\d+)\): /u;
 const GEMINI_FAILURE_ANSWER = new RegExp(
-  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_CONNECTION_LOST_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}|${GEMINI_WARNING_ANSWER.source}|${GEMINI_VERIFICATION_REQUIRED_ANSWER.source}`,
+  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_CONNECTION_LOST_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}|${GEMINI_WARNING_ANSWER.source}|${GEMINI_VERIFICATION_PROMPT_ANSWER.source}`,
   "u",
 );
 
@@ -243,6 +251,8 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
 function antigravityAccountLink(text: string, argv: readonly string[]): string | null {
   const link = geminiAccountLink(text);
   if (link !== null || !GEMINI_VERIFICATION_REQUIRED.test(text)) return link;
+  const answered = GEMINI_VERIFICATION_LINK.exec(text)?.[0].replace(/[.,;:]+$/u, "");
+  if (answered) return answered;
   for (const log of antigravityRecentLogs(argv)) {
     if (!log.includes("VALIDATION_REQUIRED")) continue;
     const links = log

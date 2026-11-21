@@ -217,6 +217,7 @@ interface AcpTurn {
   signInLost: boolean;
   failureCause: CauseCode | null;
   accountLink: string | null;
+  accountVerification: boolean;
   sessionLost: boolean;
   sdkFailureAt: number | null;
   retryNotices: string;
@@ -2405,6 +2406,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       signInLost: false,
       failureCause: null,
       accountLink: null,
+      accountVerification: false,
       sessionLost: false,
       sdkFailureAt: null,
       retryNotices: "",
@@ -2603,13 +2605,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           const detail = failure || turn.text.trim();
           turn.text = failure ? turn.text.slice(0, failureAt) : "";
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
-            const answeredLink = sdkHarness.accountLink?.(detail, this.options.argv, thread.id) ?? null;
-            const verification = answeredLink !== null || sdkHarness.accountVerification?.test(detail) === true;
-            const liveLink = verification ? yield* this.#readVerificationLink() : null;
-            if (thread.activeTurn !== turn || turn.completing) return;
-            turn.accountLink = liveLink ?? answeredLink;
+            turn.accountLink = sdkHarness.accountLink?.(detail, this.options.argv, thread.id) ?? null;
+            turn.accountVerification =
+              turn.accountLink !== null || sdkHarness.accountVerification?.test(detail) === true;
             const rawCause = classifyFailure(detail);
-            turn.failureCause = verification
+            turn.failureCause = turn.accountVerification
               ? "authentication"
               : rawCause === "unknown"
                 ? (sdkHarness.fallbackCause?.(detail) ?? rawCause)
@@ -3974,8 +3974,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#completeMessage(thread, turn, "final_answer", failureReport);
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
-      if (turn.accountLink === null && this.#flavor.sdkHarness?.accountVerification?.test(detail)) {
-        turn.accountLink = yield* this.#readVerificationLink();
+      if (turn.accountVerification || this.#flavor.sdkHarness?.accountVerification?.test(detail)) {
+        turn.accountLink = (yield* this.#readVerificationLink()) ?? turn.accountLink;
         turn.failureCause ??= "authentication";
       }
       const message =
