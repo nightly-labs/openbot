@@ -194,11 +194,15 @@ stall also sets Moonlight's `bitrate` and `fps` to the phone app's Data saver va
 the server ID, because one viewer origin shows all joined servers. The phone app keeps the quality
 from its menu. A Windows host lets Sunshine pick a hardware encoder, and some hardware encoders
 (AMD AMF on some drivers) pass Sunshine's start probe but never send a frame that the viewer can
-decode (#14210). When no frame came before the stall, the script sends `noPicture` with the
-`error` report, and on a Windows host the text says that the next connection uses a different
-video setting. The host then writes the `sunshine-software-encoder` marker in the runtime state
-folder, and the next Sunshine start writes `encoder = software`. When no frame comes with the
-software encoder either, the host removes the marker, because the encoder was not the cause. The
+decode (#14210). When no frame came before the stall, the viewer is the only session of a Windows
+host, and that host does not use the software encoder yet, the text says that the next connection
+uses a different video setting, and the script sends `noPicture` with the `error` report. The host
+then writes the `sunshine-software-encoder` marker, with an expiry 7 days later, in the runtime
+state folder. Retry closes the only session, so the runtime stops, and the next Sunshine start
+writes `encoder = software`. The expiry lets a host go back to the hardware encoder after a false
+alarm, such as a slow link, or after a driver update. With more than one session, the host does not
+change the encoder: another member may see a picture, and Sunshine does not restart for them.
+`scripts/remote-desktop-no-picture-e2e.ts` checks this through the real gateway in a browser. The
 host serves this script also when it has no clipboard writer, but then without
 the paste part.
 

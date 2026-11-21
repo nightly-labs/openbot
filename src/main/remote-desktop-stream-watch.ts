@@ -9,7 +9,7 @@ const LOWER_QUALITY = { bitrate: 3_000, fps: 30 };
 export function remoteDesktopStreamWatchScript(serverId: string, switchesEncoder: boolean): string {
   const tooSlowLowered = sourceText("error.remote.streamTooSlowLowerQuality");
   const tooSlow = sourceText("error.remote.streamTooSlow");
-  const noPicture = sourceText("error.remote.noPictureSwitchEncoder");
+  const noPictureText = sourceText("error.remote.noPictureSwitchEncoder");
   return `{
 const QUALITY_KEY = ${JSON.stringify(`openbot-remote-quality:${serverId}`)};
 const sessionId = /\\/sessions\\/([A-Za-z0-9-]+)\\/moonlight(?:\\/|$)/.exec(location.pathname)?.[1];
@@ -94,8 +94,8 @@ const check = async () => {
       lower = true;
     } catch {}
   }
-  const message = !started && ${switchesEncoder} ? ${JSON.stringify(noPicture)} : lower ? ${JSON.stringify(tooSlowLowered)} : ${JSON.stringify(tooSlow)};
-  report("error", message, !started);
+  const noPicture = !started && ${switchesEncoder};
+  report("error", noPicture ? ${JSON.stringify(noPictureText)} : lower ? ${JSON.stringify(tooSlowLowered)} : ${JSON.stringify(tooSlow)}, noPicture);
 };
 if (sessionId && window.RTCPeerConnection) {
   const Native = window.RTCPeerConnection;
