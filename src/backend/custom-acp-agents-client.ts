@@ -143,9 +143,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return this.#running;
   }
 
+  #sessionChildren(): Set<AgentClient> {
+    return new Set([...this.#sessions.values()].map(({ child }) => child));
+  }
+
   canReleaseProcess(): boolean {
-    const children = new Set([...this.#sessions.values()].map(({ child }) => child));
-    return [...children].every((child) => child.canReleaseProcess?.() !== false);
+    return [...this.#sessionChildren()].every((child) => child.canReleaseProcess?.() !== false);
   }
 
   readonly readHistory = Effect.fn("CustomAcp.readHistory")(function* (
@@ -199,8 +202,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   }
 
   markTurnsStoppedForShutdown(): void {
-    for (const child of new Set([...this.#sessions.values()].map((held) => held.child)))
-      child.markTurnsStoppedForShutdown?.();
+    for (const child of this.#sessionChildren()) child.markTurnsStoppedForShutdown?.();
   }
 
   readonly stop = Effect.fn("CustomAcp.stop")(function* (this: CustomAcpAgentsClient) {
