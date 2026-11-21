@@ -124,17 +124,20 @@ export interface DeliveryPromptSources {
 
 export interface SkippedRoutineRuns {
   count: number;
+  complete: boolean;
   reasons: readonly string[];
 }
 
-function skippedRoutineRunsNote({ count, reasons }: SkippedRoutineRuns): string {
-  const runs =
-    count > ROUTINE_MISSED_COUNT_LIMIT
-      ? `More than ${ROUTINE_MISSED_COUNT_LIMIT} scheduled runs`
-      : count === 1
-        ? "1 scheduled run"
-        : `${count} scheduled runs`;
-  return `OpenBot note, not from the user: ${runs} of this routine did not happen before this run. Reason: ${reasons.map((reason) => reason.replace(/\.$/u, "")).join("; ")}. Start your answer with this, in plain words: how many runs did not happen, why, what the user missed, and what to change if it can happen again. Then report this run. Give this answer also when the task has nothing new to report: do not call the ${ROUTINE_NO_UPDATE_TOOL} tool in this run.`;
+function skippedRunsCount({ count, complete }: SkippedRoutineRuns): string {
+  if (count > ROUTINE_MISSED_COUNT_LIMIT) return `More than ${ROUTINE_MISSED_COUNT_LIMIT} scheduled runs`;
+  if (!complete) return `At least ${count} scheduled runs`;
+  return count === 1 ? "1 scheduled run" : `${count} scheduled runs`;
+}
+
+function skippedRoutineRunsNote(skipped: SkippedRoutineRuns): string {
+  const { reasons } = skipped;
+  const runs = skippedRunsCount(skipped);
+  return `OpenBot note, not from the user: ${runs} of this routine did not happen before this run. Reason: ${reasons.map((reason) => reason.replace(/\.$/u, "")).join("; ")}. Start your answer with this, in plain words: how many runs did not happen, why, what the user missed, and what to change if it can happen again. Then report this run.`;
 }
 
 export interface TaskReportState {
@@ -514,7 +517,9 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
       testRun
         ? "This is a manual Test run. Report the action and result even when a normal scheduled run would suppress a notification because there is no change."
-        : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool and write no text, also none before it. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
+        : sources.skippedRoutineRuns
+          ? `This is a ${runKind}. Report the skipped runs also when the task has nothing new: do not call the ${ROUTINE_NO_UPDATE_TOOL} tool in this run.`
+          : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool and write no text, also none before it. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
       ...(testRun || run?.source === "script"
         ? []
         : [

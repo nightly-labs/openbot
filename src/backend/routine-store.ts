@@ -575,27 +575,25 @@ export class RoutineStore {
     ).map((row) => this.#run(row));
   }
 
-  protected skippedRowsBefore(
-    ownerId: string,
-    routineId: string,
-    runId: string,
-    createdAt: string,
-  ): { count: number; error: string | null }[] {
+  protected skippedRowsBefore(ownerId: string, routineId: string, runId: string, createdAt: string): SkippedRunRows {
     const rows = databaseRows(
       this.database.connection
         .prepare(
           `SELECT missed_count, error FROM ${this.tables.runTable}
-           WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?
+           WHERE routine_id = ? AND ${this.tables.ownerColumn} = ? AND run_kind = 'scheduled' AND run_source IS NULL
              AND (created_at < ? OR (created_at = ? AND run_id < ?))
            ORDER BY created_at DESC, run_id DESC LIMIT ?`,
         )
         .all(routineId, ownerId, createdAt, createdAt, runId, SKIPPED_ROWS_LIMIT),
     );
     const end = rows.findIndex((row) => row.missed_count === null);
-    return rows.slice(0, end < 0 ? rows.length : end).map((row) => ({
-      count: requiredNumberColumn(row, "missed_count"),
-      error: optionalStringColumn(row, "error"),
-    }));
+    return {
+      rows: rows.slice(0, end < 0 ? rows.length : end).map((row) => ({
+        count: requiredNumberColumn(row, "missed_count"),
+        error: optionalStringColumn(row, "error"),
+      })),
+      complete: end >= 0 || rows.length < SKIPPED_ROWS_LIMIT,
+    };
   }
 
   protected pendingRunRows(): OwnedRoutineRun[] {
@@ -1355,6 +1353,11 @@ type RunSource = Pick<OwnedRoutine, "id" | "ownerId" | "name" | "instruction">;
 
 const MISSED_WALK_LIMIT = ROUTINE_MISSED_COUNT_LIMIT + 1;
 const SKIPPED_ROWS_LIMIT = 20;
+
+export interface SkippedRunRows {
+  rows: { count: number; error: string | null }[];
+  complete: boolean;
+}
 const HOUR_MS = 3_600_000;
 const MISSED_WINDOWS_MS = [HOUR_MS, 24 * HOUR_MS, 32 * 24 * HOUR_MS, 400 * 24 * HOUR_MS, Number.POSITIVE_INFINITY];
 

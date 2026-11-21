@@ -181,12 +181,12 @@ async function skippedWhileRunOpen(): Promise<CaseDetails> {
     assert.equal(firstNote, null, "A run with no skips before it gets no note.");
     const skipped = fixture.scheduler.skippedBefore(second);
     assert.ok(skipped, "The skipped runs before the second run are found.");
-    assert.deepEqual(skipped, { count: 6, reasons: [RUN_OPEN_REASON] });
+    assert.deepEqual(skipped, { count: 6, complete: true, reasons: [RUN_OPEN_REASON] });
     const note = skipNote(routineTaskText(fixture, second));
     assert.ok(note, "The run after the skips gets the skip note.");
     assert.match(note, /6 scheduled runs of this routine did not happen/);
     assert.ok(note.includes(RUN_OPEN_REASON), "The note gives the stored reason.");
-    assert.match(note, /do not call the routine_no_update tool/);
+    assert.match(routineTaskText(fixture, second), /do not call the routine_no_update tool in this run/);
     fixture.runs.updateRunStatus(second.id, "succeeded");
     await runCauseEffect(fixture.scheduler.processDue(new Date(start.getTime() + 8 * STEP)));
     const third = deliveredRuns(fixture, routine)[2];

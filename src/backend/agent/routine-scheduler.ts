@@ -198,10 +198,12 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   skippedBefore(run: RoutineRun): SkippedRoutineRuns | null {
-    const rows = this.#routines.skippedBefore(run);
+    if (run.kind !== "scheduled" || run.source !== undefined) return null;
+    const { rows, complete } = this.#routines.skippedBefore(run);
     if (rows.length === 0) return null;
     return {
       count: rows.reduce((total, row) => total + row.count, 0),
+      complete,
       reasons: [...new Set(rows.map((row) => (row.error ? redactText(row.error) : SKIPPED_WHILE_CLOSED)))],
     };
   }
