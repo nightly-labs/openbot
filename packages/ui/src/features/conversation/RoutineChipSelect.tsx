@@ -40,9 +40,8 @@ export function RoutineChipSelect(props: RoutineChipSelectProps) {
         );
       }}
       onChange={(option) => {
-        if (!option || option.value === props.value) return;
+        if (!open || !option || option.value === props.value) return;
         props.onChange(option.value);
-        if (!open) props.onClose?.();
       }}
       itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.label}</SelectItem>}
     >
