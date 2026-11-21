@@ -29,6 +29,8 @@ export const messages = {
   "error.skill.replaceModified": "Questa skill ha modifiche locali. Conferma la sostituzione per continuare.",
   "error.skill.removeModified": "Questa skill ha modifiche locali. Conferma la rimozione per eliminarle.",
   "error.skill.notFound": "Skill non trovata.",
+  "error.skill.folderSkillToggle":
+    "OpenBot non ha installato questa skill, quindi non può attivarla né disattivarla. Modificala o rimuovila in {location}.",
   "error.skill.disableModified":
     "Questa skill ha modifiche locali. Salva o riconcilia entrambe le copie del provider prima di disattivarla.",
   "error.skill.disableNeedsRepair": "Questa skill va riparata prima di poterla disattivare.",

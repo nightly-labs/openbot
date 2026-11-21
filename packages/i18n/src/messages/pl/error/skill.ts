@@ -29,6 +29,8 @@ export const messages = {
   "error.skill.replaceModified": "Ta umiejętność ma lokalne zmiany. Potwierdź zastąpienie, aby kontynuować.",
   "error.skill.removeModified": "Ta umiejętność ma lokalne zmiany. Potwierdź usunięcie, aby je skasować.",
   "error.skill.notFound": "Nie znaleziono umiejętności.",
+  "error.skill.folderSkillToggle":
+    "OpenBot nie zainstalował tej umiejętności, więc nie może jej włączyć ani wyłączyć. Edytuj ją lub usuń w {location}.",
   "error.skill.disableModified":
     "Ta umiejętność ma lokalne zmiany. Zapisz lub uzgodnij obie kopie dostawców, zanim ją wyłączysz.",
   "error.skill.disableNeedsRepair": "Tę umiejętność trzeba naprawić, zanim będzie można ją wyłączyć.",
