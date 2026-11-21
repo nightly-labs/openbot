@@ -239,6 +239,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
   "error.backend.mcpServerInvalid": "OpenBot cannot save this MCP server configuration.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Header names cannot contain spaces or symbols such as : ( ) /. Use a name such as Authorization, and put the key or token in Value.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",
   "error.backend.mcpSignInNotAccepted": "The server did not accept that sign-in.",
   "error.backend.mcpSignInAccountRefused":

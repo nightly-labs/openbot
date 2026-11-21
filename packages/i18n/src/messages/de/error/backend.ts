@@ -265,6 +265,8 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",
   "error.backend.mcpServerInvalid": "OpenBot kann diese MCP-Server-Konfiguration nicht speichern.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Header-Namen dürfen keine Leerzeichen oder Zeichen wie : ( ) / enthalten. Verwende einen Namen wie Authorization und trage den Schlüssel oder das Token unter Wert ein.",
   "error.backend.mcpServerNoAnswer": "Der Server hat innerhalb von {seconds} Sekunden nicht geantwortet.",
   "error.backend.mcpSignInNotAccepted": "Der Server hat diese Anmeldung nicht akzeptiert.",
   "error.backend.mcpSignInAccountRefused":

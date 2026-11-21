@@ -228,6 +228,8 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot שומר עד {limit} שרתי MCP.",
   "error.backend.mcpServerNameTaken": "כבר קיים שרת MCP בשם {name}.",
   "error.backend.mcpServerInvalid": "OpenBot אינו יכול לשמור את תצורת שרת ה-MCP הזו.",
+  "error.backend.mcpHeaderNameInvalid":
+    "שמות כותרות לא יכולים להכיל רווחים או סמלים כמו : ( ) /. השתמשו בשם כמו Authorization, והזינו את המפתח או האסימון בשדה ערך.",
   "error.backend.mcpServerNoAnswer": "השרת לא ענה תוך {seconds} שניות.",
   "error.backend.mcpSignInNotAccepted": "השרת לא קיבל את ההתחברות הזו.",
   "error.backend.mcpSignInAccountRefused":

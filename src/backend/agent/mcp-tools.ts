@@ -330,7 +330,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const existing = servers.list().find((config) => config.name === input.name);
       const config = normalizeMcpConfig(mergeServer(existing, input));
       const errors = mcpConfigErrors(config);
-      const invalid = errors.name ?? errors.command ?? errors.url;
+      const invalid = errors.name ?? errors.command ?? errors.url ?? errors.headers;
       if (invalid) return openBotToolFailure(invalid);
       const headers = input.headers ?? [];
       if (headers.length > 0 && config.transport !== "http")

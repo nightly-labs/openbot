@@ -228,6 +228,8 @@ export const messages = {
   "error.backend.mcpServerLimit": "يحتفظ OpenBot بـ {limit} خوادم MCP كحد أقصى.",
   "error.backend.mcpServerNameTaken": "يوجد بالفعل خادم MCP باسم {name}.",
   "error.backend.mcpServerInvalid": "لا يمكن لـ OpenBot حفظ إعداد خادم MCP هذا.",
+  "error.backend.mcpHeaderNameInvalid":
+    "لا يمكن أن تحتوي أسماء الترويسات على مسافات أو رموز مثل : ( ) /. استخدم اسمًا مثل Authorization، وضع المفتاح أو الرمز المميز في القيمة.",
   "error.backend.mcpServerNoAnswer": "لم يُجب الخادم خلال {seconds} ثانية.",
   "error.backend.mcpSignInNotAccepted": "لم يقبل الخادم تسجيل الدخول هذا.",
   "error.backend.mcpSignInAccountRefused":

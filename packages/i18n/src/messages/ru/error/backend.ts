@@ -246,6 +246,8 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
   "error.backend.mcpServerInvalid": "OpenBot не может сохранить эту конфигурацию сервера MCP.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Имена заголовков не могут содержать пробелы и символы вроде : ( ) /. Используйте имя вроде Authorization, а ключ или токен укажите в поле «Значение».",
   "error.backend.mcpServerNoAnswer": "Сервер не ответил за {seconds} с.",
   "error.backend.mcpSignInNotAccepted": "Сервер не принял этот вход.",
   "error.backend.mcpSignInAccountRefused":
