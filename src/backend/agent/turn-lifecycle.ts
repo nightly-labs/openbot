@@ -266,6 +266,7 @@ export interface TurnHooks {
   isRoutineThread(threadId: string): boolean;
   taskOpen(taskId: string): boolean;
   taskBackgroundLost(taskId: string): void;
+  taskReporting(taskId: string): boolean;
   taskFailed(taskId: string, message: string): void;
   conversationTurnEnded(
     agentId: string,
@@ -672,6 +673,7 @@ export class TurnLifecycle {
 
   #taskRunsInProvider(agentId: string, taskId: string): boolean {
     if (!this.#hooks.taskOpen(taskId)) return false;
+    if (this.#hooks.taskReporting(taskId)) return true;
     const threadIds = [
       ...[...this.#waitingThreads].flatMap(([threadId, work]) => (work.agentId === agentId ? [threadId] : [])),
       ...[...this.#runningTurns.values()].flatMap((turn) => (turn.agentId === agentId ? [turn.threadId] : [])),
@@ -2393,6 +2395,13 @@ export class TurnLifecycle {
             !limited &&
             (tokenRefused || (failureCause !== undefined && TEMPORARY_REQUEST_CAUSES.has(failureCause)));
           for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id, temporary);
+          if (terminal === "failed")
+            yield* this.#relayTaskResults(
+              agentId,
+              turnId,
+              deliveries,
+              failedTaskReportNote(failure ? this.#hooks.redactMcp(failure) : null),
+            );
         }
         for (const { delivery } of deliveries) {
           if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
@@ -2921,9 +2930,11 @@ export class TurnLifecycle {
         senderTaskId && delivery.sender.kind === "agent" && delivery.sender.agentId === agentId ? [senderTaskId] : [],
       ),
     );
-    if ([...reportedTaskIds].some((taskId) => this.#mailbox.taskStillWorks(agentId, taskId))) return;
+    const finishedTaskIds = new Set(
+      [...reportedTaskIds].filter((taskId) => !this.#mailbox.taskStillWorks(agentId, taskId)),
+    );
     const requestIds = new Set(
-      [...reportedTaskIds].flatMap((taskId) => this.#mailbox.requestsHeldByTask(agentId, taskId)),
+      [...finishedTaskIds].flatMap((taskId) => this.#mailbox.requestsHeldByTask(agentId, taskId)),
     );
     for (const requestId of requestIds) {
       const requesterId = this.#mailbox.requestSenderAgentId(requestId);
@@ -2932,7 +2943,7 @@ export class TurnLifecycle {
         !this.#store.has(requesterId) ||
         this.#mailbox.hasReplyFrom(agentId, requestId) ||
         this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, requesterId, new Set()) ||
-        this.#mailbox.heldByTask(agentId, requestId, reportedTaskIds)
+        this.#mailbox.heldByTask(agentId, requestId, finishedTaskIds)
       )
         continue;
       yield* this.#sendResult(agentId, turnId, requestId, requesterId, text);
@@ -3467,4 +3478,15 @@ function showsOutput(message: ConversationMessage): boolean {
 
 function subagentStates(subagents: readonly ConversationSubagent[]): string {
   return subagents.map((subagent) => `${subagent.id}:${subagent.status}`).join("\n");
+}
+
+const FAILED_TASK_REPORT_REASON_LIMIT = 2_000;
+
+function failedTaskReportNote(reason: string | null): string {
+  return [
+    "Status: blocked",
+    `Result: OpenBot note, not written by this teammate: the task for this request ended, but the teammate's turn that read its result failed before the teammate answered. ${(reason ?? "The provider gave no reason.").slice(0, FAILED_TASK_REPORT_REASON_LIMIT)}`,
+    "Evidence: none",
+    "Unblock: The teammate's chat has the task result. Send the request again if you still need the answer.",
+  ].join("\n");
 }

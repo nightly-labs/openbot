@@ -1372,7 +1372,11 @@ export class DrainScheduler {
       ...new Set(
         this.#mailbox
           .heldRequestIdsOf(messageId)
-          .filter((requestId) => !this.#mailbox.hasReplyFrom(recipientAgentId, requestId))
+          .filter(
+            (requestId) =>
+              !this.#mailbox.hasReplyFrom(recipientAgentId, requestId) &&
+              !this.#mailbox.heldByTask(recipientAgentId, requestId, new Set([context.senderTaskId ?? ""])),
+          )
           .flatMap((requestId) => this.#mailbox.requestSenderAgentId(requestId) ?? []),
       ),
     ];

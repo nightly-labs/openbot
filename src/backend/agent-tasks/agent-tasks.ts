@@ -130,6 +130,7 @@ export class AgentTasks implements TaskLanes {
   readonly #userStops = new Map<string, string>();
   readonly #progressPublish = new Map<string, NodeJS.Timeout>();
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
+  readonly #pendingReports = new Map<string, number>();
   readonly #branches = Semaphore.makeUnsafe(1);
   readonly #starts = Semaphore.makeUnsafe(1);
 
@@ -143,6 +144,10 @@ export class AgentTasks implements TaskLanes {
   threadId(taskId: string): string | null {
     const task = this.#store.task(taskId);
     return task && task.closedAt === null ? task.threadId : null;
+  }
+
+  reporting(taskId: string): boolean {
+    return this.#pendingReports.has(taskId);
   }
 
   openTaskIds(agentId: string): readonly string[] {
@@ -639,6 +644,7 @@ export class AgentTasks implements TaskLanes {
           }),
         ),
       );
+    for (const archivedTask of archived) yield* this.releaseHeldRequests(archivedTask);
     if (!queued) {
       this.discard(task);
       if (archived.length > 0) this.changed(caller.agentId);
@@ -698,7 +704,14 @@ export class AgentTasks implements TaskLanes {
     taskId: string,
   ): Effect.fn.Return<void> {
     const task = this.#store.task(taskId);
-    if (!task || task.closedAt !== null || this.#mailbox.requestsLeftByTask(task.agentId, taskId).length === 0) return;
+    if (
+      !task ||
+      task.closedAt !== null ||
+      this.#mailbox
+        .requestsLeftByTask(task.agentId, taskId)
+        .every((requestId) => this.#mailbox.heardFromSince(task.agentId, requestId))
+    )
+      return;
     this.#store.setOutcome(taskId, "interrupted");
     this.changed(task.agentId);
     yield* this.releaseHeldRequests(task);
@@ -788,7 +801,7 @@ export class AgentTasks implements TaskLanes {
             routine: task.routineId !== null,
             turn: event,
           });
-          if (reports) this.#hooks.fork(this.#report(task, event));
+          if (reports) this.#hooks.fork(this.#reportOnce(task, event));
         }
         return true;
       }
@@ -805,6 +818,19 @@ export class AgentTasks implements TaskLanes {
     if (this.#mailbox.taskAwaitsAgent(task.agentId, task.taskId)) return false;
     const stopped = this.#stoppedTurns.get(task.taskId) === event.turnId;
     return !stopped || this.#userStops.get(task.taskId) === event.turnId;
+  }
+
+  #reportOnce(task: AgentThreadRecord, event: AgentTurnCompletedEvent): Effect.Effect<void> {
+    this.#pendingReports.set(task.taskId, (this.#pendingReports.get(task.taskId) ?? 0) + 1);
+    return this.#report(task, event).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          const left = (this.#pendingReports.get(task.taskId) ?? 1) - 1;
+          if (left > 0) this.#pendingReports.set(task.taskId, left);
+          else this.#pendingReports.delete(task.taskId);
+        }),
+      ),
+    );
   }
 
   readonly #report = Effect.fn("AgentTasks.report")(function* (

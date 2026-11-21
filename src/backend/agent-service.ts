@@ -1904,6 +1904,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           Effect.runFork(
             this.#tasks.releaseAfterLostWork(taskId).pipe(Effect.forkIn(this.#scope, { startImmediately: true })),
           ),
+        taskReporting: (taskId) => this.#tasks.reporting(taskId),
         taskFailed: (taskId, message) => this.#tasks.failed(taskId, this.#mcp.redact(message)),
       },
     });

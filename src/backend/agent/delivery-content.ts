@@ -365,14 +365,14 @@ export function routineLocalTime(scheduledFor: string, timeZone: string | undefi
 function taskReportFraming(taskId: string, report: TaskReportState | null, waiting: readonly string[]): string[] {
   const name = report ? `"${report.title}" (taskId ${taskId})` : `taskId ${taskId}`;
   const status =
-    report === null || report.closed
-      ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, is closed. The text below is its last answer, or its title when it gave none.`
-      : report.outcome === "failed"
-        ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, failed. The text below is its error or last answer.`
-        : report?.outcome === "stopped"
-          ? `Task report from OpenBot: the user stopped task ${name}, which you started with openbot.start_task. Do not start it again unless the user asks. The text below is its last answer, so part of the work can be done.`
-          : report?.outcome === "interrupted"
-            ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, or its title when it gave none, so part of the work can be done.`
+    report?.outcome === "failed"
+      ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, failed. The text below is its error or last answer.`
+      : report?.outcome === "stopped"
+        ? `Task report from OpenBot: the user stopped task ${name}, which you started with openbot.start_task. Do not start it again unless the user asks. The text below is its last answer, so part of the work can be done.`
+        : report?.outcome === "interrupted"
+          ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, or its title when it gave none, so part of the work can be done.`
+          : report === null || report.closed
+            ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, is closed. The text below is its last answer, or its title when it gave none.`
             : `Task report from OpenBot: task ${name}, which you started with openbot.start_task, ended its turn. The text below is its final answer.`;
   const running = report?.stillRunning.length
     ? [`Still running: ${report.stillRunning.map((other) => `"${other.title}" (taskId ${other.taskId})`).join(", ")}.`]

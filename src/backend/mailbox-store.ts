@@ -1129,14 +1129,16 @@ export class MailboxStore {
     const messages = this.#messagesById();
     const sourceTurnIds = this.#sourceTurnIds();
     return this.#state.deliveries.some((delivery) => {
-      if (!isActiveDelivery(delivery) || delivery.recipientAgentId === agentId) return false;
+      const held = delivery.status === "completed";
+      if ((!held && !isActiveDelivery(delivery)) || delivery.recipientAgentId === agentId) return false;
       const request = messages.get(delivery.messageId);
       return (
         request?.sender.kind === "agent" &&
         request.sender.agentId === agentId &&
         request.expectsReply !== false &&
         (request.senderTaskId ?? null) === taskId &&
-        turnIds.has(sourceTurnIds.get(request.id) ?? "")
+        turnIds.has(sourceTurnIds.get(request.id) ?? "") &&
+        (!held || this.heldByTask(delivery.recipientAgentId, request.id))
       );
     });
   }
@@ -1192,6 +1194,25 @@ export class MailboxStore {
 
   heldRequestIdsOf(messageId: string): string[] {
     return this.#messagesById().get(messageId)?.heldRequestIds ?? [];
+  }
+
+  heardFromSince(agentId: string, requestId: string): boolean {
+    const request = this.#messagesById().get(requestId);
+    if (request?.sender.kind !== "agent") return false;
+    const requesterId = request.sender.agentId;
+    const later = new Set(
+      this.#state.messages
+        .filter(
+          (message) =>
+            message.sender.kind === "agent" &&
+            message.sender.agentId === agentId &&
+            message.createdAt > request.createdAt,
+        )
+        .map((message) => message.id),
+    );
+    return this.#state.deliveries.some(
+      (delivery) => delivery.recipientAgentId === requesterId && later.has(delivery.messageId),
+    );
   }
 
   requestSenderAgentId(requestId: string): string | null {
