@@ -18,9 +18,64 @@ export interface BloubAvatarProfile {
 
 const AUTOMATIC_COLORS = ["rouge", "orange", "ambre", "vert", "turquoise", "bleu", "violet", "rose"] as const;
 const UNSUPPORTED_AVATAR_SILHOUETTE = "goutte" as const satisfies ShapeId;
-export const SUPPORTED_AVATAR_SILHOUETTES = SHAPES.map((option) => option.id).filter(
-  (silhouette): silhouette is SupportedAvatarSilhouetteId => silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE,
+const isSupportedSilhouette = (silhouette: ShapeId): silhouette is SupportedAvatarSilhouetteId =>
+  silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE;
+export const SUPPORTED_AVATAR_SILHOUETTES = SHAPES.map((option) => option.id).filter(isSupportedSilhouette);
+const SEEDED_AVATAR_SILHOUETTES = [
+  "cercle",
+  "galet",
+  "squircle",
+  "capsule",
+  "triangle",
+  "hexagone",
+  "nuage",
+  "goutte",
+  "carre",
+  "losange",
+  "pentagone",
+] as const satisfies readonly ShapeId[];
+type SeededSilhouette = (typeof SEEDED_AVATAR_SILHOUETTES)[number];
+type SeededSupportedSilhouette = Exclude<SeededSilhouette, typeof UNSUPPORTED_AVATAR_SILHOUETTE>;
+type NamedSilhouette = Exclude<ShapeId, SeededSilhouette>;
+const SEEDED_SUPPORTED_SILHOUETTES = SEEDED_AVATAR_SILHOUETTES.filter(
+  (silhouette): silhouette is SeededSupportedSilhouette => silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE,
 );
+const NAMED_SILHOUETTE_LOOKALIKES: Readonly<Record<NamedSilhouette, SeededSupportedSilhouette>> = {
+  fantome: "squircle",
+  meduse: "galet",
+  poulpe: "nuage",
+};
+const NAMED_SILHOUETTE_SEED_PATTERN = /:([a-z]+):(?:face|flat):\d+$/;
+
+function isNamedSilhouette(silhouette: string): silhouette is NamedSilhouette {
+  return Object.hasOwn(NAMED_SILHOUETTE_LOOKALIKES, silhouette);
+}
+
+function namedSilhouette(seed: string): NamedSilhouette | null {
+  const silhouette = NAMED_SILHOUETTE_SEED_PATTERN.exec(seed)?.[1];
+  return silhouette !== undefined && isNamedSilhouette(silhouette) ? silhouette : null;
+}
+
+function seededSilhouette(seed: string): SeededSupportedSilhouette {
+  const silhouette = requiredItem(
+    SEEDED_AVATAR_SILHOUETTES,
+    stableIndex(`${seed}:shape`, SEEDED_AVATAR_SILHOUETTES.length),
+  );
+  return silhouette === UNSUPPORTED_AVATAR_SILHOUETTE
+    ? requiredItem(
+        SEEDED_SUPPORTED_SILHOUETTES,
+        stableIndex(`${seed}:shape:replacement`, SEEDED_SUPPORTED_SILHOUETTES.length),
+      )
+    : silhouette;
+}
+
+function seededLookalike(silhouette: SupportedAvatarSilhouetteId): SeededSupportedSilhouette {
+  return isNamedSilhouette(silhouette) ? NAMED_SILHOUETTE_LOOKALIKES[silhouette] : silhouette;
+}
+
+function seededExpression(seed: string): ExpressionId {
+  return requiredItem(EXPRESSIONS, stableIndex(`${seed}:expression`, EXPRESSIONS.length)).id;
+}
 
 const HUE_COLORS: Readonly<Record<AvatarHue, string>> = {
   0: colorHex("rouge"),
@@ -107,15 +162,8 @@ export function bloubAvatarProfile(
   hue: AvatarHue | null,
   color: AvatarColor | null = null,
 ): BloubAvatarProfile {
-  const storedSilhouette = requiredItem(SHAPES, stableIndex(`${seed}:shape`, SHAPES.length)).id;
-  const silhouette =
-    storedSilhouette === UNSUPPORTED_AVATAR_SILHOUETTE
-      ? requiredItem(
-          SUPPORTED_AVATAR_SILHOUETTES,
-          stableIndex(`${seed}:shape:replacement`, SUPPORTED_AVATAR_SILHOUETTES.length),
-        )
-      : storedSilhouette;
-  const expression = requiredItem(EXPRESSIONS, stableIndex(`${seed}:expression`, EXPRESSIONS.length)).id;
+  const silhouette = namedSilhouette(seed) ?? seededSilhouette(seed);
+  const expression = seededExpression(seed);
 
   return {
     shape: silhouette,
@@ -149,7 +197,7 @@ function automaticColor(seed: string): ServerPlushColor {
 export function avatarCandidateSeeds(agentId: string, currentSeed: string, batch: number): string[] {
   const candidates = [currentSeed];
   const firstProfile = bloubAvatarProfile(currentSeed, null);
-  const unseenSilhouetteIds = new Set<SupportedAvatarSilhouetteId>(SUPPORTED_AVATAR_SILHOUETTES);
+  const unseenSilhouetteIds = new Set<SupportedAvatarSilhouetteId>(SEEDED_SUPPORTED_SILHOUETTES);
   const usedExpressions = new Set<ExpressionId>([firstProfile.expression]);
   unseenSilhouetteIds.delete(firstProfile.shape);
   let index = 1;
@@ -202,10 +250,13 @@ export function avatarSeedForFace(
   face: { shape: SupportedAvatarSilhouetteId; expression: ExpressionId },
   style: AvatarStyle = "plush",
 ): string {
+  const prefix = isNamedSilhouette(face.shape) ? `${agentId}:${face.shape}` : agentId;
+  const seededShape = seededLookalike(face.shape);
   for (let index = 0; index < FACE_SEED_TRIES; index += 1) {
-    const candidate = `${agentId}:${STYLE_SEED_SEGMENT[style]}:${index}`;
-    const profile = bloubAvatarProfile(candidate, null);
-    if (profile.shape === face.shape && profile.expression === face.expression) return candidate;
+    const candidate = `${prefix}:${STYLE_SEED_SEGMENT[style]}:${index}`;
+    if (seededSilhouette(candidate) === seededShape && seededExpression(candidate) === face.expression) {
+      return candidate;
+    }
   }
   throw new Error("No avatar seed draws this face.");
 }
