@@ -311,6 +311,8 @@ export class QueueControls {
               workflowRunSource:
                 context.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(input.deliveryId) : null,
               wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
+              continuesWait:
+                context.delivery.sender.kind === "routine" && this.#routines.continuesWait(input.deliveryId),
               routineTimezone:
                 context.delivery.sender.kind === "routine"
                   ? this.#routines.timezoneForDelivery(input.deliveryId)

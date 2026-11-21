@@ -231,6 +231,13 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#waits.wokenBy(deliveryId);
   }
 
+  continuesWait(deliveryId: string): boolean {
+    const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
+    if (sender?.kind !== "routine") return false;
+    const run = this.#routines.run(sender.runId);
+    return run !== null && run.deliveryId !== null && run.deliveryId !== deliveryId;
+  }
+
   quietRunForDelivery(deliveryId: string): boolean {
     const run = this.#routines.runForDelivery(deliveryId);
     return run !== null && quietRoutineRun(run);

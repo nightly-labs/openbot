@@ -112,6 +112,7 @@ export interface DeliveryPromptSources {
   workflowRunSource?: WorkflowRunSource | null;
   routineTimezone?: string | undefined;
   wokenWaits?: readonly AgentWait[];
+  continuesWait?: boolean;
   executionText?: string | undefined;
   tags?: TagReferenceSource | undefined;
   answeredRoutine?: AnsweredRoutine | null;
@@ -485,12 +486,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       .join("\n");
   }
   const wokenWaits = sources.wokenWaits ?? [];
-  const continuesWait =
-    delivery.sender.kind === "routine" &&
-    sources.routineRun === null &&
-    !sources.workflowRunSource &&
-    wokenWaits.length > 0;
-  if (delivery.sender.kind === "routine" && continuesWait) {
+  if (delivery.sender.kind === "routine" && sources.continuesWait) {
     text = [
       "An event of an existing OpenBot routine continues a wait that you opened in this thread.",
       `Routine name: ${delivery.sender.routineName}`,
@@ -499,7 +495,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       ROUTINE_TASK_START,
       displayText,
       ROUTINE_TASK_END,
-      wokenWaitsPromptText(wokenWaits),
+      wokenWaitsPromptText(wokenWaits) ?? "The wait closed before this message. Do nothing more for it.",
     ].join("\n");
   } else if (delivery.sender.kind === "routine") {
     const run = sources.routineRun;

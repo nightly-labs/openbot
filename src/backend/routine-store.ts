@@ -1269,12 +1269,17 @@ export class RoutineStore {
     return routine;
   }
 
-  #requireRun(runId: string): OwnedRoutineRun {
+  protected runRow(runId: string): OwnedRoutineRun | null {
     const row = this.database.connection
       .prepare(`SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE run_id = ?`)
       .get(runId);
-    if (!isDynamicRecord(row)) throw new Error("The routine run no longer exists.");
-    return this.#run(row);
+    return isDynamicRecord(row) ? this.#run(row) : null;
+  }
+
+  #requireRun(runId: string): OwnedRoutineRun {
+    const run = this.runRow(runId);
+    if (!run) throw new Error("The routine run no longer exists.");
+    return run;
   }
 
   #mutateRun(

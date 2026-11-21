@@ -171,6 +171,7 @@ function promptText(agentId: string, deliveryId: string): string {
     snapshot: { agentId, threadId: null, activeTurnId: null, revision: 0, messages: [] },
     routineRun: scheduler.runForDelivery(deliveryId),
     wokenWaits: scheduler.wokenWaits(deliveryId),
+    continuesWait: scheduler.continuesWait(deliveryId),
     routineTimezone: "UTC",
   });
   return input.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n");
@@ -293,6 +294,23 @@ try {
     assert.equal(threads.task(side.taskId)?.closedAt, null, "The side thread is open again.");
     await finish(agent.id, [run.deliveryId]);
     return { runDelivery: run.deliveryId };
+  });
+
+  await step("A side-thread message whose wait closed still does not run the routine again", async () => {
+    const sideTurn = await requestInTurn(agent.id, "Tell me when the nightly build ends.", side.taskId);
+    const opened = awaitEvent(agent.id, side.threadId, sideTurn, "Nightly build runs");
+    const waitId = String(opened.value.waitId);
+    const run = await runCauseEffect(
+      scheduler.runWithPayload({ agentId: agent.id, routineId: routine.id, payload: "exit 0", source: "script" }),
+    );
+    const wakeDeliveryId = waits.list(agent.id).waits.find((wait) => wait.id === waitId)?.wakeDeliveryId;
+    assert.ok(wakeDeliveryId && wakeDeliveryId !== run.deliveryId, "The side thread gets its own message.");
+    for (const wait of scheduler.wokenWaits(wakeDeliveryId)) waits.cancel(agent.id, wait.id);
+    assert.deepEqual(scheduler.wokenWaits(wakeDeliveryId), [], "Each wait of the side-thread message is closed.");
+    const sidePrompt = promptText(agent.id, wakeDeliveryId);
+    assert.ok(!sidePrompt.includes("Perform the task below now"), "The closed wait does not start a second run.");
+    await finish(agent.id, [run.deliveryId, wakeDeliveryId]);
+    return { runDelivery: run.deliveryId, sideDelivery: wakeDeliveryId };
   });
 
   await step("A thread that the agent started is not a side thread for waits", async () => {
