@@ -1,10 +1,10 @@
 {
-  "version": "0.76.0",
+  "version": "0.76.1",
   "highlights": [
     "Update your joined servers to this version too, so that parallel tasks, workflow folders, typed workflow answers and up to 20 provider accounts work there.",
     "Agents can split unrelated work into tasks that run at the same time and combine the results for you.",
-    "Change any keyboard shortcut in the new Keyboard tab of Settings.",
-    "Workflows open in tabs, and workflow steps can give typed answers that later steps use.",
-    "Use an MP4 or WebM video as the window backdrop."
+    "Open the agent browser in its own window and move it to a second monitor.",
+    "Word documents open in the file preview, and the Files panel opens the workspace folder of the agent.",
+    "Change any keyboard shortcut in the new Keyboard tab of Settings."
   ]
 }
