@@ -1443,6 +1443,7 @@ export const IPC_ENDPOINTS = {
     cancelScheduledRestart: request<undefined, UpdateStatus>()("update:cancel-scheduled-restart"),
     restartWhenIdle: request<IdleRestartTarget, UpdateStatus>()("update:restart-when-idle"),
     cancelIdleRestart: request<undefined, UpdateStatus>()("update:cancel-idle-restart"),
+    restartNow: request<undefined, UpdateStatus>()("update:restart-now"),
     event: event<UpdateStatus>()("update:event"),
     preference: event<UpdatePreference>()("update:preference-event"),
   },

@@ -8,6 +8,7 @@ import {
   AlertTitle,
   Button,
   Clock3,
+  ConfirmDialog,
   Item,
   ItemActions,
   ItemContent,
@@ -22,7 +23,7 @@ import {
   SettingsSection,
   SwitchField,
 } from "@openbot/ui";
-import { Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { restartReasonKey } from "../updates/restart-reasons";
 import type { GeneralSettingsValue } from "./app-settings";
@@ -82,41 +83,68 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
         )}
       </Show>
       <Show when={props.store.idleRestart()}>
-        {(restart) => (
-          <Alert tone={restart().error === undefined ? "neutral" : "danger"} role="status">
-            <AlertIcon>
-              <Clock3 />
-            </AlertIcon>
-            <AlertContent>
-              <AlertTitle>
-                {restart().error !== undefined
-                  ? t("update.idleRestart.failedTitle")
-                  : restart().target === "update"
-                    ? t("update.idleRestart.updateTitle")
-                    : t("update.idleRestart.relaunchTitle")}
-              </AlertTitle>
-              <AlertDescription>
-                {restart().error !== undefined
-                  ? errorMessage(restart().error, t("update.idleRestart.failedTitle"))
-                  : t("update.idleRestart.description")}
-              </AlertDescription>
-              <Show when={restart().error === undefined && restart().waitingFor.length > 0}>
-                <AlertDescription>{idleRestartWaitingFor(restart().waitingFor)}</AlertDescription>
-              </Show>
-            </AlertContent>
-            <AlertActions>
-              <Button
-                variant="outline"
-                type="button"
-                size="sm"
-                loading={props.store.idleRestartBusy()}
-                onClick={() => void props.store.cancelIdleRestart()}
-              >
-                {restart().error === undefined ? t("update.idleRestart.cancel") : t("common.close")}
-              </Button>
-            </AlertActions>
-          </Alert>
-        )}
+        {(restart) => {
+          const [confirmingRestartNow, setConfirmingRestartNow] = createSignal(false);
+          return (
+            <Alert tone={restart().error === undefined ? "neutral" : "danger"} role="status">
+              <AlertIcon>
+                <Clock3 />
+              </AlertIcon>
+              <AlertContent>
+                <AlertTitle>
+                  {restart().error !== undefined
+                    ? t("update.idleRestart.failedTitle")
+                    : restart().target === "update"
+                      ? t("update.idleRestart.updateTitle")
+                      : t("update.idleRestart.relaunchTitle")}
+                </AlertTitle>
+                <AlertDescription>
+                  {restart().error !== undefined
+                    ? errorMessage(restart().error, t("update.idleRestart.failedTitle"))
+                    : t("update.idleRestart.description")}
+                </AlertDescription>
+                <Show when={restart().error === undefined && restart().waitingFor.length > 0}>
+                  <AlertDescription>{idleRestartWaitingFor(restart().waitingFor)}</AlertDescription>
+                </Show>
+              </AlertContent>
+              <AlertActions>
+                <Show when={restart().error === undefined && props.store.restartNowOffered()}>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    size="sm"
+                    disabled={props.store.idleRestartBusy()}
+                    onClick={() => setConfirmingRestartNow(true)}
+                  >
+                    {t("update.idleRestart.restartNow")}
+                  </Button>
+                </Show>
+                <Button
+                  variant="outline"
+                  type="button"
+                  size="sm"
+                  loading={props.store.idleRestartBusy()}
+                  onClick={() => void props.store.cancelIdleRestart()}
+                >
+                  {restart().error === undefined ? t("update.idleRestart.cancel") : t("common.close")}
+                </Button>
+              </AlertActions>
+              <ConfirmDialog
+                open={confirmingRestartNow() && restart().error === undefined}
+                initialFocus="cancel"
+                title={t("update.idleRestart.restartNowTitle")}
+                description={t("update.idleRestart.restartNowDescription")}
+                confirmLabel={t("update.idleRestart.restartNow")}
+                cancelLabel={t("update.idleRestart.keepWaiting")}
+                onCancel={() => setConfirmingRestartNow(false)}
+                onConfirm={() => {
+                  setConfirmingRestartNow(false);
+                  void props.store.restartNow();
+                }}
+              />
+            </Alert>
+          );
+        }}
       </Show>
       <Show when={props.onOpenWhatsNew}>
         <Button type="button" variant="outline" size="sm" onClick={() => props.onOpenWhatsNew?.()}>

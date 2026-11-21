@@ -69,6 +69,17 @@ export class IdleRestart {
     return this.#updater.getStatus();
   }
 
+  restartNow(): UpdateStatus {
+    if (this.#restarting) throw new Error(sourceText("error.update.alreadyRestarting"));
+    const status = this.#status;
+    if (!status || status.error) return this.#updater.getStatus();
+    this.#clearTimer();
+    this.#log(`The user asked to restart now while waiting for: ${status.waitingFor.join(", ") || "nothing"}.`);
+    this.#startRestart(status);
+    Effect.runFork(this.#restart(status));
+    return this.#updater.getStatus();
+  }
+
   cancel(): UpdateStatus {
     if (this.#restarting) throw new Error(sourceText("error.update.alreadyRestarting"));
     if (this.#status && !this.#status.error) this.#log("The restart when idle was cancelled.");
@@ -100,15 +111,24 @@ export class IdleRestart {
       this.#schedule(this.#pollMs);
       return;
     }
+    this.#log("No work runs.");
+    this.#startRestart(status);
+    yield* this.#restart(status);
+  });
+
+  #startRestart(status: IdleRestartStatus): void {
     this.#restarting = true;
     this.#publish({ ...status, waitingFor: [] });
     this.#keepHold();
+  }
+
+  readonly #restart = Effect.fn("IdleRestart.restart")(function* (this: IdleRestart, status: IdleRestartStatus) {
     if (status.target === "relaunch") {
-      this.#log("Restarting OpenBot: no work runs.");
+      this.#log("Restarting OpenBot.");
       this.#relaunch();
       return;
     }
-    this.#log("Installing the update: no work runs.");
+    this.#log("Installing the update.");
     const installed = yield* Effect.result(this.#updater.installUpdate());
     if (Result.isSuccess(installed)) {
       this.#restarting = false;
