@@ -125,6 +125,10 @@ function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): bo
   );
 }
 
+function isRefusedOpenCodeInput(provider: AgentProvider, message: string): boolean {
+  return provider === "opencode" && /\bInternal error: Invalid input\s*$/.test(message);
+}
+
 function isRejectedAntigravityRequest(provider: AgentProvider, message: string): boolean {
   return provider === "antigravity" && GEMINI_INVALID_ARGUMENT.test(message);
 }
@@ -197,6 +201,7 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
   if (provider === "opencode" && isUnreadableContentDiagnostic(message))
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
+  if (isRefusedOpenCodeInput(provider, message)) return sourceText("error.provider.opencodeInputRefused");
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
   if (isClearedAntigravityHistory(provider, message) || isUnencodableAntigravityHistory(provider, message))
     return sourceText("error.provider.antigravityHistoryUnreadable");
