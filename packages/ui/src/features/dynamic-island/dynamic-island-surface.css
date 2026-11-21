@@ -881,14 +881,22 @@ div.dynamic-island-surface-context-line span {
 
 .dynamic-island-surface-question-detail {
   max-height: calc(var(--openbot-leading-sm) * 3);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  margin: 0 0 6px;
+  margin-bottom: 6px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   overflow-wrap: anywhere;
   white-space: pre-line;
+}
+
+.scroll-edges.dynamic-island-surface-question-detail > .scroll-edges-view {
+  --scroll-edges-fade-size: var(--openbot-leading-sm);
+
+  overscroll-behavior: contain;
+}
+
+.dynamic-island-surface-question-detail p {
+  margin: 0;
 }
 
 .dynamic-island-surface-question-actions {
