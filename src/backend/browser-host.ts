@@ -3735,10 +3735,7 @@ export class BrowserHost {
     contents.on("page-title-updated", changed);
     contents.on("render-process-gone", (_event, details) => {
       if (tab.closing || tab.contents !== contents || contents.isDestroyed() || details.reason === "clean-exit") return;
-      if (tab.endingSilentPage) {
-        tab.endingSilentPage = false;
-        return;
-      }
+      if (tab.endingSilentPage) return;
       tab.crashes = (tab.crashes ?? 0) + 1;
       if (tab.secret) return;
       const reload =
@@ -4203,7 +4200,8 @@ export class BrowserHost {
       const contents = this.#tabs.get(tabId)?.contents;
       if (!contents || contents.isDestroyed()) return;
       const gone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails) => {
-        if (details.reason !== "clean-exit") resume(Effect.succeed({ status: "page_crashed" }));
+        if (details.reason !== "clean-exit" && !this.#tabs.get(tabId)?.endingSilentPage)
+          resume(Effect.succeed({ status: "page_crashed" }));
       };
       contents.on("render-process-gone", gone);
       return Effect.sync(() => contents.off("render-process-gone", gone));
