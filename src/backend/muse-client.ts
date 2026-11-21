@@ -442,7 +442,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (MUSE_MODEL_UNAVAILABLE.test(message))
       return sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) });
     if (this.#options.apiKey() && (unexplained || MUSE_CREDENTIAL_FAILURE.test(message)))
-      return sourceText("error.provider.museSavedKeyFailed", { detail: shownFailureDetail(message) });
+      return sourceText("error.provider.museSavedKeyFailed", { detail: message });
     return message;
   }
   #fail(_error: unknown): void {
