@@ -219,7 +219,8 @@
     color var(--openbot-duration-fast) ease-out;
 }
 
-.question-prompt-answer-skipped .question-prompt-letter.ui-kbd {
+.question-prompt-answer-skipped .question-prompt-letter.ui-kbd,
+.question-prompt-answer-closed .question-prompt-letter.ui-kbd {
   background: var(--openbot-bg-control-active);
   color: var(--openbot-text-muted);
 }
@@ -360,7 +361,8 @@
   overflow-wrap: anywhere;
 }
 
-.question-prompt-answer-skipped {
+.question-prompt-answer-skipped,
+.question-prompt-answer-closed {
   color: var(--openbot-text-muted);
 }
 
