@@ -255,6 +255,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot kan deze MCP-serverconfiguratie niet opslaan.",
   "error.backend.mcpServerNoAnswer": "De server reageerde niet binnen {seconds} seconden.",
   "error.backend.mcpSignInNotAccepted": "De server heeft die inlog niet geaccepteerd.",
+  "error.backend.mcpSignInGrantRefused":
+    "De server heeft de aanmelding niet geaccepteerd. Meld je opnieuw aan. Als het probleem blijft, controleer dan of je account op dezelfde site of in dezelfde regio staat als deze app.",
   "error.backend.mcpSignInAccountRefused":
     "De server heeft het account geweigerd waarmee je bent ingelogd. Controleer of dit account de dienst mag gebruiken. Log uit en log opnieuw in om een ander account te gebruiken.",
   "error.backend.mcpSignInClientRefused":

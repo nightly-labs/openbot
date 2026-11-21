@@ -231,6 +231,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "لا يمكن لـ OpenBot حفظ إعداد خادم MCP هذا.",
   "error.backend.mcpServerNoAnswer": "لم يُجب الخادم خلال {seconds} ثانية.",
   "error.backend.mcpSignInNotAccepted": "لم يقبل الخادم تسجيل الدخول هذا.",
+  "error.backend.mcpSignInGrantRefused":
+    "لم يقبل الخادم تسجيل الدخول. سجّل الدخول مرة أخرى. إذا استمرت المشكلة، فتأكد من أن حسابك على نفس الموقع أو المنطقة التي يستخدمها هذا التطبيق.",
   "error.backend.mcpSignInAccountRefused":
     "رفض الخادم الحساب الذي سجّلت الدخول به. تحقّق من أن هذا الحساب يمكنه استخدام الخدمة. لاستخدام حساب آخر، سجّل الخروج ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInClientRefused":
