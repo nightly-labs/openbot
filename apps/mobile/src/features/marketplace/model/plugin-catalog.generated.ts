@@ -1690,6 +1690,57 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "postonce",
+    name: "PostOnce",
+    tagline: "Post to every social network",
+    description:
+      "PostOnce lets agents list your connected accounts, then publish or schedule one post to LinkedIn, X, Threads, Bluesky, Facebook Pages, Instagram, TikTok, YouTube and Pinterest through each network's official API. Agents can upload images and video, write a different caption for each network, manage drafts and scheduled posts, set up repost workflows, and read views, likes and comments for each post. Sign in to your PostOnce account through the browser, or paste an API key from Developers in the PostOnce dashboard. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "PostOnce",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-accounts", text: "Which social media accounts are connected to PostOnce?" },
+      { id: "prompt-week", text: "Which posts are scheduled for next week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn and an X post about our new release, but do not publish them." },
+    ],
+    websiteUrl: "https://postonce.to",
+    privacyPolicyUrl: "https://postonce.to/privacy-policy",
+    termsUrl: "https://postonce.to/tos",
+    featured: false,
+    apps: [
+      {
+        id: "app-postonce-mcp",
+        name: "PostOnce",
+        description:
+          "Accounts, posts, drafts, media, workflows and analytics, over PostOnce's MCP server with browser sign-in or an API key.",
+        server: {
+          name: "postonce",
+          transport: "http",
+          url: "https://postonce.to/mcp",
+          auth: [
+            { id: "postonce-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "postonce-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "PostOnce dashboard › Developers › API keys",
+                },
+              ],
+              docsUrl: "https://docs.postonce.to/getting-started/authentication",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "composio",
     name: "Composio",
     tagline: "Gmail, Slack, GitHub and 1,000+ more apps",

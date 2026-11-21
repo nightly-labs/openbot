@@ -261,6 +261,12 @@
       "detailSha256": "872298599d7dedfa1d31e1f83a293a6d992b54a444809546d84e98cea0668765"
     },
     {
+      "slug": "postonce",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "f0b3be0dfe25eb080133b5141efca188f08e8950bfc9e3a2fba25010d2832045"
+    },
+    {
       "slug": "composio",
       "version": "1.2.0",
       "featured": false,

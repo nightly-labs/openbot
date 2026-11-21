@@ -277,6 +277,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "872298599d7dedfa1d31e1f83a293a6d992b54a444809546d84e98cea0668765",
     },
     {
+      slug: "postonce",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "f0b3be0dfe25eb080133b5141efca188f08e8950bfc9e3a2fba25010d2832045",
+    },
+    {
       slug: "composio",
       version: "1.2.0",
       featured: false,
@@ -3289,6 +3295,59 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://trypost.it",
     privacyPolicyUrl: "https://trypost.it/en/privacy",
     termsUrl: "https://trypost.it/en/terms",
+    skills: [],
+  },
+  postonce: {
+    slug: "postonce",
+    name: "PostOnce",
+    tagline: "Post to every social network",
+    description:
+      "PostOnce lets agents list your connected accounts, then publish or schedule one post to LinkedIn, X, Threads, Bluesky, Facebook Pages, Instagram, TikTok, YouTube and Pinterest through each network's official API. Agents can upload images and video, write a different caption for each network, manage drafts and scheduled posts, set up repost workflows, and read views, likes and comments for each post. Sign in to your PostOnce account through the browser, or paste an API key from Developers in the PostOnce dashboard. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "PostOnce",
+    iconUrl: "https://postonce.to/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-accounts", text: "Which social media accounts are connected to PostOnce?" },
+      { id: "prompt-week", text: "Which posts are scheduled for next week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn and an X post about our new release, but do not publish them." },
+    ],
+    apps: [
+      {
+        id: "app-postonce-mcp",
+        name: "PostOnce",
+        description:
+          "Accounts, posts, drafts, media, workflows and analytics, over PostOnce's MCP server with browser sign-in or an API key.",
+        iconUrl: "https://postonce.to/favicon.ico",
+        server: {
+          name: "postonce",
+          transport: "http",
+          url: "https://postonce.to/mcp",
+          auth: [
+            { id: "postonce-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "postonce-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "PostOnce dashboard › Developers › API keys",
+                },
+              ],
+              docsUrl: "https://docs.postonce.to/getting-started/authentication",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://postonce.to",
+    privacyPolicyUrl: "https://postonce.to/privacy-policy",
+    termsUrl: "https://postonce.to/tos",
     skills: [],
   },
   composio: {
