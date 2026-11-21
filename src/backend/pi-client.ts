@@ -1074,7 +1074,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       ),
       Effect.catch(() => Effect.void),
     );
-    const append = this.options.history?.append;
+    const keepsHistory = !isRecord(thread.params) || thread.params.persistSession !== false;
+    const append = keepsHistory ? this.options.history?.append : undefined;
     if (append) {
       const saved = yield* Effect.exit(
         append(thread.id, {

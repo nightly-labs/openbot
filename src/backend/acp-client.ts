@@ -301,6 +301,7 @@ interface AcpThread {
   workHold: { since: number; changedAt: number } | null;
   leftOutMcpServers: Map<McpServer, string>;
   throwaway: boolean;
+  keepsHistory: boolean;
 }
 
 type ReleasedAcpThread = Pick<
@@ -1814,6 +1815,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               workHold: null,
               leftOutMcpServers: new Map(),
               throwaway: isRecord(params) && params.ephemeral === true,
+              keepsHistory: !isRecord(params) || params.persistSession !== false,
             };
             threadRef = thread;
             providerResult(
@@ -3991,7 +3993,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         },
       });
     }
-    const append = this.options.history?.append;
+    const append = thread.keepsHistory ? this.options.history?.append : undefined;
     if (append) {
       const persisted = yield* Effect.exit(
         append(thread.id, {
