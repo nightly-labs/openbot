@@ -2,7 +2,8 @@ import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort }
 import { Button, CircleCheck, Play, Split, Textarea } from "@openbot/ui";
 import { createMemo, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import { BRANCH_NAME, resultValue, useBoard } from "./workflow-board";
+import { AnswerAction, AnswerProblems, AnswerSummary, useAnswerText } from "./workflow-answer-parts";
+import { BRANCH_NAME, useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
 import {
@@ -45,9 +46,15 @@ export function ConditionNode(props: { id: string; rule?: string }) {
   const tab = createMemo(
     (): WfProvider => provider() || chosen()?.provider || defaultWorkflowModel(board.catalogs())?.provider || "codex",
   );
+  const [check] = useAnswerText(() => props.id, "check");
+  const checked = () => board.catalogs().answers === true && check().trim() !== "";
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
-  const taken = () => (run.running() ? undefined : resultValue(board.shown(props.id)));
+  const taken = () => {
+    if (run.running()) return undefined;
+    const shown = board.shown(props.id);
+    return shown?.failed ? undefined : (shown?.branch ?? shown?.value);
+  };
   return (
     <NodeShell
       action={
@@ -71,46 +78,51 @@ export function ConditionNode(props: { id: string; rule?: string }) {
       requires
       toolbar={
         <NodeToolbar id={props.id} name={t("workflow.condition.name")} locked={locked()} onLock={setLocked}>
+          <AnswerAction id={props.id} field="check" locked={locked()} />
           <StepSettingsAction id={props.id} kind="condition" />
         </NodeToolbar>
       }
     >
-      <Field class="wfn-block-field">
-        <Textarea
-          class="wfn-input"
-          aria-label={t("workflow.condition.rule")}
-          placeholder={t("workflow.condition.rulePlaceholder")}
-          readonly={locked()}
-          value={rule()}
-          onValueChange={setRule}
-        />
-        <div class="wfn-field-foot wfn-condition-foot">
-          <ModelPill
-            provider={tab()}
-            value={model()}
-            placeholder={t("workflow.model.auto")}
-            disabled={locked()}
-            onChange={(next, nextProvider) => {
-              const options = modelOption(models(), next);
-              const current = effort();
-              const keep = current !== "" && options?.supportedReasoningEfforts.includes(current);
-              board.setFields(props.id, {
-                model: next,
-                provider: nextProvider,
-                ...(keep ? {} : { effort: options?.defaultReasoningEffort ?? "medium" }),
-              });
-            }}
+      <Show when={!checked()}>
+        <Field class="wfn-block-field">
+          <Textarea
+            class="wfn-input"
+            aria-label={t("workflow.condition.rule")}
+            placeholder={t("workflow.condition.rulePlaceholder")}
+            readonly={locked()}
+            value={rule()}
+            onValueChange={setRule}
           />
-          <Show when={model()}>
-            <EffortPill
-              efforts={chosen()?.supportedReasoningEfforts ?? []}
-              value={effort() || chosen()?.defaultReasoningEffort || "medium"}
+          <div class="wfn-field-foot wfn-condition-foot">
+            <ModelPill
+              provider={tab()}
+              value={model()}
+              placeholder={t("workflow.model.auto")}
               disabled={locked()}
-              onChange={setEffort}
+              onChange={(next, nextProvider) => {
+                const options = modelOption(models(), next);
+                const current = effort();
+                const keep = current !== "" && options?.supportedReasoningEfforts.includes(current);
+                board.setFields(props.id, {
+                  model: next,
+                  provider: nextProvider,
+                  ...(keep ? {} : { effort: options?.defaultReasoningEffort ?? "medium" }),
+                });
+              }}
             />
-          </Show>
-        </div>
-      </Field>
+            <Show when={model()}>
+              <EffortPill
+                efforts={chosen()?.supportedReasoningEfforts ?? []}
+                value={effort() || chosen()?.defaultReasoningEffort || "medium"}
+                disabled={locked()}
+                onChange={setEffort}
+              />
+            </Show>
+          </div>
+        </Field>
+      </Show>
+      <AnswerSummary id={props.id} field="check" />
+      <AnswerProblems id={props.id} />
       <For each={BRANCHES}>
         {(branch) => (
           <div

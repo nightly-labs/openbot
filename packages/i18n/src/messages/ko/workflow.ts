@@ -235,6 +235,22 @@ export const messages = {
   "workflow.condition.rule": "규칙",
   "workflow.condition.rulePlaceholder": "실행이 ‘예’로 가는 경우를 설명하세요",
   "workflow.condition.taken": "선택됨",
+  "workflow.answer.title": "답변 필드",
+  "workflow.answer.placeholder": "priority: high|normal|low\nsummary: text\ncount?: number",
+  "workflow.answer.problem.name": "“{line}” 줄에 유효한 필드 이름이 없습니다.",
+  "workflow.answer.problem.type":
+    "{name}의 유형을 알 수 없습니다. text, number, yes/no, list 또는 high|low 같은 레이블을 사용하세요.",
+  "workflow.answer.problem.labels": "{name}에는 high|low처럼 레이블이 두 개 이상 필요합니다.",
+  "workflow.answer.problem.duplicate": "{name}이(가) 목록에 두 번 있습니다.",
+  "workflow.answer.problem.many": "필드는 20개 이하로 사용하세요.",
+  "workflow.answer.problem.check":
+    "검사가 올바르지 않습니다. priority = high 같은 테스트를 쓰고 and 또는 or로 연결하세요.",
+  "workflow.answer.problem.field": "이 단계 앞에 {name}을(를) 주는 단계가 없습니다.",
+  "workflow.answer.problem.test": "{name}은(는) 이렇게 비교할 수 없습니다.",
+  "workflow.answer.problem.conflict": "앞의 두 단계가 서로 다른 유형의 {name}을(를) 줍니다.",
+  "workflow.check.title": "검사",
+  "workflow.check.placeholder": "priority = high and count > 2",
+  "workflow.check.fields": "필드: {names}",
 
   "workflow.output.title": "출력",
   "workflow.output.name": "출력",

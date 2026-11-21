@@ -255,6 +255,22 @@ export const messages = {
   "workflow.condition.rule": "Правило",
   "workflow.condition.rulePlaceholder": "Опишите, когда запуск идёт по ветке «Да»",
   "workflow.condition.taken": "Выбрана",
+  "workflow.answer.title": "Поля ответа",
+  "workflow.answer.placeholder": "priority: high|normal|low\nsummary: text\ncount?: number",
+  "workflow.answer.problem.name": "В строке «{line}» нет допустимого имени поля.",
+  "workflow.answer.problem.type":
+    "У {name} неизвестный тип. Используйте text, number, yes/no, list или метки, например high|low.",
+  "workflow.answer.problem.labels": "Для {name} нужно две или больше меток, например high|low.",
+  "workflow.answer.problem.duplicate": "{name} есть в списке дважды.",
+  "workflow.answer.problem.many": "Используйте не больше 20 полей.",
+  "workflow.answer.problem.check":
+    "Проверка недопустима. Пишите условия вроде priority = high и соединяйте их через and или or.",
+  "workflow.answer.problem.field": "Ни один предыдущий шаг не даёт {name}.",
+  "workflow.answer.problem.test": "{name} нельзя так сравнить.",
+  "workflow.answer.problem.conflict": "Два предыдущих шага дают {name} с разными типами.",
+  "workflow.check.title": "Проверка",
+  "workflow.check.placeholder": "priority = high and count > 2",
+  "workflow.check.fields": "Поля: {names}",
 
   "workflow.output.title": "Вывод",
   "workflow.output.name": "вывод",

@@ -20,6 +20,10 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "Der Agent hat angehalten, bevor er auf diesen Schritt antwortete. Führe den Schritt erneut aus.",
   "error.workflow.conditionUnclear": "Das Modell hat nicht mit Ja oder Nein geantwortet.",
+  "error.workflow.answerInvalid":
+    "Die Antwort hatte nicht die Felder, die dieser Schritt verlangt: {fields}. Führe den Schritt erneut aus.",
+  "error.workflow.checkInvalid":
+    "Die Prüfung dieses Schritts ist ungültig. Korrigiere sie und führe den Schritt erneut aus.",
   "error.workflow.modelFailed": "Das Modell konnte nicht antworten. Führe den Schritt erneut aus.",
   "error.workflow.modelTimedOut":
     "Das Modell hat nicht rechtzeitig geantwortet. Wähle für diesen Schritt einen geringeren Aufwand oder ein schnelleres Modell und führe ihn erneut aus.",

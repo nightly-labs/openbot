@@ -22,6 +22,8 @@ import {
   type WorkflowRunDetail,
   type WorkflowStep,
   type WorkflowStepSettings,
+  workflowAnswerProblems,
+  workflowAnswerProblemText,
   workflowCatalogProvider,
   workflowGitHubTriggerRepositoryFields,
   workflowGraphProblemAt,
@@ -605,6 +607,17 @@ function graphProblem(graph: WorkflowGraph): string | null {
   return `Edge ${found.edge.from} -> ${found.edge.to}: ${PROBLEM_TEXT[found.problem] ?? found.problem}.`;
 }
 
+function newAnswerProblem(
+  before: WorkflowGraph,
+  applied: { graph: WorkflowGraph; ids: Record<string, string> },
+): string | null {
+  const known = new Set(workflowAnswerProblems(before).map((problem) => JSON.stringify(problem)));
+  const found = workflowAnswerProblems(applied.graph).find((problem) => !known.has(JSON.stringify(problem)));
+  if (!found) return null;
+  const ref = Object.entries(applied.ids).find(([, id]) => id === found.nodeId)?.[0];
+  return `Node ${ref ?? found.nodeId}: ${workflowAnswerProblemText(found)}`;
+}
+
 function stepLabel(node: WorkflowNode | undefined) {
   if (!node) return {};
   const field = LABEL_FIELD[node.kind];
@@ -676,7 +689,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
     let detail = yield* workflows.get(workflowId);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const applied = yield* toolStep(() => applyWorkflowOps(detail.graph, ops, agentIds, tidy));
-      const problem = graphProblem(applied.graph);
+      const problem = graphProblem(applied.graph) ?? newAnswerProblem(detail.graph, applied);
       if (problem) return yield* toolStep(() => refuse(problem));
       const result = yield* workflows.saveGraph(
         { workflowId, baseRevision: detail.revision, graph: applied.graph },
@@ -723,10 +736,9 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
       const workflowId = input.workflowId;
       if (workflowId === undefined) {
         if (input.title === undefined) return openBotToolFailure("A new workflow needs a title.");
-        const applied = yield* toolStep(() =>
-          applyWorkflowOps({ nodes: [], edges: [], strokes: [] }, ops, agentIds, tidy),
-        );
-        const problem = graphProblem(applied.graph);
+        const empty: WorkflowGraph = { nodes: [], edges: [], strokes: [] };
+        const applied = yield* toolStep(() => applyWorkflowOps(empty, ops, agentIds, tidy));
+        const problem = graphProblem(applied.graph) ?? newAnswerProblem(empty, applied);
         if (problem) return openBotToolFailure(problem);
         const created = yield* workflows.create({ title: input.title, graph: applied.graph }, callerId);
         return openBotToolResult({

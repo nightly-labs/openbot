@@ -6,15 +6,18 @@ import {
   type AgentReasoningEffort,
   type CreateWorkflowInput,
   type DecideWorkflowStepInput,
+  fillWorkflowTemplate,
   graphAgentIds,
   isReasoningEffort,
   nodeAgentId,
+  parseWorkflowCheck,
   type QueueDeliveryStatus,
   type RenameWorkflowInput,
   type RetryWorkflowStepInput,
   type RunWorkflowStepInput,
   type SaveWorkflowGraphInput,
   type StartWorkflowRunInput,
+  WORKFLOW_CHECK_FIELD,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_PICTURE_TYPES,
   type WorkflowCatalogProvider,
@@ -46,6 +49,7 @@ import {
   type WorkflowVersionInput,
   workflowCatalogMediaModel,
   workflowCatalogProvider,
+  workflowCheckPasses,
   workflowMediaKind,
   workflowMediaModel,
   workflowMediaSpecs,
@@ -53,7 +57,20 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Cause, Context, Effect, Exit, Fiber, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
+import {
+  Cause,
+  Context,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  ManagedRuntime,
+  Option,
+  Result,
+  Schema,
+  Scope,
+  Semaphore,
+} from "effect";
 import { isNoUpdateAnswer } from "../agent/routine-quiet-runs";
 import type { AgentProvider } from "../agent-client";
 import { coalescedPasses } from "../coalesced-passes";
@@ -110,6 +127,18 @@ import {
   telegramTriggerMessage,
   workflowTelegramPayload,
 } from "./telegram-matching";
+import {
+  agentAnswerAsk,
+  answerFields,
+  answerFixAsk,
+  answerProblemNames,
+  modelAnswerAsk,
+  nodeAnswerFields,
+  readAnswer,
+  readableAnswerInputs,
+  stepAnswer,
+  webhookAnswerEvent,
+} from "./workflow-answers";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
 import { nodeTimezone } from "./workflow-graph";
@@ -298,7 +327,8 @@ export type WorkflowWebhookResult =
   | { kind: "ignored"; reason: "busy" | "refused" }
   | { kind: "duplicate" }
   | { kind: "gone" }
-  | { kind: "too-large" };
+  | { kind: "too-large" }
+  | { kind: "bad-answer" };
 
 interface WorkflowGitHubEventInput {
   event: string;
@@ -449,7 +479,32 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           settle(step, { status: "failed", error: sourceText("error.workflow.handoffFailed") });
         });
 
-        const settleFromDelivery = (step: StoredWorkflowStep): boolean => {
+        const askAnswerFix = Effect.fn("Workflows.askAnswerFix")(function* (
+          step: StoredWorkflowStep,
+          agentId: string,
+          deliveryId: string,
+          text: string,
+        ) {
+          const run = step.runId ? runs.run(step.runId) : null;
+          const sent = yield* dependencies
+            .sendHandoff({
+              run: {
+                id: step.runId ?? step.id,
+                routineId: step.workflowId,
+                routineName: titleOf(step.workflowId),
+                scheduledFor: run?.scheduledFor ?? run?.startedAt ?? step.createdAt,
+              },
+              agentId,
+              text,
+              sourcePaths: [],
+              idempotencyKey: `workflow-step:${step.id}:answer`,
+            })
+            .pipe(Effect.option);
+          if (Option.isNone(sent) || sent.value === deliveryId) return false;
+          return runs.replaceDelivery(step.id, deliveryId, sent.value, now());
+        });
+
+        const settleFromDelivery = Effect.fn("Workflows.settleFromDelivery")(function* (step: StoredWorkflowStep) {
           if (!step.deliveryId) return false;
           if (!step.agentId)
             return settle(step, { status: "failed", error: sourceText("error.workflow.agentMissing") });
@@ -460,7 +515,18 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if (delivery.error) return settle(step, { status: "failed", error: delivery.error });
             const answer = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             const output = answer === null || isNoUpdateAnswer(answer) ? "" : answer;
-            return settle(step, { status: "done", output });
+            const fields = answerFields(step.settings);
+            if (fields.length === 0 || output === "") return settle(step, { status: "done", output });
+            const read = readAnswer(fields, output);
+            if ("output" in read) return settle(step, { status: "done", output: read.output });
+            if (yield* askAnswerFix(step, step.agentId, step.deliveryId, answerFixAsk(fields, read.problems))) {
+              changed(step.workflowId);
+              return false;
+            }
+            return settle(step, {
+              status: "failed",
+              error: sourceText("error.workflow.answerInvalid", { fields: answerProblemNames(read.problems) }),
+            });
           }
           if (delivery.status === "cancelled") return settle(step, { status: "stopped", error: delivery.error });
           if (delivery.status === "failed" || delivery.status === "interrupted")
@@ -469,7 +535,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               error: delivery.error ?? sourceText("error.workflow.agentStepStopped"),
             });
           return false;
-        };
+        });
 
         const modelStepImages = Effect.fn("Workflows.modelStepImages")(function* (
           step: StoredWorkflowStep,
@@ -501,13 +567,20 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               yield* requestSweep();
               return;
             }
+            const fields = condition ? [] : nodeAnswerFields(node);
+            const answer = condition ? null : answerOf(step, run);
+            const prompt = condition
+              ? conditionPrompt(fieldText(node, "rule"), step.input)
+              : modelStepPrompt(
+                  fillWorkflowTemplate(fieldText(node, "system"), answer),
+                  fillWorkflowTemplate(fieldText(node, "prompt"), answer),
+                  step.input,
+                );
             const request: WorkflowTextRequest = {
               provider: isAgentProvider(node.fields.provider) ? node.fields.provider : null,
               model: fieldText(node, "model") || null,
               effort: isReasoningEffort(node.fields.effort) ? node.fields.effort : null,
-              prompt: condition
-                ? conditionPrompt(fieldText(node, "rule"), step.input)
-                : modelStepPrompt(fieldText(node, "system"), fieldText(node, "prompt"), step.input),
+              prompt: fields.length > 0 ? `${prompt}\n\n${modelAnswerAsk(fields)}` : prompt,
               images: images.success,
             };
             const chosen = Effect.gen(function* () {
@@ -516,11 +589,34 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               runs.recordUsedSettings(step.id, { ...choice });
               return { ...request, ...choice };
             });
-            const result = yield* generationLock
-              .withPermit(Effect.flatMap(chosen, (ready) => dependencies.generateText(ready)))
-              .pipe(Effect.result);
+            const ready = yield* chosen.pipe(Effect.result);
+            const generated = (prompt: string) =>
+              Result.isFailure(ready)
+                ? Effect.fail(ready.failure)
+                : generationLock.withPermit(dependencies.generateText({ ...ready.success, prompt }));
+            const result = yield* generated(request.prompt).pipe(Effect.result);
             if (Result.isFailure(result)) {
               settle(step, { status: "failed", error: result.failure.message });
+            } else if (fields.length > 0) {
+              const first = readAnswer(fields, result.success);
+              const read =
+                "output" in first
+                  ? first
+                  : yield* generated(
+                      `${request.prompt}\n\n--- your answer ---\n${result.success}\n\n${answerFixAsk(fields, first.problems)}`,
+                    ).pipe(
+                      Effect.map((text) => readAnswer(fields, text)),
+                      Effect.orElseSucceed(() => first),
+                    );
+              settle(
+                step,
+                "output" in read
+                  ? { status: "done", output: read.output }
+                  : {
+                      status: "failed",
+                      error: sourceText("error.workflow.answerInvalid", { fields: answerProblemNames(read.problems) }),
+                    },
+              );
             } else if (!condition) {
               settle(step, { status: "done", output: result.success });
             } else {
@@ -1000,8 +1096,24 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             case "agent":
               yield* sendAgentStep(step);
               return;
-            case "llm":
             case "condition":
+              if (fieldText(node, WORKFLOW_CHECK_FIELD).trim()) {
+                const check = parseWorkflowCheck(fieldText(node, WORKFLOW_CHECK_FIELD));
+                settle(
+                  step,
+                  check
+                    ? {
+                        status: "done",
+                        output: step.input,
+                        branch: workflowCheckPasses(check, answerOf(step, run)) ? "yes" : "no",
+                      }
+                    : { status: "failed", error: sourceText("error.workflow.checkInvalid") },
+                );
+                return;
+              }
+              yield* startGeneration(step, node, run);
+              return;
+            case "llm":
               yield* startGeneration(step, node, run);
               return;
             case "image":
@@ -1017,7 +1129,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                   kind: "approval",
                   workflowId: step.workflowId,
                   workflowTitle: titleOf(step.workflowId),
-                  text: fieldText(node, "question"),
+                  text: fillWorkflowTemplate(fieldText(node, "question"), answerOf(step, run)),
                 });
               }
               return;
@@ -1059,10 +1171,33 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
         });
 
-        const stepInput = (node: WorkflowNode, workflowId: string, inputs: readonly string[]) => {
+        const answerOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null) => {
+          const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
+          return graph
+            ? stepAnswer(graph, step.nodeId, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
+            : {};
+        };
+
+        const stepInput = (
+          node: WorkflowNode,
+          workflowId: string,
+          inputs: readonly string[],
+          graph: WorkflowGraph,
+          latest: ReadonlyMap<string, StoredWorkflowStep>,
+        ) => {
           if (node.kind === "output" && fieldText(node, "target") === "github") return githubOutputInput(inputs);
+          if (node.kind === "output") return inputText(readableAnswerInputs(graph, node.id, latest, inputs));
           const text = inputText(inputs);
-          return node.kind === "agent" ? agentStepText(titleOf(workflowId), fieldText(node, "task"), text) : text;
+          if (node.kind !== "agent") return text;
+          const task = fillWorkflowTemplate(fieldText(node, "task"), stepAnswer(graph, node.id, latest));
+          const fields = nodeAnswerFields(node);
+          return agentStepText(
+            titleOf(workflowId),
+            fields.length > 0
+              ? `${task.trim() || "Do this step of the workflow with the input below."}\n\n${agentAnswerAsk(fields)}`
+              : task,
+            text,
+          );
         };
 
         const stopNow = Effect.fn("Workflows.stopNow")(function* (step: StoredWorkflowStep) {
@@ -1140,7 +1275,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     requestId: `${run.id}:${node.id}:${(latest.get(node.id)?.attempt ?? 0) + 1}`,
                     agentId: nodeAgentId(node),
                     status: action.action === "skip" ? "skipped" : "running",
-                    input: action.action === "skip" ? "" : stepInput(node, run.workflowId, action.inputs),
+                    input:
+                      action.action === "skip" ? "" : stepInput(node, run.workflowId, action.inputs, run.graph, latest),
                     ...(action.action === "run" ? stepRecord(run.graph, node, latest) : {}),
                   },
                   now(),
@@ -1197,7 +1333,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               if (!step.deliveryId) {
                 yield* sendAgentStep(step);
                 ended = runs.step(step.id)?.status !== "running";
-              } else ended = settleFromDelivery(step);
+              } else ended = yield* settleFromDelivery(step);
             } else if (
               step.kind === "llm" ||
               step.kind === "condition" ||
@@ -1408,7 +1544,16 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 return { kind: "gone" };
               const receipt = { workflowId, nodeId, deliveryId: event.deliveryId, receivedAt: event.receivedAt };
               if (yield* attempt(() => runs.hasWebhookReceipt(receipt))) return { kind: "duplicate" };
-              const payload = workflowWebhookPayload(nodeId, event);
+              const checked = webhookAnswerEvent(trigger, event);
+              if ("problems" in checked) {
+                logger.warn("A workflow webhook request did not match the trigger's answer fields.", {
+                  workflowId,
+                  nodeId,
+                  fields: answerProblemNames(checked.problems),
+                });
+                return { kind: "bad-answer" };
+              }
+              const payload = workflowWebhookPayload(nodeId, checked.event);
               if (payload.length > INPUT_LIMITS.workflowWebhookPayload) return { kind: "too-large" };
               if (runs.openRuns().some((run) => run.workflowId === workflowId)) {
                 yield* attempt(() =>
@@ -1814,7 +1959,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     requestId: input.requestId,
                     agentId: nodeAgentId(node),
                     status: "running",
-                    input: stepInput(node, input.workflowId, inputs),
+                    input: stepInput(node, input.workflowId, inputs, detail.graph, answered),
                     ...stepRecord(detail.graph, node, answered),
                   },
                   now(),
@@ -1885,7 +2030,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     status: "running",
                     input:
                       node.kind === "agent"
-                        ? stepInput(node, failed.workflowId, soloInputs(graph, failed.nodeId, latest))
+                        ? stepInput(node, failed.workflowId, soloInputs(graph, failed.nodeId, latest), graph, latest)
                         : failed.input,
                     ...stepRecord(graph, node, latest),
                   },

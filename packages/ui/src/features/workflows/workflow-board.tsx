@@ -1,4 +1,12 @@
-import type { AgentStepActivity, RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
+import {
+  type AgentStepActivity,
+  nodeAnswerProblems,
+  type RoutineSchedule,
+  type StoredFileRow,
+  type WorkflowAnswerProblem,
+  type WorkflowGraph,
+  workflowInputAnswerFields,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -82,6 +90,7 @@ export interface WfnResult {
   at: string;
   value: string;
   failed?: boolean;
+  branch?: string;
 }
 
 export const resultValue = (result: WfnResult | undefined) => (result?.failed ? undefined : result?.value);
@@ -185,6 +194,8 @@ export interface WfnBoard {
   setField: (id: string, key: string, value: WfnFieldValue, typing?: boolean) => void;
   setFields: (id: string, values: WfnFields) => void;
   githubTriggers: (id: string) => string[];
+  answerNames: (id: string) => readonly string[];
+  answerProblems: (id: string) => readonly WorkflowAnswerProblem[];
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
@@ -244,6 +255,7 @@ export function BoardProvider(props: { board: WfnBoard; children: JSX.Element })
 
 export interface BoardOptions {
   catalogs: () => WorkflowCatalogs;
+  graph?: () => WorkflowGraph;
   buildState?: (edgeId: string) => "unbuilt" | "arrived" | undefined;
   selected?: string | undefined;
   edges?: readonly WfnEdge[] | undefined;
@@ -803,6 +815,15 @@ export function createBoard(options: BoardOptions) {
         layer = next;
       }
       return found;
+    },
+    answerNames: (id) => {
+      const graph = options.graph?.();
+      return graph ? [...workflowInputAnswerFields(graph, id).keys()] : [];
+    },
+    answerProblems: (id) => {
+      const graph = options.graph?.();
+      const node = graph?.nodes.find((candidate) => candidate.id === id);
+      return graph && node ? nodeAnswerProblems(graph, node) : [];
     },
     inputs: (id, type) =>
       state.edges.flatMap((edge) =>

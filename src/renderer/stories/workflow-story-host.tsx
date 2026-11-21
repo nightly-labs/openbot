@@ -148,6 +148,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     mediaTransparentSupported: () => true,
     mediaSizeSupported: () => true,
     agentFilesSupported: () => true,
+    answersSupported: () => true,
     stepSettingsSupported: () => true,
     foldersSupported: () => true,
     folders: () => api.folders(),

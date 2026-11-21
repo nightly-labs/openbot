@@ -34,6 +34,7 @@ import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
+import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
@@ -2040,7 +2041,7 @@ try {
   );
 
   await step(
-    "agent files: the host advertises workflows-agent-files-v1 to a protocol 10 peer; an agent step gets each connected picture and a note to use them together; a missing file fails the step",
+    "agent files: the host advertises workflows-agent-files-v1 and workflows-answers-v1 to a protocol 10 peer; an agent step gets each connected picture and a note to use them together; a missing file fails the step",
     async () => {
       const capabilities = async (protocol: number) =>
         list(
@@ -2049,6 +2050,8 @@ try {
         );
       assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_AGENT_FILES_CAPABILITY));
       assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_AGENT_FILES_CAPABILITY));
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_ANSWERS_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_ANSWERS_CAPABILITY));
       const run = async (fileIds: readonly string[]) => {
         const title = ["Agent files", fileIds.length, ...fileIds].join(" ");
         const workflow = await hostWorkflow(title, {

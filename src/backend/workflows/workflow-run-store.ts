@@ -365,6 +365,16 @@ export class WorkflowRunStore {
       .run(deliveryId, now.toISOString(), stepId);
   }
 
+  replaceDelivery(stepId: string, deliveryId: string, nextDeliveryId: string, now = new Date()): boolean {
+    return (
+      this.#database.connection
+        .prepare(
+          "UPDATE workflow_steps SET delivery_id = ?, turn_id = NULL, updated_at = ? WHERE step_id = ? AND delivery_id = ? AND status = 'running'",
+        )
+        .run(nextDeliveryId, now.toISOString(), stepId, deliveryId).changes > 0
+    );
+  }
+
   attachTurn(stepId: string, turnId: string, now = new Date()): void {
     this.#database.connection
       .prepare("UPDATE workflow_steps SET turn_id = ?, updated_at = ? WHERE step_id = ? AND turn_id IS NOT ?")

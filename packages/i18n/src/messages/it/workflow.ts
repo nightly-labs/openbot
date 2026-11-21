@@ -238,6 +238,22 @@ export const messages = {
   "workflow.condition.rule": "Regola",
   "workflow.condition.rulePlaceholder": "Descrivi quando l'esecuzione segue Sì",
   "workflow.condition.taken": "Seguito",
+  "workflow.answer.title": "Campi della risposta",
+  "workflow.answer.placeholder": "priority: high|normal|low\nsummary: text\ncount?: number",
+  "workflow.answer.problem.name": "La riga «{line}» non ha un nome di campo valido.",
+  "workflow.answer.problem.type":
+    "{name} ha un tipo sconosciuto. Usa text, number, yes/no, list o etichette come high|low.",
+  "workflow.answer.problem.labels": "{name} richiede due o più etichette, come high|low.",
+  "workflow.answer.problem.duplicate": "{name} è due volte nell’elenco.",
+  "workflow.answer.problem.many": "Usa al massimo 20 campi.",
+  "workflow.answer.problem.check":
+    "Il controllo non è valido. Scrivi test come priority = high e uniscili con and oppure or.",
+  "workflow.answer.problem.field": "Nessun passaggio precedente fornisce {name}.",
+  "workflow.answer.problem.test": "{name} non si può confrontare così.",
+  "workflow.answer.problem.conflict": "Due passaggi precedenti forniscono {name} con tipi diversi.",
+  "workflow.check.title": "Controllo",
+  "workflow.check.placeholder": "priority = high and count > 2",
+  "workflow.check.fields": "Campi: {names}",
 
   "workflow.output.title": "Output",
   "workflow.output.name": "output",
