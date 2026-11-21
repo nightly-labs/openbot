@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  AGENT_INSTRUCTION_FILE_NAMES,
   type AgentInstructionFileName,
   type AgentSummary,
   agentAutomationAllowed,
@@ -627,7 +628,7 @@ export class ThreadLifecycle {
       ...this.#computerUseParam(agent, client),
       ...this.#mcpAgentParam(agent, client),
       ...this.#channelToolsParam(client, publicThreadId),
-      ...this.#excludedInstructionFilesParam(client, instructionsFile),
+      ...this.#excludedInstructionFilesParam(instructionsFile),
       ...this.#instructions(
         agent,
         client,
@@ -1219,26 +1220,31 @@ export class ThreadLifecycle {
     agent: AgentSummary,
     client: AgentClient,
   ) {
+    const enforced = workspaceAccessEnforced(agent);
     const read =
-      client.provider === "claude" && workspaceAccessEnforced(agent)
+      client.provider === "claude" && enforced
         ? []
         : agentProviderDescriptor(client.provider).workspaceInstructionFiles;
     const file = yield* promptInstructionsFile(agent.workspacePath, read);
     const sent = file && !file.readByCli ? file : null;
-    const missing = client.provider === "claude" ? yield* missingInstructionFileNames(agent.workspacePath) : [];
+    const cliReadsProjectFiles = client.provider === "claude" && !enforced;
+    const missing = cliReadsProjectFiles ? yield* missingInstructionFileNames(agent.workspacePath) : [];
     return {
       fileName: file?.fileName ?? "AGENTS.md",
       found: file,
       file: sent,
-      hiddenFromCli: missing.filter((fileName) => !read.includes(fileName)).concat(sent ? [sent.fileName] : []),
+      hiddenFromCli: cliReadsProjectFiles
+        ? AGENT_INSTRUCTION_FILE_NAMES.filter(
+            (fileName) => !read.includes(fileName) && (sent?.fileName === fileName || missing.includes(fileName)),
+          )
+        : [],
     } satisfies InstructionsFileInPrompt;
   });
 
-  #excludedInstructionFilesParam(
-    client: AgentClient,
-    instructionsFile: InstructionsFileInPrompt,
-  ): { excludedInstructionFiles?: AgentInstructionFileName[] } {
-    return client.provider === "claude" && instructionsFile.hiddenFromCli.length > 0
+  #excludedInstructionFilesParam(instructionsFile: InstructionsFileInPrompt): {
+    excludedInstructionFiles?: AgentInstructionFileName[];
+  } {
+    return instructionsFile.hiddenFromCli.length > 0
       ? { excludedInstructionFiles: instructionsFile.hiddenFromCli }
       : {};
   }
@@ -1269,7 +1275,7 @@ export class ThreadLifecycle {
       ...this.#computerUseParam(agent, client),
       ...this.#mcpAgentParam(agent, client),
       ...this.#channelToolsParam(client, publicThreadId),
-      ...this.#excludedInstructionFilesParam(client, instructionsFile),
+      ...this.#excludedInstructionFilesParam(instructionsFile),
       ...this.#instructions(
         agent,
         client,
