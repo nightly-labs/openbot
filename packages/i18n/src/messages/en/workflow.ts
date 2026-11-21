@@ -107,6 +107,8 @@ export const messages = defineMessages("workflow", {
   "workflow.agent.removedLabel": "Agent removed. Choose agent",
   "workflow.agent.list": "Agents",
   "workflow.agent.search": "Search agents",
+  "workflow.agentMade.title": "{agent} made a workflow",
+  "workflow.agentMade.open": "Open",
 
   "workflow.model.label": "Model: {name}",
   "workflow.model.title": "Models",
