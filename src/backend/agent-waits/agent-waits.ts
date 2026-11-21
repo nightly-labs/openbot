@@ -73,7 +73,8 @@ export class AgentWaits {
 
   sideThreadOfWait(agentId: string, waitId: string): string | null {
     const wait = this.#store.get(agentId, waitId);
-    return wait ? this.#sideThreadOf(wait) : null;
+    if (!wait || (wait.wakeDeliveryId && this.#isPending(wait.wakeDeliveryId))) return null;
+    return this.#sideThreadOf(wait);
   }
 
   wakeForRun(

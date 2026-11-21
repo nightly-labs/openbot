@@ -222,11 +222,12 @@ routine thread and the chat of one agent can then drive the screen at the same t
 can. A channel thread keeps Computer Use too (see [channels](channels-and-messaging.md)). Only
 `start_task` tasks and branches run without it. The runs of a routine thread also keep the tools of
 the chat that side threads do not have: `OpenBotToolRouter` does not count a routine thread as an
-execution thread, so a run can call `await_event` and `start_task`. Another side thread of the
-agent can call `await_event` too, but not `start_task`. A wait keeps no thread column: `AgentWaits`
+execution thread, so a run can call `await_event` and `start_task`. A side thread that the user
+opened can call `await_event` too, but not `start_task`. A thread that the agent started cannot. A wait keeps no thread column: `AgentWaits`
 finds the side thread from the mailbox message of the wait's request. `RoutineScheduler` sends a run
 that names the wait to that side thread, and gives each other side thread with woken waits its own
-routine message (`#wakeInSideThread`). `AgentTasks.waitThread` opens an archived side thread again.
+routine message (`#wakeInSideThread`). That message continues the wait and does not run the routine task
+again. A failure there keeps the wait in the run's place and does not fail the run. `AgentTasks.waitThread` opens an archived side thread again.
 
 A routine run (in its thread, or in the agent's own chat) does not resume a provider session.
 `DrainScheduler.startDelivery` starts a new session for each run with

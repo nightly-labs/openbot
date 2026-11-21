@@ -2330,7 +2330,8 @@ export class OpenBotToolRouter {
     };
     const waitResult = this.#waits.handleTool(params, {
       agentId: senderAgentId,
-      inExecutionThread: caller.inExecutionThread && callerTaskId === null,
+      inExecutionThread:
+        caller.inExecutionThread && !(callerTaskId !== null && this.#tasks.isSideThread(senderAgentId, callerTaskId)),
     });
     if (waitResult) return waitResult;
 

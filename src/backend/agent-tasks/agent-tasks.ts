@@ -218,16 +218,11 @@ export class AgentTasks implements TaskLanes {
   routineThread(agentId: string, routineId: string, routineName: string): AgentThreadRecord | null {
     const existing = this.#store.threadForRoutine(agentId, routineId);
     const title = taskTitle(routineName);
-    if (existing?.closedAt === null) {
-      this.#conversation.registerTaskThread(agentId, existing.threadId);
-      return this.#followRoutineName(existing, title);
+    if (existing) {
+      const opened = this.#openWithRoom(agentId, existing);
+      return opened ? this.#followRoutineName(opened, title) : null;
     }
     if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
-    if (existing) {
-      this.reopen(existing);
-      const reopened = this.#store.task(existing.taskId);
-      return reopened ? this.#followRoutineName(reopened, title) : null;
-    }
     if (!title) return null;
     const task = this.#store.create({ agentId, origin: "agent", title, titleSource: "agent", routineId });
     this.#conversation.registerTaskThread(agentId, task.threadId);
@@ -237,20 +232,23 @@ export class AgentTasks implements TaskLanes {
 
   isSideThread(agentId: string, taskId: string): boolean {
     const task = this.#store.task(taskId);
-    return task?.agentId === agentId && task.routineId === null;
+    return task?.agentId === agentId && task.origin === "user" && task.routineId === null;
   }
 
   waitThread(agentId: string, taskId: string): AgentThreadRecord | null {
-    if (!this.isSideThread(agentId, taskId)) return null;
     const task = this.#store.task(taskId);
-    if (!task) return null;
+    if (!task || !this.isSideThread(agentId, taskId)) return null;
+    return this.#openWithRoom(agentId, task);
+  }
+
+  #openWithRoom(agentId: string, task: AgentThreadRecord): AgentThreadRecord | null {
     if (task.closedAt === null) {
       this.#conversation.registerTaskThread(agentId, task.threadId);
       return task;
     }
     if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
     this.reopen(task);
-    return this.#store.task(taskId);
+    return this.#store.task(task.taskId);
   }
 
   #followRoutineName(thread: AgentThreadRecord, title: string | null): AgentThreadRecord {

@@ -7,6 +7,7 @@ import type { AgentEvent } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
+import { deliveryPromptInput } from "../src/backend/agent/delivery-content";
 import { RoutineScheduler } from "../src/backend/agent/routine-scheduler";
 import type { OpenBotToolResponse } from "../src/backend/agent/routine-tools";
 import { AgentStore } from "../src/backend/agent-store";
@@ -162,6 +163,19 @@ function deliveryTask(deliveryId: string | null | undefined): string | null {
   return mailbox.taskIdForDelivery(deliveryId);
 }
 
+function promptText(agentId: string, deliveryId: string): string {
+  const context = mailbox.getDelivery(deliveryId);
+  assert.ok(context, "The delivery is stored.");
+  const input = deliveryPromptInput(context, {
+    agentNames: new Map(store.list().map((agent) => [agent.id, agent.name])),
+    snapshot: { agentId, threadId: null, activeTurnId: null, revision: 0, messages: [] },
+    routineRun: scheduler.runForDelivery(deliveryId),
+    wokenWaits: scheduler.wokenWaits(deliveryId),
+    routineTimezone: "UTC",
+  });
+  return input.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n");
+}
+
 async function finish(agentId: string, deliveryIds: readonly (string | null | undefined)[]): Promise<void> {
   for (const deliveryId of deliveryIds) {
     if (!deliveryId) continue;
@@ -225,6 +239,21 @@ try {
       "The side-thread turn sees its wait.",
     );
     assert.ok(drains.includes(agent.id), "The side-thread message is drained.");
+    const sidePrompt = promptText(agent.id, sideWait.wakeDeliveryId);
+    assert.ok(sidePrompt.includes(opened.sideWait), "The side-thread turn names its wait.");
+    assert.ok(
+      !sidePrompt.includes("Perform the task below now"),
+      "The side-thread turn does not run the routine again.",
+    );
+    assert.ok(
+      promptText(agent.id, run.deliveryId ?? "").includes("Perform the task below now"),
+      "The run does the task.",
+    );
+    assert.equal(
+      waits.sideThreadOfWait(agent.id, opened.sideWait),
+      null,
+      "A script event does not take a side thread while its wake is pending.",
+    );
     await finish(agent.id, [run.deliveryId, sideWait.wakeDeliveryId]);
     return { runDelivery: run.deliveryId, sideDelivery: sideWait.wakeDeliveryId };
   });
@@ -264,6 +293,13 @@ try {
     assert.equal(threads.task(side.taskId)?.closedAt, null, "The side thread is open again.");
     await finish(agent.id, [run.deliveryId]);
     return { runDelivery: run.deliveryId };
+  });
+
+  await step("A thread that the agent started is not a side thread for waits", async () => {
+    const delegated = tasks.create(agent.id, "Check the logs", "agent");
+    assert.equal(tasks.isSideThread(agent.id, delegated.taskId), false);
+    assert.equal(tasks.waitThread(agent.id, delegated.taskId), null);
+    return { taskId: delegated.taskId };
   });
 
   report.passed = true;
