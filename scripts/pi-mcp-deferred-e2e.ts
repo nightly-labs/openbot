@@ -42,7 +42,9 @@ interface Report {
   requests: string[][];
   servers?: string;
   toolResults?: string;
+  secondToolResult?: string;
   reply?: string;
+  secondReply?: string;
   error?: string;
 }
 
@@ -50,6 +52,10 @@ const report: Report = { passed: false, requests: [] };
 const root = await mkdtemp(join(tmpdir(), "openbot-pi-deferred-e2e-"));
 const clients: AgentClient[] = [];
 const systems: string[] = [];
+
+function messageText({ content }: { content?: string | Array<{ text?: string }> }): string {
+  return typeof content === "string" ? content : (content ?? []).map((part) => part.text).join("");
+}
 
 async function body(request: IncomingMessage): Promise<ChatRequest> {
   const chunks: Buffer[] = [];
@@ -89,17 +95,14 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
           )
           .join(NL),
       );
-      if (report.requests.length === 2)
-        report.toolResults = (parsed.messages ?? [])
-          .filter((message) => message.role === "tool")
-          .map(({ content }) =>
-            typeof content === "string" ? content : (content ?? []).map((part) => part.text).join(""),
-          )
-          .join(NL);
+      const toolMessages = (parsed.messages ?? []).filter((message) => message.role === "tool");
+      if (report.requests.length === 2) report.toolResults = toolMessages.map(messageText).join(NL);
+      if (report.requests.length === 4) report.secondToolResult = messageText(toolMessages.at(-1) ?? {});
     }
     response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-    if (names.length > 0 && report.requests.length === 1) {
-      const call = { index: 0, id: "call_1", type: "function", function: { name: "tool_search", arguments: "" } };
+    if (names.length > 0 && (report.requests.length === 1 || report.requests.length === 3)) {
+      const id = `call_${report.requests.length}`;
+      const call = { index: 0, id, type: "function", function: { name: "tool_search", arguments: "" } };
       response.write(event({ role: "assistant", tool_calls: [call] }, null));
       const args = JSON.stringify({ query: TOOL });
       response.write(event({ tool_calls: [{ index: 0, function: { arguments: args } }] }, null));
@@ -195,6 +198,30 @@ try {
   assert.match(report.servers, /\(tool_search\): fixture$/mu, "The system prompt does not name the server.");
   assert.ok(!systems.some((system) => system.includes("<docs>")), "The system prompt has Pi's <docs> section.");
   assert.equal(systems[1], systems[0], "The system prompt changed after tool_search.");
+  const loadedNote = "This search does not show tools that an earlier search loaded.";
+  assert.ok(
+    !report.toolResults?.includes(loadedNote),
+    `A search that found tools has the empty note: ${report.toolResults}`,
+  );
+
+  const again = await runTurn(client, thread, { text: "Find the ping tool again.", timeoutMs: 60_000 });
+  report.secondReply = again.reply;
+  assert.equal(again.error, null, `The second turn failed: ${again.error}`);
+  const [, , third, fourth] = report.requests;
+  assert.ok(third && fourth, `Pi sent ${report.requests.length} requests, not 4.`);
+  assert.equal(external(third).length, 1, `The second turn does not declare the loaded tool: ${third.join(", ")}`);
+  assert.ok(
+    report.secondToolResult?.includes("No matching tools found"),
+    `The second tool_search found tools: ${report.secondToolResult}`,
+  );
+  assert.ok(
+    report.secondToolResult?.includes(loadedNote),
+    `The empty tool_search result does not say that loaded tools stay loaded: ${report.secondToolResult}`,
+  );
+  assert.ok(
+    report.secondToolResult?.includes(`find them with ${openbotSearch},`),
+    `The empty tool_search result does not name ${openbotSearch}: ${report.secondToolResult}`,
+  );
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
