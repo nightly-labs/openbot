@@ -75,6 +75,10 @@ All notable changes to OpenBot will be documented here. The project follows
 - You can upload an MP4 or WebM video of up to 100 MB as the window backdrop in Settings > Appearance. The video plays without sound and loops. You can also choose Use as backdrop on a video in a chat.
 - Agents on all providers can ask a question that takes more than one answer. Before, only Claude
   agents could ask one.
+- A group chat can have folders. Open the group chat settings, select Folders, and add up to 8
+  folders. All agents in the group chat can then change files and run commands in these folders, so
+  they can work together on the same project. On a joined server, an owner or an admin can choose
+  folders on the server. The server must also be on the new version.
 
 ### Changed
 
@@ -116,6 +120,11 @@ All notable changes to OpenBot will be documented here. The project follows
 - The mobile app card in the sidebar shows your agents and has an iPhone button and an Android button.
   Each button opens Settings > Mobile Connect on the install step for that phone, with the QR code of its store.
 - A provider now keeps up to 20 accounts. Before, the limit was 10. To manage more than 10 accounts of one provider on a joined server, the server and the device that you connect from must both be on this version.
+- An agent can work in more than one channel at the same time. Before, a task for an agent waited
+  while that agent worked in another channel. An agent now runs one task in each channel, in as many
+  channels as its "Parallel threads per agent" limit, which tasks and channels share. Requests in the same channel still go one at a
+  time. Agents whose provider runs one turn at a time keep the old order. On a joined server, the
+  server must also be on the new version.
 
 ### Fixed
 
@@ -502,6 +511,11 @@ All notable changes to OpenBot will be documented here. The project follows
   Before, OpenBot showed you a password card and the routine stopped until you typed the password.
   Now the agent gets the reason at once, reloads the sign-in page, and the saved login fills. On a
   joined server, the server must also be on the new version.
+- A custom agent that starts slowly, such as Kiro CLI on Windows, could show no models, with the
+  error "Kiro request timed out: model/list". When OpenBot started the agent to read its models, it
+  opened two test sessions, one after the other, in the same 30 s limit. OpenBot now uses the models
+  from the first session, so the models of a slow agent show again. On a joined server, the server
+  must also be on the new version.
 
 ## [0.75.0] - 2026-11-20
 
