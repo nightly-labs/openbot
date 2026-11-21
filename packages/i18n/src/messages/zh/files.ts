@@ -190,6 +190,8 @@ export const messages = {
   "files.conversation.title": "文件",
   "files.conversation.summary": "{files} · 对话 {size}",
   "files.conversation.close": "关闭文件",
+  "files.conversation.workspace": "工作区文件夹",
+  "files.conversation.workspaces": "工作区文件夹",
   "files.conversation.emptyTitle": "该对话中没有文件",
   "files.conversation.emptyDescription": "你附加的文件和助手生成的文件会显示在这里。",
 } as const satisfies PartialTranslation<typeof source>;

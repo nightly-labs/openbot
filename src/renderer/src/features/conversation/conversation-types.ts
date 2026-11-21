@@ -82,6 +82,7 @@ export interface ConversationChannelSource {
   ownMessage: (message: AgentMessage) => boolean;
   workers: () => ChannelWorker[];
   memberThreadIds: () => ReadonlySet<string>;
+  memberAgentIds: () => ReadonlySet<string>;
   browserOwner: () => { agentId: string; threadId: string } | null;
   workingTurns: () => readonly string[];
   interactionAgentName: () => string | undefined;

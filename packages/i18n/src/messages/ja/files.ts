@@ -194,6 +194,8 @@ export const messages = {
   "files.conversation.title": "ファイル",
   "files.conversation.summary": "{files} · チャット {size}",
   "files.conversation.close": "ファイルを閉じる",
+  "files.conversation.workspace": "ワークスペースフォルダー",
+  "files.conversation.workspaces": "ワークスペースフォルダー",
   "files.conversation.emptyTitle": "このチャットにファイルはありません",
   "files.conversation.emptyDescription": "添付したファイルとエージェントが作成したファイルがここに表示されます。",
 } as const satisfies PartialTranslation<typeof source>;

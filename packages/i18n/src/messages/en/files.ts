@@ -200,6 +200,8 @@ export const messages = defineMessages("files", {
   "files.conversation.title": "Files",
   "files.conversation.summary": "{files} · chat {size}",
   "files.conversation.close": "Close files",
+  "files.conversation.workspace": "Workspace folder",
+  "files.conversation.workspaces": "Workspace folders",
   "files.conversation.emptyTitle": "No files in this chat",
   "files.conversation.emptyDescription": "Files you attach and files the agent makes show here.",
 });

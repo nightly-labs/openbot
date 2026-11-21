@@ -63,6 +63,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const threads = () => summary()?.threads;
   const readOnly = () => page()?.channel.archived === true;
   const memberThreadIds = createMemo(() => new Set(threads()?.map((thread) => thread.threadId)));
+  const memberAgentIds = createMemo(() => new Set(threads()?.map((thread) => thread.agentId)));
   const browserOwner = createMemo(() => {
     const channel = page()?.channel;
     const allowed = channel ? channelBrowserAgent(channel) : false;
@@ -237,6 +238,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
         : [];
     },
     memberThreadIds,
+    memberAgentIds,
     browserOwner,
     workingTurns,
     interactionAgentName: () => {

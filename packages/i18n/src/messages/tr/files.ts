@@ -198,6 +198,8 @@ export const messages = {
   "files.conversation.title": "Dosyalar",
   "files.conversation.summary": "{files} · sohbet {size}",
   "files.conversation.close": "Dosyaları kapat",
+  "files.conversation.workspace": "Çalışma alanı klasörü",
+  "files.conversation.workspaces": "Çalışma alanı klasörleri",
   "files.conversation.emptyTitle": "Bu sohbette dosya yok",
   "files.conversation.emptyDescription": "Eklediğiniz dosyalar ve ajanın oluşturduğu dosyalar burada gösterilir.",
 } as const satisfies PartialTranslation<typeof source>;
