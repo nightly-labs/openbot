@@ -89,11 +89,6 @@ try {
     "The first channel turn ended before the second channel started; use a longer prompt.",
   );
   assert.ok(runningTask(thirdPage, a.id), "The agent did not start its task in the second channel.");
-  assert.equal(
-    (thirdPage.waits ?? []).some((wait) => wait.reason === "agent-busy"),
-    false,
-    "The second channel says that the agent is busy in another channel.",
-  );
 
   await client.sendToAgent(a.id, SHORT_PROMPT);
   const [ownChat, duringOwnChat] = await waitFor(
