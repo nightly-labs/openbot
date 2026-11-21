@@ -472,6 +472,7 @@ export const messages = {
   "workflow.canvas.action.addHere": "여기에 노드 추가",
   "workflow.canvas.action.deleteConnection": "연결 삭제",
   "workflow.canvas.action.selectAll": "모두 선택",
+  "workflow.canvas.action.tidy": "정리",
   "workflow.canvas.action.undo": "실행 취소",
   "workflow.canvas.action.redo": "다시 실행",
   "workflow.canvas.action.search": "검색",

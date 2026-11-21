@@ -477,6 +477,7 @@ export const messages = defineMessages("workflow", {
   "workflow.canvas.action.addHere": "Add node here",
   "workflow.canvas.action.deleteConnection": "Delete connection",
   "workflow.canvas.action.selectAll": "Select all",
+  "workflow.canvas.action.tidy": "Tidy up",
   "workflow.canvas.action.undo": "Undo",
   "workflow.canvas.action.redo": "Redo",
   "workflow.canvas.action.search": "Search",
