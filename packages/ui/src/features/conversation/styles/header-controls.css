@@ -708,6 +708,11 @@
   width: 128px;
 }
 
+/* Why the effort list stops early: a line of its own under the label and the control. */
+.provider-model-effort-note {
+  flex-basis: 100%;
+}
+
 .provider-model-effort-select .ui-select-trigger {
   border-color: transparent;
   border-radius: var(--ui-menu-item-radius);
