@@ -1861,6 +1861,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
+        backupReadyAt: (agentId) => this.#backupReadyAt(agentId),
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
@@ -4105,6 +4106,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #mayFailOver(agentId: string): boolean {
     return this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId);
+  }
+
+  #backupReadyAt(agentId: string): number | null {
+    const agent = this.#store.get(agentId);
+    if (!agent?.backupModels?.automatic || this.#mayFailOver(agentId)) return null;
+    const current = agentModelChoice(agent);
+    const ends = agent.backupModels.order
+      .filter(
+        (choice) =>
+          !sameAgentModelChoice(choice, current) &&
+          this.#modelChoiceReady(choice) &&
+          !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
+      )
+      .flatMap((choice) => this.#usageLimits.heldUntil(usageLimitOf(choice)) ?? []);
+    return ends.length > 0 ? Math.ceil(Math.min(...ends) / 1_000) : null;
   }
 
   #waitsForLimit(agentId: string): boolean {

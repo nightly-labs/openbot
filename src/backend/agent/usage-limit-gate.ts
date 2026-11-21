@@ -149,6 +149,14 @@ export class UsageLimitGate {
     return this.#failures.get(limitKey(limit.provider, limit.accountId, limit.model))?.spent === true;
   }
 
+  heldUntil(limit: UsageLimitKey): number | null {
+    const key = limitKey(limit.provider, limit.accountId, limit.model);
+    const reached = this.#limits.get(key);
+    if (reached?.resetsAt === null) return null;
+    const endsAt = Math.max(this.#failures.get(key)?.endsAt ?? 0, (reached?.resetsAt ?? 0) * 1_000);
+    return endsAt > Date.now() ? endsAt : null;
+  }
+
   failed(agentId: string, model: string | null = null, resetDelayMs: number | null = null, spent = false): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
