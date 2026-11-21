@@ -18,14 +18,8 @@ export interface CustomBackdrop extends CustomBackdropSummary {
   blob: Blob;
 }
 
-export const CUSTOM_BACKDROP_IMAGE_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "image/avif",
-] as const;
-export const CUSTOM_BACKDROP_VIDEO_TYPES = ["video/mp4", "video/webm"] as const;
+const CUSTOM_BACKDROP_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"] as const;
+const CUSTOM_BACKDROP_VIDEO_TYPES = ["video/mp4", "video/webm"] as const;
 export const CUSTOM_BACKDROP_UPLOAD_TYPES = [...CUSTOM_BACKDROP_IMAGE_TYPES, ...CUSTOM_BACKDROP_VIDEO_TYPES] as const;
 const IMAGE_MIME_TYPES = new Set<string>(CUSTOM_BACKDROP_IMAGE_TYPES);
 const VIDEO_MIME_TYPES = new Set<string>(CUSTOM_BACKDROP_VIDEO_TYPES);
