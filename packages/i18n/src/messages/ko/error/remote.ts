@@ -91,7 +91,9 @@ export const messages = {
     "보안 키가 없거나 변경되어 OpenBot이 이 서버를 확인할 수 없어요. 서버 소유자에게 서버를 확인해 달라고 요청하세요.",
   "error.remote.connectionNotStarted":
     "OpenBot이 이 서버와 연결을 시작하지 못했어요. 문제가 계속되면 OpenBot을 종료하고 다시 여세요.",
-  "error.remote.hostDidNotConnect": "WebRTC 호스트가 연결되지 않았어요.",
+  "error.remote.connectionServiceUnreachable":
+    "이 컴퓨터가 OpenBot 연결 서비스에 연결할 수 없어요. 인터넷 연결을 확인하세요. OpenBot이 자동으로 다시 연결해요.",
+  "error.remote.serverAnswerTimeout": "서버가 제때 응답하지 않았어요. OpenBot이 자동으로 다시 연결해요.",
   "error.remote.connectionCancelled": "원격 연결이 취소되었어요.",
   "error.remote.hostDisconnected": "서버와의 연결이 끊어졌어요. 작업이 완료되었는지 확인한 후 다시 시도해 주세요.",
   "error.remote.eventGap": "호스트 이벤트 순서에 누락이 있어요.",

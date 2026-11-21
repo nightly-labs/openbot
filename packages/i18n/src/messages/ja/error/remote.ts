@@ -96,7 +96,9 @@ export const messages = {
     "セキュリティキーがないか変更されたため、OpenBot はこのサーバーを確認できません。サーバーの所有者にサーバーの確認を依頼してください。",
   "error.remote.connectionNotStarted":
     "OpenBot はこのサーバーへの接続を開始できませんでした。問題が続く場合は、OpenBot を終了してもう一度開いてください。",
-  "error.remote.hostDidNotConnect": "WebRTC ホストが接続しませんでした。",
+  "error.remote.connectionServiceUnreachable":
+    "このコンピューターから OpenBot の接続サービスに接続できません。インターネット接続を確認してください。OpenBot は自動で再接続します。",
+  "error.remote.serverAnswerTimeout": "サーバーが時間内に応答しませんでした。OpenBot は自動で再接続します。",
   "error.remote.connectionCancelled": "リモート接続がキャンセルされました。",
   "error.remote.hostDisconnected":
     "サーバーとの接続が切れました。操作が完了したか確認してから、もう一度お試しください。",
