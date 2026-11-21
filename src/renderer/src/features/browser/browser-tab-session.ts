@@ -95,7 +95,7 @@ export function moveBrowserTab(serverId: string, tabs: readonly BrowserTab[], ta
   });
 }
 
-export function rememberClosedBrowserTab(serverId: string, tab: BrowserTab, index: number) {
+function rememberClosedBrowserTab(serverId: string, tab: BrowserTab, index: number) {
   if (!recordable(tab.url)) return;
   update(serverId, (draft) => {
     draft.closed = [{ url: tab.url, index }, ...draft.closed].slice(0, CLOSED_LIMIT);
