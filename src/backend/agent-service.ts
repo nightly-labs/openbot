@@ -6233,7 +6233,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (turnId) {
       this.#tasks.markStopped(task.taskId, turnId, byUser);
       yield* this.#interruptTurn(task.agentId, turnId, task.threadId);
-    }
+    } else if (byUser) yield* this.#tasks.releaseAfterLostWork(task.taskId);
     this.#tasks.changed(task.agentId);
   }).bind(this);
 
