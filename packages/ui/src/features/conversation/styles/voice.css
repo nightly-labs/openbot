@@ -438,7 +438,8 @@
   height: var(--openbot-icon-sm);
 }
 
-.voice-pill-error {
+.voice-pill-error,
+.voice-pill-status {
   max-width: min(480px, 100%);
   margin: 0;
   color: var(--openbot-danger);
@@ -449,7 +450,11 @@
   transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-.voice-pill-dock[data-closing] > .voice-pill-error {
+.voice-pill-status {
+  color: var(--openbot-text-secondary);
+}
+
+.voice-pill-dock[data-closing] > :is(.voice-pill-error, .voice-pill-status) {
   opacity: 0;
 }
 

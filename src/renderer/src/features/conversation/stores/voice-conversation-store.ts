@@ -2,9 +2,11 @@ import {
   type ConversationMessage,
   DEFAULT_SPEECH_SETTINGS,
   LOCAL_SERVER_ID,
+  type SpeechModelStatus,
   VOICE_AUDIO_LIMITS,
   VOICE_MODELS,
   VOICE_STREAM_LIMITS,
+  type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
@@ -69,6 +71,7 @@ interface VoiceConversationState {
   heard: string;
   error: string | null;
   levels: number[];
+  downloadProgress: number | null;
 }
 
 export interface VoiceConversationDeps {
@@ -111,6 +114,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     heard: "",
     error: null,
     levels: quietLevels(),
+    downloadProgress: null,
   });
   let generation = 0;
   let disposed = false;
@@ -138,6 +142,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let sentTurns = 0;
   const serverKind = deps.serverId === LOCAL_SERVER_ID ? "local" : "remote";
   let ownServer = false;
+  const downloadListeners: Array<() => void> = [];
+  let downloadingModel: string | null = null;
   const transcription = () => {
     if (ownServer) return "server";
     return cloud ? "cloud" : "local";
@@ -200,6 +206,31 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (ready && step === "listening") void listen();
   });
 
+  function showDownload(status: VoiceModelStatus | SpeechModelStatus): void {
+    if (status.modelId !== downloadingModel || status.phase !== "downloading" || disposed) return;
+    setState((draft) => {
+      draft.downloadProgress = status.progress ?? 0;
+    });
+  }
+
+  function watchDownload(modelId: string): void {
+    downloadingModel = modelId;
+    setState((draft) => {
+      draft.downloadProgress = null;
+    });
+  }
+
+  function removeDownloadListeners(): void {
+    for (const stop of downloadListeners.splice(0)) stop();
+  }
+
+  function stopDownloadProgress(): void {
+    removeDownloadListeners();
+    setState((draft) => {
+      draft.downloadProgress = null;
+    });
+  }
+
   async function start(): Promise<void> {
     const own = generation;
     const analytics = desktopAnalytics.scope();
@@ -207,6 +238,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     loading = true;
     try {
       const speech = speechPort().voice;
+      downloadListeners.push(speech.onSpeechModelStatus(showDownload), deps.voice.onModelStatus(showDownload));
       const [server, turnPauseMs] = await Promise.all([
         speech.getServer(),
         speech.getSpeechSettings().then(
@@ -215,7 +247,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         ),
       ]);
       turnEndSilenceMs = turnPauseMs;
-      if (!server?.routes.speech && (await speech.getSpeechModelStatus()).phase !== "ready") {
+      const speechModel = server?.routes.speech ? null : await speech.getSpeechModelStatus();
+      if (speechModel && speechModel.phase !== "ready") {
+        watchDownload(speechModel.modelId);
         const downloadAt = performance.now();
         const status = await speech.downloadSpeechModel().catch((error: unknown) => {
           analytics.track("speech_model_action", {
@@ -238,7 +272,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         });
         if (status.phase !== "ready") throw new Error(status.message ?? currentText().t("conversation.voice.error"));
       }
-      const [settings, model] = await Promise.all([deps.voice.getSettings(), deps.voice.prepareModel()]);
+      const settings = await deps.voice.getSettings();
+      watchDownload(settings.modelId);
+      const model = await deps.voice.prepareModel();
       if (own !== generation || disposed) return;
       if (model.phase !== "ready")
         throw new Error(currentText().errorMessage(model.message, currentText().t("composer.voice.prepareFailed")));
@@ -272,6 +308,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       });
     } finally {
       loading = false;
+      stopDownloadProgress();
     }
   }
 
@@ -829,6 +866,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
     generation += 1;
     stopReplyEnd();
+    removeDownloadListeners();
     releaseTurn();
     dropReply();
   }
@@ -852,6 +890,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     muted: () => state.muted,
     talking: () => state.talking,
     error: () => state.error,
+    downloadProgress: () => state.downloadProgress,
     levels: () => (phase() === "speaking" ? (reading()?.levels ?? state.levels) : state.levels),
     toggleMute,
     setTalkMode,
