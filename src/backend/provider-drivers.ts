@@ -41,7 +41,7 @@ import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields
 import type { TurnContext } from "./agent/turn-context";
 import type { AgentClient } from "./agent-client";
 import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-token-import";
-import { readAntigravityEmail, readAntigravityQuota } from "./antigravity-usage";
+import { readAntigravityEmail, readAntigravityQuota, readAntigravityValidationLink } from "./antigravity-usage";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import {
@@ -927,6 +927,14 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                 model,
                 ...(context.systemProxyFetch ? { fetch: context.systemProxyFetch } : {}),
               }),
+        readVerificationLink: () =>
+          readAntigravityValidationLink({
+            tokenFile: join(
+              antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }),
+              ANTIGRAVITY_TOKEN_FILE,
+            ),
+            fetch: context.systemProxyFetch,
+          }),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {

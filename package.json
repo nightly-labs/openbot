@@ -335,6 +335,7 @@
     "test:antigravity-usage-metering": "bun scripts/antigravity-usage-metering-e2e.ts",
     "test:antigravity-quota-failover": "bun scripts/antigravity-quota-failover-e2e.ts",
     "test:antigravity-failing-session": "bun scripts/antigravity-failing-session-e2e.ts",
+    "test:antigravity-verification-link": "bun scripts/antigravity-verification-link-e2e.ts",
     "test:antigravity-refused-history": "bun scripts/antigravity-refused-history-e2e.ts",
     "test:antigravity-windows-zip": "bun scripts/antigravity-windows-zip-e2e.ts",
     "test:opencode-usage-metering": "bun scripts/opencode-usage-metering-e2e.ts",
