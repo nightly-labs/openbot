@@ -101,6 +101,9 @@ OpenBot quits, OpenBot stops listening and deletes the files.
 
 Each request needs `Authorization: Bearer <token>`.
 
+Responses remove secrets from text, but IDs (`id`, `agentId`, `threadId`, `turnId`, `requestId`,
+`deliveryId` and similar) are always the real values.
+
 ### `GET /v1/agents`
 
 The agents that allow local scripts, with their routines:

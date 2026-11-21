@@ -20,7 +20,7 @@ import {
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, registerSecretValue, toLogValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
@@ -413,9 +413,34 @@ async function readBody(request: IncomingMessage): Promise<string | null> {
   return body === null ? null : body.toString("utf8");
 }
 
+const ROUTING_ID_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "agentId",
+  "recipientAgentId",
+  "threadId",
+  "turnId",
+  "requestId",
+  "messageId",
+  "deliveryId",
+  "runId",
+  "providerAccountId",
+]);
+
 function send(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
-  response.end(JSON.stringify(toLogValue(body)));
+  response.end(JSON.stringify(withRoutingIds(body, toLogValue(body))));
+}
+
+function withRoutingIds(source: unknown, redacted: LogValue): LogValue {
+  if (Array.isArray(redacted))
+    return Array.isArray(source) ? redacted.map((entry, index) => withRoutingIds(source[index], entry)) : redacted;
+  if (typeof redacted !== "object" || redacted === null || !isDynamicRecord(source)) return redacted;
+  return Object.fromEntries(
+    Object.entries(redacted).map(([key, entry]) => {
+      const original = source[key];
+      return [key, ROUTING_ID_KEYS.has(key) && isString(original) ? original : withRoutingIds(original, entry)];
+    }),
+  );
 }
 
 async function readJson(request: IncomingMessage): Promise<DynamicRecord> {
