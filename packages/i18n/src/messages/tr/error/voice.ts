@@ -25,6 +25,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Konuşma modelini Ayarlar → Ses bölümünden indirin.",
   "error.voice.speech.timedOut": "Yanıtı sesli okuma zaman aşımına uğradı.",
   "error.voice.speech.failed": "OpenBot yanıtı sesli okuyamadı.",
+  "error.voice.speech.providerRefused": "{provider} sesi oluşturmayı reddetti: {reason}",
   "error.voice.recordingNotKept": "OpenBot ses kaydını saklayamadı.",
   "error.voice.live.timedOut": "Codex canlı ses zamanında başlamadı. Tekrar dene.",
   "error.voice.live.failed": "Canlı ses durdu: {reason}",
