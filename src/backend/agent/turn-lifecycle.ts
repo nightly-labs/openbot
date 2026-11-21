@@ -82,7 +82,7 @@ import { markIncompleteMediaGeneration } from "./image-generation";
 import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
-import { type FinishCheckMode, type PlanContinuation, waitsForUser } from "./plan-continuation";
+import { type FinishCheckMode, type PlanContinuation, promisesWork, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import {
   GEMINI_INVALID_CREDENTIALS,
@@ -2321,7 +2321,9 @@ export class TurnLifecycle {
       const turnPlan = snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null;
       const toolSteps = trace?.steps.filter((step) => step.kind === "tool") ?? [];
       const finishCheck: FinishCheckMode =
-        latestAssistant === undefined || this.#hooks.checkFinish === undefined || toolSteps.length === 0
+        latestAssistant === undefined ||
+        this.#hooks.checkFinish === undefined ||
+        (toolSteps.length === 0 && !promisesWork(latestAssistant.text))
           ? "no"
           : continueMode;
       const proposed =
