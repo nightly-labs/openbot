@@ -15,6 +15,7 @@ import {
   agentFolderCoverage,
   folderInside,
 } from "@openbot/contracts/ipc";
+import { effectiveAgentFolders } from "../backend/agent/workspace-sandbox";
 import type { AgentService } from "../backend/agent-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { oneAtATimePerKey } from "./ipc/one-at-a-time";
@@ -170,7 +171,7 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
       return { outcome: "refused", path: picked, refusal: "missing", list: await list(agent) };
     const path = await realFolder(picked);
     const current = await list(agent);
-    const roots = [current.workspace, current.shared, ...current.folders.map((folder) => folder.path)];
+    const roots = [current.workspace, current.shared, ...effectiveAgentFolders(agent)];
     if (roots.includes(path)) return { outcome: "refused", path, refusal: "root", list: current };
     if (!roots.some((root) => folderInside(root, path)))
       return { outcome: "refused", path, refusal: "outside", list: current };

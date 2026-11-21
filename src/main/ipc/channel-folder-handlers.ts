@@ -7,9 +7,10 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
-import { type BrowserWindow, dialog } from "electron";
+import type { BrowserWindow } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { ChannelFolders } from "../channel-folders";
+import { pickFolder } from "../folder-dialog";
 import {
   decodeRemoteAgentFolderBrowse,
   decodeRemoteChannelFolderChange,
@@ -51,21 +52,6 @@ export function channelFolderIpcHandlers({
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
 
-  let picking = false;
-
-  async function pick(title: string): Promise<string | undefined> {
-    if (picking) return undefined;
-    picking = true;
-    const parent = getMainWindow();
-    const options = { title, properties: ["openDirectory" as const, "createDirectory" as const] };
-    const result = await (parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options)).finally(
-      () => {
-        picking = false;
-      },
-    );
-    return result.canceled ? undefined : result.filePaths[0];
-  }
-
   return {
     channelFolders: {
       listChannelFolders: scopedHandler(parseChannelId, {
@@ -75,7 +61,10 @@ export function channelFolderIpcHandlers({
       }),
       chooseChannelFolder: payloadHandler(parseChannelId, async (channelId) => {
         const channel = folders.requireChannel(channelId);
-        const picked = await pick(translate("dialog.chooseChannelFolder", { channel: channel.name }));
+        const picked = await pickFolder(getMainWindow(), {
+          title: translate("dialog.chooseChannelFolder", { channel: channel.name }),
+          properties: ["openDirectory", "createDirectory"],
+        });
         if (picked === undefined) return { outcome: "cancelled", list: await folders.list(channelId) };
         return folders.add(channelId, picked);
       }),

@@ -122,12 +122,13 @@ export type ChannelFolders = ReturnType<typeof createChannelFolders>;
 
 export function ChannelFoldersRow(props: { folders: ChannelFolders; onOpen: () => void }) {
   const { t } = useText();
-  const folders = () => props.folders.state.list?.folders ?? [];
-  const lost = () => folders().filter((folder) => !folder.found).length;
   const value = () => {
-    if (lost() > 0) return t("agentSettings.folders.valueMissing", { count: lost() });
-    return folders().length > 0
-      ? t("agentSettings.folders.valueCount", { count: folders().length })
+    const folders = props.folders.state.list?.folders;
+    if (!folders) return undefined;
+    const lost = folders.filter((folder) => !folder.found).length;
+    if (lost > 0) return t("agentSettings.folders.valueMissing", { count: lost });
+    return folders.length > 0
+      ? t("agentSettings.folders.valueCount", { count: folders.length })
       : t("agentSettings.folders.valueNone");
   };
   return <SettingsLinkRow label={t("channel.settings.folders.title")} value={value()} onClick={props.onOpen} />;

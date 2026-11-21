@@ -106,6 +106,7 @@ export interface ChannelHooks {
   releaseQuestions?(agentId: string, threadId: string, turnId: string): void;
   changed(channelId: string, revision: number, messagesOnly?: boolean): void;
   queueHoldChanged?(): void;
+  memberFoldersChanged?(agentIds: readonly string[]): void;
   memoriesChanged?(channelId: string): void;
   personAgentLevel?(personId: string, agentId: string): AgentAccessLevel;
   remotePerson?(personId: string): boolean;
@@ -207,7 +208,7 @@ export class ChannelService {
     readonly images: ChannelImages,
     readonly hooks: ChannelHooks,
   ) {
-    this.store = new ChannelStore(database);
+    this.store = new ChannelStore(database, (agentIds) => hooks.memberFoldersChanged?.(agentIds));
     setChannelFolderSource((agentId) => this.store.memberFolders(agentId));
     this.memories = new ChannelMemoryStore(database);
     this.#history = new ChannelHistory(this.store, hooks.generate, this.memories);

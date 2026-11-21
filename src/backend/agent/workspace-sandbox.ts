@@ -21,13 +21,13 @@ export function setChannelFolderSource(source: (agentId: string) => readonly str
   channelFoldersOf = source;
 }
 
-function agentFolderPaths(agent: FolderAgent): string[] {
+export function effectiveAgentFolders(agent: FolderAgent): string[] {
   const own = agent.additionalFolders ?? [];
   return [...own, ...channelFoldersOf(agent.id).filter((folder) => !own.includes(folder))];
 }
 
 export const checkAgentFolders = Effect.fn("checkAgentFolders")(function* (agent: FolderAgent) {
-  const folders = agentFolderPaths(agent);
+  const folders = effectiveAgentFolders(agent);
   const found = yield* Effect.promise(() =>
     Promise.all(
       folders.map((folder) =>
@@ -42,7 +42,7 @@ export const checkAgentFolders = Effect.fn("checkAgentFolders")(function* (agent
 });
 
 export function existingAgentFolders(agent: FolderAgent): string[] {
-  return agentFolderPaths(agent).filter((folder) => foundFolders.get(folder) === true);
+  return effectiveAgentFolders(agent).filter((folder) => foundFolders.get(folder) === true);
 }
 
 export function workspaceWritableRoots(
