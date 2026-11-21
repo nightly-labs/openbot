@@ -275,11 +275,28 @@ is the practical end state.
 ### What is already wired in this fork
 
 `packages/server-headless/src/`:
-- `main.ts` — the composition skeleton with real imports, done and TODO sections.
-- `headless-secret-storage.ts` — implements the `obk1` container (AES-256-GCM, same
-  byte format) with `node:crypto`; byte-compatible with the packaged server.
+- `main.ts` — **milestone 2: runs the repository's own server code under Bun.**
+  Real `CentralAuthManager` (restores the obk1 session on boot), real
+  `secret-storage-cipher` (file key), real `ServerMode` (control socket with
+  `/v1/status` in the packaged-server format, `turn_limit`, memory lines).
+  Process measured at **109.9 MB PSS** on the phone vs 276 MB for the Electron
+  main; no Xvfb, no dbus, no keyring, no window.
+- `headless-host-adapter.ts` — the minimal HostService surface for ServerMode
+  until the real HostService/TeamApiServer wiring lands.
+- `headless-secret-storage.ts` — obk1 container with node:crypto (byte-compatible;
+  the real cipher also reads it).
 - `headless-browser-host.ts` — refuses every browser tool ("descarte browser").
 - `headless-database-host.ts` — spawn swap stub (blocked on the compiled entry).
+- `cli.ts` — status/login/logout over the control socket, packaged-server format.
+- `electron-stub.cjs` — the Electron alias (applied at the Bun cache and
+  node_modules, both reversible; see README) that makes every real server module
+  importable: server-mode, central-auth-manager, team-api-server, host-service,
+  agent-service, team-store, automation-server, secret-storage-cipher.
+
+Verified on the phone (2026-11-21): `node:sqlite`+WAL under Bun/arm64; obk1
+round-trip and cross-instance read; `GET /v1/status`, `invalid_email` validation
+and `turn_limit=16` from the real code paths; synthetic session restores and is
+then correctly revoked by the real 401 flow.
 
 ## Non-goals for the first milestone
 

@@ -49,7 +49,7 @@ const serverMode = new ServerMode({
   host: host as never,
   memory: {
     level: () => memoryLines().memory_level as "ok" | "low" | "critical",
-    sample: () => memoryLines(),
+    sample: () => ({ total: memoryLines().memory_total_mib, available: memoryLines().memory_free_mib }),
     turnLimit: () => 16,
   },
   onError: (message, error) => console.warn(message, error),
