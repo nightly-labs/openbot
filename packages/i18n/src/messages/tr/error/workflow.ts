@@ -18,6 +18,8 @@ export const messages = {
   "error.workflow.agentStepEnded": "Ajana giden mesaj, ajan yanıt vermeden kaldırıldı.",
   "error.workflow.agentStepStopped": "Ajan bu adımı yanıtlamadan durdu. Adımı yeniden çalıştırın.",
   "error.workflow.conditionUnclear": "Model evet ya da hayır yanıtı vermedi.",
+  "error.workflow.answerInvalid": "Yanıt bu adımın istediği alanları içermiyordu: {fields}. Adımı yeniden çalıştırın.",
+  "error.workflow.checkInvalid": "Bu adımın denetimi geçerli değil. Düzeltin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelFailed": "Model yanıt veremedi. Adımı yeniden çalıştırın.",
   "error.workflow.modelTimedOut":
     "Model zamanında yanıt vermedi. Bu adım için daha düşük bir efor veya daha hızlı bir model seçin, sonra adımı yeniden çalıştırın.",

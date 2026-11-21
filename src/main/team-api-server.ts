@@ -188,6 +188,7 @@ import {
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOW_FOLDERS_CAPABILITY,
   WORKFLOWS_AGENT_FILES_CAPABILITY,
+  WORKFLOWS_ANSWERS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -2823,6 +2824,7 @@ export class TeamApiServer {
         if (capability === WORKFLOWS_STEP_SETTINGS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_AGENT_FILES_CAPABILITY) return this.#options.workflows !== undefined;
+        if (capability === WORKFLOWS_ANSWERS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHATS_CAPABILITY)
           return this.#options.workflows !== undefined && this.#options.admin?.routineResults !== undefined;
         if (

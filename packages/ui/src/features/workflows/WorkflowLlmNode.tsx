@@ -2,6 +2,7 @@ import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort }
 import { Button, Play, Sparkles, Textarea } from "@openbot/ui";
 import { untrack } from "solid-js";
 import { useText } from "../../text";
+import { AnswerAction, AnswerProblems, AnswerSummary } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
@@ -69,6 +70,7 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
       output="text"
       toolbar={
         <NodeToolbar id={props.id} name={t("workflow.llm.name")} locked={locked()} onLock={setLocked}>
+          <AnswerAction id={props.id} field="answer" locked={locked()} />
           <StepSettingsAction id={props.id} kind="llm" />
         </NodeToolbar>
       }
@@ -115,6 +117,8 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
           onValueChange={setSystem}
         />
       </Field>
+      <AnswerSummary id={props.id} field="answer" />
+      <AnswerProblems id={props.id} />
       <ResultField id={props.id} running={run.running()} />
     </NodeShell>
   );

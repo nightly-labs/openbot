@@ -195,7 +195,8 @@ function refused(
 }
 
 function deliveryResult(received: ReceivedDelivery): WebhookDeliveryResult {
-  return received.kind === "too-large" ? "too_large" : received.kind;
+  if (received.kind === "too-large") return "too_large";
+  return received.kind === "bad-answer" ? "bad_body" : received.kind;
 }
 
 function deliveryAgeMs(timestamp: string, now: number): number | null {
@@ -214,6 +215,8 @@ function deliveryStatus(result: ReceivedDelivery) {
       return 404;
     case "too-large":
       return 413;
+    case "bad-answer":
+      return 400;
     case "unavailable":
       return 503;
   }

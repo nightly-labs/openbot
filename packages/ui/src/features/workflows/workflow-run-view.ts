@@ -16,6 +16,7 @@ export interface WorkflowNodeResult {
   at: string;
   value: string;
   failed?: boolean;
+  branch?: string;
 }
 
 export interface WorkflowNodeRunState {
@@ -75,7 +76,8 @@ function resultOf(step: WorkflowStep, run: number | undefined): WorkflowNodeResu
   const at = step.endedAt ?? step.startedAt;
   if (!at) return undefined;
   const base = run === undefined ? { id: step.id, at } : { id: step.id, run, at };
-  if (step.status === "done" && step.output !== null) return { ...base, value: step.output };
+  if (step.status === "done" && step.output !== null)
+    return step.branch ? { ...base, value: step.output, branch: step.branch } : { ...base, value: step.output };
   if (step.status === "failed") return { ...base, value: step.error ?? "", failed: true };
   return undefined;
 }

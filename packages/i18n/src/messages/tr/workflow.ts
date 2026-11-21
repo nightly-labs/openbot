@@ -238,6 +238,22 @@ export const messages = {
   "workflow.condition.rule": "Kural",
   "workflow.condition.rulePlaceholder": "Çalıştırmanın ne zaman Evet yolunu izleyeceğini tarif edin",
   "workflow.condition.taken": "İzlendi",
+  "workflow.answer.title": "Yanıt alanları",
+  "workflow.answer.placeholder": "priority: high|normal|low\nsummary: text\ncount?: number",
+  "workflow.answer.problem.name": "“{line}” satırında geçerli bir alan adı yok.",
+  "workflow.answer.problem.type":
+    "{name} bilinmeyen bir türde. text, number, yes/no, list veya high|low gibi etiketler kullanın.",
+  "workflow.answer.problem.labels": "{name} için high|low gibi iki veya daha fazla etiket gerekir.",
+  "workflow.answer.problem.duplicate": "{name} listede iki kez var.",
+  "workflow.answer.problem.many": "En fazla 20 alan kullanın.",
+  "workflow.answer.problem.check":
+    "Kontrol geçerli değil. priority = high gibi testler yazın ve bunları and ya da or ile birleştirin.",
+  "workflow.answer.problem.field": "Bundan önceki hiçbir adım {name} vermiyor.",
+  "workflow.answer.problem.test": "{name} bu şekilde karşılaştırılamaz.",
+  "workflow.answer.problem.conflict": "Önceki iki adım {name} alanını farklı türlerle veriyor.",
+  "workflow.check.title": "Kontrol",
+  "workflow.check.placeholder": "priority = high and count > 2",
+  "workflow.check.fields": "Alanlar: {names}",
 
   "workflow.output.title": "Çıktı",
   "workflow.output.name": "çıktı",

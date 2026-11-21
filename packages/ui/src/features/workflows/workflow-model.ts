@@ -104,6 +104,7 @@ export interface WorkflowCatalogs {
   mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
   mediaSize?: boolean | undefined;
   agentFiles?: boolean | undefined;
+  answers?: boolean | undefined;
   stepSettings?: ((stepId: string) => Promise<WorkflowStepSettings>) | undefined;
   files: readonly StoredFileRow[];
   media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;

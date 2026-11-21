@@ -18,6 +18,8 @@ export const messages = {
   "error.workflow.agentStepEnded": "에이전트가 답하기 전에 이 단계의 메시지가 삭제됐어요.",
   "error.workflow.agentStepStopped": "에이전트가 이 단계에 답하기 전에 멈췄어요. 단계를 다시 실행해 주세요.",
   "error.workflow.conditionUnclear": "모델이 ‘예’ 또는 ‘아니요’로 답하지 않았어요.",
+  "error.workflow.answerInvalid": "답에 이 단계가 요구하는 필드가 없었어요: {fields}. 단계를 다시 실행해 주세요.",
+  "error.workflow.checkInvalid": "이 단계의 확인 조건이 올바르지 않아요. 고친 뒤 단계를 다시 실행해 주세요.",
   "error.workflow.modelFailed": "모델이 답할 수 없었어요. 단계를 다시 실행해 주세요.",
   "error.workflow.modelTimedOut":
     "모델이 제때 답하지 않았어요. 이 단계의 강도를 낮추거나 더 빠른 모델을 고른 다음 다시 실행해 주세요.",

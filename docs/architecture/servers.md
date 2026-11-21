@@ -504,6 +504,12 @@ no route. A client shows the connected pictures on the Agent card only on a host
 because a host before v0.72.0 does not send these files to the agent. A v0.72.0 to v0.74.x host sends
 them without the note and does not advertise the capability, so its Agent card shows no pictures.
 
+`workflows-answers-v1` says that the host runs typed answers: the `answer` field of an agent, a model
+step and a webhook trigger, the `check` field of a condition, and `{{name}}` in a step's text (see
+[Workflows](agents.md#workflows)). The capability adds no route: the fields are text in the graph,
+and a host before it keeps them but does not use them. A client shows the editors and the problems
+only on a host that advertises it.
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
