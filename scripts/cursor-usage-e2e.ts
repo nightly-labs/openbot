@@ -118,11 +118,18 @@ process.env.CURSOR_API_ENDPOINT = `http://127.0.0.1:${address.port}`;
 const authFile = cursorAuthFile();
 
 async function install(): Promise<string> {
-  const executable = join(root, "cursor", "cursor-agent");
-  await mkdir(dirname(executable), { recursive: true });
-  await writeFile(executable, FAKE_CURSOR);
-  await chmod(executable, 0o755);
-  return executable;
+  const base = join(root, "cursor", "cursor-agent");
+  await mkdir(dirname(base), { recursive: true });
+  if (process.platform === "win32") {
+    const script = join(dirname(base), "fake-cursor.js");
+    await writeFile(script, FAKE_CURSOR);
+    const cmdPath = `${base}.cmd`;
+    await writeFile(cmdPath, `@echo off\r\n"${process.execPath}" "${script}"\r\n`);
+    return cmdPath;
+  }
+  await writeFile(base, FAKE_CURSOR);
+  await chmod(base, 0o755);
+  return base;
 }
 
 const executable = await install();

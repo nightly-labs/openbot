@@ -6,6 +6,7 @@ import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { cursorModelSelected, cursorModelSpeedLabel } from "@/features/agents/model/cursor-model-speed";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
   SettingsContent,
@@ -138,7 +139,12 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
   const model = fieldText(node, "model");
   const value = provider && model ? `${provider}:${model}` : "";
   const options = models.data ?? [];
-  const current = options.find((option) => option.provider === provider && option.id === model);
+  const current = options.find((option) =>
+    provider === "cursor"
+      ? option.provider === provider && cursorModelSelected(option.id, model)
+      : option.provider === provider && option.id === model,
+  );
+  const pickerValue = current ? `${current.provider}:${current.id}` : value;
   const efforts = current && current.reasoningEffortConfigurable !== false ? current.supportedReasoningEfforts : [];
   const effort = fieldText(node, "effort") || current?.defaultReasoningEffort || "";
   return (
@@ -149,17 +155,24 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
       <SettingsRow
         trailing={
           <SettingsPicker<string>
-            value={value}
+            value={pickerValue}
             enabled={!models.isPending}
             dark={theme === "dark"}
             label={t("mobile.workflow.step.model")}
             options={[
               { value: "", label: t("mobile.workflow.step.defaultModel") },
               ...(value && !current ? [{ value, label: model }] : []),
-              ...options.map((option) => ({ value: `${option.provider}:${option.id}`, label: option.name })),
+              ...options.map((option) => ({
+                value: `${option.provider}:${option.id}`,
+                label:
+                  option.provider === "cursor"
+                    ? cursorModelSpeedLabel(option.name, option.id, t("mobile.agent.runtime.fast"))
+                    : option.name,
+              })),
             ]}
             onChange={(next) => {
               const chosen = options.find((option) => `${option.provider}:${option.id}` === next);
+              if (chosen && current && chosen.id === current.id && chosen.provider === current.provider) return;
               setFields(
                 node.id,
                 chosen
