@@ -3,6 +3,7 @@ import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
+import { WORKSPACE_DIRECTORY_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { settingsPanelMaxWidth } from "@openbot/ui/components/SettingsPanel";
@@ -413,6 +414,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     return serverHasStorage(server) ? server : undefined;
   };
   const filesTitle = () => channel?.name() ?? props.agent?.name ?? "this chat";
+  const workspaceAgents = createMemo(() => {
+    if (!serverSupportsCapability(props.server, WORKSPACE_DIRECTORY_CAPABILITY)) return [];
+    if (!channel) return props.agent ? [props.agent] : [];
+    const agentIds = channel.memberAgentIds();
+    return props.agents.filter((agent) => agentIds.has(agent.id));
+  });
+  const openAgentWorkspace = (agentId: string) => openWorkspaceFolder(".", agentId, "tab");
   function showFileMessage(messageId: string) {
     if (channel) void replyJump.reveal(messageId, undefined, undefined);
     else void props.onOpenSearchMessage?.(messageId);
@@ -644,6 +652,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                   onPreviewFile={(file) => void previewAttachment(file)}
                   onShowMessage={showFileMessage}
                   calls={props.runtime?.storageCalls}
+                  workspaceAgents={workspaceAgents()}
+                  onOpenWorkspace={openAgentWorkspace}
                 />
               </Loading>
             )}

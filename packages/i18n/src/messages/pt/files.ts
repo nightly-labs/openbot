@@ -203,6 +203,8 @@ export const messages = {
   "files.conversation.title": "Arquivos",
   "files.conversation.summary": "{files} · chat {size}",
   "files.conversation.close": "Fechar arquivos",
+  "files.conversation.workspace": "Pasta do espaço de trabalho",
+  "files.conversation.workspaces": "Pastas dos espaços de trabalho",
   "files.conversation.emptyTitle": "Nenhum arquivo neste chat",
   "files.conversation.emptyDescription": "Os arquivos que você anexa e que o agente cria aparecem aqui.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -251,6 +251,8 @@ export const messages = {
   "files.conversation.title": "Pliki",
   "files.conversation.summary": "{files} · czat {size}",
   "files.conversation.close": "Zamknij pliki",
+  "files.conversation.workspace": "Folder obszaru roboczego",
+  "files.conversation.workspaces": "Foldery obszarów roboczych",
   "files.conversation.emptyTitle": "Brak plików w tym czacie",
   "files.conversation.emptyDescription": "Tu pojawiają się pliki, które załączasz, i pliki tworzone przez agenta.",
 } as const satisfies PartialTranslation<typeof source>;

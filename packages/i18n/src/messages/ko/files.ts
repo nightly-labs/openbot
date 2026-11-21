@@ -193,6 +193,8 @@ export const messages = {
   "files.conversation.title": "파일",
   "files.conversation.summary": "{files} · 채팅 {size}",
   "files.conversation.close": "파일 닫기",
+  "files.conversation.workspace": "워크스페이스 폴더",
+  "files.conversation.workspaces": "워크스페이스 폴더",
   "files.conversation.emptyTitle": "이 채팅에 파일이 없어요",
   "files.conversation.emptyDescription": "첨부한 파일과 에이전트가 만든 파일이 여기에 표시돼요.",
 } as const satisfies PartialTranslation<typeof source>;

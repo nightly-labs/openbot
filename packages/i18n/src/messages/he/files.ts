@@ -208,6 +208,8 @@ export const messages = {
   "files.conversation.title": "קבצים",
   "files.conversation.summary": "{files} · צ'אט {size}",
   "files.conversation.close": "סגירת הקבצים",
+  "files.conversation.workspace": "תיקיית סביבת העבודה",
+  "files.conversation.workspaces": "תיקיות סביבות העבודה",
   "files.conversation.emptyTitle": "אין קבצים בצ'אט הזה",
   "files.conversation.emptyDescription": "קבצים שמצרפים וקבצים שהסוכן יוצר מופיעים כאן.",
 } as const satisfies PartialTranslation<typeof source>;
