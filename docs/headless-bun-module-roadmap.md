@@ -124,6 +124,31 @@ which backend services import Electron transitively.
 - Can a local-only Bun module (no account/Signal) be useful on this phone even if it
   cannot join the maintainer's network?
 
+## Viability recommendation (ordered by feasibility)
+
+Based on the evidence above. Item 3 and the transitive Electron audit are still being
+checked by an architecture subagent; everything else is confirmed from files in this
+fork and from the upstream docs cited.
+
+| Option | What it is | Feasibility | Depends on creator? |
+| --- | --- | --- | --- |
+| **A. Bun CLI/client that drives an installed server** | A Bun package that wraps the existing `control.sock` CLI and the Local scripts API (Bearer token, 30 req/h per agent). No server replacement. | **Highest.** Both interfaces already exist and are documented; no Electron code involved. Works today on the reference host with `openbot status/login/...` and scripted agent calls. | **No.** Local socket/HTTP only. Account sign-in still uses the owner's existing session. |
+| **B. Bun launcher without Electron UI, reusing backend services** | Start the server with Bun, reuse the 122 team-API routes and `../../backend/*` services, keep the provider runtime, skip window/Xvfb/gnome-keyring. The renderer patch in PR #13808 removes the visible UI cost. | **Medium.** The domain surface has zero Electron imports and is typed against contracts/Effect, but who wires the services today is Electron's main process. Need a hostless bootstrap and a replacement for the IPC/team-API registration. | **Partly.** Local/self-hosted works; joining the maintainer's account/Signal network still needs their secrets and CLA for upstream merge. |
+| **C. Pure Bun main process (no Electron at all)** | Rewrite the main process: account/Cloudflare client, ACP registry, SQLite host, Effect graph, secret redaction, control socket, shutdown semantics, plus the team API. | **Lowest.** Violates no product constraint by itself, but it is a rewrite of a large, security-sensitive surface, and a true headless build is explicitly not planned upstream (issue #1547). | **Yes** for network features. Local-only use is possible, but the result is a different product, not an OpenBot server in their network. |
+
+**Decision for this fork:** start with **A** as a thin, useful Bun module that needs no
+maintainer approval and no new permissions. Keep **B** as the research target; the team
+API being Electron-free makes it plausible, and PR #13808 already removes the largest UI
+cost on the current host. Do not attempt **C** before B produces evidence that the
+Electron-bound bootstrap is small enough to replace. Re-evaluate if mainline ships
+headless first (#6350): then rebase this fork and drop the local patches.
+
+**What would unblock B:** a Bun entrypoint that instantiates the backend service graph
+and registers the team-API HTTP routes without Electron, using the same contracts and
+Effect runtime the desktop host uses today. The audit of transitive Electron imports in
+`src/backend/*` is the remaining unknown; if it is shallow, B is realistic, if deep, A
+is the practical end state.
+
 ## Non-goals for the first milestone
 
 - No Computer Use / GUI automation, desktop notifications, tray/dock, deep links or
