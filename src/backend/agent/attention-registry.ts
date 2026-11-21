@@ -1311,6 +1311,13 @@ export class AttentionRegistry {
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.request.vaultSkip === "agent-script") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else {
             this.#routines.markNeedsAttention(turnId);
             this.#emit({ type: "browser-takeover-requested", request: takeover });
