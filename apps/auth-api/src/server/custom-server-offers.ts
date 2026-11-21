@@ -43,7 +43,7 @@ function customServerPlanOf(row: CustomServerOfferRow): CustomServerPlan | null 
   });
 }
 
-export function customServerPaid(status: string | null): boolean {
+function customServerPaid(status: string | null): boolean {
   return isOneOf(CUSTOM_SERVER_PAID_STATUSES, status);
 }
 
