@@ -1314,7 +1314,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons}을(를) 기다리는 중이에요.",
   "mobile.server.update.disabledTitle": "원격 업데이트가 꺼져 있어요",
   "mobile.server.update.disabledDescription":
-    "{name} 사용자가 서버 멤버의 업데이트를 껐어요. OpenBot을 업데이트하거나 설정을 켜 달라고 요청하세요.",
+    "{name} 사용자가 서버 멤버의 업데이트를 껐어요. OpenBot을 업데이트하거나, 그 컴퓨터에서 설정 > 업데이트를 열고 ‘서버 멤버의 업데이트 허용’을 켜 달라고 요청하세요.",
   "mobile.server.update.managedTitle": "Host Manager가 업데이트를 관리해요",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager가 {name}을(를) 업데이트해요. 호스트 관리자에게 문의하세요.",

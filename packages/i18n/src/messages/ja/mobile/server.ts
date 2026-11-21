@@ -1345,7 +1345,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons} を待っています。",
   "mobile.server.update.disabledTitle": "リモートアップデートはオフです",
   "mobile.server.update.disabledDescription":
-    "{name} のユーザーが、サーバーメンバーからのアップデートをオフにしました。OpenBot をアップデートするか、設定をオンにするよう依頼してください。",
+    "{name} のユーザーが、サーバーメンバーからのアップデートをオフにしました。OpenBot をアップデートするか、そのコンピューターで「設定」>「アップデート」を開いて「サーバーのメンバーからのアップデートを許可する」をオンにするよう依頼してください。",
   "mobile.server.update.managedTitle": "アップデートは Host Manager が管理しています",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager が {name} をアップデートします。ホストの管理者に連絡してください。",

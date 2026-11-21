@@ -1238,7 +1238,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "正在等待{reasons}。",
   "mobile.server.update.disabledTitle": "远程更新已关闭",
   "mobile.server.update.disabledDescription":
-    "{name} 的用户已关闭来自服务器成员的更新。请联系其更新 OpenBot 或开启该设置。",
+    "{name} 的用户已关闭来自服务器成员的更新。请联系其更新 OpenBot，或在那台电脑上打开“设置 > 更新”，开启“允许服务器成员触发更新”。",
   "mobile.server.update.managedTitle": "更新由 Host Manager 控制",
   "mobile.server.update.managedDescription": "OpenBot Host Manager 负责更新 {name}。请联系主机管理员。",
   "mobile.server.update.unsupportedTitle": "{name} 无法自我更新",

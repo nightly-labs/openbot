@@ -1782,7 +1782,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "ממתין ל{reasons}.",
   "mobile.server.update.disabledTitle": "עדכונים מרחוק כבויים",
   "mobile.server.update.disabledDescription":
-    "המשתמש של {name} כיבה עדכונים מחברי השרת. יש לבקש ממנו לעדכן את OpenBot או להפעיל את ההגדרה.",
+    "המשתמש של {name} כיבה עדכונים מחברי השרת. יש לבקש ממנו לעדכן את OpenBot, או לפתוח במחשב שלו הגדרות > עדכונים ולהפעיל את ״אישור עדכונים מחברי שרת״.",
   "mobile.server.update.managedTitle": "Host Manager שולט בעדכונים",
   "mobile.server.update.managedDescription": "OpenBot Host Manager מעדכן את {name}. יש לפנות למנהל המארח.",
   "mobile.server.update.unsupportedTitle": "{name} לא יכול לעדכן את עצמו",

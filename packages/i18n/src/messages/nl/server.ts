@@ -696,7 +696,7 @@ export const messages = {
   "server.update.waitingFor": "Wacht op {reasons}.",
   "server.update.disabledTitle": "Updates op afstand staan uit",
   "server.update.disabledDescription":
-    "De gebruiker van {name} heeft updates van serverleden uitgezet. Vraag diegene om OpenBot bij te werken of de instelling aan te zetten.",
+    "De gebruiker van {name} heeft updates van serverleden uitgezet. Vraag diegene om OpenBot bij te werken, of om op die computer Instellingen > Updates te openen en “Sta updates van serverleden toe” aan te zetten.",
   "server.update.managedTitle": "Een Host Manager regelt updates",
   "server.update.managedDescription":
     "OpenBot Host Manager werkt {name} bij. Neem contact op met de beheerder van de host.",

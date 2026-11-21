@@ -637,7 +637,7 @@ export const messages = {
   "server.update.waitingFor": "Esperando {reasons}.",
   "server.update.disabledTitle": "Las actualizaciones remotas están desactivadas",
   "server.update.disabledDescription":
-    "El usuario de {name} desactivó las actualizaciones de los miembros del servidor. Pídele que actualice OpenBot o que active el ajuste.",
+    "El usuario de {name} desactivó las actualizaciones de los miembros del servidor. Pídele que actualice OpenBot o que abra Ajustes > Actualizaciones en su equipo y active «Permitir actualizaciones de los miembros del servidor».",
   "server.update.managedTitle": "Un Host Manager controla las actualizaciones",
   "server.update.managedDescription": "OpenBot Host Manager actualiza {name}. Contacta con el administrador del host.",
   "server.update.unsupportedTitle": "{name} no puede actualizarse por sí mismo",

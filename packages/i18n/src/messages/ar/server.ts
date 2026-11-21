@@ -792,7 +792,7 @@ export const messages = {
   "server.update.waitingFor": "بانتظار {reasons}.",
   "server.update.disabledTitle": "التحديثات عن بُعد متوقفة",
   "server.update.disabledDescription":
-    "أوقف مستخدم {name} التحديثات من أعضاء الخادم. اطلب منه تحديث OpenBot أو تشغيل الإعداد.",
+    "أوقف مستخدم {name} التحديثات من أعضاء الخادم. اطلب منه تحديث OpenBot، أو فتح الإعدادات > التحديثات على ذلك الحاسوب وتشغيل «السماح بالتحديثات من أعضاء الخادم».",
   "server.update.managedTitle": "يتحكم Host Manager في التحديثات",
   "server.update.managedDescription": "يحدّث OpenBot Host Manager الخادم {name}. تواصل مع مسؤول المضيف.",
   "server.update.unsupportedTitle": "لا يستطيع {name} تحديث نفسه",
