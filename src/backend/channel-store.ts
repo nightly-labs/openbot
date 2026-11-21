@@ -393,14 +393,14 @@ export class ChannelStore {
     );
   }
 
-  agentAssignment(
+  agentWork(
     agentId: string,
     states: readonly ChannelAssignment["state"][],
-  ): { assignment: ChannelAssignment; channel: Channel } | null {
-    if (!states.length) return null;
+  ): Array<{ assignment: ChannelAssignment; channel: Channel }> {
+    if (!states.length) return [];
     const placeholders = states.map(() => "?").join(", ");
     const ranking = states.map((_, index) => `WHEN ? THEN ${index}`).join(" ");
-    const row = databaseRow(
+    return databaseRows(
       this.database.connection
         .prepare(
           `SELECT assignments.assignment_json AS assignment_json, channels.channel_json AS channel_json
@@ -410,16 +410,13 @@ export class ChannelStore {
               AND json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
               AND COALESCE(json_extract(channels.channel_json, '$.archived'), 0) = 0
             ORDER BY CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END,
-                     assignments.rowid
-            LIMIT 1`,
+                     assignments.rowid`,
         )
-        .get(agentId, ...states, ...states),
-    );
-    if (!row) return null;
-    return {
+        .all(agentId, ...states, ...states),
+    ).map((row) => ({
       assignment: decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))),
       channel: decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json"))),
-    };
+    }));
   }
 
   assignmentForDelivery(deliveryId: string): ChannelAssignment | null {

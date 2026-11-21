@@ -330,7 +330,7 @@ import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
-import { type MailboxStore, MESSAGING_LANE } from "./mailbox-store";
+import { laneChannelId, type MailboxStore, MESSAGING_LANE } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
@@ -1483,10 +1483,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toChannelOperationError),
       loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
-      busy: (agentId) =>
+      channelTurnLimit: (agentId) => this.#tasks.limit(agentId),
+      busy: (agentId, channelId) =>
         this.#channelHeld(agentId) ||
-        this.#mailbox.channelLanes(agentId).length > 0 ||
-        this.#conversation.workingChannelSnapshots(agentId).length > 0 ||
+        this.#channelsAtWork(agentId).has(channelId) ||
+        this.#channelsAtWork(agentId).size >= this.#tasks.limit(agentId) ||
         (this.#tasks.oneTurnAtATime(agentId) &&
           (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
             this.#mailbox.laneActive(agentId, null) ||
@@ -4213,6 +4214,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.forkIn(this.#scope, { startImmediately: true }),
       ),
     );
+  }
+
+  #channelsAtWork(agentId: string): Set<string> {
+    const channelIds = new Set<string>();
+    for (const lane of this.#mailbox.channelLanes(agentId)) {
+      const channelId = laneChannelId(lane);
+      if (channelId) channelIds.add(channelId);
+    }
+    for (const snapshot of this.#conversation.workingChannelSnapshots(agentId)) {
+      const channelId = this.#conversation.channelForThread(snapshot.threadId);
+      if (channelId) channelIds.add(channelId);
+    }
+    return channelIds;
   }
 
   #channelHeld(agentId: string): boolean {

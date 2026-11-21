@@ -412,9 +412,13 @@ in `ConversationRuntime`. So a channel turn runs beside the agent's own chat and
 deliveries, as a task turn does (#4761). It gets the side-thread guidance. It keeps Computer Use
 when the agent has it on, so a channel task can drive a desktop app without a step in the own chat.
 The channel turn and the own chat can then drive the screen at the same time, as two agents can. An
-agent runs one channel turn at a time over all channels: the scheduler holds the other channel lanes
-(`channel-turn`), and the channel `busy` hook starts no second assignment while one is active. The
-work of other agents does not hold it. A channel turn takes no task slot. When the provider of the
+agent runs one turn at a time in each channel, and turns in different channels at the same time, up
+to its parallel thread limit (`agentTaskLimit`, the `channelTurnLimit` hook). At that limit the
+scheduler holds the other channel lanes (`channel-turn`), the channel `busy` hook starts no further
+assignment, and the waiting task shows `agent-busy` with one channel where the agent works. The
+limit counts channels with an active assignment, so two channels that start at the same time do not
+go over it. The work of other agents does not hold it. A channel turn takes no task slot: the task
+limit and the channel limit are counted apart. When the provider of the
 agent runs one turn at a time (`concurrentTurns: false`), nothing runs in parallel: its chat and task
 turns count as busy, and `ChannelService.mayDrain` holds its main lane during an active assignment. Only declared `browser` and `workspace:<path>` resources are
 serialized: the same browser, or two workspaces where one path contains the other. An empty list,

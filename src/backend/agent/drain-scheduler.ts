@@ -362,9 +362,9 @@ export class DrainScheduler {
     const channelId = laneChannelId(taskId);
     if (
       channelId !== null &&
-      this.#lanesOf(agentId).some(
+      this.#lanesOf(agentId).filter(
         (other) => other.taskId !== taskId && laneChannelId(other.taskId) !== null && this.#laneRunning(other),
-      )
+      ).length >= this.#tasks.limit(agentId)
     )
       return "channel-turn";
     const ownTaskId = laneTaskId(lane);
