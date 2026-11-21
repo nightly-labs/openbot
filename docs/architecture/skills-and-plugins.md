@@ -97,7 +97,7 @@ secure card, with no card. While agent code from `evaluate` can still run in the
 `BrowserHost` reports `agentScriptedOrigin`, because that code could read the filled fields. When the
 call names a `loginId`, the agent gets the skip text at once, with no card: a reload of the sign-in page
 lets the saved login fill, and a scheduled routine has nobody to answer a card (#14181). Without a
-`loginId`, the card opens instead. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
+`loginId`, the card opens instead, so the agent can still let the user type the password. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
 A script can also write Cache Storage that a service worker serves as page code, also to a page that
 the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a

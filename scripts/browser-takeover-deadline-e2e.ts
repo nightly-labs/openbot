@@ -923,7 +923,11 @@ try {
       );
       assert(!attention.some((entry) => entry.startsWith("needs:")), "the routine was marked as waiting for the user");
       const unnamed = signIn();
-      while (cards() === 0) await new Promise((done) => setImmediate(done));
+      let unnamedAnswered = false;
+      void unnamed.finally(() => {
+        unnamedAnswered = true;
+      });
+      while (cards() === 0 && !unnamedAnswered) await new Promise((done) => setImmediate(done));
       const card = vaultRegistry.runtimeAttention().pendingBrowserTakeovers[0];
       assert(card?.secret, "no password card for a sign-in without loginId");
       await runCauseEffect(

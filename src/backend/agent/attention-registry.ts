@@ -1300,7 +1300,7 @@ export class AttentionRegistry {
           } else if (pending.request.vaultSkip === "agent-script") {
             pending.resolve(
               browserTakeoverError(
-                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, use request_takeover so that the user signs in.`,
+                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
