@@ -2070,6 +2070,7 @@ export class ProviderRuntime implements ProviderPort {
     harness: CustomProviderHarness,
   ): Effect.fn.Return<CustomProviderRestart> {
     this.#environmentReloadPending.delete(harness);
+    this.#environmentReloadWaitsSince.delete(harness);
     if (!this.#clients.has(harness)) {
       if (this.#released.has(harness))
         yield* this.ensureProvider(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope));
@@ -2346,6 +2347,7 @@ export class ProviderRuntime implements ProviderPort {
           yield* this.#reloadProviderCli(provider, cli, firstInstall);
           this.cancelProviderRestart(provider);
           this.#environmentReloadPending.delete(provider);
+          this.#environmentReloadWaitsSince.delete(provider);
           this.#installedFallback.delete(provider);
           if (this.#installedChosen.delete(provider))
             yield* this.#saveInstalledChoice(provider, false).pipe(
