@@ -65,6 +65,7 @@ const FAILED_REQUEST_REASON_LIMIT = 2_000;
 const FAILED_REQUEST_KEY_PREFIX = "failed-request:";
 export const AUTO_RESULT_KEY_PREFIX = "auto-result:";
 const RESTARTED_RESULT_KEY_PREFIX = "restarted-result:";
+const RESTARTED_TURN_KEY_PREFIX = "restarted-turn:";
 const WELCOME_PENDING_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 export interface MessagingOrigin {
   linkId: string;
@@ -228,6 +229,7 @@ export interface DeliveryContext {
   channelId?: string;
   senderTaskId?: string;
   restartedResult?: true;
+  restartedTurnId?: string;
 }
 
 const EMPTY_STATE: StoredState = {
@@ -3210,6 +3212,7 @@ export class MailboxStore {
     )
       return false;
     this.#state.idempotency[key] = message.id;
+    if (delivery.turnId) this.#state.idempotency[`${RESTARTED_TURN_KEY_PREFIX}${deliveryId}`] = delivery.turnId;
     yield* this.requeueRefused(deliveryId);
     return true;
   }, Effect.uninterruptible).bind(this);
@@ -3662,17 +3665,21 @@ export class MailboxStore {
     messages?: ReadonlyMap<string, StoredMessage>,
   ): DeliveryContext {
     const message = this.#requireMessage(delivery.messageId, messages);
+    const restarted =
+      this.#state.idempotency[`${RESTARTED_RESULT_KEY_PREFIX}${delivery.id}`] !== undefined &&
+      !delivery.resumeAfterUsageLimit &&
+      !delivery.planContinuation;
+    const restartedTurnId = restarted
+      ? this.#state.idempotency[`${RESTARTED_TURN_KEY_PREFIX}${delivery.id}`]
+      : undefined;
     return {
       delivery: this.#publicDelivery(delivery, positions, message),
       ...(delivery.resumeAfterUsageLimit ? { resumeAfterUsageLimit: delivery.resumeAfterUsageLimit } : {}),
       ...(delivery.planContinuation ? { planContinuation: delivery.planContinuation } : {}),
       ...(message.channelId ? { channelId: message.channelId } : {}),
       ...(message.senderTaskId ? { senderTaskId: message.senderTaskId } : {}),
-      ...(this.#state.idempotency[`${RESTARTED_RESULT_KEY_PREFIX}${delivery.id}`] !== undefined &&
-      !delivery.resumeAfterUsageLimit &&
-      !delivery.planContinuation
-        ? { restartedResult: true as const }
-        : {}),
+      ...(restarted ? { restartedResult: true as const } : {}),
+      ...(restartedTurnId ? { restartedTurnId } : {}),
       managedAttachments: message.attachments.map((attachment) => ({
         ...toAttachmentSummary(attachment),
         path: attachment.path,

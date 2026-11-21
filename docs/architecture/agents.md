@@ -974,8 +974,9 @@ request that an earlier finished turn already took (`MailboxStore.answersHandled
 quietly, with the same or new text (#13130, #13746): the requester already had a result to act on,
 and an empty turn means that it has nothing to add, as OpenClaw and Hermes Agent treat an empty turn
 for a sub-agent result. The later answer stays in the chat. A turn whose results restart recovery each gave again after a restart
-(`restartedResult`, #12039) ends quietly too (#14330): the requester can have taken them before the
-restart, and the turn note tells it to check its earlier work. An OpenBot note for a failed request does
+(`restartedResult`, #12039) ends quietly too (#14330) when each result had a provider turn before the
+restart (`restartedTurnId`): the requester can have taken them in that turn, and the turn note tells it
+to check its earlier work. A result that was only `starting` keeps the retry and the error. An OpenBot note for a failed request does
 not count as an earlier answer, so the first real result after it still fails as above. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
 error. With no backup, a turn that only teammate results started runs once more on the same model.

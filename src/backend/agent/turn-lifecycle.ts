@@ -944,7 +944,7 @@ export class TurnLifecycle {
       });
       return false;
     }
-    if (deliveries.every((context) => context.restartedResult && answeredRequestId(context.delivery) !== null)) {
+    if (deliveries.every(replaysStartedResult)) {
       logger.info("A turn for a teammate result that a restart gave again ended quietly.", {
         agentId,
         turnId,
@@ -3482,6 +3482,10 @@ function isEmptyAnswer(item: { type?: unknown; phase?: unknown; text?: unknown }
 
 function hasText(item: { text?: unknown }): boolean {
   return isString(item.text) && item.text.trim() !== "";
+}
+
+function replaysStartedResult({ delivery, restartedResult, restartedTurnId }: DeliveryContext): boolean {
+  return restartedResult === true && restartedTurnId !== undefined && answeredRequestId(delivery) !== null;
 }
 
 function showsOutput(message: ConversationMessage): boolean {

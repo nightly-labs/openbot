@@ -163,7 +163,10 @@ const answer = (message) => {
       appendFileSync(LOG, JSON.stringify({ turnId, model: params.model, kind: turn.kind, mode: turn.mode ?? null, empty: turn.empty }) + "\\n");
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
-      if (turn.crash) return setTimeout(() => process.exit(1), 50);
+      if (turn.crash) {
+        write({ method: "item/completed", params: { threadId: params.threadId, turnId, item: { type: "commandExecution", id: "command-" + turnId, command: "ls", cwd: "/", status: "completed", aggregatedOutput: "", exitCode: 0 } } });
+        return setTimeout(() => process.exit(1), 50);
+      }
       return callNext(turn);
     }
     case "turn/interrupt": {
@@ -825,23 +828,26 @@ try {
     return outcome;
   });
 
-  await check("an empty turn for a teammate result that a restart gave again ends quietly", async () => {
-    const outcome = await askTeam(lead.id, [alpha.id], "restart-replay");
-    assert.deepEqual(
-      outcome.turns.map((turn) => turn.empty),
-      [false, true],
-      `The result runs again once after the restart and not after its empty turn: ${JSON.stringify(outcome)}`,
-    );
-    assert.deepEqual(
-      outcome.results.map((result) => result.status),
-      ["completed"],
-    );
-    assert.ok(
-      !outcome.errors.includes(NO_ANSWER),
-      `No error shows for the replayed result: ${JSON.stringify(outcome)}`,
-    );
-    return outcome;
-  });
+  await check(
+    "an empty turn for a teammate result that a restart gave again after its turn started ends quietly",
+    async () => {
+      const outcome = await askTeam(lead.id, [alpha.id], "restart-replay");
+      assert.deepEqual(
+        outcome.turns.map((turn) => turn.empty),
+        [false, true],
+        `The result runs again once after the restart and not after its empty turn: ${JSON.stringify(outcome)}`,
+      );
+      assert.deepEqual(
+        outcome.results.map((result) => result.status),
+        ["completed"],
+      );
+      assert.ok(
+        !outcome.errors.includes(NO_ANSWER),
+        `No error shows for the replayed result: ${JSON.stringify(outcome)}`,
+      );
+      return outcome;
+    },
+  );
 
   report.passed = true;
 } catch (error) {
