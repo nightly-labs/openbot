@@ -541,7 +541,7 @@ export const SPEECH_LIMITS = {
 
 export interface SpeechInput {
   text: string;
-  language: SpeechLanguage;
+  language: SpeechLanguage | null;
 }
 
 export interface SpeechAudio {
