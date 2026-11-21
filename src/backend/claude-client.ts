@@ -254,12 +254,10 @@ function claudeHomeMemoryFiles(): string[] {
   return [join(userFolder, "CLAUDE.md"), join(userFolder, "rules", "**")];
 }
 
-const CLAUDE_EXCLUDE_PATTERN_CHARACTERS = /[*?[\]{}()!]/;
+const CLAUDE_EXCLUDE_PATTERN_CHARACTERS = /[*?[\]{}()!]/g;
 
 function claudeWorkspaceInstructionExcludes(cwd: string, fileNames: readonly string[]): string[] {
-  return fileNames
-    .map((fileName) => join(cwd, fileName))
-    .filter((path) => !CLAUDE_EXCLUDE_PATTERN_CHARACTERS.test(path));
+  return fileNames.map((fileName) => join(cwd, fileName).replace(CLAUDE_EXCLUDE_PATTERN_CHARACTERS, "?"));
 }
 
 const CLAUDE_OTHER_API_VARIABLES = [

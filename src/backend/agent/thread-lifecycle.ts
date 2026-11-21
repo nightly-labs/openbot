@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  AGENT_INSTRUCTION_FILE_NAMES,
   type AgentInstructionFileName,
   type AgentSummary,
   agentAutomationAllowed,
@@ -83,6 +82,7 @@ import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } f
 import { visibleDynamicTools } from "./tool-catalog";
 import {
   AGENT_INSTRUCTIONS_FILE_BYTES,
+  missingInstructionFileNames,
   type PromptInstructionsFile,
   promptInstructionsFile,
 } from "./workspace-instructions";
@@ -1224,13 +1224,13 @@ export class ThreadLifecycle {
         ? []
         : agentProviderDescriptor(client.provider).workspaceInstructionFiles;
     const file = yield* promptInstructionsFile(agent.workspacePath, read);
+    const sent = file && !file.readByCli ? file : null;
+    const missing = client.provider === "claude" ? yield* missingInstructionFileNames(agent.workspacePath) : [];
     return {
       fileName: file?.fileName ?? "AGENTS.md",
       found: file,
-      file: file && !file.readByCli ? file : null,
-      hiddenFromCli: AGENT_INSTRUCTION_FILE_NAMES.filter(
-        (fileName) => !read.includes(fileName) && !(file?.fileName === fileName && file.readByCli),
-      ),
+      file: sent,
+      hiddenFromCli: missing.filter((fileName) => !read.includes(fileName)).concat(sent ? [sent.fileName] : []),
     } satisfies InstructionsFileInPrompt;
   });
 
