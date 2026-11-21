@@ -54,7 +54,10 @@ export function ChannelEditor(props: ChannelEditorProps) {
   createEffect(
     () => {
       const current = channel();
-      return current && { id: current.id, members: current.members.map((member) => member.agentId).join(",") };
+      if (!current) return undefined;
+      const providers = new Map(agentList().map((agent) => [agent.id, agent.provider]));
+      const members = current.members.map((member) => `${member.agentId}:${providers.get(member.agentId) ?? ""}`);
+      return { id: current.id, members: members.join(",") };
     },
     (next) => {
       const signature = next ? `${next.id}:${next.members}` : "";
@@ -65,7 +68,11 @@ export function ChannelEditor(props: ChannelEditorProps) {
         (available) => {
           if (compactSignature === signature) setCompactBlocked(available ? null : next.id);
         },
-        () => undefined,
+        () => {
+          if (compactSignature !== signature) return;
+          compactSignature = "";
+          setCompactBlocked(null);
+        },
       );
     },
   );

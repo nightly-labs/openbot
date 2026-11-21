@@ -17,6 +17,7 @@ export function ChannelContextActions({
   serverId,
   channelId,
   channelName,
+  memberKey,
   store,
   available,
   canDeleteHistory,
@@ -24,6 +25,7 @@ export function ChannelContextActions({
   serverId: string;
   channelId: string;
   channelName: string;
+  memberKey: string;
   store: MobileChannelStore;
   available: boolean;
   canDeleteHistory: boolean;
@@ -34,17 +36,23 @@ export function ChannelContextActions({
   const [compactShown, setCompactShown] = useState(true);
 
   useEffect(() => {
+    if (!memberKey) {
+      setCompactShown(false);
+      return;
+    }
     let current = true;
     store.compactAvailable(serverId, channelId).then(
       (shown) => {
         if (current) setCompactShown(shown);
       },
-      () => undefined,
+      () => {
+        if (current) setCompactShown(true);
+      },
     );
     return () => {
       current = false;
     };
-  }, [store, serverId, channelId]);
+  }, [store, serverId, channelId, memberKey]);
 
   function run(action: Action): void {
     setRunning(action);

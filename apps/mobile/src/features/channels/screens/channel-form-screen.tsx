@@ -335,10 +335,12 @@ function ChannelForm({
       ) : null}
       {!create && channel && !channel.archived && contextActionsSupported ? (
         <ChannelContextActions
-          key={channel.members.map((member) => member.agentId).join(",")}
           serverId={serverId}
           channelId={channelId}
           channelName={channel.name}
+          memberKey={channel.members
+            .map((member) => `${member.agentId}:${agentsById.get(member.agentId)?.provider ?? ""}`)
+            .join(",")}
           store={store}
           available={available && !saving && !finished}
           canDeleteHistory={canAdministerServer(role)}
