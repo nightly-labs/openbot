@@ -108,6 +108,8 @@ export const messages = {
   "workflow.agent.removedLabel": "Agente eliminado. Elegir agente",
   "workflow.agent.list": "Agentes",
   "workflow.agent.search": "Buscar agentes",
+  "workflow.agentMade.title": "{agent} creó un flujo de trabajo",
+  "workflow.agentMade.open": "Abrir",
 
   "workflow.model.label": "Modelo: {name}",
   "workflow.model.title": "Modelos",

@@ -108,6 +108,19 @@ export function desktopMediaCredits(serverId: string) {
   return window.openbot.workflows.mediaCredits(serverId);
 }
 
+export function desktopWorkflowList(serverId: string) {
+  return window.openbot.workflows.list(serverId);
+}
+
+export function onDesktopWorkflowsChanged(
+  changed: (serverId: string, workflowId: string, agentId: string | undefined) => void,
+): () => void {
+  return window.openbot.agent.onScopedEvent((scoped) => {
+    if (scoped.event.type === "workflows-changed")
+      changed(scoped.serverId, scoped.event.workflowId, scoped.event.agentId);
+  });
+}
+
 export function desktopWorkflowHost(serverId: string, server: () => ServerSummary | undefined): WorkflowHost {
   const api = () => window.openbot.workflows;
   const local = () => server()?.kind !== "remote";
