@@ -11,6 +11,7 @@ import {
   isJSONRPCRequest,
   isJSONRPCResultResponse,
   type JSONRPCErrorResponse,
+  type JSONRPCRequest,
   type JSONRPCResultResponse,
   type RequestId,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -45,6 +46,7 @@ type ServerAnswer = JSONRPCResultResponse | JSONRPCErrorResponse;
 interface Handshake {
   request: RequestId;
   reply: RequestId;
+  client: string;
   answer: ServerAnswer | null;
 }
 
@@ -98,15 +100,19 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     return entry;
   };
 
-  const adoptStartingServer = (transport: StreamableHTTPServerTransport, request: RequestId) => {
+  const adoptStartingServer = (transport: StreamableHTTPServerTransport, request: JSONRPCRequest) => {
     const entry = starting;
     const handshake = entry?.output.handshake;
-    if (!entry || !handshake) return null;
+    if (!entry || !handshake || handshake.client !== handshakeClient(request)) return null;
     starting = null;
+    if (handshake.answer && isJSONRPCErrorResponse(handshake.answer)) {
+      void stopServer(entry.child);
+      return null;
+    }
     entry.output.transport = transport;
-    handshake.reply = request;
-    if (handshake.answer) void transport.send({ ...handshake.answer, id: request }).catch(() => undefined);
-    else entry.output.pending.add(request);
+    handshake.reply = request.id;
+    if (handshake.answer) void transport.send({ ...handshake.answer, id: request.id }).catch(() => undefined);
+    else entry.output.pending.add(request.id);
     return entry;
   };
 
@@ -128,15 +134,21 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     });
     transports.add(transport);
     transport.onmessage = (message) => {
-      const initialize = isJSONRPCRequest(message) && message.method === "initialize";
+      const initialize = isJSONRPCRequest(message) && message.method === "initialize" ? message : null;
       if (!live && initialize) {
-        live = adoptStartingServer(transport, message.id);
+        live = adoptStartingServer(transport, initialize);
         if (live) return;
       }
       live ??= launchServer(transport);
       const output = live.output;
       if (isJSONRPCRequest(message)) output.pending.add(message.id);
-      if (initialize && !output.handshake) output.handshake = { request: message.id, reply: message.id, answer: null };
+      if (initialize && !output.handshake)
+        output.handshake = {
+          request: initialize.id,
+          reply: initialize.id,
+          client: handshakeClient(initialize),
+          answer: null,
+        };
       if (isJSONRPCNotification(message) && message.method === "notifications/initialized") live.initialized = true;
       live.child.stdin?.write(serializeMessage(message));
     };
@@ -245,6 +257,10 @@ function relayedOutcome(answer: JSONRPCResultResponse | JSONRPCErrorResponse | n
   if (!isJSONRPCResultResponse(answer)) return { error: boundedError(answer.error.message) };
   const decoded = CallToolResultSchema.safeParse(answer.result);
   return decoded.success ? { result: decoded.data } : { error: boundedError(decoded.error.message) };
+}
+
+function handshakeClient(request: JSONRPCRequest): string {
+  return JSON.stringify([request.params?.protocolVersion, request.params?.capabilities]);
 }
 
 function startServer(launch: StdioMcpLaunch, output: ServerOutput): ChildProcess {
