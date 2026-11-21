@@ -122,6 +122,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   }
 
   function openAddressPaste(provider: AgentProviderId, opener: ProviderCodeLoginOpener | null): void {
+    if (!signingIn(provider)) return;
     codeLoginGeneration++;
     clearCodeLoginExpiry();
     codeLoginStarted = false;
@@ -455,7 +456,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     if (outcome.kind === "connected") {
       const description = outcome.accountLabel
         ? t("app.provider.signedInAs", { account: outcome.accountLabel })
-        : accountId === undefined
+        : accountId === undefined && method !== "address"
           ? t("app.provider.signedInElsewhere")
           : undefined;
       actionToast.success(t("app.provider.connected", { name }), description ? { description } : {});

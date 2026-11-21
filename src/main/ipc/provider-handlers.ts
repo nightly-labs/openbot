@@ -54,6 +54,7 @@ export function providerIpcHandlers({
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
   async function connect(provider: AgentProviderId, region: SignInRegion) {
     await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
+    signInPages.forget(provider);
     return runCauseEffect(
       service.connectProvider(
         provider,
