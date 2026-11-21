@@ -239,6 +239,17 @@ export const messages = {
   "marketplace.plugin.hindsight.prompt.reflect":
     "Reflektiere über meine Hindsight-Erinnerungen: Welche Muster siehst du in meiner Arbeit im letzten Monat?",
   "marketplace.plugin.hindsight.hint.apiKey": "Erstelle einen Schlüssel auf der Seite Connect in Hindsight Cloud.",
+  "marketplace.plugin.mnemoverse.tagline": "Gedächtnis zum Bewerten und Teilen",
+  "marketplace.plugin.mnemoverse.description":
+    "Mnemoverse gibt Agenten ein gehostetes Langzeitgedächtnis. Ein Agent speichert eine Vorliebe oder eine Entscheidung und findet sie später mit einer einfachen Frage wieder. Dasselbe Konto funktioniert in ChatGPT, Claude, Cursor und VS Code. Wenn du eine abgerufene Erinnerung als hilfreich oder irreführend bewertest, ändert sich, was beim nächsten Mal oben steht. In geteilten Räumen lesen und schreiben die Assistenten mehrerer Personen ein gemeinsames Gedächtnis. Wenn du in den Einstellungen eines Agenten „OpenBot-Erinnerungen“ ausschaltest, wird Mnemoverse sein einziges Gedächtnis. Mnemoverse erhält, was ein Agent speichert, und die Fragen, mit denen er sucht.",
+  "marketplace.plugin.mnemoverse.app": "Erinnerungen in deinem Mnemoverse-Konto speichern, durchsuchen und bewerten.",
+  "marketplace.plugin.mnemoverse.prompt.recall":
+    "Bevor wir anfangen: Schau in Mnemoverse nach, was beim letzten Mal zu diesem Projekt entschieden wurde.",
+  "marketplace.plugin.mnemoverse.prompt.save":
+    "Speichere jede Entscheidung aus diesem Chat als eigene Erinnerung in Mnemoverse.",
+  "marketplace.plugin.mnemoverse.prompt.rate":
+    "Bewerte in Mnemoverse die Erinnerungen aus diesem Chat: welche geholfen haben und welche falsch waren.",
+  "marketplace.plugin.mnemoverse.hint.apiKey": "Erstelle einen Schlüssel auf console.mnemoverse.com.",
   "marketplace.plugin.figma.tagline": "Designs und Prototypen",
   "marketplace.plugin.figma.description":
     "Mit Figma lesen Agenten Designdateien, prüfen Komponenten, Stile und Variablen und übergeben Produktionsspezifikationen an Entwickler. Es verbindet sich mit dem MCP-Server in der Figma-Desktop-App auf diesem Computer. Der Server kann Designs nur lesen; Schreibunterstützung ist in Arbeit.",

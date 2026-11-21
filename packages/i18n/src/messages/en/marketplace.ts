@@ -235,6 +235,16 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.hindsight.prompt.reflect":
     "Reflect on my Hindsight memories: what patterns do you see in my last month of work?",
   "marketplace.plugin.hindsight.hint.apiKey": "Create a key on the Connect page of Hindsight Cloud.",
+  "marketplace.plugin.mnemoverse.tagline": "Memory you can rate and share",
+  "marketplace.plugin.mnemoverse.description":
+    "Mnemoverse is hosted long-term memory for AI agents. An agent saves a preference or a decision and finds it later with a plain question. The same account works in ChatGPT, Claude, Cursor and VS Code. Rating a recalled memory as helpful or misleading re-ranks what comes back next. Shared rooms let several people's assistants read and write one memory. With OpenBot memory turned off in an agent's settings, Mnemoverse becomes that agent's only memory. Mnemoverse receives what an agent saves and the questions it searches with.",
+  "marketplace.plugin.mnemoverse.app": "Save, search and rate memories in your Mnemoverse account.",
+  "marketplace.plugin.mnemoverse.prompt.recall":
+    "Before we start, check Mnemoverse for what I decided about this project last time.",
+  "marketplace.plugin.mnemoverse.prompt.save": "Save each decision from this chat to Mnemoverse as a separate memory.",
+  "marketplace.plugin.mnemoverse.prompt.rate":
+    "In Mnemoverse, rate the memories you used in this chat: which helped and which were wrong.",
+  "marketplace.plugin.mnemoverse.hint.apiKey": "Create a key at console.mnemoverse.com.",
   "marketplace.plugin.figma.tagline": "Designs and prototypes",
   "marketplace.plugin.figma.description":
     "Figma lets agents read design files, inspect components, styles and variables, and hand production specs to engineers. It connects to the MCP server in the Figma desktop app, on this computer. The server can read designs only; write support is in progress.",

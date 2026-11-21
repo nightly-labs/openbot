@@ -206,6 +206,14 @@ export const messages = {
   "marketplace.plugin.hindsight.prompt.retain": "把这个对话中的决定和未解决的问题保留到 Hindsight。",
   "marketplace.plugin.hindsight.prompt.reflect": "反思我在 Hindsight 中的记忆：你在我上个月的工作中看到了哪些规律？",
   "marketplace.plugin.hindsight.hint.apiKey": "在 Hindsight Cloud 的 Connect 页面创建密钥。",
+  "marketplace.plugin.mnemoverse.tagline": "可以评分和共享的记忆",
+  "marketplace.plugin.mnemoverse.description":
+    "Mnemoverse 为智能体提供托管的长期记忆。智能体保存一个偏好或决定，之后用一个普通问题就能找到。同一个账号可以在 ChatGPT、Claude、Cursor 和 VS Code 中使用。把找回的记忆评为有帮助或有误导，会改变下一次返回结果的顺序。共享房间让多个人的助手读写同一份记忆。在智能体设置中关闭“OpenBot 记忆”后，Mnemoverse 就成为该智能体唯一的记忆。Mnemoverse 接收的是智能体保存的内容和它用来搜索的问题。",
+  "marketplace.plugin.mnemoverse.app": "在你的 Mnemoverse 账号中保存、搜索和评价记忆。",
+  "marketplace.plugin.mnemoverse.prompt.recall": "开始之前，在 Mnemoverse 里查一下上次关于这个项目做了什么决定。",
+  "marketplace.plugin.mnemoverse.prompt.save": "把这次对话中的每个决定分别作为一条记忆保存到 Mnemoverse。",
+  "marketplace.plugin.mnemoverse.prompt.rate": "在 Mnemoverse 里给这次对话用到的记忆评分：哪些有帮助，哪些是错的。",
+  "marketplace.plugin.mnemoverse.hint.apiKey": "在 console.mnemoverse.com 创建密钥。",
   "marketplace.plugin.figma.tagline": "设计与原型",
   "marketplace.plugin.figma.description":
     "Figma 让助手读取设计文件、检查组件、样式与变量，并把生产规格交给工程师。它连接这台电脑上 Figma 桌面应用里的 MCP 服务器。该服务器目前只能读取设计，写入支持仍在开发中。",

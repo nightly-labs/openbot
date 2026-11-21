@@ -244,6 +244,17 @@ export const messages = {
   "marketplace.plugin.hindsight.prompt.reflect":
     "Przeanalizuj moje wspomnienia w Hindsight: jakie wzorce widzisz w mojej pracy z ostatniego miesiąca?",
   "marketplace.plugin.hindsight.hint.apiKey": "Utwórz klucz na stronie Connect w Hindsight Cloud.",
+  "marketplace.plugin.mnemoverse.tagline": "Pamięć, którą można oceniać i udostępniać",
+  "marketplace.plugin.mnemoverse.description":
+    "Mnemoverse daje agentom długotrwałą pamięć w chmurze. Agent zapisuje preferencję albo decyzję, a później odnajduje ją zwykłym pytaniem. To samo konto działa w ChatGPT, Claude, Cursor i VS Code. Ocena odnalezionego wspomnienia jako pomocnego lub mylącego zmienia kolejność tego, co pojawi się następnym razem. Wspólne pokoje pozwalają asystentom kilku osób czytać i zapisywać jedną pamięć. Po wyłączeniu „Pamięć OpenBot” w ustawieniach agenta Mnemoverse staje się jego jedyną pamięcią. Mnemoverse otrzymuje to, co zapisuje agent, i pytania, którymi szuka.",
+  "marketplace.plugin.mnemoverse.app": "Zapisywanie, wyszukiwanie i ocenianie wspomnień na koncie Mnemoverse.",
+  "marketplace.plugin.mnemoverse.prompt.recall":
+    "Zanim zaczniemy, sprawdź w Mnemoverse, co ostatnio postanowiono w sprawie tego projektu.",
+  "marketplace.plugin.mnemoverse.prompt.save":
+    "Zapisz w Mnemoverse każdą decyzję z tego czatu jako osobne wspomnienie.",
+  "marketplace.plugin.mnemoverse.prompt.rate":
+    "Oceń w Mnemoverse wspomnienia użyte w tym czacie: które pomogły, a które były błędne.",
+  "marketplace.plugin.mnemoverse.hint.apiKey": "Utwórz klucz na console.mnemoverse.com.",
   "marketplace.plugin.figma.tagline": "Projekty i prototypy",
   "marketplace.plugin.figma.description":
     "Figma pozwala agentom czytać pliki projektów, sprawdzać komponenty, style i zmienne oraz przekazywać specyfikacje produkcyjne inżynierom. Łączy się z serwerem MCP w aplikacji desktopowej Figma na tym komputerze. Serwer może tylko czytać projekty; obsługa zapisu jest w przygotowaniu.",
