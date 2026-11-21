@@ -69,6 +69,14 @@ interface Report {
     restartedWhenIdle: boolean;
     holdsAfterRestart: boolean;
   };
+  heldWork?: {
+    updateInstallsWhileHeld: number;
+    updateHoldsNewTurns: boolean;
+    updateInstallsAfterWork: number;
+    restartPendingWhileHeld: boolean;
+    restartHoldsNewTurns: boolean;
+    restartedAfterWork: boolean;
+  };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-update-busy-e2e-"));
@@ -277,6 +285,55 @@ try {
   };
   assert.ok(restartedWhenIdle, "the provider restarts with the new settings");
   assert.equal(report.settingsChanged.holdsAfterRestart, false);
+  assert.equal(row()?.state, "available");
+
+  let backgroundWorkRuns = true;
+  const holdBackgroundWork = () => {
+    const client = providers.currentClient("antigravity");
+    assert.ok(client, "the provider runs");
+    Object.defineProperty(client, "canReleaseProcess", { value: () => !backgroundWorkRuns, configurable: true });
+  };
+  const spawnCount = async () => (await readFile(log, "utf8")).split("\n").filter(Boolean).length;
+  holdBackgroundWork();
+  installs = 0;
+  let waitedForWork = false;
+  const heldUpdate = runCauseEffect(
+    providers
+      .updateProviderCli("antigravity", install(newerExecutable), new AbortController().signal, () => {
+        waitedForWork = true;
+      })
+      .pipe(Effect.result),
+  );
+  await waitFor("the update to wait for the background work", () => waitedForWork);
+  const updateInstallsWhileHeld = installs;
+  const updateHoldsNewTurns = providers.isReplacingCli("antigravity");
+  assert.equal(updateInstallsWhileHeld, 0, "the update does not stop background work that still runs");
+  assert.equal(updateHoldsNewTurns, false, "agents keep starting turns while only background work runs");
+  backgroundWorkRuns = false;
+  assert.ok(Result.isSuccess(await heldUpdate), "the update runs after the background work");
+  const updateInstallsAfterWork = installs;
+  assert.equal(updateInstallsAfterWork, 1);
+
+  backgroundWorkRuns = true;
+  holdBackgroundWork();
+  const spawnsBeforeHeldRestart = await spawnCount();
+  await runCauseEffect(providers.startSettingsChanged("antigravity"));
+  const restartPendingWhileHeld = row()?.restartPending === true && (await spawnCount()) === spawnsBeforeHeldRestart;
+  const restartHoldsNewTurns = providers.isReplacingCli("antigravity");
+  assert.ok(restartPendingWhileHeld, "the settings restart waits for the background work");
+  assert.equal(restartHoldsNewTurns, false, "agents keep starting turns while the restart waits");
+  backgroundWorkRuns = false;
+  await waitFor("the restart to run after the background work", () => row()?.restartPending !== true);
+  const restartedAfterWork = (await spawnCount()) > spawnsBeforeHeldRestart;
+  assert.ok(restartedAfterWork, "the provider restarts once the background work ends");
+  report.heldWork = {
+    updateInstallsWhileHeld,
+    updateHoldsNewTurns,
+    updateInstallsAfterWork,
+    restartPendingWhileHeld,
+    restartHoldsNewTurns,
+    restartedAfterWork,
+  };
   assert.equal(row()?.state, "available");
 
   await checkProviderAccountReload();

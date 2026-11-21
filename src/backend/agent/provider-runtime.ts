@@ -891,6 +891,10 @@ export class ProviderRuntime implements ProviderPort {
     return client !== undefined && (client.canReleaseProcess?.() === false || this.#providerInUse(provider));
   }
 
+  #holdsBackgroundWork(provider: AgentProvider): boolean {
+    return this.#clients.get(provider)?.canReleaseProcess?.() === false;
+  }
+
   readonly releaseIdleThreads = Effect.fn("ProviderRuntime.releaseIdleThreads")(function* (this: ProviderRuntime) {
     for (const client of this.#clients.values()) if (client.releaseIdleThreads) yield* client.releaseIdleThreads();
     for (const { client } of this.#confined.values()) if (client.releaseIdleThreads) yield* client.releaseIdleThreads();
@@ -2097,7 +2101,7 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#off.has(provider)) return;
     this.#environmentReloadPending.delete(provider);
     if (!this.#clients.has(provider)) return;
-    if (this.#hooks.isProviderBusy(provider)) {
+    if (this.#hooks.isProviderBusy(provider) || this.#holdsBackgroundWork(provider)) {
       this.#environmentReloadPending.add(provider);
       return;
     }
@@ -2259,18 +2263,23 @@ export class ProviderRuntime implements ProviderPort {
     signal: AbortSignal,
     onWait: () => void,
   ) {
+    let waitShown = false;
     while (true) {
       if (signal.aborted) return yield* new ProviderOperationFailed({ cause: signal.reason });
       if (this.#hooks.isStopping())
         return yield* new ProviderOperationFailed({ cause: new Error(sourceText("error.provider.closing")) });
-      if (!this.#hooks.isProviderBusy(provider)) return;
-      if (!this.#updatesWhenIdle.has(provider)) {
-        this.#updatesWhenIdle.add(provider);
-        this.#hooks.onProviderHeld?.(provider);
-        recordRestartActivity();
-        onWait();
-      }
-      this.#hooks.releasePersonWaits?.(provider);
+      const busy = this.#hooks.isProviderBusy(provider);
+      if (!busy && !this.#holdsBackgroundWork(provider)) return;
+      if (!waitShown && !this.#updatesWhenIdle.has(provider)) onWait();
+      waitShown = true;
+      if (busy) {
+        if (!this.#updatesWhenIdle.has(provider)) {
+          this.#updatesWhenIdle.add(provider);
+          this.#hooks.onProviderHeld?.(provider);
+          recordRestartActivity();
+        }
+        this.#hooks.releasePersonWaits?.(provider);
+      } else if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
       yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
     }
   });
@@ -2294,7 +2303,7 @@ export class ProviderRuntime implements ProviderPort {
     const busy = yield* providerStep(() => {
       if ((provider === "codex" && this.#codexLogin.pending) || this.#cliLogin.has(provider))
         throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
-      return this.#hooks.isProviderBusy(provider);
+      return this.#hooks.isProviderBusy(provider) || this.#holdsBackgroundWork(provider);
     });
     if (busy) return null;
     const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
@@ -2689,6 +2698,7 @@ export class ProviderRuntime implements ProviderPort {
     const waiting =
       this.#status.phase !== "ready" ||
       this.#hooks.isProviderBusy(provider) ||
+      (this.#restartsKeepingTurns.has(provider) && this.#holdsBackgroundWork(provider)) ||
       this.#providerStarts.has(provider) ||
       this.#providerConnectionCommands.has(provider) ||
       this.#replacingCli.has(provider) ||
