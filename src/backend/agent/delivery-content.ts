@@ -488,6 +488,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             "Do not create, delete, or test routines, and do not change other routines, during this run.",
             `When the task says to stop after a condition and the condition is met, pause this routine: call openbot.update_routine with routineId "${delivery.sender.routineId}" and active false, then give your report. Make no other change to this routine.`,
             `A failure or a blocker, such as a file or a service that you cannot reach, is not a stop condition: keep this routine on, and call the ${ROUTINE_REPORT_FAILURE_TOOL} tool.`,
+            `Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report, so do not call the ${ROUTINE_NO_UPDATE_TOOL} tool after a pause.`,
           ]
         : ["Do not create, update, delete, or test routines during this run."]),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
