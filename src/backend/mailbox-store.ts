@@ -3212,7 +3212,8 @@ export class MailboxStore {
     )
       return false;
     this.#state.idempotency[key] = message.id;
-    if (delivery.turnId) this.#state.idempotency[`${RESTARTED_TURN_KEY_PREFIX}${deliveryId}`] = delivery.turnId;
+    if (delivery.status === "running" && delivery.turnId)
+      this.#state.idempotency[`${RESTARTED_TURN_KEY_PREFIX}${deliveryId}:${delivery.turnId}`] = message.id;
     yield* this.requeueRefused(deliveryId);
     return true;
   }, Effect.uninterruptible).bind(this);
@@ -3669,8 +3670,11 @@ export class MailboxStore {
       this.#state.idempotency[`${RESTARTED_RESULT_KEY_PREFIX}${delivery.id}`] !== undefined &&
       !delivery.resumeAfterUsageLimit &&
       !delivery.planContinuation;
+    const turnKeyPrefix = `${RESTARTED_TURN_KEY_PREFIX}${delivery.id}:`;
     const restartedTurnId = restarted
-      ? this.#state.idempotency[`${RESTARTED_TURN_KEY_PREFIX}${delivery.id}`]
+      ? Object.keys(this.#state.idempotency)
+          .find((key) => key.startsWith(turnKeyPrefix))
+          ?.slice(turnKeyPrefix.length)
       : undefined;
     return {
       delivery: this.#publicDelivery(delivery, positions, message),
