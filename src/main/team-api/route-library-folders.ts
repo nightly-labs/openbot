@@ -36,14 +36,32 @@ function visibleLibraryFolders(
   };
 }
 
+function withoutHiddenWorkflowFiles(
+  snapshot: LibraryFoldersSnapshot,
+  workflowFiles: ReadonlyMap<string, { id: string }>,
+  workflowIds: ReadonlySet<string>,
+): LibraryFoldersSnapshot {
+  const hidden = (fileId: string) => {
+    const workflow = workflowFiles.get(fileId);
+    return workflow !== undefined && !workflowIds.has(workflow.id);
+  };
+  if (!Object.keys(snapshot.placement).some(hidden)) return snapshot;
+  return {
+    ...snapshot,
+    placement: Object.fromEntries(Object.entries(snapshot.placement).filter(([fileId]) => !hidden(fileId))),
+  };
+}
+
 function requireFolderAccess(
   context: TeamApiRequestContext,
-  { agentIds, orphanFile }: LibraryFolderActionAgents,
+  { agentIds, orphanFile, agentlessFiles }: LibraryFolderActionAgents,
   hiddenAgentIds: ReadonlySet<string>,
+  workflowIds: ReadonlySet<string>,
 ): void {
   if ([...agentIds].some((agentId) => hiddenAgentIds.has(agentId)))
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
-  if (orphanFile) throw new HttpError(404, sourceText("error.backend.fileGone"));
+  if (orphanFile || agentlessFiles.some((file) => file.workflowId !== null && !workflowIds.has(file.workflowId)))
+    throw new HttpError(404, sourceText("error.backend.fileGone"));
   for (const agentId of agentIds) requireAgentLevel(context, agentId, "chat");
 }
 
@@ -52,6 +70,7 @@ export async function routeLibraryFolders(
   libraryFolders: TeamApiLibraryFolders | undefined,
   hiddenAgentIds: ReadonlySet<string>,
   agentIds: () => ReadonlySet<string>,
+  workflowIds: () => Promise<ReadonlySet<string>>,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !Object.values(LIBRARY_FOLDERS_ROUTES).some((path) => path === url.pathname))
@@ -59,15 +78,20 @@ export async function routeLibraryFolders(
   if (!libraryFolders || !capabilities.has(LIBRARY_FOLDERS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.libraryFoldersUnsupported"));
   const body = await readJson(request);
-  const visible = (snapshot: LibraryFoldersSnapshot) =>
-    visibleLibraryFolders(snapshot, hiddenAgentIds, canAdministerServer(member.role) ? null : agentIds());
-  if (url.pathname === LIBRARY_FOLDERS_ROUTES.read) return json(200, visible(libraryFolders.snapshot()));
+  const shownWorkflows = await workflowIds();
+  const visible = async (snapshot: LibraryFoldersSnapshot) =>
+    withoutHiddenWorkflowFiles(
+      visibleLibraryFolders(snapshot, hiddenAgentIds, canAdministerServer(member.role) ? null : agentIds()),
+      await runCauseEffect(libraryFolders.workflowFiles()),
+      shownWorkflows,
+    );
+  if (url.pathname === LIBRARY_FOLDERS_ROUTES.read) return json(200, await visible(libraryFolders.snapshot()));
   const action = parseLibraryFolderAction(body);
   try {
     const snapshot = await runCauseEffect(
-      libraryFolders.change(action, (agents) => requireFolderAccess(context, agents, hiddenAgentIds)),
+      libraryFolders.change(action, (agents) => requireFolderAccess(context, agents, hiddenAgentIds, shownWorkflows)),
     );
-    return json(200, visible(snapshot));
+    return json(200, await visible(snapshot));
   } catch (error) {
     if (error instanceof LibraryFolderChangeRefused)
       throw new HttpError(NOT_FOUND.has(error.reason) ? 404 : 400, error.message);

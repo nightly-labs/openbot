@@ -12,13 +12,14 @@ import {
   FILES_CONVERSATIONS,
   FILES_REMOVABLE_RUNTIMES,
   FILES_ROWS,
+  FILES_WORKFLOW_ROWS,
 } from "../../stories/files-fixtures";
 
 const GB = 1024 ** 3;
 const FREE_BYTES = 182 * GB;
 
 export function createMockStorage(onFoldersChanged: () => void = () => undefined): StorageDesktopApi {
-  let files = structuredClone(FILES_ROWS);
+  let files = structuredClone([...FILES_ROWS, ...FILES_WORKFLOW_ROWS]);
   let breakdown = structuredClone(FILES_BREAKDOWN);
   let removableRuntimes = structuredClone(FILES_REMOVABLE_RUNTIMES);
   let libraryFolders = structuredClone(EMPTY_LIBRARY_FOLDERS);

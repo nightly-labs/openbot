@@ -46,6 +46,7 @@ import {
   SKILL_LEARNING_CAPABILITY,
   withSkillSuggestionNames,
 } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-workflow-files-v1";
 import {
   addUiBlockAutoAnswers,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -835,6 +836,7 @@ export class TeamWebRtcHostPeer {
             channelTaskWaits: peerCapabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
             mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
             routineResultsWhatsApp: peerCapabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
+            storageWorkflowFiles: peerCapabilities.has(STORAGE_WORKFLOW_FILES_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),

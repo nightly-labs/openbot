@@ -262,6 +262,7 @@ import { withSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill
 import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_USER_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-user-files-v1";
+import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-workflow-files-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
@@ -483,6 +484,7 @@ import { routeWhatsAppWorkingMessage } from "./team-api/route-whatsapp-working-m
 import { routeWorkflowFolders } from "./team-api/route-workflow-folders";
 import { routeWorkflows } from "./team-api/route-workflows";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
+import { visibleWorkflowIds } from "./team-api/workflow-visibility";
 import { TeamStoreError } from "./team-store";
 
 const EVENT_PAYLOAD_LIMIT = 256 * 1_024;
@@ -1187,6 +1189,7 @@ export class TeamApiServer {
           this.#options.channels,
           hidden,
           () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+          () => visibleWorkflowIds(context, this.#options.workflows, this.#options.agents, hidden),
           this.#options.libraryFolders,
         )) === "handled"
       )
@@ -1243,6 +1246,7 @@ export class TeamApiServer {
           this.#options.libraryFolders,
           hidden,
           () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+          () => visibleWorkflowIds(context, this.#options.workflows, this.#options.agents, hidden),
         )) === "handled"
       )
         return;
@@ -2374,6 +2378,7 @@ export class TeamApiServer {
       channelTaskWaits: route.capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
       mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
       routineResultsWhatsApp: route.capabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
+      storageWorkflowFiles: route.capabilities.has(STORAGE_WORKFLOW_FILES_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -2676,6 +2681,8 @@ export class TeamApiServer {
         if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
         if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
         if (capability === STORAGE_USER_FILES_CAPABILITY) return this.#options.storage !== undefined;
+        if (capability === STORAGE_WORKFLOW_FILES_CAPABILITY)
+          return this.#options.storage !== undefined && this.#options.workflows !== undefined;
         if (capability === LIBRARY_FOLDERS_CAPABILITY || capability === LIBRARY_FOLDERS_EVENTS_CAPABILITY)
           return this.#options.libraryFolders !== undefined;
         if (capability === STORAGE_CHANNEL_CAPABILITY)

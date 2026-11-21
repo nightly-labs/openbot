@@ -126,6 +126,7 @@ import { UserBrowsingLog } from "../backend/user-browsing-log";
 import { UserFilesBytes } from "../backend/user-files-bytes";
 import { WORKFLOW_FOLDERS_FILE, WorkflowFoldersStore } from "../backend/workflow-folders-store";
 import { clearFlatBackground } from "../backend/workflows/flat-background";
+import { workflowFileOwners } from "../backend/workflows/workflow-file-owners";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
@@ -1919,6 +1920,11 @@ export async function createApplicationServices({
       config.command === "npx" &&
       catalogPluginSlug(config, catalogPluginServers, homedir()) !== null,
   );
+  const workflowStore = new WorkflowStore({
+    database: store.database,
+    nextDueAt: workflowScheduleDueAt(() => serverTimezone.effective()),
+  });
+  const workflowRuns = new WorkflowRunStore({ database: store.database });
   const userData = app.getPath("userData");
   const storageSources = {
     roots: {
@@ -1950,6 +1956,12 @@ export async function createApplicationServices({
           )
         : null,
     ...(hostedServer ? { userFiles: new UserFilesBytes(userData, homedir()) } : {}),
+    workflowFiles: () =>
+      workflowFileOwners({
+        outputs: () => workflowRuns.mediaOutputs(),
+        workflows: () => workflowStore.list(),
+        folders: (workflowIds) => workflowFolders.getSnapshot({ workflowIds }),
+      }),
   };
   const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));
@@ -2227,10 +2239,6 @@ export async function createApplicationServices({
     }),
   );
   teardown.push(TEARDOWN_ORDER.routineFlows, "the routine flows", () => Effect.runPromise(routineFlowRuntime.close()));
-  const workflowStore = new WorkflowStore({
-    database: store.database,
-    nextDueAt: workflowScheduleDueAt(() => serverTimezone.effective()),
-  });
   const githubRest = createGitHubRest({
     fetch: (url, init) => fetch(url, init),
     tokens: (repository) => githubConnector.repositoryTokens(repository),
@@ -2240,7 +2248,7 @@ export async function createApplicationServices({
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({
       store: workflowStore,
-      runs: new WorkflowRunStore({ database: store.database }),
+      runs: workflowRuns,
       github: new WorkflowGitHubStore({ database: store.database }),
       githubApp: () => githubAppConfig()?.slug ?? null,
       watchGitHub: (repositories) => githubRelay.setRepositories(repositories),

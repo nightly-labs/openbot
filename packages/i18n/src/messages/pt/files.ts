@@ -69,6 +69,8 @@ export const messages = {
   "files.library.agents": "Agentes",
   "files.library.allAgents": { one: "{count} agente", other: "Todos os {count} agentes" },
   "files.library.folders": "Pastas",
+  "files.library.workflows": "Fluxos",
+  "files.library.workflowsOf": "Fluxos em {name}",
   "files.library.favorite": "Favoritar {name}",
   "files.folder.new": "Nova pasta",
   "files.folder.name": "Nome da pasta",

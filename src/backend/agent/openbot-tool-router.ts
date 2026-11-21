@@ -171,6 +171,7 @@ import { type ImageFitter, READ_IMAGE_MAX_FILE_BYTES, readImageToolSchema } from
 import {
   type AgentLibraryFolders,
   libraryFileAgents,
+  libraryFileWorkflows,
   listLibraryFolders,
   listLibraryFoldersToolSchema,
   organizeLibrary,
@@ -1984,8 +1985,16 @@ export class OpenBotToolRouter {
       if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
       const storedFiles = this.#mailbox.listStoredFiles();
       const fileAgents = yield* libraryFileAgents(libraryFolders, storedFiles);
+      const fileWorkflows = yield* libraryFileWorkflows(libraryFolders, storedFiles);
       return openBotToolResult(
-        listLibraryFolders(libraryFolders.getSnapshot(), storedFiles, fileAgents, senderAgentId, args.folder),
+        listLibraryFolders(
+          libraryFolders.getSnapshot(),
+          storedFiles,
+          fileAgents,
+          fileWorkflows,
+          senderAgentId,
+          args.folder,
+        ),
       );
     }
 

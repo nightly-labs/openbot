@@ -96,6 +96,8 @@ export const messages = {
     other: "Wszyscy agenci ({count})",
   },
   "files.library.folders": "Foldery",
+  "files.library.workflows": "Przepływy",
+  "files.library.workflowsOf": "Przepływy w {name}",
   "files.library.favorite": "Ulubiony: {name}",
   "files.folder.new": "Nowy folder",
   "files.folder.name": "Nazwa folderu",
