@@ -1136,7 +1136,13 @@ try {
     ) === true,
     stopPrompt,
   );
-  for (const name of ["Paused then failed", "Failed then paused", "Paused then quiet", "Quiet then paused"]) {
+  for (const name of [
+    "Paused then failed",
+    "Failed then paused",
+    "Paused then quiet",
+    "Stops with a report",
+    "Quiet then paused",
+  ]) {
     const routine = agents.listRoutines(checker.id).find((entry) => entry.name === name);
     if (routine) agents.updateRoutine({ agentId: checker.id, routineId: routine.id, active: false });
   }

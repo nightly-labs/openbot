@@ -2099,20 +2099,23 @@ export class OpenBotToolRouter {
         return openBotToolFailure(
           "In a channel routine run, only the owner of the request can end the run with nothing to report. Give your result as usual.",
         );
+      const shownToOwner = channelRun?.part === "owner" && !channelRun.quiet;
       const pausedTurn = this.#routineRunTurns.get(params.turnId);
-      if (pausedTurn !== undefined && pausedTurn.paused.length > 0) {
+      if (!shownToOwner && pausedTurn !== undefined && pausedTurn.paused.length > 0) {
         const results = pausedTurn.paused.map((pause) => this.#routines.resumeAfterRunPause(pause, params));
-        this.#noteRoutineRunTurn(params.turnId, { ended: pausedTurn.ended, paused: [] });
+        const stillPaused = pausedTurn.paused.filter((pause) =>
+          this.#routines.listFor(pause.agentId).some((routine) => routine.id === pause.routineId && !routine.active),
+        );
+        this.#noteRoutineRunTurn(params.turnId, { ended: pausedTurn.ended, paused: stillPaused });
         return openBotToolFailure(
-          results.includes("failed")
-            ? "You paused this routine, and OpenBot could not turn it on again. Give a short report that says that the routine is paused, and that the user can turn it on again."
+          stillPaused.length > 0
+            ? "You paused this routine, and it stays paused. Give a short report that says that the routine is paused, and that the user can turn it on again."
             : `Nothing to report is not a stop condition${results.includes("resumed") ? ", so this routine is on again" : ""}. When the task says to stop this routine now, pause it again and give a short report that says that it stopped and why. Otherwise call this tool again.`,
         );
       }
-      const outcome =
-        channelRun?.part === "owner" && !channelRun.quiet
-          ? "shown"
-          : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
+      const outcome = shownToOwner
+        ? "shown"
+        : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
           "Use this tool only in a routine run, for a teammate's message (an update that wants no answer, or a request after your reply to it), or when your background work wakes you again after your report. Give your answer as usual.",
@@ -2121,7 +2124,13 @@ export class OpenBotToolRouter {
         return openBotToolFailure(
           "Send your result to the teammate who asked with openbot.send_message first, then call this tool again.",
         );
-      if (outcome === "quiet") this.#endRoutineRunTurn(params, "quiet");
+      if (
+        outcome === "quiet" &&
+        this.#mailbox
+          .findDeliveriesByTurn(senderAgentId, params.turnId)
+          .some(({ delivery }) => delivery.sender.kind === "routine")
+      )
+        this.#endRoutineRunTurn(params, "quiet");
       return openBotToolResult(
         outcome === "quiet"
           ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
