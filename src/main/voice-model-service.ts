@@ -336,9 +336,14 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
   ): Effect.Effect<void, VoiceOperationError> {
     const partialPath = `${path}.part`;
     let committed = false;
+    let stall: StallDeadline | undefined;
     return Effect.gen({ self: this }, function* () {
       yield* voiceIO(() => rm(partialPath, { force: true }));
-      const response = yield* voiceIO(() => this.#fetch(file.url, { signal }));
+      const deadline = startStallDeadline();
+      stall = deadline;
+      const response = yield* voiceIO(() =>
+        deadline.race(this.#fetch(file.url, { signal: AbortSignal.any([signal, deadline.signal]) })),
+      );
       if (!response.ok || !response.body)
         return yield* new VoiceOperationError({ cause: new Error(`download-status-${response.status}`) });
       const body = response.body;
@@ -353,8 +358,9 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
             (reader) =>
               Effect.gen({ self: this }, function* () {
                 while (true) {
-                  const { done, value } = yield* voiceIO(() => reader.read());
+                  const { done, value } = yield* voiceIO(() => deadline.race(reader.read()));
                   if (done) break;
+                  deadline.extend();
                   receivedBytes += value.byteLength;
                   if (receivedBytes > file.bytes)
                     return yield* new VoiceOperationError({ cause: new Error("download-too-large") });
@@ -377,7 +383,7 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
                 }
               }),
             (reader) =>
-              voiceIO(() => reader.cancel()).pipe(
+              voiceIO(() => deadline.race(reader.cancel())).pipe(
                 Effect.catch(() => Effect.void),
                 Effect.ensuring(Effect.sync(() => reader.releaseLock())),
               ),
@@ -391,6 +397,7 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
       const { size, mtimeMs } = yield* voiceIO(() => stat(path));
       this.#verified.set(file.name, { size, mtimeMs });
     }).pipe(
+      Effect.ensuring(Effect.sync(() => stall?.clear())),
       Effect.ensuring(
         Effect.suspend(() =>
           committed ? Effect.void : voiceIO(() => rm(partialPath, { force: true })).pipe(Effect.orDie),
@@ -459,6 +466,40 @@ export class VoiceOperationError extends Schema.TaggedError<VoiceOperationError>
 }) {}
 
 const { io: voiceIO } = causeHelpers(VoiceOperationError);
+
+const DOWNLOAD_STALL_MS = 60_000;
+
+interface StallDeadline {
+  readonly signal: AbortSignal;
+  readonly extend: () => void;
+  readonly clear: () => void;
+  readonly race: <T>(work: Promise<T>) => Promise<T>;
+}
+
+function startStallDeadline(): StallDeadline {
+  const controller = new AbortController();
+  const stalled = new Error("download-stalled");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const extend = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(stalled), DOWNLOAD_STALL_MS);
+  };
+  extend();
+  return {
+    signal: controller.signal,
+    extend,
+    clear: () => clearTimeout(timer),
+    race: <T>(work: Promise<T>) =>
+      new Promise<T>((resolve, reject) => {
+        const stop = () => reject(stalled);
+        work
+          .then(resolve, (error: unknown) => reject(controller.signal.aborted ? stalled : error))
+          .finally(() => controller.signal.removeEventListener("abort", stop));
+        if (controller.signal.aborted) stop();
+        else controller.signal.addEventListener("abort", stop, { once: true });
+      }),
+  };
+}
 
 function downloadFailureReason(cause: unknown): string {
   if (!(cause instanceof Error)) return "unknown";

@@ -72,6 +72,7 @@ export interface VoicePillProps {
   muted: boolean;
   levels: readonly number[];
   error: string | null;
+  downloadProgress?: number | null | undefined;
   onToggleMute: () => void;
   talkMode: VoiceTalkMode;
   onTalkModeChange: (mode: VoiceTalkMode) => void;
@@ -396,6 +397,11 @@ export function VoicePill(props: VoicePillProps) {
             {error()}
           </p>
         )}
+      </Show>
+      <Show when={!props.error && props.phase === "starting" && props.downloadProgress != null}>
+        <p class="voice-pill-status" role="status">
+          {t("composer.voice.progress", { progress: props.downloadProgress ?? 0 })}
+        </p>
       </Show>
     </div>
   );
