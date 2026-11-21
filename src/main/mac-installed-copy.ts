@@ -10,7 +10,7 @@ import { causeHelpers } from "../backend/effect-boundary";
 
 const logger = createOpenBotLogger("mac-installed-copy");
 
-const TOOL_TIMEOUT_MS = 120_000;
+const TOOL_TIMEOUT_MS = 60_000;
 const QUARANTINE_ATTRIBUTE = "com.apple.quarantine";
 const runTool = promisify(execFile);
 
@@ -65,7 +65,12 @@ function prepareInstalledCopy(runningBundle: string, currentVersion: string): Ef
       const copyPath = join(folder, basename(runningBundle));
       if (copyPath === runningBundle) continue;
       const usable = yield* isSameAppAtLeastAsNew(copyPath, requirement, currentVersion).pipe(
-        Effect.catch(() => Effect.succeed(false)),
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            logger.info("An OpenBot copy cannot be used to install the update.", toLogValue(error.cause));
+            return false;
+          }),
+        ),
       );
       if (usable && (yield* removeQuarantine(copyPath))) return copyPath;
     }

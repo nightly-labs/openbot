@@ -14,7 +14,7 @@ import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { isNewerRelease } from "@openbot/contracts/release-version";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from "effect";
+import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -185,7 +185,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #installStarted = false;
   #pendingInstallRequests = 0;
   #installHandedOver = false;
-  #restartingFromInstalledCopy = false;
+  #installedCopyRestart: Deferred.Deferred<boolean> | null = null;
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   readonly #logLock = Semaphore.makeUnsafe(1);
@@ -541,6 +541,26 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     });
   }
 
+  #restartFromInstalledCopy(bundle: string): Effect.Effect<boolean> {
+    return Effect.gen({ self: this }, function* () {
+      const { restartFromInstalledCopy } = this.#options;
+      if (!restartFromInstalledCopy) return false;
+      if (this.#installedCopyRestart) return yield* Deferred.await(this.#installedCopyRestart);
+      const result = Deferred.makeUnsafe<boolean>();
+      this.#installedCopyRestart = result;
+      return yield* restartFromInstalledCopy(bundle).pipe(
+        Effect.catchDefect(() => Effect.succeed(false)),
+        Effect.onExit((exit) =>
+          Effect.gen({ self: this }, function* () {
+            const restarted = Exit.isSuccess(exit) && exit.value;
+            if (!restarted) this.#installedCopyRestart = null;
+            yield* Deferred.succeed(result, restarted);
+          }),
+        ),
+      );
+    });
+  }
+
   #install(): Effect.Effect<void, UpdateOperationFailure> {
     return Effect.gen({ self: this }, function* () {
       this.#pendingInstallRequests += 1;
@@ -558,12 +578,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         return yield* new UpdateOperationFailure({ cause: new Error(this.#siblingSessionMessage(siblings)) });
       const bundle = this.#options.platform === "darwin" ? this.#options.appBundlePath : undefined;
       if (bundle && (yield* isOnReadOnlyVolume(bundle))) {
-        if (this.#restartingFromInstalledCopy)
-          return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.restartStarted")) });
-        this.#restartingFromInstalledCopy = true;
-        const { restartFromInstalledCopy } = this.#options;
-        this.#restartingFromInstalledCopy = restartFromInstalledCopy ? yield* restartFromInstalledCopy(bundle) : false;
-        if (this.#restartingFromInstalledCopy) return;
+        if (yield* this.#restartFromInstalledCopy(bundle)) return;
         logger.warn("OpenBot update install refused: the application runs from a read-only volume.");
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.readOnlyLocation")) });
       }
