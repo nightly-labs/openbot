@@ -252,7 +252,7 @@ export class AgentTasks implements TaskLanes {
       .slice(0, TASK_REPORT_RUNNING_LIMIT)
       .map((other) => ({ taskId: other.taskId, title: other.title }));
     const outcome = task.outcome === "interrupted" && this.#userStops.has(task.taskId) ? "stopped" : task.outcome;
-    return { taskId: task.taskId, title: task.title, outcome, stillRunning };
+    return { taskId: task.taskId, title: task.title, outcome, closed: task.closedAt !== null, stillRunning };
   }
 
   isRoutineThread(taskId: string): boolean {
@@ -601,7 +601,7 @@ export class AgentTasks implements TaskLanes {
     const started = this.#mailbox.deliveryForKey(idempotencyKey);
     const startedTaskId = started ? this.#mailbox.taskIdForDelivery(started.delivery.id) : null;
     const startedTask = startedTaskId ? this.#store.task(startedTaskId) : null;
-    if (startedTask) return startedTaskResult(startedTask);
+    if (startedTask) return this.#startedResult(startedTask);
     const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
     const finished = open.filter((task) => this.#finished(task));
     if (this.#unfinishedTasks(caller.agentId) >= AGENT_STARTED_UNFINISHED_TASKS)
@@ -646,7 +646,51 @@ export class AgentTasks implements TaskLanes {
     }
     this.changed(caller.agentId);
     this.#hooks.queued(caller.agentId);
-    return startedTaskResult(task);
+    return this.#startedResult(task);
+  });
+
+  #startedResult(task: AgentThreadRecord): OpenBotToolResponse {
+    const waiting = [
+      ...new Set(
+        this.#mailbox
+          .openRequestsHeldByTask(task.agentId, task.taskId)
+          .flatMap((requestId) => this.#mailbox.requestSenderAgentId(requestId) ?? []),
+      ),
+    ].map((agentId) => this.#hooks.agent(agentId)?.name ?? agentId);
+    return startedTaskResult(task, waiting);
+  }
+
+  readonly releaseHeldRequests = Effect.fn("AgentTasks.releaseHeldRequests")(function* (
+    this: AgentTasks,
+    task: AgentThreadRecord,
+  ): Effect.fn.Return<void> {
+    const requestIds = this.#mailbox.requestsLeftByTask(task.agentId, task.taskId);
+    if (requestIds.length === 0) return;
+    const queued = yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: task.agentId },
+        requesterIds: this.#mailbox.taskRequesterIds(task.taskId),
+        senderTaskId: task.taskId,
+        heldRequestIds: requestIds,
+        recipientAgentIds: [task.agentId],
+        text: task.title,
+        replyToMessageId: null,
+        expectsReply: false,
+        idempotencyKey: `task-release:${task.taskId}:${requestIds.join(",")}`,
+      })
+      .pipe(
+        Effect.as(true),
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not queue the report of a closed task.", {
+              agentId: task.agentId,
+              error: failure.cause,
+            });
+            return false;
+          }),
+        ),
+      );
+    if (queued) this.#hooks.queued(task.agentId);
   });
 
   changed(agentId: string): void {
@@ -772,6 +816,7 @@ export class AgentTasks implements TaskLanes {
         sender: { kind: "agent", agentId: task.agentId },
         requesterIds: this.#mailbox.taskRequesterIds(task.taskId),
         senderTaskId: task.taskId,
+        heldRequestIds: this.#mailbox.openRequestsHeldByTask(task.agentId, task.taskId),
         recipientAgentIds: [task.agentId],
         text,
         replyToMessageId: null,
@@ -951,11 +996,16 @@ function branchTitle(sourceTitle: string, titles: readonly string[]): string {
   return `${prefix}${last + 1}`;
 }
 
-function startedTaskResult(task: AgentThreadRecord): OpenBotToolResponse {
+function startedTaskResult(task: AgentThreadRecord, waiting: readonly string[]): OpenBotToolResponse {
+  const note =
+    "The task runs in its own conversation beside this chat, and the user can follow it in its tab. When its turn ends, OpenBot sends its final answer to your main chat as a task report. Start the other independent tasks now, do the quick parts yourself, tell the user in one sentence what runs, and end your turn. Do not wait for the task or read it to check progress.";
   return openBotToolResult({
     taskId: task.taskId,
     title: task.title,
-    note: "The task runs in its own conversation beside this chat, and the user can follow it in its tab. When its turn ends, OpenBot sends its final answer to your main chat as a task report. Start the other independent tasks now, do the quick parts yourself, tell the user in one sentence what runs, and end your turn. Do not wait for the task or read it to check progress.",
+    note:
+      waiting.length === 0
+        ? note
+        : `${note} ${waiting.join(", ")} still wait for the result of their request: OpenBot sends them your answer to the task report as your reply. Do not send them a status or a result now.`,
   });
 }
 

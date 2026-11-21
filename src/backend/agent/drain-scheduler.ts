@@ -930,6 +930,7 @@ export class DrainScheduler {
                   : undefined,
               answeredRoutine: this.answeredRoutine(item.delivery),
               taskReport: this.taskReport(item),
+              taskReportWaiting: this.taskReportWaiting(item),
               tags,
               liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
               externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
@@ -1357,6 +1358,19 @@ export class DrainScheduler {
     const { sender, recipientAgentId } = context.delivery;
     const ownTask = sender.kind === "agent" && sender.agentId === recipientAgentId;
     return ownTask && context.senderTaskId ? this.#tasks.taskReport(context.senderTaskId) : null;
+  }
+
+  taskReportWaiting(context: DeliveryContext): string[] {
+    const { sender, recipientAgentId, messageId } = context.delivery;
+    if (!context.senderTaskId || sender.kind !== "agent" || sender.agentId !== recipientAgentId) return [];
+    return [
+      ...new Set(
+        this.#mailbox
+          .heldRequestIdsOf(messageId)
+          .filter((requestId) => !this.#mailbox.hasReplyFrom(recipientAgentId, requestId))
+          .flatMap((requestId) => this.#mailbox.requestSenderAgentId(requestId) ?? []),
+      ),
+    ];
   }
 
   answeredRoutine(delivery: DeliveryContext["delivery"]): AnsweredRoutine | null {

@@ -120,6 +120,7 @@ export interface DeliveryPromptSources {
   steersQuietTurn?: boolean;
   externalChat?: boolean;
   taskReport?: TaskReportState | null;
+  taskReportWaiting?: readonly string[];
 }
 
 export interface SkippedRoutineRuns {
@@ -144,6 +145,7 @@ export interface TaskReportState {
   taskId: string;
   title: string;
   outcome: "completed" | "failed" | "interrupted" | "stopped" | null;
+  closed: boolean;
   stillRunning: ReadonlyArray<{ taskId: string; title: string }>;
 }
 
@@ -360,16 +362,18 @@ export function routineLocalTime(scheduledFor: string, timeZone: string | undefi
   ];
 }
 
-function taskReportFraming(taskId: string, report: TaskReportState | null): string[] {
+function taskReportFraming(taskId: string, report: TaskReportState | null, waiting: readonly string[]): string[] {
   const name = report ? `"${report.title}" (taskId ${taskId})` : `taskId ${taskId}`;
   const status =
-    report?.outcome === "failed"
-      ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, failed. The text below is its error or last answer.`
-      : report?.outcome === "stopped"
-        ? `Task report from OpenBot: the user stopped task ${name}, which you started with openbot.start_task. Do not start it again unless the user asks. The text below is its last answer, so part of the work can be done.`
-        : report?.outcome === "interrupted"
-          ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, so part of the work can be done.`
-          : `Task report from OpenBot: task ${name}, which you started with openbot.start_task, ended its turn. The text below is its final answer.`;
+    report === null || report.closed
+      ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, is closed. The text below is its last answer, or its title when it gave none.`
+      : report.outcome === "failed"
+        ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, failed. The text below is its error or last answer.`
+        : report?.outcome === "stopped"
+          ? `Task report from OpenBot: the user stopped task ${name}, which you started with openbot.start_task. Do not start it again unless the user asks. The text below is its last answer, so part of the work can be done.`
+          : report?.outcome === "interrupted"
+            ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, so part of the work can be done.`
+            : `Task report from OpenBot: task ${name}, which you started with openbot.start_task, ended its turn. The text below is its final answer.`;
   const running = report?.stillRunning.length
     ? [`Still running: ${report.stillRunning.map((other) => `"${other.title}" (taskId ${other.taskId})`).join(", ")}.`]
     : [];
@@ -378,6 +382,11 @@ function taskReportFraming(taskId: string, report: TaskReportState | null): stri
     `The user can read the whole task in its tab. When the text ends with "${TASK_REPORT_CUT_MARK}", it is cut: openbot.history_read with this taskId gives the rest.`,
     ...running,
     "While other tasks still run, tell the user in one line what is done, and give all results together after the last report. To continue a task, call openbot.message_task with {taskId, text}. To stop one, call openbot.close_task with {taskId}.",
+    ...(waiting.length === 0
+      ? []
+      : [
+          `${waiting.join(", ")} wait for the result of the request that you started this task for. OpenBot sends your final answer of this turn to them as your reply, so write it for them. ${RESULT_FORMAT} Do not send it with openbot.send_message.`,
+        ]),
   ];
 }
 
@@ -415,7 +424,11 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     context.senderTaskId
   ) {
     text = [
-      ...taskReportFraming(context.senderTaskId, sources.taskReport ?? null),
+      ...taskReportFraming(
+        context.senderTaskId,
+        sources.taskReport ?? null,
+        (sources.taskReportWaiting ?? []).map((agentId) => agentNames.get(agentId) ?? agentId),
+      ),
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");
