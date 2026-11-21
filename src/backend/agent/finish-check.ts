@@ -23,7 +23,7 @@ export const FinishCheckResult = Schema.Struct({
 });
 export type FinishCheckResult = typeof FinishCheckResult.Type;
 
-export interface FinishCheckStep extends ConversationTraceStep {
+interface FinishCheckStep extends ConversationTraceStep {
   tool?: string | undefined;
   result?: string | undefined;
 }
