@@ -332,6 +332,7 @@ try {
   automationRunsPerHour = 10;
   const shortVaultPassword = "nt-ad";
   registerSecretValue(shortVaultPassword, { allowShort: true });
+  registerSecretValue("gentI", { allowShort: true });
   approvalCommand = `echo ${shortVaultPassword}`;
   await check("a short saved secret inside an agent ID keeps the ID in the list", ["list", "--json"], 0, (run) => {
     return parsed(run).agents[0]?.id === "agent-ada";

@@ -428,19 +428,15 @@ const ROUTING_ID_KEYS: ReadonlySet<string> = new Set([
 
 function send(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
-  response.end(JSON.stringify(withRoutingIds(body, toLogValue(body))));
+  response.end(JSON.stringify(responseValue(body)));
 }
 
-function withRoutingIds(source: unknown, redacted: LogValue): LogValue {
-  if (Array.isArray(redacted))
-    return Array.isArray(source) ? redacted.map((entry, index) => withRoutingIds(source[index], entry)) : redacted;
-  if (typeof redacted !== "object" || redacted === null || !isDynamicRecord(source)) return redacted;
-  return Object.fromEntries(
-    Object.entries(redacted).map(([key, entry]) => {
-      const original = source[key];
-      return [key, ROUTING_ID_KEYS.has(key) && isString(original) ? original : withRoutingIds(original, entry)];
-    }),
-  );
+function responseValue(value: unknown, key?: string): LogValue {
+  if (key !== undefined && ROUTING_ID_KEYS.has(key) && isString(value)) return value;
+  if (Array.isArray(value)) return value.map((entry) => responseValue(entry));
+  if (isDynamicRecord(value))
+    return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, responseValue(entry, name)]));
+  return toLogValue(value);
 }
 
 async function readJson(request: IncomingMessage): Promise<DynamicRecord> {
