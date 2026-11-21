@@ -1,10 +1,15 @@
-// @openbot-server-headless — milestone 3: the repository's own server + agent stack under Bun.
+// @openbot-server-headless — milestone 4: the repository's own server + agent stack under Bun.
 //
 // Runs the REAL CentralAuthManager (obk1 session), the REAL ServerMode (control socket),
 // the REAL OpenBotDatabase/AgentStore/MailboxStore (SQLite), the REAL AgentService
-// (phase 1: opencode preferred via ACP), the REAL TeamStore and the REAL TeamApiServer
+// (opencode preferred via ACP), the REAL ProviderCredentialStore (encrypted provider-key
+// envelope, file-key cipher — no keyring), the REAL TeamStore and the REAL TeamApiServer
 // serving the team routes on 127.0.0.1. No Electron, no Xvfb, no dbus, no keyring, no
 // window, no browser (HeadlessBrowserHost refuses every call).
+//
+// OPENBOT_HEADLESS_MODEL (with OPENBOT_HEADLESS_PROVIDER, default "opencode") pins the
+// first agent's model after boot — the free-tier default is
+// opencode/deepseek-v4.1-flash-free, which needs no key at all.
 //
 // Boot order mirrors the native host (index.ts:1412-1858): the host surface (control
 // socket, then team API) listens first; the account and the agent service initialize
@@ -77,7 +82,8 @@ import { OpenBotDatabase } from "../../../src/backend/openbot-database";
 import { AgentStore } from "../../../src/backend/agent-store";
 import { MailboxStore } from "../../../src/backend/mailbox-store";
 import { AgentService } from "../../../src/backend/agent-service";
-import { NO_PROVIDER_CREDENTIALS } from "../../../src/backend/provider-drivers";
+import { ProviderCredentialStore } from "../../../src/main/provider-credential-store";
+import { createSecretStorage, SECRET_STORAGE_KEY_FILE } from "../../../src/main/secret-storage-cipher";
 import { AGENT_PROVIDERS } from "@openbot/contracts/agent-providers";
 import { HeadlessBrowserHost } from "./headless-browser-host";
 
@@ -133,14 +139,43 @@ await Effect.runPromise(store.initialize() as never).catch((error) => {
 });
 const mailbox = new MailboxStore(userData, store.sharedRoot, database);
 
-// --- agents (real service, phase 1: opencode over ACP, no credentials yet) -----------
+// --- provider credentials (real store: the encrypted envelope, no keyring) --------------
+// Native (application-services.ts:1615): ProviderCredentialStore over the userData file
+// with the secret-storage cipher. The cipher's Linux path is the obk1 file-key (pure
+// node:crypto), so provider keys persist with neither dbus nor a keyring; the free
+// OpenCode Zen models (deepseek-v4.1-flash-free) need no key at all.
+const secretStorage = createSecretStorage({ keyPath: join(userData, SECRET_STORAGE_KEY_FILE) });
+const providerCredentials = new ProviderCredentialStore(
+  join(userData, "openbot-provider-credentials-v1.json"),
+  secretStorage.cipher(() => "The headless secret storage is unavailable."),
+);
+const credentialLoadError = await Effect.runPromise(providerCredentials.load() as never);
+if (credentialLoadError) {
+  console.warn(
+    "OpenBot could not read the provider key file. It was left unchanged.",
+    String(credentialLoadError),
+  );
+}
+
+// --- agents (real service: opencode over ACP with the real credential store) -----------
 const browser = new HeadlessBrowserHost();
 const agentService = new AgentService({
   store,
   mailbox,
   browser,
   preferredProvider: "opencode",
-  credentials: NO_PROVIDER_CREDENTIALS,
+  credentials: {
+    // Native shape (application-services.ts:2073): the real store answers apiKey and the
+    // account keys read/write the same encrypted envelope.
+    apiKey: (provider: never) => providerCredentials.get(provider),
+    accountKeys: {
+      get: (provider: never, accountId: string) => providerCredentials.accountKey(provider, accountId),
+      set: (provider: never, accountId: string, key: string | null) =>
+        providerCredentials.setAccountKey(provider, accountId, key) as never,
+    },
+    customProviders: () => [],
+    mcpServers: () => [],
+  } as never,
   bundledExecutables: { opencode: existsSync(OPENCODE_BIN) ? OPENCODE_BIN : null },
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "opencode"),
   tables: null,
@@ -247,7 +282,39 @@ void Effect.runPromise(centralAuth.initialize() as never)
   .then((state) => console.log(`account=${(state as { status: string } | null)?.status ?? "loading"}`))
   .catch((error) => console.warn("The account did not initialize.", String(error)));
 void Effect.runPromise(agentService.initialize() as never)
-  .then(() => console.log("agents=ready"))
+  .then(async () => {
+    console.log("agents=ready");
+    // Milestone 4: pin the first agent to a chosen model (the free tier by default in
+    // the test harness); updateAgent is the same path the desktop picker uses.
+    const model = process.env.OPENBOT_HEADLESS_MODEL;
+    if (!model) return;
+    const provider = process.env.OPENBOT_HEADLESS_PROVIDER ?? "opencode";
+    const service = agentService as unknown as {
+      listAgents: () => Array<{ id: string; name: string }>;
+      updateAgent: (input: Record<string, unknown>) => never;
+      createAgent: (input: Record<string, unknown>) => never;
+    };
+    let agent = service.listAgents()[0];
+    if (agent) {
+      await Effect.runPromise(service.updateAgent({ agentId: agent.id, provider, model }));
+    } else {
+      // The packaged app creates its first agent during first-run setup; a headless host
+      // has no setup UI, so the model pin creates the roster entry itself.
+      const created = (await Effect.runPromise(
+        service.createAgent({
+          name: "Headless",
+          description: "The headless Bun host agent.",
+          avatarSeed: "openbot-headless",
+          avatarHue: null,
+          initialMessage: "Say ready and nothing else.",
+          provider,
+          model,
+        }),
+      )) as { id: string; name: string };
+      agent = created;
+    }
+    console.log(`model=${model} provider=${provider} agent=${agent.id}`);
+  })
   .catch((error) =>
     console.warn(
       "The agent service did not initialize fully.",

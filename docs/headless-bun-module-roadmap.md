@@ -372,6 +372,44 @@ round-trip and cross-instance read; `GET /v1/status`, `invalid_email` validation
 and `turn_limit=16` from the real code paths; synthetic session restores and is
 then correctly revoked by the real 401 flow.
 
+### Milestone 4 (2026-11-21 night): real credentials + a full free-model turn
+
+- **ProviderCredentialStore (real, no keyring)** — constructed exactly like the
+  native host (application-services.ts:1615) over `openbot-provider-credentials-v1.json`
+  with the file-key cipher, and the AgentService now receives the native credentials
+  shape (apiKey + accountKeys from the store; application-services.ts:2073). Gate 11
+  proves the encrypted envelope persists and a second instance reloads it. No keyring,
+  no dbus: the Linux cipher path is the obk1 file key (pure `node:crypto`).
+- **The free model: `opencode/deepseek-v4.1-flash-free`** — OpenCode Zen's free tier of
+  DeepSeek V4.1 Flash (weights GA 2026-09-10, free inside OpenCode since 2026-10-15,
+  MIT weights). Needs **no key and no account**, which fits the headless host: the ACP
+  runtime is the opencode binary itself, so the free tier applies. Confirmed `active`
+  at $0 in the phone's opencode 2.2.5 model list (next to `opencode/hy4-flash-free`;
+  `nvidia/deepseek-ai/deepseek-v4.1-flash` also lists at $0 but needs the NVIDIA key).
+- **Agent creation** — the packaged app creates its first agent during first-run setup,
+  which a headless host does not have; the boot (gated by `OPENBOT_HEADLESS_MODEL`)
+  now creates the "Headless" agent itself (`createAgent` with an initial message — the
+  product flow requires one) and pins provider+model through the same `updateAgent`
+  path the desktop picker uses.
+- **A full turn, measured** (`scripts/free-model-turn.ts`): login over the loopback
+  team API (`POST /v1/auth/login` → Bearer, `OpenBot-Protocol-Version`/`OpenBot-App-Version`
+  negotiation headers), one message through `POST /v1/agents/{id}/messages` (the same
+  route the mobile app uses), reply matched by the delivery id (the receipt's
+  `messageId` is the idempotency id; the thread turn id is `deliveries[0].id`):
+  - boot to model pinned: **12-14 s** (control socket ~2 s of that; packaged host ~17 s
+    to the CLI point)
+  - cold turn overlapping the agent-creation turn: **4.2-5.5 s**; steady-state turn:
+    **2.4-2.6 s** (user message → `final_answer` "headless bun turn ok", completed)
+  - PSS during the turn: server **237 MiB** + ACP runtime **748 MiB across 3
+    processes** — the same opencode binary the packaged server spawns in ACP, so this
+    is the model-runtime cost, identical to native, not headless overhead.
+- 11/11 quality gates PASS (`bun packages/server-headless/scripts/quality-gates.ts`).
+
+Remaining for parity: the WebRTC bridge (the app still connects through the
+maintainer's signal network), the database host child, and the real account login
+(the CLI flow exists; the email login sends a code to the owner's email — not fired
+from the headless test yet).
+
 ## Non-goals for the first milestone
 
 - No Computer Use / GUI automation, desktop notifications, tray/dock, deep links or

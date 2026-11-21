@@ -16,6 +16,8 @@
 //   8 SINGLE    a second instance refuses to steal the control socket.
 //   9 SHUTDOWN  SIGTERM removes the socket file and exits non-hanging.
 //  10 COUNT     report: native modules reused vs stub adapters (informational).
+//  11 CREDENTIALS the REAL ProviderCredentialStore round-trips the encrypted envelope
+//               through the file-key cipher and a second instance reloads it.
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from "node:fs";
@@ -113,6 +115,30 @@ await systemOverhead("setup", async () => {
   };
   report("4 RESTORE", "real manager restores signed_in", state?.status === "signed_in", `state=${state?.status}`);
   void CentralAuthManager;
+});
+
+// --- gate 11: the real provider credential store (encrypted envelope, file-key) -----------
+await systemOverhead("credentials", async () => {
+  const { ProviderCredentialStore } = await import(join(ROOT, "src", "main", "provider-credential-store.ts"));
+  const { createSecretStorage } = await import(join(ROOT, "src", "main", "secret-storage-cipher.ts"));
+  const { Effect } = await import("effect");
+  const path = join(USER_DATA, "openbot-provider-credentials-v1.json");
+  const cipher = createSecretStorage({ keyPath: join(USER_DATA, "secret-storage.key") }).cipher(() => "unavailable");
+  const first = new ProviderCredentialStore(path, cipher);
+  await Effect.runPromise((first as { load(): never }).load());
+  await Effect.runPromise((first as { set(provider: string, key: string): never }).set("kilo", "gates-key"));
+  // A second instance must read the same encrypted envelope through the same file-key,
+  // exactly like the packaged server restart would.
+  const second = new ProviderCredentialStore(path, cipher);
+  await Effect.runPromise((second as { load(): never }).load());
+  const read = (second as { get(provider: string): string | null }).get("kilo");
+  const status = (second as { status(provider: string): string }).status("kilo");
+  report(
+    "11 CREDENTIALS",
+    "real credential store persists and reloads",
+    read === "gates-key" && status === "saved",
+    `round-trip=${read === "gates-key"}, status=${status}`,
+  );
 });
 
 // --- gates 5-9: live server ---------------------------------------------------------------

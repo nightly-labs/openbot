@@ -62,6 +62,32 @@ The reference host is the arm64 phone described in
 KernelSU, zram). Native modules (SQLite, crypto) must be verified under Bun on arm64
 before anything here is trusted.
 
+## A real turn with the free model (milestone 4)
+
+The host now wires the **real `ProviderCredentialStore`** (encrypted
+`openbot-provider-credentials-v1.json` + file-key cipher — no keyring) into the real
+AgentService, and `OPENBOT_HEADLESS_MODEL` pins the first agent's model. The default
+test model is `opencode/deepseek-v4.1-flash-free` (OpenCode Zen's free tier of DeepSeek
+V4.1 Flash): **no key, no account** — the ACP runtime is the opencode binary, so the
+free tier applies as-is.
+
+One full turn, end to end, measured on the phone:
+
+```sh
+bun packages/server-headless/scripts/free-model-turn.ts
+# model=opencode/deepseek-v4.1-flash-free provider=opencode agent=agent-...
+# boot=13772 ms (socket + agents ready + model pinned)
+# login=ok member=... agents=1
+# reply=5536 ms text="headless bun turn ok"
+# pss server=237.2 MiB acp=748.1 MiB (3 child)
+# TURN PASS
+```
+
+That is: `POST /v1/auth/login` over the loopback team API → Bearer →
+`POST /v1/agents/{id}/messages` (the route the mobile app uses) → AgentService →
+ACP → opencode 2.2.5 → the free model → the reply in the conversation. Cold turns
+(overlapping the agent-creation turn) run 4-6 s; steady-state turns 2.4-2.6 s.
+
 ## Verified on the phone (2026-11-21)
 
 - `node:sqlite` with WAL works under Bun/arm64.
