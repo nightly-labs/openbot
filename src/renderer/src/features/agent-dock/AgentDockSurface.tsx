@@ -125,7 +125,7 @@ export function AgentDockSurface() {
   function syncExtent() {
     const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
     const extent =
-      dockShape === null || menuOpen()
+      dockShape === null || pointerIn || menuOpen()
         ? null
         : windowExtent(
             isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
@@ -159,6 +159,7 @@ export function AgentDockSurface() {
 
   const sync = () => {
     updateTuck();
+    if (FITTED_WINDOW) syncExtent();
     const next = { interactive: pointerIn, keyboard: chatOpen || menuOpen() };
     if (next.interactive === sent?.interactive && next.keyboard === sent.keyboard) return;
     sent = next;
