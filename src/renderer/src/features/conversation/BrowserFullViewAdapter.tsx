@@ -20,6 +20,7 @@ export default function BrowserFullViewAdapter() {
     browserTabOwner,
     navigateBrowserTab,
     openBrowserAddress,
+    browserCanDetach,
     openBrowserWindow,
     reloadBrowserTab,
     stopBrowserTab,
@@ -36,9 +37,7 @@ export default function BrowserFullViewAdapter() {
   } = useConversationViewScope();
   const { t } = useText();
   const controls = createBrowserFullViewControls();
-  const canDetach = () =>
-    !props.runtime && (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-view"));
-  const windowOpener = () => (canDetach() ? openBrowserWindow : undefined);
+  const windowOpener = () => (browserCanDetach() ? openBrowserWindow : undefined);
 
   async function saveTeach() {
     const steps = await stopBrowserTeach(true);
@@ -86,8 +85,8 @@ export default function BrowserFullViewAdapter() {
       onStop={(tabId) => void stopBrowserTab(tabId)}
       onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
       onOpenAddress={(url, tabId) => void openBrowserAddress(url, tabId === undefined)}
-      canEnterPip={canDetach()}
-      canOpenWindow={canDetach()}
+      canEnterPip={browserCanDetach()}
+      canOpenWindow={browserCanDetach()}
       onSurface={setBrowserSurfaceElement}
       liveViewTabId={
         props.server?.kind === "remote" && serverSupportsCapability(props.server, "browser-view")

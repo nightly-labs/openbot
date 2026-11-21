@@ -306,8 +306,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   }
 
   function openBrowserWindow() {
-    const mode = activeRightPanel();
-    if (mode === "browser-expanded" || mode === "browser-pip") setActiveRightPanel("none");
+    if (isBrowserScreenMode(activeRightPanel())) showRightPanel("none");
+    deps.setRightPanels(withoutBrowserScreens);
     deps.setBrowserWindowOpen(true);
   }
 
@@ -808,4 +808,16 @@ function samePreview(next: FilePreview, shown: FilePreview): boolean {
     if (next.bytes[index] !== shown.bytes[index]) return false;
   }
   return true;
+}
+
+function isBrowserScreenMode(mode: RightPanelMode): boolean {
+  return mode === "browser-expanded" || mode === "browser-pip";
+}
+
+function withoutBrowserScreens(current: Record<string, RightPanelMode>): Record<string, RightPanelMode> {
+  const entries = Object.entries(current);
+  if (!entries.some(([, mode]) => isBrowserScreenMode(mode))) return current;
+  return Object.fromEntries(
+    entries.map(([agentId, mode]): [string, RightPanelMode] => [agentId, isBrowserScreenMode(mode) ? "none" : mode]),
+  );
 }

@@ -1372,6 +1372,7 @@ export async function createApplicationServices({
     browser,
     preloadPath: join(__dirname, "../preload/index.cjs"),
     iconPath: appIconPath,
+    title: () => language.translate("browser.panel.label"),
     ...(developmentUrl === undefined ? {} : { developmentUrl }),
     onEvent: (event) => {
       const window = windows.getMainWindow();

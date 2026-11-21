@@ -21,6 +21,7 @@ interface DetachedBrowserWindowOptions {
   browser: Pick<BrowserHost, "setPictureInPictureWindow">;
   preloadPath: string;
   iconPath: string;
+  title: () => string;
   developmentUrl?: string | undefined;
   onEvent: (event: BrowserWindowEvent) => void;
   onModel: (window: BrowserWindow, model: BrowserWindowModel) => void;
@@ -76,7 +77,7 @@ export class DetachedBrowserWindow {
       minHeight: DETACHED_BROWSER_MIN_HEIGHT,
       show: false,
       backgroundColor: windowBackgroundColor(DETACHED_BROWSER_DARK_BACKGROUND),
-      title: "OpenBot Browser",
+      title: this.#options.title(),
       icon: this.#options.iconPath,
       webPreferences: {
         preload: this.#options.preloadPath,
@@ -99,8 +100,8 @@ export class DetachedBrowserWindow {
       if (window.isDestroyed()) return;
       this.#options.onEvent({ type: "bounds-changed", bounds: window.getNormalBounds() });
     };
-    window.on("moved", sendBounds);
-    window.on("resized", sendBounds);
+    window.on("move", sendBounds);
+    window.on("resize", sendBounds);
     window.on("closed", () => {
       if (this.#window !== window) return;
       this.#window = null;

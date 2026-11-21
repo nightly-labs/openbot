@@ -2041,6 +2041,8 @@ export function createConversationViewScope(props: ConversationProps) {
   );
 
   const browserWindowShown = () => browserWindowOpen() && props.browserEnabled !== false;
+  const browserCanDetach = () =>
+    !props.runtime && (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-view"));
   createEffect(
     () => ({
       agentId: props.agent?.id,
@@ -2163,8 +2165,12 @@ export function createConversationViewScope(props: ConversationProps) {
 
   let browserWindowServerId: string | undefined;
   createEffect(
-    () => ({ open: browserWindowShown(), serverId: props.server?.id }),
-    ({ open, serverId }) => {
+    () => ({ open: browserWindowShown(), canDetach: browserCanDetach(), serverId: props.server?.id }),
+    ({ open, canDetach, serverId }) => {
+      if (open && !canDetach) {
+        setBrowserWindowOpen(false);
+        return;
+      }
       const runtime = conversationRuntime(props);
       if (!open) {
         if (browserWindowServerId === undefined) return;
@@ -2685,6 +2691,7 @@ export function createConversationViewScope(props: ConversationProps) {
     sidebarFilePreview,
     showBrowserPip,
     browserWindowShown,
+    browserCanDetach,
     openBrowserWindow,
     reattachBrowserWindow,
     showComposerActions,
