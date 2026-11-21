@@ -1,7 +1,7 @@
 import { type MobilePlatformLogoVariant, PlatformLogo } from "@openbot/brand";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { Button, IconButton, X } from "@openbot/ui";
-import { For } from "solid-js";
+import { createSignal, For, onSettled } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -44,8 +44,27 @@ export function SidebarMobileAppCard(props: {
   onDismiss: () => void;
 }) {
   const { t } = useText();
+  const [pointerInSidebar, setPointerInSidebar] = createSignal(false);
+  let section: HTMLElement | undefined;
+  onSettled(() => {
+    const area = section?.closest<HTMLElement>(".sidebar") ?? section;
+    if (!area) return;
+    const enter = () => setPointerInSidebar(true);
+    const leave = () => setPointerInSidebar(false);
+    setPointerInSidebar(area.matches(":hover"));
+    area.addEventListener("pointerenter", enter);
+    area.addEventListener("pointerleave", leave);
+    return () => {
+      area.removeEventListener("pointerenter", enter);
+      area.removeEventListener("pointerleave", leave);
+    };
+  });
   return (
-    <section class="sidebar-mobile-app sidebar-mobile-app-crew" aria-labelledby="sidebar-mobile-app-title">
+    <section
+      ref={section}
+      class="sidebar-mobile-app sidebar-mobile-app-crew"
+      aria-labelledby="sidebar-mobile-app-title"
+    >
       <IconButton
         class="sidebar-mobile-app-dismiss"
         size="icon-xs"
@@ -64,7 +83,12 @@ export function SidebarMobileAppCard(props: {
               data-lead={index() === LEAD_INDEX ? "" : undefined}
               style={{ "--sidebar-crew-index": String(index()) }}
             >
-              <AgentAvatar agent={member} motion="idle" followPointer class="sidebar-mobile-app-crew-avatar" />
+              <AgentAvatar
+                agent={member}
+                motion="idle"
+                followPointer={pointerInSidebar()}
+                class="sidebar-mobile-app-crew-avatar"
+              />
             </span>
           )}
         </For>
