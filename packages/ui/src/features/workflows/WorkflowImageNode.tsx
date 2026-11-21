@@ -1,6 +1,18 @@
 import type { WorkflowMediaInput } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { Button, Download, Film, Image, Maximize2, Mic, Square, Textarea } from "@openbot/ui";
+import {
+  Button,
+  Download,
+  Film,
+  Image,
+  Maximize2,
+  Mic,
+  RotateCcw,
+  Square,
+  Textarea,
+  TriangleAlert,
+  Zap,
+} from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
@@ -9,18 +21,25 @@ import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
 import { VideoPlayer } from "../conversation/VideoPlayer";
 import { usePictureShape } from "./picture-shape";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
-import { resultValue, useBoard } from "./workflow-board";
+import { resultValue, useBoard, type WfnResult } from "./workflow-board";
 import {
   type Aspect,
   BACKGROUND_TEXT,
-  clock,
   KIND_TEXT,
+  type MediaStep,
   RunContent,
   resolutionName,
-  useElapsed,
   useMediaStep,
 } from "./workflow-media-step";
-import { download, NodeShell, NodeToolbar, ToolAction, type WfnInputPort } from "./workflow-node-parts";
+import {
+  clock,
+  download,
+  NodeShell,
+  NodeToolbar,
+  ToolAction,
+  useElapsed,
+  type WfnInputPort,
+} from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
 import { StepSettingsAction } from "./workflow-step-settings";
 
@@ -58,6 +77,41 @@ function videoPorts(
 
 function cardWidth(ratio: number) {
   return ratio < 0.7 ? "240px" : "380px";
+}
+
+function FailedTake(props: { id: string; result: WfnResult; step: MediaStep }) {
+  const board = useBoard();
+  const { t, format } = useText();
+  return (
+    <div class="wfn-media-failed" role="alert">
+      <TriangleAlert class="wfn-media-failed-icon" aria-hidden="true" />
+      <span>{t(props.step.kind() === "video" ? "workflow.video.failed" : "workflow.image.failed")}</span>
+      <Show when={props.result.value}>{(reason) => <span class="wfn-media-failed-reason">{reason()}</span>}</Show>
+      <Show when={board.retryResult}>
+        {(retry) => (
+          <Button
+            variant="secondary"
+            size="sm"
+            class="wfn-media-retry"
+            aria-label={props.step.retryLabel()}
+            disabled={props.step.locked()}
+            onClick={() => retry()(props.id, props.result.id)}
+          >
+            <RotateCcw aria-hidden="true" />
+            {t("workflow.node.retry")}
+            <Show when={props.step.price()}>
+              {(credits) => (
+                <span class="wfn-media-retry-price">
+                  <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+                  {format.number(credits())}
+                </span>
+              )}
+            </Show>
+          </Button>
+        )}
+      </Show>
+    </div>
+  );
 }
 
 function SpecChip(props: { text: string; icon?: JSX.Element }) {
@@ -130,7 +184,17 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const index = images.findIndex((entry) => entry.id === shown?.id);
     setViewer({ images, index: Math.max(0, index), origin: media });
   };
-  const making = () => run.running();
+  const busy = () => run.running() || board.pending(props.id).length > 0;
+  const making = () => {
+    const first = board.pending(props.id)[0];
+    if (!first) return run.running();
+    const shown = board.shown(props.id);
+    return shown === undefined || (shown.id === board.newest(props.id)?.id && shown.at < first.at);
+  };
+  const failedTake = () => {
+    const shown = board.shown(props.id);
+    return shown?.failed ? shown : undefined;
+  };
   const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
   const frameText = () => {
     const size = specs().size;
@@ -196,51 +260,54 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
             </div>
           }
         >
-          <Show
-            when={shownPicture()}
-            fallback={
-              <Show
-                when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
-                fallback={<CardPictureLoading />}
-              >
-                <span class="wfn-media-empty" aria-hidden="true">
-                  <Show when={kind() === "video"} fallback={<Image />}>
-                    <Film />
-                  </Show>
-                </span>
-              </Show>
-            }
-          >
-            {(url) => (
-              <Show
-                when={kind() === "video"}
-                fallback={
-                  <CardPicture
+          <Show when={failedTake()}>{(result) => <FailedTake id={props.id} result={result()} step={step} />}</Show>
+          <Show when={!failedTake()}>
+            <Show
+              when={shownPicture()}
+              fallback={
+                <Show
+                  when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
+                  fallback={<CardPictureLoading />}
+                >
+                  <span class="wfn-media-empty" aria-hidden="true">
+                    <Show when={kind() === "video"} fallback={<Image />}>
+                      <Film />
+                    </Show>
+                  </span>
+                </Show>
+              }
+            >
+              {(url) => (
+                <Show
+                  when={kind() === "video"}
+                  fallback={
+                    <CardPicture
+                      ref={(element) => {
+                        media = element;
+                      }}
+                      src={url()}
+                      alt={prompt() || text("description")}
+                    />
+                  }
+                >
+                  <VideoPlayer
+                    src={url()}
+                    label={prompt() || text("description")}
+                    durationSeconds={specs().duration}
+                    fullControls
+                    loading={videoReady() !== url()}
+                    onMetadata={() => setVideoReady(url())}
+                    onError={() => setVideoReady(url())}
                     ref={(element) => {
                       media = element;
                     }}
-                    src={url()}
-                    alt={prompt() || text("description")}
                   />
-                }
-              >
-                <VideoPlayer
-                  src={url()}
-                  label={prompt() || text("description")}
-                  durationSeconds={specs().duration}
-                  fullControls
-                  loading={videoReady() !== url()}
-                  onMetadata={() => setVideoReady(url())}
-                  onError={() => setVideoReady(url())}
-                  ref={(element) => {
-                    media = element;
-                  }}
-                />
-                <span class="wfn-clip-length" aria-hidden="true">
-                  {clock(specs().duration)}
-                </span>
-              </Show>
-            )}
+                  <span class="wfn-clip-length" aria-hidden="true">
+                    {clock(specs().duration)}
+                  </span>
+                </Show>
+              )}
+            </Show>
           </Show>
         </Show>
         <div class="wfn-overlay wfn-media-overlay" inert>
@@ -289,11 +356,11 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                   <Button
                     size="xs"
                     class="wfn-run-pill"
-                    loading={making()}
+                    loading={busy()}
                     disabled={!step.runnable() || step.locked() || !model()}
                     aria-label={step.runLabel()}
                   >
-                    <RunContent credits={step.price()} />
+                    <RunContent credits={step.total()} takes={step.batch()} />
                   </Button>
                 }
               >

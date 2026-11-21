@@ -189,6 +189,10 @@ const logger = createOpenBotLogger("workflows");
 const GITHUB_CHAIN_RUNS = 3;
 const GITHUB_CHAIN_WINDOW_MS = 10 * 60_000;
 const GITHUB_SELF_WINDOW_MS = 60 * 60_000;
+const CREDIT_MEDIA_AT_ONCE = 4;
+const SUBSCRIPTION_MEDIA_AT_ONCE = 2;
+
+const paysWithCredits = (provider: WorkflowMediaProvider) => provider === "sunra" || provider === "higgsfield";
 
 class WorkflowFailed extends Schema.TaggedError<WorkflowFailed>()("WorkflowFailed", {
   cause: Schema.Defect(),
@@ -397,7 +401,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         const scope = yield* Scope.Scope;
         const lock = yield* Semaphore.make(1);
         const generationLock = yield* Semaphore.make(1);
-        const mediaLock = yield* Semaphore.make(1);
+        const creditMedia = yield* Semaphore.make(CREDIT_MEDIA_AT_ONCE);
+        const subscriptionMedia = yield* Semaphore.make(SUBSCRIPTION_MEDIA_AT_ONCE);
         const { store, runs, github, changed, rearm } = dependencies;
         const now = () => (dependencies.now ?? (() => new Date()))();
         const working = new Map<string, Fiber.Fiber<void>>();
@@ -681,7 +686,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
               : !generateMedia || !model
                 ? Result.fail({ message: sourceText("error.workflow.nodeUnsupported") })
-                : yield* mediaLock
+                : yield* (paysWithCredits(model.provider) ? creditMedia : subscriptionMedia)
                     .withPermit(
                       generateMedia({
                         kind,

@@ -33,9 +33,9 @@ import {
   ASPECT_SHAPE,
   BACKGROUND_TEXT,
   type Background,
-  clock,
   type Frame,
   KIND_TEXT,
+  MEDIA_BATCH_SIZES,
   type MediaStep,
   type MediaStepOption,
   modeNameKey,
@@ -45,9 +45,9 @@ import {
   readableName,
   resolutionName,
   typedSide,
-  useElapsed,
   useMediaStep,
 } from "./workflow-media-step";
+import { clock, useElapsed } from "./workflow-node-parts";
 
 const GAP = 10;
 const TOP_ROOM = 56;
@@ -271,10 +271,16 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
       size || !specs().resolution ? undefined : resolutionName(specs().resolution ?? ""),
       !video() && specs().transparent ? t(BACKGROUND_TEXT.transparent) : undefined,
       video() && step.model()?.voices && step.voice() ? step.voiceText() : undefined,
+      step.batch() > 1 ? t("workflow.media.batchCount", { value: String(step.batch()) }) : undefined,
     ]
       .filter(Boolean)
       .join(" · ");
   };
+  const batches = (): readonly Choice<string>[] =>
+    MEDIA_BATCH_SIZES.map((count) => ({
+      value: String(count),
+      label: t(video() ? "workflow.media.batchVideos" : "workflow.media.batchImages", { count }),
+    }));
   const frames = (): readonly Choice<Frame>[] => [
     ...step.aspects().map((value) => ({ value, label: value, name: t(ASPECT_SHAPE[value]) })),
     ...(step.customAllowed()
@@ -408,6 +414,12 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
             <Show when={step.options().length > 0}>
               <ModelOptions options={step.options()} onChange={step.setOption} />
             </Show>
+            <PickTile
+              label={t("workflow.media.batch")}
+              value={String(step.batch())}
+              options={batches()}
+              onChange={(value) => step.setBatch(Number(value))}
+            />
           </ScrollEdges>
         </Popover.Content>
       </Popover.Portal>
@@ -544,7 +556,7 @@ function RunButton(props: { step: MediaStep; id: string; ready: boolean }) {
             aria-label={step.runLabel()}
             onClick={step.run.start}
           >
-            <RunContent credits={step.price()} />
+            <RunContent credits={step.total()} takes={step.batch()} />
           </Button>
         }
       >
