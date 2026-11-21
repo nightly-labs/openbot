@@ -272,12 +272,18 @@ interface CustomOptions {
 
 const PLAN_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._+-]{0,58}[A-Za-z0-9.+]?$/u;
 const PRICE_PATTERN = /^\d{1,6}(?:\.\d{2})?$/u;
+const CUSTOM_PLAN_OPTIONS = ["price", "currency", "interval", "vcpu", "memory", "storage"] as const;
 const CUSTOM_CHECKOUT_OPEN_MS = 35 * 60 * 1000;
 const PAID_STATUSES_SQL = `(${CUSTOM_SERVER_PAID_STATUSES.map((status) => `'${status}'`).join(", ")})`;
 
 function customPlanOption(option: (name: string) => string | undefined, support: boolean): CustomServerPlan | null {
   const name = option("plan");
-  if (name === undefined) return null;
+  if (name === undefined) {
+    if (support || CUSTOM_PLAN_OPTIONS.some((planOption) => option(planOption) !== undefined)) {
+      throw new Error("Give --plan=<name> with the plan options, or remove them.");
+    }
+    return null;
+  }
   const price = option("price") ?? "";
   if (!PLAN_NAME_PATTERN.test(name) || !PRICE_PATTERN.test(price)) {
     throw new Error(

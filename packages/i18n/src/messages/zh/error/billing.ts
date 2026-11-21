@@ -28,4 +28,5 @@ export const messages = {
   "error.billing.invalidResponse": "账单响应无效。",
   "error.billing.notStripePage": "该账单页面不是 Stripe 页面。",
   "error.billing.customServerOfferMissing": "此服务器没有可付款的方案。",
+  "error.billing.checkoutUnavailable": "现在无法开始付款。请一分钟后重试。",
 } as const satisfies PartialTranslation<typeof source>;

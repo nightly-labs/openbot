@@ -515,7 +515,7 @@ export class StripeClient {
       ...checkoutLineFields(input, input.currency),
       "line_items[0][quantity]": String(input.quantity ?? 1),
       currency: input.currency,
-      allow_promotion_codes: "true",
+      allow_promotion_codes: "priceId" in input ? "true" : "false",
       ui_mode: "hosted",
       origin_context: "web",
       submit_type: "auto",

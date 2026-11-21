@@ -32,4 +32,5 @@ export const messages = {
   "error.billing.invalidResponse": "결제 응답이 올바르지 않아요.",
   "error.billing.notStripePage": "결제 페이지가 Stripe 페이지가 아니에요.",
   "error.billing.customServerOfferMissing": "이 서버에는 결제할 요금제가 없습니다.",
+  "error.billing.checkoutUnavailable": "지금은 결제를 시작할 수 없습니다. 1분 후에 다시 시도하세요.",
 } as const satisfies PartialTranslation<typeof source>;

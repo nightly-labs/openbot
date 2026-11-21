@@ -11,6 +11,7 @@ import {
   AlertContent,
   AlertDescription,
   AlertTitle,
+  ArrowLeft,
   ArrowRight,
   Button,
   Checkbox,
@@ -103,7 +104,7 @@ export function createServerPaywall(input: {
   const [billingChecked, setBillingChecked] = createSignal(input.billingDetails === undefined);
   const [missingBilling, setMissingBilling] = createSignal<MissingBillingDetails | null>(null);
   const [savedBilling, setSavedBilling] = createSignal<BillingDetails | null>(null);
-  const [earlyStart, setEarlyStart] = createSignal(false);
+  const [earlyStartFor, setEarlyStartFor] = createSignal<string | null>(null);
   createEffect(
     () => {
       const current = input.server();
@@ -111,7 +112,7 @@ export function createServerPaywall(input: {
     },
     (paidServerId) => {
       if (paidServerId === null) return;
-      setEarlyStart(false);
+      setEarlyStartFor((serverId) => (serverId === paidServerId ? null : serverId));
       setCheckout((started) =>
         started?.serverId === paidServerId && !started.paid ? { serverId: paidServerId, paid: true } : started,
       );
@@ -144,6 +145,11 @@ export function createServerPaywall(input: {
     const missing = missingBilling();
     return isWithdrawalConsumer(missing ? missing.draft : savedBilling());
   };
+  const earlyStart = () => {
+    const serverId = earlyStartFor();
+    return serverId !== null && serverId === server()?.id;
+  };
+  const setEarlyStart = (requested: boolean) => setEarlyStartFor(requested ? (server()?.id ?? null) : null);
   const readyToSubscribe = () => {
     const missing = missingBilling();
     return (
@@ -373,6 +379,10 @@ function PaywallCheckout(props: { paywall: ServerPaywall; titleId: string }) {
       <h1 id={props.titleId}>{t("server.paywall.checkoutTitle")}</h1>
       <p class="server-paywall-description">{t("server.paywall.checkoutDescription")}</p>
       <div class="server-paywall-actions">
+        <Button variant="ghost" disabled={props.paywall.pending()} onClick={() => props.paywall.dismiss()}>
+          <ArrowLeft aria-hidden="true" />
+          {t("common.back")}
+        </Button>
         <Button
           variant="outline"
           loading={props.paywall.pending()}

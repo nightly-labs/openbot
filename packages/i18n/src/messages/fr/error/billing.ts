@@ -38,4 +38,5 @@ export const messages = {
   "error.billing.invalidResponse": "La réponse de facturation n’est pas valide.",
   "error.billing.notStripePage": "La page de facturation n’est pas une page Stripe.",
   "error.billing.customServerOfferMissing": "Ce serveur n’a aucune offre à payer.",
+  "error.billing.checkoutUnavailable": "Le paiement ne peut pas démarrer maintenant. Réessayez dans une minute.",
 } as const satisfies PartialTranslation<typeof source>;

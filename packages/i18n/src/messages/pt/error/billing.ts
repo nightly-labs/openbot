@@ -33,4 +33,5 @@ export const messages = {
   "error.billing.invalidResponse": "A resposta de cobrança é inválida.",
   "error.billing.notStripePage": "A página de cobrança não é uma página do Stripe.",
   "error.billing.customServerOfferMissing": "Este servidor não tem um plano para pagar.",
+  "error.billing.checkoutUnavailable": "O pagamento não pode começar agora. Tente novamente em um minuto.",
 } as const satisfies PartialTranslation<typeof source>;

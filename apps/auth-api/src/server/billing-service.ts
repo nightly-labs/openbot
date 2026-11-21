@@ -217,6 +217,10 @@ interface SyncedSubscription {
   startedAt: number | null;
 }
 
+interface CustomServerSync {
+  kind: "custom_server";
+}
+
 export interface CustomServerCheckoutRequest {
   user: { id: string; email: string };
   serverId: string;
@@ -1044,7 +1048,9 @@ export class BillingService {
               interval: synced.interval,
               currency: synced.currency,
             }
-          : synced;
+          : synced?.kind === "plan"
+            ? synced
+            : null;
       if (this.#sales) {
         yield* this.#sales.webhook(event, sold, payment).pipe(Effect.mapError(() => new BillingOperationError({})));
       }
@@ -1060,7 +1066,7 @@ export class BillingService {
             .bind(now - WEBHOOK_EVENT_RETENTION_MS),
         ]),
       );
-      if (!this.#sales) yield* this.#trackEvent(event, synced);
+      if (!this.#sales) yield* this.#trackEvent(event, synced?.kind === "custom_server" ? null : synced);
       const mismatch = event.type === "checkout.session.completed" ? checkoutCountryMismatch(event.data.object) : null;
       if (mismatch) {
         console.warn(`billing: ${mismatch}`);
@@ -1114,7 +1120,7 @@ export class BillingService {
     this: BillingService,
     subscriptionId: string,
   ): Effect.fn.Return<
-    SyncedSubscription | LicenseSync | null,
+    SyncedSubscription | LicenseSync | CustomServerSync | null,
     BillingError | BillingOperationError,
     BillingDependencies
   > {
@@ -1123,7 +1129,7 @@ export class BillingService {
     const subscription = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
     if (subscription.metadata[LICENSE_METADATA.kind] === CUSTOM_SERVER_METADATA_KIND) {
       yield* this.#syncCustomServer(subscription, readAt);
-      return null;
+      return { kind: "custom_server" };
     }
     const customerId = subscriptionCustomerId(subscription);
     const price = subscriptionServerItem(subscription)?.price;

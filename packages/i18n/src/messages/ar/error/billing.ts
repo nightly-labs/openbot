@@ -30,4 +30,5 @@ export const messages = {
   "error.billing.invalidResponse": "استجابة الفوترة غير صالحة.",
   "error.billing.notStripePage": "صفحة الفوترة ليست صفحة Stripe.",
   "error.billing.customServerOfferMissing": "لا توجد خطة للدفع لهذا الخادم.",
+  "error.billing.checkoutUnavailable": "لا يمكن بدء الدفع الآن. حاول مرة أخرى بعد دقيقة.",
 } as const satisfies PartialTranslation<typeof source>;

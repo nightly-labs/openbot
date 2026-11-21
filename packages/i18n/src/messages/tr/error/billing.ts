@@ -33,4 +33,5 @@ export const messages = {
   "error.billing.invalidResponse": "Faturalandırma yanıtı geçersiz.",
   "error.billing.notStripePage": "Faturalandırma sayfası bir Stripe sayfası değil.",
   "error.billing.customServerOfferMissing": "Bu sunucunun ödenecek bir planı yok.",
+  "error.billing.checkoutUnavailable": "Ödeme şu anda başlatılamıyor. Bir dakika sonra yeniden deneyin.",
 } as const satisfies PartialTranslation<typeof source>;

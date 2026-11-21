@@ -62,7 +62,7 @@ function offerNotFound(): BillingError {
 }
 
 function billingUnavailable(): BillingError {
-  return new BillingError(503, "billing_unavailable", "Billing is not available.");
+  return new BillingError(503, "billing_unavailable", sourceText("error.billing.checkoutUnavailable"));
 }
 
 export class CustomServerOffers {
@@ -113,7 +113,7 @@ export class CustomServerOffers {
     );
     if (stored.meta.changes !== 1) {
       yield* billing.closeCheckout(session.sessionId).pipe(Effect.ignore);
-      return yield* new BillingError(409, "custom_server_conflict", "Try the request again.");
+      return yield* new BillingError(409, "custom_server_conflict", sourceText("error.billing.checkoutUnavailable"));
     }
     return { checkoutUrl: session.url };
   });
