@@ -309,8 +309,18 @@ try {
     assert.deepEqual(scheduler.wokenWaits(wakeDeliveryId), [], "Each wait of the side-thread message is closed.");
     const sidePrompt = promptText(agent.id, wakeDeliveryId);
     assert.ok(!sidePrompt.includes("Perform the task below now"), "The closed wait does not start a second run.");
-    await finish(agent.id, [run.deliveryId, wakeDeliveryId]);
-    return { runDelivery: run.deliveryId, sideDelivery: wakeDeliveryId };
+    const handoff = await runCauseEffect(
+      scheduler.enqueueHandoff({
+        run,
+        agentId: agent.id,
+        text: "Publish the build notes.",
+        idempotencyKey: `handoff:${run.id}`,
+      }),
+    );
+    assert.equal(scheduler.continuesWait(handoff), false, "A routine flow handoff is not a wait message.");
+    assert.ok(promptText(agent.id, handoff).includes("Perform the task below now"), "A handoff does its task.");
+    await finish(agent.id, [run.deliveryId, wakeDeliveryId, handoff]);
+    return { runDelivery: run.deliveryId, sideDelivery: wakeDeliveryId, handoff };
   });
 
   await step("A thread that the agent started is not a side thread for waits", async () => {

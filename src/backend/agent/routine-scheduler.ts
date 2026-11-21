@@ -232,10 +232,10 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   continuesWait(deliveryId: string): boolean {
-    const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
-    if (sender?.kind !== "routine") return false;
-    const run = this.#routines.run(sender.runId);
-    return run !== null && run.deliveryId !== null && run.deliveryId !== deliveryId;
+    const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (delivery?.sender.kind !== "routine" || this.#mailbox.taskIdForDelivery(deliveryId) === null) return false;
+    const run = this.#routines.run(delivery.sender.runId);
+    return run?.agentId === delivery.recipientAgentId && run.deliveryId !== null && run.deliveryId !== deliveryId;
   }
 
   quietRunForDelivery(deliveryId: string): boolean {
