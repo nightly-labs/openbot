@@ -4,6 +4,7 @@ import { loadPhotoQualityPreference, usePhotoQualityPreference } from "@/feature
 
 const PHOTO_LONG_EDGE = 2048;
 const PHOTO_QUALITY = 0.8;
+const CONVERTED_PHOTO_QUALITY = 0.9;
 const SMALL_PHOTO_BYTES = 1024 * 1024;
 
 export async function smallerPhoto(uri: string, name: string): Promise<{ uri: string; name: string }> {
@@ -40,6 +41,20 @@ export async function smallerPhoto(uri: string, name: string): Promise<{ uri: st
     return { uri: saved.uri, name: `${name.replace(/\.(jpe?g|heic|heif)$/iu, "")}.jpg` };
   } catch {
     return original;
+  } finally {
+    for (const native of natives) native.release();
+  }
+}
+
+export async function jpegPhoto(uri: string, name: string): Promise<{ uri: string; name: string }> {
+  const natives = new Set<{ release(): void }>();
+  try {
+    const decode = ImageManipulator.manipulate(uri);
+    natives.add(decode);
+    const image = await decode.renderAsync();
+    natives.add(image);
+    const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: CONVERTED_PHOTO_QUALITY });
+    return { uri: saved.uri, name: `${name.replace(/\.(heic|heif)$/iu, "")}.jpg` };
   } finally {
     for (const native of natives) native.release();
   }

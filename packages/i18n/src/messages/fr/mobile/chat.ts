@@ -175,6 +175,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "Remplacer",
   "mobile.chat.attachment.files": "Fichiers",
   "mobile.chat.attachment.photos": "Photos",
+  "mobile.chat.attachment.recentPhoto": "Photo récente",
+  "mobile.chat.attachment.sheetTitle": "Ajouter au chat",
   "mobile.chat.attachment.camera": "Appareil photo",
   "mobile.chat.attachment.useSkill": "Utiliser une compétence ou une app",
   "mobile.chat.attachment.addFailed": "Impossible d’ajouter la pièce jointe",
