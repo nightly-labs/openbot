@@ -242,6 +242,45 @@ is the practical end state.
   full transitive graph; it did not validate Bun compatibility of native addons or run
   a build. Treat as a grounded feasibility signal, not a proven implementation.
 
+### Bootstrap audit result (subagent, 2026-11-21) — the composition is confirmed
+
+- **Minimum boot order** (17 steps, mirrors `index.ts:1412-1858`):
+  env/paths → timezone+logs → secret storage (file key) → `CentralAuthManager.initialize`
+  → `OpenBotDatabase`+`AgentStore`+`MailboxStore`+`AgentTables`+supervisor →
+  `ProviderRuntimeManager`+`ProviderCredentialStore` → `AgentService` →
+  `AutomationServer` (optional) → `TeamStore` → `ServerMemory` → `HostService` →
+  `ServerMode.listen()` (control socket) → publish policy on `centralAuth.on("changed")`
+  → `AgentInitializationGate` → signal teardown.
+- **The 13 Electron symbols** of `application-services.ts:59-73` all have a headless
+  answer: `app.getPath/getVersion/isPackaged` -> XDG + package.json; `BrowserWindow`,
+  `Menu`, `screen`, `webContents`, `desktopCapturer` -> eliminated; `clipboard`, `shell`,
+  `powerMonitor`, `systemPreferences`, `Notification` -> stubs; `nativeImage` -> magic
+  byte sniff; `net` -> native fetch. Plus 3 indirect swaps: `utilityProcess.fork` ->
+  Bun spawn, `safeStorage` -> file key, `account-service-access` -> plain fetch.
+- **Agents do not fork per turn**: one shared ACP client per provider
+  (`provider-drivers.ts:796-826`, `acp-connection.ts:70-89`); `opencode acp` (92 MB PSS)
+  is the stdio bridge and `opencode serve` (356 MB PSS) the real backend — both stay.
+- **RAM estimate for the Bun process: 150-200 MB PSS** (Effect subset + node:sqlite +
+  Bun baseline) vs the 276 MB Electron main, plus ~85 MB of Chromium subprocesses gone:
+  **~135-175 MB saved in the tree**. Labeled estimate until measured.
+- **Risk order:** 1) verify `node:sqlite`/WAL and unix-socket `chmod 0600` under
+  Bun/arm64; 2) fill the `AgentService` options bag; 3) `HeadlessBrowserHost` refusals;
+  4) DB-host spawn swap; 5) WebRTC mobile bridge (or `host.startLoopbackOnly`
+  short-term); 6) routines/workflows second phase; 7) single-instance lock so the
+  Electron server and the Bun server never share one userData at the same time.
+- **Verdict:** viable with one entrypoint + 4 adapters; no server service imports
+  Electron. The complexity lives in the `AgentService` options bag and the mobile
+  WebRTC bridge, not in the control socket or the team API.
+
+### What is already wired in this fork
+
+`packages/server-headless/src/`:
+- `main.ts` — the composition skeleton with real imports, done and TODO sections.
+- `headless-secret-storage.ts` — implements the `obk1` container (AES-256-GCM, same
+  byte format) with `node:crypto`; byte-compatible with the packaged server.
+- `headless-browser-host.ts` — refuses every browser tool ("descarte browser").
+- `headless-database-host.ts` — spawn swap stub (blocked on the compiled entry).
+
 ## Non-goals for the first milestone
 
 - No Computer Use / GUI automation, desktop notifications, tray/dock, deep links or

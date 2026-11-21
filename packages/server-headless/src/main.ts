@@ -1,75 +1,136 @@
-// @openbot/server-headless — research entrypoint (WIP, not functional).
+// @openbot/server-headless — option B entrypoint (WIP; see README and
+// docs/headless-bun-module-roadmap.md).
 //
-// Goal: boot the OpenBot server surface in Bun with no Electron. The sequence below
-// mirrors what the Electron main process wires at startup (src/main/index.ts), with
-// Electron-only parts stubbed or dropped. Confirmed facts from the auth audit are
-// inline; remaining TODOs point at the file that owns each implementation.
+// This is a NEW composition root: it builds the server services directly instead of
+// importing createApplicationServices (which requires a BrowserWindow and imports
+// Electron). Cut points, confirmed by audit:
+//   - application-services.ts (composition)     -> replaced by this file
+//   - secret-storage-cipher.ts (safeStorage)    -> headless-secret-storage.ts
+//   - account-service-access.ts (electron net)  -> native fetch here
+//   - agent-database-host-process.ts (utilityProcess.fork) -> headless-database-host.ts
+//   - AgentService options bag (GUI fields)     -> stubs/null below
 //
-// Nothing here runs against the user data until the audit is complete and the CLI
-// contract is verified. This file is the fork's plan, not a product.
+// Boot order mirrors src/main/index.ts:1412-1858 and application-services.ts:995-4147.
+// Numbers in comments point at the lines this step replaces.
 
-// --- auth contract (CONFIRMED, measured on the host) -----------------------------
-// Login is an opaque Bearer token against https://api.openbot.run (no OAuth, no cookie):
-//   POST /v1/auth/email/start   {email}                  -> {challengeId, expiresAt, resendAt}
-//     (header Idempotency-Key: <uuid4>; definitive errors: invalid_email,
-//      sign_in_code_expired, email_delivery_rate_limited; 429 honors Retry-After)
-//   POST /v1/auth/email/verify {challengeId, code}         -> {sessionToken, user}
-//   GET  /v1/me with Authorization: Bearer ${sessionToken}  (401 = session revoked)
-//   POST /v1/auth/logout                                  (revoke)
-// OPENBOT_AUTH_API_URL overrides the origin (HTTPS or loopback only).
-//
-// Session persistence (CONFIRMED): ~/.config/OpenBot/openbot-central-auth-v1.bin holds
-// base64("obk1" || IV(12) || GCM tag(16) || ciphertext) — AES-256-GCM keyed by
-// ~/.config/OpenBot/secret-storage.key (base64 32B, created by the app itself).
-// The plaintext JSON is {version: 2, sessionToken, teamHostTokens, mobileConnectLink?,
-// user?}. No gnome-keyring involved on this host: the app's own fallback cipher
-// (src/main/secret-storage-cipher.ts) owns the format. node:crypto covers all of it.
-//
-// Control socket (CONFIRMED): /run/openbot/control.sock, HTTP over unix socket,
-// GET /v1/status and POST /v1/login/{start,verify,claim}, /v1/name, /v1/mobile-connect,
-// /v1/logout; responses are plain "key=value\n" (src/main/server-mode.ts:249-273).
-// The bash CLI /opt/OpenBot/hosted/openbot parses exactly that, so this module must
-// answer with the same shape.
-//
-// What the mobile app needs beyond login (CONFIRMED scope):
-//   1. TeamStore identity: ~/.config/OpenBot/openbot-team-server-v2.json — serverId +
-//      keypair + owner (src/main/team-store.ts).
-//   2. Host registration: POST /v2/remote/hosts/register {hostId, name,
-//      ownerMembershipId, devicePublicKey, rotateCredential} -> machineToken.
-//   3. Publication: POST /v2/remote/hosts/{hostId}/ticket {machineToken} ->
-//      {ticket (JWT ES256), signalUrl}; connect the signal WebSocket -> online.
-//   4. WebRTC peer-to-peer: the app reaches the Team API (122 routes,
-//      src/main/team-api-server.ts) through a WebRTC data channel, never direct TCP.
-//      This is the heaviest piece; it is what makes the server "online" for the phone.
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { Effect } from "effect";
+import { runCauseEffect } from "../../../src/backend/effect-boundary";
 
-// --- planned boot sequence --------------------------------------------------------
-// 1. Read env: OPENBOT_SERVER=1, XDG_RUNTIME_DIR, OPENBOT_AUTH_API_URL.
-// 2. Load or create secret-storage.key; decrypt openbot-central-auth-v1.bin.
-// 3. Bind /run/openbot/control.sock; serve the /v1 routes with key=value responses.
-// 4. If no session: CLI login flow (email -> code -> verify), persist obk1 format.
-// 5. Build the backend service graph (agent database host, AgentService, ACP registry,
-//    provider runtime opencode over stdio) — instantiation order pending the
-//    bootstrap audit of application-services.ts.
-// 6. Start TeamApiServer on 127.0.0.1 (122 routes, zero Electron imports).
-// 7. HostService publish: register + ticket + signal WebSocket -> online for the app.
-// 8. WebRTC host peer serving the Team API over a data channel.
+// --- 0. paths (replaces app.getPath/app.setName, index.ts:300-314) ----------------
+const appData = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
+const userData = join(appData, "OpenBot");
+const appVersion = "0.75.0"; // TODO read from package.json (replaces app.getVersion)
+const controlSocketPath = join(process.env.XDG_RUNTIME_DIR ?? "/run/openbot", "control.sock");
 
-// --- what we stub (Electron symbols used by application-services) ------------------
-// app.getPath/getVersion/isPackaged -> XDG dirs + package.json version.
-// powerMonitor/screen/Notification/Menu/shell -> no-ops on a server.
-// BrowserWindow/WebContentsView/desktopCapturer -> unavailable; browser feature dropped.
+// --- 1. timezone + logs (reuse, no Electron; index.ts:315-318, application-services.ts:995-1001)
+import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "../../../src/main/server-timezone-preference-store";
+import { startProviderLog } from "../../../src/main/provider-log";
+// TODO: startAgentLog / startAccountLog / startMainLog from the same module family.
+applyServerTimezone(join(userData, SERVER_TIMEZONE_PREFERENCE_FILE), process.env);
+startProviderLog(join(userData, "logs"));
 
-// --- what we drop -------------------------------------------------------------------
-// windows, IPC groups, preload/renderer, URL schemes, tray/dock, Computer Use,
-// openbot_browser, deep links, desktop notifications, dbus, Xvfb, gnome-keyring.
+// --- 2. secret storage without safeStorage (copy of secret-storage-cipher.ts:42-173
+//        with isEncryptionAvailable()=false, app.isReady()=true; same file formats) --
+import { createHeadlessSecretStorage } from "./headless-secret-storage";
+const secretStorage = createHeadlessSecretStorage({ keyPath: join(userData, "secret-storage.key") });
+const secretCipher = secretStorage.cipher(() => "secure storage unavailable");
+
+// --- 3. CentralAuthManager (rewrites account-service-access.ts:30-67 with native fetch)
+import { CentralAuthManager } from "../../../src/main/central-auth-manager";
+const apiUrl = process.env.OPENBOT_AUTH_API_URL ?? "https://api.openbot.run";
+const centralAuth = new CentralAuthManager({
+  apiUrl,
+  storagePath: join(userData, "openbot-central-auth-v1.bin"),
+  fetch: (input: string, init?: RequestInit) => fetch(input, init),
+  ...secretCipher,
+  keyringChanged: () => secretStorage.madeKeyFile(),
+  confirmSessionAtStart: false, // server mode (application-services.ts:1128)
+} as never); // TODO: match the real constructor options of central-auth-manager.ts:190
+await runCauseEffect(centralAuth.initialize() as never); // restores the obk1 session
+
+// --- 4. database + roster (application-services.ts:1180-1190, 1254-1255, 1783-1798)
+// TODO: OpenBotDatabase is node:sqlite — verify DatabaseSync/WAL under Bun on arm64.
+// import { OpenBotDatabase } from "../../../src/backend/openbot-database";
+// import { AgentStore } from "../../../src/backend/agent-store";
+// import { MailboxStore } from "../../../src/backend/mailbox-store";
+// import { AgentTables } from "../../../src/backend/agent-data/agent-tables";
+// import { AgentDatabaseSupervisor } from "../../../src/backend/agent-data/agent-database-supervisor";
+// import { spawnAgentDatabaseHostBun } from "./headless-database-host";
+const database = null as never; // TODO
+const store = null as never; // TODO AgentStore(userData, homedir(), database, defaults)
+const mailbox = null as never; // TODO MailboxStore(userData, store.sharedRoot, store.database)
+const agentTables = null as never; // TODO AgentTables + supervisor with Bun spawn
+
+// --- 5. provider runtime (application-services.ts:1550-1571, 1615-1623) -----------
+// import { ProviderRuntimeManager } from "../../../src/main/provider-runtime-manager";
+// import { ProviderCredentialStore } from "../../../src/main/provider-credential-store";
+const providerRuntimes = null as never; // TODO root = ~/.config/OpenBot/provider-runtimes
+const providerCredentials = null as never; // TODO same file names as the desktop host
+
+// --- 6. AgentService (application-services.ts:1961-2175; GUI options -> stub/null)
+import { AgentService } from "../../../src/backend/agent-service";
+import { HeadlessBrowserHost } from "./headless-browser-host";
+const service = new AgentService({
+  store,
+  mailbox,
+  browser: new HeadlessBrowserHost(), // refuses browser ops on a headless host
+  screenCapture: null, // constructor accepts null (application-services.ts:2020-2022)
+  // TODO: fill the full options bag (avatarDecoder, credentials, preferredProvider,
+  // videoReader, feedback, hostedSites, skills, providerAccounts, ...)
+} as never);
+
+// --- 7. automation + team store + memory (2177-2195, 2581-2585, 1268-1275) -------
+// import { AutomationServer } from "../../../src/main/automation-server";
+// import { TeamStore } from "../../../src/main/team-store";
+// import { ServerMemory } from "../../../src/main/server-memory";
+const teamStore = null as never; // TODO openbot-team-server-v2.json (same file as desktop)
+const hostMemory = null as never; // TODO ServerMemory({ hostedPlan: false, ... })
+const automation = null as never; // TODO second phase if needed
+
+// --- 8. HostService: owns TeamApiServer, listens on 127.0.0.1 ---------------------
+// import { HostService } from "../../../src/main/host-service";
+const host = null as never;
+// TODO: HostService({ appVersion, store: teamStore, agents: service, mailbox,
+//   registerRemoteHost: (i) => centralAuth.registerRemoteHost(i),
+//   issueRemoteHostTicket: (h) => centralAuth.issueRemoteHostTicket(h), ... })
+// Short-term alternative until WebRTC exists: host.startLoopbackOnly (host-service.ts:1136).
+
+// --- 9. ServerMode: control socket, the /v1 routes (server-mode.ts:92-141) -------
+// import { ServerMode } from "../../../src/main/server-mode";
+const serverMode = null as never;
+// TODO: new ServerMode({ environment: { controlSocketPath, setupPagePort: null },
+//   version: appVersion, centralAuth, host, memory: { ... } })
+// await runCauseEffect(serverMode.listen()); // application-services.ts:4101-4104
+
+// --- 10. publish policy (index.ts:1652-1670) --------------------------------------
+// centralAuth.on("changed", (state) => {
+//   if (state.status === "signed_in") void serverMode.publish(true);
+//   if (state.status === "signed_out") void host.stop(false);
+// });
+
+// --- 11. agent initialization gate (application-services.ts:3925-3938) ------------
+// import { AgentInitializationGate } from "../../../src/main/agent-initialization";
+const agentInitialization = null as never; // TODO: service.initialize + automation.sync
+
+// --- 12. shutdown (index.ts:490-505) -----------------------------------------------
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    void (async () => {
+      // TODO: serverMode.close(), host.stop(false), service teardown, database.close()
+      process.exit(0);
+    })();
+  });
+}
 
 console.log(
   JSON.stringify({
-    status: "scaffold",
+    status: "scaffold-wiring",
     package: "@openbot/server-headless",
-    auth: "confirmed: bearer token + obk1 AES-256-GCM file, no keyring",
-    pending: "bootstrap order, WebRTC host peer",
+    done: ["paths", "timezone+logs", "secret-storage-stub", "central-auth-manager", "browser-host-stub"],
+    todo: ["database", "provider-runtime", "agent-options-bag", "host-service", "server-mode", "publish", "init-gate", "shutdown"],
+    ram_estimate: "150-200 MB PSS vs 276 MB Electron main + 85 MB chromium subprocesses",
     see: "docs/headless-bun-module-roadmap.md",
-    note: "not functional yet",
   }),
 );
