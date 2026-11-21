@@ -1391,6 +1391,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
       setInputRegion: async () => undefined,
+      setExtent: async () => undefined,
       setXWayland: async () => undefined,
       onCloseChat: () => () => undefined,
       listDisplays: async () => [{ id: 1, label: "Built-in Retina Display", primary: true, internal: true }],
