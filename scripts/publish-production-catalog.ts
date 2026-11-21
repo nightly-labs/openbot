@@ -162,6 +162,64 @@ export async function publishProductionCatalog(
   }
 }
 
+interface CatalogListing {
+  label: string;
+  path: string;
+  version: number;
+}
+
+export async function unpublishedCatalogEntries(): Promise<string[]> {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "openbot-production-catalog-check-"));
+  try {
+    const artifactRoot = join(temporaryRoot, "artifacts");
+    await buildProductionCatalog(artifactRoot);
+    const publication = await readPublication(artifactRoot);
+    const listings: CatalogListing[] = [
+      ...publication.skills.map((skill) => ({
+        label: `skill ${skill.slug}`,
+        path: `/v1/skills/${encodeURIComponent(skill.id)}`,
+        version: skill.version,
+      })),
+      ...publication.agents.map((agent) => ({
+        label: `agent ${agent.id.replace("openbot-curated-agent-", "")}`,
+        path: `/v1/marketplace/agents/${encodeURIComponent(agent.id)}`,
+        version: agent.version,
+      })),
+    ];
+    const [live, retired] = await Promise.all([
+      Promise.all(listings.map(async (listing) => ({ ...listing, liveVersion: await fetchLiveVersion(listing.path) }))),
+      Promise.all(
+        publication.retiredAgents.map(async (slug) => ({
+          slug,
+          liveVersion: await fetchLiveVersion(`/v1/marketplace/agents/openbot-curated-agent-${slug}`),
+        })),
+      ),
+    ]);
+    return [
+      ...live.filter(({ liveVersion }) => liveVersion === null).map(({ label }) => `${label} (missing)`),
+      ...retired
+        .filter(({ liveVersion }) => liveVersion !== null)
+        .map(({ slug }) => `retired agent ${slug} (still listed)`),
+      ...live
+        .filter(({ liveVersion, version }) => liveVersion !== null && liveVersion < version)
+        .map(({ label }) => label),
+    ];
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
+async function fetchLiveVersion(path: string): Promise<number | null> {
+  const response = await fetch(new URL(path, productionApiUrl));
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`The live Marketplace answered ${path} with HTTP ${response.status}.`);
+  const value = await response.json();
+  if (!isDynamicRecord(value) || !isNumber(value.version)) {
+    throw new Error(`The live Marketplace sent an invalid listing for ${path}.`);
+  }
+  return value.version;
+}
+
 async function verifyProductionAdmin(token: string): Promise<void> {
   const response = await fetch(new URL("/v1/skills/admin/submissions", productionApiUrl), {
     headers: { authorization: `Bearer ${token}` },
