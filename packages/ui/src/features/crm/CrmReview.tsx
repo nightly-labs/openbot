@@ -1,8 +1,8 @@
 import type { CrmProposal } from "@openbot/contracts/ipc";
-import { Button, CircleCheck, IconButton, X } from "@openbot/ui";
+import { Button, CircleCheck, ConfirmDialog, IconButton, X } from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { AgentAccess, Owner, SideBody } from "./CrmParts";
 import { matches, timeAgo } from "./crm-model";
 import type { CrmViewModel } from "./crm-state";
@@ -31,7 +31,36 @@ function useDecision(crm: CrmViewModel, proposal: () => CrmProposal) {
   return { busy, decide };
 }
 
-function ProposalCard(props: { crm: CrmViewModel; proposal: CrmProposal }) {
+/**
+ * Approves a list of suggestions one at a time and stops at the first one that does not apply. The
+ * list is fixed when the person opens the confirmation, so the count they read is what it approves.
+ */
+function useApproveAll(crm: CrmViewModel, shown: () => CrmProposal[]) {
+  // The list stays while the dialog closes, so its title keeps the count.
+  const [batch, setBatch] = createSignal<{ open: boolean; proposals: CrmProposal[] }>({ open: false, proposals: [] });
+  const [running, setRunning] = createSignal(false);
+  let unmounted = false;
+  onSettled(() => () => {
+    unmounted = true;
+  });
+  const close = () => setBatch((current) => ({ ...current, open: false }));
+  // The panel lists the newest first, so the reversed list starts with the oldest suggestion.
+  const ask = () => setBatch({ open: true, proposals: [...shown()].reverse() });
+  const run = async () => {
+    setRunning(true);
+    try {
+      for (const proposal of batch().proposals) {
+        if (unmounted || !crm.view.agents || !(await crm.decide(proposal, true))) break;
+      }
+    } finally {
+      setRunning(false);
+      close();
+    }
+  };
+  return { batch, running, ask, run, close };
+}
+
+function ProposalCard(props: { crm: CrmViewModel; proposal: CrmProposal; locked: boolean }) {
   const { t, locale } = useText();
   const crm = props.crm;
   const text = useCrmText(crm);
@@ -61,10 +90,15 @@ function ProposalCard(props: { crm: CrmViewModel; proposal: CrmProposal }) {
       <div class="crm-card-actions">
         <Owner crm={crm} id={props.proposal.agentId} label />
         <span class="crm-spacer" />
-        <Button variant="ghost" size="sm" disabled={decision.busy()} onClick={() => void decision.decide(false)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={decision.busy() || props.locked}
+          onClick={() => void decision.decide(false)}
+        >
           {t("crm.review.reject")}
         </Button>
-        <Button size="sm" disabled={decision.busy()} onClick={() => void decision.decide(true)}>
+        <Button size="sm" disabled={decision.busy() || props.locked} onClick={() => void decision.decide(true)}>
           {t("crm.review.approve")}
         </Button>
       </div>
@@ -114,6 +148,7 @@ export function ReviewPanel(props: { crm: CrmViewModel }) {
       )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   );
+  const approveAll = useApproveAll(crm, list);
   return (
     <aside class="crm-side crm-review" aria-labelledby={titleId}>
       <header class="crm-side-head">
@@ -121,6 +156,11 @@ export function ReviewPanel(props: { crm: CrmViewModel }) {
           {t("crm.review.title")}
         </h2>
         <span class="crm-spacer" />
+        <Show when={list().length > 1}>
+          <Button variant="outline" size="sm" disabled={approveAll.running()} onClick={approveAll.ask}>
+            {t("crm.review.approveAll")}
+          </Button>
+        </Show>
         <AgentAccess crm={crm} />
         <IconButton label={t("crm.panel.close")} variant="ghost" size="icon-sm" onClick={() => crm.closePanel()}>
           <X aria-hidden="true" />
@@ -137,10 +177,21 @@ export function ReviewPanel(props: { crm: CrmViewModel }) {
           }
         >
           <ol class="crm-cards">
-            <For each={list()}>{(proposal) => <ProposalCard crm={crm} proposal={proposal} />}</For>
+            <For each={list()}>
+              {(proposal) => <ProposalCard crm={crm} proposal={proposal} locked={approveAll.running()} />}
+            </For>
           </ol>
         </Show>
       </SideBody>
+      <ConfirmDialog
+        open={approveAll.batch().open}
+        tone="default"
+        title={t("crm.review.approveAllTitle", { count: approveAll.batch().proposals.length })}
+        description={t("crm.review.approveAllBody")}
+        confirmLabel={t("crm.review.approveAll")}
+        onCancel={approveAll.close}
+        onConfirm={approveAll.run}
+      />
     </aside>
   );
 }
