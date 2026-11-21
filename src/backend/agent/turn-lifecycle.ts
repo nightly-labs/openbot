@@ -890,6 +890,14 @@ export class TurnLifecycle {
     if (taskId !== null) this.#hooks.taskFailed(taskId, failover.message);
   }
 
+  #showsRefusedCredential(agentId: string, threadId: string, failover: HeldProviderError): boolean {
+    return (
+      failover.context.causeCode === "authentication" &&
+      !failover.quiet &&
+      this.#taskForThread(agentId, threadId) === null
+    );
+  }
+
   #holdNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
@@ -1109,7 +1117,7 @@ export class TurnLifecycle {
   #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
     const resetDelayMs = providerResetDelayMs(failover.message);
     const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
-    this.#usageLimits.failed(agentId, model, resetDelayMs, spent);
+    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, failover.context.causeCode === "authentication");
   }
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {
@@ -2190,7 +2198,9 @@ export class TurnLifecycle {
         return;
       }
       if (failover && (failedOver || runsAgainHere) && failedKey !== null) {
-        this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
+        if (failedOver && this.#showsRefusedCredential(agentId, threadId, failover))
+          this.#hooks.emitError("agent_error", failover.message, agentId, failover.context, failover.link);
+        else this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
         for (const { delivery } of deliveries) {
           const failed = this.#failoverRetries.get(delivery.id) ?? new Set<string>();
           this.#failoverRetries.set(delivery.id, failed.add(failedKey));

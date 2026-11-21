@@ -1461,7 +1461,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                   });
                   const resetDelayMs = providerResetDelayMs(failed.message);
                   const spent = resetDelayMs === null && isBalanceDiagnostic(failed.message);
-                  this.#usageLimits.failed(lead.id, lead.model, resetDelayMs, spent);
+                  this.#usageLimits.failed(
+                    lead.id,
+                    lead.model,
+                    resetDelayMs,
+                    spent,
+                    failed.causeCode === "authentication",
+                  );
                 }
                 return Effect.void;
               }),
