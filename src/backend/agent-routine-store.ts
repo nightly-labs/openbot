@@ -159,6 +159,10 @@ export class AgentRoutineStore extends RoutineStore {
     return toRun(this.updateRunRow(runId, status, error));
   }
 
+  skippedBefore(run: RoutineRun): { count: number; error: string | null }[] {
+    return this.skippedRowsBefore(run.agentId, run.routineId, run.id, run.createdAt);
+  }
+
   runForDelivery(deliveryId: string): RoutineRun | null {
     const run = this.runForHandleRow(deliveryId);
     return run ? toRun(run) : null;

@@ -52,7 +52,7 @@ import {
   type ConversationTransaction,
   withDatabaseTransaction,
 } from "./conversation-runtime";
-import { failedRunReason, routineStatusForDelivery } from "./delivery-content";
+import { failedRunReason, routineStatusForDelivery, type SkippedRoutineRuns } from "./delivery-content";
 import { quietRoutineRun } from "./routine-quiet-runs";
 import {
   localTimezone,
@@ -195,6 +195,15 @@ export class RoutineScheduler implements RoutineDueSource {
 
   runForDelivery(deliveryId: string): RoutineRun | null {
     return this.#routines.runForDelivery(deliveryId);
+  }
+
+  skippedBefore(run: RoutineRun): SkippedRoutineRuns | null {
+    const rows = this.#routines.skippedBefore(run);
+    if (rows.length === 0) return null;
+    return {
+      count: rows.reduce((total, row) => total + row.count, 0),
+      reasons: [...new Set(rows.map((row) => (row.error ? redactText(row.error) : SKIPPED_WHILE_CLOSED)))],
+    };
   }
 
   workflowRunSource(deliveryId: string): WorkflowRunSource | null {
