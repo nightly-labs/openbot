@@ -32,4 +32,5 @@ export const messages = {
   "error.billing.invalidRequest": "Het factureringsverzoek is ongeldig.",
   "error.billing.invalidResponse": "Het factureringsantwoord is ongeldig.",
   "error.billing.notStripePage": "De factureringspagina is geen Stripe-pagina.",
+  "error.billing.customServerOfferMissing": "Deze server heeft geen abonnement om te betalen.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -27,10 +27,14 @@ they do. This skill adds the rules for an agent.
 
 1. Get the four inputs: the VPS ID, the owner's email, one word for the customer (`a-z`, `0-9`) and
    the server name that the customer sees (6 to 32 characters). Ask for each one that is missing.
+   Also ask for the plan, when the customer pays in the app: the plan name, the price and its
+   currency and interval, and the spec. See
+   [The plan of a custom server](../../../docs/hosted-servers.md#the-plan-of-a-custom-server). To
+   set, change or remove the plan later, use [custom-server-plan](../custom-server-plan/SKILL.md).
    When the developer does not know the VPS ID, run `leaseweb-pool.ts free`: it lists each VPS with no
    reference on the five accounts.
-2. Run the command without `--apply`. Show the plan: the reference, the hostname and the server
-   name. Do not show the email in a message that other people can read.
+2. Run the command without `--apply`. Show the plan: the reference, the hostname, the server
+   name and the offer. Do not show the email in a message that other people can read.
 3. After approval, run it with `--apply`, and write the output to
    `.openbot-build/custom/run-<VPS ID>.log`.
 4. When it stops, read the error and run the same command again. It continues from the step where it

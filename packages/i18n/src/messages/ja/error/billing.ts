@@ -34,4 +34,5 @@ export const messages = {
   "error.billing.invalidRequest": "お支払いのリクエストが無効です。",
   "error.billing.invalidResponse": "お支払いの応答が無効です。",
   "error.billing.notStripePage": "お支払いページが Stripe のページではありません。",
+  "error.billing.customServerOfferMissing": "このサーバーには支払うプランがありません。",
 } as const satisfies PartialTranslation<typeof source>;

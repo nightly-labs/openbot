@@ -2,6 +2,7 @@ import {
   BILLING_CURRENCIES,
   BILLING_METADATA,
   type BillingCurrency,
+  type BillingInterval,
   type BillingStorageTier,
   parseStorageTierPrice,
 } from "@openbot/contracts/billing";
@@ -106,6 +107,26 @@ const checkoutSessionListSchema = Schema.Struct({
   data: Schema.Array(Schema.Struct({ ...checkoutSessionSchema.fields, created: Schema.Int })),
 });
 export type StripeOpenCheckoutSession = (typeof checkoutSessionListSchema.Type)["data"][number];
+
+export interface CheckoutInlinePrice {
+  productName: string;
+  amount: number;
+  interval: BillingInterval;
+}
+
+type CheckoutLine = { priceId: string } | { inlinePrice: CheckoutInlinePrice };
+
+function checkoutLineFields(line: CheckoutLine, currency: BillingCurrency): Record<string, string> {
+  if ("priceId" in line) return { "line_items[0][price]": line.priceId };
+  return {
+    "line_items[0][price_data][currency]": currency,
+    "line_items[0][price_data][unit_amount]": String(line.inlinePrice.amount),
+    "line_items[0][price_data][recurring][interval]": line.inlinePrice.interval,
+    "line_items[0][price_data][tax_behavior]": "exclusive",
+    "line_items[0][price_data][product_data][name]": line.inlinePrice.productName,
+  };
+}
+
 const priceSchema = Schema.Struct({
   id: Schema.String,
   lookup_key: Schema.NullOr(Schema.String),
@@ -470,9 +491,8 @@ export class StripeClient {
 
   readonly createCheckoutSession = Effect.fn("StripeClient.createCheckoutSession")(function* (
     this: StripeClient,
-    input: {
+    input: CheckoutLine & {
       customerId: string;
-      priceId: string;
       currency: BillingCurrency;
       userId: string;
       serverId?: string;
@@ -492,7 +512,7 @@ export class StripeClient {
     const body = new URLSearchParams({
       mode: "subscription",
       customer: input.customerId,
-      "line_items[0][price]": input.priceId,
+      ...checkoutLineFields(input, input.currency),
       "line_items[0][quantity]": String(input.quantity ?? 1),
       currency: input.currency,
       allow_promotion_codes: "true",

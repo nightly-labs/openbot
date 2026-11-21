@@ -467,6 +467,7 @@ export function createWebWorkspace(
     props.accountId,
     {
       accountChanged: props.onSessionCheck,
+      serversChanged: retryHosts,
       accessDenied(id, error) {
         if (!disposed && id === hostId) blockAccess(error);
       },

@@ -169,6 +169,7 @@ import {
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
+import { createServerPaywall } from "@openbot/ui/features/servers/ServerPaywall";
 import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
@@ -622,6 +623,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
         ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
         ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
+        ...(host.paymentRequired ? { paymentRequired: host.paymentRequired } : {}),
+        ...(host.customPlan ? { customPlan: host.customPlan } : {}),
         compatibility: {
           localAppVersion: "web",
           hostAppVersion: incompatibility?.hostAppVersion ?? null,
@@ -637,7 +640,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }),
   );
   const server = createMemo(() => servers().find((item) => item.active));
+  const paywall = createServerPaywall({
+    server,
+    subscribe: (request) => hostedServers.calls.openCustomCheckout(request),
+    billingDetails: createWebBillingCalls(props.accountFetch),
+    errorMessage: (error) => text.errorMessage(error, t("server.paywall.checkoutFailed")),
+  });
   const blockedServer = createMemo(() => {
+    const paywallServer = paywall.server();
+    if (paywallServer) return paywallServer;
     const current = server();
     if (!current) return null;
     return current.state === "incompatible" || serverPlanBlocks(current, hostedServers.planDeletesAt(current.id))
@@ -2797,6 +2808,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               data-web-mobile-pane={mobilePane()}
               compact={compact()}
               blockedServer={blockedServer()}
+              paywall={paywall}
               planDeletesAt={hostedServers.planDeletesAt}
               onRenewPlan={hostedServers.renewPlan}
               initialLoading={hostOffline()}
@@ -3048,7 +3060,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       {...serverActionCallbacks}
                     />
                   </Show>
-                  <Show when={!planScreenShown()}>
+                  <Show when={!planScreenShown() && !paywall.server()}>
                     <Sidebar
                       agentsConnecting={!noHost() && !workspace.state.agentsLoaded}
                       channels={sidebarChannels().filter((channel) => !channel.archived)}

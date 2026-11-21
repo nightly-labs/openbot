@@ -34,4 +34,5 @@ export const messages = {
   "error.billing.invalidRequest": "La richiesta di fatturazione non è valida.",
   "error.billing.invalidResponse": "La risposta di fatturazione non è valida.",
   "error.billing.notStripePage": "La pagina di fatturazione non è una pagina Stripe.",
+  "error.billing.customServerOfferMissing": "Questo server non ha un piano da pagare.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -26,6 +26,11 @@ import {
   storageTierOf,
 } from "@openbot/contracts/billing";
 import type { BillingDetails, BillingDetailsRequest } from "@openbot/contracts/billing-details";
+import {
+  CUSTOM_SERVER_METADATA_KIND,
+  CUSTOM_SERVER_PAID_STATUSES,
+  type CustomServerPlan,
+} from "@openbot/contracts/custom-server-plans";
 import type {
   HostedServerCatalog,
   HostedServerCatalogPlan,
@@ -161,6 +166,7 @@ export interface BillingServiceOptions {
   fetch: StripeFetch;
   now?: () => number;
   onSubscriptionSynced?: (sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>;
+  onCustomServerChanged?: (hostId: string) => Effect.Effect<void, RemoteFailure>;
   onServerRefunded?: (refund: ServerRefund) => Effect.Effect<void, HostedFailure>;
   onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
   analytics?: AccountAnalytics;
@@ -211,6 +217,15 @@ interface SyncedSubscription {
   startedAt: number | null;
 }
 
+export interface CustomServerCheckoutRequest {
+  user: { id: string; email: string };
+  serverId: string;
+  plan: CustomServerPlan;
+  target: BillingReturnTarget;
+  origin: string;
+  earlyStartAt?: number;
+}
+
 export interface CheckoutRequest {
   user: { id: string; email: string };
   serverId: string;
@@ -232,6 +247,7 @@ class BillingDependencies extends Context.Service<
     stripe: StripeClient;
     now: () => number;
     onSubscriptionSynced: ((sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>) | null;
+    onCustomServerChanged: ((hostId: string) => Effect.Effect<void, RemoteFailure>) | null;
     onServerRefunded: ((refund: ServerRefund) => Effect.Effect<void, HostedFailure>) | null;
     analytics: AccountAnalytics;
   }
@@ -273,6 +289,7 @@ export class BillingService {
       stripe,
       now,
       onSubscriptionSynced,
+      onCustomServerChanged: options.onCustomServerChanged ?? null,
       onServerRefunded: options.onServerRefunded ?? null,
       analytics: this.#analytics,
     });
@@ -541,6 +558,44 @@ export class BillingService {
             amount: licenseAmount,
           });
       }
+      return { sessionId: session.id, url: session.url };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly createCustomServerCheckout = Effect.fn("BillingService.createCustomServerCheckout")(
+    function* (
+      this: BillingService,
+      request: CustomServerCheckoutRequest,
+    ): Effect.fn.Return<{ sessionId: string; url: string }, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      yield* this.license.assertCurrency(request.user.id, request.plan.currency);
+      const customerId = yield* this.ensureCustomer(request.user);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
+      const returnUrl = customServerReturnUrl(request.origin, request.target);
+      const session = yield* this.#stripeCall(() =>
+        dependencies.stripe.createCheckoutSession({
+          customerId,
+          inlinePrice: {
+            productName: `OpenBot ${request.plan.name}`,
+            amount: request.plan.amount,
+            interval: request.plan.interval,
+          },
+          currency: request.plan.currency,
+          userId: request.user.id,
+          serverId: request.serverId,
+          tax,
+          metadata: {
+            [LICENSE_METADATA.kind]: CUSTOM_SERVER_METADATA_KIND,
+            ...(request.earlyStartAt === undefined
+              ? {}
+              : { [EARLY_START_METADATA]: new Date(request.earlyStartAt).toISOString() }),
+          },
+          successUrl: returnUrl,
+          cancelUrl: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}cancelled=1`,
+          nowSeconds: Math.floor(dependencies.now() / 1_000),
+        }),
+      );
       return { sessionId: session.id, url: session.url };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1066,6 +1121,10 @@ export class BillingService {
     const dependencies = yield* BillingDependencies;
     const readAt = dependencies.now();
     const subscription = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
+    if (subscription.metadata[LICENSE_METADATA.kind] === CUSTOM_SERVER_METADATA_KIND) {
+      yield* this.#syncCustomServer(subscription, readAt);
+      return null;
+    }
     const customerId = subscriptionCustomerId(subscription);
     const price = subscriptionServerItem(subscription)?.price;
     if (!price && subscriptionLicenseItem(subscription)) {
@@ -1202,6 +1261,49 @@ export class BillingService {
     }
     yield* finish;
     return synced;
+  });
+
+  readonly #syncCustomServer = Effect.fn("BillingService.syncCustomServer")(function* (
+    subscription: StripeSubscription,
+    readAt: number,
+  ): Effect.fn.Return<void, BillingError | BillingOperationError, BillingDependencies> {
+    const dependencies = yield* BillingDependencies;
+    const metadataServerId = subscription.metadata[BILLING_METADATA.serverId];
+    const serverId = metadataServerId && SERVER_ID_PATTERN.test(metadataServerId) ? metadataServerId : null;
+    if (!serverId) {
+      console.warn("billing: custom server subscription has no server", { subscriptionId: subscription.id });
+      return;
+    }
+    const paid = CUSTOM_SERVER_PAID_STATUSES.map(() => "?").join(", ");
+    const stored = yield* billingCall(() =>
+      dependencies.database
+        .prepare(
+          `UPDATE custom_server_offers
+              SET stripe_subscription_id = ?, subscription_status = ?, checkout_session_id = NULL, updated_at = ?
+            WHERE host_id = ?
+              AND (stripe_subscription_id IS NULL OR stripe_subscription_id = ?
+                OR subscription_status IS NULL OR subscription_status NOT IN (${paid}))
+              AND (stripe_subscription_id IS NOT ? OR subscription_status IS NOT ?)`,
+        )
+        .bind(
+          subscription.id,
+          subscription.status,
+          readAt,
+          serverId,
+          subscription.id,
+          ...CUSTOM_SERVER_PAID_STATUSES,
+          subscription.id,
+          subscription.status,
+        )
+        .run(),
+    );
+    if (stored.meta.changes !== 1) return;
+    const changed = dependencies.onCustomServerChanged;
+    if (changed) {
+      yield* changed(serverId).pipe(
+        Effect.mapError((error) => (error instanceof BillingError ? error : new BillingOperationError({}))),
+      );
+    }
   });
 
   readonly #firstPlanStarted = Effect.fn("BillingService.firstPlanStarted")(
@@ -1470,6 +1572,11 @@ function plansUnavailable(): BillingError {
 
 function checkoutReturnUrl(origin: string, target: BillingReturnTarget, serverId: string): string {
   if (target === "web") return `${origin}/app?hosting=checkout&hosted_server=${encodeURIComponent(serverId)}`;
+  return `${origin}/billing/return?kind=plan`;
+}
+
+function customServerReturnUrl(origin: string, target: BillingReturnTarget): string {
+  if (target === "web") return `${origin}/app?hosting=custom`;
   return `${origin}/billing/return?kind=plan`;
 }
 

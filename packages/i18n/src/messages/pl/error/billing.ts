@@ -33,4 +33,5 @@ export const messages = {
   "error.billing.invalidRequest": "Żądanie rozliczeniowe jest nieprawidłowe.",
   "error.billing.invalidResponse": "Odpowiedź rozliczeniowa jest nieprawidłowa.",
   "error.billing.notStripePage": "Strona rozliczeń nie jest stroną Stripe.",
+  "error.billing.customServerOfferMissing": "Ten serwer nie ma planu do opłacenia.",
 } as const satisfies PartialTranslation<typeof source>;

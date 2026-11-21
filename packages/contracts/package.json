@@ -35,6 +35,7 @@
     "./conversation-narration": "./src/conversation-narration.ts",
     "./conversation-order": "./src/conversation-order.ts",
     "./conversation-read": "./src/conversation-read.ts",
+    "./custom-server-plans": "./src/custom-server-plans.ts",
     "./hosted-servers": "./src/hosted-servers.ts",
     "./hosted-sites": "./src/hosted-sites.ts",
     "./host-grant": "./src/host-grant.ts",

@@ -31,4 +31,5 @@ export const messages = {
   "error.billing.invalidRequest": "결제 요청이 올바르지 않아요.",
   "error.billing.invalidResponse": "결제 응답이 올바르지 않아요.",
   "error.billing.notStripePage": "결제 페이지가 Stripe 페이지가 아니에요.",
+  "error.billing.customServerOfferMissing": "이 서버에는 결제할 요금제가 없습니다.",
 } as const satisfies PartialTranslation<typeof source>;

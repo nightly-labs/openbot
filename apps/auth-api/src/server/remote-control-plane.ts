@@ -68,6 +68,7 @@ import {
   SERVER_MEMBER_LIMIT_SQL,
 } from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
+import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -884,27 +885,31 @@ export class RemoteControlPlane {
            (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
            (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier,
+           ${CUSTOM_SERVER_OFFER_COLUMNS}
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
+         LEFT JOIN custom_server_offers o ON o.host_id = h.host_id
          WHERE m.user_id = ? AND m.status = 'active'
          ORDER BY h.name, h.host_id`,
           )
           .bind(userId)
-          .all<{
-            host_id: string;
-            name: string;
-            logo_key: string | null;
-            appearance_shape: string | null;
-            appearance_color: string | null;
-            device_public_key: string | null;
-            auth_epoch: number;
-            membership_id: string;
-            role: RemoteMemberRole;
-            hosted_plan: string | null;
-            operator_host: string | null;
-            hosted_storage_tier: number | null;
-          }>(),
+          .all<
+            {
+              host_id: string;
+              name: string;
+              logo_key: string | null;
+              appearance_shape: string | null;
+              appearance_color: string | null;
+              device_public_key: string | null;
+              auth_epoch: number;
+              membership_id: string;
+              role: RemoteMemberRole;
+              hosted_plan: string | null;
+              operator_host: string | null;
+              hosted_storage_tier: number | null;
+            } & CustomServerOfferRow
+          >(),
       );
       const keyHandovers = yield* this.#keyHandoversByHost({
         sql: "host_id IN (SELECT host_id FROM remote_memberships WHERE user_id = ? AND status = 'active')",
@@ -930,6 +935,7 @@ export class RemoteControlPlane {
               hosted: row.hosted_plan !== null,
               ...(row.operator_host === null ? {} : { restartAvailable: false }),
               ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
+              ...customServerPayment(row, row.role),
             };
           }),
         { concurrency: "unbounded" },
