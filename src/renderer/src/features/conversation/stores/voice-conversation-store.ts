@@ -143,6 +143,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   const serverKind = deps.serverId === LOCAL_SERVER_ID ? "local" : "remote";
   let ownServer = false;
   const downloadListeners: Array<() => void> = [];
+  let downloadingModel: string | null = null;
   const transcription = () => {
     if (ownServer) return "server";
     return cloud ? "cloud" : "local";
@@ -206,9 +207,16 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   });
 
   function showDownload(status: VoiceModelStatus | SpeechModelStatus): void {
-    if (status.phase !== "downloading" || disposed) return;
+    if (status.modelId !== downloadingModel || status.phase !== "downloading" || disposed) return;
     setState((draft) => {
       draft.downloadProgress = status.progress ?? 0;
+    });
+  }
+
+  function watchDownload(modelId: string): void {
+    downloadingModel = modelId;
+    setState((draft) => {
+      draft.downloadProgress = null;
     });
   }
 
@@ -239,7 +247,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         ),
       ]);
       turnEndSilenceMs = turnPauseMs;
-      if (!server?.routes.speech && (await speech.getSpeechModelStatus()).phase !== "ready") {
+      const speechModel = server?.routes.speech ? null : await speech.getSpeechModelStatus();
+      if (speechModel && speechModel.phase !== "ready") {
+        watchDownload(speechModel.modelId);
         const downloadAt = performance.now();
         const status = await speech.downloadSpeechModel().catch((error: unknown) => {
           analytics.track("speech_model_action", {
@@ -262,7 +272,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         });
         if (status.phase !== "ready") throw new Error(status.message ?? currentText().t("conversation.voice.error"));
       }
-      const [settings, model] = await Promise.all([deps.voice.getSettings(), deps.voice.prepareModel()]);
+      const settings = await deps.voice.getSettings();
+      watchDownload(settings.modelId);
+      const model = await deps.voice.prepareModel();
       if (own !== generation || disposed) return;
       if (model.phase !== "ready")
         throw new Error(currentText().errorMessage(model.message, currentText().t("composer.voice.prepareFailed")));

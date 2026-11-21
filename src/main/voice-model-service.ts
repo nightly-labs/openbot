@@ -372,6 +372,7 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
                     );
                     writtenBytes += result.bytesWritten;
                   }
+                  deadline.extend();
                   const progress = Math.min(
                     100,
                     Math.floor(((completedBytes + receivedBytes) / this.#totalBytes) * 100),
