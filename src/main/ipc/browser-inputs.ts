@@ -257,9 +257,9 @@ function parseTabLabel(value: unknown): BrowserTabLabel {
   if (!isObject(value)) throw new Error("Invalid browser tab profile.");
   return {
     tabId: requireString(value.tabId, "tabId"),
-    name: value.name === null ? null : requireString(value.name, "name"),
+    name: value.name === null ? null : requireString(value.name, "name", INPUT_LIMITS.browserUrl),
     hue: parseAvatarHue(value.hue),
-    ...(value.proxy === undefined ? {} : { proxy: requireString(value.proxy, "proxy") }),
+    ...(value.proxy === undefined ? {} : { proxy: requireString(value.proxy, "proxy", INPUT_LIMITS.browserUrl) }),
   };
 }
 
