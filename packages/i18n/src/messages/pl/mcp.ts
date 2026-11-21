@@ -30,6 +30,8 @@ export const messages = {
   "mcp.signIn.pageDescription": "Ta strona jest otwarta w przeglądarce na: {host}. Zaloguj się tutaj.",
   "mcp.signIn.copyHint": "Jeśli strona się nie wczytuje, skopiuj link i otwórz go w innej przeglądarce.",
   "mcp.signIn.copyLink": "Kopiuj link",
+  "mcp.signIn.pasteHint":
+    "Jeśli logujesz się na innym urządzeniu, skopiuj na końcu adres z jego przeglądarki i wklej go tutaj.",
   "mcp.test.connected": {
     one: "Połączono · {count} narzędzie",
     few: "Połączono · {count} narzędzia",

@@ -45,6 +45,7 @@ import type {
   ChannelRoutine,
   ChannelRoutineRun,
   CodexLiveVoice,
+  CompleteMcpSignInRelayInput,
   ConversationFileSearchPage,
   ConversationMessage,
   ConversationMessageSender,
@@ -332,7 +333,7 @@ import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
 import { type MailboxStore, MESSAGING_LANE } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
-import type { McpSignInOpener } from "./mcp-oauth-provider";
+import type { McpSignInAddressOutcome, McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { MessagePinRefused } from "./message-pins";
@@ -2593,6 +2594,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   mcpSignInLink(input: CancelMcpSignInInput): string | null {
     return this.#mcp.signInLink(input.url);
+  }
+
+  receiveMcpSignInAddress(input: CompleteMcpSignInRelayInput): McpSignInAddressOutcome {
+    return this.#mcp.receiveSignInAddress(input.url, input.address);
   }
 
   signOutMcpServer(input: SignOutMcpServerInput): Effect.Effect<McpSignInState[], AgentLifecycleFailed> {

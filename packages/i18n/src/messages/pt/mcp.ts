@@ -30,6 +30,8 @@ export const messages = {
   "mcp.signIn.pageDescription": "Esta página está aberta no navegador de {host}. Entre aqui.",
   "mcp.signIn.copyHint": "Se a página não carregar, copie o link e abra-o em outro navegador.",
   "mcp.signIn.copyLink": "Copiar link",
+  "mcp.signIn.pasteHint":
+    "Se você entrar em outro dispositivo, copie o endereço que o navegador dele mostra no final e cole-o aqui.",
   "mcp.test.connected": { one: "Conectado · {count} ferramenta", other: "Conectado · {count} ferramentas" },
   "mcp.status.testing": "Testando…",
   "mcp.status.failed": "Falhou",
