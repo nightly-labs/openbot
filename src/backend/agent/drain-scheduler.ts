@@ -269,6 +269,18 @@ export class DrainScheduler {
     ];
   }
 
+  #runningChannelTurns(agentId: string, exceptLaneId: string | null): number {
+    return this.#lanesOf(agentId).filter(
+      (other) => other.taskId !== exceptLaneId && laneChannelId(other.taskId) !== null && this.#laneRunning(other),
+    ).length;
+  }
+
+  #runningTasks(agentId: string, exceptTaskId: string | null): number {
+    return this.#tasks
+      .openTaskIds(agentId)
+      .filter((other) => other !== exceptTaskId && this.#laneRunning({ agentId, taskId: other })).length;
+  }
+
   #laneRunning(lane: Lane): boolean {
     return (
       this.#drainingLanes.has(laneKey(lane)) ||
@@ -360,20 +372,13 @@ export class DrainScheduler {
     )
       return "one-turn";
     const channelId = laneChannelId(taskId);
-    if (
-      channelId !== null &&
-      this.#lanesOf(agentId).some(
-        (other) => other.taskId !== taskId && laneChannelId(other.taskId) !== null && this.#laneRunning(other),
-      )
-    )
+    if (channelId !== null && this.#runningChannelTurns(agentId, taskId) >= this.channelTurnLimit(agentId))
       return "channel-turn";
     const ownTaskId = laneTaskId(lane);
     if (ownTaskId !== null) {
       if (this.#tasks.threadId(ownTaskId) === null) return "task-closed";
-      const running = this.#tasks
-        .openTaskIds(agentId)
-        .filter((other) => other !== ownTaskId && this.#laneRunning({ agentId, taskId: other })).length;
-      if (running >= this.#tasks.limit(agentId)) return "task-limit";
+      const extraChannelTurns = Math.max(0, this.#runningChannelTurns(agentId, null) - 1);
+      if (this.#runningTasks(agentId, ownTaskId) + extraChannelTurns >= this.#tasks.limit(agentId)) return "task-limit";
     }
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (
@@ -438,6 +443,18 @@ export class DrainScheduler {
 
   messagingTurnActive(agentId: string): boolean {
     return this.#ownThreadTurnActive(agentId, true);
+  }
+
+  channelTurnLimit(agentId: string): number {
+    return Math.max(1, this.#tasks.limit(agentId) - this.#runningTasks(agentId, null));
+  }
+
+  channelTurnFull(agentId: string, channelId: string): boolean {
+    const channelLanes = this.#lanesOf(agentId).filter((lane) => laneChannelId(lane.taskId) !== null);
+    return (
+      channelLanes.some((lane) => laneChannelId(lane.taskId) === channelId) ||
+      channelLanes.length >= this.channelTurnLimit(agentId)
+    );
   }
 
   ownChatHold(agentId: string): string | null {

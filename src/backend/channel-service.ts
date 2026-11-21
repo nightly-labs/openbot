@@ -81,7 +81,8 @@ export interface ChannelHooks {
   schedule(agentId: string): void;
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
-  busy(agentId: string): boolean;
+  busy(agentId: string, channelId: string): boolean;
+  channelTurnLimit?(agentId: string): number;
   usageLimited?(agentId: string): boolean;
   retry?(agentId: string): void;
   skipAtLimit?(task: ChannelTask): boolean;
@@ -1091,13 +1092,29 @@ export class ChannelService {
     const root = tasks.get(task.rootTaskId);
     if (root && (root.state === "paused" || root.state === "failed" || root.state === "cancelled")) return true;
     return (
-      assignments.some((assignment) => assignment.agentId === task.ownerAgentId || assignment.taskId === task.id) ||
+      assignments.some(
+        (assignment) =>
+          assignment.taskId === task.id ||
+          (assignment.agentId === task.ownerAgentId && assignment.channelId === task.channelId),
+      ) ||
+      (task.ownerAgentId !== null && this.#agentAtChannelLimit(task.ownerAgentId, assignments)) ||
       assignments.filter((assignment) => assignment.channelId === task.channelId).length >= CHANNEL_PARALLEL_LIMIT ||
       task.dependencies.some((id) => {
         const dependency = tasks.get(id);
         return !dependency || !settled(dependency);
       })
     );
+  }
+
+  #agentAtChannelLimit(agentId: string, assignments: readonly ChannelAssignment[]): boolean {
+    const channelIds = new Set(
+      assignments.filter((assignment) => assignment.agentId === agentId).map((assignment) => assignment.channelId),
+    );
+    return channelIds.size >= this.#channelTurnLimit(agentId);
+  }
+
+  #channelTurnLimit(agentId: string): number {
+    return this.hooks.channelTurnLimit?.(agentId) ?? 1;
   }
 
   #holdPlace(taskId: string): void {
@@ -1112,7 +1129,7 @@ export class ChannelService {
     const ownerAgentId = waiter.ownerAgentId;
     if (waiter.state !== "queued" || !ownerAgentId || this.#deletedChannels.has(waiter.channelId)) return false;
     if (this.#waitsForWork(waiter, tasks, assignments)) return false;
-    if (this.hooks.busy(ownerAgentId) || this.hooks.usageLimited?.(ownerAgentId)) return false;
+    if (this.hooks.busy(ownerAgentId, waiter.channelId) || this.hooks.usageLimited?.(ownerAgentId)) return false;
     const channel = this.store.get(waiter.channelId);
     return (
       !channel.archived &&
@@ -1661,7 +1678,7 @@ export class ChannelService {
         continue;
       }
       if (!task.ownerAgentId) continue;
-      if (this.hooks.busy(task.ownerAgentId)) {
+      if (this.hooks.busy(task.ownerAgentId, channelId)) {
         this.#waitingForAgents.add(channelId);
         continue;
       }
@@ -1898,7 +1915,7 @@ export class ChannelService {
   }
 
   queueHold(agentId: string): QueueHold | null {
-    const reserving = this.store.agentAssignment(agentId, ACTIVE_ASSIGNMENT_STATES);
+    const [reserving] = this.store.agentWork(agentId, ACTIVE_ASSIGNMENT_STATES);
     if (!reserving) return null;
     return {
       reason: "channel-task",
@@ -1935,15 +1952,18 @@ export class ChannelService {
       if (root && (root.state === "paused" || root.state === "failed" || root.state === "cancelled")) return [];
       if (assignments.some((assignment) => assignment.agentId === agentId || assignment.taskId === task.id)) return [];
       if (task.dependencies.some((id) => !dependencySettled(id))) return [];
-      const elsewhere = this.store.agentAssignment(agentId, ACTIVE_ASSIGNMENT_STATES);
-      if (elsewhere)
+      const elsewhere = this.store
+        .agentWork(agentId, ACTIVE_ASSIGNMENT_STATES)
+        .filter((item) => item.channel.id !== channelId);
+      const busyIn = elsewhere[0];
+      if (busyIn && new Set(elsewhere.map((item) => item.channel.id)).size >= this.#channelTurnLimit(agentId))
         return [
           {
             taskId: task.id,
             agentId,
             reason: "agent-busy",
-            channelId: elsewhere.channel.id,
-            channelName: elsewhere.channel.name,
+            channelId: busyIn.channel.id,
+            channelName: busyIn.channel.name,
           },
         ];
       return assignments.length >= CHANNEL_PARALLEL_LIMIT ? [{ taskId: task.id, agentId, reason: "channel-full" }] : [];

@@ -1483,10 +1483,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toChannelOperationError),
       loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
-      busy: (agentId) =>
+      channelTurnLimit: (agentId) => this.#drain.channelTurnLimit(agentId),
+      busy: (agentId, channelId) =>
         this.#channelHeld(agentId) ||
-        this.#mailbox.channelLanes(agentId).length > 0 ||
-        this.#conversation.workingChannelSnapshots(agentId).length > 0 ||
+        this.#drain.channelTurnFull(agentId, channelId) ||
         (this.#tasks.oneTurnAtATime(agentId) &&
           (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
             this.#mailbox.laneActive(agentId, null) ||
