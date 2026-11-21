@@ -4112,7 +4112,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.#store.get(agentId);
     if (!agent?.backupModels?.automatic || this.#mayFailOver(agentId)) return null;
     const current = agentModelChoice(agent);
-    const ends = agent.backupModels.order
+    const returnTo = agent.usageLimitReturn;
+    const ends = (returnTo ? [...agent.backupModels.order, returnTo] : agent.backupModels.order)
       .filter(
         (choice) =>
           !sameAgentModelChoice(choice, current) &&
