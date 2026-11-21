@@ -710,7 +710,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
 
   canReleaseProcess(): boolean {
-    return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
+    return !this.runsBackgroundWork();
+  }
+
+  runsBackgroundWork(): boolean {
+    return [...this.#threads.ids()].some((id) => Boolean(this.#threads.get(id)?.backgroundTasks));
   }
 
   holdsBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
@@ -748,10 +752,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     );
   });
 
-  #emitBackgroundWork(runtime: ThreadRuntime): void {
+  #emitBackgroundWork(runtime: ThreadRuntime, closed = false): void {
     this.emit("notification", {
       method: "openbot/background-work",
-      params: { threadId: runtime.id, running: runtime.backgroundTasks > 0 },
+      params: { threadId: runtime.id, running: runtime.backgroundTasks > 0, ...(closed ? { closed } : {}) },
     });
   }
 
@@ -785,9 +789,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     yield* removeClaudeQueryFile(runtime.settingsFile);
     for (const change of stopSubagents(runtime.subagents, new Date().toISOString()))
       this.#emitSubagents(runtime, change);
-    if (runtime.backgroundTasks > 0) {
+    if (runtime.backgroundTasks > 0 || runtime.awaitsResultTurn) {
       runtime.backgroundTasks = 0;
-      this.#emitBackgroundWork(runtime);
+      runtime.awaitsResultTurn = false;
+      this.#emitBackgroundWork(runtime, true);
     }
     if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
     if (turn && runtime.activeTurn === turn) {

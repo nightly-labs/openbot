@@ -53,7 +53,7 @@ export const messages = {
   "settings.chatBackground.default": "Standaard",
   "settings.chatBackdrop.title": "Vensterachtergrond",
   "settings.chatBackdrop.description":
-    "Een scène, afbeelding of GIF achter het hele venster op dit apparaat. Vraag een agent om een scène en kies dan ‘Als achtergrond gebruiken’ bij zijn antwoord.",
+    "Een scène, afbeelding, GIF of video achter het hele venster op dit apparaat. Vraag een agent om een scène en kies dan ‘Als achtergrond gebruiken’ bij zijn antwoord.",
   "settings.chatBackdrop.none": "Geen",
   "settings.chatBackdrop.pond": "Koivijver",
   "settings.chatBackdrop.jellyfish": "Kwallen",
@@ -61,8 +61,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "Sneeuwval",
   "settings.chatBackdrop.fireflies": "Vuurvliegjes",
   "settings.chatBackdrop.coast": "Neonkust",
-  "settings.chatBackdrop.upload": "Afbeelding uploaden…",
-  "settings.chatBackdrop.uploadRefused": "Gebruik een PNG-, JPEG-, GIF-, WebP- of AVIF-afbeelding van maximaal 20 MB.",
+  "settings.chatBackdrop.upload": "Uploaden…",
+  "settings.chatBackdrop.uploadRefused":
+    "Gebruik een PNG-, JPEG-, GIF-, WebP- of AVIF-afbeelding van maximaal 20 MB, of een MP4- of WebM-video van maximaal 100 MB.",
   "settings.chatBackdrop.saveFailed": "De achtergrond is niet opgeslagen.",
   "settings.chatBackdrop.removeFailed": "De achtergrond is niet verwijderd.",
   "settings.chatColor.title": "Chatkleur",

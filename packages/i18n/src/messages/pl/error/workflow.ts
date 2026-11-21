@@ -18,6 +18,9 @@ export const messages = {
   "error.workflow.agentStepEnded": "Wiadomość do agenta została usunięta, zanim odpowiedział.",
   "error.workflow.agentStepStopped": "Agent zatrzymał się, zanim odpowiedział na ten krok. Uruchom krok ponownie.",
   "error.workflow.conditionUnclear": "Model nie odpowiedział tak ani nie.",
+  "error.workflow.answerInvalid": "Odpowiedź nie miała pól, których wymaga ten krok: {fields}. Uruchom krok ponownie.",
+  "error.workflow.checkInvalid":
+    "Warunek sprawdzenia w tym kroku jest nieprawidłowy. Popraw go i uruchom krok ponownie.",
   "error.workflow.modelFailed": "Model nie mógł odpowiedzieć. Uruchom krok ponownie.",
   "error.workflow.modelTimedOut":
     "Model nie odpowiedział na czas. Wybierz mniejszy wysiłek lub szybszy model dla tego kroku, a potem uruchom go ponownie.",

@@ -499,6 +499,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                       channelIsolation: true,
                       channelPicture: true,
                       channelBrowser: true,
+                      providerManyAccounts: true,
                     })
                   : encodeTeamProtocolV9WebRtcHttpRequest(method, path, init.body, {
                       ...(init.preserveSemanticTags === undefined
@@ -557,6 +558,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelSeenSubtasks: true,
                     channelTaskWaits: true,
                     mcpManyServers: true,
+                    providerManyAccounts: true,
                     routineResultsWhatsApp: true,
                     storageWorkflowFiles: true,
                   })

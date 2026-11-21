@@ -22,7 +22,12 @@ export interface ComposerStoreDeps {
   seenMessageIds: Set<string>;
 }
 
-export function conversationOwnerId(props: ConversationProps): string | undefined {
+type ConversationOwner = {
+  agent?: Pick<NonNullable<ConversationProps["agent"]>, "id"> | undefined;
+  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id"> | undefined;
+};
+
+export function conversationOwnerId(props: ConversationOwner): string | undefined {
   return props.channel?.id ?? props.agent?.id;
 }
 

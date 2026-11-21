@@ -20,6 +20,9 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "De agent is gestopt voordat hij deze stap beantwoordde. Voer de stap opnieuw uit.",
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
+  "error.workflow.answerInvalid":
+    "Het antwoord had niet de velden die deze stap vraagt: {fields}. Voer de stap opnieuw uit.",
+  "error.workflow.checkInvalid": "De controle van deze stap is ongeldig. Corrigeer hem en voer de stap opnieuw uit.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
   "error.workflow.modelTimedOut":
     "Het model antwoordde niet op tijd. Kies een lager denkniveau of een sneller model voor deze stap en voer hem opnieuw uit.",

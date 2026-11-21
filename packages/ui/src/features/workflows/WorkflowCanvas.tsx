@@ -562,6 +562,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const canvas = createBoard({
     focus: () => focusAsset(),
     catalogs: () => props.catalogs,
+    graph: () => graph(),
     buildState: (id) => buildState(id),
     github: () => props.github,
     features: () => props.features,

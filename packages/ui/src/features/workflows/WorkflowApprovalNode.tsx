@@ -1,6 +1,7 @@
 import { Button, Check, CircleCheck, Textarea, UserCheck, X } from "@openbot/ui";
 import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { Field, NodeShell, NodeToolbar, useLocked, useTextField } from "./workflow-node-parts";
 
@@ -56,6 +57,7 @@ export function ApprovalNode(props: { id: string; question?: string }) {
           onValueChange={setQuestion}
         />
       </Field>
+      <AnswerProblems id={props.id} />
       <Show when={waiting()}>
         <div class="wfn-block-actions">
           <Button size="sm" onClick={() => decide(true)}>

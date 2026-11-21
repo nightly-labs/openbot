@@ -51,7 +51,7 @@ export const messages = {
   "settings.chatBackground.default": "ברירת מחדל",
   "settings.chatBackdrop.title": "רקע החלון",
   "settings.chatBackdrop.description":
-    "סצנה, תמונה או GIF מאחורי כל החלון במכשיר הזה. בקשו מסוכן ליצור סצנה, ואז בחרו „שימוש כרקע” בתשובה שלו.",
+    "סצנה, תמונה, GIF או סרטון מאחורי כל החלון במכשיר הזה. בקשו מסוכן ליצור סצנה, ואז בחרו „שימוש כרקע” בתשובה שלו.",
   "settings.chatBackdrop.none": "ללא",
   "settings.chatBackdrop.pond": "בריכת קוי",
   "settings.chatBackdrop.jellyfish": "מדוזות",
@@ -59,8 +59,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "שלג יורד",
   "settings.chatBackdrop.fireflies": "גחליליות",
   "settings.chatBackdrop.coast": "חוף ניאון",
-  "settings.chatBackdrop.upload": "העלאת תמונה…",
-  "settings.chatBackdrop.uploadRefused": "יש להשתמש בתמונת PNG,‏ JPEG,‏ GIF,‏ WebP או AVIF בגודל של עד 20 MB.",
+  "settings.chatBackdrop.upload": "העלאה…",
+  "settings.chatBackdrop.uploadRefused":
+    "יש להשתמש בתמונת PNG,‏ JPEG,‏ GIF,‏ WebP או AVIF בגודל של עד 20 MB, או בסרטון MP4 או WebM בגודל של עד 100 MB.",
   "settings.chatBackdrop.saveFailed": "הרקע לא נשמר.",
   "settings.chatBackdrop.removeFailed": "הרקע לא הוסר.",
   "settings.chatColor.title": "צבע הצ'אט",

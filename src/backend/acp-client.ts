@@ -887,11 +887,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   canReleaseProcess(): boolean {
     if (this.#threads.ids().next().done) return true;
+    if (this.runsBackgroundWork()) return false;
+    return this.#supportsSessionResume || this.#loadsSessions;
+  }
+
+  runsBackgroundWork(): boolean {
     for (const id of this.#threads.ids()) {
       const thread = this.#threads.get(id);
-      if (thread && (thread.workHold || this.#heldByBackgroundSubagent(thread))) return false;
+      if (thread && (thread.workHold || this.#heldByBackgroundSubagent(thread))) return true;
     }
-    return this.#supportsSessionResume || this.#loadsSessions;
+    return false;
   }
 
   callRelayedMcpTool(

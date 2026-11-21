@@ -155,6 +155,8 @@ export const messages = defineMessages("error.team", {
   "error.team.mcpUnsupported": "MCP servers are not supported by this connection.",
   "error.team.mcpServerListNeedsUpdate":
     "Update OpenBot on this device to use more than {limit} MCP servers on this server.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Update OpenBot on this device to use more than {limit} accounts of one provider on this server.",
   "error.team.storageUnsupported": "Storage is not supported by this connection.",
   "error.team.machineResourcesUnsupported": "Machine use is not supported by this connection.",
   "error.team.machineAlertMemberInvalid": "Only an owner or admin of this server can get machine alerts.",

@@ -152,6 +152,8 @@ export const messages = {
   "error.team.mcpUnsupported": "MCP sunucuları bu bağlantı tarafından desteklenmiyor.",
   "error.team.mcpServerListNeedsUpdate":
     "Bu sunucuda {limit} sayısından fazla MCP sunucusu kullanmak için bu cihazdaki OpenBot'u güncelleyin.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Bu sunucuda bir sağlayıcının {limit} sayısından fazla hesabını kullanmak için bu cihazdaki OpenBot'u güncelleyin.",
   "error.team.storageUnsupported": "Depolama bu bağlantı tarafından desteklenmiyor.",
   "error.team.machineResourcesUnsupported": "Makine kullanımı bu bağlantı tarafından desteklenmiyor.",
   "error.team.machineAlertMemberInvalid": "Makine uyarılarını yalnızca bu sunucunun sahibi veya yöneticisi alabilir.",

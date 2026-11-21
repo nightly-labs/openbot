@@ -52,7 +52,7 @@ export const messages = {
   "settings.chatBackground.default": "По умолчанию",
   "settings.chatBackdrop.title": "Фон окна",
   "settings.chatBackdrop.description":
-    "Сцена, изображение или GIF за всем окном на этом устройстве. Попросите агента сделать сцену, затем выберите «Сделать фоном» у его ответа.",
+    "Сцена, изображение, GIF или видео за всем окном на этом устройстве. Попросите агента сделать сцену, затем выберите «Сделать фоном» у его ответа.",
   "settings.chatBackdrop.none": "Нет",
   "settings.chatBackdrop.pond": "Пруд с карпами кои",
   "settings.chatBackdrop.jellyfish": "Медузы",
@@ -60,9 +60,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "Снегопад",
   "settings.chatBackdrop.fireflies": "Светлячки",
   "settings.chatBackdrop.coast": "Неоновое побережье",
-  "settings.chatBackdrop.upload": "Загрузить изображение…",
+  "settings.chatBackdrop.upload": "Загрузить…",
   "settings.chatBackdrop.uploadRefused":
-    "Используйте изображение PNG, JPEG, GIF, WebP или AVIF размером не больше 20 МБ.",
+    "Используйте изображение PNG, JPEG, GIF, WebP или AVIF размером не больше 20 МБ или видео MP4 или WebM размером не больше 100 МБ.",
   "settings.chatBackdrop.saveFailed": "Фон не сохранён.",
   "settings.chatBackdrop.removeFailed": "Фон не удалён.",
   "settings.chatColor.title": "Цвет чата",

@@ -189,6 +189,7 @@ import {
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOW_FOLDERS_CAPABILITY,
   WORKFLOWS_AGENT_FILES_CAPABILITY,
+  WORKFLOWS_ANSWERS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -242,6 +243,7 @@ import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-prot
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
@@ -1159,8 +1161,13 @@ export class TeamApiServer {
       )
         return;
       if (
-        (await routeSignInRelay(context, mcpServers && this.#options.signInRelay, mcpServers, mcpServerOwners)) ===
-        "handled"
+        (await routeSignInRelay(
+          context,
+          mcpServers && this.#options.signInRelay,
+          mcpServers,
+          mcpServerOwners,
+          this.#options.providerAccounts,
+        )) === "handled"
       )
         return;
       if ((await routeConnectors(context, this.#options.connectors)) === "handled") return;
@@ -1284,7 +1291,7 @@ export class TeamApiServer {
       if ((await routeAgentPublish(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAcpRegistry(context, this.#options.admin)) === "handled") return;
       if ((await routeCustomAgents(context, this.#options.admin)) === "handled") return;
-      if ((await routeProviders(context, this.#options.admin)) === "handled") return;
+      if ((await routeProviders(context, this.#options.admin, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUse(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAppearance(context, this.#options.admin)) === "handled") return;
@@ -2380,6 +2387,7 @@ export class TeamApiServer {
       channelSeenSubtasks: route.capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
       channelTaskWaits: route.capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
       mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
+      providerManyAccounts: route.capabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY),
       routineResultsWhatsApp: route.capabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
       storageWorkflowFiles: route.capabilities.has(STORAGE_WORKFLOW_FILES_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
@@ -2827,6 +2835,7 @@ export class TeamApiServer {
         if (capability === WORKFLOWS_STEP_SETTINGS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_AGENT_FILES_CAPABILITY) return this.#options.workflows !== undefined;
+        if (capability === WORKFLOWS_ANSWERS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHATS_CAPABILITY)
           return this.#options.workflows !== undefined && this.#options.admin?.routineResults !== undefined;
         if (

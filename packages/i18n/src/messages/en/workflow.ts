@@ -237,6 +237,22 @@ export const messages = defineMessages("workflow", {
   "workflow.condition.rule": "Rule",
   "workflow.condition.rulePlaceholder": "Describe when the run takes Yes",
   "workflow.condition.taken": "Taken",
+  "workflow.answer.title": "Answer fields",
+  "workflow.answer.placeholder": "priority: high|normal|low\nsummary: text\ncount?: number",
+  "workflow.answer.problem.name": "The line “{line}” has no valid field name.",
+  "workflow.answer.problem.type":
+    "{name} has a type that is not known. Use text, number, yes/no, list or labels such as high|low.",
+  "workflow.answer.problem.labels": "{name} needs two or more labels, such as high|low.",
+  "workflow.answer.problem.duplicate": "{name} is in the list two times.",
+  "workflow.answer.problem.many": "Use 20 fields or fewer.",
+  "workflow.answer.problem.check":
+    "The check is not valid. Write tests such as priority = high, and join them with and or or.",
+  "workflow.answer.problem.field": "No step before this one gives {name}.",
+  "workflow.answer.problem.test": "{name} cannot be compared like this.",
+  "workflow.answer.problem.conflict": "Two steps before this one give {name} with different types.",
+  "workflow.check.title": "Check",
+  "workflow.check.placeholder": "priority = high and count > 2",
+  "workflow.check.fields": "Fields: {names}",
 
   "workflow.output.title": "Output",
   "workflow.output.name": "output",
