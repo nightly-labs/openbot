@@ -1,0 +1,19 @@
+{
+  "name": "@openbot/server-headless",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Research: a Bun-only OpenBot host. No Electron, no Xvfb, no browser. Serves the mobile app and the desktop client over the existing team API and control socket.",
+  "bin": {
+    "openbot-headless": "./src/main.ts"
+  },
+  "scripts": {
+    "start": "bun src/main.ts",
+    "status": "bun src/cli.ts status"
+  },
+  "dependencies": {
+    "@openbot/contracts": "workspace:*",
+    "@openbot/logging": "workspace:*",
+    "effect": "4.0.0"
+  }
+}
