@@ -1,43 +1,79 @@
-// @openbot/server-headless — milestone 1: control socket + account session, Bun only.
+// @openbot/server-headless — milestone 2: the repository's own server modules under Bun.
 //
-// What runs today: restore the obk1 session (byte-compatible with the packaged
-// server), serve the /v1 control surface in the same key=value format, and the
-// email+code login against the account API with native fetch. Everything else in
-// docs/headless-bun-module-roadmap.md is still TODO and stays wired off.
+// With the electron cache shim (see README), this entry now runs the REAL
+// CentralAuthManager (obk1 session), the REAL secret-storage-cipher (file key), and
+// the REAL ServerMode (control socket with the /v1 routes). The host surface is a
+// minimal adapter until HostService wiring lands. No Xvfb, no dbus, no keyring, no
+// window: the process stays what Bun needs and nothing more.
 //
-// Safety: never point this at the real userData while the Electron server runs.
-// Default test root: ~/.config/openbot-headless-test; control socket under
-// /run/openbot-headless-test. Override with OPENBOT_HEADLESS_USER_DATA and
-// OPENBOT_HEADLESS_CONTROL_SOCKET.
+// Safety: defaults to a test userData, never the real ~/.config/OpenBot, so the
+// packaged server and this module never fight over one session.
 
 import { homedir } from "node:os";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { HeadlessAuth } from "./headless-auth";
-import { ControlSocket } from "./control-socket";
+import { readFileSync } from "node:fs";
+import { Effect } from "effect";
 
 const userData = process.env.OPENBOT_HEADLESS_USER_DATA ?? join(homedir(), ".config", "openbot-headless-test");
 const socketDir = process.env.OPENBOT_HEADLESS_CONTROL_DIR ?? "/run/openbot-headless-test";
 const socketPath = join(socketDir, "control.sock");
-const version = "0.0.1-headless";
-
+process.env.OPENBOT_HEADLESS_USER_DATA = userData;
 mkdirSync(userData, { recursive: true });
 mkdirSync(socketDir, { mode: 0o700, recursive: true });
 rmSync(socketPath, { force: true });
 
-const auth = new HeadlessAuth({ userData });
-const state = await auth.restore();
+// --- real repository modules (loaded through the electron cache shim) -------------
+import { createCentralAuthManager, centralAuthApiUrl } from "../../../src/main/account-service-access";
+import { ServerMode } from "../../../src/main/server-mode";
+import { HeadlessHostAdapter } from "./headless-host-adapter";
 
-const control = new ControlSocket({ socketPath, version, auth, serverName: "openbot-headless-test" });
-await control.listen(() => undefined);
+const centralAuth = createCentralAuthManager({ confirmSessionAtStart: false });
+const host = new HeadlessHostAdapter();
 
-console.log(`openbot-headless ${version}`);
-console.log(`account=${state.status}${state.email ? ` (${state.email})` : ""}`);
+function memoryLines(): Record<string, string | number> {
+  const meminfo = readFileSync("/proc/meminfo", "utf8");
+  const available = Number(/^MemAvailable:\s+(\d+)/m.exec(meminfo)?.[1] ?? 0);
+  const total = Number(/^MemTotal:\s+(\d+)/m.exec(meminfo)?.[1] ?? 0);
+  return {
+    memory_level: available > 512 * 1024 ? "ok" : available > 256 * 1024 ? "low" : "critical",
+    memory_free_mib: Math.round(available / 1024),
+    memory_total_mib: Math.round(total / 1024),
+  };
+}
+
+const serverMode = new ServerMode({
+  environment: { controlSocketPath: socketPath, setupPagePort: null },
+  version: "0.0.2-headless",
+  centralAuth: centralAuth as never,
+  host: host as never,
+  memory: {
+    level: () => memoryLines().memory_level as "ok" | "low" | "critical",
+    sample: () => memoryLines(),
+    turnLimit: () => 16,
+  },
+  onError: (message, error) => console.warn(message, error),
+});
+
+const state = await Effect.runPromise(centralAuth.initialize() as never).catch((error) => {
+  console.warn("account initialize failed:", String(error));
+  return null;
+});
+
+await Effect.runPromise(serverMode.listen() as never).catch((error) => {
+  console.error("control socket failed:", String(error));
+  process.exit(1);
+});
+
+console.log(`openbot-headless 0.0.2-headless`);
+console.log(`account=${state ? (state as { status: string }).status : "unknown"}`);
+console.log(`api=${centralAuthApiUrl()}`);
 console.log(`control socket: ${socketPath}`);
-console.log("login flow: curl --unix-socket %s -X POST -d 'email=you@example.com' http://openbot/v1/login/start", socketPath);
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
-    void control.close().finally(() => process.exit(0));
+    void Effect.runPromise(serverMode.close() as never)
+      .catch(() => undefined)
+      .finally(() => process.exit(0));
   });
 }
