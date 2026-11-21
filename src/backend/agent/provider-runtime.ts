@@ -285,6 +285,7 @@ export interface ProviderHooks {
   onProviderHeld?(provider: AgentProvider): void;
   releasePersonWaits?(provider: AgentProvider): void;
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
+  onModelsRelisted?(provider: AgentProvider, configRevision: number): void;
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   onAccountsChanged?(): void;
   onProvidersUnready?(): void;
@@ -3734,6 +3735,10 @@ export class ProviderRuntime implements ProviderPort {
     yield* refreshRuntime;
   });
 
+  configRevision(client: AgentClient): number {
+    return this.#configRevisions.get(client) ?? 0;
+  }
+
   #bindClient(client: AgentClient): void {
     this.#configRevisions.set(client, this.#hooks.captureConfigRevision());
     this.#hooks.bindClient(client);
@@ -4181,6 +4186,8 @@ export class ProviderRuntime implements ProviderPort {
     const lastError = this.#lastErrors.get(provider);
     if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
+    const client = this.#clients.get(provider);
+    if (client) this.#hooks.onModelsRelisted?.(provider, this.configRevision(client));
     return true;
   });
 

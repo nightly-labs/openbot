@@ -115,10 +115,21 @@ export class CustomEndpoints {
   }
 
   serves(modelId: string, provider: AgentProvider): boolean {
-    if (!isCustomProviderHarness(provider)) return true;
+    return this.#releasedAt(modelId, provider) === null;
+  }
+
+  servesClient(modelId: string, provider: AgentProvider, configRevision: number | null): boolean {
+    const releasedAt = this.#releasedAt(modelId, provider);
+    if (releasedAt === null) return true;
+    if (this.#hooks.endpointHarness(modelId.slice(0, modelId.indexOf("/"))) !== provider) return false;
+    return configRevision === null || configRevision >= releasedAt;
+  }
+
+  #releasedAt(modelId: string, provider: AgentProvider): number | null {
+    if (!isCustomProviderHarness(provider)) return null;
     const separator = modelId.indexOf("/");
-    if (separator <= 0) return true;
-    return !this.#released[provider].has(modelId.slice(0, separator));
+    if (separator <= 0) return null;
+    return this.#released[provider].get(modelId.slice(0, separator)) ?? null;
   }
 
   pending(harness: CustomProviderHarness): boolean {

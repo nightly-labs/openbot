@@ -96,7 +96,7 @@ export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   isStopping(): boolean;
   isDeleting(agentId: string): boolean;
-  servesModel(model: string, provider: AgentProvider): boolean;
+  servesModel(model: string, provider: AgentProvider, configRevision: number | null): boolean;
   redactMcp(text: string): string;
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
@@ -810,10 +810,11 @@ export class DrainScheduler {
       const agent = yield* this.#store.getOrCreate(delivery.recipientAgentId).pipe(toDeliveryStartFailed);
       yield* checkAgentFolders(agent);
       requestedModel = agent.model;
-      const requireServedModel = () => {
-        if (!this.#hooks.servesModel(agent.model, providerForAgent(agent))) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+      const requireServedModel = (configRevision: number | null) => () => {
+        if (!this.#hooks.servesModel(agent.model, providerForAgent(agent), configRevision))
+          throw new Error(REMOVED_ENDPOINT_MESSAGE);
       };
-      yield* drainStep(requireServedModel);
+      yield* drainStep(requireServedModel(null));
       yield* this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id, laneId !== null && laneId !== MESSAGING_LANE);
       const providerRunning = this.#providers.agentClientRunning(agent);
@@ -1001,7 +1002,7 @@ export class DrainScheduler {
 
       const startTurn = (providerThreadId: string) =>
         Effect.gen({ self: this }, function* () {
-          yield* drainStep(requireServedModel);
+          yield* drainStep(requireServedModel(this.#providers.configRevision(client)));
           return yield* this.#threads
             .requestWithArchivedThreadRecovery(
               agent,

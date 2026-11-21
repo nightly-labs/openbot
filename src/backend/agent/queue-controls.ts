@@ -264,7 +264,8 @@ export class QueueControls {
           throw new Error(sourceText("error.backend.steerQueuedOnly"));
         const turnId = snapshot.activeTurnId;
         const turnModel = this.#drain.modelForTurn(agent.id, turnId) ?? agent.model;
-        if (!this.#endpoints.serves(turnModel, client.provider)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+        if (!this.#endpoints.servesClient(turnModel, client.provider, this.#providers.configRevision(client)))
+          throw new Error(REMOVED_ENDPOINT_MESSAGE);
         return { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel };
       },
     );
