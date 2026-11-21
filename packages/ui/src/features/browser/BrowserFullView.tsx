@@ -39,6 +39,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
   const live = () => props.liveViewTabId !== null;
   const canClose = () => props.canCloseTabs !== false;
   const recording = () => typeof props.teach?.startedAt === "number";
+  const docked = () => props.open && props.tabs.length > 0 && !props.teach;
   let hideButton: HTMLButtonElement | undefined;
   let view: HTMLElement | undefined;
   let surfaceElement: HTMLDivElement | undefined;
@@ -273,6 +274,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
           <div
             class="browser-surface browser-full-surface"
             data-live={live() ? "" : undefined}
+            data-docked={docked() ? "" : undefined}
             data-teach-recording={recording() ? "" : undefined}
             ref={(element) => (surfaceElement = element)}
           >
@@ -287,7 +289,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
                 />
               )}
             </Show>
-            <Show when={props.open && props.tabs.length > 0 && !props.teach}>{props.dock}</Show>
+            <Show when={docked()}>{props.dock}</Show>
             <Show when={props.tabs.length === 0}>
               <div class="browser-empty-state">
                 <strong>{t("browser.empty.title")}</strong>
