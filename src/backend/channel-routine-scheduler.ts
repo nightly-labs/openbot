@@ -197,10 +197,10 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
         if (!active()) break;
         if (this.#excluded().has(due.routine.channelId)) continue;
         const scheduledFor = yield* channelRoutineStep(() => {
+          changed.add(due.routine.channelId);
           if (due.schedule.kind === "once") {
             this.#routines.completeTrigger(due.routine.id, due.triggerId, now);
-            changed.add(due.routine.channelId);
-            return due.nextRunAt;
+            return this.#skipReason(due.routine) ? null : due.nextRunAt;
           }
           const occurrence = collapseMissedOccurrences(
             due.schedule,
@@ -208,12 +208,21 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
             new Date(due.nextRunAt),
             now,
           );
+          const skipReason = this.#skipReason(due.routine);
+          if (skipReason) {
+            this.#routines.skipOccurrences(
+              due.routine,
+              new Date(due.nextRunAt),
+              occurrence.scheduledFor,
+              occurrence.nextRunAt,
+              skipReason,
+            );
+            return null;
+          }
           this.#routines.advanceTrigger(due.routine.id, due.triggerId, occurrence.nextRunAt.toISOString());
-          changed.add(due.routine.channelId);
           return occurrence.scheduledFor.toISOString();
         });
-        if (due.routine.limitPolicy === "skip" && this.#hooks.usageLimited(due.routine.channelId)) continue;
-        if (yield* channelRoutineStep(() => this.#hasLiveRun(due.routine.channelId, due.routine.id))) continue;
+        if (!scheduledFor) continue;
         yield* this.#fireEffect(due.routine, due.triggerId, scheduledFor);
       }
     }).pipe(
@@ -277,6 +286,13 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
 
   reconcileAll(): void {
     for (const channelId of this.#routines.channelsWithOpenRuns()) this.reconcile(channelId);
+  }
+
+  #skipReason(routine: Pick<ChannelRoutine, "id" | "channelId" | "limitPolicy">): string | null {
+    if (this.#hasLiveRun(routine.channelId, routine.id)) return sourceText("status.agent.routineSkippedRunOpen");
+    if (routine.limitPolicy === "skip" && this.#hooks.usageLimited(routine.channelId))
+      return sourceText("status.agent.routineSkippedUsageLimit");
+    return null;
   }
 
   #hasLiveRun(channelId: string, routineId: string): boolean {
