@@ -30,6 +30,8 @@ export const messages = {
   "mcp.signIn.pageDescription": "このページは {host} のブラウザーで開いています。ここでサインインしてください。",
   "mcp.signIn.copyHint": "ページが読み込まれない場合は、リンクをコピーして別のブラウザーで開いてください。",
   "mcp.signIn.copyLink": "リンクをコピー",
+  "mcp.signIn.pasteHint":
+    "別のデバイスでサインインした場合は、最後にそのブラウザーに表示されたアドレスをコピーしてここに貼り付けてください。",
   "mcp.test.connected": { other: "接続済み · ツール {count} 個" },
   "mcp.status.testing": "テスト中…",
   "mcp.status.failed": "失敗",

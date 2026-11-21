@@ -21,6 +21,7 @@ import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import {
   type McpOAuthAuthority,
+  type McpSignInAddressOutcome,
   type McpSignInOffer,
   type McpSignInOpener,
   mcpOAuthAccountKey,
@@ -388,6 +389,10 @@ export class McpGateway {
 
   signInLink(url: string): string | null {
     return this.#oauth?.signInLink(url) ?? null;
+  }
+
+  receiveSignInAddress(url: string, address: string): McpSignInAddressOutcome {
+    return this.#oauth?.receiveSignInAddress(url, address) ?? "ended";
   }
 
   readonly signOut = Effect.fn("McpGateway.signOut")(function* (this: McpGateway, input: SignOutMcpServerInput) {

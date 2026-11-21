@@ -30,6 +30,8 @@ export const messages = {
   "mcp.signIn.pageDescription": "이 페이지는 {host}의 브라우저에서 열려 있어요. 여기에서 로그인하세요.",
   "mcp.signIn.copyHint": "페이지가 열리지 않으면 링크를 복사해 다른 브라우저에서 여세요.",
   "mcp.signIn.copyLink": "링크 복사",
+  "mcp.signIn.pasteHint":
+    "다른 기기에서 로그인했다면 마지막에 그 브라우저에 표시된 주소를 복사해 여기에 붙여 넣으세요.",
   "mcp.test.connected": { other: "연결됨 · 도구 {count}개" },
   "mcp.status.testing": "테스트 중…",
   "mcp.status.failed": "실패",

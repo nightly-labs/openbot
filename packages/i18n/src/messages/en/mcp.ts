@@ -29,6 +29,8 @@ export const messages = defineMessages("mcp", {
   "mcp.signIn.pageDescription": "This page is open in the browser on {host}. Sign in here.",
   "mcp.signIn.copyHint": "If the page does not load, copy the link and open it in another browser.",
   "mcp.signIn.copyLink": "Copy link",
+  "mcp.signIn.pasteHint":
+    "If you sign in on another device, copy the address that its browser shows at the end and paste it here.",
   "mcp.test.connected": { one: "Connected · {count} tool", other: "Connected · {count} tools" },
   "mcp.status.testing": "Testing…",
   "mcp.status.failed": "Failed",
