@@ -6,7 +6,7 @@ import type {
   ShortcutEnvironment,
   ShortcutOverrides,
 } from "@openbot/ui/features/settings/keyboard-shortcuts";
-import { SHORTCUT_COMMANDS } from "@openbot/ui/features/settings/keyboard-shortcuts";
+import { withShortcut } from "@openbot/ui/features/settings/keyboard-shortcuts";
 import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
@@ -19,15 +19,8 @@ type Story = StoryObj<typeof meta>;
 
 function ShortcutsStory(props: { environment: ShortcutEnvironment; overrides?: ShortcutOverrides }) {
   const [overrides, setOverrides] = createSignal<ShortcutOverrides>(props.overrides ?? {});
-  const change = (command: ShortcutCommand, key: ShortcutChord | null) => {
-    const current = overrides();
-    const next: ShortcutOverrides = {};
-    for (const name of SHORTCUT_COMMANDS) {
-      const value = name === command ? key : current[name];
-      if (value) next[name] = value;
-    }
-    setOverrides(next);
-  };
+  const change = (command: ShortcutCommand, key: ShortcutChord | null) =>
+    setOverrides(withShortcut(overrides(), command, key));
   return (
     <main class="foundation-story">
       <Heading as="h1" size="lg">

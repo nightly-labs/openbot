@@ -1,6 +1,7 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
   isTalkKeyCode,
+  sameTalkKey,
   type TalkKey,
   type TalkKeyPlatform,
   type TalkKeySymbol,
@@ -136,10 +137,13 @@ export function isValidShortcut(key: TalkKey): key is ShortcutChord {
 const PRIMARY_RESERVED_CODES = new Set([
   "KeyA",
   "KeyC",
+  "KeyG",
   "KeyH",
+  "KeyL",
   "KeyM",
   "KeyQ",
   "KeyR",
+  "KeyT",
   "KeyV",
   "KeyW",
   "KeyX",
@@ -173,17 +177,22 @@ export function isReservedShortcut(key: ShortcutChord, environment: ShortcutEnvi
   if (environment.browser && isBrowserReserved(key, primaryOnly)) return true;
   if (!primaryOnly) return false;
   if (!key.shift) return PRIMARY_RESERVED_CODES.has(key.code);
-  return key.code === "KeyZ";
+  return key.code === "KeyZ" || key.code === "KeyG";
 }
 
-export function sameShortcut(left: TalkKey, right: TalkKey): boolean {
-  return (
-    left.ctrl === right.ctrl &&
-    left.alt === right.alt &&
-    left.shift === right.shift &&
-    left.meta === right.meta &&
-    left.code === right.code
-  );
+export const sameShortcut = sameTalkKey;
+
+export function withShortcut(
+  overrides: ShortcutOverrides,
+  command: ShortcutCommand,
+  key: ShortcutChord | null,
+): ShortcutOverrides {
+  const next: ShortcutOverrides = {};
+  for (const name of SHORTCUT_COMMANDS) {
+    const value = name === command ? key : overrides[name];
+    if (value) next[name] = value;
+  }
+  return next;
 }
 
 export type ShortcutRefusal =
@@ -207,6 +216,7 @@ export function shortcutRefusal(
 
 export interface ShortcutKeyEvent {
   readonly code: string;
+  readonly key?: string;
   readonly ctrlKey: boolean;
   readonly altKey: boolean;
   readonly shiftKey: boolean;
@@ -220,12 +230,33 @@ function editableTarget(target: EventTarget | null | undefined): boolean {
   return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 }
 
+const CHARACTER_CODES: Readonly<Record<string, string>> = {
+  "[": "BracketLeft",
+  "]": "BracketRight",
+  "/": "Slash",
+  "\\": "Backslash",
+  ",": "Comma",
+  ".": "Period",
+  ";": "Semicolon",
+  "'": "Quote",
+  "`": "Backquote",
+  "-": "Minus",
+  "=": "Equal",
+};
+
+export function shortcutCodeOfEvent(event: Pick<ShortcutKeyEvent, "code" | "key">): string {
+  const character = event.key ?? "";
+  if (/^[a-z]$/i.test(character)) return `Key${character.toUpperCase()}`;
+  if (/^[0-9]$/.test(character)) return `Digit${character}`;
+  return CHARACTER_CODES[character] ?? (event.code || character);
+}
+
 function movesCaret(key: ShortcutChord): boolean {
   return !key.ctrl && !key.meta && !key.shift && key.code.startsWith("Arrow");
 }
 
 export function shortcutMatches(event: ShortcutKeyEvent, key: ShortcutChord): boolean {
-  if (event.isComposing === true || event.code !== key.code) return false;
+  if (event.isComposing === true || shortcutCodeOfEvent(event) !== key.code) return false;
   if (event.ctrlKey !== key.ctrl || event.altKey !== key.alt) return false;
   if (event.shiftKey !== key.shift || event.metaKey !== key.meta) return false;
   return !(movesCaret(key) && editableTarget(event.target));

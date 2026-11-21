@@ -40,6 +40,7 @@ import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
+import { insideOverlay } from "../window/workspace-shortcuts";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import { createChangeMarkerActions } from "./change-marker-actions";
 import type { ChatSearchMatch } from "./chat-search";
@@ -996,8 +997,7 @@ export function createConversationViewScope(props: ConversationProps) {
   };
   const handleThreadShortcut = (event: KeyboardEvent) => {
     if (event.defaultPrevented || event.repeat) return;
-    if (event.target instanceof Element && event.target.closest('[role="dialog"], [role="alertdialog"], [role="menu"]'))
-      return;
+    if (insideOverlay(event.target)) return;
     const action = threadShortcutAction(event);
     if (!action?.()) return;
     event.preventDefault();

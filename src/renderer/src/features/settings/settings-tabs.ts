@@ -17,6 +17,7 @@ import {
   Smartphone,
   UserRound,
 } from "@openbot/ui";
+import { SHORTCUT_COMMANDS, SHORTCUT_TITLES } from "@openbot/ui/features/settings/keyboard-shortcuts";
 
 export type SettingsTab =
   | "general"
@@ -139,19 +140,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.keyboard.title",
     descriptionKey: "settings.tab.keyboard.description",
     icon: Keyboard,
-    rows: [
-      { titleKey: "settings.shortcuts.command.newThread" },
-      { titleKey: "settings.shortcuts.command.previousThread" },
-      { titleKey: "settings.shortcuts.command.nextThread" },
-      { titleKey: "settings.shortcuts.command.newAgent" },
-      { titleKey: "settings.shortcuts.command.globalSearch" },
-      { titleKey: "settings.shortcuts.command.searchChat" },
-      { titleKey: "settings.shortcuts.command.focusComposer" },
-      { titleKey: "settings.shortcuts.command.back" },
-      { titleKey: "settings.shortcuts.command.forward" },
-      { titleKey: "settings.shortcuts.command.toggleSidebar" },
-      { titleKey: "settings.shortcuts.command.showShortcuts" },
-    ],
+    rows: SHORTCUT_COMMANDS.map((command) => ({ titleKey: SHORTCUT_TITLES[command] })),
   },
   {
     value: "profile",

@@ -8,7 +8,7 @@ export type WorkspaceShortcutActions = Partial<Record<WorkspaceShortcutCommand, 
 
 const WORKSPACE_SHORTCUT_COMMANDS: readonly WorkspaceShortcutCommand[] = ["newAgent", "toggleSidebar", "showShortcuts"];
 
-function insideOverlay(target: EventTarget | null): boolean {
+export function insideOverlay(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[role=dialog], [role=alertdialog], [role=menu]") !== null;
 }
 

@@ -83,8 +83,3 @@ export function setVoiceTalkKey(key: TalkKey | null, platform: TalkKeyPlatform):
   writeVoiceTalkKey(saved);
   setSavedTalkKey(saved);
 }
-
-export function useKeyLayout(): () => KeyLayout | undefined {
-  askKeyLayout();
-  return keyLayout;
-}

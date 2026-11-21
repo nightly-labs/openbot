@@ -12,7 +12,7 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
 import { TalkKeyCaps } from "../conversation/TalkKeyCaps";
-import { isModifierCode, type KeyLayout, type TalkKey, talkKeyOfEvent } from "../conversation/talk-key";
+import { isModifierCode, type TalkKey, talkKeyOfEvent } from "../conversation/talk-key";
 import {
   defaultShortcut,
   FIXED_SHORTCUT_TITLES,
@@ -28,6 +28,7 @@ import {
   type ShortcutOverrides,
   type ShortcutRefusal,
   sameShortcut,
+  shortcutCodeOfEvent,
   shortcutRefusal,
   shortcutText,
 } from "./keyboard-shortcuts";
@@ -35,7 +36,6 @@ import {
 export interface KeyboardShortcutsSettingsProps {
   environment: ShortcutEnvironment;
   overrides: ShortcutOverrides;
-  layout?: KeyLayout | undefined;
   onChange: (command: ShortcutCommand, key: ShortcutChord | null) => void;
   onResetAll: () => void;
 }
@@ -44,7 +44,6 @@ interface ShortcutRowProps {
   command: ShortcutCommand;
   environment: ShortcutEnvironment;
   overrides: ShortcutOverrides;
-  layout?: KeyLayout | undefined;
   onChange: (key: ShortcutChord | null) => void;
 }
 
@@ -92,7 +91,7 @@ function ShortcutRow(props: ShortcutRowProps): JSX.Element {
       setPressed(heldModifiers(event));
       return;
     }
-    const key = talkKeyOfEvent(event);
+    const key: TalkKey = { ...talkKeyOfEvent(event), code: shortcutCodeOfEvent(event) };
     const refused = shortcutRefusal(props.command, key, props.overrides, props.environment);
     if (refused || key.code === null) {
       setPressed(key);
@@ -110,6 +109,17 @@ function ShortcutRow(props: ShortcutRowProps): JSX.Element {
   };
   const pressOutside = (event: PointerEvent) => {
     if (!(event.target instanceof Node && recorder.contains(event.target))) stop();
+  };
+
+  const reset = () => {
+    const refused = shortcutRefusal(
+      props.command,
+      defaultShortcut(props.command, props.environment),
+      props.overrides,
+      props.environment,
+    );
+    if (refused) setRefusal(refused);
+    else props.onChange(null);
   };
 
   function start(): void {
@@ -154,7 +164,7 @@ function ShortcutRow(props: ShortcutRowProps): JSX.Element {
             {shortcutText(current(), props.environment.platform, t)}
           </span>
           <Show when={!isDefault() && !recording()}>
-            <Button variant="ghost" size="sm" type="button" onClick={() => props.onChange(null)}>
+            <Button variant="ghost" size="sm" type="button" onClick={reset}>
               {t("settings.shortcuts.reset")}
             </Button>
           </Show>
@@ -174,7 +184,7 @@ function ShortcutRow(props: ShortcutRowProps): JSX.Element {
               when={recording()}
               fallback={
                 <TalkKeyCaps
-                  binding={{ key: current(), platform: props.environment.platform, layout: props.layout }}
+                  binding={{ key: current(), platform: props.environment.platform }}
                   class="keyboard-shortcut-caps"
                 />
               }
@@ -185,7 +195,7 @@ function ShortcutRow(props: ShortcutRowProps): JSX.Element {
               >
                 {(key) => (
                   <TalkKeyCaps
-                    binding={{ key: key(), platform: props.environment.platform, layout: props.layout }}
+                    binding={{ key: key(), platform: props.environment.platform }}
                     class="keyboard-shortcut-caps"
                   />
                 )}
@@ -198,11 +208,7 @@ function ShortcutRow(props: ShortcutRowProps): JSX.Element {
   );
 }
 
-function FixedShortcutCaps(props: {
-  fixed: FixedShortcut;
-  environment: ShortcutEnvironment;
-  layout?: KeyLayout | undefined;
-}): JSX.Element {
+function FixedShortcutCaps(props: { fixed: FixedShortcut; environment: ShortcutEnvironment }): JSX.Element {
   const chords = () => fixedShortcutChords(props.fixed, props.environment);
   const separator = () => (props.fixed === "switchServer" ? "–" : " ");
   return (
@@ -215,10 +221,7 @@ function FixedShortcutCaps(props: {
                 {separator()}
               </span>
             </Show>
-            <TalkKeyCaps
-              binding={{ key, platform: props.environment.platform, layout: props.layout }}
-              class="keyboard-shortcut-caps"
-            />
+            <TalkKeyCaps binding={{ key, platform: props.environment.platform }} class="keyboard-shortcut-caps" />
           </>
         )}
       </For>
@@ -249,7 +252,6 @@ export function KeyboardShortcutsSettings(props: KeyboardShortcutsSettingsProps)
                 command={command}
                 environment={props.environment}
                 overrides={props.overrides}
-                layout={props.layout}
                 onChange={(key) => props.onChange(command, key)}
               />
             )}
@@ -266,7 +268,7 @@ export function KeyboardShortcutsSettings(props: KeyboardShortcutsSettingsProps)
                   <ItemTitle>{t(FIXED_SHORTCUT_TITLES[fixed])}</ItemTitle>
                 </ItemContent>
                 <ItemActions>
-                  <FixedShortcutCaps fixed={fixed} environment={props.environment} layout={props.layout} />
+                  <FixedShortcutCaps fixed={fixed} environment={props.environment} />
                 </ItemActions>
               </Item>
             )}

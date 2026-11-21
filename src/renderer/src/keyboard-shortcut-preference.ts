@@ -2,7 +2,6 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   parseShortcutOverrides,
   resolveShortcut,
-  SHORTCUT_COMMANDS,
   type ShortcutChord,
   type ShortcutCommand,
   type ShortcutEnvironment,
@@ -11,6 +10,7 @@ import {
   serializeShortcutOverrides,
   shortcutMatches,
   shortcutText,
+  withShortcut,
 } from "@openbot/ui/features/settings/keyboard-shortcuts";
 import { createSignal } from "solid-js";
 import { currentDevicePlatform } from "./send-shortcut-preference";
@@ -63,12 +63,7 @@ export function useShortcutOverrides(): () => ShortcutOverrides {
 }
 
 export function setShortcut(command: ShortcutCommand, key: ShortcutChord | null): void {
-  const current = overrides();
-  const next: ShortcutOverrides = {};
-  for (const name of SHORTCUT_COMMANDS) {
-    const value = name === command ? key : current[name];
-    if (value) next[name] = value;
-  }
+  const next = withShortcut(overrides(), command, key);
   writeOverrides(next);
   setOverridesSignal(next);
 }
