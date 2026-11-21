@@ -25,6 +25,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Scarica il modello di sintesi vocale in Impostazioni → Voce.",
   "error.voice.speech.timedOut": "La lettura ad alta voce della risposta è scaduta.",
   "error.voice.speech.failed": "OpenBot non è riuscito a leggere la risposta ad alta voce.",
+  "error.voice.speech.providerRefused": "{provider} ha rifiutato di creare l’audio: {reason}",
   "error.voice.recordingNotKept": "OpenBot non è riuscito a conservare la registrazione vocale.",
   "error.voice.live.timedOut": "La voce dal vivo di Codex non si è avviata in tempo. Riprova.",
   "error.voice.live.failed": "La voce dal vivo si è interrotta: {reason}",

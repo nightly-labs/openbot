@@ -1,5 +1,5 @@
 import type { AgentPromptResolution, RespondToPromptInput } from "@openbot/contracts/ipc";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 import { answeredPromptResolution, nextUnansweredQuestion } from "@/features/chat/model/question-prompt";
 import { haptics } from "@/shared/lib/haptics";
@@ -34,12 +34,20 @@ export function useQuestionPrompt(
   message: Extract<ChatMessage, { kind: "question" }> | undefined,
   canSend: boolean,
   respond: (agentId: string, input: RespondToPromptInput) => Promise<void>,
+  onUnsentPreview?: (text: string) => void,
 ) {
   const scope = JSON.stringify([agentId, message?.id]);
   const [stored, setState] = useState(() => initialState(scope));
   const state = stored.scope === scope ? stored : initialState(scope);
   if (stored.scope !== scope) setState(state);
   const submitting = useRef(new Set<string>());
+  const unsentPreview = useRef<{ scope: string; text: string } | undefined>(undefined);
+  useEffect(() => {
+    const unsent = unsentPreview.current;
+    if (!unsent || unsent.scope === scope) return;
+    unsentPreview.current = undefined;
+    onUnsentPreview?.(unsent.text);
+  }, [scope, onUnsentPreview]);
   const prompt = message?.prompt;
   const resolution = prompt?.resolution ?? state.resolution;
   const question = resolution ? undefined : prompt?.questions[state.index];
@@ -56,9 +64,14 @@ export function useQuestionPrompt(
         throw new Error(currentText().t("mobile.chat.question.sendFailed"));
       submitting.current.add(scope);
       update({ pending: true, failedAnswers: null });
+      const unsent = unsentPreview.current;
+      unsentPreview.current = undefined;
       try {
         await respond(agentId, { requestId: prompt.requestId, answers });
         update({ resolution: answeredPromptResolution(prompt.questions, answers), answers: {}, drafts: {} });
+      } catch (error) {
+        unsentPreview.current ??= unsent;
+        throw error;
       } finally {
         submitting.current.delete(scope);
         update({ pending: false });
@@ -101,6 +114,9 @@ export function useQuestionPrompt(
       draft: question ? (state.drafts[question.id] ?? "") : "",
       setDraft: (text: string) => {
         if (question && !disabled) update({ drafts: { ...state.drafts, [question.id]: text } });
+      },
+      setUnsentPreview: (text: string | undefined) => {
+        unsentPreview.current = text === undefined ? undefined : { scope, text };
       },
       replyInChat: state.replyInChat,
       setReplyInChat: (replyInChat: boolean) => {

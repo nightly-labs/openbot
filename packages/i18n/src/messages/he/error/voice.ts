@@ -23,6 +23,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "יש להוריד את מודל הדיבור בהגדרות ← קול.",
   "error.voice.speech.timedOut": "הקראת התשובה חרגה מהזמן המותר.",
   "error.voice.speech.failed": "OpenBot לא הצליח להקריא את התשובה.",
+  "error.voice.speech.providerRefused": "{provider} סירבה ליצור את השמע: {reason}",
   "error.voice.recordingNotKept": "OpenBot לא הצליח לשמור את הקלטת הקול.",
   "error.voice.live.timedOut": "הקול החי של Codex לא התחיל בזמן. יש לנסות שוב.",
   "error.voice.live.failed": "הקול החי נעצר: {reason}",

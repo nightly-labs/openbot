@@ -72,7 +72,6 @@ import { DISCORD_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/disc
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
-import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
@@ -692,6 +691,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     if (!loading) setPageLoad(false);
   });
   const [loadingCover, setLoadingCover] = createSignal<boolean>(untrack(fullWindowLoading));
+  const [loadingWaitedLong, setLoadingWaitedLong] = createSignal(false);
   createEffect(
     () => fullWindowLoading() && !loadingCover(),
     (show) => {
@@ -1446,16 +1446,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return (
       !hostedServers.isHosted(serverId) &&
       server()?.id === serverId &&
-      workspace.state.status === "online" &&
-      workspace.runtime.admin !== undefined &&
-      workspace.state.capabilities.includes(HOST_RESTART_CAPABILITY)
+      workspace.state.restartReady &&
+      workspace.runtime.admin !== undefined
     );
   }
   async function restartHost(): Promise<void> {
     const hostId = restartRequest()?.hostId;
     if (!hostId) return;
     if (hostedServers.isHosted(hostId)) await hostedServers.calls.restart(hostId);
-    else await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
+    else {
+      await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
+      workspace.restartRequested();
+    }
   }
   createEffect(
     () => props.billingReturn,
@@ -2720,6 +2722,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         }
         busy={workspace.state.status === "connecting" || !workspace.state.host}
         onRetry={() => void workspace.run(workspace.reconnect)}
+        onWaitedLong={cover ? setLoadingWaitedLong : undefined}
         onManage={() => setBillingOpen(true)}
         upsell={offlineUpsell()}
       />
@@ -2744,7 +2747,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           }
         >
           <WindowBackdrop pages="srcdoc" />
-          <div class="app-window web-app-window">
+          <div
+            class="app-window web-app-window"
+            data-loading-waited-long={loadingCover() && loadingWaitedLong() ? "" : undefined}
+          >
             <PageRail
               hidden={false}
               logo={{ variant: "production", href: "/" }}

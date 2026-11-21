@@ -14,6 +14,7 @@ import {
   type ReceivedWebhookEvent,
   type RoutineRunStart,
   RoutineStore,
+  type SkippedRunRows,
   type WebhookReceiveResult,
 } from "./routine-store";
 import { ROUTINE_TABLES } from "./routine-tables";
@@ -157,6 +158,10 @@ export class AgentRoutineStore extends RoutineStore {
 
   updateRunStatus(runId: string, status: RoutineRunStatus, error: string | null = null): RoutineRun {
     return toRun(this.updateRunRow(runId, status, error));
+  }
+
+  skippedBefore(run: RoutineRun): SkippedRunRows {
+    return this.skippedRowsBefore(run.agentId, run.routineId, run.id, run.createdAt);
   }
 
   runForDelivery(deliveryId: string): RoutineRun | null {

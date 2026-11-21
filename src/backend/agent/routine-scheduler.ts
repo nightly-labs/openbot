@@ -52,7 +52,7 @@ import {
   type ConversationTransaction,
   withDatabaseTransaction,
 } from "./conversation-runtime";
-import { failedRunReason, routineStatusForDelivery } from "./delivery-content";
+import { failedRunReason, routineStatusForDelivery, type SkippedRoutineRuns } from "./delivery-content";
 import { quietRoutineRun } from "./routine-quiet-runs";
 import {
   localTimezone,
@@ -197,6 +197,17 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.runForDelivery(deliveryId);
   }
 
+  skippedBefore(run: RoutineRun): SkippedRoutineRuns | null {
+    if (run.kind !== "scheduled" || run.source !== undefined) return null;
+    const { rows, complete } = this.#routines.skippedBefore(run);
+    if (rows.length === 0) return null;
+    return {
+      count: rows.reduce((total, row) => total + row.count, 0),
+      complete,
+      reasons: [...new Set(rows.map((row) => (row.error ? redactText(row.error) : SKIPPED_WHILE_CLOSED)))],
+    };
+  }
+
   workflowRunSource(deliveryId: string): WorkflowRunSource | null {
     const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
     return sender?.kind === "routine" ? this.#workflowRuns.handoffSource(sender.runId) : null;
@@ -221,7 +232,7 @@ export class RoutineScheduler implements RoutineDueSource {
 
   quietRunForDelivery(deliveryId: string): boolean {
     const run = this.#routines.runForDelivery(deliveryId);
-    return run !== null && quietRoutineRun(run);
+    return run === null ? this.workflowRunSource(deliveryId) !== null : quietRoutineRun(run);
   }
 
   retriesAfterRestart(deliveryId: string): boolean {
@@ -314,7 +325,7 @@ export class RoutineScheduler implements RoutineDueSource {
     this.stateChanged(agentId);
   }
 
-  resumeAfterFailedRun(
+  resumeAfterRunPause(
     pause: { agentId: string; routineId: string; updatedAt: string },
     params: DynamicToolCallParams,
   ): "resumed" | "kept" | "failed" {
@@ -325,7 +336,7 @@ export class RoutineScheduler implements RoutineDueSource {
       this.update({ agentId, routineId, active: true }, this.#toolMutationOptions(agentId, agentId, params));
       return "resumed";
     } catch (error) {
-      logger.warn("A routine that a failed run paused could not be turned on again.", {
+      logger.warn("A routine that a run paused could not be turned on again.", {
         error: error instanceof Error ? error.message : String(error),
       });
       return "failed";

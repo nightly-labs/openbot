@@ -12,6 +12,7 @@ import type {
   RoutineRun,
   WorkflowRunSource,
 } from "@openbot/contracts/ipc";
+import { ROUTINE_MISSED_COUNT_LIMIT } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
@@ -107,6 +108,7 @@ export interface DeliveryPromptSources {
   agentNames: ReadonlyMap<string, string>;
   snapshot: ConversationSnapshot;
   routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
+  skippedRoutineRuns?: SkippedRoutineRuns | null;
   workflowRunSource?: WorkflowRunSource | null;
   routineTimezone?: string | undefined;
   wokenWaits?: readonly AgentWait[];
@@ -118,6 +120,24 @@ export interface DeliveryPromptSources {
   steersQuietTurn?: boolean;
   externalChat?: boolean;
   taskReport?: TaskReportState | null;
+}
+
+export interface SkippedRoutineRuns {
+  count: number;
+  complete: boolean;
+  reasons: readonly string[];
+}
+
+function skippedRunsCount({ count, complete }: SkippedRoutineRuns): string {
+  if (count > ROUTINE_MISSED_COUNT_LIMIT) return `More than ${ROUTINE_MISSED_COUNT_LIMIT} scheduled runs`;
+  if (!complete) return `At least ${count} scheduled runs`;
+  return count === 1 ? "1 scheduled run" : `${count} scheduled runs`;
+}
+
+function skippedRoutineRunsNote(skipped: SkippedRoutineRuns): string {
+  const { reasons } = skipped;
+  const runs = skippedRunsCount(skipped);
+  return `OpenBot note, not from the user: ${runs} of this routine did not happen before this run. Reason: ${reasons.map((reason) => reason.replace(/\.$/u, "")).join("; ")}. Start your answer with this, in plain words: how many runs did not happen, why, what the user missed, and what to change if it can happen again. Then report this run.`;
 }
 
 export interface TaskReportState {
@@ -488,15 +508,19 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             "Do not create, delete, or test routines, and do not change other routines, during this run.",
             `When the task says to stop after a condition and the condition is met, pause this routine: call openbot.update_routine with routineId "${delivery.sender.routineId}" and active false, then give your report. Make no other change to this routine.`,
             `A failure or a blocker, such as a file or a service that you cannot reach, is not a stop condition: keep this routine on, and call the ${ROUTINE_REPORT_FAILURE_TOOL} tool.`,
+            `Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report, so do not call the ${ROUTINE_NO_UPDATE_TOOL} tool after a pause.`,
           ]
         : ["Do not create, update, delete, or test routines during this run."]),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
+      ...(sources.skippedRoutineRuns ? [skippedRoutineRunsNote(sources.skippedRoutineRuns)] : []),
       "Nobody answers you during this run. Do all of the task in this turn: do not stop after a step to report progress or to ask whether to continue.",
       `A request to a teammate is not a failure: finish the parts that do not need its reply, then end this turn. The reply starts a turn that continues this task. Do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool only because a reply has not come yet.`,
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
       testRun
         ? "This is a manual Test run. Report the action and result even when a normal scheduled run would suppress a notification because there is no change."
-        : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
+        : sources.skippedRoutineRuns
+          ? `This is a ${runKind}. Report the skipped runs also when the task has nothing new: do not call the ${ROUTINE_NO_UPDATE_TOOL} tool in this run.`
+          : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool and write no text, also none before it. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
       ...(testRun || run?.source === "script"
         ? []
         : [

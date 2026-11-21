@@ -345,6 +345,7 @@ export class ProviderRuntime implements ProviderPort {
   #removingCustomRuntime = false;
   readonly #released = new Set<AgentProvider>();
   readonly #restartsWhenIdle = new Map<AgentProvider, NodeJS.Timeout | null>();
+  readonly #restartsKeepingTurns = new Set<AgentProvider>();
   readonly #updatesWhenIdle = new Set<AgentProvider>();
   #customAgentsReloadPending = false;
   readonly #environmentReloadPending = new Set<AgentProvider>();
@@ -573,7 +574,7 @@ export class ProviderRuntime implements ProviderPort {
       requestTimeoutMs: this.#requestTimeoutMs,
       recordProviderError: (provider, error) => this.#recordProviderError(provider, error),
       startSettingsChanged: (provider) =>
-        this.spawnSettingsChanged(provider).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid),
+        this.startSettingsChanged(provider).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid),
     });
   }
 
@@ -2597,7 +2598,9 @@ export class ProviderRuntime implements ProviderPort {
 
   isReplacingCli(provider: AgentProvider): boolean {
     return (
-      this.#replacingCli.has(provider) || this.#restartsWhenIdle.has(provider) || this.#updatesWhenIdle.has(provider)
+      this.#replacingCli.has(provider) ||
+      (this.#restartsWhenIdle.has(provider) && !this.#restartsKeepingTurns.has(provider)) ||
+      this.#updatesWhenIdle.has(provider)
     );
   }
 
@@ -2605,7 +2608,21 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
-    if (this.#restartsWhenIdle.has(provider)) return this.status();
+    return yield* this.#restartWhenIdle(provider, true);
+  }).bind(this);
+
+  readonly #restartWhenIdle = Effect.fn("ProviderRuntime.restartWhenIdle")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    holdsTurns: boolean,
+  ) {
+    if (this.#restartsWhenIdle.has(provider)) {
+      if (holdsTurns && this.#restartsKeepingTurns.delete(provider)) {
+        this.#hooks.onProviderHeld?.(provider);
+        this.#setStatus({});
+      }
+      return this.status();
+    }
     this.#startFailures.delete(provider);
     if (!this.#clients.has(provider)) {
       if (this.#released.has(provider)) {
@@ -2616,7 +2633,8 @@ export class ProviderRuntime implements ProviderPort {
     }
     yield* providerStep(() => {
       this.#restartsWhenIdle.set(provider, null);
-      this.#hooks.onProviderHeld?.(provider);
+      if (holdsTurns) this.#hooks.onProviderHeld?.(provider);
+      else this.#restartsKeepingTurns.add(provider);
       recordRestartActivity();
       this.#setStatus({});
     });
@@ -2630,6 +2648,14 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     yield* providerStep(() => this.#countActivation(provider));
     return yield* this.restartProviderWhenIdle(provider);
+  }).bind(this);
+
+  readonly startSettingsChanged = Effect.fn("ProviderRuntime.startSettingsChanged")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    yield* providerStep(() => this.#countActivation(provider));
+    return yield* this.#restartWhenIdle(provider, false);
   }).bind(this);
 
   readonly chooseInstalledCli = Effect.fn("ProviderRuntime.chooseInstalledCli")(function* (
@@ -2669,7 +2695,8 @@ export class ProviderRuntime implements ProviderPort {
       this.#cliLogin.has(provider) ||
       (provider === "codex" && this.#codexLogin.pending);
     if (waiting) {
-      if (this.#hooks.isProviderBusy(provider)) this.#hooks.releasePersonWaits?.(provider);
+      if (this.#hooks.isProviderBusy(provider) && !this.#restartsKeepingTurns.has(provider))
+        this.#hooks.releasePersonWaits?.(provider);
       const timer = setTimeout(
         () => Effect.runFork(this.#checkRestartWhenIdle(provider).pipe(Effect.forkIn(this.#scope))),
         PROVIDER_RESTART_POLL_MS,
@@ -2679,6 +2706,8 @@ export class ProviderRuntime implements ProviderPort {
       return;
     }
     this.#restartsWhenIdle.set(provider, null);
+    const keptTurns = this.#restartsKeepingTurns.delete(provider);
+    if (keptTurns) this.#hooks.onProviderHeld?.(provider);
     const disposals = this.#disposals;
     yield* this.#runProviderConnectionCommand(provider, () =>
       this.#clients.has(provider) ? this.#reprobeProvider(provider).pipe(Effect.asVoid) : Effect.void,
@@ -2687,6 +2716,10 @@ export class ProviderRuntime implements ProviderPort {
       Effect.flatMap((done) => {
         if (disposals !== this.#disposals || !this.#restartsWhenIdle.has(provider)) return Effect.void;
         if (done) return Effect.sync(() => this.#endRestartWhenIdle(provider));
+        if (keptTurns) {
+          this.#restartsKeepingTurns.add(provider);
+          this.#hooks.onProviderResumed(provider);
+        }
         return this.#checkRestartWhenIdle(provider);
       }),
       Effect.forkIn(this.#scope),
@@ -2695,6 +2728,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #endRestartWhenIdle(provider: AgentProvider): void {
     this.#restartsWhenIdle.delete(provider);
+    this.#restartsKeepingTurns.delete(provider);
     this.#setStatus({});
     this.#hooks.onProviderResumed(provider);
   }
@@ -2784,6 +2818,7 @@ export class ProviderRuntime implements ProviderPort {
     for (const provider of [...this.#signInRechecks.keys()]) this.#endSignInRecheck(provider);
     for (const timer of this.#restartsWhenIdle.values()) if (timer) clearTimeout(timer);
     this.#restartsWhenIdle.clear();
+    this.#restartsKeepingTurns.clear();
     if (this.#idleCheck) clearInterval(this.#idleCheck);
     this.#idleCheck = null;
     if (this.#signInCheck) clearInterval(this.#signInCheck);

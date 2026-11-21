@@ -301,6 +301,7 @@ interface AcpThread {
   workHold: { since: number; changedAt: number } | null;
   leftOutMcpServers: Map<McpServer, string>;
   throwaway: boolean;
+  keepsHistory: boolean;
 }
 
 type ReleasedAcpThread = Pick<
@@ -744,6 +745,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#scope = Scope.makeUnsafe();
     this.#promptAnswered = false;
     this.#transport.start();
+  }
+
+  markTurnsStoppedForShutdown(): void {
+    for (const id of this.#threads.ids()) {
+      const turn = this.#threads.get(id)?.activeTurn;
+      if (!turn) continue;
+      turn.stopped = true;
+      turn.stop.abort();
+    }
   }
 
   readonly stop = Effect.fn("AcpAgentClient.stop")(function* (
@@ -1726,13 +1736,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             }
             const sentAt = Date.now();
             if (resume && requestedThreadId) {
+              const restoreMethod = this.#supportsSessionResume ? "resume" : "load";
               const restored = this.#restoreSessionEffect(
                 connection,
                 { sessionId: requestedThreadId, cwd, ...directories, mcpServers, ...meta },
-                this.#supportsSessionResume ? "resume" : "load",
+                restoreMethod,
               );
               const response = providerResult(
-                yield* Effect.result(afterSignInRead(sessionTransport ? restored : this.#whileProcessWrites(restored))),
+                yield* Effect.result(
+                  afterSignInRead(
+                    sessionTransport ? restored : this.#whileProcessWrites(restored, `session/${restoreMethod}`),
+                  ),
+                ),
               );
               id = requestedThreadId;
               configOptions = response.configOptions ?? [];
@@ -1740,7 +1755,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             } else {
               const created = providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta }));
               const response = providerResult(
-                yield* Effect.result(afterSignInRead(sessionTransport ? created : this.#whileProcessWrites(created))),
+                yield* Effect.result(
+                  afterSignInRead(sessionTransport ? created : this.#whileProcessWrites(created, "session/new")),
+                ),
               );
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
@@ -1757,7 +1774,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 { sessionId: id, cwd, ...directories, mcpServers, ...meta },
                 "resume",
               );
-              const retried = yield* Effect.result(sessionTransport ? retry : this.#whileProcessWrites(retry));
+              const retried = yield* Effect.result(
+                sessionTransport ? retry : this.#whileProcessWrites(retry, "session/resume"),
+              );
               if (Result.isFailure(retried) || mcp.dropped(retriedAt, connectLimit))
                 this.emit("diagnostic", `${this.#label} still did not load OpenBot's tools.`);
             }
@@ -1796,6 +1815,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               workHold: null,
               leftOutMcpServers: new Map(),
               throwaway: isRecord(params) && params.ephemeral === true,
+              keepsHistory: !isRecord(params) || params.persistSession !== false,
             };
             threadRef = thread;
             providerResult(
@@ -3581,7 +3601,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return true;
   });
 
-  #whileProcessWrites<A>(request: Effect.Effect<A, ProviderClientOperationError>) {
+  #whileProcessWrites<A>(request: Effect.Effect<A, ProviderClientOperationError>, method: string) {
     const limit = this.options.turnStallMs ?? ACP_TURN_STALL_MS;
     const startedAt = Date.now();
     const busy = () =>
@@ -3597,7 +3617,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         yield* Effect.sleep(silentFor < limit ? limit - silentFor : limit);
       }
       const message = sourceText("error.provider.acpUnresponsive", { provider: this.#label });
-      this.emit("diagnostic", `${this.#label} wrote nothing for ${limit} ms while a session opened.`);
+      logger.warn("An ACP agent wrote nothing while a session opened, so OpenBot ended its process.", {
+        provider: this.provider,
+        method,
+        silentMs: limit,
+      });
       yield* this.#endAgentProcess(message);
       return yield* providerFailure(new TimeoutError(message));
     });
@@ -3969,7 +3993,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         },
       });
     }
-    const append = this.options.history?.append;
+    const append = thread.keepsHistory ? this.options.history?.append : undefined;
     if (append) {
       const persisted = yield* Effect.exit(
         append(thread.id, {
