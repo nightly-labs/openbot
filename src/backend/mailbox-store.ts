@@ -1180,8 +1180,28 @@ export class MailboxStore {
     if (this.#taskHasOwnWork(agentId, taskId)) return [];
     const holders = this.#requestHolders();
     return this.openRequestsHeldByTask(agentId, taskId).filter(
-      (requestId) => !this.heldByTask(agentId, requestId, new Set([taskId]), holders),
+      (requestId) =>
+        !this.heldByTask(agentId, requestId, new Set([taskId]), holders) &&
+        !this.#answeredInReportTurn(agentId, taskId, requestId),
     );
+  }
+
+  #answeredInReportTurn(agentId: string, taskId: string, requestId: string): boolean {
+    const requesterId = this.requestSenderAgentId(requestId);
+    if (!requesterId) return false;
+    const messages = this.#messagesById();
+    return this.#state.deliveries.some((delivery) => {
+      const turnId = delivery.turnId;
+      if (delivery.recipientAgentId !== agentId || delivery.status !== "completed" || turnId === null) return false;
+      const report = messages.get(delivery.messageId);
+      if (report?.senderTaskId !== taskId || !report.heldRequestIds?.includes(requestId)) return false;
+      const turnRequestIds = new Set(
+        this.#state.deliveries
+          .filter((candidate) => candidate.recipientAgentId === agentId && candidate.turnId === turnId)
+          .map((candidate) => candidate.messageId),
+      );
+      return this.hasAgentMessageFromTurnTo(agentId, turnId, requesterId, turnRequestIds);
+    });
   }
 
   useTaskRunsInProvider(probe: (agentId: string, taskId: string) => boolean): void {

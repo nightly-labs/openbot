@@ -682,7 +682,9 @@ export class AgentTasks implements TaskLanes {
         text: task.title,
         replyToMessageId: null,
         expectsReply: false,
-        idempotencyKey: `task-release:${task.taskId}:${requestIds.join(",")}`,
+        idempotencyKey: `task-release:${createHash("sha256")
+          .update(JSON.stringify([task.taskId, requestIds]))
+          .digest("hex")}`,
       })
       .pipe(
         Effect.as(true),
