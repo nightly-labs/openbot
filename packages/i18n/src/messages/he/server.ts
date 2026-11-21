@@ -19,6 +19,8 @@ export const messages = {
   "server.connection.planHint": "יש לפתוח את הגדרות החשבון כדי לבדוק את תוכנית השרת.",
   "server.connection.loadingHint": "אפשר לבחור שרת אחר בזמן שהשרת הזה נטען.",
   "server.connection.cachedHint": "תוכן שנטען וטיוטות נשמרים. פעולות השרת יתחדשו אחרי החיבור מחדש.",
+  "server.connection.computerOffline":
+    "{name} לא מחובר. יש לוודא שהמחשב שלו פועל, ש-OpenBot פתוח, ושפרסום השרת הזה מופעל בהגדרות השרת > חברים.",
   "server.connection.conversationFailed": "לא ניתן לטעון את השיחה. אפשר לנסות שוב.",
   "server.connection.panelsFailed": "חלק מהחלוניות של סביבת העבודה לא נטענו. אפשר לנסות שוב.",
   "server.connection.retry": "ניסיון חוזר",

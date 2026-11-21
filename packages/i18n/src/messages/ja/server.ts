@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "このサーバーの読み込み中に、別のサーバーを選択できます。",
   "server.connection.cachedHint":
     "読み込み済みのコンテンツと下書きは保持されます。再接続後にサーバーの操作が再開されます。",
+  "server.connection.computerOffline":
+    "{name} はオフラインです。そのコンピューターの電源が入っていて OpenBot が開いていること、また「サーバーの設定」>「メンバー」で「このサーバーを公開」がオンになっていることを確認してください。",
   "server.connection.conversationFailed": "会話を読み込めませんでした。もう一度お試しください。",
   "server.connection.panelsFailed": "一部のワークスペースパネルを読み込めませんでした。もう一度お試しください。",
   "server.connection.retry": "再試行",

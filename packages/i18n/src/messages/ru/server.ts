@@ -22,6 +22,8 @@ export const messages = {
   "server.connection.loadingHint": "Пока этот сервер загружается, можно выбрать другой.",
   "server.connection.cachedHint":
     "Загруженное содержимое и черновики сохранены. Действия сервера возобновятся после повторного подключения.",
+  "server.connection.computerOffline":
+    "{name} не в сети. Убедитесь, что его компьютер включён, OpenBot открыт, а Опубликовать этот сервер включено в Настройки сервера > Участники.",
   "server.connection.conversationFailed": "Не удалось загрузить диалог. Повторите попытку.",
   "server.connection.panelsFailed": "Не удалось загрузить некоторые панели рабочего пространства. Повторите попытку.",
   "server.connection.retry": "Повторить",
