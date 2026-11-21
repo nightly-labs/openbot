@@ -94,8 +94,10 @@ uses it in two places: `openbot_browser.list_logins` returns the logins saved fo
 site (id, title, username), and `AttentionRegistry` answers a `submit_secret` password or
 authenticator request for a saved login by filling it through the same `prepareSecret` path as the
 secure card, with no card. While agent code from `evaluate` can still run in the page,
-`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because that code could read
-the filled fields. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
+`BrowserHost` reports `agentScriptedOrigin`, because that code could read the filled fields. When the
+call names a `loginId`, the agent gets the skip text at once, with no card: a reload of the sign-in page
+lets the saved login fill, and a scheduled routine has nobody to answer a card (#14181). Without a
+`loginId`, the card opens instead. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
 A script can also write Cache Storage that a service worker serves as page code, also to a page that
 the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a

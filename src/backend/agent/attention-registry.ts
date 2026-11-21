@@ -1297,6 +1297,13 @@ export class AttentionRegistry {
           if (this.#messagingRequestTurn(agentId, turnId)) {
             pending.resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.request.vaultSkip === "agent-script") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else if (pending.secret?.withCode) {
             pending.resolve(
               browserTakeoverError(
