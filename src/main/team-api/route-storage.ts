@@ -131,6 +131,6 @@ async function visibleStorage(
 
 function visibleFile(file: StoredFileRow, agentVisible: boolean, shownWorkflows: ReadonlySet<string>): StoredFileRow[] {
   const { workflow, ...untagged } = file;
-  if (workflow && shownWorkflows.has(workflow.id)) return [file];
+  if (workflow && shownWorkflows.has(workflow.id) && (file.agentId === null || agentVisible)) return [file];
   return agentVisible ? [untagged] : [];
 }

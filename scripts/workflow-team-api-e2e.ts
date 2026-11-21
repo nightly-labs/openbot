@@ -117,6 +117,7 @@ import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
 let sunraSignedIn = false;
 let mediaFileId = "e2e-media-file";
+const sharedFileAgents = new Map<string, string>();
 let higgsfieldSignedIn = false;
 let serviceAccounts: WorkflowMediaAccountCredits[] = [];
 const mediaAccounts: (string | null)[] = [];
@@ -532,7 +533,7 @@ function workflowLibraryScan(sources: WorkflowFileOwnerSources, deleted: Readonl
           previewKind: "none",
           previewUrl: null,
           source: "generated",
-          agentId: null,
+          agentId: sharedFileAgents.get(id) ?? null,
           conversation: null,
           messageId: null,
           createdAt: owner.createdAt ?? scannedAt,
@@ -2313,7 +2314,7 @@ try {
   );
 
   await step(
-    "library: workflow media files carry their workflow and folder; a member gets only the files of workflows they can see; a peer without storage-workflow-files-v1 gets no tag",
+    "library: workflow media files carry their workflow and folder; a member gets only the files of workflows they can see, and not one in a thread of a closed or removed agent; a peer without storage-workflow-files-v1 gets no tag",
     async () => {
       const imageGraph: WorkflowGraph = {
         nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields: { model: "gpt-image" } }],
@@ -2385,6 +2386,15 @@ try {
       assert.deepEqual(owner, [shotsRow, looseRow, hiddenRow]);
       const memberRows = await usage(member, current10);
       assert.deepEqual(memberRows, [shotsRow, looseRow]);
+      const memberShared: { agentId: string; rows: Awaited<ReturnType<typeof usage>> }[] = [];
+      for (const agentId of [closed, "agent-e2e-removed"]) {
+        sharedFileAgents.set("e2e-library-loose", agentId);
+        assert.deepEqual(await usage(ownerToken, current10), [shotsRow, looseRow, hiddenRow]);
+        const rows = await usage(member, current10);
+        memberShared.push({ agentId, rows });
+        assert.deepEqual(rows, [shotsRow], `The member got a workflow file of a thread of ${agentId}.`);
+      }
+      sharedFileAgents.delete("e2e-library-loose");
       const olderOwner = await usage(ownerToken, older);
       assert.deepEqual(
         olderOwner,
@@ -2395,7 +2405,7 @@ try {
         olderMember,
         [shotsRow, looseRow].map((row) => ({ id: row.id, workflow: null })),
       );
-      return { owner, member: memberRows, olderOwner, olderMember };
+      return { owner, member: memberRows, memberShared, olderOwner, olderMember };
     },
   );
 
