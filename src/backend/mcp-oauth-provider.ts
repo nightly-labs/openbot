@@ -453,9 +453,10 @@ export class McpOAuth implements McpOAuthAuthority {
   receiveSignInAddress(url: string, address: string): McpSignInAddressOutcome {
     const page = this.signInLink(url);
     const state = page ? URL.parse(page)?.searchParams.get("state") : null;
-    if (!state || !this.#waiting.has(state)) return "ended";
+    if (!state || !this.#exchanges.has(state)) return "ended";
     const query = relayCallbackQuery(address, state);
     if (query === null) return "invalid";
+    if (!this.#waiting.has(state)) return "received";
     const code = new URLSearchParams(query).get("code");
     const received = code ? this.receiveAuthorizationCode(state, code) : this.refuseAuthorization(state);
     return received ? "received" : "ended";
