@@ -31,6 +31,8 @@ To publish after review, authenticate Wrangler for the production account and pr
 bun run marketplace:publish:production -- --apply --confirm-production
 ```
 
+Publish before the release that announces the change. `bun run release:preflight` builds the catalog and stops when the live Marketplace misses an entry, lists a retired Agent, or has an older version of an entry.
+
 The publisher verifies the production admin credential before writing, uploads immutable bundle and icon keys, then inserts approved Skills and Agents with their exact skill-version dependencies. It does not go through community submission limits or pending review. `--local --apply` targets only local storage; mixing local and production flags is rejected.
 
 ## Repeating and updating
