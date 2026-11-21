@@ -433,6 +433,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "9422e58247f644abf234503f9c4a3b340dc040d6900b44fbabeb788309d33b33",
     },
     {
+      slug: "agents2me",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "33d3ed690af0f791f047a15e48320ddc462a88a0374942630388421ba2f791d2",
+    },
+    {
       slug: "aws-knowledge",
       version: "1.0.0",
       featured: false,
@@ -4207,6 +4213,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://attio.com",
     privacyPolicyUrl: "https://attio.com/legal/privacy",
     termsUrl: "https://attio.com/legal/services-agreement",
+    skills: [],
+  },
+  agents2me: {
+    slug: "agents2me",
+    name: "agents2.me",
+    tagline: "CRM and WhatsApp inbox",
+    description:
+      "agents2.me lets agents search and update accounts, contacts, opportunities and tasks, read and answer WhatsApp conversations, run reports, and manage campaigns and workflows in your company's workspace. Each user signs in to their own agents2.me account through the browser. Agents can send WhatsApp messages and templates to customers, so review each message before you approve it.",
+    category: "productivity",
+    creatorName: "agents2.me",
+    iconUrl: "https://agents2.me/favicon.svg",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-open-conversations", text: "Which WhatsApp conversations are waiting for a reply?" },
+      { id: "prompt-stale-deals", text: "Which open opportunities had no activity in the last two weeks?" },
+      { id: "prompt-follow-up", text: "Create a task to follow up with this contact next Tuesday." },
+    ],
+    apps: [
+      {
+        id: "app-agents2me-mcp",
+        name: "agents2.me",
+        description:
+          "CRM records, WhatsApp inbox, tasks, reports and campaigns, over agents2.me's MCP server with browser sign-in.",
+        iconUrl: "https://agents2.me/favicon.svg",
+        server: {
+          name: "agents2me",
+          transport: "http",
+          url: "https://api.agents2.me/mcp",
+          auth: [{ id: "agents2me-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://agents2.me",
+    privacyPolicyUrl: "https://app.agents2.me/privacy",
+    termsUrl: "https://app.agents2.me/terms",
     skills: [],
   },
   "aws-knowledge": {

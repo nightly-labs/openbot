@@ -453,3 +453,26 @@ Troubleshooting:
 
 - Connect shows "The server answered 401": the token is wrong or was deleted. Create a
   new token and connect again.
+
+## agents2.me
+
+The listing connects to agents2.me's own MCP server at `https://api.agents2.me/mcp`
+(<https://docs.agents2.me>). It answers 401 with a `Bearer` challenge. The authorization server
+(`https://api.agents2.me`) has dynamic client registration and client ID metadata documents, with
+S256 and refresh tokens, so the user signs in through the browser and types no key. A loopback
+redirect is accepted on any port.
+
+The connection works in the company of the signed-in user, with that user's role permissions. The
+server reads the role on each call, so a role change applies at once. Agents can search, create,
+update and delete CRM records (accounts, contacts, opportunities, tasks, events), read and answer
+WhatsApp conversations, run reports, and manage campaigns and workflows. Sending a message or a
+template, and dispatching a campaign, reach real customers on WhatsApp.
+
+Troubleshooting:
+
+- The consent page says "Your role does not allow connecting AI assistants": ask an admin to turn
+  on MCP access for the role. If the admin turns it off later, the next call answers 401.
+- A tool is refused with 403: the user's role does not have that permission. Ask an admin to change
+  the role.
+- A free-text message is refused because the window is closed: WhatsApp allows free text only within
+  24 hours of the customer's last message. Send an approved template instead.
