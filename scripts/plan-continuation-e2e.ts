@@ -1252,6 +1252,8 @@ try {
       { answer: "Pode deixar, vou pesquisar isso agora.", verdict: { verdict: "continue", missing: "Faça." } },
       { answer: "Sure, I'll research the three options now.", verdict: { verdict: "done" } },
       { answer: "Let me know if you need anything else.", verdict: { verdict: "continue", missing: "Do more." } },
+      { answer: "I will not delete the files.", verdict: { verdict: "continue", missing: "Do more." } },
+      { answer: "Não vou apagar isso.", verdict: { verdict: "continue", missing: "Do more." } },
     ] satisfies { answer: string; verdict: Verdict }[];
     const results = [];
     for (const item of cases) {
@@ -1278,8 +1280,10 @@ try {
         [2, 2],
         [1, 1],
         [1, 0],
+        [1, 0],
+        [1, 0],
       ],
-      "A promise continues on a continue verdict, ends on done, and a plain closing gets no check.",
+      "A promise continues on a continue verdict, ends on done, and a closing or a refusal gets no check.",
     );
     return { results };
   });
