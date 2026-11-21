@@ -38,7 +38,8 @@ fi
 
 in_use=$(node_modules/.bin/wrangler d1 execute DB --remote --json --config apps/auth-api/wrangler.jsonc \
   --command "SELECT DISTINCT provider_template FROM hosted_servers
-    WHERE provider_sandbox_id IS NULL AND provider_template IS NOT NULL AND observed_state != 'deleted'" |
+    WHERE provider_sandbox_id IS NULL AND provider_template IS NOT NULL AND operator_host IS NULL
+    AND observed_state != 'deleted'" |
   jq -er '[.[].results[].provider_template] | join(",")')
 
 bun scripts/hosting/build-boat-template.ts \

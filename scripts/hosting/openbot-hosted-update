@@ -87,7 +87,7 @@ install_packages() {
   done <"$1"
   [ "${#missing[@]}" -eq 0 ] && return 0
   dpkg --configure -a
-  apt-get -o DPkg::Lock::Timeout=600 update
+  apt-get -o DPkg::Lock::Timeout=600 -o Acquire::AllowReleaseInfoChange::Label=true update
   for package in "${missing[@]}"; do
     if available_package "$package"; then
       available+=("$package")
