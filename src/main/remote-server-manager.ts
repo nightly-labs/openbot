@@ -1004,11 +1004,17 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         const accepted = yield* transport
           .acceptInvite(invite.token)
           .pipe(Effect.catchIf(isOwnServerInvitation, () => Effect.succeed({ hostId: invite.serverId })));
-        if (accepted.hostId === this.#getLocalHostId()) {
-          this.#store.setActiveServerId(LOCAL_SERVER_ID);
+        const serverOnThisComputer =
+          accepted.hostId === this.#getLocalHostId()
+            ? LOCAL_SERVER_ID
+            : this.#thisComputerServers.has(accepted.hostId)
+              ? accepted.hostId
+              : null;
+        if (serverOnThisComputer) {
+          this.#store.setActiveServerId(serverOnThisComputer);
           yield* this.#store.persist();
           this.#emitChanged();
-          return yield* remoteDecode(() => requiredServerSummary(this.list(), LOCAL_SERVER_ID));
+          return yield* remoteDecode(() => requiredServerSummary(this.list(), serverOnThisComputer));
         }
         if (accepted.hostId !== invite.serverId)
           return yield* new RemoteWorkflowError({
