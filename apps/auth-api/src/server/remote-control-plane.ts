@@ -68,7 +68,12 @@ import {
   SERVER_MEMBER_LIMIT_SQL,
 } from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
-import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
+import {
+  CUSTOM_SERVER_OFFER_COLUMNS,
+  type CustomServerOfferRow,
+  customServerPaid,
+  customServerPayment,
+} from "./custom-server-offers";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -2387,13 +2392,16 @@ export class RemoteControlPlane {
     function* (this: RemoteControlPlane, userId: string, hostId: string) {
       const dependencies = yield* RemoteDependencies;
       yield* this.#requireRole(hostId, userId, ["owner"]);
-      const hosted = yield* remoteCall(() =>
+      const billed = yield* remoteCall(() =>
         dependencies.database
-          .prepare("SELECT server_id FROM hosted_servers WHERE server_id = ? LIMIT 1")
+          .prepare(
+            `SELECT EXISTS(SELECT 1 FROM hosted_servers WHERE server_id = ?1) AS hosted,
+                    (SELECT subscription_status FROM custom_server_offers WHERE host_id = ?1) AS custom_status`,
+          )
           .bind(hostId)
-          .first<{ server_id: string }>(),
+          .first<{ hosted: number; custom_status: string | null }>(),
       );
-      if (hosted)
+      if (billed && (billed.hosted === 1 || customServerPaid(billed.custom_status)))
         return yield* new RemoteControlPlaneError(
           409,
           "hosted_server_removal",
