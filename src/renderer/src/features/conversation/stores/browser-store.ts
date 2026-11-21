@@ -1,4 +1,10 @@
-import type { BrowserControlSession, BrowserPreview, BrowserTab, BrowserTeachStep } from "@openbot/contracts/ipc";
+import type {
+  BrowserControlSession,
+  BrowserPreview,
+  BrowserTab,
+  BrowserTakeoverRequest,
+  BrowserTeachStep,
+} from "@openbot/contracts/ipc";
 import { BROWSER_TEACH_CAPABILITY } from "@openbot/contracts/team-protocol/browser-teach-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -214,9 +220,18 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       if (!expanded) takeoverFullViewTabId = null;
     },
   );
-  const respondToBrowserTakeover = async (decision: "complete" | "cancel") => {
+  let takeoverResponse: { requestId: string | number; result: Promise<boolean> } | null = null;
+  const respondToBrowserTakeover = (decision: "complete" | "cancel"): Promise<boolean> => {
     const request = deps.props.browserTakeover;
-    if (!request) return false;
+    if (!request) return Promise.resolve(false);
+    if (takeoverResponse?.requestId === request.requestId) return takeoverResponse.result;
+    const result = sendBrowserTakeoverResponse(request, decision).finally(() => {
+      if (takeoverResponse?.result === result) takeoverResponse = null;
+    });
+    takeoverResponse = { requestId: request.requestId, result };
+    return result;
+  };
+  const sendBrowserTakeoverResponse = async (request: BrowserTakeoverRequest, decision: "complete" | "cancel") => {
     const resolution = {
       decision,
       tab: browserTakeoverTab(),
