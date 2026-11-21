@@ -1,5 +1,6 @@
 import {
   canAdministerServer,
+  type LibraryFolderAction,
   type LibraryFolderRefusalReason,
   type LibraryFoldersSnapshot,
   parseLibraryFolderAction,
@@ -68,6 +69,10 @@ function requireFolderAccess(
   for (const agentId of agentIds) requireAgentLevel(context, agentId, "chat");
 }
 
+function carriesFiles(action: LibraryFolderAction): boolean {
+  return action.type === "place" || action.type === "restore" || (action.type === "create" && !!action.fileIds);
+}
+
 export async function routeLibraryFolders(
   context: TeamApiRequestContext,
   libraryFolders: TeamApiLibraryFolders | undefined,
@@ -97,7 +102,7 @@ export async function routeLibraryFolders(
   };
   if (url.pathname === LIBRARY_FOLDERS_ROUTES.read) return json(200, await visible(libraryFolders.snapshot()));
   const action = parseLibraryFolderAction(body);
-  const visibleWorkflows = await shown();
+  const visibleWorkflows = carriesFiles(action) ? await shown() : new Set<string>();
   try {
     const snapshot = await runCauseEffect(
       libraryFolders.change(action, (agents) => requireFolderAccess(context, agents, hiddenAgentIds, visibleWorkflows)),
