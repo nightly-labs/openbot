@@ -1,7 +1,7 @@
 import type { AppInfo, SettingLinkId } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import type { AgentSettingLinkId } from "@openbot/ui/features/conversation/agent-setting-links";
-import type { SettingsTab } from "./settings-tabs";
+import { type SettingsTab, settingsTabShown } from "./settings-tabs";
 
 export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId>;
 
@@ -56,5 +56,16 @@ export function appSettingLinkTarget(
   return {
     tab: "dynamic-island",
     row: platform === "darwin" ? "settings.notch.show.title" : "settings.notch.show.titleTopOfScreen",
+  };
+}
+
+export function appSettingRowOpener(
+  window: () => { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
+  openRow: (tab: SettingsTab, row: AppTextKey) => void,
+): (settingId: AppSettingLinkId) => (() => void) | undefined {
+  return (settingId) => {
+    const current = window();
+    const target = appSettingLinkTarget(settingId, current.platform);
+    return settingsTabShown(target.tab, current) ? () => openRow(target.tab, target.row) : undefined;
   };
 }

@@ -23,6 +23,7 @@ import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
+import { appSettingRowOpener } from "../settings/setting-link-targets";
 import { useSettings } from "../settings/settings-context";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
@@ -58,6 +59,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     mcpSignIns,
     refreshMcpSignIns,
     generalSettings,
+    openAppSettingRow,
   } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userPausedAgentIds } = useAgents();
   const { approvals, pendingPrompts, usageLimits } = useTurns();
@@ -131,6 +133,10 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       notice={<ChannelErrorNotice />}
       platform={platform.appInfo()?.platform}
       connectors={connectors.active}
+      appSettingOpener={appSettingRowOpener(
+        () => ({ platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null }),
+        openAppSettingRow,
+      )}
       agentStatus={shownAgentStatus()}
       agent={undefined}
       agents={agentList()}

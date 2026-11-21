@@ -15,6 +15,7 @@ import {
   isChannelMessage,
   isChannelTask,
   MCP_SIGN_IN_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
   withBrowserMember,
 } from "@openbot/contracts/ipc";
@@ -51,6 +52,7 @@ const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread FROM projection_channel_mess
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?`;
 
@@ -148,6 +150,7 @@ export class ChannelStore {
         excludedId,
         `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
         `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
+        `${SETTING_LINK_ITEM_TYPE_PREFIX}%`,
       ),
     );
     const count = Number(row?.unread ?? 0);
