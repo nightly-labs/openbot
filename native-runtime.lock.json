@@ -355,7 +355,7 @@
       "licenseSha256": "8b1ba204bb69a0ade2bfcf65ef294a920f6bb361b317dba43c7ef29d96332b9b",
       "patch": {
         "path": "vendor/remote-desktop/patches/moonlight-web-stream-v2.10.0-openbot.patch",
-        "sha256": "916fcf57ec3f3d5a7517d488d106d698dbc7f4c8c2d12acc6be9982510a05444"
+        "sha256": "ef96c4d3637ade7fa2594185638e6cc715b1bc71036dadc2e2d6895cca04c185"
       },
       "overrides": [],
       "submodules": {}
@@ -366,31 +366,7 @@
       "win32-x64": ["sunshine.exe", "web-server.exe", "streamer.exe"],
       "linux-x64": ["sunshine", "web-server", "streamer"]
     },
-    "releaseArtifacts": {
-      "darwin-arm64": {
-        "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "bc3dec7efe4d1fc8f0aa9a0ae76f013eedde751d5dec67233138938ac4c4c63a"
-      },
-      "darwin-x64": {
-        "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
-        "sha256": "9bd4f16fe6bc39b3c3da876729f3ab17473039856b59ac477564c78c619f7900"
-      },
-      "win32-x64": {
-        "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "75b55c4163e8fde18fbcc34454e222aaf1001433d3c9962872618c4223763e38"
-      },
-      "linux-x64": {
-        "asset": "remote-desktop-runtime-linux-x64.tar.gz",
-        "sha256": "92d8235b681ee5e3e4ff88e968a2834736c0fd7738212a2ba2214cb86dbccb5d"
-      }
-    },
-    "artifactRelease": {
-      "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-1a675ecdf05e7b581279162ec3ffc3fb235681acceb48450aaeb9421d43b1d2c",
-      "inputDigest": "1a675ecdf05e7b581279162ec3ffc3fb235681acceb48450aaeb9421d43b1d2c",
-      "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "4a66653f745d42272c1c1efa5f3b10257d3974967d1f5e1036173a1de82b765a"
-    }
+    "releaseArtifacts": {}
   },
   "bun": {
     "registry": "https://registry.npmjs.org",
