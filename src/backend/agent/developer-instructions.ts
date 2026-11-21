@@ -555,7 +555,9 @@ function memoryInstructions(
 
 function longJobStart() {
   if (process.platform === "win32") return "run your own long job detached (nohup) to outlive the call";
-  return "detach your own long job: (set -m; nohup ... >log 2>&1 &)";
+  if (process.platform === "darwin")
+    return "detach your own long job: nohup perl -MPOSIX -e 'setsid; exec @ARGV' ... >log 2>&1 &";
+  return "detach your own long job: setsid nohup ... >log 2>&1 &";
 }
 
 function automationInstructions(agentId: string, root: string): string {
