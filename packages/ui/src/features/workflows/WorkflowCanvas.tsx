@@ -675,9 +675,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   });
   const [sketchPoints, setSketchPoints] = createSignal<readonly WfnPoint[]>([], { equals: false });
 
+  let tidyGoals: ReadonlyMap<string, WfnPoint> | undefined;
+  let tidyFrame = 0;
   const capture = (): CanvasSnapshot => ({
     nodes: nodes(),
-    positions: Object.fromEntries(Object.entries(positions).map(([id, at]) => [id, { ...at }])),
+    positions: Object.fromEntries(Object.entries(positions).map(([id, at]) => [id, { ...(tidyGoals?.get(id) ?? at) }])),
     sizes: Object.fromEntries(Object.entries(sizes).map(([id, size]) => [id, { ...size }])),
     board: canvas.snapshot(),
     strokes: strokes(),
@@ -712,8 +714,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   });
   const { steps } = edits;
   const commit = () => {
-    endTidy(true);
     edits.commit();
+    endTidy(true);
   };
 
   const frames = new Map<number, () => void>();
@@ -1000,6 +1002,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const reset = (next: WorkflowGraph, same: boolean) => {
     const before = same ? (liveCanvas ?? capture()) : undefined;
+    endTidy(false);
     const snapshot = snapshotFromGraph(next);
     baseGraph = graphFromSnapshot(snapshot);
     savedGraph = stableJson(baseGraph);
@@ -1339,8 +1342,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     else moveCamera(next, false);
   };
 
-  let tidyGoals: ReadonlyMap<string, WfnPoint> | undefined;
-  let tidyFrame = 0;
   const endTidy = (land: boolean) => {
     const goals = tidyGoals;
     if (!goals) return;
@@ -1464,7 +1465,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   const canTidy = () => !editsBlocked() && !deleted() && live().length > 1;
   const tidyUp = () => {
-    if (!canTidy()) return;
+    if (!canTidy() || tidyGoals) return;
     const goals = tidyPlaces();
     const moved = [...goals].some(([id, at]) => positions[id]?.x !== at.x || positions[id]?.y !== at.y);
     if (!moved) {
