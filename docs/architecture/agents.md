@@ -108,7 +108,9 @@ agent can hold the result that the user asked for, so it is never quiet.
 A quiet turn can start background work, such as a background command or subagent. When it ends while
 no turn runs, Claude starts a turn of its own to answer it, and no delivery started that turn. The
 Claude client keeps the turn that started each background task (`task_started`), and the turn that
-answers it names those turns (`continues` on `turn/started`). When each of them ended quiet, the
+answers it names those turns (`continues` on `turn/started`). A task that a subagent starts for itself
+(`owned_by_subagent`) is not counted: its end does not wake the agent. A task that a subagent starts as
+its own subagent (`parent_task_id`) counts for the turn that started that subagent. When each of them ended quiet, the
 turn can end quiet in the same way: the no-update tool accepts the call, and its text answers become
 quiet answers (#10847). Work that ends while that turn runs goes to it too
 (`openbot/turn-continues`). Work of a person's request, or of an unknown turn, keeps the answer in

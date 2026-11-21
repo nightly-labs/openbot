@@ -405,7 +405,7 @@ interface ThreadRuntime {
   subagents: SubagentState;
   backgroundTasks: number;
   awaitsResultTurn: boolean;
-  taskTurns: Map<string, string>;
+  taskTurns: Map<string, string | typeof SUBAGENT_OWNED_TASK>;
   endedTaskTurns: (string | null)[];
   subagentLimit: { resetsAt: number | null; text: string } | null;
   lastOutputAt: number;
@@ -442,6 +442,18 @@ const SKIPPED_PROMPT_RETRIES = MAX_RUNS + 1;
 
 const CLAUDE_STOP_HOOK_FEEDBACK = "Stop hook feedback:\n";
 
+const SUBAGENT_OWNED_TASK = Symbol("subagent-owned task");
+
+function startedTaskOrigin(
+  taskTurns: ReadonlyMap<string, string | typeof SUBAGENT_OWNED_TASK>,
+  message: ClaudeStreamMessage,
+  turn: ActiveTurn | null,
+): string | typeof SUBAGENT_OWNED_TASK | undefined {
+  if (message.owned_by_subagent === true) return SUBAGENT_OWNED_TASK;
+  const parentOrigin = isString(message.parent_task_id) ? taskTurns.get(message.parent_task_id) : undefined;
+  return parentOrigin ?? turn?.id;
+}
+
 interface ClaudeStreamMessage {
   type: string;
   parent_tool_use_id?: string | null;
@@ -468,6 +480,8 @@ interface ClaudeStreamMessage {
   rate_limit_info?: unknown;
   tasks?: unknown;
   task_id?: unknown;
+  parent_task_id?: unknown;
+  owned_by_subagent?: unknown;
   run_id?: unknown;
   command_uuid?: unknown;
   state?: unknown;
@@ -1680,6 +1694,23 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return turn;
   }
 
+  #noteEndedTask(runtime: ThreadRuntime, message: ClaudeStreamMessage, taskId: string, origin: string | null): void {
+    const turn = runtime.activeTurn;
+    if (!turn) {
+      runtime.endedTaskTurns.push(origin);
+      if (isString(message.run_id))
+        runtime.nextTurnId = claudeTaskTurnId(
+          isString(message.session_id) ? message.session_id : runtime.id,
+          taskId,
+          message.run_id,
+        );
+    } else if (turn.unprompted && origin !== turn.id)
+      this.emit("notification", {
+        method: "openbot/turn-continues",
+        params: { threadId: runtime.id, turnId: turn.id, continues: origin },
+      });
+  }
+
   #holdSubagentLimit(runtime: ThreadRuntime, message: ClaudeStreamMessage): void {
     const text = messageText(message.message);
     const refusal = claudeUsageLimitRefusal(message);
@@ -1913,23 +1944,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     if (message.type === "system" && message.subtype?.startsWith("task_") && isString(message.task_id)) {
       const turn = runtime.activeTurn;
-      if (message.subtype === "task_started" && turn) runtime.taskTurns.set(message.task_id, turn.id);
-      else if (message.subtype === "task_notification") {
-        const origin = runtime.taskTurns.get(message.task_id) ?? null;
+      if (message.subtype === "task_started") {
+        const origin = startedTaskOrigin(runtime.taskTurns, message, turn);
+        if (origin !== undefined) runtime.taskTurns.set(message.task_id, origin);
+      } else if (message.subtype === "task_notification") {
+        const owner = runtime.taskTurns.get(message.task_id);
         runtime.taskTurns.delete(message.task_id);
-        if (!turn) {
-          runtime.endedTaskTurns.push(origin);
-          if (isString(message.run_id))
-            runtime.nextTurnId = claudeTaskTurnId(
-              isString(message.session_id) ? message.session_id : runtime.id,
-              message.task_id,
-              message.run_id,
-            );
-        } else if (turn.unprompted && origin !== turn.id)
-          this.emit("notification", {
-            method: "openbot/turn-continues",
-            params: { threadId: runtime.id, turnId: turn.id, continues: origin },
-          });
+        if (owner !== SUBAGENT_OWNED_TASK) this.#noteEndedTask(runtime, message, message.task_id, owner ?? null);
       }
     }
     if (message.type === "system" && message.subtype?.startsWith("task_")) {
