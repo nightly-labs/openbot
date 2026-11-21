@@ -2022,6 +2022,7 @@ export class ProviderRuntime implements ProviderPort {
               env,
               timeoutMs: command.timeoutMs,
               ...(command.closeInput ? { closeInput: true } : {}),
+              ...(command.pipedInput ? { pipedInput: true } : {}),
               ...(command.savedSignIn ? { savedSignIn: command.savedSignIn(cli, { ...process.env, ...env }) } : {}),
             });
           }),
