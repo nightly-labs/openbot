@@ -809,7 +809,9 @@ export class AgentTasks implements TaskLanes {
   }
 
   #reportsTurn(task: AgentThreadRecord, event: AgentTurnCompletedEvent): boolean {
-    if (!isStartedTask(task) || task.closedAt !== null || event.origin === "user") return false;
+    if (!isStartedTask(task) || task.closedAt !== null) return false;
+    if (event.origin === "user" && this.#mailbox.openRequestsHeldByTask(task.agentId, task.taskId).length === 0)
+      return false;
     if (this.#mailbox.taskAwaitsAgent(task.agentId, task.taskId)) return false;
     const stopped = this.#stoppedTurns.get(task.taskId) === event.turnId;
     return !stopped || this.#userStops.get(task.taskId) === event.turnId;

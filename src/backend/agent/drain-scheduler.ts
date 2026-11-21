@@ -1365,7 +1365,8 @@ export class DrainScheduler {
     if (!context.senderTaskId || sender.kind !== "agent" || sender.agentId !== recipientAgentId) return [];
     if (
       this.#mailbox.taskBusy(recipientAgentId, context.senderTaskId) ||
-      this.#mailbox.taskRunsInProvider(recipientAgentId, context.senderTaskId)
+      this.#mailbox.taskRunsInProvider(recipientAgentId, context.senderTaskId) ||
+      this.#mailbox.taskAwaitsTeammate(recipientAgentId, context.senderTaskId)
     )
       return [];
     return [

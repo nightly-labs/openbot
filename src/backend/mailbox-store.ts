@@ -1251,9 +1251,12 @@ export class MailboxStore {
   }
 
   taskStillWorks(agentId: string, taskId: string): boolean {
-    return (
-      this.#taskWorksItself(agentId, taskId) ||
-      this.awaitedThreadRequests().some((request) => request.taskId === taskId && request.senderAgentId === agentId)
+    return this.#taskWorksItself(agentId, taskId) || this.taskAwaitsTeammate(agentId, taskId);
+  }
+
+  taskAwaitsTeammate(agentId: string, taskId: string): boolean {
+    return this.awaitedThreadRequests().some(
+      (request) => request.taskId === taskId && request.senderAgentId === agentId,
     );
   }
 
