@@ -74,7 +74,7 @@ function registerVoice(
     downloadModel: payloadHandler(parseVoiceModelRequest, () => READY),
     cancelModelDownload: payloadHandler(parseVoiceModelRequest, () => READY),
     removeModel: payloadHandler(parseVoiceModelRequest, () => READY),
-    getSettings: handler(() => SETTINGS),
+    getSettings: handler(() => ({ ...SETTINGS, saved: true })),
     setSettings: payloadHandler(parseVoiceSettings, (settings) => settings),
     transcribe: withEvent
       ? eventPayloadHandler(decodeNote, (event, input) => transcribe(input, event))

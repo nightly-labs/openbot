@@ -1,4 +1,10 @@
-import { VOICE_AUDIO_LIMITS, VOICE_MODELS, VOICE_STREAM_LIMITS, type VoiceModelId } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_VOICE_MODEL_ID,
+  VOICE_AUDIO_LIMITS,
+  VOICE_MODELS,
+  VOICE_STREAM_LIMITS,
+  type VoiceModelId,
+} from "@openbot/contracts/ipc";
 import { VOICE_LIMIT_WARNING_SECONDS } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { currentText } from "@openbot/ui/text";
 import { onCleanup } from "solid-js";
@@ -92,6 +98,7 @@ export interface VoiceStoreDeps {
   setConversationError: (target: ConversationTarget, message: string) => void;
   viewIsMounted: () => boolean;
   setVoiceLimitReached?: (target: ConversationTarget, reached: boolean) => void;
+  offerVoiceLanguageChoice?: (target: ConversationTarget) => void;
   hooks: VoiceSubmitHooks;
   thread?: VoiceThreadHooks;
 }
@@ -108,6 +115,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   const { resources } = deps;
   let preparingModelId: VoiceModelId | null = null;
   let stoppedAtLimit = false;
+  let usesDefaultParakeet = false;
 
   async function startVoiceRecording(threadKey?: string): Promise<void> {
     const agentId = deps.props.agent?.id;
@@ -142,6 +150,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           const model = VOICE_MODELS.find((candidate) => candidate.id === settings.modelId);
           const own = server?.routes.dictation === true;
           livePreview = !own && (model?.livePreview ?? true);
+          usesDefaultParakeet = !own && !settings.saved && settings.modelId === DEFAULT_VOICE_MODEL_ID;
           streamed = !own && model?.kind === "cloud" && model.provider === "elevenlabs";
         }),
         voice.prepareModel(),
@@ -387,6 +396,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     const submitRequest = resources.voiceSubmitRequest;
     const atLimit = stoppedAtLimit;
     stoppedAtLimit = false;
+    const offerLanguageChoice = usesDefaultParakeet;
+    usesDefaultParakeet = false;
     const cloud = resources.voiceCloudStream;
     resources.voiceCloudStream = undefined;
     resources.voiceRecorder = undefined;
@@ -476,6 +487,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           deps.setComposerFocusRequest((current) => current + 1);
         }
       }
+      if (offerLanguageChoice) deps.offerVoiceLanguageChoice?.(recordingTarget);
     } catch (error) {
       analytics.track("voice_transcription", {
         result: "failed",

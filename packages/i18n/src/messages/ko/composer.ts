@@ -100,6 +100,9 @@ export const messages = {
   "composer.voice.recording": "음성 녹음",
   "composer.voice.limitSoon": "{seconds}초 후 녹음이 중지돼요.",
   "composer.voice.limitReached": "2분 제한에 도달해 녹음이 중지되었어요. 말한 내용은 메시지에 들어 있어요.",
+  "composer.voice.languageNotice":
+    "받아쓰기는 영어 등 25개 유럽 언어를 알아들어요. 다른 언어는 더 큰 모델({size})이 필요하고, 텍스트는 멈춘 뒤에 나타나요.",
+  "composer.voice.languageNotice.action": "다른 언어로 말해요",
   "composer.send.saveQueued": "대기열 메시지 저장",
   "composer.send.voice": "음성 메시지 보내기",
   "composer.send.message": "메시지 보내기",

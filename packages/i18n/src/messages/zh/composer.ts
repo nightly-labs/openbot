@@ -97,6 +97,9 @@ export const messages = {
   "composer.voice.recording": "录音中",
   "composer.voice.limitSoon": "录音将在 {seconds} 秒后停止。",
   "composer.voice.limitReached": "录音已在 2 分钟上限处停止，你说的内容已放入消息。",
+  "composer.voice.languageNotice":
+    "听写可识别英语等 25 种欧洲语言。其他语言需要更大的模型（{size}），文字会在停止后显示。",
+  "composer.voice.languageNotice.action": "我说其他语言",
   "composer.send.saveQueued": "保存排队消息",
   "composer.send.voice": "发送语音消息",
   "composer.send.message": "发送消息",
