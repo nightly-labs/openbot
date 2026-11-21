@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
+import { chatVisualReply } from "@openbot/contracts/chat-visual";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_TASK_QUEUED_PREVIEW,
@@ -23,7 +25,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import type { ConversationRuntime } from "../agent/conversation-runtime";
-import { TASK_REPORT_CUT_MARK, type TaskReportState } from "../agent/delivery-content";
+import { TASK_REPORT_CUT_MARK, type TaskReportState, visualReplyMessageId } from "../agent/delivery-content";
 import type { TaskLanes } from "../agent/drain-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import {
@@ -755,6 +757,14 @@ export class AgentTasks implements TaskLanes {
     event: AgentTurnCompletedEvent,
   ): Effect.fn.Return<void> {
     const task = this.#store.task(ended.taskId) ?? ended;
+    if (event.status === "completed")
+      yield* this.#showTaskPages(task, event.turnId).pipe(
+        Effect.catchCause((cause) =>
+          Effect.sync(() =>
+            logger.warn("Could not show task pages in the main chat.", { agentId: task.agentId, cause }),
+          ),
+        ),
+      );
     const text = taskReportText(task, event.status, this.#hooks.turnAnswer(task.agentId, task.threadId, event.turnId));
     const queued = yield* this.#mailbox
       .enqueue({
@@ -777,6 +787,61 @@ export class AgentTasks implements TaskLanes {
         ),
       );
     if (queued) this.#hooks.queued(task.agentId);
+  });
+
+  readonly #showTaskPages = Effect.fn("AgentTasks.showTaskPages")(function* (
+    this: AgentTasks,
+    task: AgentThreadRecord,
+    turnId: string,
+  ) {
+    const threadId = this.#hooks.agent(task.agentId)?.threadId;
+    if (!threadId) return;
+    const shown = new Set(this.#conversation.ensureSnapshot(task.agentId, threadId).messages.map(({ id }) => id));
+    const staged: string[] = [];
+    yield* Effect.gen({ self: this }, function* () {
+      const added: ConversationMessage[] = [];
+      for (const page of runPages(this.#conversation.ensureSnapshot(task.agentId, task.threadId).messages)) {
+        const visual = chatVisualReply(page);
+        const id = visualReplyMessageId(threadId, task.threadId, page.id);
+        if (!visual || shown.has(id)) continue;
+        const file = yield* this.#mailbox.resolveAttachment(visual.attachment.id);
+        if (!file) continue;
+        const copy = yield* this.#mailbox.stageGeneratedCopy({
+          sourcePath: file.path,
+          name: file.name,
+          mimeType: file.mimeType,
+          ownerAgentId: task.agentId,
+          ownerThreadId: threadId,
+        });
+        staged.push(copy.id);
+        added.push({
+          id,
+          author: "assistant",
+          source: "assistant",
+          text: page.text,
+          createdAt: new Date().toISOString(),
+          status: "completed",
+          itemType: page.itemType,
+          attachments: [copy],
+        });
+      }
+      if (added.length === 0) return;
+      const chat = this.#conversation.ensureSnapshot(task.agentId, threadId);
+      chat.messages.push(...added);
+      sortConversationMessages(chat.messages);
+      try {
+        chat.revision = this.#mailbox.persistGeneratedAttachmentsWithConversation(
+          chat,
+          "attachment.task-pages-shown",
+          { taskId: task.taskId, turnId },
+          staged,
+        ).revision;
+      } catch (error) {
+        for (const message of added) chat.messages.splice(chat.messages.indexOf(message), 1);
+        throw error;
+      }
+      this.#conversation.publishConversation(chat);
+    }).pipe(Effect.onError(() => this.#mailbox.discardStagedGeneratedAttachments(staged).pipe(Effect.ignore)));
   });
 
   #unfinishedTasks(agentId: string): number {
@@ -854,6 +919,14 @@ export class AgentTasks implements TaskLanes {
       throughMessageId,
     };
   }
+}
+
+function runPages(messages: readonly ConversationMessage[]): ConversationMessage[] {
+  const run = messages.slice(
+    messages.findLastIndex((message) => message.author === "user" || message.author === "agent") + 1,
+  );
+  const newest = new Map(run.filter((message) => chatVisualReply(message)).map((page) => [page.text, page]));
+  return [...newest.values()];
 }
 
 function branchFiles(messages: readonly ConversationMessage[]): AttachmentSummary[] {
