@@ -87,8 +87,12 @@ session through the core tools, a subagent, a skill, a deferred tool, and a comm
 Pi adds its own system prompt, tools, and skill listing to each request of the Pi-based providers
 (`pi`, `inception`, `deepseek`, `openrouter`). The MCP extension of `pi-mcp.ts` removes Pi's `<docs>`
 section, which gives the paths of Pi's own documentation, from the copy of the messages that each
-request gets (`context_with_system`). A prompt returned from `before_agent_start` would also drop the
-`<mcp_servers>` section that names the user's deferred servers. The OpenBot bridge hides
+request gets (`context_with_system`). It also adds a note to each result of Pi's own `tool_search`
+(`tool_result`): the note sends the agent to OpenBot's `tool_search` for OpenBot and browser tools. On
+an empty result, the note also says that the tools that an earlier search loaded stay loaded and are
+called by name, because Pi's search does not show them again. A prompt returned from
+`before_agent_start` would also drop the `<mcp_servers>` section that names the user's deferred
+servers. The OpenBot bridge hides
 `request_api_key` and `suggest_marketplace_app` from Pi (`PI_SEARCH_ONLY_OPENBOT_TOOLS`). The agent
 finds and runs these two tools through OpenBot's `tool_search` and `tool_call`. They are `hidden`, not
 `deferred`: a deferred tool adds Pi's own `tool_search` and an `<mcp_servers>` line. `ask_ui` stays
