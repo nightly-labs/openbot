@@ -78,8 +78,9 @@ export function useMessageBackdropAction(runtime: ConversationRuntime) {
 
   const useAsBackdrop = async (source: BackdropSource) => {
     try {
+      const bytes = await source.bytes();
       const previous = useChatBackdrop()();
-      const id = await addCustomBackdrop({ name: source.name, mimeType: source.mimeType, bytes: await source.bytes() });
+      const id = await addCustomBackdrop({ name: source.name, mimeType: source.mimeType, bytes });
       const choice = customBackdropChoice(id);
       setChatBackdrop(choice);
       const undo = () => {
