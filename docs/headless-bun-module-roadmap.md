@@ -89,6 +89,32 @@ automation bridge) is viable without the creator. A module that *replaces* the b
 connects to OpenBot's account/Signal infrastructure is not, without their secrets. The
 local, self-hosted surface is where this fork can move first.
 
+## Local architecture findings (read-only scan of this fork)
+
+- `src/main/team-api/` has **122 `route-*.ts` files and zero `from 'electron'` imports**.
+  `dependencies.ts` types its services against `../../backend/*` (agent service, browser
+  host, channel, mailbox, messaging, routines, workflows) and `@openbot/contracts`.
+  The HTTP/domain surface is not Electron-bound; Electron is the host that wires it.
+- The shipped server entrypoints are shell wrappers that launch the **Electron** binary:
+  `scripts/hosting/openbot-container` and `openbot-hosted-server` create one or two Xvfb
+  displays, a dbus session and an unlocked gnome-keyring, then exec
+  `/opt/OpenBot/app/openbot` with `OPENBOT_SERVER=1` or `OPENBOT_HOSTED_SERVER=1`.
+  The CLI `openbot` talks to `/run/openbot/control.sock` with `curl`; the socket is
+  created by the main process.
+- The repo is already Bun-based for dev/test/check (`bun scripts/dev-services.ts app`,
+  `bun run check`), and `scripts/hosting/openbot-hosted-server` is bash around the same
+  Electron app. So Bun can run the toolchain, but **no Bun entrypoint for the server
+  itself exists today**.
+- `src/main/index.ts` calls `keepWindowsHidden()` in server mode; the window stays because
+  `app.on("window-all-closed", () => app.quit())` would otherwise quit the app. PR #13808
+  skips only the renderer, not the window.
+
+**Implication:** the reusable surface is large (HTTP routes + backend services + contracts),
+and the Electron-bound part is mostly bootstrap (window, displays, keyring, IPC bridge).
+A Bun launcher can plausibly own the first group; the second needs reimplementation or a
+hostless startup path. This is still a hypothesis until the architecture subagent checks
+which backend services import Electron transitively.
+
 ## Open questions (to resolve with evidence, not guesses)
 
 - Does a CLI-only server need the Electron main process at all, or can the hosted server
