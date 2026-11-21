@@ -39,12 +39,13 @@ export const TaskListRow = memo(
 );
 
 function TaskListRowContent({ task, agent, dimmed = false, onPress, menu, slotWidth }: TaskListRowProps) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const { theme } = useUniwind();
   const menuRef = useRef<MenuComponentRef | null>(null);
   const [measuredWidth, setMeasuredWidth] = useState<number>();
   const width = slotWidth ?? measuredWidth;
-  const status = agentTaskStatus(task, t);
+  const status = agentTaskStatus(task, t, sourceText);
+
   const when = formatUpdatedAt(task.closedAt ?? task.updatedAt, format);
   const line = agent
     ? t("mobile.server.threads.rowMetaTime", { agent: agent.name, status: STATUS_MARK, when })

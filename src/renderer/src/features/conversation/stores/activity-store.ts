@@ -103,7 +103,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     const activeTurnId = deps.props.activeTurnId;
     if (!activeTurnId) return null;
     const streamingMessage = streamingAgentMessage();
-    if (streamingMessage && streamingMessage.itemType !== "commentary") return null;
+    if (streamingMessage && streamingMessage.itemType !== "commentary" && streamingMessage.body.trim()) return null;
     if (!deps.props.channel && deps.props.responseStyle === "natural") return null;
     for (let index = deps.props.messages.length - 1; index >= 0; index -= 1) {
       const message = deps.props.messages[index];
@@ -123,7 +123,11 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     const hold = heldByOwnChannelWork();
     if (hold) return currentText().t("chat.activity.workingIn", { channel: hold.channelName });
     const progress = deps.props.activityDetail?.trim();
-    return latestActiveCommentary() ?? (progress ? currentText().sourceText(progress) : null);
+    const commentary = latestActiveCommentary();
+    return (
+      (commentary ? currentText().sourceText(commentary) : null) ??
+      (progress ? currentText().sourceText(progress) : null)
+    );
   });
   const activeStepActivity = createMemo((): AgentStepActivity | null => {
     if (deps.props.prompt || deps.props.approval || deps.props.browserTakeover || heldByOwnChannelWork()) return null;

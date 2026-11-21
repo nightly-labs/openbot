@@ -247,7 +247,7 @@ export interface AgentThreadSelectionActions {
 }
 
 export function AgentThreadView(props: AgentThreadViewProps) {
-  const { t, format, errorMessage } = useText();
+  const { t, format, errorMessage, sourceText } = useText();
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
   const [addMenuOpen, setAddMenuOpen] = createSignal(false);
@@ -887,17 +887,20 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             }}
           </For>
           <Show when={running()}>
-            {(task) => (
-              <div class="virtual-chat-row virtual-chat-row-activity">
-                <AgentActivityIndicator
-                  agent={props.agent}
-                  label={activityLabel}
-                  detail={task().progress}
-                  steps={props.activeSteps}
-                  stepsOpenByDefault={props.stepsOpenByDefault}
-                />
-              </div>
-            )}
+            {(task) => {
+              const progress = task().progress;
+              return (
+                <div class="virtual-chat-row virtual-chat-row-activity">
+                  <AgentActivityIndicator
+                    agent={props.agent}
+                    label={activityLabel}
+                    detail={progress ? sourceText(progress) : null}
+                    steps={props.activeSteps}
+                    stepsOpenByDefault={props.stepsOpenByDefault}
+                  />
+                </div>
+              );
+            }}
           </Show>
           <Show when={backgroundWorkSince()}>
             {(since) => (
