@@ -796,14 +796,14 @@ export class AgentTasks implements TaskLanes {
   ) {
     const threadId = this.#hooks.agent(task.agentId)?.threadId;
     if (!threadId) return;
-    const chat = this.#conversation.ensureSnapshot(task.agentId, threadId);
+    const shown = new Set(this.#conversation.ensureSnapshot(task.agentId, threadId).messages.map(({ id }) => id));
     const staged: string[] = [];
     yield* Effect.gen({ self: this }, function* () {
       const added: ConversationMessage[] = [];
       for (const page of runPages(this.#conversation.ensureSnapshot(task.agentId, task.threadId).messages)) {
         const visual = chatVisualReply(page);
         const id = visualReplyMessageId(threadId, task.threadId, page.id);
-        if (!visual || chat.messages.some((message) => message.id === id)) continue;
+        if (!visual || shown.has(id)) continue;
         const file = yield* this.#mailbox.resolveAttachment(visual.attachment.id);
         if (!file) continue;
         const copy = yield* this.#mailbox.stageGeneratedCopy({
@@ -814,9 +814,19 @@ export class AgentTasks implements TaskLanes {
           ownerThreadId: threadId,
         });
         staged.push(copy.id);
-        added.push({ ...page, id, createdAt: new Date().toISOString(), attachments: [copy] });
+        added.push({
+          id,
+          author: "assistant",
+          source: "assistant",
+          text: page.text,
+          createdAt: new Date().toISOString(),
+          status: "completed",
+          itemType: page.itemType,
+          attachments: [copy],
+        });
       }
       if (added.length === 0) return;
+      const chat = this.#conversation.ensureSnapshot(task.agentId, threadId);
       chat.messages.push(...added);
       sortConversationMessages(chat.messages);
       try {
@@ -912,7 +922,9 @@ export class AgentTasks implements TaskLanes {
 }
 
 function runPages(messages: readonly ConversationMessage[]): ConversationMessage[] {
-  const run = messages.slice(messages.findLastIndex((message) => message.author !== "assistant") + 1);
+  const run = messages.slice(
+    messages.findLastIndex((message) => message.author === "user" || message.author === "agent") + 1,
+  );
   const newest = new Map(run.filter((message) => chatVisualReply(message)).map((page) => [page.text, page]));
   return [...newest.values()];
 }
