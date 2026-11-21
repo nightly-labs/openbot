@@ -710,7 +710,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
 
   canReleaseProcess(): boolean {
-    return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
+    return !this.runsBackgroundWork();
+  }
+
+  runsBackgroundWork(): boolean {
+    return [...this.#threads.ids()].some((id) => Boolean(this.#threads.get(id)?.backgroundTasks));
   }
 
   holdsBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {

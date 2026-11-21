@@ -70,6 +70,7 @@ interface Report {
     holdsAfterRestart: boolean;
   };
   heldWork?: {
+    updateWaitsForOpenSession: boolean;
     updateInstallsWhileHeld: number;
     updateHoldsNewTurns: boolean;
     updateInstallsAfterWork: number;
@@ -291,9 +292,25 @@ try {
   const holdBackgroundWork = () => {
     const client = providers.currentClient("antigravity");
     assert.ok(client, "the provider runs");
-    Object.defineProperty(client, "canReleaseProcess", { value: () => !backgroundWorkRuns, configurable: true });
+    Object.defineProperty(client, "runsBackgroundWork", { value: () => backgroundWorkRuns, configurable: true });
   };
   const spawnCount = async () => (await readFile(log, "utf8")).split("\n").filter(Boolean).length;
+  const sessionClient = providers.currentClient("antigravity");
+  assert.ok(sessionClient, "the provider runs");
+  Object.defineProperty(sessionClient, "canReleaseProcess", { value: () => false, configurable: true });
+  installs = 0;
+  let waitedForSession = false;
+  const sessionUpdate = await runCauseEffect(
+    providers
+      .updateProviderCli("antigravity", install(newerExecutable), new AbortController().signal, () => {
+        waitedForSession = true;
+      })
+      .pipe(Effect.result),
+  );
+  const updateWaitsForOpenSession = waitedForSession || installs !== 1;
+  assert.ok(Result.isSuccess(sessionUpdate));
+  assert.equal(updateWaitsForOpenSession, false, "an open session with no background work does not delay the update");
+
   holdBackgroundWork();
   installs = 0;
   let waitedForWork = false;
@@ -327,6 +344,7 @@ try {
   const restartedAfterWork = (await spawnCount()) > spawnsBeforeHeldRestart;
   assert.ok(restartedAfterWork, "the provider restarts once the background work ends");
   report.heldWork = {
+    updateWaitsForOpenSession,
     updateInstallsWhileHeld,
     updateHoldsNewTurns,
     updateInstallsAfterWork,

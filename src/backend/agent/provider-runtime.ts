@@ -892,7 +892,7 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   #holdsBackgroundWork(provider: AgentProvider): boolean {
-    return this.#clients.get(provider)?.canReleaseProcess?.() === false;
+    return this.#clients.get(provider)?.runsBackgroundWork?.() === true;
   }
 
   readonly releaseIdleThreads = Effect.fn("ProviderRuntime.releaseIdleThreads")(function* (this: ProviderRuntime) {
