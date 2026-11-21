@@ -939,10 +939,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       case "turn/interrupt": {
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
-        if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
+        const turnId = getString(params, "turnId");
+        const notRunning = turnId === null ? {} : { turnActive: false };
+        if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder(notRunning));
         const runtime = yield* providerSync(() => this.#requireThread(threadId));
         const turn = runtime.activeTurn;
-        const stopped = turn && turn.id === getString(params, "turnId") ? turn : null;
+        const stopped = turn && turn.id === turnId ? turn : null;
         if (stopped) {
           stopped.stopRequested = true;
           yield* this.#closeIfStopIgnored(runtime, stopped);
@@ -954,7 +956,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
               : Effect.fail(failure),
           ),
         );
-        return yield* providerSync(() => decoder({}));
+        return yield* providerSync(() => decoder(stopped ? {} : notRunning));
       }
       case "thread/compact/start":
         return yield* providerSync(() => decoder({}));

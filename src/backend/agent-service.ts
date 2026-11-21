@@ -6894,13 +6894,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const session = this.#runningSession(agent, targetThreadId);
     if (!session) return false;
     this.#images.interrupt(agentId, session, turnId);
-    yield* client
+    const response = yield* client
       .request("turn/interrupt", { threadId: session, turnId }, decodeRecordResponse)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "interrupt turn", cause: failure.cause })),
       );
+    if (!mayStop && response.turnActive === false && this.#turnRunsOnlyInSnapshot(agentId, turnId)) {
+      logger.warn("Stop found a chat turn that its provider does not run. It ends as interrupted.", {
+        agentId,
+        turnId,
+      });
+      yield* this.#turn.settleOrphanedTurn(agentId, targetThreadId ?? null, turnId, "interrupted");
+    }
     return true;
   }, Effect.uninterruptible);
+
+  #turnRunsOnlyInSnapshot(agentId: string, turnId: string): boolean {
+    return (
+      this.#turn.turnStartedAt(turnId) === null &&
+      !this.#turn.isCompleting(turnId) &&
+      this.#conversation.snapshotWithTurn(agentId, turnId) !== undefined
+    );
+  }
 
   #routineRunsIn(agent: AgentSummary, threadId: string | null): boolean {
     const publicThreadId = threadId ?? agent.threadId;
