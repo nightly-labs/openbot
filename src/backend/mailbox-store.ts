@@ -2051,8 +2051,15 @@ export class MailboxStore {
         (candidate) =>
           candidate.messageId === request.id &&
           candidate.recipientAgentId !== answeredBy &&
-          isActiveDelivery(candidate),
+          this.#stillWorksOn(candidate, request.id),
       ) && !this.#turnAfterRequestEnded(delivery, request, messages)
+    );
+  }
+
+  #stillWorksOn(delivery: StoredDelivery, requestId: string): boolean {
+    return (
+      isActiveDelivery(delivery) ||
+      (delivery.status === "completed" && this.heldByTask(delivery.recipientAgentId, requestId))
     );
   }
 
@@ -2079,7 +2086,7 @@ export class MailboxStore {
       .filter(
         (delivery) =>
           delivery.messageId === requestId &&
-          isActiveDelivery(delivery) &&
+          this.#stillWorksOn(delivery, requestId) &&
           !this.#hasAnswered(requestId, delivery.recipientAgentId),
       )
       .map((delivery) => delivery.recipientAgentId);
