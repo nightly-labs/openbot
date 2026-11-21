@@ -38,6 +38,7 @@ import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { isTextAnswer } from "./agent/routine-quiet-runs";
+import { setChannelFolderSource } from "./agent/workspace-sandbox";
 import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
 import {
   assignmentText,
@@ -157,6 +158,10 @@ type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
 
 const CHANNEL_HANDOFF_AUTHOR_PREFIX = "agent:";
 
+function withoutFolders({ folders: _folders, ...channel }: Channel): Channel {
+  return channel;
+}
+
 function channelHandoffAuthorId(agentId: string): string {
   return `${CHANNEL_HANDOFF_AUTHOR_PREFIX}${agentId}`;
 }
@@ -203,6 +208,7 @@ export class ChannelService {
     readonly hooks: ChannelHooks,
   ) {
     this.store = new ChannelStore(database);
+    setChannelFolderSource((agentId) => this.store.memberFolders(agentId));
     this.memories = new ChannelMemoryStore(database);
     this.#history = new ChannelHistory(this.store, hooks.generate, this.memories);
   }
@@ -344,6 +350,20 @@ export class ChannelService {
           Effect.tapError(() => (written ? images.remove(written.path) : Effect.void)),
         );
         if (previous) yield* images.remove(previous.path);
+        this.publish(channelId);
+        return result;
+      }).pipe(Effect.uninterruptible),
+    ),
+  );
+
+  readonly setFolders = Effect.fn("ChannelService.setFolders")((channelId: string, folders: readonly string[]) =>
+    this.#serialize(
+      channelId,
+      Effect.gen({ self: this }, function* () {
+        const channel = yield* channelSync(() => this.store.get(channelId));
+        const result = yield* channelSync(() =>
+          this.store.update(folders.length ? { ...channel, folders: [...folders] } : withoutFolders(channel)),
+        );
         this.publish(channelId);
         return result;
       }).pipe(Effect.uninterruptible),

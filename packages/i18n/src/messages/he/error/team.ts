@@ -128,6 +128,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "יעדי שגרות אינם נתמכים בחיבור הזה.",
   "error.team.agentMemoryLimitUnsupported": "מגבלת הזיכרון של הסוכן אינה נתמכת בחיבור הזה.",
   "error.team.agentFoldersUnsupported": "תיקיות סוכנים אינן נתמכות בחיבור הזה.",
+  "error.team.channelFoldersUnsupported": "תיקיות ערוצים אינן נתמכות בחיבור הזה.",
   "error.team.folderUnavailable": "התיקייה הזו אינה זמינה במחשב המארח.",
   "error.team.memoryReviewUnsupported": "סקירת הזיכרון אינה נתמכת בחיבור הזה.",
   "error.team.skillLearningUnsupported": "החיבור הזה אינו תומך בלמידת מיומנויות.",

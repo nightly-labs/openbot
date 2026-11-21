@@ -121,7 +121,35 @@ export class ChannelStore {
   #unreadCountsConnection: DatabaseSync | null = null;
   #unreadCountsDataVersion: unknown = null;
 
+  #memberFolders: { connection: DatabaseSync; folders: ReadonlyMap<string, readonly string[]> } | null = null;
+
   constructor(readonly database: OpenBotDatabase) {}
+
+  memberFolders(agentId: string): readonly string[] {
+    const connection = this.database.connection;
+    if (this.#memberFolders?.connection !== connection)
+      this.#memberFolders = { connection, folders: this.#readMemberFolders(connection) };
+    return this.#memberFolders.folders.get(agentId) ?? [];
+  }
+
+  #readMemberFolders(connection: DatabaseSync): ReadonlyMap<string, readonly string[]> {
+    const folders = new Map<string, string[]>();
+    const rows = databaseRows(
+      connection
+        .prepare(
+          "SELECT channel_json FROM projection_channels WHERE json_array_length(channel_json, '$.folders') > 0 AND COALESCE(json_extract(channel_json, '$.archived'), 0) = 0 ORDER BY rowid",
+        )
+        .all(),
+    );
+    for (const row of rows) {
+      const channel = decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
+      for (const member of channel.members) {
+        const known = folders.get(member.agentId) ?? [];
+        folders.set(member.agentId, [...known, ...(channel.folders ?? []).filter((path) => !known.includes(path))]);
+      }
+    }
+    return folders;
+  }
 
   #keepsUnreadCounts(): boolean {
     const db = this.database.connection;
@@ -648,6 +676,7 @@ export class ChannelStore {
 
   private project(db: DatabaseSync, change: ChannelChange): void {
     this.#unreadCounts.delete(change.channel.id);
+    this.#memberFolders = null;
     db.prepare(
       "INSERT INTO projection_channels VALUES (?, ?) ON CONFLICT(channel_id) DO UPDATE SET channel_json = excluded.channel_json",
     ).run(change.channel.id, JSON.stringify(change.channel));
@@ -822,6 +851,7 @@ export class ChannelStore {
       ],
       (db) => {
         this.#unreadCounts.delete(channelId);
+        this.#memberFolders = null;
         const memoryIds = databaseRows(
           db.prepare("SELECT memory_id FROM projection_channel_memories WHERE channel_id = ?").all(channelId),
         ).map((row) => requiredStringColumn(row, "memory_id"));

@@ -129,6 +129,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "وجهات المهام الدورية غير مدعومة في هذا الاتصال.",
   "error.team.agentMemoryLimitUnsupported": "حد ذاكرة الوكيل غير مدعوم في هذا الاتصال.",
   "error.team.agentFoldersUnsupported": "مجلدات الوكيل غير مدعومة في هذا الاتصال.",
+  "error.team.channelFoldersUnsupported": "مجلدات القناة غير مدعومة في هذا الاتصال.",
   "error.team.folderUnavailable": "هذا المجلد غير متاح على حاسوب المضيف.",
   "error.team.memoryReviewUnsupported": "مراجعة الذاكرة غير مدعومة في هذا الاتصال.",
   "error.team.skillLearningUnsupported": "تعلّم المهارات غير مدعوم في هذا الاتصال.",

@@ -132,6 +132,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Bu bağlantı rutin hedeflerini desteklemiyor.",
   "error.team.agentMemoryLimitUnsupported": "Bu bağlantı ajanların bellek sınırını desteklemiyor.",
   "error.team.agentFoldersUnsupported": "Bu bağlantı ajanların klasörlerini desteklemiyor.",
+  "error.team.channelFoldersUnsupported": "Bu bağlantı kanalların klasörlerini desteklemiyor.",
   "error.team.folderUnavailable": "Bu klasör ana bilgisayarda kullanılamıyor.",
   "error.team.memoryReviewUnsupported": "Bu bağlantı bellek incelemesini desteklemiyor.",
   "error.team.skillLearningUnsupported": "Bu bağlantı beceri öğrenmeyi desteklemiyor.",

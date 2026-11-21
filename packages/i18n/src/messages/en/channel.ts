@@ -21,6 +21,11 @@ export const messages = defineMessages("channel", {
   "channel.panel.close": "Close channel panel",
   "channel.settings.title": "Channel settings",
   "channel.settings.memories": "Memories",
+  "channel.settings.folders.title": "Folders",
+  "channel.settings.folders.description":
+    "All members of {channel} can change files and run commands in these folders.",
+  "channel.settings.folders.toastAdded": "Members of {channel} can now change files in {folder}",
+  "channel.settings.folders.toastRemoved": "Members of {channel} can no longer change files in {folder}",
   "channel.settings.isolated": "Keep memories in this channel",
   "channel.settings.isolatedDescription":
     "Agents save what they learn here as channel memories. Their other chats do not see them.",

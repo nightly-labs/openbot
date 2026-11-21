@@ -65,6 +65,9 @@ import {
   type BusyMessageModePreference,
   browserProxyAddressText,
   type CentralAuthState,
+  CHANNEL_FOLDER_LIMIT,
+  type ChannelFolderChange,
+  type ChannelFolderList,
   type ClaudeCompactWindowSetting,
   type ClaudeUserSetupSetting,
   type ClientAgentModelOption,
@@ -78,6 +81,7 @@ import {
   type ConversationTurnTrace,
   type CustomAgentSummary,
   type CustomProviderSummary,
+  channelFolderCoverage,
   composedCustomModelId,
   createMcpServerId,
   DEFAULT_AGENT_ACCESS,
@@ -877,6 +881,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     if (replacing) return { outcome: "replaced", path, list: mockAgentFolders(agentId) };
     const replaced = others.filter((folder) => !kept.includes(folder));
     return { outcome: "added", path, replaced, list: mockAgentFolders(agentId) };
+  }
+
+  const mockChannelFolderPaths = new Map<string, string[]>();
+
+  function mockChannelFolders(channelId: string): ChannelFolderList {
+    return { folders: (mockChannelFolderPaths.get(channelId) ?? []).map((path) => ({ path, found: true })) };
+  }
+
+  function addMockChannelFolder(channelId: string, path: string): ChannelFolderChange {
+    const current = mockChannelFolderPaths.get(channelId) ?? [];
+    const list = mockChannelFolders(channelId);
+    const folder = channelFolderCoverage(path, current);
+    if (folder) return { outcome: "covered", path, folder, list };
+    const kept = current.filter((existing) => !folderInside(path, existing));
+    if (kept.length >= CHANNEL_FOLDER_LIMIT) return { outcome: "refused", path, refusal: "limit", list };
+    mockChannelFolderPaths.set(channelId, [...kept, path]);
+    const replaced = current.filter((existing) => !kept.includes(existing));
+    return { outcome: "added", path, replaced, list: mockChannelFolders(channelId) };
   }
 
   function allModels() {
@@ -2271,6 +2293,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           volumes: [],
         };
       },
+      listChannelFolders: async (channelId) => mockChannelFolders(channelId),
+      chooseChannelFolder: async (channelId) => addMockChannelFolder(channelId, "/mock/Projects/Shared work"),
+      addChannelFolder: async ({ channelId, path }) => addMockChannelFolder(channelId, path),
+      removeChannelFolder: async ({ channelId, path }) => {
+        mockChannelFolderPaths.set(
+          channelId,
+          (mockChannelFolderPaths.get(channelId) ?? []).filter((folder) => folder !== path),
+        );
+        return { outcome: "removed", path, list: mockChannelFolders(channelId) };
+      },
+      browseChannelFolders: async ({ path }) => api.agent.browseAgentFolders({ agentId: "", path }),
       readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
       saveAgentInstructions: async ({ agentId, text, expected }) => {
         const current = mockAgentInstructions(agentId);

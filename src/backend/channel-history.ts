@@ -40,6 +40,8 @@ const REPEATED_ASSIGNMENT_CHARACTERS = 2_000;
 const ISOLATED_MEMORY_RULE =
   "This channel is isolated: openbot.remember saves a channel memory here, not one of your own memories, so your other chats do not get what you learn in this channel.";
 const SHARED_MEMORY_RULE = "This channel is no longer isolated: openbot.remember saves one of your own memories again.";
+const CHANNEL_FOLDERS_RULE =
+  "channel.folders are folders that the user shares with all members of this channel. Every member can change files and run commands in them. Do the shared work of this channel there, keep your own notes in your working directory, and tell the other members which files you changed.";
 const EVERY_MEMBER_BROWSER_RULE = "Every member of this channel can use the browser again.";
 
 function channelBrowserRule(channel: Pick<ChannelDraft, "browser">, agentId: string): string | null {
@@ -541,6 +543,7 @@ export class ChannelHistory {
         instructions: channel.instructions,
         members: channel.members,
         leadAgentId: channel.leadAgentId,
+        ...(channel.folders?.length ? { folders: channel.folders } : {}),
         ...(channel.browser && channel.browser.kind !== "members" ? { browser: channel.browser } : {}),
         ...(channel.isolated ? { isolated: true } : {}),
       };
@@ -611,6 +614,7 @@ export class ChannelHistory {
                 : []),
               ...(channel.isolated && factsChanged ? [ISOLATED_MEMORY_RULE] : []),
               ...(!channel.isolated && wasIsolated ? [SHARED_MEMORY_RULE] : []),
+              ...(channel.folders?.length && factsChanged ? [CHANNEL_FOLDERS_RULE] : []),
               ...(browserRule && factsChanged ? [browserRule] : []),
               ...(!browserRule && hadBrowserRule ? [EVERY_MEMBER_BROWSER_RULE] : []),
               ...(memoriesChanged

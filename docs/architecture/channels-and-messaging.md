@@ -505,6 +505,16 @@ the person asks for another member or for help, or when a part clearly needs ano
   channel facts with a rule line, and a line when a person turns it off. A save without the field
   keeps the stored value, so a client from before it does not turn it off. The agent import archive
   (`src/main/agent-import-manifest.ts`) has no field for it, so an imported channel starts with it off.
+- The folders of a channel (`Channel.folders`, at most 8 host paths, in `channel_json`, so no
+  migration) let each member agent change files and run commands there (#3711). `setChannelFolderSource`
+  in `src/backend/workspace-sandbox.ts` adds the folders of each channel that an agent is a member of
+  to its writable roots, so the folders also apply to the agent's own chats and tasks. `ChannelStore`
+  keeps the member folders in a cache that a projection and a delete clear. The packet gives the
+  folders in the channel facts with a rule line. `src/main/channel-folders.ts` checks a folder as the
+  agent folder picker does: it refuses the app data, the OpenBot folder, a disk root, and a folder that
+  holds the shared folder or a member workspace. A save of the channel draft keeps the folders. The
+  Team API channel records do not send the paths. The instance transfer and the agent import archive
+  do not move them, because the paths belong to the old computer; agent folders do the same.
 - The Browser setting of a channel (`Channel.browser`, in `channel_json`, so no migration) says which
   members can use the browser there (#4135): every member (absent, or `{ kind: "members" }`), one
   member (`{ kind: "member", agentId }`), or no member (`{ kind: "none" }`). `OpenBotToolRouter`
@@ -595,6 +605,11 @@ On a host with `channel-isolation-v1`, each channel record and the draft of a `s
 the "Keep memories in this channel" setting. The channels-v1 codec drops the field, so a joined
 server or the browser client shows the switch only when the host advertises the capability (#5380).
 A save without the field keeps the stored value, so a phone or an older client does not turn it off.
+
+On a host with `channel-folders-v1`, an owner or an admin reads, adds and removes the folders of a
+channel through the admin routes (`/v1/admin/channels/folders`, `/add`, `/remove`, `/browse`). The
+channel records do not carry the paths. A joined server, the browser client and the phone show the
+Folders row of the channel settings only to an owner or an admin of a host that advertises it.
 
 On a host with `channel-browser-v1`, each channel record and the draft of a `save` carry `browser`, in
 the same way. A joined server or the browser client shows the Browser select only when the host

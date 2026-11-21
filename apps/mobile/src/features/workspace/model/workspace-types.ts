@@ -53,6 +53,9 @@ import type {
   BrowserProfileSummary,
   BrowserProxyList,
   BrowserProxySummary,
+  ChannelFolderChange,
+  ChannelFolderInput,
+  ChannelFolderList,
   ClearableStorageCategory,
   ClearBrowserDataInput,
   ConnectorMessagingPlatform,
@@ -667,6 +670,11 @@ export interface MobileWorkspaceContextValue {
   excludeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentExclusionChange>;
   includeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentExclusionChange>;
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
+  canManageChannelFolders: (serverId: string) => boolean;
+  loadChannelFolders: (channelId: string, serverId: string) => Promise<ChannelFolderList>;
+  addChannelFolder: (input: ChannelFolderInput, serverId: string) => Promise<ChannelFolderChange>;
+  removeChannelFolder: (input: ChannelFolderInput, serverId: string) => Promise<ChannelFolderChange>;
+  browseChannelFolders: (channelId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
   canUseLiveVoice: (serverId: string) => boolean;
   startLiveVoice: (input: LiveVoiceStartRequest, serverId: string) => Promise<LiveVoiceSessionResponse>;
@@ -874,6 +882,7 @@ type ServerCheckKey =
   | "canManageAgentSkills"
   | "canManageSharedTables"
   | "canManageAgentFolders"
+  | "canManageChannelFolders"
   | "canNestSidebarFolders"
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"

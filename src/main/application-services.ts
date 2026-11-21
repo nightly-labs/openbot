@@ -193,6 +193,7 @@ import { BrowserViewClient } from "./browser-view-client";
 import { BrowsingMemoryPreferenceStore } from "./browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
 import { type CentralAuthManager, isHostNotOnAccount } from "./central-auth-manager";
+import { type ChannelFolders, createChannelFolders } from "./channel-folders";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
 import {
   type ClaudeCompactWindowControl,
@@ -680,6 +681,7 @@ export interface ApplicationServices {
   agentHostSettings: AgentHostSettingsService;
   agentDefaultsSettings: AgentDefaultsSettingsService;
   agentFolders: AgentFolders;
+  channelFolders: ChannelFolders;
   agentInstructions: AgentInstructionsFiles;
   browserProfiles: BrowserProfileService;
   language: LanguageService;
@@ -2745,6 +2747,11 @@ export async function createApplicationServices({
   const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode, agentDefaults });
   const agentDefaultsSettings = createAgentDefaultsSettings({ agents: service, agentDefaults, busyMessageMode });
   const agentFolders = createAgentFolders({ service, userDataPath: app.getPath("userData") });
+  const channelFolders = createChannelFolders({
+    service,
+    userDataPath: app.getPath("userData"),
+    browse: agentFolders.browse,
+  });
   const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
     store: browserProfileStore,
@@ -3133,6 +3140,7 @@ export async function createApplicationServices({
       agentHost: agentHostSettings,
       agentDefaults: agentDefaultsSettings,
       folders: agentFolders,
+      channelFolders,
       instructions: agentInstructions,
       sessionSettings: service,
       acpRegistry,
@@ -4193,6 +4201,7 @@ export async function createApplicationServices({
     agentHostSettings,
     agentDefaultsSettings,
     agentFolders,
+    channelFolders,
     agentInstructions,
     browserProfiles,
     language,

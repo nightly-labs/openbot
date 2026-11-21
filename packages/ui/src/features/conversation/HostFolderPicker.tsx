@@ -9,6 +9,7 @@ export interface HostFolderPick {
   mode: HostFolderPickMode;
   agentName: string;
   start: string | null;
+  title?: string | undefined;
 }
 
 export function HostFolderPicker(props: {
@@ -54,6 +55,7 @@ export function HostFolderPicker(props: {
   const title = () => {
     const pick = props.request;
     if (!pick) return "";
+    if (pick.title) return pick.title;
     return pick.mode === "exclude"
       ? t("dialog.chooseAgentExclusion", { agent: pick.agentName })
       : t("dialog.chooseAgentFolder", { agent: pick.agentName });

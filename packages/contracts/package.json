@@ -149,6 +149,7 @@
     "./validation": "./src/validation.ts",
     "./team-protocol/channels-v1": "./src/team-protocol/channels-v1.ts",
     "./team-protocol/channel-browser-v1": "./src/team-protocol/channel-browser-v1.ts",
+    "./team-protocol/channel-folders-v1": "./src/team-protocol/channel-folders-v1.ts",
     "./team-protocol/channel-isolation-v1": "./src/team-protocol/channel-isolation-v1.ts",
     "./team-protocol/channel-picture-v1": "./src/team-protocol/channel-picture-v1.ts",
     "./team-protocol/claude-api-key-v1": "./src/team-protocol/claude-api-key-v1.ts",
