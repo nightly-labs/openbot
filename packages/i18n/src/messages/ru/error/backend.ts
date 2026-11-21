@@ -127,6 +127,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "Запуск остановился с ошибкой, но причина не пришла. Откройте запуск, чтобы увидеть, что сделал агент.",
   "error.backend.turnNotStarted": "Провайдер не начал этот ход.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} не подтвердил вовремя, что начал обрабатывать это сообщение. OpenBot не отправляет его снова, чтобы работа не выполнилась дважды. OpenBot ждёт до 5 минут, пока агент начнёт.",
+  "error.backend.turnStartAbandoned":
+    "Агент не начал обрабатывать это сообщение за 5 минут. Отправьте сообщение снова.",
   "error.backend.routineResultConnectionOff":
     "Это подключение к мессенджеру выключено или удалено. Выберите другое место.",
   "error.backend.routineResultNoDelivery": "У этого запуска нет ответа для повторной отправки.",

@@ -117,6 +117,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "ההרצה נעצרה עם שגיאה, אך לא התקבלה סיבה. פתחו את ההרצה כדי לראות מה הסוכן עשה.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} לא אישר בזמן שהוא התחיל את ההודעה הזו. OpenBot לא שולח אותה שוב, כדי שהעבודה לא תרוץ פעמיים. OpenBot ממתין עד 5 דקות שהסוכן יתחיל.",
+  "error.backend.turnStartAbandoned": "הסוכן לא התחיל את ההודעה הזו תוך 5 דקות. שלחו את ההודעה שוב.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",
   "error.backend.channelMemoryLimit": "בערוץ יכולים להיות עד {limit} זיכרונות.",
