@@ -177,7 +177,11 @@ export function requireSitePublishingEnabled(): void {
 }
 
 export function hostedSiteErrorResponse(error: unknown): Response {
-  if (error instanceof HostedSiteInputError) return apiError(error.status, error.code, error.message);
+  if (error instanceof HostedSiteInputError) {
+    const response = apiError(error.status, error.code, error.message);
+    if (error.retryAfterSeconds !== undefined) response.headers.set("Retry-After", String(error.retryAfterSeconds));
+    return response;
+  }
   return authErrorResponse(error);
 }
 
