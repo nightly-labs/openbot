@@ -1290,13 +1290,27 @@ export class HostedSiteService {
           .bind(deployment.id, userId)
           .run(),
       );
-      const today = yield* siteCall(() =>
+      const counts = yield* siteCall(() =>
         database
-          .prepare("SELECT COUNT(*) AS count FROM site_deployments WHERE user_id = ? AND activation_authorized_at >= ?")
-          .bind(userId, day)
-          .first<{ count: number }>(),
+          .prepare(
+            `SELECT
+               (SELECT COUNT(*) FROM site_deployments WHERE user_id = ? AND activation_authorized_at >= ?) AS hour_count,
+               (SELECT COUNT(*) FROM site_deployments WHERE user_id = ? AND activation_authorized_at >= ?) AS day_count`,
+          )
+          .bind(userId, hour, userId, day)
+          .first<{ hour_count: number; day_count: number }>(),
       );
-      return yield* activationRateLimitError((today?.count ?? 0) >= HOSTED_SITE_LIMITS.activationsPerDay, now);
+      if ((counts?.day_count ?? 0) >= HOSTED_SITE_LIMITS.activationsPerDay) {
+        return yield* activationRateLimitError(true, now);
+      }
+      if ((counts?.hour_count ?? 0) >= HOSTED_SITE_LIMITS.activationsPerHour) {
+        return yield* activationRateLimitError(false, now);
+      }
+      return yield* new HostedSiteInputError(
+        409,
+        "operation_in_progress",
+        "This site operation is already in progress.",
+      );
     },
   );
 
@@ -1857,7 +1871,7 @@ function activationRateLimitError(daily: boolean, now: number): HostedSiteInputE
   const wait = minutes < 90 ? (minutes === 1 ? "1 minute" : `${minutes} minutes`) : `${Math.ceil(minutes / 60)} hours`;
   const limit = daily
     ? `${HOSTED_SITE_LIMITS.activationsPerDay} site publishes and replaces in one day (UTC)`
-    : `${HOSTED_SITE_LIMITS.activationsPerHour} site publishes and replaces in one hour`;
+    : `${HOSTED_SITE_LIMITS.activationsPerHour} site publishes and replaces in one clock hour`;
   return new HostedSiteInputError(
     429,
     "activation_rate_limit",
