@@ -197,8 +197,6 @@ const browserStepSchema = z.discriminatedUnion("action", [
 
 export type BrowserStep = z.infer<typeof browserStepSchema>;
 
-const BROWSER_STEP_ACTIONS = browserStepSchema.options.flatMap((option) => [...option.shape.action.values]).join(", ");
-
 export function parseBrowserStep(value: unknown): BrowserStep {
   const result = browserStepSchema.safeParse(isDynamicRecord(value) ? repairBrowserStep(value) : value);
   if (!result.success) throw new Error(`Invalid browser step: ${z.prettifyError(result.error)}`);
@@ -544,7 +542,8 @@ export const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "run_script",
-    description: `Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action is one of ${BROWSER_STEP_ACTIONS}. Other tools, such as screenshot, do not work in a script: call them after it. A target is a CSS selector string, role(role, name?), text(text), or a target object; .nth(i), from 0, picks one of several matches, as in text('Delete').nth(1). A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.`,
+    description:
+      "Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }) with action as a helper in snake_case. A target is a CSS selector string, role(role, name?), text(text), or a target object; .nth(i), from 0, picks one of several matches, as in text('Delete').nth(1). A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
     shape: {
       tabId,
       script: requiredString(BROWSER_SCRIPT_MAX_CHARS).describe(
