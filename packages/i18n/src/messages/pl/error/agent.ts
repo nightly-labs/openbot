@@ -158,6 +158,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Zachowanie wiadomości podczas pracy agenta można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.backupModelsLocalOnly": "Modele zapasowe można ustawić tylko na komputerze, na którym działa agent.",
+  "error.agent.backupModelsAtLimit":
+    "Żaden model zapasowy nie może teraz przejąć pracy: każdy osiągnął limit użycia lub niedawno zawiódł. Modele jednego konta mogą mieć wspólny limit. Aby kontynuować teraz, dodaj model zapasowy od innego dostawcy lub z innego konta albo poczekaj na odnowienie limitu.\n{reason}",
   "error.agent.taskLimitLocalOnly": "Limit zadań można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.localScriptsOff": "Ten agent nie zezwala na lokalne skrypty.",
   "error.agent.localScriptsRateLimited":

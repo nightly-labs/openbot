@@ -143,6 +143,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "لا يمكن تحديد ما تفعله الرسائل أثناء عمل الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.backupModelsLocalOnly": "لا يمكن تعيين النماذج الاحتياطية إلا على الحاسوب الذي يشغّل الوكيل.",
+  "error.agent.backupModelsAtLimit":
+    "لا يمكن لأي نموذج احتياطي أن يتولى العمل الآن: كل نموذج بلغ حد الاستخدام أو فشل قبل قليل. قد تتشارك نماذج الحساب الواحد حدًا واحدًا. للمتابعة الآن، أضف نموذجًا احتياطيًا من مزوّد آخر أو حساب آخر، أو انتظر إعادة تعيين الحد.\n{reason}",
   "error.agent.taskLimitLocalOnly": "لا يمكن تعيين حد المهام إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.localScriptsOff": "لا يسمح هذا الوكيل بالسكربتات المحلية.",
   "error.agent.localScriptsRateLimited":

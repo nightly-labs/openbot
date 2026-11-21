@@ -167,6 +167,8 @@ export const messages = {
     "Cosa fanno i messaggi mentre l'agente lavora si può impostare solo sul computer che lo esegue.",
   "error.agent.backupModelsLocalOnly":
     "I modelli di riserva si possono impostare solo sul computer che esegue l'agente.",
+  "error.agent.backupModelsAtLimit":
+    "Nessun modello di riserva può subentrare ora: ognuno ha raggiunto il suo limite di utilizzo o ha avuto un errore poco fa. I modelli di un account possono condividere un limite. Per continuare ora, aggiungi un modello di riserva di un altro provider o di un altro account, oppure attendi il ripristino.\n{reason}",
   "error.agent.taskLimitLocalOnly": "Il limite di attività si può impostare solo sul computer che esegue l'agente.",
   "error.agent.localScriptsOff": "Questo agente non consente gli script locali.",
   "error.agent.localScriptsRateLimited":

@@ -166,6 +166,8 @@ export const messages = {
     "El comportamiento de los mensajes mientras trabaja el agente solo se puede configurar en el equipo que lo ejecuta.",
   "error.agent.backupModelsLocalOnly":
     "Los modelos de respaldo solo se pueden configurar en el equipo que ejecuta el agente.",
+  "error.agent.backupModelsAtLimit":
+    "Ningún modelo de respaldo puede tomar el relevo ahora: cada uno llegó a su límite de uso o falló hace poco. Los modelos de una cuenta pueden compartir un límite. Para continuar ahora, añade un modelo de respaldo de otro proveedor o de otra cuenta, o espera al reinicio.\n{reason}",
   "error.agent.taskLimitLocalOnly": "El límite de tareas solo se puede configurar en el equipo que ejecuta el agente.",
   "error.agent.localScriptsOff": "Este agente no permite scripts locales.",
   "error.agent.localScriptsRateLimited":

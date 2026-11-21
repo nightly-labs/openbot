@@ -153,6 +153,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
+  "error.agent.backupModelsAtLimit":
+    "Şu anda hiçbir yedek model devralamaz: her biri kullanım sınırına ulaştı ya da kısa süre önce başarısız oldu. Bir hesabın modelleri tek bir sınırı paylaşabilir. Şimdi devam etmek için başka bir sağlayıcıdan veya başka bir hesaptan yedek model ekleyin ya da sınırın sıfırlanmasını bekleyin.\n{reason}",
   "error.agent.taskLimitLocalOnly": "Görev limiti yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.localScriptsOff": "Bu ajan yerel betiklere izin vermiyor.",
   "error.agent.localScriptsRateLimited":

@@ -170,6 +170,8 @@ export const messages = {
     "エージェントの作業中のメッセージの扱いは、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.backupModelsLocalOnly":
     "バックアップモデルは、エージェントを実行しているコンピューターでのみ設定できます。",
+  "error.agent.backupModelsAtLimit":
+    "今は引き継げる予備モデルがありません。どの予備モデルも利用上限に達したか、少し前に失敗しました。同じアカウントのモデルは上限を共有することがあります。今すぐ続けるには、別のプロバイダーまたは別のアカウントの予備モデルを追加するか、上限のリセットを待ってください。\n{reason}",
   "error.agent.taskLimitLocalOnly": "タスクの上限は、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.localScriptsOff": "このエージェントはローカルスクリプトを許可していません。",
   "error.agent.localScriptsRateLimited":

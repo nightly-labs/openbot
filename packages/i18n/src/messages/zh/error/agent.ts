@@ -134,6 +134,8 @@ export const messages = {
   "error.agent.webSearchFailed": "网页搜索未完成。请重试。",
   "error.agent.busyMessageModeLocalOnly": "忙碌时消息的处理方式只能在运行该助手的电脑上设置。",
   "error.agent.backupModelsLocalOnly": "备用模型只能在运行该助手的电脑上设置。",
+  "error.agent.backupModelsAtLimit":
+    "现在没有备用模型可以接手：每个备用模型都已达到使用上限，或刚刚失败。同一账号的模型可能共用一个上限。要现在继续，请添加来自其他服务商或其他账号的备用模型，或等待上限重置。\n{reason}",
   "error.agent.taskLimitLocalOnly": "任务并发数只能在运行该助手的电脑上设置。",
   "error.agent.localScriptsOff": "该助手不允许使用本地脚本。",
   "error.agent.localScriptsRateLimited":

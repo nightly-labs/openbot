@@ -1689,10 +1689,17 @@ export class TurnLifecycle {
         }
         const taskId =
           notification.method === "error" && agentId && threadId ? this.#taskForThread(agentId, threadId) : null;
+        const shown =
+          notification.method === "error" &&
+          context.causeCode === "usage_limit" &&
+          agentId &&
+          this.#hooks.backupReadyAt(agentId) !== null
+            ? sourceText("error.agent.backupModelsAtLimit", { reason: message })
+            : message;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
-          this.#hooks.taskFailed(taskId, message);
-        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context, link);
+          this.#hooks.taskFailed(taskId, shown);
+        } else this.#hooks.emitError(`agent_${notification.method}`, shown, agentId, context, link);
       }
     }
   }).bind(this);
