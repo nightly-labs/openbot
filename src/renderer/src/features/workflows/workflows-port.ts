@@ -64,6 +64,7 @@ export interface WorkflowHost {
   onFoldersChanged(changed: () => void): () => void;
   pictures(): Promise<readonly StoredFileRow[]>;
   uploadPicture(file: File): Promise<StoredFileRow>;
+  downloadMedia?(attachmentId: string): Promise<void>;
   mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | null | undefined;
   mediaPreviewUrl(attachmentId: string): string | null | undefined;
   githubConnector: GitHubConnectorPort;
@@ -276,6 +277,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
         });
       return keptPicture(fileId, file, mediaUrl(fileId));
     },
+    downloadMedia: (attachmentId) =>
+      window.openbot.agent.openAttachment({ attachmentId, action: "download" }, serverId),
     githubSupported,
     mediaSupported,
     mediaAccountSupported,
