@@ -111,7 +111,7 @@ export function isProviderAccountId(value: unknown): value is string {
   return typeof value === "string" && PROVIDER_ACCOUNT_ID.test(value);
 }
 
-export const MAX_PROVIDER_ACCOUNTS = 10;
+export const MAX_PROVIDER_ACCOUNTS = 20;
 
 export const PROVIDER_ACCOUNT_STATES = ["connected", "connecting", "checking", "signed-out", "error"] as const;
 export type ProviderAccountState = (typeof PROVIDER_ACCOUNT_STATES)[number];

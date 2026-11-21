@@ -161,6 +161,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Diese Verbindung unterstützt keine MCP-Server.",
   "error.team.mcpServerListNeedsUpdate":
     "Aktualisiere OpenBot auf diesem Gerät, um mehr als {limit} MCP-Server auf diesem Server zu nutzen.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Aktualisiere OpenBot auf diesem Gerät, um mehr als {limit} Konten eines Anbieters auf diesem Server zu nutzen.",
   "error.team.storageUnsupported": "Diese Verbindung unterstützt keinen Speicher.",
   "error.team.machineResourcesUnsupported": "Diese Verbindung unterstützt keine Maschinennutzung.",
   "error.team.machineAlertMemberInvalid":

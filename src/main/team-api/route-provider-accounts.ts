@@ -24,6 +24,10 @@ import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_FROZEN_ACCOUNTS_LIMIT,
+  PROVIDER_MANY_ACCOUNTS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText, registerSecretValue } from "@openbot/logging";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -34,6 +38,36 @@ import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_ACCOUNTS_ROUTES));
+
+export function requireProviderAccountsFit(capabilities: ReadonlySet<string>, accountCount: number): void {
+  if (accountCount > PROVIDER_FROZEN_ACCOUNTS_LIMIT && !capabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY))
+    throw new HttpError(
+      409,
+      sourceText("error.team.providerAccountListNeedsUpdate", { limit: PROVIDER_FROZEN_ACCOUNTS_LIMIT }),
+    );
+}
+
+type ProviderAccountList = Pick<TeamApiProviderAccounts, "list">;
+
+function mostAccounts(listed: ReturnType<TeamApiProviderAccounts["list"]>): number {
+  return Math.max(0, ...listed.providers.map((row) => row.accounts.length));
+}
+
+function requireAllAccountsFit(capabilities: ReadonlySet<string>, accounts: ProviderAccountList): void {
+  if (!capabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY))
+    requireProviderAccountsFit(capabilities, mostAccounts(accounts.list()));
+}
+
+export function requireRoomForAccount(
+  capabilities: ReadonlySet<string>,
+  accounts: ProviderAccountList | undefined,
+  provider: string,
+  accountId: string | null,
+): void {
+  if (!accounts || accountId !== null || capabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY)) return;
+  const held = accounts.list().providers.find((row) => row.provider === provider)?.accounts.length ?? 0;
+  requireProviderAccountsFit(capabilities, held + 1);
+}
 
 export async function routeProviderAccounts(
   context: TeamApiRequestContext,
@@ -47,13 +81,19 @@ export async function routeProviderAccounts(
   const body = await readJson(request);
   const accountId = isString(body.accountId) ? body.accountId : null;
   switch (url.pathname) {
-    case PROVIDER_ACCOUNTS_ROUTES.list:
-      return json(200, accounts.list());
+    case PROVIDER_ACCOUNTS_ROUTES.list: {
+      const listed = accounts.list();
+      requireProviderAccountsFit(capabilities, mostAccounts(listed));
+      return json(200, listed);
+    }
     case PROVIDER_ACCOUNTS_ROUTES.usage:
       return json(200, await runCauseEffect(accounts.usage()));
-    case PROVIDER_ACCOUNTS_ROUTES.signInStart:
-      await runCauseEffect(accounts.startSignIn(parseProviderId(body.provider), accountId));
+    case PROVIDER_ACCOUNTS_ROUTES.signInStart: {
+      const provider = parseProviderId(body.provider);
+      requireRoomForAccount(capabilities, accounts, provider, accountId);
+      await runCauseEffect(accounts.startSignIn(provider, accountId));
       return json(200, {});
+    }
     case PROVIDER_ACCOUNTS_ROUTES.signInStatus:
       return json(200, accounts.signInStatus(parseProviderId(body.provider)));
     case PROVIDER_ACCOUNTS_ROUTES.signInCancel:
@@ -87,6 +127,7 @@ export async function routeProviderAccountModels(
   if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_MODELS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
+  requireAllAccountsFit(capabilities, accounts);
   return json(200, accounts.models());
 }
 
@@ -101,6 +142,7 @@ export async function routeProviderAccountPool(
   if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_POOL_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
+  requireAllAccountsFit(capabilities, accounts);
   if (url.pathname === PROVIDER_ACCOUNT_POOL_ROUTES.list) return json(200, accounts.pools());
   const body = await readJson(request);
   const leftOut = Array.isArray(body.leftOut) ? body.leftOut.filter(isString) : [];
@@ -143,10 +185,11 @@ export async function routeProviderAccountKeys(
   const key = isString(body.key) ? body.key.trim() : "";
   if (!key) throw new HttpError(400, "key is invalid.");
   registerSecretValue(key);
+  const provider = parseProviderId(body.provider);
+  const accountId = isString(body.accountId) ? body.accountId : null;
+  requireRoomForAccount(capabilities, accounts, provider, accountId);
   try {
-    await runCauseEffect(
-      accounts.connectKey(parseProviderId(body.provider), isString(body.accountId) ? body.accountId : null, key),
-    );
+    await runCauseEffect(accounts.connectKey(provider, accountId, key));
   } catch (error) {
     if (error instanceof Error) throw new HttpError(409, redactText(error.message));
     throw error;
@@ -185,6 +228,7 @@ export async function routeProviderAccountCode(
     await runCauseEffect(accounts.cancelCodeSignIn(provider, requiredAccount(accountId)));
     return json(200, {});
   }
+  requireRoomForAccount(capabilities, accounts, provider, accountId);
   try {
     return json(200, await runCauseEffect(accounts.startCodeSignIn(provider, accountId)));
   } catch (error) {

@@ -241,6 +241,7 @@ import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-prot
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
@@ -1157,8 +1158,13 @@ export class TeamApiServer {
       )
         return;
       if (
-        (await routeSignInRelay(context, mcpServers && this.#options.signInRelay, mcpServers, mcpServerOwners)) ===
-        "handled"
+        (await routeSignInRelay(
+          context,
+          mcpServers && this.#options.signInRelay,
+          mcpServers,
+          mcpServerOwners,
+          this.#options.providerAccounts,
+        )) === "handled"
       )
         return;
       if ((await routeConnectors(context, this.#options.connectors)) === "handled") return;
@@ -2377,6 +2383,7 @@ export class TeamApiServer {
       channelSeenSubtasks: route.capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
       channelTaskWaits: route.capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
       mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
+      providerManyAccounts: route.capabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY),
       routineResultsWhatsApp: route.capabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
       storageWorkflowFiles: route.capabilities.has(STORAGE_WORKFLOW_FILES_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
