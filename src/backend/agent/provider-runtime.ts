@@ -351,6 +351,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #updatesWhenIdle = new Set<AgentProvider>();
   #customAgentsReloadPending = false;
   readonly #environmentReloadPending = new Set<AgentProvider>();
+  readonly #environmentReloadWaitsSince = new Map<AgentProvider, number>();
   readonly #lastUsed = new Map<AgentProvider, number>();
   readonly #compactionModes = new Map<AgentProvider, NonNullable<AgentClient["contextCompaction"]>>();
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
@@ -893,7 +894,7 @@ export class ProviderRuntime implements ProviderPort {
     return client !== undefined && (client.canReleaseProcess?.() === false || this.#providerInUse(provider));
   }
 
-  #holdsBackgroundWork(provider: AgentProvider, waitingSince = Date.now()): boolean {
+  #holdsBackgroundWork(provider: AgentProvider, waitingSince: number): boolean {
     if (Date.now() - waitingSince >= PROVIDER_BACKGROUND_WORK_WAIT_MS) return false;
     return this.#clients.get(provider)?.runsBackgroundWork?.() === true;
   }
@@ -2103,9 +2104,12 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     if (this.#off.has(provider)) return;
     this.#environmentReloadPending.delete(provider);
+    const waitingSince = this.#environmentReloadWaitsSince.get(provider) ?? Date.now();
+    this.#environmentReloadWaitsSince.delete(provider);
     if (!this.#clients.has(provider)) return;
-    if (this.#hooks.isProviderBusy(provider) || this.#holdsBackgroundWork(provider)) {
+    if (this.#hooks.isProviderBusy(provider) || this.#holdsBackgroundWork(provider, waitingSince)) {
       this.#environmentReloadPending.add(provider);
+      this.#environmentReloadWaitsSince.set(provider, waitingSince);
       return;
     }
     const result = yield* Effect.result(
