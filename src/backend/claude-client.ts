@@ -373,6 +373,7 @@ interface ActiveTurn {
   prompt: { requestedId: string | null; message: SDKUserMessage; retries: number } | null;
   messageIds: Set<string>;
   untakenSteerIds: Set<string>;
+  hostToolCalls: Set<AbortController>;
   promptStarted: boolean;
   lastActivityAt: number;
   stalled: boolean;
@@ -1650,6 +1651,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       prompt: null,
       messageIds: new Set<string>(),
       untakenSteerIds: new Set<string>(),
+      hostToolCalls: new Set<AbortController>(),
       promptStarted: false,
       lastActivityAt: Date.now(),
       stalled: false,
@@ -2181,6 +2183,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         this.#emitToolCall(runtime, toolCallId, name, true);
       }
       turn.toolCalls.clear();
+      for (const hostToolCall of turn.hostToolCalls) hostToolCall.abort();
+      turn.hostToolCalls.clear();
       queryLogger.info("Claude stopped its running tools to take a steered message.", { threadId: runtime.id });
       return;
     }
@@ -2709,17 +2713,27 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     args: unknown,
   ): Effect.fn.Return<CallToolResult, ProviderClientOperationError> {
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
+    const turn = runtime.activeTurn;
+    const hostToolCall = new AbortController();
+    turn?.hostToolCalls.add(hostToolCall);
     const result = yield* this.#awaitHost(
       threadId,
-      this.#serverRequests.call("item/tool/call", {
-        threadId,
-        turnId: runtime.activeTurn?.id ?? randomUUID(),
-        callId: randomUUID(),
-        namespace,
-        tool: name,
-        arguments: args,
-      }),
-    ).pipe(toProviderClientOperationError);
+      this.#serverRequests.call(
+        "item/tool/call",
+        {
+          threadId,
+          turnId: turn?.id ?? randomUUID(),
+          callId: randomUUID(),
+          namespace,
+          tool: name,
+          arguments: args,
+        },
+        hostToolCall.signal,
+      ),
+    ).pipe(
+      Effect.ensuring(Effect.sync(() => turn?.hostToolCalls.delete(hostToolCall))),
+      toProviderClientOperationError,
+    );
     if (!isRecord(result)) return { content: [{ type: "text" as const, text: String(result) }] };
     const content: CallToolResult["content"] = [];
     if (Array.isArray(result.contentItems)) {

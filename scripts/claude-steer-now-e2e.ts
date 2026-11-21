@@ -29,6 +29,8 @@ const STEERED_ANSWER = "Answer of the steered message.";
 const STEERED_MESSAGE = "Steered message.";
 const HELD_TOOL_ID = "toolu_held_command";
 const heldToolEvents: Array<{ method: string; turnId: string | null; status: string | null }> = [];
+const HELD_HOST_TOOL = "list_agents";
+const heldHostToolCalls: AbortSignal[] = [];
 
 function recordHeldTool(notification: AppServerNotification): void {
   const params = notification.params;
@@ -114,6 +116,8 @@ const turn = (message) => {
     begin(message, ${JSON.stringify(WORKING_TEXT)});
     assistant(message, [{ type: "text", text: ${JSON.stringify(WORKING_TEXT)} },
       { type: "tool_use", id: ${JSON.stringify(HELD_TOOL_ID)}, name: "Bash", input: { command: "sleep 600" } }], "tool_use");
+    write({ type: "control_request", request_id: "req_held_host_tool", request: { subtype: "mcp_message", server_name: "openbot",
+      message: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: ${JSON.stringify(HELD_HOST_TOOL)}, arguments: {} } } } });
     held = message;
     fs.writeFileSync(${JSON.stringify(holdMarker)}, message.uuid);
     return;
@@ -140,6 +144,17 @@ process.stdin.on("data", (chunk) => {
 process.stdin.on("end", () => process.exit(0));
 `;
 
+function isHeldHostToolCall(request: AppServerRequest): boolean {
+  const params = request.params;
+  return (
+    request.method === "item/tool/call" &&
+    typeof params === "object" &&
+    params !== null &&
+    "tool" in params &&
+    params.tool === HELD_HOST_TOOL
+  );
+}
+
 interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
@@ -161,7 +176,10 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
       recordHeldTool(notification);
       this.emit("notification", notification);
     });
-    this.#real.on("request", (request) => this.emit("request", request));
+    this.#real.on("request", (request) => {
+      if (isHeldHostToolCall(request) && request.signal) heldHostToolCalls.push(request.signal);
+      else this.emit("request", request);
+    });
     this.#real.on("diagnostic", (message) => this.emit("diagnostic", message));
     this.#real.on("exit", (error) => this.emit("exit", error));
   }
@@ -227,6 +245,7 @@ const report: {
   deliveries?: Array<{ id: string; status: string }>;
   shown?: string[];
   heldToolEvents?: typeof heldToolEvents;
+  heldHostToolCallAborted?: boolean;
   passed: boolean;
   error?: string;
 } = { passed: false };
@@ -322,6 +341,7 @@ try {
   const threadId = service.store.list().find((item) => item.id === agent.id)?.threadId;
   assert.ok(threadId, "The agent has a chat thread.");
   await waitFor("the held tool call to start", () => heldToolEvents.length > 0);
+  await waitFor("the held host tool call to start", () => heldHostToolCalls.length > 0);
   const receipt = await runCauseEffect(service.agents.sendMessage({ agentId: agent.id, text: STEERED_MESSAGE }));
   const steerDeliveryId = receipt.deliveries[0]?.id;
   assert.ok(steerDeliveryId, "The steered message has a delivery.");
@@ -338,6 +358,7 @@ try {
   report.deliveries = service.deliveries(agent.id);
   report.shown = service.shown(agent.id, threadId);
   report.heldToolEvents = heldToolEvents;
+  report.heldHostToolCallAborted = heldHostToolCalls.every((signal) => signal.aborted);
   assert.equal(report.priorities.length, 2, "Claude gets the first message and the steer.");
   assert.equal(report.priorities[0]?.priority, null, "The first message has no priority.");
   assert.equal(report.priorities[1]?.priority, "now", "The steer stops the running tool call.");
@@ -363,6 +384,12 @@ try {
     report.heldToolEvents[1]?.turnId,
     report.heldToolEvents[0]?.turnId,
     "The stopped tool call ends in the turn that started it.",
+  );
+  assert.equal(heldHostToolCalls.length, 1, "The stand-in makes one host tool call.");
+  assert.equal(
+    report.heldHostToolCallAborted,
+    true,
+    "The host stops the tool call that Claude dropped, so its approval card goes away.",
   );
   report.passed = true;
 } catch (error) {

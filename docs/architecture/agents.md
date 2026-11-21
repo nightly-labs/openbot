@@ -1059,7 +1059,8 @@ answered that it was too late. While a main-thread tool call is open, `ClaudeAge
 steer with `priority: "now"`. Claude Code then stops the turn (`terminal_reason` `aborted_tools`):
 it moves a running shell command to the background and stops other tools, a subagent included, and
 starts a new turn with the steer. The aborted result does not list the steer's uuid
-(`untakenSteerIds`), so the client closes the open tool calls and keeps the OpenBot turn open. The
+(`untakenSteerIds`), so the client closes the open tool calls, aborts its open host tool calls
+(`hostToolCalls`, so the host removes their approval cards), and keeps the OpenBot turn open. The
 result of the steer's turn completes it. A stop from the person (`stopRequested`) still ends the turn
 as interrupted. While a question, an elicitation or a write approval waits for the person
 (`personRequests`), the steer has no priority: the open card stays the one that Claude waits for, and
