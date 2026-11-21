@@ -2395,13 +2395,15 @@ export class TurnLifecycle {
             !limited &&
             (tokenRefused || (failureCause !== undefined && TEMPORARY_REQUEST_CAUSES.has(failureCause)));
           for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id, temporary);
-          if (terminal === "failed")
-            yield* this.#relayTaskResults(
-              agentId,
-              turnId,
-              deliveries,
-              failedTaskReportNote(failure ? this.#hooks.redactMcp(failure) : null),
-            );
+          yield* this.#relayTaskResults(
+            agentId,
+            turnId,
+            deliveries,
+            endedTaskReportNote(
+              terminal === "failed" && failure ? this.#hooks.redactMcp(failure) : null,
+              terminal === "failed" ? "The provider gave no reason." : "The turn was stopped.",
+            ),
+          );
         }
         for (const { delivery } of deliveries) {
           if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
@@ -2936,13 +2938,14 @@ export class TurnLifecycle {
     const requestIds = new Set(
       [...finishedTaskIds].flatMap((taskId) => this.#mailbox.requestsHeldByTask(agentId, taskId)),
     );
+    const turnRequestIds = new Set(deliveries.map(({ delivery }) => delivery.messageId));
     for (const requestId of requestIds) {
       const requesterId = this.#mailbox.requestSenderAgentId(requestId);
       if (
         !requesterId ||
         !this.#store.has(requesterId) ||
         this.#mailbox.hasReplyFrom(agentId, requestId) ||
-        this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, requesterId, new Set()) ||
+        this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, requesterId, turnRequestIds) ||
         this.#mailbox.heldByTask(agentId, requestId, finishedTaskIds)
       )
         continue;
@@ -3480,12 +3483,12 @@ function subagentStates(subagents: readonly ConversationSubagent[]): string {
   return subagents.map((subagent) => `${subagent.id}:${subagent.status}`).join("\n");
 }
 
-const FAILED_TASK_REPORT_REASON_LIMIT = 2_000;
+const ENDED_TASK_REPORT_REASON_LIMIT = 2_000;
 
-function failedTaskReportNote(reason: string | null): string {
+function endedTaskReportNote(reason: string | null, fallback: string): string {
   return [
     "Status: blocked",
-    `Result: OpenBot note, not written by this teammate: the task for this request ended, but the teammate's turn that read its result failed before the teammate answered. ${(reason ?? "The provider gave no reason.").slice(0, FAILED_TASK_REPORT_REASON_LIMIT)}`,
+    `Result: OpenBot note, not written by this teammate: the task for this request ended, but the teammate's turn that read its result ended before the teammate answered. ${(reason ?? fallback).slice(0, ENDED_TASK_REPORT_REASON_LIMIT)}`,
     "Evidence: none",
     "Unblock: The teammate's chat has the task result. Send the request again if you still need the answer.",
   ].join("\n");
