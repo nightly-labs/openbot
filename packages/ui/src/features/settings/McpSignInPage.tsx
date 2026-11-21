@@ -106,7 +106,10 @@ export function relayDescriptionKey(page: McpSignInRelaySource) {
   return page.listening ? "mcp.signIn.relayDescription" : "mcp.signIn.relayOpenDescription";
 }
 
-export function McpSignInRelayControls(props: McpSignInRelayActions & { page: McpSignInRelaySource }) {
+export function McpSignInRelayControls(
+  props: Pick<McpSignInRelayActions, "onPaste"> &
+    Partial<Pick<McpSignInRelayActions, "onOpen">> & { page: McpSignInRelaySource },
+) {
   const { t, errorMessage } = useText();
   const [address, setAddress] = createSignal("");
   const [sending, setSending] = createSignal(false);
@@ -114,7 +117,7 @@ export function McpSignInRelayControls(props: McpSignInRelayActions & { page: Mc
   const openPage = async () => {
     setError(null);
     try {
-      await props.onOpen();
+      await props.onOpen?.();
     } catch (cause) {
       setError(errorMessage(cause, t("error.mcp.relayEnded")));
     }
@@ -134,14 +137,16 @@ export function McpSignInRelayControls(props: McpSignInRelayActions & { page: Mc
   };
   return (
     <>
-      <div class="mcp-sign-in-relay-open">
-        <Button type="button" onClick={() => void openPage()}>
-          {t("mcp.signIn.relayOpen")}
-        </Button>
-        <Show when={props.page.url}>
-          {(url) => <CopyButton value={url()} label={t("mcp.signIn.relayCopy")} iconOnly size="icon" />}
-        </Show>
-      </div>
+      <Show when={props.onOpen}>
+        <div class="mcp-sign-in-relay-open">
+          <Button type="button" onClick={() => void openPage()}>
+            {t("mcp.signIn.relayOpen")}
+          </Button>
+          <Show when={props.page.url}>
+            {(url) => <CopyButton value={url()} label={t("mcp.signIn.relayCopy")} iconOnly size="icon" />}
+          </Show>
+        </div>
+      </Show>
       <Show
         when={props.page.pasteable}
         fallback={

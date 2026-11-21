@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "{name} 설치",
   "provider.aria.signIn": "{name}에 로그인",
   "provider.aria.codeFallback": "코드로 {name}에 로그인",
+  "provider.aria.addressFallback": "{name} 로그인 주소 붙여넣기",
   "provider.aria.moreActions": "{name} 추가 작업",
 
   "provider.aria.use": "OpenBot에서 {name} 사용",
@@ -92,6 +93,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "기다리는 중이에요. 이 로그인은 {time} 후에 중단돼요.",
   "provider.codeLogin.linkTitle": "다른 기기에서 {name}에 로그인",
   "provider.codeLogin.pageTitle": "{name}에 로그인",
+  "provider.codeLogin.addressDescription": "브라우저에서 로그인을 완료하세요. 로그인이 끝나면 이 창이 닫힙니다.",
   "provider.codeLogin.pageDescription": "이 페이지는 {host}의 브라우저에서 열려 있어요. 여기서 로그인하세요.",
   "provider.codeLogin.relayStarting": "{host}에서 {name} 로그인을 시작하는 중…",
   "provider.codeLogin.pageOpening": "{host}에서 {name} 로그인 페이지를 여는 중…",

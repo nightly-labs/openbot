@@ -544,6 +544,8 @@ const Providers = createSimpleContext({
               start: (provider) => providersPort().startProviderCodeLogin(provider),
               submit: (provider, code) => providerAdmin().submitCodeLogin({ provider, code }, LOCAL_SERVER_ID),
               cancel: (provider) => providersPort().cancelProviderCodeLogin(provider),
+              pasteAddress: (provider, address) =>
+                providerAdmin().pasteRelaySignIn({ provider, address }, LOCAL_SERVER_ID),
               accountCode: accountCode(LOCAL_SERVER_ID),
             };
       },

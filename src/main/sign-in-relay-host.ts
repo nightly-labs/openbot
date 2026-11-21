@@ -162,7 +162,7 @@ export class SignInRelayHost {
   });
 
   startReplay(memberId: string, signIn: RelaySignIn): { flowId: string; expiresAt: number } {
-    return this.#open(memberId, { ...signIn, deliver: replay, refuse: replay });
+    return this.#open(memberId, { ...signIn, deliver: replaySignInCallback, refuse: replaySignInCallback });
   }
 
   startLink(memberId: string, agentId: string, url: string): { flowId: string; expiresAt: number } {
@@ -173,13 +173,13 @@ export class SignInRelayHost {
       key: `link\n${url}`,
       status: () => ({ pageUrl: url, result }),
       deliver: (query, pageUrl) =>
-        replay(query, pageUrl).pipe(
+        replaySignInCallback(query, pageUrl).pipe(
           Effect.map((delivered) => {
             if (delivered) result = { toolCount: 0, error: null };
             return delivered;
           }),
         ),
-      refuse: replay,
+      refuse: replaySignInCallback,
       cancel: () =>
         Effect.sync(() => {
           result ??= { toolCount: 0, error: sourceText("error.mcp.relayEnded") };
@@ -285,7 +285,10 @@ function view(flow: Flow): SignInRelayView {
   return { authorizeUrl: pageUrl, callback: pageUrl ? loopbackCallback(pageUrl) : null, result };
 }
 
-const replay = Effect.fn("SignInRelayHost.replay")(function* (query: URLSearchParams, pageUrl: string) {
+export const replaySignInCallback = Effect.fn("SignInRelayHost.replay")(function* (
+  query: URLSearchParams,
+  pageUrl: string,
+) {
   if (!loopbackCallback(pageUrl)) return false;
   const code = query.get("code");
   if (code) registerSecretValue(code);
