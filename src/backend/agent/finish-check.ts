@@ -14,6 +14,7 @@ const CONTEXT_CHARACTERS = 600;
 const ANSWER_CHARACTERS = 4_000;
 const STEP_LINES = 40;
 const STEP_CHARACTERS = 160;
+const RESULT_CHARACTERS = 240;
 const MISSING_CHARACTERS = 600;
 
 export const FinishCheckResult = Schema.Struct({
@@ -22,10 +23,15 @@ export const FinishCheckResult = Schema.Struct({
 });
 export type FinishCheckResult = typeof FinishCheckResult.Type;
 
+export interface FinishCheckStep extends ConversationTraceStep {
+  tool?: string | undefined;
+  result?: string | undefined;
+}
+
 export interface FinishCheckInput {
   request: readonly string[];
   context: readonly Pick<ConversationMessage, "author" | "text">[];
-  steps: readonly ConversationTraceStep[];
+  steps: readonly FinishCheckStep[];
   plan: ConversationPlan | null;
   answer: string;
   continuations: number;
@@ -36,10 +42,15 @@ const clip = (text: string, limit: number) =>
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 
-function stepLine(step: ConversationTraceStep): string {
-  const what = oneLine(step.command ?? step.text ?? "tool");
-  const outcome = step.failed ? ` (failed${step.error ? `: ${oneLine(step.error)}` : ""})` : "";
-  return `- ${clip(what, STEP_CHARACTERS)}${clip(outcome, STEP_CHARACTERS)}`;
+function stepLine(step: FinishCheckStep): string {
+  const named = [step.tool, step.command].filter((part) => part !== undefined && part.trim() !== "").join(": ");
+  const what = oneLine(named || (step.text ?? "tool"));
+  const outcome = step.failed
+    ? ` (failed${step.error ? `: ${oneLine(step.error)}` : ""})`
+    : step.result
+      ? ` → ${oneLine(step.result)}`
+      : "";
+  return `- ${clip(what, STEP_CHARACTERS)}${clip(outcome, RESULT_CHARACTERS)}`;
 }
 
 export function finishCheckPrompt(input: FinishCheckInput): string {
@@ -67,7 +78,7 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
     "",
     tools.length === 0
       ? "The agent used no tools in its last turn."
-      : `The tool steps of the agent's last turn (${tools.length}${tools.length > shownTools.length ? `, the last ${shownTools.length} shown` : ""}):`,
+      : `The tool steps of the agent's last turn (${tools.length}${tools.length > shownTools.length ? `, the last ${shownTools.length} shown` : ""}), each with the start of its result after "→" when there is one. Use them as evidence of what the agent did:`,
     ...shownTools.map(stepLine),
     ...(plan.length > 0 ? ["", "The agent's plan:", ...plan] : []),
     "",

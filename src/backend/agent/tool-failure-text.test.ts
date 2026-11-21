@@ -2,7 +2,7 @@ import { CONVERSATION_TRACE_TEXT_LIMIT } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import { redactMcpValues } from "../mcp-redaction";
 import type { ThreadItem } from "../protocol";
-import { toolFailureText } from "./thread-items";
+import { toolFailureText, toolResultText } from "./thread-items";
 
 const secret = "tok_9f8e7d6c5b4a3210";
 const redact = (text: string) => redactMcpValues(text, [secret]);
@@ -39,5 +39,19 @@ describe("toolFailureText", () => {
     const text = toolFailureText(item({ type: "toolCall", name: "Bash", status: "failed", error: output }), redact);
     expect(text?.endsWith("npm ERR! token ••• is not valid")).toBe(true);
     expect(text?.length).toBe(CONVERSATION_TRACE_TEXT_LIMIT);
+  });
+});
+
+describe("toolResultText", () => {
+  it("gives no text for a failed step", () => {
+    expect(toolResultText(item({ type: "mcpToolCall", status: "failed", error: secret }), redact)).toBeNull();
+  });
+
+  it("masks a secret in the result of a finished tool", () => {
+    const text = toolResultText(
+      item({ type: "toolCall", name: "mcp__openbot__create_routine", status: "completed", output: `saved ${secret}` }),
+      redact,
+    );
+    expect(text).toBe("saved •••");
   });
 });

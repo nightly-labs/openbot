@@ -121,14 +121,16 @@ import {
   refusedSessionFailure,
   type ToolUsageSignal,
   toolActivity,
+  toolCallName,
   toolFailed,
   toolFailureText,
   toolProgressText,
+  toolResultText,
   toolTraceDetail,
   toolUsage,
   toThreadItem,
 } from "./thread-items";
-import { TurnTraces, traceMessage } from "./turn-traces";
+import { type ToolOutcome, TurnTraces, traceMessage } from "./turn-traces";
 import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 
@@ -710,6 +712,7 @@ export class TurnLifecycle {
     snapshot: ConversationSnapshot,
     deliveries: readonly DeliveryContext[],
     steps: readonly ConversationTraceStep[],
+    outcomes: ReadonlyMap<string, ToolOutcome>,
     plan: ConversationPlan | null,
     answer: string,
     continuations: number,
@@ -734,12 +737,17 @@ export class TurnLifecycle {
     const input: FinishCheckInput = {
       request,
       context,
-      steps: steps.map((step) => ({
-        ...step,
-        ...(step.text === undefined ? {} : { text: redact(step.text) }),
-        ...(step.command === undefined ? {} : { command: redact(step.command) }),
-        ...(step.error === undefined ? {} : { error: redact(step.error) }),
-      })),
+      steps: steps.map((step) => {
+        const outcome = outcomes.get(step.id);
+        return {
+          ...step,
+          ...(step.text === undefined ? {} : { text: redact(step.text) }),
+          ...(step.command === undefined ? {} : { command: redact(step.command) }),
+          ...(step.error === undefined ? {} : { error: redact(step.error) }),
+          ...(outcome?.tool ? { tool: outcome.tool } : {}),
+          ...(outcome?.result ? { result: redact(outcome.result) } : {}),
+        };
+      }),
       plan: plan && { ...plan, steps: plan.steps.map((step) => ({ ...step, text: redact(step.text) })) },
       answer: redact(answer),
       continuations,
@@ -1885,6 +1893,7 @@ export class TurnLifecycle {
       this.#runningTurns.delete(turnId);
       this.#markEnded(turnId);
       this.#completingTurns.add(turnId);
+      const toolOutcomes = this.#traces.toolOutcomes(turnId);
       const trace = this.#traces.take(turnId, new Date().toISOString());
       const noUpdateSteps = this.#noUpdateSteps.get(turnId);
       this.#noUpdateSteps.delete(turnId);
@@ -2291,6 +2300,7 @@ export class TurnLifecycle {
           snapshot,
           deliveries,
           toolSteps,
+          toolOutcomes,
           turnPlan,
           latestAssistant.text,
           proposed.continuations,
@@ -3198,6 +3208,12 @@ export class TurnLifecycle {
         text: toolProgress,
         error: failure,
         ...toolTraceDetail(item),
+        ...(this.#hooks.checkFinish === undefined
+          ? {}
+          : {
+              tool: toolCallName(item),
+              result: completed ? toolResultText(item, (text) => redactText(this.#hooks.redactMcp(text))) : null,
+            }),
       });
     } else if (item.type === "agentMessage")
       this.#traces.observe(turnId, item.id, item.phase === "commentary" ? "reasoning" : "message", { completed });

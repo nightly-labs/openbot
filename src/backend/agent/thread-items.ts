@@ -465,7 +465,22 @@ function isShellCommand(item: ThreadItem): boolean {
 }
 
 export function toolFailureText(item: ThreadItem, redact: (text: string) => string): string | null {
-  if (getString(item, "status") !== "failed") return null;
+  return getString(item, "status") === "failed" ? boundedResultText(item, redact) : null;
+}
+
+export function toolResultText(item: ThreadItem, redact: (text: string) => string): string | null {
+  return toolFailed(item) ? null : boundedResultText(item, redact);
+}
+
+export function toolCallName(item: ThreadItem): string | null {
+  const bridged = bridgedToolName(item);
+  if (bridged) return bridged;
+  const usage = toolUsage(item);
+  if (usage?.server && usage.tool) return `${usage.server}.${usage.tool}`;
+  return getString(item, "tool") ?? getString(item, "name");
+}
+
+function boundedResultText(item: ThreadItem, redact: (text: string) => string): string | null {
   const raw = resultText(item);
   if (!raw) return null;
   const tail = isShellCommand(item);
