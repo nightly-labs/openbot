@@ -29,7 +29,7 @@ import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow
 import { ChannelPictureEditor } from "@openbot/ui/features/channels/ChannelPictureEditor";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createStore, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { useChannels } from "./channels-context";
 import { matchesAgentSearch, toggleChannelMember } from "./channels-draft";
 
@@ -49,6 +49,26 @@ export function ChannelEditor(props: ChannelEditorProps) {
     if (!channels.historyDeletionSupported()) return undefined;
     return () => channels.deleteHistory(channelId);
   }
+  const [compactBlocked, setCompactBlocked] = createSignal<string | null>(null);
+  let compactSignature = "";
+  createEffect(
+    () => {
+      const current = channel();
+      return current && { id: current.id, members: current.members.map((member) => member.agentId).join(",") };
+    },
+    (next) => {
+      const signature = next ? `${next.id}:${next.members}` : "";
+      if (signature === compactSignature) return;
+      compactSignature = signature;
+      if (!next) return;
+      void channels.compactAvailable(next.id).then(
+        (available) => {
+          if (compactSignature === signature) setCompactBlocked(available ? null : next.id);
+        },
+        () => undefined,
+      );
+    },
+  );
   const [fields, setFields] = createStore({ name: "", title: "", instructions: "" });
   const [dirty, setDirty] = createStore({ name: false, title: false, instructions: false });
   let lastSignature = "";
@@ -394,7 +414,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
           <ChannelContextActions
             channelName={current().name}
             startNewConversation={() => channels.clearContext(current().id)}
-            compact={() => channels.compactContext(current().id)}
+            compact={compactBlocked() === current().id ? undefined : () => channels.compactContext(current().id)}
             deleteHistory={deleteHistoryAction(current().id)}
           />
         )}

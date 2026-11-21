@@ -394,6 +394,7 @@ const fakeAgents: TeamApiAgents = {
   deleteAgentHistory: unused("deleteAgentHistory"),
   clearChannelContext: unused("clearChannelContext"),
   compactChannelContext: unused("compactChannelContext"),
+  channelCompactAvailable: unused("channelCompactAvailable"),
   deleteChannelHistory: unused("deleteChannelHistory"),
   compactAgentContext: unused("compactAgentContext"),
   compactTaskContext: unused("compactTaskContext"),

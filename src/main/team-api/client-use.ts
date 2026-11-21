@@ -32,6 +32,7 @@ import { BROWSER_PAGE_STATE_ROUTES } from "@openbot/contracts/team-protocol/brow
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_USER_CONTROL_ROUTES } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CHANNEL_COMPACT_AVAILABILITY_ROUTE } from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CLAUDE_COMPACT_WINDOW_ROUTES } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
@@ -175,6 +176,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_NEW_CHAT_ROUTES.settings,
   AGENT_PLAN_CARD_ROUTES.settings,
   AGENT_BUILTIN_MEMORY_ROUTES.settings,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
   AGENT_DEFAULTS_ROUTES.settings,
   AGENT_FAST_MODE_ROUTES.settings,
   AGENT_FAST_MODE_ROUTES.models,

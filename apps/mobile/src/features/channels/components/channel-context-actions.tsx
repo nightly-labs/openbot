@@ -2,7 +2,7 @@ import { Typography } from "heroui-native";
 import FoldVertical from "lucide-react-native/icons/fold-vertical";
 import SquarePen from "lucide-react-native/icons/square-pen";
 import Trash2 from "lucide-react-native/icons/trash";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -31,6 +31,20 @@ export function ChannelContextActions({
   const { t } = useText();
   const [running, setRunning] = useState<Action | null>(null);
   const [compactStarted, setCompactStarted] = useState(false);
+  const [compactShown, setCompactShown] = useState(true);
+
+  useEffect(() => {
+    let current = true;
+    store.compactAvailable(serverId, channelId).then(
+      (shown) => {
+        if (current) setCompactShown(shown);
+      },
+      () => undefined,
+    );
+    return () => {
+      current = false;
+    };
+  }, [store, serverId, channelId]);
 
   function run(action: Action): void {
     setRunning(action);
@@ -83,17 +97,19 @@ export function ChannelContextActions({
           {t(running === "clear" ? "mobile.channel.newConversation.starting" : "mobile.channel.newConversation.title")}
         </Typography.Paragraph>
       </SettingsRow>
-      <SettingsRow
-        description={t(compactStarted ? "mobile.channel.compact.started" : "mobile.channel.compact.footer")}
-        disabled={disabled}
-        disclosure={false}
-        leading={<RowIcon icon={FoldVertical} tone="accent" />}
-        onPress={() => run("compact")}
-      >
-        <Typography.Paragraph className="text-accent">
-          {t(running === "compact" ? "mobile.channel.compact.compacting" : "mobile.channel.compact.title")}
-        </Typography.Paragraph>
-      </SettingsRow>
+      {compactShown ? (
+        <SettingsRow
+          description={t(compactStarted ? "mobile.channel.compact.started" : "mobile.channel.compact.footer")}
+          disabled={disabled}
+          disclosure={false}
+          leading={<RowIcon icon={FoldVertical} tone="accent" />}
+          onPress={() => run("compact")}
+        >
+          <Typography.Paragraph className="text-accent">
+            {t(running === "compact" ? "mobile.channel.compact.compacting" : "mobile.channel.compact.title")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
       {canDeleteHistory ? (
         <SettingsRow
           description={t("mobile.channel.deleteHistory.footer")}

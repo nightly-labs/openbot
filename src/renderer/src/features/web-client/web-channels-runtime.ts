@@ -92,6 +92,8 @@ export function createWebChannelsPort(
       deleteChannelMessage: (input) => remote.deleteMessage?.({ kind: "channel", ...input }) ?? unavailable(),
       clearChannelContext: (channelId) => remote.clearChannelContext?.(channelId) ?? unavailable(),
       compactChannelContext: (channelId) => remote.compactChannelContext?.(channelId) ?? unavailable(),
+      channelCompactAvailability: (channelId) =>
+        remote.channelCompactAvailability?.(channelId) ?? Promise.resolve({ available: true }),
       deleteChannelHistory: (channelId) => remote.deleteHistory?.({ kind: "channel", channelId }) ?? unavailable(),
     },
     get eventRoutines() {

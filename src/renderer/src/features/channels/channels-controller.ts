@@ -499,6 +499,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
       if (!compactChannelContext) throw new Error(currentText().t("channel.error.action"));
       await compactChannelContext(channelId);
     },
+    compactAvailable: async (channelId: string) => {
+      const channelCompactAvailability = env.port().agent.channelCompactAvailability;
+      return channelCompactAvailability ? (await channelCompactAvailability(channelId)).available : true;
+    },
     refresh,
     retry: async (onAccepted?: (accepted: ChannelCommand) => void) => {
       const previous = failedCommand;

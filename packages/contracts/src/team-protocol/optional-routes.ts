@@ -49,6 +49,7 @@ import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
+import { CHANNEL_COMPACT_AVAILABILITY_CODECS } from "./channel-compact-availability-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
 import { CLAUDE_COMPACT_WINDOW_CODECS } from "./claude-compact-window-v1";
@@ -308,6 +309,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WHATSAPP_STATUS_REACTIONS_CODECS,
   ...MESSAGE_DELETE_CODECS,
   ...CHAT_HISTORY_CODECS,
+  ...CHANNEL_COMPACT_AVAILABILITY_CODECS,
   ...CONVERSATION_UNREAD_FROM_CODECS,
   ...PASSWORD_MANAGERS_CODECS,
   ...BROWSER_PROXIES_CODECS,
