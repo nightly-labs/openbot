@@ -2673,6 +2673,7 @@ export class OpenBotToolRouter {
         attachmentCall(async () => {
           if (!source) throw new Error("The image file was not found.");
           const { size } = await source.handle.stat();
+          if (size === 0) throw new Error("The image file is empty. Ask the user to attach the image again.");
           if (size > READ_IMAGE_MAX_FILE_BYTES)
             throw new Error(`The image file is larger than ${READ_IMAGE_MAX_FILE_BYTES / 1024 / 1024} MB.`);
           const bytes = Buffer.alloc(size);

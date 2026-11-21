@@ -5,6 +5,8 @@ export const messages = {
   "error.attachment.notFound": "Вложение не найдено.",
   "error.attachment.fileTooLarge": "Файл превышает лимит 100 МБ.",
   "error.attachment.namedFileTooLarge": "{name} превышает лимит 100 МБ.",
+  "error.attachment.emptyFile":
+    "Файл {name} пуст, или OpenBot не может его прочитать. Сохраните файл заново, затем прикрепите его снова.",
   "error.attachment.totalTooLarge": "Вложения превышают общий лимит 250 МБ.",
   "error.attachment.unavailable": "Этот файл больше недоступен.",
   "error.attachment.tooMany": "Выберите не более {limit} файлов.",
