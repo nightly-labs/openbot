@@ -1,8 +1,6 @@
-import type { BrowserWindowAction, BrowserWindowModel } from "@openbot/contracts/ipc";
-import { createEffect, onCleanup, onSettled, snapshot } from "solid-js";
-import { browserSessionHistory, canReopenBrowserTab } from "../browser/browser-tab-session";
+import { onSettled } from "solid-js";
 import { browserWindowTabDetails } from "../browser/browser-window-model";
-import { serverSupportsCapability } from "../servers/server-capabilities";
+import { relayBrowserWindow } from "../browser/browser-window-relay";
 import { createBrowserFullViewControls } from "./browser-full-view-controls";
 import { useConversationController } from "./conversation-controller-context";
 import { conversationRuntime } from "./conversation-runtime";
@@ -21,81 +19,39 @@ export default function BrowserWindowBridge() {
     stopBrowserTab,
   } = useConversationViewScope();
   const controls = createBrowserFullViewControls();
-  const runtime = conversationRuntime(props);
   const { setChatBrowserWindowBridges } = useConversationController();
   onSettled(() => {
     setChatBrowserWindowBridges((count) => count + 1);
     return () => setChatBrowserWindowBridges((count) => count - 1);
   });
 
-  const model = (): BrowserWindowModel => {
-    const tabs = controls.tabs();
-    const remoteView = props.server?.kind === "remote" && serverSupportsCapability(props.server, "browser-view");
-    return {
-      tabs,
-      activeTabId: activeBrowserTab()?.id ?? null,
-      details: tabs.map((tab) =>
-        browserWindowTabDetails(
-          tab.id,
-          browserControlForTab(tab),
-          browserControllerForTab(tab),
-          browserTabOwner(tab),
-          controls.profileForTab(tab),
-        ),
+  relayBrowserWindow(conversationRuntime(props).browser, {
+    serverId: controls.serverId,
+    server: () => props.server,
+    macShortcuts: () => props.platform === "darwin",
+    tabs: controls.tabs,
+    activeTabId: () => activeBrowserTab()?.id,
+    tabDetails: (tab) =>
+      browserWindowTabDetails(
+        tab.id,
+        browserControlForTab(tab),
+        browserControllerForTab(tab),
+        browserTabOwner(tab),
+        controls.profileForTab(tab),
       ),
-      history: [...browserSessionHistory(controls.serverId())],
-      canReopen: canReopenBrowserTab(controls.serverId()),
-      canCloseTabs: true,
-      liveViewTabId: remoteView ? (activeBrowserTab()?.id ?? null) : null,
-      liveViewClipboard: serverSupportsCapability(props.server, "browser-view-clipboard"),
-      shortcuts: props.platform === "darwin" ? "mac" : "pc",
-    };
-  };
-
-  createEffect(model, (next) => {
-    void runtime.browser.publishWindowModel(snapshot(next));
+    operations: {
+      activate: controls.activateTab,
+      close: controls.closeTabs,
+      newTab: (afterId) => void controls.newTab(afterId),
+      duplicate: controls.duplicateTab,
+      move: controls.moveTab,
+      reopen: controls.reopenTab,
+      reload: (tabId) => void reloadBrowserTab(tabId),
+      stop: (tabId) => void stopBrowserTab(tabId),
+      navigate: (tabId, direction) => void navigateBrowserTab(tabId, direction),
+      openAddress: (url, tabId) => void openBrowserAddress(url, tabId === undefined),
+    },
   });
-
-  const runAction = (action: BrowserWindowAction) => {
-    switch (action.type) {
-      case "activate":
-        controls.activateTab(action.tabId);
-        return;
-      case "close":
-        controls.closeTabs(action.tabIds);
-        return;
-      case "new-tab":
-        void controls.newTab(action.afterId);
-        return;
-      case "duplicate":
-        controls.duplicateTab(action.tabId);
-        return;
-      case "move":
-        controls.moveTab(action.tabId, action.index);
-        return;
-      case "reopen":
-        controls.reopenTab();
-        return;
-      case "reload":
-        void reloadBrowserTab(action.tabId);
-        return;
-      case "stop":
-        void stopBrowserTab(action.tabId);
-        return;
-      case "navigate":
-        void navigateBrowserTab(action.tabId, action.direction);
-        return;
-      case "open-address":
-        void openBrowserAddress(action.url, action.tabId === undefined);
-        return;
-    }
-  };
-
-  onCleanup(
-    runtime.browser.onWindowEvent((event) => {
-      if (event.type === "action") runAction(event.action);
-    }),
-  );
 
   return null;
 }

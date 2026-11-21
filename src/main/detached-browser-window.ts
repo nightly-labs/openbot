@@ -51,10 +51,6 @@ export class DetachedBrowserWindow {
     mainContents.on("render-process-gone", this.#mainPageGone);
   }
 
-  isOpen(): boolean {
-    return this.#window !== null && !this.#window.isDestroyed();
-  }
-
   readonly open = Effect.fn("DetachedBrowserWindow.open")(function* (
     this: DetachedBrowserWindow,
     savedBounds?: BrowserBounds,
