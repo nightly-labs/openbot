@@ -33,6 +33,7 @@ export function createScheduledUpdateToast(options: {
         description: restart.mode === "now" ? t("update.scheduled.now") : t("update.scheduled.whenIdle"),
         duration: Number.POSITIVE_INFINITY,
         dismissible: false,
+        closeButton: false,
         action: {
           label: t("update.scheduled.cancel"),
           onClick: () => {
