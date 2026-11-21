@@ -14,21 +14,27 @@ export interface AgentWorkflowToastHost {
 
 export function watchAgentWorkflows(host: AgentWorkflowToastHost): void {
   const known = new Map<string, Set<string>>();
-  const seeding = new Set<string>();
+  const seeding = new Map<string, Set<string>>();
 
-  createEffect(host.activeServer, (server) => {
+  const seed = (server: ServerSummary | undefined) => {
     if (!server || server.kind === "remote" || known.has(server.id) || seeding.has(server.id)) return;
     const serverId = server.id;
-    seeding.add(serverId);
+    const seenWhileSeeding = new Set<string>();
+    seeding.set(serverId, seenWhileSeeding);
     desktopWorkflowList(serverId).then(
-      (summaries) => known.set(serverId, new Set(summaries.map((summary) => summary.id))),
+      (summaries) => {
+        seeding.delete(serverId);
+        known.set(serverId, new Set([...summaries.map((summary) => summary.id), ...seenWhileSeeding]));
+      },
       () => seeding.delete(serverId),
     );
-  });
+  };
+
+  createEffect(host.activeServer, seed);
 
   const showMade = async (serverId: string, workflowId: string, agentName: string) => {
     const summary = (await desktopWorkflowList(serverId)).find((workflow) => workflow.id === workflowId);
-    if (!summary || host.workflowsOnScreen()) return;
+    if (!summary || host.workflowsOnScreen() || host.activeServer()?.id !== serverId) return;
     const { t } = currentText();
     toast(t("workflow.agentMade.title", { agent: agentName }), {
       id: `agent-workflow:${serverId}:${workflowId}`,
@@ -39,8 +45,13 @@ export function watchAgentWorkflows(host: AgentWorkflowToastHost): void {
 
   onSettled(() =>
     onDesktopWorkflowsChanged((serverId, workflowId, agentId) => {
+      seeding.get(serverId)?.add(workflowId);
       const ids = known.get(serverId);
-      if (!ids || ids.has(workflowId)) return;
+      if (!ids) {
+        if (serverId === host.activeServer()?.id) seed(host.activeServer());
+        return;
+      }
+      if (ids.has(workflowId)) return;
       ids.add(workflowId);
       if (agentId === undefined || serverId !== host.activeServer()?.id || host.workflowsOnScreen()) return;
       if (!agentAskedHere(serverId, agentId)) return;

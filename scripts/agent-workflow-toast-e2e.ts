@@ -28,7 +28,6 @@ interface Report {
   passed?: boolean;
 }
 const report: Report = { title, pageErrors, screenshots: [] };
-let createdId: string | undefined;
 
 const shot = async (label: string) => {
   const path = resolve(OUT, `${label}.png`);
@@ -84,7 +83,6 @@ try {
     (entry) => !before.has(entry.id) && entry.title === title,
   );
   assert.ok(made, "The agent did not make the workflow.");
-  createdId = made.id;
   report.workflowId = made.id;
   report.workflowsOpenWhenToastShown = await page
     .getByRole("button", { name: english("workflow.canvas.switcher.all") })
@@ -105,10 +103,12 @@ try {
   await shot("opened");
   report.passed = true;
 } finally {
-  if (createdId !== undefined) {
-    const id = createdId;
-    await page.evaluate((workflowId) => window.openbot.workflows.delete(workflowId), id).catch(() => undefined);
-  }
+  await page
+    .evaluate(async (name) => {
+      for (const entry of await window.openbot.workflows.list())
+        if (entry.title === name) await window.openbot.workflows.delete(entry.id);
+    }, title)
+    .catch(() => undefined);
   const path = writeReport(NAME, report);
   process.stdout.write(`Report: ${path}\n`);
   await session.close();
