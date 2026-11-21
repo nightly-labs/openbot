@@ -223,7 +223,7 @@ export interface BrowserTabAgent {
   name: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
-  avatarColor?: AvatarColor | null | undefined;
+  avatarColor?: AvatarColor | null;
   avatarUrl: string | null;
 }
 
