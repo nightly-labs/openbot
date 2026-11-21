@@ -13,6 +13,7 @@ import {
   keepUsageCredits,
   type UsageCredits,
   usageQuotaForModel,
+  usageWindowsForModel,
   withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
@@ -246,7 +247,7 @@ export function spentUsageWindow(
     const quota = usageQuotaForModel(limit, model);
     if (!quota) continue;
     let spent: SpentUsageWindow | null = null;
-    for (const slot of ["primary", "secondary"] as const) {
+    for (const slot of usageWindowsForModel(provider, model, quota)) {
       const window = quota[slot];
       if (!window || window.usedPercent < 100) continue;
       if (window.resetsAt !== null && window.resetsAt * 1_000 <= nowMs) continue;

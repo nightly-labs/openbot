@@ -669,6 +669,21 @@ export function accountUsageCoversModel(provider: AgentProviderId, model: string
   return true;
 }
 
+export function isCursorOwnModel(model: string): boolean {
+  const bare = model.trim().toLowerCase();
+  const bracket = bare.indexOf("[");
+  const id = bracket >= 0 ? bare.slice(0, bracket) : bare;
+  return id === "auto" || id === "default" || id.startsWith("composer") || id.startsWith("cursor-");
+}
+export function usageWindowsForModel(
+  provider: AgentProviderId,
+  model: string | null | undefined,
+  quota: { primary: unknown; secondary: unknown },
+): readonly ("primary" | "secondary")[] {
+  if (provider === "cursor" && model && quota.primary != null && quota.secondary != null)
+    return [isCursorOwnModel(model) ? "primary" : "secondary"];
+  return ["primary", "secondary"];
+}
 export function usageQuotaForModel(
   limit: AccountUsageLimit,
   model: string | null | undefined,
