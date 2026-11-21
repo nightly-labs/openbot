@@ -37,6 +37,7 @@ export interface AgentClient {
   readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
+  markTurnsStoppedForShutdown?(): void;
   releaseThread?(externalThreadId: string, resumes?: boolean): Effect.Effect<void, ProviderClientOperationError>;
   callRelayedMcpTool?(
     externalThreadId: string,

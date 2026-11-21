@@ -746,6 +746,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#transport.start();
   }
 
+  markTurnsStoppedForShutdown(): void {
+    for (const id of this.#threads.ids()) {
+      const turn = this.#threads.get(id)?.activeTurn;
+      if (!turn) continue;
+      turn.stopped = true;
+      turn.stop.abort();
+    }
+  }
+
   readonly stop = Effect.fn("AcpAgentClient.stop")(function* (
     this: AcpAgentClient,
   ): Effect.fn.Return<void, ProviderClientOperationError> {

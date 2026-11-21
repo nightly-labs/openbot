@@ -5640,6 +5640,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
     const clients = [...(yield* this.#providers.dispose()), ...this.#profileClients.release()];
+    for (const client of clients) client.markTurnsStoppedForShutdown?.();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
       const agent = this.#store.get(agentId);
