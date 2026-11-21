@@ -372,11 +372,8 @@ export class DrainScheduler {
     )
       return "one-turn";
     const channelId = laneChannelId(taskId);
-    if (channelId !== null) {
-      const otherChannels = this.#runningChannelTurns(agentId, taskId);
-      if (otherChannels > 0 && otherChannels + this.#runningTasks(agentId, null) >= this.#tasks.limit(agentId))
-        return "channel-turn";
-    }
+    if (channelId !== null && this.#runningChannelTurns(agentId, taskId) >= this.channelTurnLimit(agentId))
+      return "channel-turn";
     const ownTaskId = laneTaskId(lane);
     if (ownTaskId !== null) {
       if (this.#tasks.threadId(ownTaskId) === null) return "task-closed";
@@ -446,6 +443,10 @@ export class DrainScheduler {
 
   messagingTurnActive(agentId: string): boolean {
     return this.#ownThreadTurnActive(agentId, true);
+  }
+
+  channelTurnLimit(agentId: string): number {
+    return Math.max(1, this.#tasks.limit(agentId) - this.#runningTasks(agentId, null));
   }
 
   ownChatHold(agentId: string): string | null {

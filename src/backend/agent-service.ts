@@ -1483,11 +1483,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toChannelOperationError),
       loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
-      channelTurnLimit: (agentId) => this.#tasks.limit(agentId),
+      channelTurnLimit: (agentId) => this.#drain.channelTurnLimit(agentId),
       busy: (agentId, channelId) =>
         this.#channelHeld(agentId) ||
         this.#channelsAtWork(agentId).has(channelId) ||
-        this.#channelsAtWork(agentId).size >= this.#tasks.limit(agentId) ||
+        this.#channelsAtWork(agentId).size >= this.#drain.channelTurnLimit(agentId) ||
         (this.#tasks.oneTurnAtATime(agentId) &&
           (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
             this.#mailbox.laneActive(agentId, null) ||
