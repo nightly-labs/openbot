@@ -82,6 +82,33 @@ export const messages = {
   "mobile.channel.form.deleteBody":
     "Esto detiene el canal. Su historial permanece en Canales eliminados solo para consulta. Puedes restaurarlo desde allí. Los agentes miembros se conservan.",
   "mobile.channel.form.delete": "Eliminar canal",
+  "mobile.channel.newConversation.title": "Nueva conversación",
+  "mobile.channel.newConversation.starting": "Iniciando nueva conversación…",
+  "mobile.channel.newConversation.footer":
+    "Los miembros olvidan los mensajes anteriores. La configuración del canal se mantiene.",
+  "mobile.channel.newConversation.confirmTitle": "¿Iniciar una nueva conversación en {name}?",
+  "mobile.channel.newConversation.confirmBody":
+    "Los miembros olvidan los mensajes anteriores de este canal. Los mensajes siguen visibles sobre un separador. Los miembros, las instrucciones, los recuerdos y las rutinas no cambian.",
+  "mobile.channel.newConversation.confirm": "Iniciar nueva conversación",
+  "mobile.channel.newConversation.failed": "No se pudo iniciar una nueva conversación",
+  "mobile.channel.newConversation.failedBody": "El host no pudo iniciar una nueva conversación.",
+  "mobile.channel.compact.title": "Compactar contexto",
+  "mobile.channel.compact.compacting": "Iniciando la compactación…",
+  "mobile.channel.compact.footer": "Los miembros guardan un resumen breve de su sesión del canal y usan menos tokens.",
+  "mobile.channel.compact.started":
+    "Compactación iniciada. Los proveedores de los miembros acortan el contexto en el host.",
+  "mobile.channel.compact.failed": "No se pudo compactar el contexto del canal",
+  "mobile.channel.compact.failedBody": "El host no pudo compactar el contexto.",
+  "mobile.channel.deleteHistory.title": "Eliminar historial",
+  "mobile.channel.deleteHistory.deleting": "Eliminando el historial…",
+  "mobile.channel.deleteHistory.footer":
+    "Los mensajes se eliminan y los miembros los olvidan. La configuración del canal se mantiene.",
+  "mobile.channel.deleteHistory.confirmTitle": "¿Eliminar el historial de {name}?",
+  "mobile.channel.deleteHistory.confirmBody":
+    "Todos los mensajes y archivos de este canal se eliminan de OpenBot y los miembros los olvidan. No se puede deshacer. Los miembros, las instrucciones, las memorias, las rutinas y las tareas no cambian.",
+  "mobile.channel.deleteHistory.confirm": "Eliminar historial",
+  "mobile.channel.deleteHistory.failed": "No se pudo eliminar el historial",
+  "mobile.channel.deleteHistory.failedBody": "El host no pudo eliminar el historial.",
   "mobile.channel.form.unavailable": "Conéctate a un servidor de escritorio que admita canales para hacer cambios.",
   "mobile.channel.form.invalidName": "Introduce un nombre de canal válido.",
   "mobile.channel.picture.title": "Imagen del canal",

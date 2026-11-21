@@ -7,7 +7,10 @@ export const messages = {
   "error.update.restartFailed": "OpenBot לא הצליח להפעיל את עצמו מחדש כדי להתקין את העדכון.",
   "error.update.downloadStalled": "הורדת העדכון הפסיקה להגיב. יש לנסות שוב.",
   "error.update.installFailed": "לא ניתן להתקין את העדכון. יש לצאת מ-OpenBot, לפתוח אותו מחדש ולנסות שוב.",
+  "error.update.notInstalled": "ההפעלה מחדש האחרונה לא התקינה את העדכון. יש להפעיל מחדש כדי לנסות שוב.",
   "error.update.downloadFailed": "לא ניתן להוריד את העדכון. יש לנסות שוב.",
+  "error.update.signatureNotConfirmed":
+    "OpenBot לא הצליח לאמת את העדכון. יש לנסות שוב. אם השגיאה נמשכת, יש להוריד את OpenBot מ-openbot.run/download.",
   "error.update.checkFailed": "לא ניתן לבדוק אם יש עדכונים. יש לנסות שוב.",
   "error.update.checkStalled": "בדיקת העדכונים הפסיקה להגיב. יש לנסות שוב.",
   "error.update.checkOffline": "לא ניתן להתחבר לשירות העדכונים. יש לבדוק את חיבור האינטרנט ולנסות שוב.",
@@ -22,6 +25,10 @@ export const messages = {
   "error.update.siblingCheckFailed": "לא ניתן לאמת סשנים אחרים של OpenBot. יש לנסות שוב לפני ההתקנה.",
   "error.update.readOnlyLocation":
     "OpenBot לא יכול להתקין עדכונים מהמיקום הזה. צא מ-OpenBot. ב-Finder, גרור את OpenBot לתיקייה 'יישומים' (אם הוא כבר שם, גרור אותו החוצה ובחזרה פנימה). לאחר מכן פתח את OpenBot והתקן את העדכון שוב.",
+  "error.update.appImageMissing":
+    "OpenBot לא יכול להתקין את העדכון כי קובץ ה-AppImage שלו הועבר, שונה שמו או הוחלף. יש לצאת מ-OpenBot ואז לפתוח שוב את קובץ ה-AppImage.",
+  "error.update.appImageReadOnly":
+    "OpenBot לא יכול להתקין עדכונים בתיקייה של קובץ ה-AppImage שלו. יש לצאת מ-OpenBot, להעביר את קובץ ה-AppImage לתיקייה בתוך תיקיית הבית, ואז לפתוח אותו ולהתקין שוב את העדכון.",
   "error.update.remoteDisabled": "עדכונים ממנהלי שרת כבויים במחשב הזה.",
   "error.update.restartStarted": "OpenBot כבר מופעל מחדש כדי להתקין את העדכון.",
   "error.update.alreadyRestarting": "OpenBot כבר מופעל מחדש.",

@@ -123,6 +123,13 @@ routine or has this routine. A run with `waitId` wakes only that wait. When no s
 the run starts without a wait. The run's input repeats the request and the agent's note, so the
 agent can continue the request.
 
+A side thread that the user opened can open a wait too. The wait continues in the side thread where it
+opened. A run with the `waitId` of a side-thread wait runs in that side thread. Any other run that
+wakes a side-thread wait stays in its usual place, and the side thread gets its own message with
+the run's instruction and the wait. That message continues the wait; it does not do the routine task again. An archived side thread opens again. When the side thread is
+gone, or no more side threads can be open, the wait continues in the run's place. A channel or
+messaging conversation cannot open a wait.
+
 Answer: `202 { "runId": string, "deliveryId": string | null }`.
 
 `202` means that the run is in the queue, not that it ran. When the agent's provider account is at
@@ -246,7 +253,7 @@ requests return `409`; refresh the pending list instead of retrying the old resp
 
 All request bodies have a 32 KiB limit. Messages and routine runs share a limit of accepted
 requests per agent per hour, including message retries. The limit is 30 by default; change it in
-Server Settings › Agents › Local scripts › Requests an hour: 30, 60, 120, 300 or 1,000. Reads, attention
+Server Settings › Agent defaults › Local scripts › Requests an hour: 30, 60, 120, 300 or 1,000. Reads, attention
 responses, settings changes and new chats do not use that limit. Routine runs have no retry key;
 retrying a run can start it twice.
 

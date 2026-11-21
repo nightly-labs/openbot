@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Cobrain here is taken from cobrain.space. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const COBRAIN_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

@@ -8,7 +8,6 @@ function serverOrderKey(accountId: string): string {
   return `openbot.web.server-order:${accountId}`;
 }
 
-/** The rail order that this browser keeps for one account. Mobile keeps its own order the same way. */
 export function readWebServerOrder(accountId: string, storage: ServerOrderStorage = window.localStorage): string[] {
   try {
     const parsed = serverOrderSchema.safeParse(JSON.parse(storage.getItem(serverOrderKey(accountId)) ?? "[]"));
@@ -25,12 +24,9 @@ export function writeWebServerOrder(
 ): void {
   try {
     storage.setItem(serverOrderKey(accountId), JSON.stringify(hostIds));
-  } catch {
-    // A UI preference must not block navigation when browser storage is unavailable.
-  }
+  } catch {}
 }
 
-/** Saved hosts come first. A host without a saved position keeps its directory order at the end. */
 export function orderWebHosts<T extends { hostId: string }>(hosts: readonly T[], order: readonly string[]): T[] {
   const position = new Map(order.map((id, index) => [id, index]));
   return hosts

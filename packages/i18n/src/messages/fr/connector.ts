@@ -58,7 +58,6 @@ export const messages = {
   "connector.github.disconnectEffectRevoke": "GitHub s’ouvre ensuite, et vous pouvez y révoquer OpenBot.",
   "connector.github.disconnectEffectKept":
     "Les discussions, les fichiers et la mémoire des agents restent sur cet ordinateur.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Chaque agent de {host} peut utiliser vos dépôts, tickets et pull requests GitHub, ainsi que gh et git.",
   "connector.github.connectedSummaryHost": {
@@ -279,6 +278,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot sur {host} ne peut pas recevoir de messages Telegram. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
   "connector.telegram.helpError": "OpenBot ne peut pas joindre cette discussion. Reconnectez-la ou déconnectez-la.",
+  "connector.telegram.helpNotLinked":
+    "Cette discussion n’est pas liée à ce serveur. Sélectionnez Reconnecter pour la lier.",
   "connector.telegram.retryAt": "Telegram a demandé à OpenBot de patienter. Nouvel essai à {time}.",
   "connector.telegram.pause": "Mettre en pause",
   "connector.telegram.resume": "Reprendre",
@@ -364,6 +365,8 @@ export const messages = {
     "WhatsApp a retiré ce serveur des appareils connectés. Associez à nouveau le numéro.",
   "connector.whatsapp.helpError":
     "OpenBot ne peut pas joindre WhatsApp sur ce numéro. Reconnectez-le ou déconnectez-le.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot ne peut pas lire les clés enregistrées de ce numéro. Associez à nouveau le numéro.",
   "connector.whatsapp.retryAt": "WhatsApp a demandé à OpenBot de patienter. Nouvel essai à {time}.",
   "connector.whatsapp.pause": "Mettre en pause",
   "connector.whatsapp.resume": "Reprendre",
@@ -378,10 +381,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action} : {name}",
   "connector.whatsapp.ownNumber": "Numéro personnel",
   "connector.whatsapp.ownNumberDescription":
-    "Seules votre discussion « Message à vous-même » et les personnes que vous autorisez peuvent écrire. Désactivez pour un numéro réservé à OpenBot.",
+    "Seules votre discussion « Message à vous-même » et les personnes que vous autorisez peuvent écrire. Les autres ne reçoivent pas de réponse. Désactivé, OpenBot répond aux inconnus avec un code.",
   "connector.whatsapp.workingMessage": "Message « En cours… »",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot l’envoie pendant que l’agent travaille, puis le remplace par la réponse. Désactivez pour n’envoyer que la réponse.",
+    "OpenBot l’envoie pendant que l’agent travaille, puis le remplace par la réponse. Une demande qui attend une demande précédente reçoit aussi un message d’attente. Désactivez pour n’envoyer que la réponse.",
+  "connector.whatsapp.statusReactions": "Réactions d’état",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot réagit avec 👀 quand un message arrive et avec ✅ quand la réponse est prête. Désactivez pour n’envoyer aucune réaction.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "Cet agent reçoit les messages destinés à OpenBot depuis tous vos numéros associés. Il répond lui-même aux messages courts, confie les autres tâches au bon agent et répond dans WhatsApp.",
@@ -400,10 +406,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Numéro",
   "connector.whatsapp.kindPersonal": "Mon numéro personnel",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot répond uniquement à votre discussion « Message à vous-même » et aux personnes que vous autorisez.",
+    "OpenBot répond uniquement à votre discussion « Message à vous-même » et aux personnes que vous autorisez. Les autres personnes ne reçoivent pas de réponse.",
   "connector.whatsapp.kindDedicated": "Un numéro réservé à OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Les inconnus reçoivent un code à vous transmettre. Vous les approuvez ici.",
+    "OpenBot répond depuis ce numéro à chaque inconnu avec un code à vous transmettre. Vous les approuvez ici.",
   "connector.whatsapp.methodLabel": "Méthode d’association",
   "connector.whatsapp.methodQr": "Code QR",
   "connector.whatsapp.methodCode": "Code d’association",
@@ -464,7 +470,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Facultatif. S’il est vide, la liste affiche le numéro de téléphone.",
   "connector.whatsapp.add": "Ajouter",
   "connector.whatsapp.groupTitle": "Ajouter un groupe",
-  "connector.whatsapp.groupDescription": "Les membres de ce groupe peuvent confier des tâches à vos agents.",
+  "connector.whatsapp.groupDescription":
+    "Les membres de ce groupe peuvent confier des tâches à vos agents en mentionnant le numéro ou en répondant à ses messages.",
   "connector.whatsapp.groupSearch": "Rechercher des groupes",
   "connector.whatsapp.groupsLoading": "Lecture des groupes…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot n’a pas pu lire les groupes",
@@ -622,9 +629,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Les agents ne peuvent plus utiliser vos identifiants partagés tant que vous ne vous reconnectez pas.",
   "connector.protonPass.reconnect": "Reconnecter",
-  "connector.protonPass.planTitle": "Proton Pass demande une offre payante",
+  "connector.protonPass.planTitle": "Proton Pass nécessite une offre avec Pass Plus",
   "connector.protonPass.planDescription":
-    "La CLI Proton Pass fonctionne uniquement avec une offre Proton payante. Changez d’offre, puis connectez à nouveau.",
+    "La CLI Proton Pass nécessite une offre Proton qui inclut Pass Plus. Les autres offres payantes, comme Mail Plus, ne l’incluent pas. Changez d’offre, puis connectez à nouveau.",
   "connector.protonPass.vaultTitle": "Coffre partagé",
   "connector.protonPass.vaultDescription":
     "Les agents peuvent se connecter avec les identifiants de ce coffre. Déplacez-y un identifiant pour le partager.",

@@ -5,23 +5,15 @@ import { ADA, CLAUDE_CODE, type LandingFeatureId, type LandingTeamsOfferId, LINU
 import type { LandingQuestion } from "./landing-faq";
 import { OPENBOT_LINKS } from "./landing-links";
 import type { MobilePlatform } from "./mobile-apps";
+import { referralPageText } from "./referral-page-text";
 import { slot, slotted } from "./text-slots";
 
-/*
- * The text of the home page, built from `sitePage.landing.*` catalog keys. The route loaders of `/`,
- * `/pl` and `/pt` run `landingPageText` with `loadPageText`, and the sections read plain strings through
- * `useLandingText`. This module has only a type import of the catalogs, so the sections do not pull
- * them into the browser bundle.
- */
-
-/** A provider name with its logo in the hero sentence. `suffix` is the punctuation that stays on its line. */
 export interface HeroProviderPart {
   provider: ProviderLogoVariant;
   name: string;
   suffix: string;
 }
 
-/** Words of a feature sentence that link to a page under /providers. */
 interface FeatureLinkPart {
   text: string;
   slug: string;
@@ -36,7 +28,6 @@ const HERO_PROVIDERS: Readonly<Record<string, Omit<HeroProviderPart, "suffix">>>
   grok: { provider: "grok", name: "Grok" },
 };
 
-/** Punctuation that follows a provider name. It stays with the name, so a line does not start with it. */
 const LEADING_PUNCTUATION = /^[,.;:]/;
 
 function heroDescription(t: AppTranslate): (string | HeroProviderPart)[] {
@@ -92,7 +83,6 @@ function providersDescription(t: AppTranslate): FeatureDescriptionPart[] {
   });
 }
 
-/** One line of the list on each row. */
 const lines = (text: string) => text.split("\n").filter((line) => line.trim() !== "");
 
 function questions(t: AppTranslate): LandingQuestion[] {
@@ -194,7 +184,6 @@ export function landingPageText(t: AppTranslate) {
       loading: t("sitePage.landing.preview.loading"),
     },
     network: {
-      /** The words appear one at a time. */
       title: t("sitePage.landing.network.title").split(/\s+/).filter(Boolean),
       description: t("sitePage.landing.network.description"),
       eggs: {
@@ -221,7 +210,6 @@ export function landingPageText(t: AppTranslate) {
     picture: {
       channel,
       team: {
-        /** In the order of `LANDING_TEAM_SENDERS`. */
         messages: [
           t("sitePage.landing.picture.team.first"),
           t("sitePage.landing.picture.team.second"),
@@ -231,7 +219,6 @@ export function landingPageText(t: AppTranslate) {
         handoff: t("sitePage.landing.picture.team.handoff", { from: ADA.name, to: LINUS.name }),
       },
       multiplayer: {
-        /** In the order of `LANDING_MULTIPLAYER_SENDERS`. */
         messages: [
           t("sitePage.landing.picture.multiplayer.first"),
           t("sitePage.landing.picture.multiplayer.second"),
@@ -308,7 +295,9 @@ export function landingPageText(t: AppTranslate) {
       phone,
       pages: t("sitePage.landing.download.pages"),
       apk: t("sitePage.landing.download.apk"),
+      intelMac: t("sitePage.marketplace.downloadFor", { platform: "Intel Mac" }),
     },
+    referral: referralPageText(t),
   };
 }
 

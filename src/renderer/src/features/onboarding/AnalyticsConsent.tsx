@@ -5,10 +5,8 @@ import { createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } fro
 import type { OnboardingAvatarVariant } from "./onboarding-avatars";
 
 export interface AnalyticsConsentRowProps {
-  /** Starts ticked only in a region that allows analytics by default. A tick by the user thanks them. */
   checked: boolean;
   disabled?: boolean;
-  /** The agents that pop out of the row after a tick. Three fit beside the title. */
   agents: readonly OnboardingAvatarVariant[];
   onChange: (enabled: boolean) => void;
   class?: string;
@@ -19,19 +17,12 @@ export interface ConsentNoticeProps {
   onOpenPrivacy: () => void;
 }
 
-// Private-use characters, which no catalog text contains, mark where each link goes.
 const TERMS_MARKER = "";
 const PRIVACY_MARKER = "";
 const MARKER_PATTERN = /(|)/;
 
-/** How long the row title says thanks after a tick. The agents that pop out are gone by then. */
 const THANKS_MS = 2400;
 
-/**
- * The "Help make OpenBot better" box of first run and of the web sign-in. A tick by the user thanks
- * them: three of the team pop out of the row, and the first tick also shows a toast. A box that
- * starts ticked says nothing, and clearing it never asks why.
- */
 export function AnalyticsConsentRow(props: AnalyticsConsentRowProps) {
   const { t } = useText();
   const inputId = createUniqueId();
@@ -54,7 +45,6 @@ export function AnalyticsConsentRow(props: AnalyticsConsentRowProps) {
   const rowClass = () => (props.class ? `first-run-choice-improve ${props.class}` : "first-run-choice-improve");
   return (
     <label class={rowClass()} for={inputId}>
-      {/* The name is the title alone; the detail line describes the box. */}
       <Checkbox
         id={inputId}
         aria-labelledby={titleId}
@@ -82,10 +72,8 @@ export function AnalyticsConsentRow(props: AnalyticsConsentRowProps) {
   );
 }
 
-/** Says that the user accepts the Terms of Service, with the two document names as links. */
 export function ConsentNotice(props: ConsentNoticeProps) {
   const { t } = useText();
-  /** The notice in the reading order of each language. */
   const parts = () =>
     t("onboarding.consent.notice", { terms: TERMS_MARKER, privacy: PRIVACY_MARKER })
       .split(MARKER_PATTERN)

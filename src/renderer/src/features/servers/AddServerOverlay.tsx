@@ -4,6 +4,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
+import { type BillingDetails, isWithdrawalConsumer } from "@openbot/contracts/billing-details";
 import type {
   HostedServerCatalog,
   HostedServerCatalogPlan,
@@ -14,11 +15,18 @@ import type {
 import type { HostedServersDesktopApi, LicenseDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
 import type { LicenseOrder, LicenseState, PricingOrder } from "@openbot/contracts/license";
 import { classifyFailure } from "@openbot/telemetry";
+import {
+  type BillingDetailsCalls,
+  type BillingDetailsDraft,
+  billingDetailsDraft,
+  saveBillingDetails,
+} from "@openbot/ui/features/billing/BillingDetailsFields";
 import type {
   CreatedHostedServer,
   CreateHostedServerInput,
   HostedServerSetupStatus,
 } from "@openbot/ui/features/servers/AddServerDialog";
+import type { OrderConsent } from "@openbot/ui/features/servers/HostedPricingPage";
 import {
   guessHostedCurrency,
   HOSTED_BILLING_CURRENCY,
@@ -41,116 +49,76 @@ import type { PricingPagePlacement } from "../window/window-page-context";
 
 type PlansEvent = DesktopAnalyticsProperties<"hosted_server_plans_action">;
 
-/** The pages that the consent of the pricing page links to. */
 const PRIVACY_URL = "https://openbot.run/privacy";
 const TERMS_URL = "https://openbot.run/terms";
 
-/** How often the dialog reads the new server while it waits for the payment and the setup. */
 const SETUP_POLL_INTERVAL_MS = 3_000;
-/**
- * How long a running server on the rail can stay without an answer before the setup offers it anyway.
- * A rail that cannot report the server, such as a browser with no status connections, never says
- * that it is online. The server then opens with its own connection notice, which has Retry.
- */
 const RAIL_ANSWER_WAIT_MS = 60_000;
 
 type AddServerCalls = Pick<HostedServersDesktopApi, "list" | "plans" | "create" | "openCheckout" | "wake">;
 
-/** The account server's answers that the flow opens with. */
 interface AddServerRead {
   catalog: HostedServerCatalog;
   list: HostedServerList;
   licenseState: LicenseState | null;
+  details: BillingDetails | null;
 }
 
-/** A server that the user created before the dialog opened, such as on a return from the payment page. */
 export interface AddServerResume {
   serverId: string;
-  /** True when Stripe returned after a payment. The setup then shows before the payment webhook. */
   paid: boolean;
 }
 
 interface AddServerOverlayProps {
   open: boolean;
-  /** Where the user opened the plans. Analytics only. */
   entryPoint?: HostedServerEntryPoint | undefined;
   calls: AddServerCalls;
-  /** The servers on the rail. The new server is ready when it shows here and is online. */
   servers: readonly ServerSummary[];
-  /**
-   * Reads the rail servers again, while the new server runs but is not on the rail yet. Without it,
-   * the consumer's own events must add the server.
-   */
   onRefreshServers?: (() => Promise<void>) | undefined;
   resume?: AddServerResume | null | undefined;
-  /** The order from the pricing page. The dialog fills it in and goes on to the payment page. */
   order?: PricingOrder | null | undefined;
-  /**
-   * Reads the account's license. When the account has none, the pricing page sells one with the server, or alone:
-   * a license alone goes to its own payment page.
-   */
   license?: Pick<LicenseDesktopApi, "getState" | "openCheckout"> | undefined;
-  /** True in the desktop app, which runs on the user's computer. The pricing page then names this computer. */
+  billingDetails?: BillingDetailsCalls | undefined;
   thisComputer?: boolean | undefined;
-  /**
-   * Shows the pricing page as a page of the desktop window. Without it, as in the web client, the page covers the
-   * app frame.
-   */
   pricingPage?: PricingPagePlacement | undefined;
-  /** Opens a web page of openbot.run, such as the privacy policy, in the browser. */
   onOpenUrl: (url: string) => void;
   onClose: () => void;
   onOpenServer: (serverId: string) => void;
   onContactUs?: (() => void) | undefined;
   onJoinWithInvite?: (() => void) | undefined;
-  /** Opens the dialog that creates a server on this computer. The web client has no such server. */
   onCreateLocal?: (() => void) | undefined;
-  /** Opens the dialog with the command that installs a server on another computer. */
   onInstallServer?: (() => void) | undefined;
-  /** Opens the list of the account's hosted servers, so that the user can delete one at the limit. */
   onManageServers?: (() => void) | undefined;
 }
 
 interface AddServerState {
   plans: HostedServerPlan[] | null;
-  /** The number of hosted servers of the account, for the name of the next one. */
   serverCount: number;
-  /** The servers that block a new one. The account server replaces an unpaid server at the limit. */
   paidCount: number;
-  /** Null when the account server does not send it. */
   maxServers: number | null;
   server: HostedServerSummary | null;
   paid: boolean;
-  /** Set when the account has no open license, so the dialog offers one. */
   licenseOffer: { used: number; trialEnd?: number } | null;
-  /** The currency of the account's open subscriptions. A Stripe customer pays in one currency. */
   currency: HostedCurrency | null;
-  /** The pricing page order, as the dialog's choices. */
   order: CreateHostedServerInput | null;
-  /** The plans with their prices, for the order form of the pricing page. */
+  pageOrder: PricingOrder | null;
   catalog: HostedServerCatalogPlan[];
-  /** True when the account has an open license. A server order then buys the server alone. */
   ownLicense: boolean;
-  /** True while an order of the pricing page goes to the payment page. */
   ordering: boolean;
-  /** True after the pricing page ordered a server. The page then stays under the setup dialog until it closes. */
   orderedFromPage: boolean;
   orderError: UserErrorDetails | null;
-  /** The title of `orderError`: an order of only a license makes no server. */
   orderErrorTitle: string;
+  details: BillingDetails | null;
+  detailsDraft: BillingDetailsDraft;
+  detailsEdited: boolean;
 }
 
-/** The license offer of an account with no open license. A failed read offers no license. */
 function licenseOfferOf(state: LicenseState | null): { used: number; trialEnd?: number } | null {
   if (!state?.available) return null;
   if (state.license && isOpenBillingStatus(state.license.status)) return null;
   return { used: state.used, ...(state.trialEnd === undefined ? {} : { trialEnd: state.trialEnd }) };
 }
 
-/**
- * The pricing page order as the dialog's choices. An account with its own license buys the server alone. When the
- * license read failed, the dialog cannot sell the license, so it gets no order and the user chooses again.
- */
 function dialogOrderOf(order: PricingOrder | null, state: LicenseState | null): CreateHostedServerInput | null {
   if (!order?.server) return null;
   const currency = HOSTED_CURRENCIES.find((entry) => HOSTED_BILLING_CURRENCY[entry] === order.currency);
@@ -165,22 +133,10 @@ function dialogOrderOf(order: PricingOrder | null, state: LicenseState | null): 
   };
 }
 
-/**
- * The plus button on the server rail, when the account can create hosted servers. A plan opens
- * the Stripe Checkout page; the account server creates the machine after Stripe confirms the payment.
- * The desktop main process and the web client open the page, so this view never gets its URL.
- */
 export function AddServerOverlay(props: AddServerOverlayProps) {
-  /**
-   * One key for each choice, kept while its server waits for the payment. A second click on the same
-   * plan, also after the dialog closed, then opens the same server and not a second one.
-   */
   const requestIds = new Map<string, RequestKey>();
-  /** A return from the payment page whose first read failed. The next opening shows its setup. */
   let pendingResume: AddServerResume | null = null;
-  /** The answers of the last opening. The next opening shows them at once and reads again behind them. */
   let lastRead: AddServerRead | null = null;
-  // The code of the page loads before the first opening, so the page does not wait for it.
   onSettled(() => {
     void HostedPricingPage.preload();
     void AddServerDialog.preload();
@@ -205,7 +161,6 @@ export function AddServerOverlay(props: AddServerOverlayProps) {
 
 interface RequestKey {
   requestId: string;
-  /** Null until the account server answers. */
   serverId: string | null;
 }
 
@@ -213,7 +168,6 @@ function AddServerSession(
   props: AddServerOverlayProps & {
     requestIds: Map<string, RequestKey>;
     lastRead: AddServerRead | null;
-    /** Null removes the answers, when this opening changed the servers. */
     onRead: (read: AddServerRead | null) => void;
     onPendingResume: (resume: AddServerResume | null) => void;
   },
@@ -229,11 +183,8 @@ function AddServerSession(
       ...properties,
       ...(entryPoint ? { entry_point: entryPoint } : {}),
     });
-  /** A read can take longer than the poll interval. The next tick then skips, so reads do not overlap. */
   let refreshing = false;
 
-  // The answers of the last opening show the pricing page at once. A return from the payment page, an order from the
-  // web page, or a server in setup opens the dialog, which reads its first choices once, so they wait for new answers.
   const lastRead = untrack(() =>
     resume || props.order || !props.lastRead || newestInSetup(props.lastRead.list.servers, props.servers)
       ? null
@@ -249,23 +200,26 @@ function AddServerSession(
     licenseOffer: null,
     currency: null,
     order: null,
+    pageOrder: null,
     catalog: [],
     ownLicense: false,
     ordering: false,
     orderedFromPage: false,
     orderError: null,
     orderErrorTitle: "",
+    details: null,
+    detailsDraft: billingDetailsDraft(null),
+    detailsEdited: false,
   };
   if (lastRead) {
     applyRead(initial, lastRead);
     trackPlans("viewed");
   }
   const [state, setState] = createStore<AddServerState>(initial);
-  /** True when the new answers arrived. An order waits for them, so it does not use the answers of the last opening. */
   const loaded = load();
 
   function applyRead(draft: AddServerState, read: AddServerRead): void {
-    const { catalog, list, licenseState } = read;
+    const { catalog, list, licenseState, details } = read;
     draft.plans = hostedServerPlansFromCatalog(catalog);
     draft.serverCount = list.servers.length;
     draft.paidCount = paidCount(list);
@@ -278,21 +232,29 @@ function AddServerSession(
         );
     draft.server = resumed ?? null;
     draft.paid = resume?.paid ?? false;
-    draft.order = resume ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
+    const needsCountry = untrack(() => props.billingDetails) !== undefined && !details?.country;
+    const order = resume ? null : (untrack(() => props.order) ?? null);
+    const needsPage = needsCountry || (isWithdrawalConsumer(details) && order?.server != null);
+    draft.order = needsPage ? null : dialogOrderOf(order, licenseState);
+    draft.pageOrder = needsPage ? order : null;
     draft.licenseOffer = licenseOfferOf(licenseState);
     draft.currency =
       HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
     draft.catalog = [...catalog.plans];
     draft.ownLicense = licenseState?.license ? isOpenBillingStatus(licenseState.license.status) : false;
+    draft.details = details;
+    if (!draft.detailsEdited) draft.detailsDraft = billingDetailsDraft(details);
   }
 
   async function load(): Promise<boolean> {
     try {
       const license = untrack(() => props.license);
-      const [catalog, list, licenseState] = await Promise.all([
+      const billingDetails = untrack(() => props.billingDetails);
+      const [catalog, list, licenseState, details] = await Promise.all([
         props.calls.plans(),
         props.calls.list(),
         license ? license.getState().catch(() => null) : Promise.resolve(null),
+        billingDetails ? billingDetails.getDetails().catch(() => null) : Promise.resolve(null),
       ]);
       for (const [choice, key] of requestIds) {
         const unpaid = list.servers.some(
@@ -301,7 +263,7 @@ function AddServerSession(
         if (key.serverId && !unpaid) requestIds.delete(choice);
       }
       props.onPendingResume(null);
-      const read = { catalog, list, licenseState };
+      const read = { catalog, list, licenseState, details };
       props.onRead(read);
       setState((draft) => applyRead(draft, read));
       if (!lastRead) trackPlans("viewed");
@@ -343,9 +305,9 @@ function AddServerSession(
       case "starting":
       case "waking":
         return "starting";
-      // The machine runs before OpenBot on it answers. The server is ready when OpenBot on it
-      // answered this client, so "Open server" opens a server that works and not a start notice.
-      // A server of another version also answered: it shows its own notice when it opens.
+      case "stopping":
+      case "stopped":
+        return state.paid && (server.error === null || server.error === "plan_ended") ? "starting" : "error";
       case "running": {
         const entry = onRail(server.serverId);
         if (!entry) return "connecting";
@@ -356,7 +318,6 @@ function AddServerSession(
     }
   };
 
-  // The owner sets this server up here, so a staged update does not announce its restart yet.
   createEffect(
     () => state.server?.serverId ?? null,
     (serverId) => (serverId ? holdHostRestartNotice(serverId) : undefined),
@@ -381,8 +342,6 @@ function AddServerSession(
     try {
       const [list] = await Promise.all([
         props.calls.list().catch(() => null),
-        // Only a server that is not on the rail yet needs a new read. A server on the rail connects by
-        // itself, and a new read would start its connection again.
         setupStatus() === "connecting" && !onRail(serverId)
           ? props.onRefreshServers?.().catch(() => undefined)
           : undefined,
@@ -401,10 +360,6 @@ function AddServerSession(
   const serverLimit = (): number | null =>
     state.maxServers !== null && state.paidCount >= state.maxServers ? state.maxServers : null;
 
-  /**
-   * Reads the server count again after a create failed. When the account reached its limit in
-   * another window, the dialog then shows the limit and not the error text of the account server.
-   */
   async function refreshCount(): Promise<void> {
     const list = await props.calls.list().catch(() => null);
     if (!list) return;
@@ -424,7 +379,7 @@ function AddServerSession(
 
   function create(input: CreateHostedServerInput): Promise<CreatedHostedServer> {
     const interval: BillingInterval = input.billing === "yearly" ? "year" : "month";
-    return createPlan(input.plan, interval, HOSTED_BILLING_CURRENCY[input.currency], input.license ?? null);
+    return createPlan(input.plan, interval, HOSTED_BILLING_CURRENCY[input.currency], input.license ?? null, false);
   }
 
   async function createPlan(
@@ -432,6 +387,7 @@ function AddServerSession(
     interval: BillingInterval,
     currency: BillingCurrency,
     license: LicenseOrder | null,
+    earlyStart: boolean,
   ): Promise<CreatedHostedServer> {
     const choice = license
       ? `${plan}:${interval}:${currency}:${license.tier}:${license.users}`
@@ -448,6 +404,7 @@ function AddServerSession(
         requestId: key.requestId,
         ...(entryPoint ? { entryPoint } : {}),
         ...(license ? { license } : {}),
+        ...(earlyStart ? { earlyStart: true } : {}),
       })
       .catch(async (error: unknown) => {
         await refreshCount();
@@ -456,7 +413,6 @@ function AddServerSession(
         throw error;
       });
     key.serverId = server.serverId;
-    // The answers of this opening do not have the new server. The next opening then waits for new answers.
     props.onRead(null);
     setState((draft) => {
       draft.server = server;
@@ -465,11 +421,27 @@ function AddServerSession(
     return { serverId: server.serverId, name: server.name };
   }
 
-  /**
-   * The order of the pricing page. A server goes to the payment page, and the dialog then shows its setup. A license
-   * alone goes to the payment page of the license.
-   */
-  async function submitOrder(order: PricingOrder): Promise<void> {
+  async function saveDetails(): Promise<boolean> {
+    const calls = props.billingDetails;
+    if (!calls) return true;
+    try {
+      const saved = await saveBillingDetails(calls, state.details, state.detailsDraft);
+      setState((draft) => {
+        draft.details = saved;
+      });
+      return true;
+    } catch (error) {
+      setState((draft) => {
+        const title = t("billing.details.saveFailed");
+        draft.orderError = errorDetails(error, title);
+        draft.orderErrorTitle = title;
+        draft.orderedFromPage = false;
+      });
+      return false;
+    }
+  }
+
+  async function submitOrder(order: PricingOrder, consent: OrderConsent): Promise<void> {
     if (state.ordering) return;
     setState((draft) => {
       draft.ordering = true;
@@ -477,9 +449,6 @@ function AddServerSession(
       draft.orderError = null;
     });
     try {
-      // The user chose on the last answers. When the new ones change the first choices, the page starts again with
-      // them, and the user must look at it again before an order. A server in setup in the new answers opens its
-      // setup dialog and does not get a second server.
       const shownKey = state.plans && pageKey(state.plans);
       if (!(await loaded) || state.server !== null || (state.plans && pageKey(state.plans)) !== shownKey) {
         setState((draft) => {
@@ -487,8 +456,15 @@ function AddServerSession(
         });
         return;
       }
+      if (!(await saveDetails())) return;
       if (order.server) {
-        await createPlan(order.server, order.interval, order.currency, state.ownLicense ? null : order.license);
+        await createPlan(
+          order.server,
+          order.interval,
+          order.currency,
+          state.ownLicense ? null : order.license,
+          consent.earlyStart,
+        );
       } else if (order.license) {
         const license = props.license;
         if (!license) return;
@@ -507,7 +483,6 @@ function AddServerSession(
           : t("settings.hostedServers.checkoutFailed");
         draft.orderError = errorDetails(error, title);
         draft.orderErrorTitle = title;
-        // No server was made, so the page stays open, and a new window page closes the flow.
         draft.orderedFromPage = false;
       });
     } finally {
@@ -517,23 +492,15 @@ function AddServerSession(
     }
   }
 
-  /** The pricing page shows until the user orders. A server in setup, or an order from the web page, opens the dialog. */
   const pageOpen = () => state.server === null && state.order === null;
-  /**
-   * The setup dialog of a server that the pricing page ordered shows over the page. The window then stays on the page
-   * and does not go back to the page below it.
-   */
   const pageShown = () => pageOpen() || state.orderedFromPage;
   const pageCurrency = (plans: HostedServerPlan[]) =>
-    HOSTED_BILLING_CURRENCY[state.currency ?? guessHostedCurrency(hostedCurrencies(plans))];
+    state.currency
+      ? HOSTED_BILLING_CURRENCY[state.currency]
+      : (state.pageOrder?.currency ?? HOSTED_BILLING_CURRENCY[guessHostedCurrency(hostedCurrencies(plans))]);
   const offerLicense = () => !state.ownLicense && props.license !== undefined;
-  /**
-   * The page reads its first choices once. When the new read changes them, after the page showed the last answers,
-   * the page starts again with the new ones.
-   */
   const pageKey = (plans: HostedServerPlan[]) =>
-    `${pageCurrency(plans)}:${state.currency !== null}:${offerLicense()}:${state.licenseOffer?.used ?? ""}`;
-  /** The web client has no window page, so the page covers the app frame there. */
+    `${pageCurrency(plans)}:${state.currency !== null}:${offerLicense()}:${state.licenseOffer?.used ?? ""}:${state.pageOrder !== null}`;
   const overlayMount = () => document.querySelector(".app-window > .app-frame") ?? document.body;
   const headerFrame = createPageHeaderFrame();
   const contactUs = () =>
@@ -558,7 +525,6 @@ function AddServerSession(
     trackPlans("closed");
     props.onClose();
   };
-  /** Another window page opened. The setup dialog of an ordered server stays; only the page under it goes. */
   const leavePage = () => {
     if (!state.orderedFromPage) {
       close();
@@ -622,7 +588,15 @@ function AddServerSession(
                   busy={state.ordering}
                   error={state.orderError}
                   errorTitle={state.orderErrorTitle}
-                  onSubmit={(order) => void submitOrder(order)}
+                  billingDetails={props.billingDetails ? state.detailsDraft : undefined}
+                  initialOrder={state.pageOrder ?? undefined}
+                  onBillingDetailsChange={(next) =>
+                    setState((draft) => {
+                      draft.detailsDraft = next;
+                      draft.detailsEdited = true;
+                    })
+                  }
+                  onSubmit={(order, consent) => void submitOrder(order, consent)}
                   onClose={close}
                   onOpenPrivacy={() => props.onOpenUrl(PRIVACY_URL)}
                   onOpenTerms={() => props.onOpenUrl(TERMS_URL)}
@@ -671,10 +645,6 @@ function AddServerSession(
   );
 }
 
-/**
- * A paid server that is not on the rail yet, so a new opening of the dialog shows its setup and not
- * the plans again. A server on the rail that wakes is not a new server.
- */
 function newestInSetup(
   servers: readonly HostedServerSummary[],
   rail: readonly ServerSummary[],
@@ -692,10 +662,6 @@ function paidCount(list: HostedServerList): number {
   return list.servers.filter((server) => server.state !== "awaiting_payment").length;
 }
 
-/**
- * Puts the pricing page in the card of the desktop window while it shows, or over the app frame without a window
- * page. Another page of the window closes the add-server flow.
- */
 function PricingPagePortal(
   props: ParentProps<{
     placement: PricingPagePlacement | undefined;

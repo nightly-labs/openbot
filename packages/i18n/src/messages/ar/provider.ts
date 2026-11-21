@@ -136,9 +136,15 @@ export const messages = {
   "provider.picker.download": "تنزيل {name}",
   "provider.picker.search": "البحث في النماذج",
   "provider.picker.noMatches": "لا توجد نماذج تطابق بحثك.",
+  "provider.picker.openrouterNoMatches":
+    "لا توجد نماذج تطابق بحثك. يمكن أن تخفي إعدادات الخصوصية والمزوّدين والحواجز الوقائية في openrouter.ai بعض النماذج من هذه القائمة.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "لا تعمل هذه النماذج مع «مساحة العمل فقط» على Windows وLinux. لاستخدامها، غيّر «الأذونات» في إعدادات الوكيل.",
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
   "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.endpointModelsInCustom": "يشغّل {name} نقاط النهاية المخصصة لديك. نماذجها في تبويب مخصص.",
+  "provider.picker.showCustomModels": "عرض النماذج",
   "provider.picker.museNoModels":
     "لم يرسل Muse أي نماذج لهذا الحساب. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل. اختر نموذجًا من مزوّد آخر.",
   "provider.picker.customEmpty":
@@ -165,6 +171,8 @@ export const messages = {
   "provider.picker.selectEffort": "اختيار الجهد",
   "provider.picker.custom": "مخصص",
   "provider.picker.cliReady": "{cli} جاهز",
+  "provider.picker.modelSourceProvider": "يستخدم {name} من إعدادات {cli}",
+  "provider.picker.modelSourceCatalog": "يستخدم قائمة نماذج من إعدادات {cli}",
   "provider.status.signInRequired": "تسجيل الدخول مطلوب",
   "provider.model.free": "مجاني",
   "provider.model.new": "جديد",
@@ -240,6 +248,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "تعذّرت إعادة الاتصال.",
   "provider.account.add": "إضافة حساب",
   "provider.account.addLabel": "إضافة حساب {name} آخر",
+  "provider.account.addWithCode": "إضافة حساب برمز",
   "provider.account.count": {
     zero: "لا حسابات",
     one: "حساب واحد",
@@ -356,6 +365,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · نزّله OpenBot",
   "provider.settings.otherVersionInstalledByUser": "غير مستخدم: {version} · ثبّته أنت",
   "provider.settings.otherVersionDownloaded": "غير مستخدم: {version} · نزّله OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "تحتاج بعض النماذج إلى جزء غير موجود في هذا الإصدار. نزّل إصدار OpenBot لاستخدامها.",
   "provider.settings.useInstalledVersion": "استخدم الإصدار المثبّت",
   "provider.settings.useDownloadedVersion": "استخدم إصدار OpenBot",
   "provider.settings.update": "تحديث",
@@ -382,6 +393,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "الافتراضي في Claude Code",
   "provider.settings.compactWindowTokens": "{size} رمز",
   "provider.settings.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
+  "provider.settings.environment": "البيئة",
+  "provider.settings.environmentVariables": "المتغيرات",
+  "provider.settings.environmentDescription":
+    "مفاتيح API وعناوين URL الأساسية وإعدادات أخرى يحصل عليها كل عملية لـ {name}. يسري التغيير عند انتهاء الأدوار الجارية.",
+  "provider.settings.environmentCodexHint":
+    "يرسل OPENAI_BASE_URL، مع OPENAI_API_KEY كمفتاح له، طلبات نماذج ChatGPT إلى ذلك العنوان.",
+  "provider.settings.environmentShellNote": "يمكن للأوامر التي يشغّلها الوكلاء قراءة هذه القيم.",
+  "provider.settings.environmentAdd": "إضافة متغير",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "القيمة",
+  "provider.settings.environmentSaved": "محفوظة",
+  "provider.settings.environmentSensitive": "حساس",
+  "provider.settings.environmentNameLabel": "اسم المتغير {index}",
+  "provider.settings.environmentValueLabel": "قيمة {name}",
+  "provider.settings.environmentSensitiveLabel": "إبقاء {name} سرًا",
+  "provider.settings.environmentRemoveLabel": "إزالة {name}",
+  "provider.settings.environmentUnnamed": "المتغير {index}",
+  "provider.settings.environmentPending":
+    "يعيد الحفظ تشغيل {name} عند انتهاء أدواره الجارية. تبقى القيم الحساسة على الخادم.",
+  "provider.settings.environmentDone": "تم الحفظ. يعاد تشغيل {name} عند انتهاء أدواره الجارية.",
+  "provider.settings.environmentDiscard": "تجاهل",
+  "provider.settings.environmentSave": "حفظ",
+  "provider.settings.environmentLoadFailed": "تعذّر تحميل متغيرات {name}.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",
@@ -423,4 +457,5 @@ export const messages = {
   },
   "provider.settings.disconnectLocalOnly":
     "يسجّل OpenBot خروج {provider} على هذا الكمبيوتر. تحتفظ واجهة {provider} CLI في الطرفية بتسجيل دخولها.",
+  "provider.settings.updateAll": "تحديث الكل",
 } as const satisfies PartialTranslation<typeof source>;

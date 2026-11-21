@@ -257,7 +257,6 @@ export class D1AuthRepository implements AuthRepository {
         .bind(input.session.id, user.id, tokenHash, input.session.expiresAt, input.now, input.now);
       const device = input.device;
       if (device) {
-        // One batch: a session without its mobile row would count as a desktop session.
         const [created, registered] = yield* storeCall(() =>
           database.batch([
             insertSession,
@@ -443,7 +442,6 @@ export class D1AuthRepository implements AuthRepository {
       now: number,
     ): Effect.fn.Return<AuthUser, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      // An answer older than the saved one changes nothing; the caller gets the saved answer.
       yield* storeCall(() =>
         database
           .prepare(
@@ -726,8 +724,6 @@ export class D1AuthRepository implements AuthRepository {
       )
         return false;
       const desktopTokenHash = yield* storeHash(input.desktopSessionToken);
-      // The insert repeats the session and host checks, so a concurrent sign-out or host key change wins.
-      // The earlier links are revoked only when the new link exists.
       const [inserted] = yield* storeCall(() =>
         database.batch([
           database
@@ -771,8 +767,6 @@ export class D1AuthRepository implements AuthRepository {
       input: { userId: string; hostId: string; now: number },
     ): Effect.fn.Return<void, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      // The phones that any link of this host signed in, also a replaced link's, are signed out with it.
-      // The revocation trigger ends their remote sessions and queues the disconnect.
       yield* storeCall(() =>
         database.batch([
           database
@@ -806,7 +800,6 @@ export class D1AuthRepository implements AuthRepository {
       },
     ): Effect.fn.Return<MobileAuthSessionResult | null, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      // A link is valid while it is not revoked and the desktop session that created it is active.
       const binding = yield* storeCall(() =>
         database
           .prepare(
@@ -915,9 +908,6 @@ export class D1AuthRepository implements AuthRepository {
       hostId: string | null,
     ): Effect.fn.Return<MobileAuthDevice[], AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      // A phone opens each host of the account directory, not only the host of its code. With a host,
-      // the list keeps the phones only when that host is in the directory: the account has an active
-      // membership, and the host has a key (`RemoteControlPlane.listHosts` and the Team client).
       const result = yield* storeCall(() =>
         database
           .prepare(
@@ -1003,8 +993,6 @@ export class D1AuthRepository implements AuthRepository {
       now: number,
     ): Effect.fn.Return<boolean, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      // The migration's trigger ends remote sessions and enqueues their disconnect atomically.
-      // RETURNING, not meta.changes: D1 also counts the rows that the trigger changes.
       const result = yield* storeCall(() =>
         database
           .prepare(
@@ -1048,7 +1036,6 @@ export class D1AuthRepository implements AuthRepository {
       input: { claimHash: string; email: string; createdAt: number; expiresAt: number },
     ): Effect.fn.Return<void, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      // One batch, and no conflict on a user that another request creates at the same time.
       const [, created] = yield* storeCall(() =>
         database.batch([
           database
@@ -1093,7 +1080,6 @@ export class D1AuthRepository implements AuthRepository {
     ): Effect.fn.Return<{ sessionToken: string; user: AuthUser } | null, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
       const tokenHash = yield* storeHash(input.session.token);
-      // The session row is made only by the redeem that spent the claim.
       const [spent] = yield* storeCall(() =>
         database.batch([
           database
@@ -1119,7 +1105,6 @@ export class D1AuthRepository implements AuthRepository {
         ]),
       );
       if (spent?.meta.changes !== 1) return null;
-      // Through the new session: the retention job can already have removed the spent claim.
       const row = yield* storeCall(() =>
         database
           .prepare(
@@ -1180,7 +1165,6 @@ export class D1AuthRepository implements AuthRepository {
   });
 }
 
-/** Registers the new mobile session and replaces the earlier session of the same device. */
 export function mobileSessionStatements(
   database: D1Database,
   input: { now: number; session: { id: string }; device: MobileAuthDeviceIdentity },
@@ -1217,10 +1201,6 @@ export function mobileSessionStatements(
   ];
 }
 
-/**
- * A host-bound credential is valid only while its account owns the host and the host key has the
- * stored fingerprint. A legacy ticket has no host.
- */
 const hostBindingMatches = Effect.fn("D1AuthRepository.hostBindingMatches")(function* (binding: HostBindingRow) {
   if (!binding.host_id) return true;
   if (!binding.device_public_key || binding.owner_user_id !== binding.user_id) return false;

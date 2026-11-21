@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   type AgentModelOption,
   type AgentSummary,
+  agentMemoryEnabled,
   type ConversationMessage,
   isContextResetMarker,
   SKILL_SUGGESTION_NAME_CHARACTERS,
@@ -12,7 +13,7 @@ import {
   skillSuggestionTarget,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Exit, Fiber, Schema, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import { extractJsonObject } from "../structured-output";
 import type { UserBrowsingLog, UserBrowsingStep } from "../user-browsing-log";
@@ -32,18 +33,21 @@ import {
 import type { ProfileClients } from "./profile-clients";
 import { type GenerationObserver, GenerationUsageLimitError, generateTextWithoutTools } from "./profile-generation";
 import type { ProviderOperationFailed } from "./provider-runtime";
-import { type LearnedSkillDraft, type SkillLearner, SkillWriterResult, skillWriterPrompt } from "./skill-learning";
+import {
+  type LearnedSkillDraft,
+  revisionKeepsSkill,
+  type SkillLearner,
+  SkillWriterResult,
+  skillWriterPrompt,
+  writerCanRevise,
+} from "./skill-learning";
 import { reviewedChat, skillSuggestionMessages, skillSuggestionSaved } from "./skill-suggestion";
 
 const logger = createOpenBotLogger("memory-review");
 
-/** The completed turns of one conversation between two reviews, by default. */
 const MEMORY_REVIEW_INTERVAL = 20;
-/** A conversation with no turn for this long gets its review early, when it has enough new turns. */
 const MEMORY_REVIEW_IDLE_MS = 15 * 60_000;
-/** The fewest new turns for a review after a pause or when a side thread closes. */
 const MEMORY_REVIEW_IDLE_TURNS = 3;
-/** The latest chat messages that a review reads when the chat is not loaded. */
 export const MEMORY_REVIEW_MESSAGES = 200;
 
 class MemoryReviewFailed extends Schema.TaggedError<MemoryReviewFailed>()("MemoryReviewFailed", {
@@ -54,84 +58,39 @@ export interface MemoryReviewOptions {
   memories: AgentMemories;
   profileClients: ProfileClients;
   listAgents(): AgentSummary[];
-  /** The models that the agent's provider lists once it is ready. */
   models(agent: AgentSummary): Effect.Effect<readonly AgentModelOption[], ProviderOperationFailed>;
-  /** A client signed in to the agent's own provider account. */
   createProfileClient(agent: AgentSummary): AgentClient;
-  /** Records the token usage of one review under its agent. */
   usageObserver(agent: AgentSummary, model: AgentModelOption): GenerationObserver;
-  /** The latest messages of the agent's own chat, or of its side thread, oldest first. */
   chat(agentId: string, threadId: string | null): readonly ConversationMessage[];
-  /** Whether a turn of the conversation runs and holds its cached snapshot. */
   turnActive(agentId: string, threadId: string | null): boolean;
   appendSystemMessage(agentId: string, threadId: string | null, message: ConversationMessage): void;
-  /**
-   * The skills that the agent has, read from this computer only. Omitted, or when it fails, a review
-   * does not suggest a skill.
-   */
   skills?(agentId: string): Effect.Effect<readonly ReviewSkill[], unknown>;
-  /**
-   * The server setting, read at each review: `automatic` saves the skill that a review finds, `ask`
-   * asks the user first, `off` does not look for skills. Omitted, `ask`.
-   */
   skillLearning?(): SkillLearningMode;
-  /** Saves a skill that a review finds. Omitted, `automatic` asks the user as `ask` does. */
   skillLearner?: SkillLearner;
   redact(text: string): string;
   stopping(): boolean;
-  /** The pause before an early review. Omitted, `MEMORY_REVIEW_IDLE_MS`. */
   idleMs?: number;
-  /**
-   * The app setting: the completed turns between two reviews, read at each use. `0` turns off all
-   * reviews, also after a pause, a clear and a closed side thread. Omitted, `MEMORY_REVIEW_INTERVAL`.
-   */
   interval?(): number;
-  /** Keeps the cursors through a restart. Omitted, they live in memory only. */
   cursors?: MemoryReviewCursors;
-  /**
-   * What the user did in the agent's tabs while they held them ("Learn from my browsing"). A review
-   * reads the steps and deletes them once it has an answer. Omitted, a review reads no steps.
-   */
   browsing?: Pick<UserBrowsingLog, "pending" | "reviewed" | "forgetAgent">;
 }
 
-/** One conversation that a review reads: the agent's own chat (`threadId` null) or one side thread. */
 interface ReviewedConversation {
   readonly key: string;
   readonly agentId: string;
   readonly threadId: string | null;
   turns: number;
-  /** The last message that a review read, or that the agent's own memory change made old. */
   cursor: string | null;
-  /** A review's lines that wait for the running turn to end, so the turn does not write over them. */
   heldLines: ConversationMessage[];
   idle: Fiber.Fiber<void> | null;
-  /** A review was due while another review ran or no profile client was free: it runs next. */
   waiting: boolean;
 }
 
-/**
- * Owns the background memory reviews: every few completed turns of an agent's
- * own chat or side thread, after a pause in it, when the chat is cleared and when a side thread
- * closes, one generation without tools reads the new part of the conversation and the agent's
- * memories, and proposes changes that `AgentMemories` applies with the checks of the memory tools.
- * One review runs at a time, and only when a profile client stays free for the user. A review that
- * cannot start waits, and starts when the running review ends or at the next turn. The counts live
- * in memory only; the cursors are also saved (`MemoryReviewCursors`), so the first review after a
- * restart reads only the messages that no finished review read.
- *
- * It never imports the agent service facade.
- */
 export class MemoryReview {
   readonly #options: MemoryReviewOptions;
   readonly #conversations = new Map<string, ReviewedConversation>();
   #running: { key: string; agentId: string; fiber: Fiber.Fiber<void> } | null = null;
-  /** The suggestions that a Save writes now, so a second Save does not write the skill again. */
-  readonly #saving = new Set<string>();
-  /**
-   * The suggestions that a Save wrote. Their skill line can wait for the running turn, or fail to
-   * append, so the chat alone does not show that the skill is saved.
-   */
+  readonly #saving = new Map<string, Deferred.Deferred<boolean>>();
   readonly #saved = new Set<string>();
   #scope = Scope.makeUnsafe();
 
@@ -139,12 +98,6 @@ export class MemoryReview {
     this.#options = options;
   }
 
-  /**
-   * A turn of the agent's own chat (`threadId` null) or of its side thread ended. A completed turn
-   * that counts brings the next review closer. A turn in which the agent changed its memories itself
-   * starts the count again. When the review looks for skills, it still reads those turns: a memory
-   * that the agent saved does not hold the lesson of how it did the task.
-   */
   readonly turnEnded = Effect.fn("MemoryReview.turnEnded")(function* (
     this: MemoryReview,
     agentId: string,
@@ -162,18 +115,15 @@ export class MemoryReview {
         Effect.orElseSucceed(() => []),
       );
       this.#moveCursor(conversation, messages);
-      // The turn end does not wait for the disk: the next delivery starts at once.
       yield* this.#saveCursor(conversation).pipe(Effect.forkIn(this.#scope));
       return;
     }
     if (counts) conversation.turns += 1;
     if (conversation.turns >= this.#interval()) yield* this.#start(conversation);
     yield* this.#startWaiting();
-    // A review that could not start now runs after a pause instead.
     yield* this.#startIdle(conversation);
   }).bind(this);
 
-  /** The agent's chat was cleared: the chat that the clear ended gets its review now. */
   readonly chatCleared = Effect.fn("MemoryReview.chatCleared")(function* (this: MemoryReview, agentId: string) {
     const conversation = yield* this.#conversation(agentId, null);
     yield* this.#stopIdle(conversation);
@@ -181,7 +131,6 @@ export class MemoryReview {
     yield* this.#start(conversation);
   }).bind(this);
 
-  /** A side thread closed: its new turns get their review now. */
   readonly threadClosed = Effect.fn("MemoryReview.threadClosed")(function* (
     this: MemoryReview,
     agentId: string,
@@ -194,7 +143,6 @@ export class MemoryReview {
     if (conversation.turns > 0) yield* this.#start(conversation);
   }).bind(this);
 
-  /** Ends the side thread's review and forgets its counts, before the thread is deleted. */
   readonly forgetThread = Effect.fn("MemoryReview.forgetThread")(function* (
     this: MemoryReview,
     agentId: string,
@@ -209,7 +157,6 @@ export class MemoryReview {
     yield* this.#options.cursors?.set(agentId, threadId, null) ?? Effect.void;
   }).bind(this);
 
-  /** Ends the agent's reviews and forgets its counts, before the agent is deleted. */
   readonly cancel = Effect.fn("MemoryReview.cancel")(function* (this: MemoryReview, agentId: string) {
     for (const conversation of [...this.#conversations.values()]) {
       if (conversation.agentId !== agentId) continue;
@@ -222,13 +169,6 @@ export class MemoryReview {
     yield* this.#options.browsing?.forgetAgent(agentId) ?? Effect.void;
   }).bind(this);
 
-  /**
-   * Saves the skill of an `ask` suggestion when the user presses Save. The writer of the `automatic`
-   * mode writes it in one generation without tools, not in a turn of the agent, and the skill line
-   * comes as from a review. It returns false when it cannot save, as when the suggestion is not in the
-   * latest messages, no profile client is free, or the writer fails: then the card sends the user's yes
-   * to the agent, so the lesson is not lost. A skill line after the suggestion means that it is saved.
-   */
   readonly saveSuggestion = Effect.fn("MemoryReview.saveSuggestion")(function* (
     this: MemoryReview,
     agentId: string,
@@ -236,11 +176,18 @@ export class MemoryReview {
     messageId: string,
   ) {
     const key = `${conversationKey(agentId, threadId)}:${messageId}`;
-    // A second press, as from another client, returns at once: the first one shows the skill line or sends the yes.
-    if (this.#saving.has(key) || this.#saved.has(key)) return true;
-    this.#saving.add(key);
+    const running = this.#saving.get(key);
+    if (running) return yield* Deferred.await(running);
+    if (this.#saved.has(key)) return true;
+    const ended = Deferred.makeUnsafe<boolean>();
+    this.#saving.set(key, ended);
     return yield* this.#saveSuggestion(agentId, threadId, messageId, () => this.#saved.add(key)).pipe(
-      Effect.ensuring(Effect.sync(() => this.#saving.delete(key))),
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          this.#saving.delete(key);
+          Deferred.doneUnsafe(ended, Effect.succeed(Exit.isSuccess(exit) && exit.value));
+        }),
+      ),
     );
   }).bind(this);
 
@@ -276,7 +223,6 @@ export class MemoryReview {
     if (options.turnActive(agentId, threadId)) conversation.heldLines.push(line);
     else
       yield* Effect.try(() => options.appendSystemMessage(agentId, threadId, line)).pipe(
-        // The skill is saved and `#saved` keeps a second Save from writing it again.
         Effect.catchCause((cause) =>
           Effect.sync(() => logger.warn("Could not show the saved skill in the chat.", { error: cause })),
         ),
@@ -295,7 +241,6 @@ export class MemoryReview {
     return this.#options.interval?.() ?? MEMORY_REVIEW_INTERVAL;
   }
 
-  /** The reviews run, so they keep what the user corrects: a skill, or a memory with skill learning off. */
   running(): boolean {
     return !this.#off();
   }
@@ -304,7 +249,6 @@ export class MemoryReview {
     return this.#options.skills !== undefined && (this.#options.skillLearning?.() ?? "ask") !== "off";
   }
 
-  /** Off, the turns still count, so a review after the user turns it on again reads them. */
   #off(): boolean {
     return this.#interval() <= 0;
   }
@@ -319,7 +263,6 @@ export class MemoryReview {
     if (known) return known;
     const cursors = this.#options.cursors;
     if (cursors) yield* cursors.load();
-    // `load` can yield, and another call can add the conversation first.
     const added = this.#conversations.get(key);
     if (added) return added;
     const conversation: ReviewedConversation = {
@@ -336,10 +279,6 @@ export class MemoryReview {
     return conversation;
   }).bind(this);
 
-  /**
-   * Saves the cursor when a review ends or fails, and when the agent changed its memories itself. A
-   * review that a stop interrupts keeps the earlier cursor, so the next run reads its messages again.
-   */
   #saveCursor(conversation: ReviewedConversation): Effect.Effect<void> {
     if (this.#conversations.get(conversation.key) !== conversation) return Effect.void;
     return this.#options.cursors?.set(conversation.agentId, conversation.threadId, conversation.cursor) ?? Effect.void;
@@ -354,7 +293,6 @@ export class MemoryReview {
     if (idle) yield* Fiber.interrupt(idle);
   }).bind(this);
 
-  /** After a pause with no turn, a conversation with enough new turns gets its review. */
   readonly #startIdle = Effect.fn("MemoryReview.startIdle")(function* (
     this: MemoryReview,
     conversation: ReviewedConversation,
@@ -387,7 +325,6 @@ export class MemoryReview {
     const fiber = yield* this.#review(conversation).pipe(
       Effect.catch((failure) =>
         Effect.sync(() => {
-          // A usage limit belongs to the user's own turns: the review does not mark the model.
           if (failure.cause instanceof GenerationUsageLimitError) return;
           logger.warn("Could not review the agent's memories.", { error: failure.cause });
         }).pipe(Effect.andThen(this.#saveCursor(conversation))),
@@ -403,10 +340,6 @@ export class MemoryReview {
     this.#running = { key: conversation.key, agentId: conversation.agentId, fiber };
   }).bind(this);
 
-  /**
-   * Starts the first review that waits. A clear's review that waits reads the chat after the clear
-   * when new turns came first: it usually starts within seconds, before the next turn.
-   */
   readonly #startWaiting = Effect.fn("MemoryReview.startWaiting")(function* (
     this: MemoryReview,
   ): Effect.fn.Return<void> {
@@ -423,7 +356,6 @@ export class MemoryReview {
       const options = this.#options;
       const { agentId, threadId } = conversation;
       const messages = yield* Effect.try(() => options.chat(agentId, threadId));
-      // The count starts again also when the review fails, so a failing model is not asked each turn.
       const before = { turns: conversation.turns, cursor: conversation.cursor };
       conversation.turns = 0;
       const excerpt = reviewExcerpt(messages, conversation.cursor);
@@ -431,11 +363,12 @@ export class MemoryReview {
       if (!excerpt.some((message) => message.author === "user")) return yield* this.#saveCursor(conversation);
       const agent = options.listAgents().find((candidate) => candidate.id === agentId);
       if (!agent || options.stopping()) return;
+      const memoryEnabled = agentMemoryEnabled(agent);
+      if (!memoryEnabled && !this.#skillLearningOn()) return yield* this.#saveCursor(conversation);
       const model = backgroundModel(agent, yield* options.models(agent));
       if (options.stopping()) return;
       if (!model) return yield* this.#saveCursor(conversation);
       if (!options.profileClients.hasSpare()) {
-        // A user turn took the spare client while the model list loaded: wait, and read these turns then.
         conversation.turns += before.turns;
         conversation.cursor = before.cursor;
         conversation.waiting = true;
@@ -446,17 +379,17 @@ export class MemoryReview {
         ...entry,
         memory: { ...entry.memory, text: options.redact(entry.memory.text) },
       }));
-      // The model sees only the redacted text of these, so it must not write or forget them.
       const hidden = new Set(
         redacted
           .filter((entry, index) => entry.memory.text !== base.memories[index]?.memory.text)
           .map((entry) => entry.memory.id),
       );
       const skillInput = yield* this.#skillInput(agentId, messages);
-      const browsing = options.browsing ? yield* options.browsing.pending(agentId) : [];
+      if (!memoryEnabled && !skillInput) return yield* this.#saveCursor(conversation);
+      const browsing = options.browsing && memoryEnabled ? yield* options.browsing.pending(agentId) : [];
       const prompt = memoryReviewPrompt(
         agent,
-        { ...base, memories: redacted },
+        { ...base, memories: memoryEnabled ? redacted : [] },
         excerpt.map((message) => redactedMessage(message, options.redact)),
         skillInput ?? undefined,
         browsing.map((step) => redactedStep(step, options.redact)),
@@ -473,17 +406,14 @@ export class MemoryReview {
       );
       const json = yield* Effect.try(() => extractJsonObject(answer));
       const result = yield* Schema.decodeUnknownEffect(MemoryReviewResult)(json);
-      // The model read the steps, so they are not kept for the next review.
       const lastStep = browsing.at(-1);
       if (lastStep) yield* options.browsing?.reviewed(agentId, lastStep.at) ?? Effect.void;
-      const operations = result.operations.filter(
-        (operation) => operation.type === "add" || !hidden.has(operation.memoryId),
-      );
+      const operations = memoryEnabled
+        ? result.operations.filter((operation) => operation.type === "add" || !hidden.has(operation.memoryId))
+        : [];
       const suggestion = skillInput
         ? yield* Schema.decodeUnknownEffect(SkillReviewResult)(json).pipe(
             Effect.map(({ skill }) => acceptedSuggestion(skill, skillInput.skills)),
-            // The agent already changed this skill in these turns, so a question to change it repeats the work.
-            // A line of an earlier review does not count: after a clear it comes after the reset marker.
             Effect.map((accepted) =>
               accepted?.action === "update" &&
               excerpt.some(
@@ -519,11 +449,14 @@ export class MemoryReview {
     Effect.mapError((failure) => new MemoryReviewFailed({ cause: failure })),
   ).bind(this);
 
-  /** The skills and the earlier skill questions, or null when the review does not suggest a skill. */
+  #skillLearningOn(): boolean {
+    return this.#options.skills !== undefined && (this.#options.skillLearning?.() ?? "ask") !== "off";
+  }
+
   #skillInput(agentId: string, messages: readonly ConversationMessage[]): Effect.Effect<SkillReviewInput | null> {
     const { skills, redact, skillLearner } = this.#options;
     const mode = this.#options.skillLearning?.() ?? "ask";
-    if (!skills || mode === "off") return Effect.succeed(null);
+    if (!skills || !this.#skillLearningOn()) return Effect.succeed(null);
     return Effect.suspend(() => skills(agentId)).pipe(
       Effect.map(
         (list): SkillReviewInput => ({
@@ -545,11 +478,6 @@ export class MemoryReview {
     );
   }
 
-  /**
-   * Writes and saves the skill that a review found, and returns the chat line of the saved skill. On
-   * any failure it returns null, and the review asks the user as in the `ask` mode: the lesson is not
-   * lost. A save that the user asked for may take the last free profile client; a review leaves it.
-   */
   #learn(
     agent: AgentSummary,
     model: AgentModelOption,
@@ -564,7 +492,6 @@ export class MemoryReview {
     return Effect.gen(function* () {
       const skillId = suggestion.action === "update" ? suggestion.skillId : undefined;
       const current = skillId ? yield* learner.read(skillId) : undefined;
-      // The writer reads the redacted text only, so a secret in the skill cannot reach the provider.
       const shown = current && {
         ...current,
         description: options.redact(current.description),
@@ -572,6 +499,10 @@ export class MemoryReview {
       };
       if (shown && (shown.description !== current.description || shown.instructions !== current.instructions))
         return yield* Effect.fail(new Error("The skill holds redacted text, so the review does not rewrite it."));
+      if (current && !writerCanRevise(current))
+        return yield* Effect.fail(
+          new Error("The skill is too long to write again, so the review does not rewrite it."),
+        );
       const free = userAsked ? !options.profileClients.busy() : options.profileClients.hasSpare();
       if (!free || options.stopping()) return null;
       const prompt = skillWriterPrompt(
@@ -593,6 +524,10 @@ export class MemoryReview {
       const written = yield* Schema.decodeUnknownEffect(SkillWriterResult)(
         yield* Effect.try(() => extractJsonObject(answer)),
       );
+      if (current && !revisionKeepsSkill(current, written.instructions))
+        return yield* Effect.fail(
+          new Error("The revision drops text or letters of the skill, so the review does not save it."),
+        );
       if (options.stopping()) return null;
       const draft: LearnedSkillDraft =
         skillId && current
@@ -652,7 +587,6 @@ export class MemoryReview {
   }
 }
 
-/** The browsing step with its texts redacted, as the review model reads it. */
 function redactedStep(step: UserBrowsingStep, redact: (text: string) => string): UserBrowsingStep {
   return {
     ...step,
@@ -662,7 +596,6 @@ function redactedStep(step: UserBrowsingStep, redact: (text: string) => string):
   };
 }
 
-/** The message with its text and its work steps redacted, as the review model reads it. */
 function redactedMessage(message: ConversationMessage, redact: (text: string) => string): ConversationMessage {
   const trace = message.trace;
   return {
@@ -684,10 +617,6 @@ function redactedMessage(message: ConversationMessage, redact: (text: string) =>
   };
 }
 
-/**
- * The skill questions and the skills saved in the chat, oldest first, so a review does not ask or
- * save the same lesson again.
- */
 function earlierSkillLines(messages: readonly ConversationMessage[]): string[] {
   const suggestions = new Set(skillSuggestionMessages(messages));
   return messages.flatMap((message) => {
@@ -697,7 +626,6 @@ function earlierSkillLines(messages: readonly ConversationMessage[]): string[] {
   });
 }
 
-/** The review's question to the user, shown after its memory changes. */
 function skillSuggestionMessage(
   turnId: string,
   suggestion: SkillReviewSuggestion,
@@ -720,19 +648,11 @@ function skillSuggestionMessage(
   };
 }
 
-/** The turn id of the lines that a review writes. */
 const REVIEW_TURN_PREFIX = "memory-review-";
 
 function isReviewTurn(turnId: string | undefined): boolean {
   return turnId?.startsWith(REVIEW_TURN_PREFIX) === true;
 }
-
-/**
- * The part of the chat that a review reads: after the last reviewed message and after the last clear
- * of the context. A clear that just happened is passed over, so its review reads the chat it ended.
- * A cursor that is not in the messages, as after a delete or with no saved cursor, makes the review
- * read the latest messages.
- */
 
 function reviewExcerpt(messages: readonly ConversationMessage[], cursor: string | null) {
   let end = messages.length;

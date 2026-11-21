@@ -1,18 +1,22 @@
 // @vitest-environment node
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
+import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves the table or
-// its marker; a newer or incomplete history is accepted; a ping names a connection that does not exist;
-// a person pinged twice in one thread gets two rows. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
 });
 
-// Migration 61 runs after 59 and adds the empty pin table.
-const PING_TABLES = { projection_messaging_pings: [], projection_pinned_thread_messages: [] };
+const PING_TABLES = {
+  projection_messaging_pings: [],
+  projection_messaging_history: [],
+  ...CRM_TABLES_AFTER_MIGRATION,
+  ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+  projection_pinned_thread_messages: [],
+};
 
 function databaseAt(version: number): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -29,7 +33,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A memory, and from schema 25 on a Slack connection: the rows that migration 59 must keep. */
 function seed(db: DatabaseSync, version: number): void {
   db.prepare(`INSERT INTO projection_agent_memories
     (memory_id, agent_id, text, normalized_text, origin, source_turn_id, created_at, updated_at, last_event_sequence)
@@ -44,7 +47,6 @@ function seed(db: DatabaseSync, version: number): void {
 
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
@@ -56,7 +58,6 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** The source rows, and each agent memory has no site, as migration 60 adds it. */
 function withNoMemorySite(before: Contents): Contents {
   return {
     ...before,
@@ -71,7 +72,7 @@ function pingObjects(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 61 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 67 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -91,7 +92,6 @@ describe("messaging pings migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db, version);
-      // The earlier migrations run first; the rows after them are what v59 must keep.
       if (version < 58) migrateUpTo(db, 58);
       const before = contents(db);
       migrateOpenBotDatabase(db);
@@ -125,9 +125,9 @@ describe("messaging pings migration", () => {
     const db = databaseAt(58);
     seed(db, 58);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(62,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(68,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=62; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=68; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(pingObjects(db)).toEqual([]);

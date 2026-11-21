@@ -1,26 +1,30 @@
 import {
   type AgentAccessLevels,
+  applyWorkflowFolderAction,
   graphAgentIds,
   type StoredFileRow,
   type WorkflowDetail,
+  type WorkflowFolderAction,
+  type WorkflowFoldersSnapshot,
   type WorkflowGitHubCatalog,
-  type WorkflowGitHubHistory,
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowNodeKind,
   type WorkflowSaveResult,
   type WorkflowSummary,
-  type WorkflowVersion,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { toast } from "@openbot/ui";
 import type { WorkflowCanvasProps } from "@openbot/ui/features/workflows/WorkflowCanvas";
+import type { WorkflowCanvasTabs } from "@openbot/ui/features/workflows/WorkflowTabs";
 import type { WorkflowBuild } from "@openbot/ui/features/workflows/workflow-build";
 import {
   EMPTY_GITHUB_HISTORY,
   githubItemUrl,
   type WorkflowGitHubCanvas,
 } from "@openbot/ui/features/workflows/workflow-github";
+import { stableJson } from "@openbot/ui/features/workflows/workflow-history";
+import { mergeWorkflowGraphs } from "@openbot/ui/features/workflows/workflow-merge";
 import type {
   WorkflowChannel,
   WorkflowDiscordServer,
@@ -28,19 +32,20 @@ import type {
   WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { EMPTY_WORKFLOW_RUN_VIEW, type WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
+import { EMPTY_WORKFLOW_RUN_VIEW } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
+import { agentAskedHere } from "../../agent-requests";
 import type { DesktopAnalyticsScope, WorkflowAnalyticsAction } from "../../analytics";
 import { webhookFailureCode } from "../../webhook-failure-code";
 import { createGitHubConnector } from "../connectors/github-connector";
+import { workflowCache as cache, type StoredWorkflow } from "./workflow-cache";
 import type { WorkflowHost } from "./workflows-port";
 
 const RUN_PAGE = 20;
-/** The pause after the last edit before the canvas saves. */
+const CACHED_WORKFLOWS = 20;
 const SAVE_DELAY_MS = 400;
 
-/** The options of a repository that the host could not read. */
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
 const FAILURE_CODES = {
@@ -58,31 +63,54 @@ const FAILURE_CODES = {
   rotate_webhook_secret: "update_failed",
 } as const satisfies Record<WorkflowAnalyticsAction, string>;
 
-/** A workflow that the page must open, and the call that marks the request as taken. */
 export interface WorkflowRequest {
   workflowId: () => string | undefined;
   taken: () => void;
 }
 
+type WorkflowBase = { revision: number; graph: WorkflowGraph };
+
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
 
-/**
- * The state and the callbacks of the canvas over one host. The canvas keeps its edits; this saves
- * them after a pause, one save at a time, each on the revision of the one before. A change from
- * another device or a restore loads the graph again. The first workflow of the host opens; a host
- * with none gets a new one, as the canvas needs a workflow.
- *
- * `analytics` gives the scope of the account that acts. Stories give none. `requested` names a
- * workflow to open in place of the first one, such as the one of a clicked notification. A new
- * request opens its workflow on the open page too.
- */
+const lastWorkflowKey = (hostKey: string) => `openbot:last-workflow:${hostKey}`;
+function readLastWorkflow(hostKey: string): string | undefined {
+  try {
+    return window.localStorage.getItem(lastWorkflowKey(hostKey)) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+function rememberLastWorkflow(hostKey: string, workflowId: string): void {
+  try {
+    if (window.localStorage.getItem(lastWorkflowKey(hostKey)) !== workflowId) {
+      window.localStorage.setItem(lastWorkflowKey(hostKey), workflowId);
+    }
+  } catch {}
+}
+
+const tabsKey = (hostKey: string) => `openbot:workflow-tabs:${hostKey}`;
+function readTabs(hostKey: string | undefined): readonly string[] {
+  if (hostKey === undefined) return [];
+  try {
+    return (window.localStorage.getItem(tabsKey(hostKey)) ?? "").split("\n").filter((id) => id !== "");
+  } catch {
+    return [];
+  }
+}
+function rememberTabs(hostKey: string | undefined, ids: readonly string[]): void {
+  if (hostKey === undefined) return;
+  try {
+    window.localStorage.setItem(tabsKey(hostKey), ids.join("\n"));
+  } catch {}
+}
+
 export function createWorkflowsController(
   host: WorkflowHost,
   analytics?: () => DesktopAnalyticsScope,
   requested?: WorkflowRequest,
+  hostKey?: string,
 ) {
   const { t, errorMessage } = useText();
-  /** Reports how a user action ended. No title, text or ID leaves the app. */
   const tracked = async <T>(
     action: WorkflowAnalyticsAction,
     call: () => Promise<T>,
@@ -110,58 +138,48 @@ export function createWorkflowsController(
   const report = (error: unknown) => {
     toast.error(errorMessage(error, t("workflow.page.failed")));
   };
-  /** Shows the error of a call whose caller undoes what it showed. */
   const reported = <T>(call: Promise<T>) =>
     call.catch((error: unknown) => {
       report(error);
       throw error;
     });
 
-  /** The open workflow as the host has it. Replaced whole after each read. */
-  const [stored, setStored] = createSignal<{
-    detail: WorkflowDetail;
-    runs: WorkflowRunView;
-    versions: readonly WorkflowVersion[];
-    github: WorkflowGitHubHistory;
-  }>();
-  const [summaries, setSummaries] = createSignal<readonly WorkflowSummary[]>([]);
+  const hostCache = hostKey === undefined ? undefined : cache.get(hostKey);
+  const firstId = untrack(() => requested?.workflowId()) ?? hostCache?.last;
+  const visited = firstId === undefined ? undefined : hostCache?.workflows.get(firstId);
+  const [stored, setStored] = createSignal<StoredWorkflow | undefined>(visited);
+  const [summaries, setSummaries] = createSignal<readonly WorkflowSummary[]>(hostCache?.library ?? []);
   const [places, setPlaces] = createSignal<readonly WorkflowPlace[]>([]);
   const [channels, setChannels] = createSignal<readonly WorkflowChannel[]>([]);
   const [discord, setDiscord] = createSignal<readonly WorkflowDiscordServer[]>([]);
   const [telegram, setTelegram] = createSignal<readonly WorkflowTelegramChat[]>([]);
   const [slack, setSlack] = createSignal<readonly WorkflowSlackWorkspace[]>([]);
-  /** The Library pictures that an asset step can use. */
-  const [pictures, setPictures] = createSignal<readonly StoredFileRow[]>([]);
-  /** Null while this account manages every agent of the host. */
-  const [levels, setLevels] = createSignal<AgentAccessLevels | null>(null);
+  const [libraryPictures, setPictures] = createSignal<readonly StoredFileRow[]>([]);
+  let picturesWanted = false;
+  const [levels, setLevels] = createSignal<AgentAccessLevels | null>(hostCache?.levels ?? null);
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
   const [resetKey, setResetKey] = createSignal(0);
-  /** The last change of an agent that the canvas plays. */
+  const [tabIds, setTabIds] = createSignal<readonly string[]>(readTabs(hostKey));
+  const [folders, setFolders] = createSignal<WorkflowFoldersSnapshot>();
   const [build, setBuild] = createSignal<WorkflowBuild>();
-  /** Plays a change of `agentId` on the canvas, from `before`, or from an empty canvas for a new workflow. */
+  const [opening, setOpening] = createSignal<string>();
+  const [failed, setFailed] = createSignal(false);
   const playBuild = (workflowId: string, agentId: string, before: WorkflowGraph | null) =>
     setBuild((last) => ({ key: (last?.key ?? 0) + 1, workflowId, agentId, before }));
 
-  /** The open workflow. A plain value, so that a callback reads the new one at once. */
-  let current = "";
-  /** The revision that the canvas edits are on: the last reset, or the last save of the canvas. */
-  let base = { workflowId: "", revision: 0 };
+  let current = visited?.detail.summary.id ?? "";
+  const bases = new Map<string, WorkflowBase>();
+  const setBase = (detail: WorkflowDetail) =>
+    bases.set(detail.summary.id, { revision: detail.revision, graph: detail.graph });
+  if (visited) setBase(visited.detail);
   let limit = RUN_PAGE;
   let disposed = false;
-  /** The edit that waits for the pause, and its timer. */
   let pending: { workflowId: string; graph: WorkflowGraph } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  /** Counts each edit and each save, so that a read that started before one does not reset the canvas. */
   let edits = 0;
   let writing = 0;
-  /** Counts each preview request, so that the graph of an older one does not show. */
   let previewRequest = 0;
 
-  /**
-   * Saves, restores and opens go one at a time, so that each save has the revision of the one before.
-   * The queue shows the error of a task. `queued` gives the task's promise, so a caller that showed a
-   * change can undo it when the task fails.
-   */
   let writes: Promise<void> = Promise.resolve();
   const queued = <T>(task: () => Promise<T>): Promise<T> => {
     writing += 1;
@@ -183,19 +201,60 @@ export function createWorkflowsController(
     setPreview(undefined);
   };
 
-  /** Shows `next` in place of the canvas edits. Undo on the canvas gets them back. */
+  const remember = (value: StoredWorkflow) => {
+    if (hostKey === undefined) return;
+    let entry = cache.get(hostKey);
+    if (!entry) {
+      entry = { library: [], workflows: new Map() };
+      cache.set(hostKey, entry);
+    }
+    const workflowId = value.detail.summary.id;
+    entry.workflows.delete(workflowId);
+    entry.workflows.set(workflowId, value);
+    for (const old of entry.workflows.keys()) {
+      if (entry.workflows.size <= CACHED_WORKFLOWS) break;
+      entry.workflows.delete(old);
+    }
+  };
+  const cached = (workflowId: string) =>
+    hostKey === undefined ? undefined : cache.get(hostKey)?.workflows.get(workflowId);
+  const putDetail = (workflowId: string, change: (detail: WorkflowDetail) => WorkflowDetail) => {
+    const open = stored();
+    const value = open?.detail.summary.id === workflowId ? open : cached(workflowId);
+    if (!value) return;
+    const next = { ...value, detail: change(value.detail) };
+    if (value === open) setStored(next);
+    remember(next);
+  };
+  const show = (value: StoredWorkflow) => {
+    if (stored()?.detail.summary.id !== value.detail.summary.id) setBase(value.detail);
+    setStored(value);
+    remember(value);
+  };
+  const dropPending = (workflowId: string) => {
+    if (pending?.workflowId !== workflowId) return;
+    pending = undefined;
+    clearTimeout(timer);
+    timer = undefined;
+  };
+  const foreign = new Map<string, number>();
+  const foreignCount = (workflowId: string) => foreign.get(workflowId) ?? 0;
+  const takeForeign = (next: WorkflowDetail) => {
+    setBase(next);
+    foreign.set(next.summary.id, foreignCount(next.summary.id) + 1);
+    dropPending(next.summary.id);
+  };
+  let saving: { workflowId: string; json: string } | undefined;
+  const canvasShows = (workflowId: string) => !disposed && stored()?.detail.summary.id === workflowId;
+
   const reset = (next: WorkflowDetail) => {
     if (disposed) return;
-    base = { workflowId: next.summary.id, revision: next.revision };
-    setStored((open) => open && { ...open, detail: next });
+    takeForeign(next);
+    putDetail(next.summary.id, () => next);
     closePreview();
     setResetKey((key) => key + 1);
   };
 
-  /**
-   * The GitHub events of the open workflow. A failed read shows no events rather than no workflow:
-   * the Events row is a view of the triggers, and the next change reads it again.
-   */
   const readGitHubHistory = (workflowId: string) =>
     host.githubSupported()
       ? host.workflows.githubHistory(workflowId).catch(() => EMPTY_GITHUB_HISTORY)
@@ -205,14 +264,11 @@ export function createWorkflowsController(
     () => host.githubConnector,
     () => host.hostName(),
   );
-  /** Undefined while it is read, and for an account that may not read it: only an admin adds GitHub steps. */
   const [githubCatalog, setGitHubCatalog] = createSignal<WorkflowGitHubCatalog>();
-  /** The labels and people of each repository that a card asked for, by lower-case name, for this page. */
   const [githubOptions, setGitHubOptions] = createSignal<ReadonlyMap<string, WorkflowGitHubRepositoryOptions>>(
     new Map(),
   );
   const askedOptions = new Set<string>();
-  /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
   let catalogRead = 0;
   const readGitHubCatalog = () => {
     if (!host.githubSupported()) return;
@@ -224,13 +280,11 @@ export function createWorkflowsController(
       () => undefined,
     );
   };
-  /** A change on GitHub can give or take repositories, labels and people, so all are read again. */
   const refreshGitHub = () => {
     askedOptions.clear();
     setGitHubOptions(new Map());
     readGitHubCatalog();
   };
-  // A connection that starts or ends changes the repositories that the host reaches.
   let connectionState: string | undefined;
   createEffect(
     () => connector.detail.props.status.state,
@@ -240,7 +294,6 @@ export function createWorkflowsController(
       if (before !== undefined && state !== before) refreshGitHub();
     },
   );
-  /** Set when GitHub opened to change the installation. The next window focus reads the repositories again. */
   let awaitingInstall = false;
   const onFocus = () => {
     if (!awaitingInstall) return;
@@ -248,87 +301,223 @@ export function createWorkflowsController(
     refreshGitHub();
   };
 
-  /**
-   * Reads the library and, for the open workflow, its detail, runs and versions. `agentId`: the agent
-   * whose change the read is for. When the change replaces the canvas, the canvas plays it.
-   */
-  const read = async (workflowId: string, agentId?: string) => {
+  let library: readonly WorkflowSummary[] | undefined;
+  const read = async (workflowId: string, agentId?: string, listed?: readonly WorkflowSummary[]) => {
     const seen = edits;
-    const list = await host.workflows.list();
+    const details = workflowId === current ? readDetail(workflowId) : undefined;
+    details?.catch(() => undefined);
+    const list = listed ?? (await host.workflows.list());
     if (disposed) return;
+    library = list;
     setSummaries(list);
-    // A delete changes the library too: the delete then opens another workflow.
+    pruneTabs(list);
+    if (hostKey !== undefined) {
+      const entry = cache.get(hostKey);
+      if (entry) entry.library = list;
+      else cache.set(hostKey, { library: list, workflows: new Map() });
+    }
     if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
-    const [next, page, versions, github] = await Promise.all([
+    const [next, page, versions, github] = await (details ?? readDetail(workflowId));
+    if (disposed || workflowId !== current) return;
+    const open = stored()?.detail;
+    const shown = open?.summary.id === workflowId ? open : undefined;
+    const known = shown && bases.get(workflowId);
+    const detail = shown && known && next.revision < known.revision ? shown : next;
+    const newer = known !== undefined && next.revision > known.revision;
+    const idle = seen === edits && writing === 0 && pending === undefined;
+    if (hostKey !== undefined) {
+      rememberLastWorkflow(hostKey, workflowId);
+      const entry = cache.get(hostKey);
+      if (entry) entry.last = workflowId;
+    }
+    const value = { detail, runs: page, versions, github };
+    if (newer && idle && agentId !== undefined && shown) {
+      playBuild(workflowId, agentId, shown.graph);
+      show(value);
+      reset(next);
+      return next;
+    }
+    if (newer) {
+      if (saving?.workflowId === workflowId && saving.json === stableJson(next.graph)) setBase(next);
+      else takeForeign(next);
+    }
+    show(value);
+    return next;
+  };
+
+  const readDetail = (workflowId: string) =>
+    Promise.all([
       host.workflows.get(workflowId),
       host.workflows.runs({ workflowId, limit }),
       host.workflows.versions(workflowId),
       readGitHubHistory(workflowId),
     ]);
-    if (disposed || workflowId !== current) return;
-    const outside =
-      base.workflowId === workflowId &&
-      next.revision > base.revision &&
-      seen === edits &&
-      writing === 0 &&
-      pending === undefined;
-    const before = stored()?.detail;
-    // The canvas reads the graph only when it opens or resets, so a read under its edits keeps them.
-    setStored({ detail: next, runs: page, versions, github });
-    if (outside) {
-      if (agentId !== undefined && before?.summary.id === workflowId) playBuild(workflowId, agentId, before.graph);
-      reset(next);
+
+  const readOpening = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
+    const shownId = stored()?.detail.summary.id;
+    setOpening(shownId !== undefined && shownId !== workflowId ? workflowId : undefined);
+    try {
+      return await read(workflowId, undefined, listed);
+    } finally {
+      if (opening() === workflowId) setOpening(undefined);
     }
-    return next;
   };
 
-  /** Reads a workflow that opens. Its new summary id resets the canvas, so the key stays. */
-  const load = async (workflowId: string) => {
+  const load = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
     current = workflowId;
     limit = RUN_PAGE;
-    const next = await read(workflowId);
-    if (next) base = { workflowId, revision: next.revision };
+    const known = cached(workflowId);
+    if (known && !disposed) show(known);
+    await readOpening(workflowId, listed);
   };
 
-  /** Starts the save of the edit that waits. */
+  const save = async (
+    edit: { workflowId: string; graph: WorkflowGraph },
+    queuedOn: { from: WorkflowBase | undefined; seen: number },
+  ): Promise<void> => {
+    const { workflowId } = edit;
+    if (foreignCount(workflowId) !== queuedOn.seen) {
+      if (canvasShows(workflowId)) return;
+      const now = bases.get(workflowId);
+      if (!now || !queuedOn.from) return;
+      const merged = mergeWorkflowGraphs(queuedOn.from.graph, edit.graph, now.graph);
+      if (stableJson(merged) === stableJson(now.graph)) return;
+      return save({ workflowId, graph: merged }, { from: now, seen: foreignCount(workflowId) });
+    }
+    const from = bases.get(workflowId);
+    if (!from) return;
+    saving = { workflowId, json: stableJson(edit.graph) };
+    let result: WorkflowSaveResult;
+    try {
+      result = await host.workflows.saveGraph({ workflowId, baseRevision: from.revision, graph: edit.graph });
+    } catch (error) {
+      saving = undefined;
+      pending ??= edit;
+      throw error;
+    }
+    saving = undefined;
+    const known = bases.get(workflowId) ?? from;
+    if (result.ok) {
+      if (result.revision <= known.revision) return;
+      bases.set(workflowId, { revision: result.revision, graph: edit.graph });
+      putDetail(workflowId, (detail) => ({ ...detail, revision: result.revision, graph: edit.graph }));
+      return;
+    }
+    const newer = result.conflict;
+    if (newer.revision <= known.revision) return;
+    takeForeign(newer);
+    putDetail(workflowId, () => newer);
+    if (canvasShows(workflowId)) return;
+    const merged = mergeWorkflowGraphs(from.graph, edit.graph, newer.graph);
+    if (stableJson(merged) !== stableJson(newer.graph)) {
+      await save({ workflowId, graph: merged }, { from: bases.get(workflowId), seen: foreignCount(workflowId) });
+    }
+  };
+
   const flush = () => {
     clearTimeout(timer);
     timer = undefined;
     const edit = pending;
     pending = undefined;
     if (!edit) return;
-    write(async () => {
-      if (base.workflowId !== edit.workflowId) return;
-      let result: WorkflowSaveResult;
-      try {
-        result = await host.workflows.saveGraph({
-          workflowId: edit.workflowId,
-          baseRevision: base.revision,
-          graph: edit.graph,
-        });
-      } catch (error) {
-        // The canvas counts the edit as sent, so it saves with the next edit, or when the page closes.
-        pending ??= edit;
-        throw error;
-      }
-      if (result.ok) {
-        base = { workflowId: edit.workflowId, revision: result.revision };
-        return;
-      }
-      reset(result.conflict);
-      toast.info(t("workflow.page.conflict"));
-    });
+    const queuedOn = { from: bases.get(edit.workflowId), seen: foreignCount(edit.workflowId) };
+    write(() => save(edit, queuedOn));
   };
 
-  /** Opens a workflow after the save of the one before. */
   const open = (workflowId: string) => {
     flush();
     closePreview();
     write(() => load(workflowId));
   };
 
+  const keepTabs = (next: readonly string[]) => {
+    setTabIds(next);
+    rememberTabs(hostKey, next);
+  };
+  const pruneTabs = (list: readonly WorkflowSummary[]) => {
+    const known = new Set(list.map((summary) => summary.id));
+    const kept = untrack(tabIds).filter((id) => id === current || known.has(id));
+    if (kept.length !== untrack(tabIds).length) keepTabs(kept);
+  };
+  createEffect(
+    () => stored()?.detail.summary.id,
+    (workflowId) => {
+      if (workflowId === undefined) return;
+      const ids = untrack(tabIds);
+      if (!ids.includes(workflowId)) keepTabs([...ids, workflowId]);
+    },
+  );
+  const shownTabs = () => {
+    const open = stored()?.detail.summary.id;
+    const known = new Set(summaries().map((summary) => summary.id));
+    return tabIds().filter((id) => id === open || known.has(id));
+  };
+  const closeTabs = (keep: (id: string, index: number) => boolean, fallback: string) => {
+    const ids = shownTabs();
+    const kept = ids.filter(keep);
+    if (kept.length === 0) return;
+    keepTabs(kept);
+    if (kept.includes(current)) return;
+    const index = ids.indexOf(current);
+    const next =
+      ids.slice(index + 1).find((id) => kept.includes(id)) ?? (kept.includes(fallback) ? fallback : kept.at(-1));
+    if (next !== undefined) open(next);
+  };
+  const tabs: WorkflowCanvasTabs = {
+    get ids() {
+      return shownTabs();
+    },
+    onClose: (workflowId) => closeTabs((id) => id !== workflowId, workflowId),
+    onCloseOthers: (workflowId) => closeTabs((id) => id === workflowId, workflowId),
+    onCloseRight: (workflowId) => {
+      const index = shownTabs().indexOf(workflowId);
+      closeTabs((_, at) => at <= index, workflowId);
+    },
+    onMove: (workflowId, index) => {
+      const ids = shownTabs().filter((id) => id !== workflowId);
+      ids.splice(Math.max(0, Math.min(index, ids.length)), 0, workflowId);
+      keepTabs(ids);
+    },
+  };
+
+  let folderRead = 0;
+  const readFolders = () => {
+    const request = ++folderRead;
+    if (!host.foldersSupported()) {
+      setFolders(undefined);
+      return;
+    }
+    host.folders().then((next) => {
+      if (!disposed && request === folderRead) setFolders(next);
+    }, report);
+  };
+  const folderFailed = (error: unknown) => {
+    toast.error(errorMessage(error, t("workflow.canvas.folder.failed")));
+    readFolders();
+  };
+  const folderAction = (action: WorkflowFolderAction) => {
+    const before = folders();
+    if (!before) return;
+    try {
+      const workflowIds = new Set(summaries().map((summary) => summary.id));
+      setFolders(applyWorkflowFolderAction(before, action, { workflowIds }));
+    } catch (error) {
+      folderFailed(error);
+      return;
+    }
+    const request = ++folderRead;
+    host.folderAction(action).then((next) => {
+      if (!disposed && request === folderRead) setFolders(next);
+    }, folderFailed);
+  };
+
   const readLevels = () => {
     host.agentLevels().then((next) => {
+      if (hostKey !== undefined) {
+        const entry = cache.get(hostKey);
+        if (entry) entry.levels = next;
+        else cache.set(hostKey, { library: [], workflows: new Map(), levels: next });
+      }
       if (!disposed) setLevels(next);
     }, report);
   };
@@ -348,21 +537,31 @@ export function createWorkflowsController(
     host.slackWorkspaces().then((next) => {
       if (!disposed) setSlack(next);
     }, report);
+    if (picturesWanted) readPictures();
+  };
+  const readPictures = () => {
     host.pictures().then((next) => {
       if (!disposed) setPictures(next);
     }, report);
   };
+  const pictures = () => {
+    if (!picturesWanted) {
+      picturesWanted = true;
+      readPictures();
+    }
+    return libraryPictures();
+  };
 
   const refresh = (workflowId: string | null, agentId?: string) => {
-    // A workflow that an agent makes opens, so the person sees the agent build it. While the person's
-    // edit saves, the open workflow stays, and the new one only goes into the library.
     if (
       workflowId !== null &&
       agentId !== undefined &&
+      hostKey !== undefined &&
       workflowId !== current &&
       writing === 0 &&
       pending === undefined &&
-      !summaries().some((summary) => summary.id === workflowId)
+      !summaries().some((summary) => summary.id === workflowId) &&
+      agentAskedHere(hostKey, agentId)
     ) {
       playBuild(workflowId, agentId, null);
       open(workflowId);
@@ -373,39 +572,52 @@ export function createWorkflowsController(
     readPlaces();
     readLevels();
     readGitHubCatalog();
+    readFolders();
   };
 
   onSettled(() => {
     const stop = host.onChanged(refresh);
+    const stopFolders = host.onFoldersChanged(readFolders);
     window.addEventListener("focus", onFocus);
     return () => {
       stop();
+      stopFolders();
       window.removeEventListener("focus", onFocus);
-      // A pending edit still saves after the page closes.
       flush();
       disposed = true;
     };
   });
 
-  // The host reads the server role once for each call; a change event reads again.
   untrack(() => {
     readPlaces();
     readLevels();
     readGitHubCatalog();
+    readFolders();
   });
-  write(async () => {
-    const list = await host.workflows.list();
-    // Read after the list, so that a request that comes while the list loads opens.
+  void queued(async () => {
+    const asked = untrack(() => requested?.workflowId());
+    const remembered = hostKey === undefined ? undefined : readLastWorkflow(hostKey);
+    const known = asked ?? (current === "" ? remembered : current);
+    if (known !== undefined) {
+      if (asked !== undefined) requested?.taken();
+      current = known;
+      limit = RUN_PAGE;
+      const shown = cached(known);
+      if (shown && stored()?.detail.summary.id !== known) show(shown);
+      if (await readOpening(known)) return;
+      if (disposed) return;
+    }
+    const list = library ?? (await host.workflows.list());
     const wanted = untrack(() => requested?.workflowId());
     if (wanted !== undefined) requested?.taken();
-    const first =
-      list.find((summary) => summary.id === wanted) ??
-      list[0] ??
-      (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary;
-    if (!disposed) await load(first.id);
-  });
-  // A request after the first workflow opened. Before that, the first load reads the request. The
-  // list is read again, as a workflow that an agent just made may not be in the library yet.
+    const found = list.find((summary) => summary.id === wanted) ?? list[0];
+    if (found) {
+      if (!disposed) await load(found.id, list);
+      return;
+    }
+    const created = await host.workflows.create({ title: t("workflow.canvas.untitled") });
+    if (!disposed) await load(created.summary.id);
+  }).catch(() => setFailed(true));
   createEffect(
     () => requested?.workflowId(),
     (workflowId) => {
@@ -416,15 +628,11 @@ export function createWorkflowsController(
       closePreview();
       write(async () => {
         const list = await host.workflows.list();
-        if (!disposed && list.some((summary) => summary.id === workflowId)) await load(workflowId);
+        if (!disposed && list.some((summary) => summary.id === workflowId)) await load(workflowId, list);
       });
     },
   );
 
-  /**
-   * Why the open workflow is read-only, or undefined when this account may change it: it has steps
-   * that only a newer app knows, or an agent that this account does not manage. The host checks again.
-   */
   const lock = createMemo((): AppTextKey | undefined => {
     const detail = stored()?.detail;
     if (!detail) return undefined;
@@ -434,8 +642,6 @@ export function createWorkflowsController(
       ? "workflow.page.manageOnly"
       : undefined;
   });
-  // The reason shows once each time a workflow opens read-only. The memo stops a read of the same
-  // workflow: an effect runs on each change of what its compute function reads.
   const lockToken = createMemo(() => {
     const reason = lock();
     return reason && `${current}\u0000${reason}`;
@@ -445,7 +651,6 @@ export function createWorkflowsController(
     if (token && reason) toast.info(t(reason));
   });
 
-  /** Starts a run of the open workflow after the save of its edits. */
   const start = (
     action: WorkflowAnalyticsAction,
     call: (workflowId: string) => Promise<unknown>,
@@ -473,7 +678,6 @@ export function createWorkflowsController(
           if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, next));
         },
         (error: unknown) => {
-          // The menus stop loading and show no options. A change on GitHub reads them again.
           if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, NO_OPTIONS));
           report(error);
         },
@@ -515,6 +719,14 @@ export function createWorkflowsController(
     get library() {
       return summaries();
     },
+    tabs,
+    get folders() {
+      return folders();
+    },
+    onFolderAction: folderAction,
+    get opening() {
+      return opening() !== undefined;
+    },
     onGraphChange: (graph) => {
       edits += 1;
       pending = { workflowId: current, graph };
@@ -531,7 +743,6 @@ export function createWorkflowsController(
       );
     },
     onRunStep: (nodeId) => {
-      // The kind as the host has it: a node that is not saved yet has none.
       const kind = stored()?.detail.graph.nodes.find((node) => node.id === nodeId)?.kind;
       start(
         "run_step",
@@ -550,7 +761,6 @@ export function createWorkflowsController(
     },
     onDecide: (stepId, approved) =>
       reported(tracked(approved ? "approve" : "reject", () => host.workflows.decide({ stepId, approved }))),
-    // The host makes the address of a trigger that it has, so the secret waits for the save before it.
     onRotateWebhookSecret: (nodeId) => {
       flush();
       const workflowId = current;
@@ -563,7 +773,6 @@ export function createWorkflowsController(
       read(current).catch(report);
     },
     onRestoreVersion: (versionId) => {
-      // The edit that waits saves first, so the version that the restore keeps has it.
       flush();
       const workflowId = current;
       write(async () => {
@@ -598,17 +807,22 @@ export function createWorkflowsController(
         const before = await host.workflows.list();
         const index = before.findIndex((summary) => summary.id === workflowId);
         await tracked("delete", () => host.workflows.delete(workflowId));
+        if (hostKey !== undefined) cache.get(hostKey)?.workflows.delete(workflowId);
         if (disposed || workflowId !== current) return;
         const rest = before.filter((summary) => summary.id !== workflowId);
-        const next = rest[Math.min(Math.max(index, 0), rest.length - 1)];
-        const opened = next?.id ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary.id;
+        const ids = untrack(shownTabs);
+        const at = ids.indexOf(workflowId);
+        const neighbor = [...ids.slice(at + 1), ...ids.slice(0, Math.max(at, 0)).reverse()].find((id) =>
+          rest.some((summary) => summary.id === id),
+        );
+        const next = neighbor ?? rest[Math.min(Math.max(index, 0), rest.length - 1)]?.id;
+        const opened = next ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary.id;
         closePreview();
         await load(opened);
       });
     },
   };
 
-  /** Sends a picture to the host and puts it first in the Library. The toast shows why it failed. */
   const uploadPicture = (file: File) =>
     reported(host.uploadPicture(file)).then((row) => {
       setPictures((list) => [row, ...list.filter((candidate) => candidate.id !== row.id)]);
@@ -617,6 +831,7 @@ export function createWorkflowsController(
 
   return {
     detail: () => stored()?.detail,
+    failed,
     places,
     channels,
     discord,

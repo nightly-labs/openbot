@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Beceri paketleri sembolik bağlantılar içeremez.",
   "error.skill.expandedTooLarge": "Açılmış beceri 10 MB altında olmalıdır.",
   "error.skill.irregularEntry": "Beceri paketleri yalnızca normal dosyalar ve klasörler içerebilir.",
@@ -52,6 +51,8 @@ export const messages = {
   "error.skill.localNotFound": "Bu yerel beceri yok. Kimliğini yerel beceriler listesinden kontrol edin.",
   "error.skill.localRevisionNotFound": "Bu yerel becerinin {revision} revizyonu yok. En son revizyonu {latest}.",
   "error.skill.localNameTaken": "Bu ada sahip yerel bir beceri zaten mevcut. Bunun yerine revize edin.",
+  "error.skill.localNameClash":
+    'Bu ad ve "{name}" yerel becerisi aynı "{slug}" değerine dönüşüyor. O beceriyi değiştirmek için revize edin. Yeni bir beceri eklemek için bu addaki Latin harflerini veya rakamları değiştirin.',
   "error.skill.localKeepName": "Revize ederken beceri adını değiştirmeden tutun.",
   "error.skill.localRelativeFolder": "Mevcut ajan çalışma alanı içinde göreli bir beceri klasörü kullanın.",
   "error.skill.localSourceOutside": "Beceri kaynağı ajan çalışma alanının içinde olmalıdır.",

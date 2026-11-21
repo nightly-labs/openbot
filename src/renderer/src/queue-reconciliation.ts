@@ -1,22 +1,12 @@
-import { isQueuedAgentReply, type QueueDelivery, type QueueSnapshot } from "@openbot/contracts/ipc";
+import { type AgentTask, isQueuedAgentReply, type QueueDelivery, type QueueSnapshot } from "@openbot/contracts/ipc";
 
-/**
- * Which of an agent's queue the conversation shows, and in what order.
- *
- * Main sends the whole queue - everything waiting, everything running, and
- * everything that has finished - and the conversation shows two much smaller
- * things: what the agent is doing now, above the composer, and what is still
- * waiting behind it, in the queue panel. Deciding which is which is list
- * arithmetic over a snapshot, so it lives here rather than in the three memos
- * it used to be spread across in `ConversationView`.
- */
+export function withoutSideThreadTurns(queue: QueueSnapshot, tasks: readonly AgentTask[]): QueueSnapshot {
+  const sideTurns = new Set(tasks.flatMap((task) => (task.activeTurnId ? [task.activeTurnId] : [])));
+  if (sideTurns.size === 0) return queue;
+  const deliveries = queue.deliveries.filter((delivery) => delivery.turnId === null || !sideTurns.has(delivery.turnId));
+  return deliveries.length === queue.deliveries.length ? queue : { ...queue, deliveries };
+}
 
-/**
- * What the agent is working on. Narrowed to the current turn when there is one,
- * unless nothing in the queue claims that turn - a delivery whose turn has not
- * been recorded yet is still work in progress, and hiding it would blank the
- * activity line mid-turn.
- */
 export function activeQueueDeliveries(
   snapshot: QueueSnapshot | undefined,
   activeTurnId: string | null | undefined,
@@ -29,10 +19,6 @@ export function activeQueueDeliveries(
   return matching.length > 0 ? matching : running;
 }
 
-/**
- * What is still waiting, in the order it will run: by the position main
- * assigned, and by arrival for anything main has not positioned yet.
- */
 export function queuedDeliveriesInOrder(snapshot: QueueSnapshot | undefined): QueueDelivery[] {
   return [...(snapshot?.deliveries ?? [])]
     .filter((delivery) => delivery.status === "queued")
@@ -43,16 +29,6 @@ export function queuedDeliveriesInOrder(snapshot: QueueSnapshot | undefined): Qu
     });
 }
 
-/**
- * The queue panel's contents: what is waiting, then anything steering the turn
- * that is running.
- *
- * Keep waiting work visible even when no turn runs, so the user can edit or cancel
- * a message that has not started. Two things drop out: a delivery already rendered
- * as a message, which the transcript is showing, and a queued delivery that
- * belongs to the running turn, which the activity line above is showing. An answer from another
- * agent goes too: the waiting block above the panel shows it with the question it answers.
- */
 export function presentQueueDeliveries(input: {
   snapshot: QueueSnapshot | undefined;
   activeTurnId: string | null | undefined;
@@ -76,18 +52,6 @@ export function presentQueueDeliveries(input: {
   return [...queued, ...steering];
 }
 
-/**
- * The queue once a turn has finished, with the work that turn was running
- * dropped.
- *
- * Main reports the completion before it reports the queue that reflects it, so
- * without this the panel keeps offering to cancel work that has already landed
- * in the transcript. Deliveries with no recorded turn go too - a delivery main
- * has not assigned a turn to was started by the turn that just ended.
- *
- * Returns the snapshot it was given when nothing matched, so a caller can leave
- * its state untouched rather than re-render an identical queue.
- */
 export function queueAfterTurnCompleted(snapshot: QueueSnapshot, turnId: string): QueueSnapshot {
   const deliveries = snapshot.deliveries.filter(
     (delivery) =>

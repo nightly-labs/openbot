@@ -11,8 +11,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browserDockLayout } from "../browser-dock-overlay";
 import { browserDockIpcHandlers } from "./browser-dock-handlers";
 
-// Same reason as define-ipc-group.test.ts: electron cannot be imported outside an Electron process, so
-// registrations are captured. The overlay module also imports the view classes, which these tests never build.
 const { registrations } = vi.hoisted(() => ({
   registrations: new Map<string, (event: unknown, payload?: unknown) => unknown>(),
 }));

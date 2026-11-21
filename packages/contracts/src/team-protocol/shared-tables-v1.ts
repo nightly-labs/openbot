@@ -1,9 +1,3 @@
-// Frozen optional shared-tables-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can list the tables the host's agents keep in their shared database, with the row count,
-// and delete one. It never carries a row. A member cannot use either route; `requireAdmin` on the
-// host is the only gate. Widening any of it needs a second capability string.
 import {
   adminRoute,
   count,

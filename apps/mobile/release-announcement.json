@@ -1,10 +1,10 @@
 {
-  "version": "1.4.9",
+  "version": "1.4.12",
   "highlights": [
-    "Get fixes without a store update: when a fix is ready, the home screen shows A new OpenBot is ready. Tap Update and the app restarts with the fix.",
-    "Attach MOV or MP4 videos from Photos, and search the model list in agent settings and Create agent.",
-    "New provider pages: add an API key for ChatGPT and Claude, choose a default provider for new agents, and sign in through the browser.",
-    "Give a channel its own picture, and get a notification when an agent finishes or stops with an error in a thread. The server needs the new OpenBot version.",
-    "Connect Postiz from the Apps marketplace so agents can draft, schedule and publish social media posts."
+    "Added chat backdrops with animated scenes or your own photo, and a redesigned Appearance screen.",
+    "Added side questions: ask an agent about a chat without adding to it.",
+    "Added an Open Agent shortcut for the iPhone Home Screen and Action button.",
+    "Redesigned the chat header and made chats faster and smoother while agents reply.",
+    "Improved server connections, with clear reasons when a server cannot start or is too old."
   ]
 }

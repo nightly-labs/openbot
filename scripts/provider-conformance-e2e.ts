@@ -1,10 +1,3 @@
-// Runs the same cases against each provider driver that speaks ACP, over one fake agent
-// (`provider-fakes/agents/conformance.ts`): start and list models, one turn, a model switch, a cancel
-// and a turn after it, a resume in a new process, a missing session, and a sign-in that is necessary.
-// A driver that skips a case fails here. The fake differs per driver only where the real CLIs differ.
-// Codex, Claude, Pi, Inception, DeepSeek, OpenRouter, TrustedRouter and Muse speak other protocols and have no shared
-// fake yet; the report names them in `notCovered`.
-// `bun run test:provider-conformance`. Writes .openbot-build/provider-conformance-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,11 +22,8 @@ const NOT_COVERED = ["codex", "claude", "pi", "inception", "deepseek", "openrout
 
 interface DriverCase {
   provider: AgentProviderId;
-  /** The form of the missing-session error that this provider's CLI gives. */
-  missing: "protocol" | "opencode" | "antigravity" | "cursor" | "kimi" | "devin" | "hermes" | "mistral";
-  /** The agent's own form of a model set, when it differs from the configuration option. */
+  missing: "protocol" | "opencode" | "antigravity" | "cursor" | "cline" | "kimi" | "devin" | "hermes" | "mistral";
   modelSet?: "kimi" | "mistral";
-  /** Why the sign-in case does not apply, when it does not. */
   noSignIn?: string;
 }
 
@@ -41,13 +31,10 @@ const DRIVERS: readonly DriverCase[] = [
   { provider: "opencode", missing: "opencode" },
   { provider: "antigravity", missing: "antigravity" },
   { provider: "cursor", missing: "cursor" },
-  { provider: "cline", missing: "protocol" },
+  { provider: "cline", missing: "cline" },
   { provider: "kimi", missing: "kimi", modelSet: "kimi" },
   { provider: "devin", missing: "devin" },
-  // GitHub Copilot CLI 1.0.105 refuses a signed-out session with `-32000`, as the fake does. Its
-  // missing-session error is not confirmed: that needs a signed-in account.
   { provider: "copilot", missing: "protocol" },
-  // Mistral Vibe 3.1.0, from runs of `vibe-acp` with a fake key. Its missing session is confirmed.
   { provider: "mistral", missing: "mistral", modelSet: "mistral" },
   { provider: "grok", missing: "protocol" },
   { provider: "hermes", missing: "hermes" },
@@ -89,7 +76,6 @@ const root = await mkdtemp(join(tmpdir(), "openbot-provider-conformance-e2e-"));
 const report: Report = { passed: false, drivers: [], notCovered: NOT_COVERED };
 const clients: AgentClient[] = [];
 
-/** Waits until the fake logs an entry that matches, or fails after `timeoutMs`. */
 async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!(await readJsonl<LogEntry>(log)).some(match)) {
@@ -98,7 +84,6 @@ async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, ti
   }
 }
 
-/** One driver with one fake executable. A custom agent is saved with that executable as its command. */
 async function driverSetup(
   driver: DriverCase,
   name: string,
@@ -142,7 +127,6 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
   });
   const label = driver.provider;
 
-  // Start: the client lists the agent's models.
   let client = setup.open();
   const listed = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
   const models = listed.data.flatMap((model) => model.model ?? []);
@@ -150,14 +134,12 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
   const beta = setup.agentModel("fake-beta");
   assert.ok(models.includes(alpha) && models.includes(beta), `${label}: model/list gives the agent's models.`);
 
-  // One turn.
   const thread = await startThread(client, { cwd: workspace, model: alpha });
   const turn = await runTurn(client, thread, { model: alpha });
   assert.equal(turn.error, null, `${label}: the turn succeeds.`);
   assert.equal(turn.status, "completed", `${label}: the turn completes.`);
   assert.match(turn.reply, /ok fake-alpha/, `${label}: the reply reaches the client.`);
 
-  // Model switch: the next prompt runs on the other model.
   const switchedTurn = await runTurn(client, thread, { model: beta });
   const prompts = (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === "prompt");
   const switched = { model: beta, agentModel: prompts.at(-1)?.model ?? null, status: switchedTurn.status };
@@ -165,12 +147,10 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
   assert.equal(switched.status, "completed", `${label}: the turn on the other model completes.`);
   assert.equal(switched.agentModel, "fake-beta", `${label}: the agent runs the selected model.`);
 
-  // Cancel: the turn ends as interrupted, the agent gets `session/cancel`, and the next turn works.
   const waiting = runTurn(client, thread, { model: beta, text: "wait" });
   await waitForEntry(log, (entry) => entry.event === "prompt" && entry.text?.trim() === "wait");
   await runCauseEffect(client.request("turn/interrupt", { threadId: thread }, (value) => value));
   const cancelled = await waiting;
-  // Antigravity ends the turn locally, so the agent can log the cancel after the turn ends.
   const cancelSent = await waitForEntry(log, (entry) => entry.event === "cancel").then(
     () => true,
     () => false,
@@ -181,7 +161,6 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
   assert.equal(cancel.cancelSent, true, `${label}: the agent gets session/cancel.`);
   assert.equal(cancel.next, "completed", `${label}: a turn after the cancel completes.`);
 
-  // Resume: a new process opens the same session again and runs a turn on it.
   await runCauseEffect(client.stop());
   client = setup.open();
   await runCauseEffect(client.request("thread/resume", { threadId: thread, cwd: workspace, model: beta }, (v) => v));
@@ -196,8 +175,6 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
   assert.equal(resume.restored, true, `${label}: the new process restores the session.`);
   assert.equal(resume.status, "completed", `${label}: a turn on the restored session completes.`);
 
-  // Missing session: the agent's own error for a session it does not have is a missing session, so
-  // the agent gets a new session with its transcript.
   const gone = thread.replace(/[^:]+$/u, "gone-1");
   const missingSession = await runCauseEffect(
     client.request("thread/resume", { threadId: gone, cwd: workspace, model: beta }, (v) => v),
@@ -207,8 +184,6 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
   );
   assert.equal(missingSession, true, `${label}: the agent's missing-session error is a missing session.`);
 
-  // Sign-in: a started agent that gives sessions has an account. An agent that refuses each session
-  // before its sign-in has none. `account/read` does not start the agent, so `initialize` comes first.
   let signInRequired: boolean | string = driver.noSignIn ?? false;
   if (!driver.noSignIn) {
     const signedIn = await runCauseEffect(client.request("account/read", {}, decodeAccountReadResult));
@@ -235,7 +210,6 @@ async function conform(driver: DriverCase): Promise<DriverResult> {
 }
 
 try {
-  // A new provider must get a case here, or a reason in `NOT_COVERED`.
   const listed: readonly string[] = [...DRIVERS.map((driver) => driver.provider), ...NOT_COVERED];
   assert.deepEqual(
     [...listed].sort(),

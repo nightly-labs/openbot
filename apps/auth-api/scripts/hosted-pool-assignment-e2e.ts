@@ -1,12 +1,3 @@
-// Runs the real account server hosted-server service on a migrated SQLite database with a fake boat API
-// that records each sandbox it makes. A purchase (`onSubscriptionSynced`) with a free prepared machine of
-// the plan's product in the pool starts on that machine with no boat sandbox, and a purchase with no such
-// machine starts in a boat sandbox. The machine gets its server and claim with its token (`poolAssignment`),
-// the sign-in of OpenBot (`redeemClaim`) sets the server to `running`, and a machine that does not sign in
-// loses the server to boat. It also checks the `machine` property of the analytics events.
-//
-// Run: bun run test:hosted-pool-assignment
-// It writes .openbot-build/hosted-pool-assignment-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -27,6 +18,7 @@ import { sqliteD1 } from "./sqlite-d1";
 const ROOT = resolve(import.meta.dirname, "../../..");
 const OUT = join(ROOT, ".openbot-build", "hosted-pool-assignment-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
+const ALERT_URL = "https://alerts.example/webhook";
 const OWNER = {
   id: "owner",
   email: "owner@example.test",
@@ -53,7 +45,6 @@ function migratedDatabase(): DatabaseSync {
   return database;
 }
 
-/** The status and code of a refused call, or null when the call worked. */
 async function refusal(call: Effect.Effect<unknown, unknown>) {
   const result = await Effect.runPromise(Effect.result(call));
   if (Result.isSuccess(result)) return null;
@@ -69,14 +60,24 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
     .run(OWNER.id, `email:${OWNER.email}`, OWNER.email);
 
-  const created: { serverId: string; from: string; claim: string }[] = [];
+  const created: { serverId: string; from: string; claim: string; type: string }[] = [];
+  const alerts: string[] = [];
   const boatFetch = async (input: string, init: RequestInit) => {
+    if (input === ALERT_URL) {
+      alerts.push(String(JSON.parse(String(init.body)).content));
+      return new Response(null, { status: 204 });
+    }
     const path = new URL(input).pathname.replace("/api/v1", "");
     const method = init.method ?? "GET";
     if (method === "POST" && path === "/sandboxes") {
       const body = JSON.parse(String(init.body));
       const serverId = String(body.env.OPENBOT_HOSTED_HOST_ID);
-      created.push({ serverId, from: String(body.from), claim: String(body.env.OPENBOT_HOSTED_CLAIM) });
+      created.push({
+        serverId,
+        from: String(body.from),
+        claim: String(body.env.OPENBOT_HOSTED_CLAIM),
+        type: String(body.type),
+      });
       return Response.json({ ok: true, sandbox: { id: `bx_${serverId}`, state: "provisioning" } });
     }
     if (path.endsWith("/commands"))
@@ -88,8 +89,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     return Response.json({ ok: true });
   };
   const sandboxOf = (serverId: string) => created.filter((entry) => entry.serverId === serverId);
-  /** For the report: the sandboxes with no claim. */
-  const sandboxes = () => created.map((entry) => ({ serverId: entry.serverId, from: entry.from }));
+  const sandboxes = () => created.map((entry) => ({ serverId: entry.serverId, from: entry.from, type: entry.type }));
 
   const tracked: Action[] = [];
   const work: Promise<void>[] = [];
@@ -100,6 +100,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       BOAT_API_KEY: "boat-key",
       BOAT_WEBHOOK_SECRET: "webhook-secret",
       HOSTED_SERVER_TEMPLATE: "tpl_1",
+      HOSTED_POOL_ALERT_WEBHOOK_URL: ALERT_URL,
       REMOTE_TICKET_PRIVATE_JWK: JSON.stringify({ kty: "EC", crv: "P-256", d: "private-value-of-the-test-key" }),
     },
     {
@@ -119,7 +120,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
 
   const tokens = new Map<string, string>();
   let added = 0;
-  /** A machine of the pool. `ready` gives it a token and a poll at this moment, as the wait unit does. */
   const machine = async (
     id: number,
     product: string,
@@ -162,7 +162,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
        current_period_end, cancel_at_period_end, updated_at
      ) VALUES (?, ?, 'cus_1', ?, ?, 'month', ?, 900, 'active', ?, 0, ?)`,
   );
-  /** The owner made the server and paid: Stripe stored the subscription, and the Worker follows it. */
   const purchase = async (serverId: string, plan: BillingPlanId, currency: string, template: string | null = null) => {
     insertServer.run(
       serverId,
@@ -188,6 +187,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
         plan,
         interval: "month",
         currency: currency === "usd" ? "usd" : "eur",
+        storageTier: 0,
       }),
     );
     await Promise.all(work.splice(0));
@@ -207,7 +207,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     return result;
   };
 
-  // The pool: two ready Standard machines, and machines that must get no server.
   const amsStandard = await machine(1001, "VPS02", "AMS-01");
   const wdcStandard = await machine(1002, "VPS02", "WDC-02");
   const amsPro = await machine(1003, "VPS03", "AMS-01");
@@ -216,7 +215,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
   const noToken = await machine(1006, "VPS02", "AMS-01", { ready: false });
   const removed = await machine(1007, "VPS02", "AMS-01", { removed: true });
   const taken = await machine(1008, "VPS02", "AMS-01");
-  // A server that an operator moved to a machine: the machine is not free.
   insertServer.run(
     "moved",
     OWNER.id,
@@ -232,7 +230,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     1,
   );
 
-  // 1. A purchase with a ready machine of the product starts there. The currency chooses the location first.
   await purchase("usd-1", "standard", "usd");
   await purchase("eur-1", "standard", "eur");
   const usd1 = row("usd-1");
@@ -259,7 +256,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     events("provisioned"),
   );
 
-  // 2. No ready machine of the product is left: the next purchase starts on boat, as before.
   await purchase("eur-2", "standard", "eur");
   const eur2 = row("eur-2");
   check(
@@ -271,6 +267,18 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       sandboxOf("eur-2").length === 1 &&
       events("provisioned", "boat").length === 1,
     { row: eur2, sandboxes: sandboxes(), provisioned: events("provisioned") },
+  );
+  const alertsAbout = (text: string) => alerts.filter((alert) => alert.includes(text));
+  check(
+    "a start on boat alerts the operator once, with the plan, the currency, the server and the reason",
+    alertsAbout("eur-2").length === 1 &&
+      alertsAbout("eur-2")[0] === "⛵ **Boat start** · standard server · eur · eur-2 · no ready VPS02 in AMS-01",
+    alerts,
+  );
+  check(
+    "a purchase that takes the last free machine of its group alerts the operator",
+    alertsAbout("🔴 **Pool** WDC-02 VPS02 · 0 free left").length === 1,
+    alerts,
   );
   const serversOn = (hostId: string) =>
     database.prepare("SELECT server_id FROM hosted_servers WHERE operator_host = ?").all(hostId);
@@ -285,7 +293,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     [amsPro, stale, neverSeen, noToken, removed, taken].map((hostId) => ({ hostId, servers: serversOn(hostId) })),
   );
 
-  // 3. The other location is used when the preferred one has no machine.
   await purchase("usd-2", "pro", "usd");
   check(
     "a US dollar purchase uses a ready machine in AMS-01 when WDC-02 has none",
@@ -293,8 +300,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     row("usd-2"),
   );
 
-  // A purchase in euros stays in the EU: it does not use the machine in WDC-02, and no purchase uses a
-  // machine in a location that the privacy notice does not name.
   const wdcPro = await machine(1012, "VPS03", "WDC-02");
   const sydPro = await machine(1013, "VPS03", "SYD-12");
   await purchase("eur-pro", "pro", "eur");
@@ -311,7 +316,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     { eur: row("eur-pro"), usd: row("usd-pro"), usd2: row("usd-pro-2") },
   );
 
-  // 4. Two purchases at the same moment and one machine.
   const starter = await machine(1009, "VPS01", "AMS-01");
   await Promise.all([purchase("starter-1", "starter", "eur"), purchase("starter-2", "starter", "eur")]);
   const onStarter = serversOn(starter).length;
@@ -320,8 +324,43 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     onStarter === 1 && sandboxOf("starter-1").length + sandboxOf("starter-2").length === 1,
     { machine: serversOn(starter), sandboxes: sandboxes() },
   );
+  const starterOnBoat = [...sandboxOf("starter-1"), ...sandboxOf("starter-2")][0];
+  const starters = (await Effect.runPromise(service.list(OWNER))).servers.filter((server) =>
+    server.serverId.startsWith("starter-"),
+  );
+  check(
+    "a Starter on boat gets a `default` sandbox, a Starter on its VPS 1 stays `small`, and both have 25 GB",
+    starterOnBoat?.type === "default" &&
+      starters.length === 2 &&
+      starters.every(
+        (server) =>
+          server.size === (server.serverId === starterOnBoat.serverId ? "default" : "small") && server.storageGb === 25,
+      ),
+    {
+      sandboxes: sandboxes(),
+      starters: starters.map(({ serverId, size, storageGb }) => ({ serverId, size, storageGb })),
+    },
+  );
 
-  // 5. A server with an earlier boat attempt stays on boat: boat can still make the sandbox of that attempt.
+  insertServer.run(
+    "starter-unpaid",
+    OWNER.id,
+    "Server starter-unpaid",
+    null,
+    null,
+    HOSTED_PLAN_SIZE.starter,
+    "starter",
+    "eur",
+    "awaiting_payment",
+    "key-starter-unpaid",
+    clock.now,
+    clock.now,
+  );
+  const unpaid = (await Effect.runPromise(service.list(OWNER))).servers.find(
+    (server) => server.serverId === "starter-unpaid",
+  );
+  check("a Starter with no machine yet shows the plan storage of 25 GB", unpaid?.storageGb === 25, { unpaid });
+
   const spare = await machine(1010, "VPS02", "AMS-01");
   await purchase("retry", "standard", "eur", "tpl_old");
   check(
@@ -330,7 +369,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     { row: row("retry"), sandboxes: sandboxes() },
   );
 
-  // 6. The machine asks for its server.
   const wrongToken = randomToken();
   const refused = {
     wrongToken: await refusal(service.poolAssignment(wdcStandard, wrongToken)),
@@ -380,7 +418,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     { state: otherClaim.state },
   );
 
-  // 7. OpenBot on the machine signs in with the claim.
   clock.now = t0 + 35 * SECOND;
   const session = first.state === "assigned" ? await Effect.runPromise(service.redeemClaim(first.claim)) : null;
   const signedIn = row("usd-1");
@@ -418,10 +455,15 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     { again, ready: events("ready") },
   );
 
-  // 8. OpenBot on the machines of `eur-1`, `usd-2`, `usd-pro` and one Starter server never signs in. The
-  // cron moves each server to boat.
+  check(
+    "a retry of an earlier boat attempt sends no alert: it never asks the pool",
+    alertsAbout("eur · retry").length === 0,
+    alerts,
+  );
+
   const unsigned = ["eur-1", "usd-2", "usd-pro", serversOn(starter)[0]?.server_id].map(String);
   const boatBefore = events("provisioned", "boat").length;
+  const alertsBefore = alerts.length;
   const before = await tick(t0 + 3 * MINUTE);
   check(
     "the cron keeps a pool start that is younger than the limit",
@@ -451,6 +493,28 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     { failed: events("setup_failed"), provisioned: events("provisioned", "boat") },
   );
   check(
+    "each lost pool start alerts once with its machine, and once more when its boat start is stored",
+    alerts.length === alertsBefore + 2 * unsigned.length &&
+      unsigned.every(
+        (serverId) =>
+          alertsAbout(`**Pool start lost** · `).filter((alert) =>
+            alert.includes(` · ${serverId.slice(0, 8)} · machine `),
+          ).length === 1 &&
+          alerts
+            .slice(alertsBefore)
+            .filter(
+              (alert) =>
+                alert.startsWith("⛵ **Boat start**") && alert.includes(`${serverId.slice(0, 8)} · pool machine`),
+            ).length === 1,
+      ),
+    alerts.slice(alertsBefore),
+  );
+  check(
+    "no alert names the owner",
+    alerts.length > 0 && alerts.every((alert) => !alert.includes(OWNER.email) && !alert.includes(OWNER.id)),
+    alerts,
+  );
+  check(
     "the machine that lost its server has no token, and the old pool claim signs nothing in",
     machineRow(amsStandard)?.assign_token_hash === null &&
       (await refusal(service.poolAssignment(amsStandard, tokens.get(amsStandard))))?.status === 401 &&
@@ -468,7 +532,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     { usd1: row("usd-1"), moved: row("moved") },
   );
 
-  // 9. The machine that lost a server gets no other server. The next purchase takes the spare machine.
   clock.now = t0 + 5 * MINUTE;
   await poll(spare);
   await purchase("eur-3", "standard", "eur");
@@ -478,7 +541,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     row("eur-3"),
   );
 
-  // 10. The owner deletes the server before OpenBot signs in.
   database.prepare("UPDATE billing_subscriptions SET status = 'canceled' WHERE server_id = 'eur-3'").run();
   await Effect.runPromise(service.delete(OWNER, "eur-3", "Server eur-3"));
   await Promise.all(work.splice(0));
@@ -498,7 +560,6 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     { deleted, afterDelete, next: row("eur-4"), later: row("eur-3") },
   );
 
-  // 11. The plan ends before OpenBot signs in: the machine is released, and no boat sandbox is made.
   const lapsing = await machine(1011, "VPS02", "AMS-01");
   await purchase("lapsed", "standard", "eur");
   const lapsedAt = clock.now;
@@ -512,6 +573,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       plan: "standard",
       interval: "month",
       currency: "eur",
+      storageTier: 0,
     }),
   );
   await Promise.all(work.splice(0));
@@ -528,8 +590,9 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       released.observed_state === "error" &&
       released.desired_state === "stopped" &&
       sandboxOf("lapsed").length === 0 &&
-      machineRow(lapsing)?.assign_token_hash === null,
-    { ended, endedPoll, released, machine: machineRow(lapsing) },
+      machineRow(lapsing)?.assign_token_hash === null &&
+      alerts.at(-1) === `🛠️ **Pool start lost** · standard server · lapsed · machine ${lapsing} · prepare it again`,
+    { ended, endedPoll, released, machine: machineRow(lapsing), alert: alerts.at(-1) },
   );
 }
 

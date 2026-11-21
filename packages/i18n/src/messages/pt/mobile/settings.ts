@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Limpar o registro de suporte?",
   "mobile.settings.support.clearBody": "Isso remove todos os eventos do registro neste celular.",
   "mobile.settings.support.logFooter":
-    "O registro fica neste celular e o OpenBot não o envia. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
+    "O registro fica neste celular. O OpenBot envia linhas dele só com um relato de bug do app do celular que você envia, e o cartão do relato as mostra antes. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
   "mobile.settings.support.saveFailed": "Não foi possível salvar o arquivo de registro. Tente novamente.",
   "mobile.settings.support.sharingUnavailable": "O compartilhamento não está disponível neste celular.",
   "mobile.settings.support.newestFirst": "Mais recentes primeiro.",
@@ -125,19 +125,66 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosidade",
   "mobile.settings.appearance.messageColorFooter":
     "Com Cor do agente, suas mensagens no chat de um agente usam a cor dele. Com Cor personalizada, suas mensagens em todos os chats usam a cor que você escolher. A cor do texto muda para continuar legível.",
+  "mobile.settings.appearance.bubbleStyle": "Estilo dos balões",
+  "mobile.settings.appearance.bubbleStyleSolid": "Sólido",
+  "mobile.settings.appearance.bubbleStyleTint": "Suave",
+  "mobile.settings.appearance.seeThroughBubbles": "Balões transparentes",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Os balões do agente e os balões sem cor deixam ver o fundo. Sem fundo, os balões são sempre opacos.",
+  "mobile.settings.appearance.tab.colors": "Cores",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 execuções de rotina",
+  "mobile.settings.appearance.preview.thinking": "Pensou por 4 segundos",
+  "mobile.settings.appearance.preview.memory": "1 memória salva",
+  "mobile.settings.appearance.backdrop.title": "Fundo",
+  "mobile.settings.appearance.backdrop.footer":
+    "Aparece atrás do Início e dos seus chats neste celular. Um agente pode definir um para você; Desfazer no chat traz o anterior de volta.",
+  "mobile.settings.appearance.backdrop.none": "Nenhum",
+  "mobile.settings.appearance.backdrop.pond": "Lago de carpas",
+  "mobile.settings.appearance.backdrop.jellyfish": "Águas-vivas",
+  "mobile.settings.appearance.backdrop.sunset": "Pôr do sol retrô",
+  "mobile.settings.appearance.backdrop.snowfall": "Neve caindo",
+  "mobile.settings.appearance.backdrop.fireflies": "Vaga-lumes",
+  "mobile.settings.appearance.backdrop.coast": "Costa neon",
+  "mobile.settings.appearance.backdrop.agentPage": "Página do agente",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Definido por um agente",
+  "mobile.settings.appearance.backdrop.photo": "Foto",
+  "mobile.settings.appearance.backdrop.photoChoose": "Escolher nas suas fotos",
+  "mobile.settings.appearance.backdrop.photoChange": "Toque de novo para escolher outra foto",
+  "mobile.settings.appearance.backdrop.strength": "Intensidade do fundo",
+  "mobile.settings.appearance.backdrop.calm": "Suave",
+  "mobile.settings.appearance.backdrop.vivid": "Vívido",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Um fundo suave deixa as respostas longas fáceis de ler. O topo do Início é onde ele mais aparece.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Você pode escrever a nota de versão?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Aqui está um rascunho: o fundo que um agente define agora aparece no seu celular também.",
+  "mobile.settings.appearance.chatBackground": "Fundo do chat",
+  "mobile.settings.appearance.chatBackgroundDefault": "Padrão",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Cada tema mantém a sua própria cor. Uma cor que dificulta a leitura do texto fica mais escura ou mais clara.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "O fundo substitui o fundo do chat. Selecione Nenhum como fundo para usar uma cor.",
   "mobile.settings.appearance.collapseRoutines": "Recolher atividade de rotinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Eventos de rotinas seguidos em um chat aparecem como uma linha recolhida. Toque na linha para vê-los.",
+  "mobile.settings.appearance.replyDetails": "Detalhes das respostas",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Desative um detalhe para ocultar a linha dele nos chats. O agente continua raciocinando, iniciando subagentes e salvando memórias.",
+  "mobile.settings.appearance.showThinking": "Mostrar o raciocínio do agente",
+  "mobile.settings.appearance.showSubagents": "Mostrar subagentes",
+  "mobile.settings.appearance.showMemoryChanges": "Mostrar memórias salvas",
+  "mobile.settings.appearance.fullVisuals": "Mostrar prévias visuais completas",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Um visual de um agente aparece no chat com a altura inteira. Quando isto está desligado, um visual alto é cortado, e você toca nele para ver tudo.",
   "mobile.settings.animations.title": "Animações",
-  "mobile.settings.animations.footer":
-    "Desative Animações para reduzir o movimento em todo o app. Quando Reduzir Movimento está ativado nas configurações do celular, o app também reduz o movimento. As animações abaixo ficam desativadas.",
-  "mobile.settings.animations.all": "Animações",
+  "mobile.settings.animations.fullMotion": "Movimento completo",
+  "mobile.settings.animations.reduced": "Reduzido",
+  "mobile.settings.animations.motionFooter":
+    "Reduzido diminui o movimento em todo o app e mantém as animações abaixo desligadas. Quando Reduzir Movimento está ativado nos ajustes do celular, o app também reduz o movimento.",
   "mobile.settings.animations.agentFaces": "Rostos animados dos agentes",
   "mobile.settings.animations.agentFacesFooter":
     "Os avatares dos agentes mexem o rosto enquanto os agentes trabalham e descansam. Quando desativado, os rostos ficam parados e os personagens da tela de boas-vindas e da tela inicial vazia param de flutuar.",
-  "mobile.settings.animations.composerResize": "Campo de mensagem compacto",
-  "mobile.settings.animations.composerResizeFooter":
-    "O campo de mensagem vira uma barra pequena enquanto o teclado está fechado. Quando desativado, o campo fica no tamanho completo.",
   "mobile.settings.animations.textReveal": "Animar respostas",
   "mobile.settings.animations.textRevealFooter":
     "Uma resposta aparece palavra por palavra, e o balão cresce suavemente. Quando desativado, o texto aparece assim que chega.",
@@ -232,6 +279,25 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Baixar arquivos grandes automaticamente",
   "mobile.settings.conversations.largeFilesFooter":
     "Imagens, vídeos e áudios com mais de {small} só são baixados quando você toca neles. Ative para baixá-los na hora, até {large}. Isso pode usar muitos dados móveis.",
+  "mobile.settings.conversations.messageField": "Campo de mensagem",
+  "mobile.settings.conversations.compact": "Compacto",
+  "mobile.settings.conversations.fullSize": "Tamanho completo",
+  "mobile.settings.conversations.compactFooter":
+    "Compacto deixa o campo de mensagem como uma barra pequena enquanto o teclado está fechado.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "O movimento está reduzido em Animações ou nos ajustes do celular, então o campo de mensagem fica no tamanho completo.",
+  "mobile.settings.conversations.media": "Fotos e arquivos",
+  "mobile.settings.conversations.swipeLeft": "Deslizar para a esquerda no chat",
+  "mobile.settings.conversations.swipeRight": "Deslizar para a direita no chat",
+  "mobile.settings.conversations.swipeQuestion": "Pergunta à parte",
+  "mobile.settings.conversations.swipeThreads": "Tópicos",
+  "mobile.settings.conversations.swipeBrowser": "Navegador",
+  "mobile.settings.conversations.swipeOff": "Desativado",
+  "mobile.settings.conversations.swipeFooter":
+    "Deslizar no sentido oposto a Voltar no chat de um agente abre isto. O mesmo gesto em uma mensagem mostra o horário das mensagens.",
+  "mobile.settings.conversations.pullInfo": "Puxar para cima para ver info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Em um chat, canal ou tópico, puxe para cima além da última mensagem e solte para abrir as informações.",
   "mobile.settings.conversations.fullQualityPhotos": "Enviar fotos em qualidade máxima",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Quando desativado, o app envia uma cópia menor de cada foto, com até 2048 pixels no lado maior. Ela chega mais rápido em uma conexão lenta. Ative para enviar a foto original.",
@@ -401,6 +467,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Servidores",
   "mobile.settings.voice.gptLive.serversFooter":
     "Toque num servidor que precisa de login para conectar o Codex a uma conta do ChatGPT. Só um proprietário ou administrador vê o login de um servidor.",
+  "mobile.settings.voice.gptLive.account": "Conta da voz ao vivo do GPT",
   "mobile.settings.voice.gptLive.status.ready": "Pronto",
   "mobile.settings.voice.gptLive.status.supported": "Compatível",
   "mobile.settings.voice.gptLive.status.offline": "Offline",
@@ -496,6 +563,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Não foi possível parar o processo.",
   "mobile.settings.agents.processes.stopTitle": "Parar este programa?",
   "mobile.settings.agents.processes.stopLabel": "Parar o processo {pid}",
+  "mobile.settings.quickActions.title": "Menu do ícone do app",
+  "mobile.settings.quickActions.footer":
+    "Toque e segure o ícone do OpenBot para ver estas ações. Você pode ativar até {count}.",
+  "mobile.settings.quickActions.latestChat": "Último chat",
+  "mobile.settings.quickActions.secondChat": "Penúltimo chat",
   "mobile.settings.shortcuts.title": "Atalhos",
   "mobile.settings.shortcuts.agent": "Agente",
   "mobile.settings.shortcuts.none": "Nenhum",
@@ -509,10 +581,34 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Escolher agente",
   "mobile.settings.shortcuts.card.locked.title": "O OpenBot está bloqueado",
   "mobile.settings.shortcuts.card.locked.action": "Abrir OpenBot",
-  "mobile.settings.shortcuts.footer": "Send Message no app Atalhos envia para este agente. O app não abre.",
+  "mobile.settings.shortcuts.card.message": "Enviar mensagem para {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "Mensagem para {name}",
+  "mobile.settings.shortcuts.footer":
+    "Send Message no app Atalhos envia para este agente. O app não abre. Open Agent abre o chat dele.",
   "mobile.settings.shortcuts.send.sent": "Enviado",
   "mobile.settings.shortcuts.send.failed": "O OpenBot não conseguiu enviar isto.",
   "mobile.settings.shortcuts.send.unconfirmed": "Sem resposta do servidor. A mensagem pode estar no chat.",
   "mobile.settings.shortcuts.send.inApp": "Enviar no OpenBot",
   "mobile.settings.shortcuts.send.openChat": "Abrir chat",
+  "mobile.settings.invite.title": "Convidar amigos",
+  "mobile.settings.invite.heading": "Um ingresso. Um amigo.",
+  "mobile.settings.invite.subtitle": "Destaque o canhoto pela linha para compartilhar seu convite.",
+  "mobile.settings.invite.pass": "OpenBot · Passe de convidado",
+  "mobile.settings.invite.from": "De {name}",
+  "mobile.settings.invite.headline": "Seus próprios\nagentes de IA",
+  "mobile.settings.invite.perk.friendLabel": "Seu amigo",
+  "mobile.settings.invite.perk.youLabel": "Você",
+  "mobile.settings.invite.perk.friendValue": "{percent} de desconto",
+  "mobile.settings.invite.perk.youValue": "{percent} de crédito",
+  "mobile.settings.invite.perk.friendDetail": "para seu amigo, no plano do OpenBot dele",
+  "mobile.settings.invite.perk.youDetail": "para você, de cada pagamento do seu amigo, como crédito nas suas faturas",
+  "mobile.settings.invite.admit": "Entrada para um amigo",
+  "mobile.settings.invite.tearHint": "Destaque pela linha",
+  "mobile.settings.invite.copy": "Copiar link",
+  "mobile.settings.invite.stub": "Canhoto com seu link de convite",
+  "mobile.settings.invite.stubHint": "Destaque-o para compartilhar seu link de convite.",
+  "mobile.settings.invite.shareMessage": "Entre no OpenBot comigo e ganhe {percent} de desconto no seu plano:",
+  "mobile.settings.invite.loading": "Carregando seu link de convite…",
+  "mobile.settings.invite.loadFailed": "Não foi possível carregar seu link de convite.",
+  "mobile.settings.invite.unavailable": "Links de convite não estão disponíveis neste servidor de contas.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,9 +1,3 @@
-// Drives MuseAgentClient and the signed-in Muse CLI for issue #2369. Sends three short model turns.
-// bun scripts/muse-mcp-startup-fault-e2e.ts [--muse=<path>]
-// 1. A new session with an MCP server that writes no JSON-RPC: Muse stores an MCP startup fault.
-// 2. The same session resumed with no MCP server: the stored fault still refuses the turn.
-// 3. A new session with no MCP server: the turn completes.
-// The report records whether each refusal is one that OpenBot closes the session for.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,7 +17,6 @@ interface Step {
   name: string;
   sessionId: string | null;
   status: string | null;
-  /** The `error` notification text: the only failure that OpenBot checks for a refused session. */
   error: string | null;
   requestError: string | null;
   refusedFailure: string | null;
@@ -62,11 +55,9 @@ function brokenServer(): McpServerConfig {
     transport: "stdio",
     enabled: true,
     command: "/bin/sh",
-    // Answers `initialize` with text that no MCP framing accepts, then stays open.
     args: ["-c", "printf 'not json-rpc\\r\\n\\r\\n'; sleep 120"],
     env: [],
     envPassthrough: [],
-    // OpenBot does not send a stdio server with a working directory to Muse.
     workingDirectory: "",
     url: "",
     headers: [],
@@ -153,7 +144,6 @@ async function run(name: string, cwd: string, servers: McpServerConfig[], resume
 
 let root: string | undefined;
 try {
-  // Muse accepts only canonical workspace roots, and the macOS temp folder is a symlink.
   root = await realpath(await mkdtemp(join(tmpdir(), "openbot-muse-mcp-fault-")));
   const cwd = join(root, "workspace");
   await mkdir(cwd);

@@ -3,7 +3,7 @@
     "name": "OpenBot",
     "slug": "openbot",
     "platforms": ["ios", "android"],
-    "version": "1.4.10",
+    "version": "1.4.12",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "openbot",
@@ -18,7 +18,9 @@
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         },
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["fetch"],
+        "BGTaskSchedulerPermittedIdentifiers": ["run.openbot.mobile.refresh"]
       },
       "icon": "./assets/icons/app-icon.icon"
     },
@@ -45,6 +47,8 @@
       "./plugins/with-workspace-bundle-inputs",
       "./plugins/with-update-channel",
       "./plugins/with-app-icons",
+      "./plugins/with-android-view-preallocation-off",
+      "./plugins/with-android-optional-features",
       "expo-router",
       "expo-video",
       [

@@ -1,8 +1,3 @@
-// Switches a running dev app through each translation in Settings, and checks that the window shows
-// no catalog keys or placeholders, that no control text is cut off or wraps when it fits in English,
-// and that a host error reads in the new language.
-// Restores the saved language at the end. Writes .openbot-build/i18n-e2e/report.json and one
-// screenshot per language. Needs `--allow-mutations`, because it changes the language setting.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -17,7 +12,6 @@ import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-cli
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 import { type FitProblem, measureFit } from "./i18n-fit-probe";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -53,7 +47,6 @@ async function savedLanguage(page: Page): Promise<AppLanguage> {
   return preference.language;
 }
 
-/** The heading of the Settings page, which shows while the page is open. */
 function settingsTitle(page: Page, shown: TranslatedLocale) {
   return page.getByRole("heading", { level: 1, name: translateFor(shown)("app.settingsPage.title"), exact: true });
 }
@@ -64,12 +57,11 @@ async function openSettings(page: Page, shown: TranslatedLocale) {
   if (!(await title.isVisible()))
     await page.keyboard.press(process.platform === "darwin" ? "Meta+Comma" : "Control+Comma");
   await title.waitFor();
-  const general = page.getByRole("tab", { name: t("settings.tab.general.title"), exact: true });
-  if (await general.isVisible()) await general.click();
+  const appearance = page.getByRole("tab", { name: t("settings.appearance.title"), exact: true });
+  if (await appearance.isVisible()) await appearance.click();
   return languageButton(page, t("settings.language.title"));
 }
 
-/** The Language button. Its name is the title and then the selected language. */
 function languageButton(page: Page, title: string) {
   return page.getByRole("button", { name: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} `) });
 }
@@ -82,7 +74,6 @@ async function chooseLanguage(page: Page, shown: TranslatedLocale, next: AppLang
   await page.getByRole("option", { name: label, exact: true }).click();
 }
 
-/** Visible text that is a catalog key, or that still has a `{placeholder}`. */
 async function leftovers(page: Page) {
   const text = await page.locator("body").innerText();
   const words = text.split(/[\s"'()[\],:;!?]+/).filter((word) => word.length > 0);
@@ -92,7 +83,6 @@ async function leftovers(page: Page) {
   };
 }
 
-/** Fit problems that English, on the same screen, does not have. */
 async function newFitProblems(page: Page, english: readonly FitProblem[]): Promise<FitProblem[]> {
   const known = new Set(english.map((problem) => `${problem.path}|${problem.reason}`));
   const problems = await page.evaluate(measureFit, "body");
@@ -118,12 +108,10 @@ const original = await savedLanguage(page);
 const results = [];
 let shown: TranslatedLocale = "en";
 try {
-  // Start from English, so the first Settings lookup knows the names it looks for.
   if (original !== "en") await page.evaluate(() => window.openbot.setAppLanguagePreference({ language: "en" }));
   await page.waitForFunction(() => document.documentElement.lang === "en");
   await openSettings(page, "en");
   const englishSettings = await page.evaluate(measureFit, "body");
-  // A focused settings tab keeps Escape for itself, so Escape goes from the title.
   await settingsTitle(page, "en").focus();
   await page.keyboard.press("Escape");
   await settingsTitle(page, "en").waitFor({ state: "hidden" });

@@ -1,5 +1,199 @@
 [
   {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Werk ook elke server waarbij je bent aangesloten bij naar deze versie. Op een server werken de instellingen van workflowstappen, Uitvoeren vanaf deze stap, eigendomsoverdracht, de knop Alles updaten en veel fixes voor agents alleen als de server deze versie heeft.",
+      "Na deze update kan een oudere versie van OpenBot je gegevens niet openen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Praat met een agent met Indrukken om te praten. Houd de spreekknop of de spreektoets ingedrukt terwijl je spreekt. OpenBot stuurt wat je zei zodra je loslaat. Wijzig de toets in Instellingen > Spraak.",
+          "Start een workflow opnieuw vanaf één stap. Selecteer in het stapmenu Uitvoeren vanaf deze stap. De stappen ervoor behouden hun antwoorden en worden niet opnieuw uitgevoerd.",
+          "Bekijk de instellingen en invoer die het resultaat van een workflowstap hebben gemaakt. Selecteer Instellingen op de stap, en daarna Deze instellingen gebruiken om hem op dezelfde manier opnieuw uit te voeren.",
+          "Geef je server over aan een ander OpenBot-account. Vul in Serverinstellingen > Leden het e-mailadres van de nieuwe eigenaar in. De server wisselt van eigenaar zodra die het accepteert.",
+          "Update alle aanbieders tegelijk. Instellingen > Aanbieders toont Alles updaten wanneer een of meer aanbieders een update hebben."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot werkt de provider-CLI's die het heeft gedownload elk uur bij, als er een nieuwe versie beschikbaar is. De update wacht tot de agents inactief zijn.",
+          "Elke thread van een agent kan de browsertabbladen gebruiken die de hoofdchat of een andere thread van die agent heeft geopend.",
+          "Het tabblad Routines is uit de zijbalk verdwenen. Routines blijven draaien. Beheer ze in de instellingen van de agent, op de pagina Planning en bij Serverinstellingen > Routines."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Herstart voor een gedownloade update wacht nu tot de agents inactief zijn, met Herstart annuleren. Eerder sloot OpenBot meteen af en stopte het de taak van de agent.",
+          "Een agent blijft na een herstart of een gebruikslimiet niet meer op «Bezig» staan met wachtende berichten. De onderbroken beurt wordt als onderbroken getoond, en de wachtende berichten starten.",
+          "Een drukke server met veel agents en verbonden apparaten raakt niet meer door zijn geheugen heen, en bevriest niet meer wanneer hij de volgende beurt selecteert.",
+          "Een bericht dat je na een pauze verstuurt, blijft niet meer op «Niet verstuurd» staan met «Verbind Claude om door te gaan.» wanneer Claude is aangemeld.",
+          "Agent-browsertabbladen die niemand gebruikt, stoppen na 2 minuten met het gebruik van de processor."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Werk ook elke server waarbij je bent aangesloten bij naar deze versie. Op een server werken kleine kopieën van de afbeeldingen op het workflowcanvas, aangepaste videolengtes en agents die een verzoek afronden zonder dat je «doorgaan» typt, alleen als de server deze versie heeft.",
+      "Als OpenBot op Linux na de update nog steeds traag is, verwijder dan het bestand `~/.config/OpenBot/gpu-crash.json` en start OpenBot opnieuw.",
+      "Als je bij Instellingen van aanbieder Nadenken voor een Mistral-agent hebt ingesteld, selecteer dan het niveau opnieuw in het menu Denkniveau en reset de oude rij Nadenken."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Deel je uitnodigingslink in Instellingen > Invite friends. Het tabblad toont je tegoed en de vrienden die zich hebben aangemeld. Een vriend krijgt 10% korting op elke betaling, en jij krijgt 10% van elke betaalde factuur van je vriend als tegoed.",
+          "Zet knooppunten van een workflowcanvas in een groep. Selecteer ze en druk op Groeperen (⌘G). Vouw een groep samen tot één stapelkaart, en druk op Groep opheffen (⇧⌘G) om de groep te beëindigen.",
+          "Geef een videostap op het workflowcanvas elke lengte die het Sunra- of Higgsfield-model ondersteunt. Selecteer Aangepast in het menu Lengte en gebruik de schuifregelaar.",
+          "Open de Marktplaats vanuit de rij Apps in de instellingen van een agent. Koppel een app, of voeg je eigen MCP-server toe met Eigen toevoegen.",
+          "Wanneer je inlogt op een nieuwe computer en je account heeft al servers, toont de eerste stap ze. Open een server om verder te gaan met de agents en chats daarvan."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents ronden je verzoek af zonder dat je «doorgaan» hoeft te typen. Als een deel van het verzoek nog niet klaar is, gaat de agent met dat deel verder, maximaal 3 keer. Een vraag die jouw keuze of goedkeuring nodig heeft, stopt de agent nog steeds.",
+          "Tabbladen van het zijpaneel behouden hun titel en één breedte. Als de tabbladen niet passen, scrolt de rij, en een menu aan het eind van de rij toont de andere tabbladen. Met een middelklik sluit je een tabblad.",
+          "Op een server waarbij je bent aangesloten, verschijnen de afbeeldingen op het workflowcanvas veel sneller. Het canvas krijgt een kleine kopie van elke afbeelding, en de volledige afbeelding opent in de viewer.",
+          "Een thread ziet er nu uit als de chat van de agent. Berichten van dezelfde afzender lezen als één blok, en de stappen van een antwoord staan ernaast."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een Claude- of ChatGPT-agent blijft niet meer uren op «Bezig» staan wanneer de provider niet meer reageert. Na 15 minuten zonder uitvoer (60 minuten terwijl een tool draait) beëindigt OpenBot de beurt, en de wachtende berichten gaan verder.",
+          "Met «Mijn Claude Code-configuratie gebruiken» uit, laden Claude-agents je algemene Claude Code-instructies en -regels niet meer. Elke beurt is sneller en kost minder. Wil je ze houden, zet «Mijn Claude Code-configuratie gebruiken» dan aan.",
+          "Je agents blijven werken terwijl OpenBot een providerupdate downloadt. Een download die een minuut geen gegevens krijgt, stopt en gaat verder waar hij was gebleven wanneer je het opnieuw probeert.",
+          "Agents sturen berichten weer rechtstreeks naar hun teamgenoten. Eerder vroeg een kaart je om elke overdracht goed te keuren, en het werk stopte tot je goedkeurde.",
+          "Een agent met automatische reservemodellen gaat in meer gevallen naar zijn volgende reservemodel, bijvoorbeeld na een limiet op het aantal verzoeken of wanneer Gemini de verbinding met Google verliest."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Nadat je deze versie hebt geïnstalleerd, kun je niet meer terug naar een oudere OpenBot-versie op deze computer of server. Deze versie maakt de database kleiner, en een oudere versie kan die niet openen.",
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken eigen afbeeldingsformaten, de Sunra- en Higgsfield-modellen en -prijzen, en het sneller laden van veel agents alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bekijk de zijthreads van elke agent in de zijbalk. Selecteer de pijl aan het eind van een agentrij, of houd de aanwijzer op de rij om al zijn threads te zien.",
+          "Filter de zijbalk met de filterknop aan het einde van het zoekveld. Toon alleen agents of kanalen, alleen ongelezen chats of agents die aan het werk zijn, of alleen de chats in de mappen die je selecteert.",
+          "Geef een afbeeldingsstap op het workflowcanvas een eigen formaat in pixels, of gebruik de beeldverhouding 4:5 of 5:4.",
+          "Het workflowcanvas toont alle afbeeldings- en videomodellen van Sunra en Higgsfield, en de knop Uitvoeren toont de prijs in credits.",
+          "Zet Achtergrondvervaging en Bewegende agentgezichten uit bij Instellingen → Weergave → Beweging om OpenBot sneller te maken op een trage computer."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Meerdere mensen kunnen tegelijk dezelfde workflow bewerken. Het canvas voegt de wijzigingen van de anderen toe zodra ze opslaan.",
+          "OpenBot gebruikt veel minder CPU terwijl veel agents werken, en je kunt typen zonder vertraging.",
+          "Agents ronden een betaling af wanneer de bank om een 3-D Secure-code vraagt. Staat de code in een e-mail of sms die de agent kan lezen, dan typt de agent hem in.",
+          "Serverinstellingen → Overdracht → Kopiëren naar een andere server kopieert nu ook de workflows en routinestromen van de agents."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "De OpenBot-database neemt veel minder ruimte in. Na de update verwijdert OpenBot in kleine stappen oude kopieën van chatberichten.",
+          "Op Windows toont een update weer de voortgang.",
+          "Een aangesloten server met veel agents en een groot kanaal openen sneller.",
+          "Gemini-chats met veel afbeeldingen of een lange geschiedenis blijven werken, en Gemini vraagt niet meer om opnieuw in te loggen wanneer een nieuwe chat begint.",
+          "De desktopapp maakt weer verbinding met een server op OpenBot v0.34.1 of ouder."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken de CRM, Account toevoegen met code, een achtergrond die een agent instelt, Bibliotheekmappen die agents ordenen en berichten in een lopende Devin-beurt alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Speel een geanimeerde achtergrond af achter het hele venster. Kies een scène, zoals Koivijver of Vuurvliegjes, bij Instellingen → Vensterachtergrond, of vraag een agent er een voor je te maken.",
+          "Houd leads, klanten en betalingen bij op de nieuwe CRM-pagina. Die is experimenteel: een eigenaar of beheerder zet hem aan bij Serverinstellingen → Experimenteel. Hij kan importeren uit Stripe, en agents stellen wijzigingen voor die een eigenaar of beheerder goedkeurt.",
+          "Beantwoord een agent in het chatvenster van het Agentdock. Sta een opdracht toe of weiger die, beantwoord een vraag, of rond een browserstap af zonder het hoofdvenster.",
+          "Organiseer de Bibliotheek met maptegels, Favorieten, Recent en Ongedaan maken. Sleep bestanden naar Nieuwe map om een map te maken, of vraag een agent zijn mappen te ordenen.",
+          "Voeg een ChatGPT (Codex)-, Grok- of Claude-account toe met een code. Open het menu naast Account toevoegen en kies Account toevoegen met code.",
+          "Een bericht dat je stuurt terwijl een Devin- of OpenCode-agent werkt, gaat naar de lopende beurt. Dit vereist Devin CLI 3000.12.57 of OpenCode 2.3.0 of later."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Instellingen hebben een nieuwe indeling. Secties staan in gelabelde groepen, en Serverinstellingen heeft nieuwe secties Geheugen en Standaarden voor agents. Op macOS gebruikt OpenBot het systeemlettertype.",
+          "Voeg eigen MCP-servers toe en bewerk ze in Marktplaats → Apps. Serverinstellingen heeft geen MCP-sectie meer.",
+          "In een chat met een agent nemen je ballonnen nu de kleur van de avatar van de agent over. Wijzig dit bij Instellingen → Weergave → Jouw ballonnen.",
+          "Een spraakgesprek opent het zijpaneel niet meer. Een kleine balk boven aan de chat toont de spraakbediening."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een chat die zijn opgeslagen sessie verliest, of te groot wordt, blijft niet langer kapot. De agent start een nieuwe sessie met de chatgeschiedenis en beantwoordt je bericht.",
+          "Meer agents schakelen naar hun reservemodel wanneer een gebruikslimiet of een providerfout een beurt stopt, ook Grok-, Hermes- en Claude-agents.",
+          "Agents kunnen een opgeslagen login op meer plaatsen gebruiken, zoals een inlogformulier in een frame.",
+          "Een routine blijft aan na een mislukte run, en een run die gepland staat terwijl de provider niet kan starten, loopt later.",
+          "OpenBot gebruikt minder CPU en batterij: video's in de chat en in verborgen browsertabbladen pauzeren wanneer je ze niet kunt zien."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken Stoppen voor routine-runs, bestanden die agents zonder tekst sturen en API-sleutels op hun oude pad alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Knijp op een touchpad of touchscreen om in te zoomen op het gebied onder de aanwijzer. Diagrammen, canvassen en de afbeeldingsviewer behouden hun eigen zoom.",
+          "Stop een routine-run vanaf het Routines-canvas: kies Stoppen in de bovenbalk of in de routinedetails. De run eindigt als Geannuleerd.",
+          "Agents kunnen een bestand of een afbeelding zonder tekst sturen naar een WhatsApp-, Telegram-, Slack- of Discord-chat.",
+          "Koop weer een gehoste Starter-server. Die heeft 25 GB opslag.",
+          "Gebruik een ClinePass-abonnement met Cline-agents. Het modelmenu toont de ClinePass-modellen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Op het Canvas sleep je een notitie, vrije tekst, een vorm of een stap via de tekst. Een klik op de tekst zet de tekstcursor waar je klikte.",
+          "Een bericht dat je stuurt terwijl een Antigravity-agent werkt, gaat naar de lopende beurt. Dit vereist Antigravity CLI 1.5.0 of later.",
+          "Een routine waarvan de taak zegt te stoppen als het werk klaar is, pauzeert nu zelf. Zet hem weer aan vanuit je lijst met routines.",
+          "De Kluis zegt nu dat elke agent de API-sleutelbestanden van de andere agents kan lezen, omdat alle agents als dezelfde systeemgebruiker draaien."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Scripts, MCP-servers en aanbiedersinstellingen die API-sleutels uit de Kluis uit hun bestanden lezen, werken weer na de update naar 0.70.0.",
+          "Een Claude-agent houdt het model in zijn profiel als Claude Code zijn standaardmodel wijzigt.",
+          "Als Claude een beurt stopt bij de maandelijkse uitgavenlimiet, gaat een agent met reservemodellen verder op zijn volgende model.",
+          "Agents krijgen het volledige transcript van een video met ondertitels, zoals een YouTube-video.",
+          "OpenBot gebruikt minder CPU: browsertabbladen die je niet ziet, vertragen, en het bewegende licht op de activiteitsregel van een agent is lichter."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

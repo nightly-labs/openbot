@@ -1,6 +1,27 @@
-import type { AgentEvent } from "@openbot/contracts/ipc";
-import type { OpenBotDatabase } from "../openbot-database";
+import type { AgentEvent, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import type { OpenBotDatabase, StreamingMessageWrite } from "../openbot-database";
+import { perfCount } from "../perf-probe-hooks";
 import type { ConversationRuntime } from "./conversation-runtime";
+
+const logger = createOpenBotLogger("delta-buffer");
+
+const STORAGE_FAILURE_CODES = new Set([5, 6, 10, 13]);
+const SAVE_INTERVAL_MS = 100;
+const SAVE_INTERVAL_PER_MESSAGE_MS = 10;
+const LONGEST_SAVE_INTERVAL_MS = 500;
+
+function saveInterval(messagesInLastSave: number): number {
+  return Math.min(
+    LONGEST_SAVE_INTERVAL_MS,
+    Math.max(SAVE_INTERVAL_MS, messagesInLastSave * SAVE_INTERVAL_PER_MESSAGE_MS),
+  );
+}
+
+function isStorageFailure(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error) || error.code !== "ERR_SQLITE_ERROR") return false;
+  return "errcode" in error && typeof error.errcode === "number" && STORAGE_FAILURE_CODES.has(error.errcode & 0xff);
+}
 
 export interface PendingDeltaInput {
   agentId: string;
@@ -13,7 +34,8 @@ export interface PendingDeltaInput {
 }
 
 interface BufferedDelta extends PendingDeltaInput {
-  timer: NodeJS.Timeout | null;
+  bytes: number;
+  retrying?: boolean;
 }
 
 export interface DeltaBufferHooks {
@@ -26,20 +48,15 @@ export interface DeltaBufferOptions {
   hooks: DeltaBufferHooks;
 }
 
-/**
- * Coalesces `item/agentMessage/delta` notifications into `conversation-delta`
- * events. Deltas accumulate per message and flush on a 100 ms debounce, an
- * 8 KiB cap, item completion, or turn completion — whichever comes first.
- *
- * Owns the pending map and its timers. Persistence goes through the database,
- * snapshots through the conversation runtime, delivery through `emit`; the
- * class never imports the facade.
- */
 export class DeltaBuffer {
   readonly #conversation: ConversationRuntime;
   readonly #database: OpenBotDatabase;
   readonly #hooks: DeltaBufferHooks;
   readonly #pending = new Map<string, BufferedDelta>();
+  #tick: NodeJS.Timeout | null = null;
+  #saveFailing = false;
+  #messagesInLastSave = 0;
+  #lastSaveAt = 0;
 
   constructor(options: DeltaBufferOptions) {
     this.#conversation = options.conversation;
@@ -48,37 +65,110 @@ export class DeltaBuffer {
   }
 
   buffer(delta: PendingDeltaInput): void {
+    perfCount("delta.buffered");
     const key = `${delta.externalThreadId}:${delta.turnId}:${delta.messageId}`;
     const existing = this.#pending.get(key);
     if (existing) {
       existing.text += delta.text;
-      if (Buffer.byteLength(existing.text, "utf8") >= 8 * 1024) this.flush(key);
+      existing.bytes += Buffer.byteLength(delta.text, "utf8");
+      if (!existing.retrying && existing.bytes >= 8 * 1024) this.#flush(key, true);
       return;
     }
-    const pending: BufferedDelta = { ...delta, timer: null };
-    pending.timer = setTimeout(() => this.flush(key), 100);
-    this.#pending.set(key, pending);
+    this.#pending.set(key, { ...delta, bytes: Buffer.byteLength(delta.text, "utf8") });
+    this.#schedule();
+  }
+
+  #schedule(): void {
+    if (this.#tick) return;
+    const recentLoad = Date.now() - this.#lastSaveAt <= LONGEST_SAVE_INTERVAL_MS ? this.#messagesInLastSave : 0;
+    this.#tick = setTimeout(() => this.#flushWaiting(), saveInterval(recentLoad));
   }
 
   flush(key: string): void {
+    this.#flush(key, false);
+  }
+
+  #flush(key: string, keepOnFailure: boolean): void {
     const pending = this.#pending.get(key);
     if (!pending) return;
     this.#pending.delete(key);
-    if (pending.timer) clearTimeout(pending.timer);
+    perfCount("delta.flush");
+    perfCount("delta.flushBytes", pending.bytes);
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
-    // Only the streamed message changed, and a flush lands ten times a second per streaming
-    // message. Writing the whole thread here made the cost of one flush grow with the thread's
-    // whole history, which is what saturated the main process when several agents streamed at once.
-    snapshot.revision = this.#database.persistStreamingMessage({
-      snapshot,
-      messageId: pending.messageId,
-      eventType: "response.delta-flushed",
-      detail: {
-        turnId: pending.turnId,
-        messageId: pending.messageId,
-        bytes: Buffer.byteLength(pending.text, "utf8"),
-      },
-    });
+    let revision: number;
+    try {
+      revision = this.#database.persistStreamingMessage(streamingWrite(snapshot, pending));
+    } catch (error) {
+      if (!isStorageFailure(error)) throw error;
+      this.#saveFailed(error);
+      if (keepOnFailure) this.#keep(key, pending);
+      return;
+    }
+    this.#saved();
+    this.#send(snapshot, pending, revision);
+  }
+
+  #flushWaiting(): void {
+    this.#tick = null;
+    this.#messagesInLastSave = this.#pending.size;
+    this.#lastSaveAt = Date.now();
+    if (this.#pending.size === 0) return;
+    const waiting = [...this.#pending].map(([key, pending]) => ({
+      key,
+      pending,
+      snapshot: this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId),
+    }));
+    this.#pending.clear();
+    let results: ReturnType<OpenBotDatabase["persistStreamingMessages"]>;
+    try {
+      results = this.#database.persistStreamingMessages(
+        waiting.map(({ snapshot, pending }) => streamingWrite(snapshot, pending)),
+      );
+    } catch (error) {
+      if (!isStorageFailure(error)) throw error;
+      this.#saveFailed(error);
+      for (const { key, pending } of waiting) this.#keep(key, pending);
+      return;
+    }
+    let unexpected: { error: unknown } | undefined;
+    let failed = false;
+    for (const [index, { key, pending, snapshot }] of waiting.entries()) {
+      const result = results[index];
+      if (!result) continue;
+      if ("error" in result) {
+        if (!isStorageFailure(result.error)) {
+          unexpected ??= result;
+          continue;
+        }
+        if (!failed) this.#saveFailed(result.error);
+        failed = true;
+        this.#keep(key, pending);
+        continue;
+      }
+      this.#send(snapshot, pending, result.revision);
+    }
+    if (!failed) this.#saved();
+    if (unexpected) throw unexpected.error;
+  }
+
+  #keep(key: string, pending: BufferedDelta): void {
+    pending.retrying = true;
+    this.#pending.set(key, pending);
+    this.#schedule();
+  }
+
+  #saveFailed(error: unknown): void {
+    if (!this.#saveFailing) logger.warn("Unable to save streamed text; a later save stores it", toLogValue(error));
+    this.#saveFailing = true;
+  }
+
+  #saved(): void {
+    if (this.#saveFailing) logger.info("Streamed text is saved again");
+    this.#saveFailing = false;
+  }
+
+  #send(snapshot: ConversationSnapshot, pending: BufferedDelta, revision: number): void {
+    snapshot.revision = revision;
     this.#hooks.emit({
       type: "conversation-delta",
       agentId: pending.agentId,
@@ -87,7 +177,7 @@ export class DeltaBuffer {
       messageId: pending.messageId,
       delta: pending.text,
       createdAt: pending.createdAt,
-      revision: snapshot.revision,
+      revision,
     });
   }
 
@@ -98,9 +188,21 @@ export class DeltaBuffer {
   }
 
   dispose(): void {
-    for (const pending of this.#pending.values()) {
-      if (pending.timer) clearTimeout(pending.timer);
-    }
+    if (this.#tick) clearTimeout(this.#tick);
+    this.#tick = null;
     this.#pending.clear();
   }
+}
+
+function streamingWrite(snapshot: ConversationSnapshot, pending: BufferedDelta): StreamingMessageWrite {
+  return {
+    snapshot,
+    messageId: pending.messageId,
+    eventType: "response.delta-flushed",
+    detail: {
+      turnId: pending.turnId,
+      messageId: pending.messageId,
+      bytes: Buffer.byteLength(pending.text, "utf8"),
+    },
+  };
 }

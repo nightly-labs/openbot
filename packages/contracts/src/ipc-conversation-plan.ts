@@ -2,11 +2,6 @@ import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
-/**
- * The plan an agent works through in one turn. Each provider has its own plan tool (Claude
- * `TodoWrite` and its task tools, Codex `update_plan`, the ACP `plan` update); the backend maps all
- * of them to this one shape, and each update holds the full list.
- */
 export const CONVERSATION_PLAN_ITEM_TYPE = "plan";
 
 export const CONVERSATION_PLAN_STEP_STATUSES = ["pending", "inProgress", "completed"] as const;
@@ -15,7 +10,6 @@ export type ConversationPlanStepStatus = (typeof CONVERSATION_PLAN_STEP_STATUSES
 export interface ConversationPlanStep {
   id: string;
   text: string;
-  /** The present-tense form a provider shows while the step runs, such as "Running the tests". */
   activeText?: string;
   status: ConversationPlanStepStatus;
 }
@@ -49,10 +43,6 @@ function isConversationPlanStep(value: unknown): value is ConversationPlanStep {
   );
 }
 
-/**
- * The plan inside the bounds of `isConversationPlan`, with blank steps removed. The backend applies
- * it before each write, so a stored plan always decodes. Returns null when no step is left.
- */
 export function clampConversationPlan(plan: ConversationPlan): ConversationPlan | null {
   const steps: ConversationPlanStep[] = [];
   const ids = new Set<string>();
@@ -76,10 +66,6 @@ function clampText(value: string): string {
   return value.replace(/\s+/gu, " ").trim().slice(0, STEP_TEXT_LIMIT);
 }
 
-/**
- * The plan as a markdown checklist. It is the message text, so a client that does not know the
- * plan field (a released Team API peer, the mobile app) still shows a readable list.
- */
 export function conversationPlanText(plan: ConversationPlan): string {
   const lines = plan.steps.map((step) => `- [${step.status === "completed" ? "x" : " "}] ${step.text}`);
   return plan.explanation ? `${plan.explanation}\n\n${lines.join("\n")}` : lines.join("\n");
@@ -87,10 +73,6 @@ export function conversationPlanText(plan: ConversationPlan): string {
 
 const CHECKLIST_LINE = /^- \[( |x)\] (.+)$/u;
 
-/**
- * The plan read back from `conversationPlanText`. A checklist has no running step, so every open
- * step is pending. Returns null when the text is not a checklist.
- */
 export function parseConversationPlanText(text: string): ConversationPlan | null {
   const lines = text.split("\n");
   const firstStep = lines.findIndex((line) => CHECKLIST_LINE.test(line));
@@ -103,4 +85,24 @@ export function parseConversationPlanText(text: string): ConversationPlan | null
   }
   const explanation = lines.slice(0, firstStep).join("\n").trim();
   return clampConversationPlan({ explanation: explanation || null, steps });
+}
+
+export interface ConversationPlanRow {
+  id: string;
+  turnId: string | undefined;
+  agent: string | null;
+  plan: boolean;
+}
+
+export function replacedConversationPlans(rows: readonly ConversationPlanRow[]): ReadonlySet<string> {
+  const replaced = new Set<string>();
+  const laterTurns = new Map<string, Set<string>>();
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (!row?.turnId || row.agent === null) continue;
+    const turns = laterTurns.get(row.agent) ?? new Set<string>();
+    if (row.plan && (turns.size > 1 || (turns.size === 1 && !turns.has(row.turnId)))) replaced.add(row.id);
+    laterTurns.set(row.agent, turns.add(row.turnId));
+  }
+  return replaced;
 }

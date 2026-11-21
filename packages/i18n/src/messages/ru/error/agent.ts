@@ -12,6 +12,17 @@ export const messages = {
     "Инструмент не запущен. В tool_call параметр arguments должен быть объектом JSON, а не текстом. Отправьте вызов снова, передав arguments как объект.",
   "error.agent.toolCallDiscoveryTool":
     "Инструмент не запущен. tool_call не может запускать openbot.tool_search и openbot.tool_describe. Вызовите их напрямую с теми же аргументами.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Инструмент не запущен. tool_call принимает только name и arguments. Передайте аргументы инструмента в arguments как объект и отправьте вызов снова.",
+  "error.agent.toolCallMissingName":
+    "Инструмент не запущен. В tool_call нет name. Укажите в name полное имя из tool_search, например openbot.history_read, и отправьте вызов снова.",
+  "error.agent.toolCallUnknownTool":
+    "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Используйте точное полное имя из tool_search, например openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Возможно, полное имя — {name}. Если это так, отправьте вызов снова с этим именем.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe не нашёл инструмент OpenBot с именем {names}. Он описывает только инструменты OpenBot и браузера из списка openbot.tool_search, а не инструменты MCP.",
+  "error.agent.toolDescribeDiscoveryNames": "Вызовите {names} напрямую. tool_describe не описывает инструменты поиска.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Расписание регулярной задачи некорректно: {detail} Исправьте расписание и повторите попытку. openbot.tool_describe возвращает схему.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",
@@ -41,6 +52,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Не удалось настроить агента, а неполного агента удалить не получилось.",
   "error.agent.modelUnavailable": "Выбранная модель агента недоступна.",
   "error.agent.modelProviderNotConnected": "Выбранная модель агента «{model}» недоступна: {provider} не подключён.",
+  "error.agent.modelProviderSignInRequired":
+    "Выбранная модель агента «{model}» недоступна: нужно войти в {provider}. Войдите в {provider} и повторите попытку.",
+  "error.agent.modelProviderNotInstalled": "Выбранная модель агента «{model}» недоступна: {provider} не установлен.",
+  "error.agent.modelProviderOutdated": "Выбранная модель агента «{model}» недоступна: {provider} нужно обновить.",
   "error.agent.modelListEmpty":
     "Выбранная модель агента «{model}» недоступна: {provider} не вернул ни одной модели. Последняя ошибка: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -52,6 +67,8 @@ export const messages = {
   "error.agent.modelNotListed": "Модель «{model}» недоступна. Доступные модели: {models}.",
   "error.agent.providerNotListed":
     "Сейчас нет доступных моделей {provider}. Вызовите list_models, чтобы увидеть доступные модели.",
+  "error.agent.creatorModelNotListed":
+    "Вашей модели «{model}» сейчас нет в списке моделей, поэтому новый агент не может начать работу на ней. Повторите попытку через несколько секунд или укажите в provider и model модель, которую показывает list_models.",
   "error.agent.reasoningEffortUnsupported":
     "Модель «{model}» не поддерживает уровень усилий «{effort}». Поддерживаются: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -87,10 +104,17 @@ export const messages = {
   "error.agent.endpointRemoved": "Эндпоинт, который использовал этот агент, удалён. Выберите для него другую модель.",
   "error.agent.turnStalled":
     "{provider} перестал отвечать, поэтому OpenBot завершил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
+  "error.agent.promptCancelled": "{provider} отменил это сообщение до его начала. Отправьте сообщение ещё раз.",
   "error.agent.toolLoopStopped":
     "{provider} много раз повторил неудачный шаг, поэтому OpenBot остановил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
+  "error.agent.answerCutOff":
+    "Агент остановился, не закончив ответ, поэтому ответ неполный. Отправьте сообщение ещё раз.",
   "error.agent.compactionConnectionLost":
     "Соединение прервалось, пока агент сжимал контекст, поэтому задача остановилась. Проверьте подключение к интернету, затем отправьте сообщение, чтобы продолжить.",
+  "error.agent.compactionConnectionLostAddress":
+    "Соединение прервалось, пока агент сжимал контекст, поэтому задача остановилась. Проверьте подключение к интернету. Также проверьте, что {variable} в разделе «Переменные» настроек {provider} — это адрес API вашего сервиса моделей (часто заканчивается на /v1). Затем отправьте сообщение.",
+  "error.agent.compactionLoopStopped":
+    "{provider} снова и снова сжимал контекст, но каждый раз он оставался слишком полным, чтобы продолжить, поэтому OpenBot остановил этот ход. Отключите серверы MCP или управление компьютером, которые этому агенту не нужны, затем отправьте сообщение. Если вы или агент изменили, когда {provider} сжимает контекст, отмените это изменение.",
   "error.agent.selectedGone": "Выбранного агента больше нет.",
   "error.agent.profileEndpointsChanged": "Пользовательские эндпоинты изменились во время создания. Повторите попытку.",
   "error.agent.profileInvalid": "Провайдер вернул некорректный профиль. Попробуйте изменить запрос.",
@@ -105,6 +129,12 @@ export const messages = {
   "error.agent.deletionBusy": "Агент уже удаляется.",
   "error.agent.stopBeforeDelete": "Остановите агента и отмените его сообщения в очереди, прежде чем удалять.",
   "error.agent.deleteIncomplete": "Данные агента удалены не полностью. Повторите удаление.",
+  "error.agent.deleteFolderInUse":
+    "Работа другого агента ещё использует папку этого агента. Удалите агента снова, когда эта работа закончится, или после перезапуска OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Другая программа ещё использует папку этого агента, например программа, которую запустил агент. Закройте эту программу или перезагрузите компьютер, на котором работает этот агент, затем удалите агента снова.",
+  "error.agent.deleteWhenFolderFree":
+    "Работа другого агента ещё использует папку этого агента. OpenBot удалит этого агента, когда эта работа закончится.",
   "error.agent.duplicationBusy": "Этот агент уже дублируется.",
   "error.agent.waitBeforeDuplicate":
     "Дождитесь, пока агент закончит работу, и очистите его очередь, прежде чем дублировать.",
@@ -143,14 +173,21 @@ export const messages = {
     "На этом сервере мало памяти. Ваше сообщение ждёт в очереди и начнётся, когда память освободится.",
   "error.agent.workspaceOnlyToolMissing":
     "Для режима «Только рабочее пространство» нужен {tool}, но OpenBot его не нашёл. Установите его или выберите «Полный доступ» в настройках агента.",
+  "error.agent.codexSandboxUnavailable":
+    "Режиму «Только рабочее пространство» нужна песочница Codex, но Codex не может запустить её на этом компьютере, поэтому команды агента не выполняются. Выберите «Сначала спрашивать» или «Полный доступ» в настройках агента.",
   "error.agent.claudeSandboxUnavailable":
     "Режиму «Только рабочее пространство» нужна песочница Claude, но Claude не может запустить её на этом компьютере: {reason}. Выберите «Полный доступ» или другого провайдера в настройках агента.",
+  "error.agent.claudeNoSandbox":
+    "Claude не может использовать песочницу на этом компьютере, поэтому режим «Только рабочее пространство» с ним не работает. Выберите «Полный доступ» или другого провайдера в настройках агента.",
+  "error.agent.claudeSandboxBlocked":
+    "Режиму «Только рабочее пространство» нужна песочница Claude, но Claude не может запустить её на этом компьютере, поэтому команды агента не выполняются. Выберите «Полный доступ» или другого провайдера в настройках агента.",
   "error.agent.screenCaptureOff":
     "Снимки экрана для этого агента выключены. Пользователь может включить управление компьютером в настройках агента.",
   "error.agent.screenCaptureUnavailable": "Снимки экрана недоступны на этом компьютере.",
   "error.agent.screenCaptureShared":
     "Снимки экрана не работают в диалогах Slack, Discord или Telegram, потому что их файлы получают другие люди.",
   "error.agent.screenCaptureDeclined": "Пользователь не разрешил этот снимок экрана. Ничего не снято.",
+  "error.agent.mcpToolDeclined": "Пользователь не разрешил этот вызов инструмента MCP. Инструмент не был запущен.",
   "error.agent.screenCaptureWindowMissing":
     "Это окно сейчас не открыто. Вызовите list_capture_sources, чтобы получить текущие ID окон.",
   "error.agent.screenCaptureDisplayMissing":
@@ -159,6 +196,8 @@ export const messages = {
     "Область не помещается в один дисплей. Используйте точки рабочего стола в границах одного дисплея из list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "У OpenBot нет разрешения «Запись экрана». Попросите пользователя открыть «Системные настройки» → «Конфиденциальность и безопасность» → «Запись экрана и системного звука», включить OpenBot, затем закрыть и снова открыть OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "У OpenBot ещё нет разрешения «Запись экрана», поэтому он не может показать список окон. Чтобы снять экран, вызовите capture_screen с target screen. Пользователь сначала одобряет снимок, затем macOS может запросить у него разрешение.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows вернула пустое изображение. Попросите пользователя разблокировать компьютер и закрыть защищённое содержимое. Снимки экрана также может запрещать политика организации.",
   "error.agent.screenCaptureFailed": "Не удалось сделать снимок экрана. Повторите попытку.",

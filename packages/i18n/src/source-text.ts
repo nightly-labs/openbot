@@ -6,20 +6,8 @@ import { createSourceLocalizer } from "./source-matcher";
 
 export type { TranslatedLocale } from "./locale";
 
-/**
- * Text the main process, a host or the team client sends as English, and a screen translates.
- *
- * An error crosses IPC as its message only, and the Team API sends `{ error: message }` to clients
- * of every released version. So the sender keeps writing English, byte for byte what it wrote
- * before, and the screen that shows the text maps it back to its key and renders the reader's
- * language. A remote client then reads its own language, not the host's.
- *
- * `bun run i18n:check` fails when two templates can match the same text, so the first match is the
- * only match.
- */
 export type SourceMessages = typeof en;
 
-/** The English text for a source key. Write it where the code threw a literal before. */
 export const sourceText: Translate<SourceMessages> = createTranslate({
   source: en,
   locale: "en",
@@ -28,36 +16,22 @@ export const sourceText: Translate<SourceMessages> = createTranslate({
 
 const localizer = createSourceLocalizer({ source: en, translation: sourceTranslation });
 
-/**
- * `text` in `locale`, when it is the English of a source key. Anything else - text from an older
- * host, a provider, or a tool - is returned as it is.
- */
 export function localizeSourceText(text: string, locale: TranslatedLocale): string {
   return localizer.localize(text, locale);
 }
 
-/** Every source key whose English can render `text`. `bun run i18n:check` expects one per template. */
 export function matchingSourceKeys(text: string): readonly string[] {
   return localizer.matchingKeys(text);
 }
 
-/** A plural template is an object of forms, and it always has a placeholder. */
 const templates: Readonly<Record<string, string | Readonly<Record<string, string>>>> = en;
 
-/**
- * True when `text` is the whole English of a source key with no placeholder. Such text holds nothing
- * from a provider, a tool or a path, so a host can send it to every client.
- */
 export function isFixedSourceText(text: string): boolean {
   return matchingSourceKeys(text).some((key) => templates[key] === text);
 }
 
 const sourceTranslators = new Map<TranslatedLocale, Translate<SourceMessages>>();
 
-/**
- * A typed translator over the source keys, for code that picks a key itself, such as an error kind.
- * A language that is not loaded reads English, as in `translateFor`.
- */
 export function sourceTranslateFor(locale: TranslatedLocale): Translate<SourceMessages> {
   const cached = sourceTranslators.get(locale);
   if (cached) return cached;

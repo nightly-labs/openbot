@@ -54,6 +54,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Te veel inlogpogingen. Probeer het later opnieuw.",
   "error.team.clientUpdateRequired": "Werk deze OpenBot-client bij voordat je verbinding maakt met deze host.",
   "error.team.hostUpdateRequired": "Werk OpenBot bij op de host voordat je verbinding maakt.",
+  "error.team.serverSafeMode": "Deze server staat in de veilige modus, omdat OpenBot er niet start.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} op deze server kan de gegevens niet openen, omdat een nieuwere OpenBot-versie ze heeft opgeslagen. Een nieuwere OpenBot-release op de server lost dit op.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} op deze server is gestopt nadat het starten vaak is mislukt. Een nieuwere OpenBot-release op de server lost dit op.",
   "error.team.sidebarLayoutUnavailable": "De indeling van de zijbalk is niet beschikbaar.",
   "error.team.providersUnsupported": "Deze verbinding ondersteunt geen instellingen voor aanbieders.",
   "error.team.providerNotManaged": "OpenBot beheert de CLI van deze aanbieder niet.",
@@ -74,16 +79,23 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Deze verbinding ondersteunt geen agentkleuren.",
   "error.team.chatColorsUnsupported": "Deze verbinding ondersteunt geen chatkleuren.",
   "error.team.routineRunPlaceUnsupported": "Deze verbinding kan niet wijzigen waar een routine wordt uitgevoerd.",
+  "error.team.routinePauseReasonsUnsupported": "Deze verbinding kan niet tonen waarom een routine is gepauzeerd.",
+  "error.team.activeQueuesUnsupported": "Deze verbinding kan de wachtrijen van alle agents niet tonen.",
   "error.team.routinesOnceUnsupported": "Deze verbinding kan geen eenmalige routines opslaan.",
   "error.team.routineRunCommandUnsupported": "Deze verbinding kan de uitvoeropdracht van een routine niet geven.",
   "error.team.threadQueueUnsupported": "Deze verbinding kan de wachtrij van een zijthread niet tonen.",
+  "error.team.threadRequestsUnsupported":
+    "Deze verbinding kan de verzoeken van een zijthread aan andere agents niet tonen.",
   "error.team.hostTurnLimitsUnsupported": "Deze verbinding kan de threadlimieten van de server niet tonen of wijzigen.",
   "error.team.usageLimitUnsupported": "Deze verbinding kan de gebruikslimieten van agents niet tonen of wijzigen.",
   "error.team.hermesImportUnsupported": "Deze verbinding kan geen Hermes-profielen van de server importeren.",
   "error.team.providerDetectionUnsupported": "Deze verbinding kan de modelservers en agents van de server niet vinden.",
+  "error.team.providerModelSourceUnsupported":
+    "Deze verbinding kan niet tonen waar de modellen van een provider vandaan komen.",
   "error.team.routineFlowStopUnsupported": "Deze verbinding kan een routine-uitvoering niet stoppen.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.libraryFoldersUnsupported": "Deze verbinding ondersteunt geen bibliotheekmappen.",
+  "error.team.workflowFoldersUnsupported": "Deze verbinding ondersteunt geen workflowmappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.sidebarPinsUnsupported":
@@ -117,6 +129,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Deze verbinding ondersteunt geen updates van de host.",
   "error.team.hostTimezoneUnsupported": "Deze verbinding ondersteunt de tijdzone van de server niet.",
   "error.team.hostRestartUnsupported": "Deze verbinding ondersteunt het herstarten van de server niet.",
+  "error.team.ownerTransferUnsupported": "Deze server ondersteunt het overdragen van eigendom niet.",
   "error.team.hostKeyRotationUnsupported": "Deze verbinding ondersteunt het wijzigen van de serversleutel niet.",
   "error.team.localServersUnsupported": "Deze verbinding ondersteunt geen servers op deze computer.",
   "error.team.routineResultsUnsupported": "Deze verbinding ondersteunt geen bestemmingen voor routines.",
@@ -130,6 +143,7 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported":
     "Deze verbinding ondersteunt de schakelaar voor de Claude Code-instellingen niet.",
   "error.team.claudeCompactWindowUnsupported": "Deze verbinding ondersteunt de compressiegrootte van Claude niet.",
+  "error.team.providerEnvironmentUnsupported": "Deze verbinding ondersteunt geen providervariabelen.",
   "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",
   "error.team.agentAccessUnsupported": "Deze verbinding ondersteunt geen rollen.",
@@ -146,6 +160,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Deze verbinding ondersteunt geen MCP-servers.",
   "error.team.mcpServerListNeedsUpdate":
     "Werk OpenBot op dit apparaat bij om meer dan {limit} MCP-servers op deze server te gebruiken.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Werk OpenBot op dit apparaat bij om meer dan {limit} accounts van één provider op deze server te gebruiken.",
   "error.team.storageUnsupported": "Deze verbinding ondersteunt geen opslag.",
   "error.team.machineResourcesUnsupported": "Deze verbinding ondersteunt geen machinegebruik.",
   "error.team.machineAlertMemberInvalid":
@@ -190,6 +206,8 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Deze verbinding ondersteunt de persoonlijkheid van de server niet.",
   "error.team.agentWaitsUnsupported": "Deze verbinding ondersteunt geen open wachtpunten.",
   "error.team.pendingApprovalUnsupported": "Deze verbinding kan geen volledige goedkeuring lezen.",
+  "error.team.pendingPromptsUnsupported": "Deze verbinding kan de open vragen niet lezen.",
+  "error.team.phoneFeedbackUnsupported": "Deze verbinding kan geen rapport vanuit de telefoon-app sturen.",
   "error.team.messagePinsUnsupported": "Deze verbinding ondersteunt geen vastgemaakte berichten.",
   "error.team.queuedMessageThreadUnsupported":
     "Deze verbinding ondersteunt het uitvoeren van een bericht in de wachtrij als nieuwe thread niet.",

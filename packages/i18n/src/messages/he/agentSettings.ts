@@ -181,11 +181,11 @@ export const messages = {
     "הבחירה הזו היא רק שלך וחלה בכל המכשירים שלך. כשהשרת מושתק או מוגדר ל״ללא״, גם הסוכן הזה שותק.",
 
   "agentSettings.newChat.title": "צ'אט חדש",
-  "agentSettings.newChat.description": "הסוכן שוכח את הצ'אט הזה. ההגדרות שלו נשארות.",
+  "agentSettings.newChat.description": "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההגדרות שלו נשארות.",
   "agentSettings.newChat.button": "התחלה",
   "agentSettings.newChat.confirmTitle": "להתחיל צ'אט חדש עם {name}?",
   "agentSettings.newChat.confirmDescription":
-    "הסוכן שוכח את הצ'אט הזה. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
+    "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "agentSettings.newChat.confirm": "התחלת צ'אט חדש",
   "agentSettings.newChat.failed": "לא ניתן להתחיל צ'אט חדש.",
   "agentSettings.deleteHistory.title": "מחיקת היסטוריה",
@@ -207,6 +207,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "מעבר ל״לשאול קודם״",
 
   "agentSettings.links.usage": "שימוש",
+  "agentSettings.links.apps": "אפליקציות",
+  "agentSettings.links.appsScope": "כל הסוכנים",
   "agentSettings.links.memories": "זיכרונות",
   "agentSettings.links.memoriesCount": { one: "אחד נשמר", two: "שניים נשמרו", other: "{count} נשמרו" },
   "agentSettings.links.skills": "מיומנויות",
@@ -231,6 +233,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "לאפשר לסוכן להתחיל צ'אט חדש כשהצ'אט שלו מתארך. קודם הוא שומר הערות.",
   "agentSettings.quickAcknowledgement.title": "הצגת התוכנית לפני משימות ארוכות",
   "agentSettings.quickAcknowledgement.description": "לפני משימה ארוכה, הסוכן מציג את התוכנית שלו.",
+  "agentSettings.builtinMemory.title": "הזיכרון של OpenBot",
+  "agentSettings.builtinMemory.description":
+    "הסוכן שומר וקורא את הזיכרונות שלו. כבו כדי להשתמש רק באפליקציית זיכרון, כמו Mem0. הזיכרונות השמורים נשארים.",
   "agentSettings.browserProfile.label": "פרופיל דפדפן",
   "agentSettings.browserProfile.shared": "משותף",
   "agentSettings.browserProfile.agent": "רק הסוכן הזה",
@@ -240,6 +245,7 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "כל פרופיל שומר התחברויות ועוגיות משלו. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
   "agentSettings.browserProfile.manage": "ניהול",
+  "agentSettings.browserProfile.movedNote": "ההתחברויות לאתרים נשארות בפרופיל הישן. הסוכן צריך להתחבר שוב לאתרים האלה.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "כל התהליך של {provider} פועל בארגז חול, ולכן כתיבה בחוץ נכשלת. זמין רק ב-macOS.",
 } as const satisfies PartialTranslation<typeof source>;

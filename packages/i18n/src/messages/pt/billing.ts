@@ -29,10 +29,13 @@ export const messages = {
   "billing.status.paused": "Pausado",
   "billing.otherServers": "Outros servidores",
   "billing.action.menu": "Ações do plano de {server}",
-  "billing.action.change": "Alterar plano",
+  "billing.action.addStorage": "Adicionar armazenamento",
   "billing.action.cancel": "Cancelar plano",
   "billing.action.renew": "Renovar plano",
   "billing.action.updatePayment": "Atualizar forma de pagamento",
+  "billing.storage.title": "Mais espaço para {server}",
+  "billing.storage.add": "Adicionar {size}",
+  "billing.storage.failed": "Não foi possível adicionar armazenamento.",
   "billing.lifecycle.cancelRenewal": "Cancelar renovação",
   "billing.lifecycle.cancelTitle": "Cancelar a renovação de {name}?",
   "billing.lifecycle.cancelDescription":
@@ -144,7 +147,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "A licença termina no fim do período pago. Seus servidores não são afetados.",
   "billing.license.cancel.keep": "Manter licença",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Período de cobrança",
   "billing.order.currency": "Moeda",
   "billing.order.monthly": "Mensal",
@@ -208,4 +210,10 @@ export const messages = {
     other:
       "Sua licença tem {count} usuários, o máximo. Fale conosco para uma licença maior. Novas pessoas não podem entrar nos seus servidores.",
   },
+  "billing.details.country": "País de cobrança",
+  "billing.details.countryPlaceholder": "Escolha um país",
+  "billing.details.vatId": "Número de IVA da UE (opcional)",
+  "billing.details.vatIdInvalid": "Este não é um número de IVA do país escolhido.",
+  "billing.details.countryMissing": "Escolha o país de cobrança.",
+  "billing.details.saveFailed": "Não foi possível salvar os dados de cobrança",
 } as const satisfies PartialTranslation<typeof source>;

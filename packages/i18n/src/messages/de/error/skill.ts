@@ -59,6 +59,8 @@ export const messages = {
     "Diese lokale Fähigkeit hat keine Überarbeitung {revision}. Die neueste Überarbeitung ist {latest}.",
   "error.skill.localNameTaken":
     "Eine lokale Fähigkeit mit diesem Namen existiert bereits. Überarbeite sie stattdessen.",
+  "error.skill.localNameClash":
+    "Dieser Name und die lokale Fähigkeit „{name}“ ergeben beide „{slug}“. Um diese Fähigkeit zu ändern, überarbeite sie. Für eine neue Fähigkeit ändere die lateinischen Buchstaben oder Ziffern in diesem Namen.",
   "error.skill.localKeepName": "Behalte den Namen der Fähigkeit bei der Überarbeitung bei.",
   "error.skill.localRelativeFolder":
     "Verwende einen relativen Fähigkeitsordner im Arbeitsbereich des aktuellen Agenten.",

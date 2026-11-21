@@ -1,6 +1,3 @@
-// The Grok agent of `grok-question-e2e.ts`. Each prompt asks the client two questions with
-// `_x.ai/ask_user_question`, with the request of the real Grok 1.0.77, and logs the client's reply.
-// It then reads the reply as Grok does: a reply without `outcome` fails the tool.
 import { logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = [{ modelId: "grok-fake", name: "Grok Fake" }];

@@ -118,9 +118,16 @@ export const messages = {
   "provider.picker.download": "{name} 다운로드",
   "provider.picker.search": "모델 검색",
   "provider.picker.noMatches": "검색과 일치하는 모델이 없어요.",
+  "provider.picker.openrouterNoMatches":
+    "검색과 일치하는 모델이 없어요. openrouter.ai의 개인정보 보호, 제공업체, 가드레일 설정 때문에 이 목록에서 모델이 숨겨질 수 있어요.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "이 모델은 Windows와 Linux에서 '워크스페이스만'으로 작동하지 않아요. 사용하려면 에이전트 설정에서 '권한'을 바꾸세요.",
   "provider.picker.olderModels": "이전 모델",
   "provider.picker.olderModelsList": "{name} 이전 모델",
   "provider.picker.noModels": "{name}에서 사용할 수 있는 모델이 없어요.",
+  "provider.picker.endpointModelsInCustom":
+    "{name}에서 사용자 지정 엔드포인트를 실행해요. 해당 모델은 사용자 지정 탭에 있어요.",
+  "provider.picker.showCustomModels": "모델 보기",
   "provider.picker.museNoModels":
     "Muse가 이 계정에 모델을 보내지 않았어요. 이 에이전트가 실행되는 국가에서는 Muse를 사용할 수 없을 수 있어요. 다른 제공자의 모델을 선택하세요.",
   "provider.picker.customEmpty":
@@ -148,6 +155,8 @@ export const messages = {
   "provider.picker.selectEffort": "강도 선택",
   "provider.picker.custom": "사용자 지정",
   "provider.picker.cliReady": "{cli} 준비됨",
+  "provider.picker.modelSourceProvider": "{cli} 설정의 {name} 사용 중",
+  "provider.picker.modelSourceCatalog": "{cli} 설정의 모델 목록 사용 중",
   "provider.status.signInRequired": "로그인 필요",
   "provider.model.free": "무료",
   "provider.model.new": "새 모델",
@@ -219,6 +228,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "다시 연결할 수 없어요.",
   "provider.account.add": "계정 추가",
   "provider.account.addLabel": "{name} 계정 추가",
+  "provider.account.addWithCode": "코드로 계정 추가",
   "provider.account.count": { other: "계정 {count}개" },
   "provider.account.numbered": "계정 {number}",
   "provider.account.apiKey": "API 키",
@@ -310,6 +320,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · OpenBot이 다운로드함",
   "provider.settings.otherVersionInstalledByUser": "사용 안 함: {version} · 직접 설치함",
   "provider.settings.otherVersionDownloaded": "사용 안 함: {version} · OpenBot이 다운로드함",
+  "provider.settings.installedVersionIncomplete":
+    "일부 모델에는 이 버전에 없는 구성 요소가 필요합니다. 사용하려면 OpenBot 버전을 다운로드하세요.",
   "provider.settings.useInstalledVersion": "설치한 버전 사용",
   "provider.settings.useDownloadedVersion": "OpenBot 버전 사용",
   "provider.settings.update": "업데이트",
@@ -329,6 +341,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Claude Code 기본값",
   "provider.settings.compactWindowTokens": "토큰 {size}",
   "provider.settings.compactWindowLoadFailed": "이 서버의 압축 크기를 불러올 수 없었어요.",
+  "provider.settings.environment": "환경",
+  "provider.settings.environmentVariables": "변수",
+  "provider.settings.environmentDescription":
+    "{name}의 각 프로세스가 받는 API 키, 기본 URL 등 설정이에요. 변경은 진행 중인 턴이 끝나면 적용돼요.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL과 키인 OPENAI_API_KEY로 ChatGPT의 모델 요청을 그 주소로 보내요.",
+  "provider.settings.environmentShellNote": "에이전트가 실행하는 명령은 이 값들을 읽을 수 있어요.",
+  "provider.settings.environmentAdd": "변수 추가",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "값",
+  "provider.settings.environmentSaved": "저장됨",
+  "provider.settings.environmentSensitive": "민감",
+  "provider.settings.environmentNameLabel": "변수 이름 {index}",
+  "provider.settings.environmentValueLabel": "{name}의 값",
+  "provider.settings.environmentSensitiveLabel": "{name} 비밀로 유지",
+  "provider.settings.environmentRemoveLabel": "{name} 제거",
+  "provider.settings.environmentUnnamed": "변수 {index}",
+  "provider.settings.environmentPending":
+    "저장하면 진행 중인 턴이 끝난 뒤 {name}이(가) 다시 시작돼요. 민감한 값은 서버에 남아요.",
+  "provider.settings.environmentDone": "저장했어요. 진행 중인 턴이 끝나면 {name}이(가) 다시 시작돼요.",
+  "provider.settings.environmentDiscard": "취소",
+  "provider.settings.environmentSave": "저장",
+  "provider.settings.environmentLoadFailed": "{name}의 변수를 불러올 수 없었어요.",
   "provider.settings.models": "모델",
   "provider.settings.modelsDescription": { other: "모델 {count}개 중 {shown}개가 모델 선택에 보여요." },
   "provider.settings.modelsSearch": "모델 검색",
@@ -355,4 +390,5 @@ export const messages = {
   "provider.settings.endpointModels": { other: "{url} · 모델 {count}개" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot이 이 컴퓨터에서 {provider} 로그아웃을 해요. 터미널의 {provider} CLI는 로그인 상태를 유지해요.",
+  "provider.settings.updateAll": "모두 업데이트",
 } as const satisfies PartialTranslation<typeof source>;

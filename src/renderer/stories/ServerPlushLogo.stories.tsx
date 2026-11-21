@@ -1,9 +1,9 @@
-import { type ServerPlushColor, serverPlushColor } from "@openbot/brand/bloub-avatar";
+import { AVATAR_COLOR_CHOICES, type ServerPlushColor, serverPlushColor } from "@openbot/brand/bloub-avatar";
+import { isServerAppearanceColor, SERVER_APPEARANCE_SHAPES } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { Heading, ServerPlushLogo, Text } from "@openbot/ui";
 import { For } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-/** One server ID for each plush colour, so the gallery shows all eight. */
 function seedsForEveryColor(): Array<{ seed: string; color: ServerPlushColor }> {
   const seen = new Map<ServerPlushColor, string>();
   for (let index = 0; seen.size < 8 && index < 1000; index += 1) {
@@ -55,6 +55,45 @@ export const Gallery: Story = {
             )}
           </For>
         </div>
+      </div>
+    </main>
+  ),
+};
+
+const SHAPE_COLORS: Array<`#${string}` | null> = [
+  null,
+  ...AVATAR_COLOR_CHOICES.flatMap((choice) => {
+    const color = choice.swatch.toLowerCase();
+    return isServerAppearanceColor(color) ? [color] : [];
+  }),
+];
+
+export const Shapes: Story = {
+  parameters: { layout: "fullscreen" },
+  render: () => (
+    <main
+      class="min-h-screen p-8"
+      style={{ background: "var(--openbot-bg-canvas)", color: "var(--openbot-text-primary)" }}
+    >
+      <div class="grid gap-3">
+        <For each={SERVER_APPEARANCE_SHAPES}>
+          {(shape) => (
+            <div class="flex items-center gap-3">
+              <Text variant="label-sm" class="w-20">
+                {shape}
+              </Text>
+              <For each={SHAPE_COLORS}>
+                {(color) => (
+                  <ServerPlushLogo
+                    seed="server-0"
+                    appearance={{ shape, color }}
+                    class="[--server-plush-logo-size:48px]"
+                  />
+                )}
+              </For>
+            </div>
+          )}
+        </For>
       </div>
     </main>
   ),

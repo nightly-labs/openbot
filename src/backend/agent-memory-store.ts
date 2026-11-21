@@ -15,10 +15,6 @@ import { databaseRows, requiredNumberColumn, requiredStringColumn } from "./data
 import { MemoryStore, type MemoryTables, memorySitesForHost, type SaveMemoryInput } from "./memory-store";
 import type { OpenBotDatabase } from "./openbot-database";
 
-/**
- * Scripts where a searched word is often part of a longer unicode61 word: no spaces between words,
- * or, in Korean, particles attached to the word.
- */
 const UNSPACED_SCRIPT =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 
@@ -37,7 +33,6 @@ export interface SaveAutomaticMemoryInput {
   sourceTurnId: string;
   expectedUpdatedAt?: string | null;
   expectedSelectionRevision?: number;
-  /** A normalized site. Absent, an update keeps the site that the memory has. */
   site?: string;
 }
 
@@ -56,7 +51,6 @@ export interface AgentMemoryListPage extends AgentMemorySearchResult {
   nextCursor: string | null;
 }
 
-/** How many site memories a page shows. Each one has at most 500 characters. */
 const SITE_MEMORY_LIMIT = 5;
 
 function agentMemoryTables(limit: () => number): MemoryTables {
@@ -71,7 +65,6 @@ function agentMemoryTables(limit: () => number): MemoryTables {
   };
 }
 
-/** Owns saved agent memories, their selection, and local recall. Channel memories remain separate. */
 export class AgentMemoryStore extends MemoryStore {
   constructor(database: OpenBotDatabase, limit: () => number = () => DEFAULT_AGENT_MEMORY_LIMIT) {
     super(database, agentMemoryTables(limit));
@@ -122,11 +115,6 @@ export class AgentMemoryStore extends MemoryStore {
     return memory && { ...memory, agentId: input.agentId };
   }
 
-  /**
-   * The newest memories tied to one of `sites`, for the browser to show on a page of that site.
-   * `agent_memories_site` serves the lookup. An essential memory is already in the agent's
-   * instructions with its site, so the browser does not show it again.
-   */
   listForSites(agentId: string, sites: readonly string[], limit: number): AgentMemory[] {
     if (sites.length === 0) return [];
     const ids = databaseRows(
@@ -143,15 +131,11 @@ export class AgentMemoryStore extends MemoryStore {
     return ids.flatMap((id) => this.get(agentId, id) ?? []);
   }
 
-  /** The newest memories about the site of a page host or of a parent domain. */
   forHost(agentId: string, hostname: string, limit = SITE_MEMORY_LIMIT): AgentMemory[] {
     return this.listForSites(agentId, memorySitesForHost(hostname), limit);
   }
 
-  /** Dispatch reuses an existing transaction and otherwise owns commit and rollback. */
   withMemoryTransaction<T>(operation: () => T): T {
-    // The wrapper writes no event, so dispatch keeps no receipt of it, and no memory text stays after
-    // forget/clear removes the memory's own receipts.
     const output: { value?: { result: T } } = {};
     this.database.dispatch(`agent-memory:batch:${randomUUID()}`, [], () => {
       output.value = { result: operation() };
@@ -271,7 +255,6 @@ export class AgentMemoryStore extends MemoryStore {
     if (query.length > 256 || terms.length === 0 || !Number.isInteger(limit) || limit < 1 || limit > 10) {
       throw new AgentMemorySelectionError({ code: "query", message: sourceText("error.backend.memorySearchQuery") });
     }
-    // unicode61 has no stemming: a long word also matches by its stem prefix, so "closing" finds "closes".
     const expression = [
       ...new Set(
         terms.flatMap((term) => {
@@ -291,8 +274,6 @@ export class AgentMemoryStore extends MemoryStore {
         )
         .all(expression, agentId, limit + 1),
     ).map((row) => requiredStringColumn(row, "memory_id"));
-    // A word inside a run of unspaced text is not an index word, so match it as a substring of this
-    // agent's few memories. Terms hold only letters, numbers and marks: LIKE needs no escape.
     const unspaced = [...new Set(terms.filter((term) => UNSPACED_SCRIPT.test(term)))];
     const ids =
       unspaced.length === 0 || indexed.length > limit

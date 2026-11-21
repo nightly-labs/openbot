@@ -8,11 +8,14 @@ import {
   axValue,
   type CdpResult,
   exceptionDescription,
+  frameAutomationContextId,
   frameIds,
+  isFrameGone,
   isRecord,
   numberValue,
   recordValue,
   type SendCommand,
+  skipGoneFrame,
   stringValue,
   textMatches,
 } from "./browser-cdp-values";
@@ -20,43 +23,37 @@ import { browserFailure, browserSync } from "./browser-effects";
 
 const MAX_SNAPSHOT_ELEMENTS = 200;
 const MAX_SNAPSHOT_CANDIDATES = MAX_SNAPSHOT_ELEMENTS * 2;
-/** How much page text a text wait scans for its needle. */
 const MAX_SCANNED_TEXT = 100_000;
-/**
- * The page text a snapshot returns. The model pays for it on each page read; the text in the viewport
- * comes first, and a truncated snapshot says so.
- */
 const MAX_SNAPSHOT_TEXT = 20_000;
 export const MAX_SNAPSHOT_SCANNED_NODES = 10_000;
-/** The matches an ambiguous target collects, so that its error can name the candidates. */
 export const MAX_TARGET_CANDIDATES = 5;
 const MAX_CANDIDATE_TEXT = 120;
 const MAX_CANDIDATE_ITEM_TEXT = 200;
 const MAX_CANDIDATE_PEERS = 500;
 const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
+const MAX_FRAME_DOCUMENTS = 12;
 const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
-/**
- * A tree walker filter that skips hidden subtrees, so that the hidden menus and panels of a large page
- * do not use the scan budget before the walk gets to what is visible. It is the hidden test of each
- * walk that uses it: a walk gets no node with a hidden ancestor, because a shadow root or a frame is
- * queued only from a host that the filter accepted. A skipped subtree counts as one node in the
- * `scanned` count of the walk, so the budget still bounds the work.
- *
- * `strict` also skips `aria-hidden`, `inert` and `opacity: 0` subtrees. `drawn` skips only what the page
- * does not draw, and `drawn-usable` also skips `inert` content, which takes no input. A page can put
- * these on a container that stays on screen, for example its main container behind a dialog or while
- * it loads; the fallback pass of a snapshot then reads it (#7770).
- */
 type HiddenSubtreeRule = "strict" | "drawn" | "drawn-usable";
+
+const SVG_RESOURCE_TAGS = [
+  "clipPath",
+  "defs",
+  "filter",
+  "linearGradient",
+  "marker",
+  "mask",
+  "pattern",
+  "radialGradient",
+  "symbol",
+];
 
 function skipHiddenSubtrees(rule: HiddenSubtreeRule): string {
   const strict = rule === "strict";
   return `{ acceptNode: node => {
   if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
-  // At the budget, the walk's own check gets the next node, stops, and records that it stopped.
   if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_ACCEPT;
-  // The attributes, not the properties: a form control named "hidden" or "inert" replaces the form's property (#7187).
-  let hidden = Element.prototype.hasAttribute.call(node, 'hidden') || (${rule !== "drawn"} && Element.prototype.hasAttribute.call(node, 'inert')) || (${strict} && String(node.getAttribute('aria-hidden')).toLowerCase() === 'true');
+  let hidden = node.namespaceURI === 'http://www.w3.org/2000/svg' && ${JSON.stringify(SVG_RESOURCE_TAGS)}.includes(node.localName);
+  hidden ||= Element.prototype.hasAttribute.call(node, 'hidden') || (${rule !== "drawn"} && Element.prototype.hasAttribute.call(node, 'inert')) || (${strict} && String(node.getAttribute('aria-hidden')).toLowerCase() === 'true');
   if (!hidden) {
     const style = node.ownerDocument.defaultView?.getComputedStyle(node);
     hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || (${strict} && style.opacity === '0');
@@ -96,8 +93,8 @@ export interface TargetRecord {
   targetId?: string | undefined;
   element: BrowserElement;
   visibleText: string;
-  /** The fallback pass found it, so an action checks it with the same rules. */
   drawnOnly?: true;
+  ownFrame?: true;
 }
 
 export interface SnapshotTarget {
@@ -123,8 +120,6 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
 ) {
   const strict = yield* collectSnapshotPass(send, captures, revision, includeText, false, deadline);
   if (!includeText || strict.elements.length > 0 || strict.text) return { ...strict, fallback: false };
-  // Nothing passed the strict rules. A page that is still drawn has put aria-hidden, inert or
-  // opacity 0 on its main container, so read what the page draws (#7770).
   return { ...(yield* collectSnapshotPass(send, captures, revision, includeText, true, deadline)), fallback: true };
 });
 
@@ -144,13 +139,27 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
   let hasFrame = captures.length > 1;
   let hasRoot = true;
   let truncated = false;
+  const documents: Array<{ capture: SnapshotTarget; contextId?: number }> = [];
+  let frameBudget = MAX_FRAME_DOCUMENTS;
   for (const capture of captures) {
+    documents.push({ capture });
+    const frames = yield* frameDocumentContexts(send, capture.sessionId, frameBudget).pipe(
+      Effect.catch(() => Effect.succeed([])),
+    );
+    frameBudget -= frames.length;
+    documents.push(...frames.map((contextId) => ({ capture, contextId })));
+  }
+  for (const { capture, contextId } of documents) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     if (includeText) {
       const remainingText = Math.max(0, MAX_SNAPSHOT_TEXT - textLength);
-      const summary = yield* collectPageSummaryEffect(send, capture.sessionId, remainingText, drawnOnly).pipe(
-        Effect.catch(() => Effect.succeed(null)),
-      );
+      const summary = yield* collectPageSummaryEffect(
+        send,
+        capture.sessionId,
+        remainingText,
+        drawnOnly,
+        contextId,
+      ).pipe(Effect.catch(() => Effect.succeed(null)));
       if (summary) {
         if (summary.text) {
           textParts.push(summary.text);
@@ -159,17 +168,17 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
         truncated ||= summary.truncated;
         hasVisualSurface ||= summary.hasVisualSurface;
         hasFrame ||= summary.hasFrame;
-        if (!capture.sessionId) hasRoot = summary.hasRoot;
+        if (!capture.sessionId && contextId === undefined) hasRoot = summary.hasRoot;
       }
     }
     const remainingElements = MAX_SNAPSHOT_ELEMENTS - elements.length;
     if (remainingElements <= 0) continue;
     const candidates =
-      capture.sessionId && deadline === undefined
-        ? yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly).pipe(
+      (capture.sessionId || contextId !== undefined) && deadline === undefined
+        ? yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, undefined, contextId).pipe(
             Effect.catch(() => Effect.succeed([])),
           )
-        : yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, deadline);
+        : yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, deadline, contextId);
     for (const candidate of candidates) {
       const properties = Array.isArray(candidate.ax.properties) ? candidate.ax.properties.filter(isRecord) : [];
       const states = properties
@@ -200,6 +209,7 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
         element,
         visibleText: candidate.visibleText,
         ...(drawnOnly ? { drawnOnly: true as const } : {}),
+        ...(contextId === undefined ? {} : { ownFrame: true as const }),
       });
       if (elements.length >= MAX_SNAPSHOT_ELEMENTS) break;
     }
@@ -216,13 +226,46 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
   };
 });
 
+const frameDocumentContexts = Effect.fn("Browser.frameDocumentContexts")(function* (
+  send: SendCommand,
+  sessionId: string | undefined,
+  limit: number,
+) {
+  if (limit <= 0) return [];
+  const tree = recordValue((yield* send("Page.getFrameTree", {}, sessionId)).frameTree);
+  const frames: string[] = [];
+  const pending = (Array.isArray(tree?.childFrames) ? tree.childFrames : []).map((child) => ({
+    child: recordValue(child),
+    parentOrigin: stringValue(recordValue(tree?.frame)?.securityOrigin),
+  }));
+  while (pending.length > 0 && frames.length < limit) {
+    const next = pending.shift();
+    const frame = recordValue(next?.child?.frame);
+    const id = stringValue(frame?.id);
+    const origin = stringValue(frame?.securityOrigin);
+    if (id && origin !== next?.parentOrigin) frames.push(id);
+    const children = next?.child?.childFrames;
+    if (Array.isArray(children))
+      pending.push(...children.map((child) => ({ child: recordValue(child), parentOrigin: origin })));
+  }
+  const contexts: number[] = [];
+  for (const frameId of frames) {
+    const contextId = yield* frameAutomationContextId(send, frameId, sessionId).pipe(
+      Effect.catch(() => Effect.succeed(undefined)),
+    );
+    if (contextId !== undefined) contexts.push(contextId);
+  }
+  return contexts;
+});
+
 const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(function* (
   send: SendCommand,
   sessionId: string | undefined,
   maxText: number,
   drawnOnly: boolean,
+  frameContextId?: number,
 ) {
-  const contextId = yield* automationContextId(send, sessionId);
+  const contextId = frameContextId ?? (yield* automationContextId(send, sessionId));
   const result = yield* send(
     "Runtime.evaluate",
     {
@@ -231,8 +274,6 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
         const maxText = ${maxText};
         const roots = [document];
         const seen = new Set();
-        // Text in the viewport comes first: a dialog is often the last child of the body, and the
-        // page behind it would otherwise fill the budget.
         const inView = { parts: [], chars: 0 };
         const outside = { parts: [], chars: 0 };
         let truncated = false;
@@ -361,7 +402,10 @@ export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* 
   for (const capture of captures) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     const scanBudgetMs = Math.max(1, deadline - Date.now());
-    const contextId = yield* automationContextId(send, capture.sessionId);
+    const contextId = yield* automationContextId(send, capture.sessionId).pipe(
+      skipGoneFrame(capture.sessionId, undefined),
+    );
+    if (contextId === undefined) continue;
     const result = yield* send(
       "Runtime.evaluate",
       {
@@ -444,13 +488,11 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
-          // The native query finds each match in this root, also on a very large page.
           for (const node of root.querySelectorAll(selector)) {
             matches.push(node);
             if (matches.length >= ${limit}) break;
           }
           if (truncated || matches.length >= ${limit}) continue;
-          // Only the search for shadow roots and frames, which the native query does not enter, is bounded.
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
           let node;
           while ((node = walker.nextNode())) {
@@ -478,7 +520,6 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
   return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), sessionId, limit);
 });
 
-/** The first elements of a page array, as objects that the caller releases. The array is released. */
 const collectionElements = Effect.fn("Browser.collectionElements")(function* (
   send: SendCommand,
   collectionId: string,
@@ -516,8 +557,14 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
   const matches: SemanticMatch[] = [];
   const seen = new Set<number>();
   const frameTree = yield* send("Page.getFrameTree", {}, capture.sessionId);
-  for (const frameId of frameIds(frameTree)) {
-    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId);
+  const ids = frameIds(frameTree);
+  for (const frameId of ids) {
+    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId).pipe(
+      Effect.catchIf(
+        (failure) => frameId !== ids[0] && isFrameGone(failure),
+        () => Effect.succeed({ nodes: [] }),
+      ),
+    );
     yield* browserSync(() => assertBeforeDeadline(deadline));
     for (const node of Array.isArray(tree.nodes) ? tree.nodes.filter(isRecord) : []) {
       if (node.ignored === true) continue;
@@ -623,20 +670,12 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
   );
 });
 
-/** What tells the candidates of an ambiguous target apart. */
 export interface TargetCandidateText {
   tag: string;
-  /** The candidate's own visible text. */
   text: string;
-  /** The visible text of the largest element around the candidate that holds no other candidate, such as its card. */
   item: string;
 }
 
-/**
- * Reads the candidates of one frame together, because the item of a candidate is the part of the page
- * that no other candidate shares. The text is visible page text, which a snapshot also returns. The
- * result is in the order of `backendNodeIds`, with no entry for a node that could not be read.
- */
 export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandidates")(function* (
   send: SendCommand,
   sessionId: string | undefined,
@@ -645,7 +684,6 @@ export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandida
   const executionContextId = yield* automationContextId(send, sessionId);
   const objectIds: string[] = [];
   return yield* Effect.gen(function* () {
-    // A node that cannot be resolved, such as one removed after the match, has no text. The others keep theirs.
     for (const backendNodeId of backendNodeIds) {
       const resolved = yield* send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId).pipe(
         Effect.catch(() => Effect.succeed<CdpResult>({})),
@@ -661,16 +699,12 @@ export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandida
         objectId: first,
         functionDeclaration: String.raw`function(...nodes) {
           const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
-          // innerText gives all of textContent for a node that is not rendered, so a hidden node gets no text.
           const rendered = (element) =>
             element.checkVisibility ? element.checkVisibility() : element.getClientRects().length > 0;
           return nodes.map((node) => {
             if (!rendered(node)) return { tag: node.localName, text: '', item: '' };
             const text = clean(node.innerText);
             const own = clean(node.textContent);
-            // Another element with the same tag and text, such as the next card's button, which a
-            // capped candidate list can leave out. Its item is not this candidate's item. Each peer is
-            // compared once, and only when it has the same shape, so that large wrappers cost little.
             const twins = new Map();
             const isTwin = (peer) => {
               let known = twins.get(peer);
@@ -735,13 +769,14 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
   limit: number,
   drawnOnly: boolean,
   deadline?: number,
+  frameContextId?: number,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
   yield* Effect.all([send("DOM.enable", {}, capture.sessionId), send("Accessibility.enable", {}, capture.sessionId)], {
     concurrency: "unbounded",
   });
   yield* browserSync(() => assertBeforeDeadline(deadline));
-  const contextId = yield* automationContextId(send, capture.sessionId);
+  const contextId = frameContextId ?? (yield* automationContextId(send, capture.sessionId));
   const results: Array<{
     backendNodeId: number;
     node: CdpResult;
@@ -841,8 +876,6 @@ function actionableNodesExpression(limit: number, rule: HiddenSubtreeRule): stri
     const roles = new Set(${JSON.stringify([...ACTIONABLE_ROLES])});
     const roots = [document];
     const seenRoots = new Set();
-    // Controls in the viewport come first: on a long page, the controls above the scroll position
-    // would otherwise fill the budget. Offscreen controls fill what is left.
     const inView = [];
     const outside = [];
     let scanned = 0;
@@ -900,7 +933,6 @@ function redactedMetadataUrl(value: string | undefined): string {
 export function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
   let bytes = Buffer.byteLength(JSON.stringify(snapshot));
   while (bytes > MAX_SERIALIZED_SNAPSHOT_BYTES) {
-    // The text ends with what is outside the viewport; the elements are what the next action uses.
     if (snapshot.text.length > 0) {
       snapshot.truncated = true;
       const excess = bytes - MAX_SERIALIZED_SNAPSHOT_BYTES;
@@ -918,7 +950,6 @@ export function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
 export function fallbackRole(node: CdpResult): string {
   const tag = (stringValue(node.localName) || stringValue(node.nodeName)).toLowerCase();
   const attributes = nodeAttributes(node.attributes);
-  // The first token of a role list is the role, as in the candidate walk. None and presentation do not apply to a control.
   const role = (attributes.role ?? "").trim().split(/\s+/u)[0]?.toLowerCase() ?? "";
   if (role && role !== "none" && role !== "presentation") return role;
   if (tag === "button" || tag === "summary") return "button";
@@ -934,10 +965,6 @@ export function fallbackRole(node: CdpResult): string {
   return "textbox";
 }
 
-/**
- * The role and name of a control. The accessibility tree ignores a control in an `aria-hidden`
- * container, so the fallback pass reads them from the element and its text.
- */
 export function controlIdentity(
   node: CdpResult,
   ax: CdpResult | undefined,
@@ -966,52 +993,62 @@ function nodeAttributes(value: unknown): Record<string, string> {
 
 const HIDDEN_SECURITY_CODE = "•••";
 
-/**
- * Hides the card values that `fill_card` typed from what an agent reads of the page: snapshots, tab
- * titles and URLs, and the text of a target or a wait. A page can copy a field anywhere, so every
- * string goes through it. The number stays hidden for the life of the tab. A security code is three
- * or four digits and also hides prices and dates, so it stays hidden only until the filled document
- * goes. Logs do not use it: the main process registers the number with the log redaction.
- */
 export class CardValueScrub {
   readonly #numbers = new Map<string, { pattern: RegExp; replacement: string }>();
-  #securityCodes = new Map<string, RegExp>();
+  #documentValues = new Map<string, RegExp>();
+  #documentSecretShown = false;
 
   add(number: string, securityCode: string): void {
     const digits = number.replace(/[^0-9]/gu, "");
     if (digits.length >= 12 && !this.#numbers.has(digits)) {
-      // Pages group the digits with spaces, dashes or dots.
       this.#numbers.set(digits, {
         pattern: new RegExp(`(?<![0-9])${[...digits].join("[\\s.\\-]*")}(?![0-9])`, "gu"),
         replacement: `•••• ${digits.slice(-4)}`,
       });
     }
-    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#securityCodes.has(securityCode))
-      this.#securityCodes.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
+    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#documentValues.has(securityCode))
+      this.#documentValues.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
   }
 
-  /** The filled document was replaced: its security code is no longer on the page. */
+  addDocumentSecret(secret: string, shown: boolean): void {
+    this.#documentSecretShown ||= shown;
+    const forms = [secret, encodeURIComponent(secret), new URLSearchParams({ v: secret }).toString().slice(2)];
+    for (const value of new Set(forms)) {
+      if (!value || this.#documentValues.has(value)) continue;
+      const escaped = value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      const pattern = /^[0-9]+$/u.test(value)
+        ? `(?<![0-9])${escaped}(?![0-9])`
+        : value.length < 4
+          ? `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`
+          : escaped;
+      this.#documentValues.set(value, new RegExp(pattern, "gu"));
+    }
+  }
+
   endDocument(): void {
-    this.#securityCodes = new Map();
+    this.#documentValues = new Map();
+    this.#documentSecretShown = false;
+  }
+
+  get documentSecretShown(): boolean {
+    return this.#documentSecretShown;
   }
 
   get active(): boolean {
-    return this.#numbers.size > 0 || this.#securityCodes.size > 0;
+    return this.#numbers.size > 0 || this.#documentValues.size > 0;
   }
 
   text(value: string): string {
     let result = value;
     for (const { pattern, replacement } of this.#numbers.values()) result = result.replace(pattern, replacement);
-    for (const pattern of this.#securityCodes.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
+    for (const pattern of this.#documentValues.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
     return result;
   }
 
-  /** Whether `value` names a hidden value. A target or a wait with one would tell the agent the value. */
   reveals(value: string): boolean {
     return this.active && this.text(value) !== value;
   }
 
-  /** A copy of `snapshot` with each string scrubbed, within the serialized size limit. */
   snapshot(snapshot: BrowserSnapshot): BrowserSnapshot {
     if (!this.active) return snapshot;
     const scrubbed: BrowserSnapshot = JSON.parse(JSON.stringify(snapshot), (_key, value: unknown) =>

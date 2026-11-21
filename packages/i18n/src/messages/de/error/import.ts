@@ -95,9 +95,11 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: Gib den API-Schlüssel in den Einstellungen erneut ein.",
   "error.import.transferAgentEnv": "{name}: Gib die Werte von {names} in den Einstellungen erneut ein.",
   "error.import.transferMcpValues":
-    "{name}: Der MCP-Server wird deaktiviert hinzugefügt. Prüfe seinen Befehl, gib seine Werte und die vollständige Adresse erneut ein und aktiviere ihn in den MCP-Einstellungen.",
+    "{name}: Der MCP-Server wird deaktiviert hinzugefügt. Prüfe seinen Befehl, gib seine Werte und die vollständige Adresse erneut ein und aktiviere ihn unter Marketplace, Apps.",
   "error.import.transferValuesCleared":
     "{name}: Werte, die ein Geheimnis enthalten können, wurden aus den Argumenten oder der Adresse entfernt. Gib sie in den Einstellungen erneut ein.",
   "error.import.transferSharedKept":
     "{number} Dateien im gemeinsamen Ordner sind hier schon vorhanden und bleiben unverändert.",
+  "error.import.transferPartSkipped":
+    "Einige Teile der Datei konnten nicht importiert werden. Die anderen Teile sind auf diesem Server, also importiere die Datei nicht noch einmal.",
 } as const satisfies PartialTranslation<typeof source>;

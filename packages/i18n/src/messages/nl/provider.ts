@@ -111,9 +111,16 @@ export const messages = {
   "provider.picker.download": "Download van {name}",
   "provider.picker.search": "Modellen zoeken",
   "provider.picker.noMatches": "Geen modellen gevonden.",
+  "provider.picker.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Deze modellen werken niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig ‘Machtigingen’ in de agentinstellingen om ze te gebruiken.",
   "provider.picker.olderModels": "Oudere modellen",
   "provider.picker.olderModelsList": "Oudere {name}-modellen",
   "provider.picker.noModels": "{name} heeft geen modellen beschikbaar.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} draait je eigen endpoints. Hun modellen staan op het tabblad Eigen.",
+  "provider.picker.showCustomModels": "Modellen tonen",
   "provider.picker.museNoModels":
     "Muse heeft geen modellen voor dit account gestuurd. Muse is mogelijk niet beschikbaar in het land waar deze agent draait. Kies een model van een andere provider.",
   "provider.picker.customEmpty":
@@ -141,6 +148,8 @@ export const messages = {
   "provider.picker.selectEffort": "Kies niveau",
   "provider.picker.custom": "Eigen",
   "provider.picker.cliReady": "{cli} gereed",
+  "provider.picker.modelSourceProvider": "Gebruikt {name} uit je {cli}-instellingen",
+  "provider.picker.modelSourceCatalog": "Gebruikt een modellijst uit je {cli}-instellingen",
   "provider.status.signInRequired": "Inloggen vereist",
   "provider.model.free": "Gratis",
   "provider.model.new": "Nieuw",
@@ -211,6 +220,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Kan niet opnieuw verbinden.",
   "provider.account.add": "Account toevoegen",
   "provider.account.addLabel": "Nog een {name}-account toevoegen",
+  "provider.account.addWithCode": "Account toevoegen met code",
   "provider.account.count": { one: "{count} account", other: "{count} accounts" },
   "provider.account.numbered": "Account {number}",
   "provider.account.apiKey": "API-sleutel",
@@ -303,6 +313,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · gedownload door OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Niet in gebruik: {version} · door jou geïnstalleerd",
   "provider.settings.otherVersionDownloaded": "Niet in gebruik: {version} · gedownload door OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Sommige modellen hebben een onderdeel nodig dat deze versie niet heeft. Download de versie van OpenBot om ze te gebruiken.",
   "provider.settings.useInstalledVersion": "Geïnstalleerde gebruiken",
   "provider.settings.useDownloadedVersion": "Versie van OpenBot gebruiken",
   "provider.settings.update": "Updaten",
@@ -329,6 +341,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Standaard van Claude Code",
   "provider.settings.compactWindowTokens": "{size} tokens",
   "provider.settings.compactWindowLoadFailed": "Kan de compressiegrootte van deze server niet laden.",
+  "provider.settings.environment": "Omgeving",
+  "provider.settings.environmentVariables": "Variabelen",
+  "provider.settings.environmentDescription":
+    "API-sleutels, basis-URL’s en andere instellingen die elk {name}-proces krijgt. Een wijziging geldt als de lopende beurten klaar zijn.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL stuurt met OPENAI_API_KEY als sleutel de modelverzoeken van ChatGPT naar dat adres.",
+  "provider.settings.environmentShellNote": "De opdrachten die agents uitvoeren, kunnen deze waarden lezen.",
+  "provider.settings.environmentAdd": "Variabele toevoegen",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Waarde",
+  "provider.settings.environmentSaved": "Opgeslagen",
+  "provider.settings.environmentSensitive": "Gevoelig",
+  "provider.settings.environmentNameLabel": "Variabelenaam {index}",
+  "provider.settings.environmentValueLabel": "Waarde van {name}",
+  "provider.settings.environmentSensitiveLabel": "{name} geheimhouden",
+  "provider.settings.environmentRemoveLabel": "{name} verwijderen",
+  "provider.settings.environmentUnnamed": "variabele {index}",
+  "provider.settings.environmentPending":
+    "Opslaan start {name} opnieuw als de lopende beurten klaar zijn. Gevoelige waarden blijven op de server.",
+  "provider.settings.environmentDone": "Opgeslagen. {name} start opnieuw als de lopende beurten klaar zijn.",
+  "provider.settings.environmentDiscard": "Verwerpen",
+  "provider.settings.environmentSave": "Opslaan",
+  "provider.settings.environmentLoadFailed": "Kan de variabelen van {name} niet laden.",
   "provider.settings.models": "Modellen",
   "provider.settings.modelsDescription": {
     one: "{shown} van {count} model staat in de modelkiezer.",
@@ -358,4 +393,5 @@ export const messages = {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
+  "provider.settings.updateAll": "Alles updaten",
 } as const satisfies PartialTranslation<typeof source>;

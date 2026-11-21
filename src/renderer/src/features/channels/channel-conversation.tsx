@@ -1,9 +1,3 @@
-/*
- * The open channel as the props of the conversation view. The desktop and the browser client build
- * the view from the same channel store; each gives the reader, the waiting requests and the routine
- * host from its own contexts.
- */
-
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import {
   type AgentApproval,
@@ -40,6 +34,7 @@ import {
   channelWorkers,
   channelWorkingTurns,
   firstUnreadChannelMessageId,
+  liveChannelPrompt,
   sentChannelMessageId,
   waitingChannelPrompt,
 } from "./channel-conversation-rows";
@@ -47,25 +42,18 @@ import { useChannels } from "./channels-context";
 
 export interface ChannelConversationEnvironment {
   channelId: string;
-  /** Is the stamped sender of a message the reader? */
   isOwnSender: (senderId: string) => boolean;
-  /** Whether the host answers. Until it does, no command goes to it. */
   connectionReady: () => boolean;
   routines: ChannelRoutineHost;
-  /** Every approval that waits on the host. The channel shows the ones of its own work. */
   approvals: () => readonly AgentApproval[];
-  /** Every browser takeover that waits on the host. */
   takeovers: () => readonly BrowserTakeoverRequest[];
-  /** Every question that waits on the host. A saved card with no answer is open only while its question is here. */
   prompts: () => readonly Extract<AgentEvent, { type: "prompt" }>[];
-  /** The hidden agents that the host stops. A host with `agent-hidden-work` stops none. */
   pausedAgentIds: () => ReadonlySet<string>;
 }
 
-/** Must run inside the view that shows the channel: it reads the channel store and the interface text. */
 export function createChannelConversation(env: ChannelConversationEnvironment) {
   const channels = useChannels();
-  const { t, errorDetails } = useText();
+  const { t, errorDetails, sourceText } = useText();
   const channelId = env.channelId;
   const page = () => {
     const current = channels.state.page;
@@ -75,7 +63,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const threads = () => summary()?.threads;
   const readOnly = () => page()?.channel.archived === true;
   const memberThreadIds = createMemo(() => new Set(threads()?.map((thread) => thread.threadId)));
-  /** An agent that the host stops gets no tab here, as it gets no work. A member with no thread here cannot use a tab yet. */
   const browserOwner = createMemo(() => {
     const channel = page()?.channel;
     const allowed = channel ? channelBrowserAgent(channel) : false;
@@ -96,15 +83,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
 
   const entries = createMemo(() => page()?.messages.filter(channelMessageHasContent) ?? []);
 
-  /*
-   * A row keeps its object while it does not change, so a streamed chunk draws one row again and not
-   * the whole transcript.
-   *
-   * A row that comes after the rows this view already drew arrives live, so it enters as a new bubble
-   * of an agent chat does. Before, a channel message showed in one frame. The rows of the first page
-   * and of an older page do not enter. The reader's own message does not enter again: the row that
-   * the send drew at once entered already.
-   */
   let rowsById = new Map<string, AgentMessage>();
   let drawn = false;
   const ownRow = (row: AgentMessage) =>
@@ -113,7 +91,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     const current = page();
     if (!current) return [];
     const next = new Map<string, AgentMessage>();
-    const mappedRows = channelConversationRows(entries());
+    const mappedRows = channelConversationRows(entries(), current.tasks, sourceText);
     const lastKnown = mappedRows.findLastIndex((mapped) => rowsById.has(mapped.id));
     const rows = mappedRows.map((mapped, index) => {
       const known = rowsById.get(mapped.id);
@@ -140,7 +118,10 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   });
   const prompt = createMemo((): Extract<AgentEvent, { type: "prompt" }> | undefined => {
     const found = waiting();
-    if (!found) return undefined;
+    if (!found) {
+      const current = page();
+      return current ? liveChannelPrompt(current, threads(), env.prompts()) : undefined;
+    }
     const agentId = found.entry.author.id;
     return {
       type: "prompt",
@@ -164,10 +145,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     return current ? activeChannelRuns(current) : [];
   });
 
-  /*
-   * Sidebar Edit and the schedule open the settings through the store. The view opens its pane once
-   * for each request, so the store request is taken and cleared.
-   */
   let settingsNonce = 0;
   const settingsRequest = createMemo<AgentSettingsRequest | null>((previous) => {
     if (channels.state.editing !== "settings" || channels.state.selectedId !== channelId) return previous ?? null;
@@ -181,10 +158,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     },
   );
 
-  /**
-   * The id of the stored message is read from the page after the send. A failure throws to the
-   * view, which keeps the message as not sent; its Retry sends the same operation id again.
-   */
   async function sendMessage(
     body: string,
     attachmentDraftIds: string[],
@@ -194,9 +167,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   ): Promise<SendMessageResult> {
     if (!env.connectionReady() || readOnly()) return { error: t("channel.error.action") };
     const sequenceBefore = page()?.throughSequence ?? 0;
-    // A request that opens with a member is addressed to that member, the way a reader writes it. A
-    // mention later in the text is a reference that the owner of the work can see. The host reads
-    // every opening mention from the text; the field names the first one for a host that reads one.
     const mention = leadingAddress(body).mentions[0];
     try {
       const after = await channels.send({
@@ -211,13 +181,11 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       const messageId = sentChannelMessageId(after, sequenceBefore, body, env.isOwnSender);
       return messageId ? { messageId } : { error: t("channel.error.action") };
     } catch (error) {
-      // The reason alone can be the generic text, so the reference says which failure it was.
       const details = errorDetails(error, t("channel.error.action"));
       return { error: details.message, reference: details.reference };
     }
   }
 
-  /** An answer that fails goes to the card that shows it, when it has one. */
   async function respond(action: () => Promise<void>, options?: PromptAnswerOptions): Promise<boolean> {
     if (!env.connectionReady() || readOnly()) return false;
     let failed = false;
@@ -233,10 +201,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     return done && !failed;
   }
 
-  /**
-   * One stop at a time, and none after the first that fails: the controller keeps one failed command
-   * for its retry, and a later stop that succeeds would clear the error of the one that failed.
-   */
   let rowStopping = false;
   async function stopWork() {
     if (!env.connectionReady()) return;
@@ -288,10 +252,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
         name: (id) => (id ? agentName(id) : t("sidebar.section.unassigned")),
       });
     },
-    // The existing Stop of a task. The stopped-task card above the composer then offers Continue,
-    // Reassign and Cancel for it.
-    // One stop at a time, as in stopWork: a second click while a stop runs does nothing, so that a
-    // stop that succeeds does not clear the error of one that failed.
     stopAwaitingReply: (taskId) => {
       if (rowStopping || !env.connectionReady() || readOnly()) return;
       rowStopping = true;
@@ -316,7 +276,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   };
 
   const deleteMessage = (messageId: string) => channels.deleteMessage(channelId, messageId);
-  /** Whether the reader may delete `message`: their own, or any message for this computer or an admin. */
   const canDeleteMessage = (message: AgentMessage) =>
     !readOnly() &&
     readerCanDeleteMessage(message, { deleteAny: channels.deletesAnyMessage(), isOwnSender: env.isOwnSender });
@@ -329,7 +288,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     firstUnreadMessageId: () => firstUnreadChannelMessageId(entries(), unreadCount(), env.isOwnSender),
     hasOlder: () => Boolean(page()?.olderCursor),
     unloadedHistory: () => unloadedHistory(page()),
-    /** The agents that a mention can name: the members. A hidden agent gets no work here either. */
     mentionAgents: () => {
       const members = new Set(page()?.channel.members.map((member) => member.agentId));
       return channels.agents().filter((agent) => members.has(agent.id));
@@ -353,7 +311,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     },
     onLoadOlder: () => void channels.loadOlder(),
     onAnswerPrompt: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => {
-      const requestId = waiting()?.prompt.requestId;
+      const requestId = prompt()?.requestId;
       if (requestId === undefined) return Promise.resolve(false);
       return respond(() => channels.port().agent.respondToPrompt({ requestId, answers }), options);
     },
@@ -368,7 +326,6 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       return respond(() => channels.port().agent.respondToBrowserTakeover({ requestId, decision }));
     },
     onStop: () => void stopWork(),
-    /** The Delete action of the channel. A host without `message-delete-v1` has none. */
     deleteMessageAction: () => (channels.messageDeletionSupported() ? deleteMessage : undefined),
     canDeleteMessage,
   };

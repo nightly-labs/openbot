@@ -1,37 +1,18 @@
 #!/bin/bash
-# openbot.service runs this as the sandbox user. It waits for the env file that openbot-hosted-env
-# writes, starts a D-Bus session with an unlocked keyring so that Electron `safeStorage` can keep
-# the account session, and runs OpenBot on a virtual display. The agents work on the boat desktop.
-#
-# On a self-hosted server (`mode` is `self`, which openbot-server-setup writes) there is no claim and
-# no boat desktop: OpenBot starts with `OPENBOT_SERVER=1` on a virtual display, the agents work on a
-# second one, and its owner signs it in with `openbot login`.
 set -euo pipefail
 umask 077
 
-# ExecStop of openbot.service. The unit also holds the virtual displays, and its stop signal goes to
-# each of its processes at the same time. An Xvfb that stops first ends OpenBot before it closes its
-# database. So this gives the signal to OpenBot only and waits for it; the unit then stops the rest.
 if [ "${1:-}" = --stop ]; then
   pid=$(cat "$XDG_RUNTIME_DIR/openbot.pid" 2>/dev/null) || pid=""
-  # The PID is still OpenBot when it is a process named openbot in the cgroup of this unit, as this
-  # script is. Do not compare /proc/$pid/exe with /opt/OpenBot/app/openbot: after a resume, OpenBot
-  # starts from the FUSE mount of /opt, and when boat moves /opt back to the disk, the two are
-  # different files. The stop then sent no signal, and OpenBot ended with its database open.
   if [[ $pid =~ ^[1-9][0-9]*$ ]] &&
     [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = openbot ] &&
     [ "$(cat "/proc/$pid/cgroup" 2>/dev/null)" = "$(cat /proc/$$/cgroup)" ] &&
     kill -TERM "$pid" 2>/dev/null; then
     while [ -e "/proc/$pid" ]; do sleep 0.2; done
   fi
-  # Then wait at most 10 s for the main process (dbus-run-session). When OpenBot exits, xvfb-run
-  # stops its display and runs `xauth remove`, which locks ~/.Xauthority with ~/.Xauthority-c. The
-  # unit sends its stop signal to the remaining processes when this script ends. An xauth that
-  # stopped with the lock held left the lock file, and each later start of xvfb-run then failed.
   main=${MAINPID:-}
   if [[ $main =~ ^[1-9][0-9]*$ ]]; then
     for _ in $(seq 1 50); do
-      # A process that exited stays a zombie (state Z) until systemd collects it.
       grep -qs '^State:[[:space:]]*[^Z[:space:]]' "/proc/$main/status" || break
       sleep 0.2
     done
@@ -48,7 +29,6 @@ if [ "${1:-}" != --in-session ] && [ "$mode" = self ]; then
   exec dbus-run-session -- "$0" --in-session
 fi
 if [ "${1:-}" != --in-session ]; then
-  # The setup script starts after the sandbox is ready, so on the first boot this runs first.
   for _ in $(seq 1 300); do
     [ -s "$state/env" ] && break
     sleep 2
@@ -57,7 +37,6 @@ if [ "${1:-}" != --in-session ]; then
   exec dbus-run-session -- "$0" --in-session
 fi
 
-# Read only the expected keys. The file is data, not a script.
 if [ "$mode" = hosted ]; then
   while IFS='=' read -r key value; do
     case $key in
@@ -66,11 +45,8 @@ if [ "$mode" = hosted ]; then
   done <"$state/env"
   export OPENBOT_HOSTED_SERVER=1
 else
-  # The control socket of `openbot`. It goes in the runtime directory that openbot.service makes.
   export OPENBOT_SERVER=1
 fi
-# A self-hosted server has this file only when its install named another account server or a
-# display size.
 requested_size=""
 if [ -r /opt/OpenBot/hosted/openbot.env ]; then
   while IFS='=' read -r key value || [ -n "$key" ]; do
@@ -81,9 +57,6 @@ if [ -r /opt/OpenBot/hosted/openbot.env ]; then
   done </opt/OpenBot/hosted/openbot.env
 fi
 
-# The size of the virtual display, which computer use reads: $1 as WIDTHxHEIGHT, else 1280x800. A
-# value that is not valid writes a warning and does not stop the start. See
-# docs/self-hosted-server.md#display-size. openbot-container has the same rules.
 display_size() {
   if [[ $1 =~ ^([1-9][0-9]{2,3})x([1-9][0-9]{2,3})$ ]] &&
     [ "${BASH_REMATCH[1]}" -ge 640 ] && [ "${BASH_REMATCH[1]}" -le 2576 ] &&
@@ -95,10 +68,6 @@ display_size() {
   echo 1280x800
 }
 
-# Each server makes its own keyring password on its first start, so no two servers share one.
-# The password only lets the daemon open the keyring without a person; the file is 0600.
-# A keyring with no password file is not new: a new password cannot open it, so the service stops
-# and systemd tries again after the home folder is back.
 if [ ! -s "$state/keyring-password" ] && [ -e /srv/openbot-hosted/keyrings/login.keyring ]; then
   echo "The keyring exists, but its password file is missing." >&2
   exit 1
@@ -108,20 +77,10 @@ if [ ! -s "$state/keyring-password" ]; then
   head -c 32 /dev/urandom | base64 | tr -d '\n' >"$temporary"
   mv -f "$temporary" "$state/keyring-password"
 fi
-# The keyring files stay in /srv/openbot-hosted, which provision.sh makes for this user. They are
-# not in ~/.local/share/keyrings: the boat image has a `default` keyring there with a password that
-# this server does not know, and a snapshot restore resets that folder after this service starts.
-# They are also not in /home: after a resume, boat serves /home from a slow FUSE mount until the
-# disk is restored. There gnome-keyring does not see the new link count after its backup link, so
-# each keyring write added links until the mount went away, 16,000 to 31,000 `*.temp-*` files. The
-# next resume read that folder through the mount, and the start took 25 s longer. boat keeps
-# changes in /srv and restores them before this service starts. libsecret stores in the `default`
-# collection, so the alias points to the `login` keyring that the daemon unlocks.
 export XDG_DATA_HOME=/srv/openbot-hosted
 keyrings="$XDG_DATA_HOME/keyrings"
 mkdir -p "$keyrings"
 printf login >"$keyrings/default"
-# An assignment first, so `set -e` stops the start when the daemon fails. `eval "$(…)"` ignores it.
 unlocked=$(gnome-keyring-daemon --unlock --components=secrets <"$state/keyring-password")
 eval "$unlocked"
 started=$(gnome-keyring-daemon --start --components=secrets)
@@ -129,8 +88,6 @@ eval "$started"
 unset XDG_DATA_HOME
 export GNOME_KEYRING_CONTROL
 
-# If boat ever serves /srv from the FUSE mount too, remove those links when the disk is back. A
-# link that is not to the current keyring file is not the backup of a write that is in progress.
 (
   for _ in $(seq 1 300); do
     case $(findmnt -n -o FSTYPE -T "$keyrings" || true) in fuse*) sleep 2 ;; *) break ;; esac
@@ -142,27 +99,9 @@ export GNOME_KEYRING_CONTROL
   done
 ) &
 
-# OpenBot and the agents use two displays. OpenBot shows its windows on one. The agents work on the
-# other, which OpenBot names in OPENBOT_AGENT_DISPLAY: main gives it to Computer Use, to remote
-# desktop and to the agent processes, so an agent's screenshot does not show the OpenBot window.
-#
-# The boat desktop is a lightdm session of this user on :0, with a window manager. It is the agent
-# display, and OpenBot shows its windows on a virtual display. xvfb-run adds the key of that display
-# to ~/.Xauthority, which already has the key of :0, so OpenBot and the processes it starts can open
-# both. lightdm keeps the other keys when it writes the file. After a resume, boat can start the
-# session after this service. A sandbox that has no desktop session uses two virtual displays. A
-# machine with no display manager, such as a VPS of the pool, never has the session, and does not
-# wait for it.
-
-# OpenBot writes its PID for `--stop` before it starts.
 openbot=(bash -c 'echo "$$" >"$XDG_RUNTIME_DIR/openbot.pid" && exec "$@"' openbot-hosted-server
   /opt/OpenBot/app/openbot --password-store=gnome-libsecret)
 if [ "$mode" = hosted ] && [ -e /etc/systemd/system/display-manager.service ]; then
-  # xauth locks ~/.Xauthority with ~/.Xauthority-c and ~/.Xauthority-l, and it does not remove a
-  # lock that a stopped xauth left. xvfb-run then waits 20 to 40 s for xauth and exits with
-  # status 1 at each start, and the unit starts again and again. An xauth holds the lock only while
-  # it writes, so with no xauth of this user, a lock file is stale. pgrep returns 1 only when it
-  # finds no process.
   search=0
   pgrep -u "$(id -u)" -x xauth >/dev/null 2>&1 || search=$?
   if [ "$search" -eq 1 ]; then rm -f "$HOME/.Xauthority-c" "$HOME/.Xauthority-l"; fi
@@ -176,12 +115,6 @@ if [ "$mode" = hosted ] && [ -e /etc/systemd/system/display-manager.service ]; t
   echo "The boat desktop session did not start. OpenBot uses two virtual displays." >&2
 fi
 
-# The outer xvfb-run starts the agent display, at the display size. The inner one starts the OpenBot
-# display and adds its key to the same authority file. The agent display has a white root (`-wr`):
-# remote desktop shows it before an agent opens a window, and the default black root looks like no
-# video (#3554). Its pointer is an arrow, not the default "×", which looks like an error (#6091).
-# `-noreset` keeps the arrow when the last client disconnects. A server whose update could not
-# install xsetroot starts with the "×".
 exec xvfb-run -a -s "-screen 0 $(display_size "$requested_size")x24 -nolisten tcp -wr -noreset" \
-  bash -c 'command -v xsetroot >/dev/null && xsetroot -cursor_name left_ptr; export OPENBOT_AGENT_DISPLAY=$DISPLAY; exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
-  openbot-hosted-server "${openbot[@]}"
+  bash -c 'command -v xsetroot >/dev/null && xsetroot -cursor_name left_ptr; if [ -r "$1" ]; then bash "$1" </dev/null & fi; shift; export OPENBOT_AGENT_DISPLAY=$DISPLAY; exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
+  openbot-hosted-server /opt/OpenBot/app/resources/hosting/openbot-desktop "${openbot[@]}"

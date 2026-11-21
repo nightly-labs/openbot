@@ -1,34 +1,13 @@
-// Checks the OpenBot Contributor License Agreement (CLA.md) on one pull request.
-//
-//   bun scripts/cla.ts pr <number>                checks one open pull request
-//   bun scripts/cla.ts record <login> <number>    records the signed PDF of <login>, then checks <number>
-//   --dry-run                                     writes nothing to GitHub; the decisions go to REPORT_PATH
-//
-// The author of the pull request and each commit author must sign. Bots, organization members and
-// users with write access skip the check, as in `contribution-policy.ts`. An author signs the PDF
-// from CLA_PAGE_URL and sends it to LICENSES_EMAIL. A maintainer reads the email, then runs `record`
-// with a GitHub token that can write to the repository. `record` adds the signature to
-// SIGNATURES_FILE on the SIGNATURES_BRANCH branch and checks the pull request again. A closed pull
-// request is skipped.
-//
-// A signature of the Contributor Assignment Agreement 1.0 also passes: that agreement assigns the
 // copyright, which gives more than the license, and it continues to apply to the contributions of
-// its signers. Its signatures were a ticked box or a comment, recorded by earlier versions of this
-// script.
-//
-// No package imports: `cla.yml` runs this before `bun install`. Every GitHub read uses `gh api --jq`.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-// Not COLLABORATOR: that includes collaborators with read or triage access, who must sign. The
-// permission lookup in `isTrusted` passes collaborators with write access.
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER"]);
 const TRUSTED_PERMISSIONS = new Set(["admin", "maintain", "write"]);
 const AGREEMENT_PATH = "CLA.md";
 const AGREEMENT_NAME = "OpenBot Contributor License Agreement";
-/** Earlier versions whose signatures still pass. See the comment at the top. */
 const EARLIER_ACCEPTED_VERSIONS = ["1.0"];
 const CLA_PAGE_URL = "https://openbot.run/cla";
 const LICENSES_EMAIL = "licenses@openbot.run";
@@ -37,7 +16,6 @@ const SIGNATURES_FILE = "signatures.json";
 const STATUS_CONTEXT = "CLA";
 const COMMENT_MARKER = "<!-- cla -->";
 const COMMENT_AUTHOR = "github-actions[bot]";
-/** The pull request commits endpoint returns at most this number of commits. */
 const MAX_COMMITS = 250;
 const SAVE_ATTEMPTS = 3;
 const REPORT_PATH = ".openbot-build/cla/report.json";
@@ -74,13 +52,11 @@ function readLines(path: string, jq: string): string[] {
     .filter((line) => line !== "");
 }
 
-/** `gh` prints the HTTP status on standard error when a request fails. */
 function failedWith(error: unknown, statuses: readonly number[]): boolean {
   const stderr = error instanceof Error && "stderr" in error ? String(error.stderr) : "";
   return statuses.some((status) => stderr.includes(`HTTP ${status}`));
 }
 
-/** One column of a `@tsv` row. A missing column is a script error. */
 function column(values: readonly string[], index: number): string {
   const value = values[index];
   if (value === undefined) fail(`Unexpected value from GitHub: ${values.join("\t")}`);
@@ -89,8 +65,6 @@ function column(values: readonly string[], index: number): string {
 
 function isTrusted(login: string, association: string): boolean {
   if (TRUSTED_ASSOCIATIONS.has(association)) return true;
-  // `author_association` can miss a private organization member. The permission lookup does not,
-  // and it fails closed: an error treats the author as external.
   try {
     return TRUSTED_PERMISSIONS.has(read(`repos/${repository}/collaborators/${login}/permission`, ".permission"));
   } catch {
@@ -98,7 +72,6 @@ function isTrusted(login: string, association: string): boolean {
   }
 }
 
-/** Every change to GitHub goes through here, so `--dry-run` only records it. */
 function write(description: string, ghArgs: readonly string[], input?: string): void {
   writes.push(description);
   if (!dryRun) gh(ghArgs, input);
@@ -110,7 +83,6 @@ function parseNumber(value: string | undefined): number {
   return number;
 }
 
-/** The version of CLA.md. The script fails when CLA.md is not the expected agreement. */
 function loadAgreement(): string {
   const text = readFileSync(AGREEMENT_PATH, "utf8");
   if (!text.startsWith(`# ${AGREEMENT_NAME}\n`)) fail(`${AGREEMENT_PATH} is not the ${AGREEMENT_NAME}.`);
@@ -130,16 +102,13 @@ interface Signature {
   readonly version: string;
   readonly signedAt: string;
   readonly pullRequest: number;
-  /** Version 1.0 signatures are a ticked box or a comment. Later signatures are a PDF sent by email. */
   readonly method: "checkbox" | "comment" | "email";
-  /** The pull request for a checkbox or an email, or the comment. */
   readonly url: string;
   readonly text: string;
 }
 
 interface SignatureStore {
   readonly signatures: readonly Signature[];
-  /** The blob SHA of SIGNATURES_FILE, or undefined when the file does not exist. */
   readonly sha: string | undefined;
   readonly branchExists: boolean;
 }
@@ -172,7 +141,6 @@ function hasSigned(signatures: readonly Signature[], id: number, version: string
   );
 }
 
-/** Writes the file with the content API. A new branch gets one commit with no parent. */
 function saveStore(store: SignatureStore, signatures: readonly Signature[], message: string): void {
   const content = `${JSON.stringify({ signatures }, null, 2)}\n`;
   if (!store.branchExists) {
@@ -201,10 +169,6 @@ function saveStore(store: SignatureStore, signatures: readonly Signature[], mess
   );
 }
 
-/**
- * Adds the new signatures to the record. A different run that writes at the same time makes the
- * write fail with 409 or 422; then the record is read again and merged.
- */
 function recordSignatures(added: readonly Signature[], version: string): void {
   const message = `Record CLA ${version} signatures: ${added.map((signature) => signature.login).join(", ")}`;
   writes.push(`${message}\n${added.map((signature) => signature.url).join("\n")}`);
@@ -250,7 +214,6 @@ function loadPullRequest(number: number): PullRequest {
   };
 }
 
-/** The people who must sign, and the commits whose author email has no GitHub account. */
 function requiredSigners(pr: PullRequest): { readonly signers: Person[]; readonly unlinked: string[] } {
   const people = new Map<number, Person>();
   const unlinked: string[] = [];
@@ -270,7 +233,6 @@ function requiredSigners(pr: PullRequest): { readonly signers: Person[]; readonl
   return { signers, unlinked };
 }
 
-/** Keeps one CLA comment per pull request and edits it in place. */
 function upsertStickyComment(number: number, body: string, createIfMissing: boolean): void {
   const text = `${COMMENT_MARKER}\n${body}`;
   const [existing] = readLines(
@@ -389,7 +351,6 @@ function checkPullRequest(number: number): Decision {
   };
 }
 
-/** Records the signed PDF that `login` sent by email, for the pull request `number`. */
 function recordEmailSignature(login: string, number: number): string {
   const version = loadAgreement();
   const user = read(`users/${login}`, "[.login, .id, .type] | @tsv").split("\t");

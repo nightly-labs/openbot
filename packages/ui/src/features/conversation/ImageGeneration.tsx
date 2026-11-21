@@ -1,6 +1,11 @@
-import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
+import {
+  type AttachmentSummary,
+  type ImageGenerationAspectRatio,
+  imageAspectRatioOf,
+  imagePixelSize,
+} from "@openbot/contracts/ipc";
 import { Button, Download, Maximize2 } from "@openbot/ui";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import {
   FAILED_MEDIA_RATIO,
@@ -10,6 +15,7 @@ import {
   type MediaGenerationStatus,
   mediaRatioValue,
 } from "./media-generation-frame";
+import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
 import { createSteadyImageUrl } from "./steady-image-url";
 
 export type ImageGenerationStatus = MediaGenerationStatus;
@@ -21,12 +27,7 @@ export interface ImageGenerationProps {
   aspectRatio: ImageGenerationAspectRatio;
   attachment?: AttachmentSummary | undefined;
   error?: string | undefined;
-  /**
-   * The image file is on its way, such as a file that the web client reads from the host. The stage
-   * shows its dots at the size of the image, so the chat does not grow when the image shows.
-   */
   loading?: boolean | undefined;
-  /** `origin` is the clicked image, for a viewer that zooms out of it. */
   onPreview?: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
 }
@@ -34,22 +35,21 @@ export interface ImageGenerationProps {
 export function ImageGeneration(props: ImageGenerationProps) {
   const { t, errorMessage } = useText();
   const [previewError, setPreviewError] = createSignal(false);
-  // The ratio stays when the URL changes: a sent image gets the URL of its stored copy, and the
-  // image keeps its size and pixels until that copy loads.
-  const [imageSize, setImageSize] = createSignal<{ width: number; height: number } | null>(null);
+  const [imageSize, setImageSize] = createSignal(untrack(() => rememberedMediaSize(props.attachment?.id)));
   const imageUrl = createSteadyImageUrl(() => props.attachment?.previewUrl);
   let image: HTMLImageElement | undefined;
   const readRatio = (element: HTMLImageElement) => {
     const { naturalHeight, naturalWidth } = element;
-    if (naturalWidth > 0 && naturalHeight > 0) setImageSize({ width: naturalWidth, height: naturalHeight });
+    if (naturalWidth <= 0 || naturalHeight <= 0) return;
+    const size = { width: naturalWidth, height: naturalHeight };
+    setImageSize(size);
+    const id = props.attachment?.id;
+    if (id) rememberMediaSize(id, size);
   };
-  // Keyed by the drawn URL: a URL that failed is not tried again while the new one loads.
   createEffect(
     () => imageUrl(),
     () => {
       setPreviewError(false);
-      // An image in the memory cache, such as one the composer showed, is complete at once. A lazy
-      // image fires `load` frames later, and the box would be square until then.
       if (image?.complete) readRatio(image);
     },
   );
@@ -84,21 +84,26 @@ export function ImageGeneration(props: ImageGenerationProps) {
     isAttachment()
       ? t("chat.image.download", { name: props.attachment?.name ?? t("chat.image.attachedFallback") })
       : t("chat.image.downloadGenerated");
-  /** The real size of the image once it loads. The size that the model was asked for until then. */
+  const knownSize = () => imageSize() ?? imagePixelSize(props.resolution);
   const size = () => {
+    const known = knownSize();
+    return known ? t("chat.media.size", { width: known.width, height: known.height }) : props.resolution;
+  };
+  const frameSize = () => {
     const loaded = imageSize();
-    return loaded ? t("chat.media.size", { width: loaded.width, height: loaded.height }) : props.resolution;
+    if (loaded) return loaded;
+    const host = imagePixelSize(props.resolution);
+    return host && imageAspectRatioOf(host) === props.aspectRatio ? host : null;
   };
   const stageRatio = () => {
-    const loaded = imageSize();
-    if (hasImage() && loaded) return `${loaded.width} / ${loaded.height}`;
+    const known = frameSize();
     if (hasFailure() && !isAttachment()) return FAILED_MEDIA_RATIO;
+    if (props.status === "completed" && known) return `${known.width} / ${known.height}`;
     return mediaRatioValue(props.aspectRatio, "image");
   };
   const preview = (event: MouseEvent & { currentTarget: HTMLElement }) => {
     if (props.attachment) props.onPreview?.(props.attachment, event.currentTarget);
   };
-  /** An attached image shows alone. A generated image says what it is under it. */
   const showsMeta = () => props.loading !== true && (!hasImage() || !isAttachment());
 
   return (

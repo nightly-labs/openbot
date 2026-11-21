@@ -1,22 +1,7 @@
 import { isDynamicRecord, isString } from "../runtime-values";
 import { CHANNEL_ROUTES } from "./channels-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
-/**
- * Frozen optional channel-task-waits-v1 contract: why a queued channel task does not start (#6067).
- * The scheduler skips such a task and keeps no reason, so a client showed a request that did not
- * start and nothing more. It adds, beside the frozen keys of channels-v1:
- *
- * - `waits` on the first page of `POST /v1/channels/read`: at most one entry for each task of the
- *   page, each for a task in state `queued`, with `taskId`, `agentId` (the owner of the task) and
- *   `reason`. `reason` is `"agent-busy"`, with `channelId` and `channelName` (1 to 80 characters)
- *   of the channel where the agent works, or `"channel-full"`.
- *
- * The host adds it only on a request that advertises the capability, so the wire of every released
- * client stays as it was. A host without the capability never sends it, so a client accepts it
- * whenever it is present. A present malformed value fails closed. A new reason or key needs a second
- * capability string.
- */
 export const CHANNEL_TASK_WAITS_CAPABILITY = "channel-task-waits-v1";
 
 const IDENTIFIER_LIMIT = 128;
@@ -30,7 +15,6 @@ function invalid(): never {
   throw new Error("Invalid channel task waits.");
 }
 
-/** `projected` with the `waits` of `source`, which channels-v1 dropped. */
 export function withChannelTaskWaits(path: string, projected: TeamProtocolV2Json, source: unknown): TeamProtocolV2Json {
   if (new URL(path, "http://openbot.invalid").pathname !== CHANNEL_ROUTES.read) return projected;
   if (!isDynamicRecord(projected) || !isDynamicRecord(source) || source.waits === undefined) return projected;

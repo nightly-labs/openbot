@@ -6,11 +6,6 @@ import { Effect } from "effect";
 import type { PiMcpExtension } from "./pi-mcp";
 import { providerCall } from "./provider-client-effects";
 
-// Each extension takes the key from the environment and removes it before a tool can start a child
-// process. The key is never written to the extension file. Pi runs an extension again when it
-// switches sessions, so the key stays in a process slot for those later runs. Pi reads an apiKey
-// that starts with `$` or `!` as an environment reference or a shell command, so the key is escaped
-// to stay a literal. A header value reads `$` in the same way, but not a `!` after the start.
 const readKey = (provider: KeyOnlyProviderId, variable: string) => `
   const slot = Symbol.for("openbot.pi.${provider}ApiKey");
   globalThis[slot] ??= process.env.${variable};
@@ -21,8 +16,6 @@ const readKey = (provider: KeyOnlyProviderId, variable: string) => `
   const apiKey = literal.replace(/^!/, "$$!");`;
 
 const KEY_EXTENSIONS = {
-  // Inception serves Mercury through OpenAI chat completions. Pi has no built-in Inception provider,
-  // so this extension registers one for this process only.
   inception: {
     variable: "OPENBOT_PI_INCEPTION_API_KEY",
     source: `export default function (pi) {${readKey("inception", "OPENBOT_PI_INCEPTION_API_KEY")}
@@ -43,14 +36,6 @@ const KEY_EXTENSIONS = {
 }
 `,
   },
-  // Pi has a built-in DeepSeek provider. A registration with only the key keeps its models, endpoint
-  // and thinking levels, which Pi updates (checked in Pi 1.4.0). Pi prefers a DeepSeek key that
-  // `/login` stored in auth.json to this apiKey, but the Authorization header replaces either one.
-  // DeepSeek refuses the whole request when a tool `pattern` has an unescaped `[` in a character class,
-  // such as `^[^[\]]*$` from an MCP server (#4037). JSON Schema reads it as ECMA-262, where it is valid;
-  // DeepSeek reads a nested class. Pi sends patterns as they are, so this removes those patterns only.
-  // Values in `const`, `default`, `enum` and `examples` are data, and the keys of `properties` are names,
-  // so they stay as they are.
   deepseek: {
     variable: "OPENBOT_PI_DEEPSEEK_API_KEY",
     source: String.raw`export default function (pi) {${readKey("deepseek", "OPENBOT_PI_DEEPSEEK_API_KEY")}
@@ -85,22 +70,20 @@ const KEY_EXTENSIONS = {
 }
 `,
   },
-  // Pi has a built-in OpenRouter provider with OpenRouter's model list (401 models in Pi 1.4.0). As for
-  // DeepSeek, a registration with only the key keeps that list, and the Authorization header replaces a
-  // key from Pi's auth.json or OPENROUTER_API_KEY. Pi sends Anthropic models to OpenRouter's Anthropic
-  // Messages endpoint, which also gets the auth.json key as `x-api-key`, so that header is replaced too.
   openrouter: {
     variable: "OPENBOT_PI_OPENROUTER_API_KEY",
     source: `export default function (pi) {${readKey("openrouter", "OPENBOT_PI_OPENROUTER_API_KEY")}
   pi.registerProvider("openrouter", { apiKey, headers: { Authorization: "Bearer " + literal, "x-api-key": literal } });
+  const OUTPUT_CAP = 128000;
+  pi.on("before_provider_request", (event) => {
+    const payload = event.payload;
+    const field = ["max_tokens", "max_completion_tokens"].find((name) => payload?.[name] > OUTPUT_CAP);
+    if (!field || (payload.thinking?.budget_tokens ?? 0) >= OUTPUT_CAP) return undefined;
+    return { ...payload, [field]: OUTPUT_CAP };
+  });
 }
 `,
   },
-  // TrustedRouter serves models through OpenAI chat completions. Pi has no built-in TrustedRouter
-  // provider, so this extension registers one for this process only. The list holds TrustedRouter's
-  // routes that take tool calls (https://api.trustedrouter.com/v1/models). Each route picks the
-  // upstream model per request, so its price varies and the cost is left at zero; OpenBot reports no
-  // usage for this provider. Model ids keep TrustedRouter's `trustedrouter/<route>` form.
   trustedrouter: {
     variable: "OPENBOT_PI_TRUSTEDROUTER_API_KEY",
     source: `export default function (pi) {${readKey("trustedrouter", "OPENBOT_PI_TRUSTEDROUTER_API_KEY")}
@@ -128,7 +111,6 @@ const KEY_EXTENSIONS = {
   },
 } as const satisfies Record<KeyOnlyProviderId, { variable: string; source: string }>;
 
-/** Owns one temporary, key-free extension file that gives a key-only provider its key in Pi. */
 export const createPiKeyExtension = Effect.fn("PiKeyProviders.createExtension")(function* (
   provider: KeyOnlyProviderId,
   key: string,

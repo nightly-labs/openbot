@@ -1,17 +1,10 @@
-import type { RemoteFailure } from "./remote-control-plane";
-// The OpenBot Discord app's OAuth install. One bot serves every Discord server (guild): a member who
-// can manage the server adds it once, and the server is linked to one OpenBot host, which answers all
-// of its messages. The Worker exchanges the code because the client secret lives here, and records
-// only which host answers the server. The bot token stays in Signal: this Worker does not get it, and
-// it revokes the user token that the exchange gives. The sealed grant goes back to the desktop in the
-// URL fragment of `/discord/connect`.
-
 import { DISCORD_BOT_PERMISSIONS } from "@openbot/contracts/discord-app";
 import { sealDiscordGuildGrant } from "@openbot/contracts/discord-guild-grant";
 import { isRawP256PublicKey } from "@openbot/contracts/host-grant";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Schema } from "effect";
 import { hmacSha256 } from "./crypto";
+import type { RemoteFailure } from "./remote-control-plane";
 import { authEventStatement } from "./remote-control-plane";
 import type { AuthUser, WorkerBindings } from "./types";
 
@@ -48,7 +41,6 @@ const StatePayload = Schema.Struct({
   e: Schema.Number,
 });
 type StatePayload = typeof StatePayload.Type;
-// The token response of the `bot` scope names the guild that added the bot.
 const DiscordGrant = Schema.Struct({
   guild: Schema.Struct({
     id: Schema.String.check(Schema.isPattern(/^[0-9]{1,24}$/u)),
@@ -71,7 +63,6 @@ export class DiscordAppService {
       WorkerBindings,
       "DB" | "DISCORD_CLIENT_ID" | "DISCORD_CLIENT_SECRET" | "DISCORD_STATE_SECRET" | "DISCORD_DEV_PUBLIC_ORIGIN"
     >,
-    // Sends the queued Signal events. The Worker passes its delivery; the cron sends them otherwise.
     options: { fetch?: Fetch; now?: () => number; flushAuthEvents?: () => Effect.Effect<void, RemoteFailure> } = {},
   ) {
     const clientId = bindings.DISCORD_CLIENT_ID?.trim();
@@ -90,12 +81,9 @@ export class DiscordAppService {
     this.#flushAuthEvents = options.flushAuthEvents ?? (() => Effect.void);
   }
 
-  /** Where Discord sends the browser back. A development API can name its public origin. */
   redirectUri(requestUrl: string): string {
     return new URL("/v2/discord/callback", this.#developmentOrigin ?? requestUrl).toString();
   }
-
-  /** The Discord install URL for one connect of one host that the account owns. */
 
   readonly authorizeUrl = Effect.fn("DiscordAppService.authorizeUrl")(function* (
     this: DiscordAppService,
@@ -128,18 +116,9 @@ export class DiscordAppService {
     url.searchParams.set("response_type", "code");
     url.searchParams.set("redirect_uri", input.redirectUri);
     url.searchParams.set("state", state);
-    // A guild install, not a user install.
     url.searchParams.set("integration_type", "0");
     return url.toString();
   }).bind(this);
-
-  /**
-   * Exchanges the code, links the guild to the host in `state`, and seals the link to the host key.
-   * Returns what the desktop needs: the nonce, to find its connect, and the sealed grant.
-   *
-   * A guild answers to one host. The account that connected it can move it to another of its hosts;
-   * another account gets `discord_guild_taken` until the first host disconnects.
-   */
 
   readonly complete = Effect.fn("DiscordAppService.complete")(function* (
     this: DiscordAppService,
@@ -159,7 +138,6 @@ export class DiscordAppService {
       }),
     );
     const body = yield* discordCall(() => response.json().catch(() => null));
-    // OpenBot does not use the user token. Revoke it at once; a failure does not stop the connect.
     if (isDynamicRecord(body) && isString(body.access_token)) yield* this.#revoke(body.access_token);
     if (!response.ok) {
       return yield* new DiscordAppError(502, "discord_exchange_failed", "Discord did not accept the install.");
@@ -167,9 +145,6 @@ export class DiscordAppService {
     const { guild } = yield* Schema.decodeUnknownEffect(DiscordGrant)(body).pipe(
       Effect.mapError(() => new DiscordAppError(502, "discord_exchange_failed", "Discord did not accept the install.")),
     );
-    // One statement, so two connects at once cannot both win. Another account's row stays as it is.
-    // When the link is made, Signal drops any older route of the guild: a host that the guild moved
-    // away from cannot keep it with the ticket it holds.
     const now = this.#now();
     const [linked] = yield* discordCall(() =>
       this.#database.batch([

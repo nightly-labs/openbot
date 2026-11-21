@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("billing", {
-  // The Billing tab in Settings and the Billing dialog in the web client.
   "billing.title": "Billing",
   "billing.description": "Each server has its own plan. Stripe handles the payment.",
   "billing.loading": "Loading billing…",
@@ -19,9 +18,7 @@ export const messages = defineMessages("billing", {
   "billing.plan.standard": "Standard",
   "billing.plan.pro": "Pro",
   "billing.server.unnamed": "Unnamed server",
-  // For example "Standard · 50 GB".
   "billing.server.summary": "{plan} · {size} GB",
-  // {amount} is a formatted price, for example "€40".
   "billing.server.price.month": "{amount} / month",
   "billing.server.price.year": "{amount} / year",
   "billing.server.renews": "Renews on {date}",
@@ -31,10 +28,13 @@ export const messages = defineMessages("billing", {
   "billing.status.paused": "Paused",
   "billing.otherServers": "Other servers",
   "billing.action.menu": "Plan actions for {server}",
-  "billing.action.change": "Change plan",
+  "billing.action.addStorage": "Add storage",
   "billing.action.cancel": "Cancel plan",
   "billing.action.renew": "Renew plan",
   "billing.action.updatePayment": "Update payment method",
+  "billing.storage.title": "More space for {server}",
+  "billing.storage.add": "Add {size}",
+  "billing.storage.failed": "Could not add storage.",
   "billing.lifecycle.cancelRenewal": "Cancel renewal",
   "billing.lifecycle.cancelTitle": "Cancel renewal for {name}?",
   "billing.lifecycle.cancelDescription":
@@ -76,7 +76,6 @@ export const messages = defineMessages("billing", {
   "billing.lifecycle.deleted": "{name} was deleted. Its subscription has ended.",
   "billing.lifecycle.label": "Design preview · Mock actions only",
   "billing.lifecycle.reset": "Reset preview",
-  // The commercial license of the account, above the server plans.
   "billing.license.title": "License",
   "billing.license.description": "For work at a company. It does not include a server.",
   "billing.license.loadFailed": "Could not load the license.",
@@ -86,27 +85,22 @@ export const messages = defineMessages("billing", {
   "billing.license.personal.title": "Personal use",
   "billing.license.personal.description": "Free for noncommercial use.",
   "billing.license.status.ended": "Ended",
-  // A badge on the row of what the account has now, above the commercial license offer.
   "billing.license.current": "Current",
   "billing.license.ended": "The license ended on {date}.",
   "billing.license.buy": "Buy a license",
-  // The row under the current license row that sells a license. {count} is the smallest Team license.
   "billing.license.offer.title": "Commercial license",
   "billing.license.offer.description": "Starter for 1 user, or Team for {count} or more users.",
   "billing.license.buy.description": "How many people use OpenBot at work? AI agents are not users.",
   "billing.license.buy.confirm": "Continue to payment",
   "billing.license.trial.until": "Free until {date}",
   "billing.license.trial.confirm": "Start free trial",
-  // {used} people use the license; it is paid for {users}.
   "billing.license.work.used": "{used} of {users} users",
   "billing.license.tier.starter.title": "Starter license",
   "billing.license.tier.team.title": "Team license",
   "billing.license.starter.inUse": "{used} people use your servers. Starter is for 1 user.",
   "billing.license.users.label": "Users",
   "billing.license.line.base": { one: "First {count} user", other: "First {count} users" },
-  // For example "3 more users × €15".
   "billing.license.line.extra": "{extra} more × {price}",
-  // {currency} is a currency code, for example "EUR".
   "billing.license.total.month": "/ month, {currency}",
   "billing.license.total.year": "/ year, {currency}",
   "billing.license.contact.action": "Contact us",
@@ -123,7 +117,6 @@ export const messages = defineMessages("billing", {
   "billing.license.overLimitOneUser":
     "{used} people use the license, but it is for 1 user. Change it to Team so that new people can join.",
   "billing.license.covered.title": "Covered by a license",
-  // {owners} is a list of names, for example "Ana and Jan".
   "billing.license.covered.description": "Work on servers of {owners} is covered by their license.",
   "billing.license.change.title": "Change users",
   "billing.license.change.description": "Now: {users} users, {amount} a month. AI agents are not users.",
@@ -150,26 +143,21 @@ export const messages = defineMessages("billing", {
   "billing.license.cancel.descriptionNow":
     "The license ends at the end of the paid period. Your servers are not affected.",
   "billing.license.cancel.keep": "Keep license",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Billing period",
   "billing.order.currency": "Currency",
   "billing.order.monthly": "Monthly",
   "billing.order.yearly": "Yearly",
-  // {percent} is a whole number, such as 20.
   "billing.order.yearlySaving": "−{percent}% yearly",
   "billing.order.server.title": "Hosted server",
   "billing.order.server.summary": "We run OpenBot for your team.",
   "billing.order.server.none": "No server",
   "billing.order.server.noneDetail": "Run OpenBot on your own computer",
-  // The free choice of the order form in the app, which already runs on this computer. The web page says "No server".
   "billing.order.server.thisComputer": "Your computer",
   "billing.order.server.bestValue": "Best value",
   "billing.order.server.bestFor.starter": "Best for one person",
   "billing.order.server.bestFor.standard": "Best for a small team",
   "billing.order.server.bestFor.pro": "Best for heavy browser work",
-  // {size} is a whole number of gigabytes.
   "billing.order.server.storage": "{size} GB storage",
-  // {speed} is how many times faster than the Starter server, such as 2.
   "billing.order.server.speed": "{speed}× speed",
   "billing.order.license.title": "License",
   "billing.order.license.summary": "To use OpenBot at work.",
@@ -177,9 +165,7 @@ export const messages = defineMessages("billing", {
   "billing.order.license.noneDetail": "Personal and noncommercial use",
   "billing.order.license.starter": "Starter license",
   "billing.order.license.team": "Team license",
-  // {percent} is a whole number, such as 20.
   "billing.order.license.bundleSaving": "−{percent}% with your server",
-  // {included} is the number of members in the base price. {price} is the monthly price of one more member.
   "billing.order.license.teamDetail": "{included} included, +{price} for each more",
   "billing.order.license.serverMembers": {
     one: "Your server has {count} member",
@@ -190,30 +176,25 @@ export const messages = defineMessages("billing", {
   "billing.order.license.more": "More members",
   "billing.order.memberCount": { one: "{count} member", other: "{count} members" },
   "billing.order.summary.title": "Your plan",
-  // {plan} is a server plan name, such as Standard.
   "billing.order.summary.server": {
     one: "{plan} server, {count} member",
     other: "{plan} server, up to {count} members",
   },
   "billing.order.summary.starterLicense": "Starter license, 1 member",
   "billing.order.summary.license": { one: "Team license, {count} member", other: "Team license, {count} members" },
-  // {percent} is a whole number, such as 20.
   "billing.order.summary.yearlyDiscount": "Yearly discount ({percent}%)",
   "billing.order.summary.bundleDiscount": "Bundle discount",
   "billing.order.summary.personal": "Personal use on your own computer",
   "billing.order.summary.total": "Total",
   "billing.order.unit.month": "a month",
   "billing.order.unit.monthBilledYearly": "a month, billed yearly",
-  // The unit beside the total for a visitor in the EU: the prices do not include VAT.
   "billing.order.unit.monthExclVat": "a month, excl. VAT",
   "billing.order.unit.monthBilledYearlyExclVat": "a month, billed yearly, excl. VAT",
   "billing.order.unit.free": "forever",
   "billing.order.cta.server": "Create a server",
   "billing.order.cta.license": "Buy a license",
   "billing.order.cta.download": "Download",
-  // The button of the order form in the app when the order has no server and no license. It closes the page.
   "billing.order.cta.keepComputer": "Keep using this computer",
-  // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "Add a user to the license?",
   "billing.license.invite.description": "This invite adds 1 user to your license: {price} more a month.",
   "billing.license.invite.confirm": "Add user and invite",
@@ -225,4 +206,51 @@ export const messages = defineMessages("billing", {
     other:
       "Your license has {count} users, the maximum. Contact us for a larger license. New people cannot join your servers.",
   },
+  "billing.details.country": "Billing country",
+  "billing.details.countryPlaceholder": "Select a country",
+  "billing.details.vatId": "EU VAT ID (optional)",
+  "billing.details.vatIdInvalid": "This is not a VAT ID of the selected country.",
+  "billing.details.countryMissing": "Select your billing country.",
+  "billing.details.saveFailed": "Could not save the billing details",
+  "billing.referral.split":
+    "Your friend gets {percent} off the first payment. You get {percent} of each payment of your friend, as credit.",
+  "billing.referral.split.friend": "{percent} off the first payment of your friend",
+  "billing.referral.split.you": "{percent} credit for you",
+  "billing.referral.link.title": "Your link",
+  "billing.referral.link.label": "Your invite link",
+  "billing.referral.link.copy": "Copy link",
+  "billing.referral.link.copied": "Link copied",
+  "billing.referral.link.copyFailed": "Could not copy the link.",
+  "billing.referral.credit.title": "Your credit",
+  "billing.referral.credit.none": "None",
+  "billing.referral.credit.next": "Goes to your next invoice.",
+  "billing.referral.credit.empty": "Starts when a friend pays a second time, or 30 days after a yearly payment.",
+  "billing.referral.credit.pendingTitle": "Waiting",
+  "billing.referral.credit.pending":
+    "Ready after a friend pays a second time. A yearly payment gets ready in 12 parts, one each 30 days. Goes to your credit when full.",
+  "billing.referral.credit.progress": "{ready} of {minimum} ready",
+  "billing.referral.credit.earnedTitle": "Earned in total",
+  "billing.referral.friends.title": "Friends",
+  "billing.referral.filter.label": "Show friends",
+  "billing.referral.filter.all": "All",
+  "billing.referral.filter.paying": "Paying",
+  "billing.referral.filter.noPlan": "No plan",
+  "billing.referral.filter.stopped": "Stopped",
+  "billing.referral.empty.all": "No friend has joined with your link yet.",
+  "billing.referral.empty.paying": "No friend pays now.",
+  "billing.referral.empty.noPlan": "Each friend has a plan.",
+  "billing.referral.empty.stopped": "No friend stopped paying.",
+  "billing.referral.friend.unnamed": "Friend with no name",
+  "billing.referral.friend.joined": "Joined on {date}",
+  "billing.referral.friend.paying": "Joined on {date} · paying since {since}",
+  "billing.referral.friend.stopped": "Joined on {date} · stopped on {stopped}",
+  "billing.referral.friend.earned": "{amount} credit",
+  "billing.referral.friend.pending": "{amount} waiting",
+  "billing.referral.pages.label": "Pages of friends",
+  "billing.referral.pages.range": "{first}–{last} of {total}",
+  "billing.referral.pages.previous": "Previous page",
+  "billing.referral.pages.next": "Next page",
+  "billing.referral.loading": "Loading your invite link…",
+  "billing.referral.loadFailed": "Could not load your invite link.",
+  "billing.referral.unavailable": "Invite links are not available on this account server.",
 });

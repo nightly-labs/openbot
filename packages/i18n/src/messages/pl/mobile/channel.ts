@@ -86,6 +86,31 @@ export const messages = {
   "mobile.channel.form.deleteBody":
     "To zatrzyma kanał. Jego historia zostanie w sekcji „Usunięte kanały” tylko do podglądu. Można go stamtąd przywrócić. Agenci należący do kanału zostaną zachowani.",
   "mobile.channel.form.delete": "Usuń kanał",
+  "mobile.channel.newConversation.title": "Nowa rozmowa",
+  "mobile.channel.newConversation.starting": "Rozpoczynanie nowej rozmowy…",
+  "mobile.channel.newConversation.footer": "Członkowie zapominają wcześniejsze wiadomości. Ustawienia kanału zostają.",
+  "mobile.channel.newConversation.confirmTitle": "Rozpocząć nową rozmowę w {name}?",
+  "mobile.channel.newConversation.confirmBody":
+    "Członkowie zapominają wcześniejsze wiadomości tego kanału. Wiadomości zostają widoczne nad separatorem. Członkowie, instrukcje, wspomnienia i rutyny się nie zmieniają.",
+  "mobile.channel.newConversation.confirm": "Rozpocznij nową rozmowę",
+  "mobile.channel.newConversation.failed": "Nie udało się rozpocząć nowej rozmowy",
+  "mobile.channel.newConversation.failedBody": "Host nie mógł rozpocząć nowej rozmowy.",
+  "mobile.channel.compact.title": "Kompaktuj kontekst",
+  "mobile.channel.compact.compacting": "Rozpoczynanie kompaktowania…",
+  "mobile.channel.compact.footer": "Członkowie zachowują krótkie podsumowanie sesji kanału i zużywają mniej tokenów.",
+  "mobile.channel.compact.started": "Kompaktowanie rozpoczęte. Dostawcy członków skracają kontekst na hoście.",
+  "mobile.channel.compact.failed": "Nie udało się skompaktować kontekstu kanału",
+  "mobile.channel.compact.failedBody": "Host nie mógł skompaktować kontekstu.",
+  "mobile.channel.deleteHistory.title": "Usuń historię",
+  "mobile.channel.deleteHistory.deleting": "Usuwanie historii…",
+  "mobile.channel.deleteHistory.footer":
+    "Wiadomości znikają, a członkowie o nich zapominają. Konfiguracja kanału zostaje.",
+  "mobile.channel.deleteHistory.confirmTitle": "Usunąć historię kanału {name}?",
+  "mobile.channel.deleteHistory.confirmBody":
+    "Wszystkie wiadomości i pliki tego kanału znikną z OpenBot, a członkowie o nich zapomną. Nie można tego cofnąć. Członkowie, instrukcje, wspomnienia, rutyny i zadania się nie zmienią.",
+  "mobile.channel.deleteHistory.confirm": "Usuń historię",
+  "mobile.channel.deleteHistory.failed": "Nie udało się usunąć historii",
+  "mobile.channel.deleteHistory.failedBody": "Host nie mógł usunąć historii.",
   "mobile.channel.form.unavailable":
     "Aby wprowadzić zmiany, połącz się z serwerem desktopowym, który obsługuje kanały.",
   "mobile.channel.form.invalidName": "Wpisz prawidłową nazwę kanału.",

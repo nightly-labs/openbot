@@ -1,7 +1,7 @@
 import { ANALYTICS_GENERATIONS } from "@openbot/telemetry";
-import { OpenPanel, type TrackHandlerPayload } from "@openpanel/react-native";
-import * as Application from "expo-application";
+import type { TrackHandlerPayload } from "@openpanel/react-native";
 import { Platform } from "react-native";
+import { nativeApplication, nativeApplicationVersion, nativeBuildVersion } from "@/shared/lib/native-application";
 import { MobileAnalytics } from "./analytics-core";
 import { MOBILE_EVENTS, type MobileEventName, sanitizeMobileEvent } from "./events";
 import { mobileReportQueue } from "./failure-reports";
@@ -11,13 +11,10 @@ const metadata = {
   environment: "production",
   event_schema_version: ANALYTICS_GENERATIONS.mobile,
   platform: Platform.OS,
-  app_version: Application.nativeApplicationVersion ?? "unknown",
-  build_number: Application.nativeBuildVersion ?? "unknown",
+  app_version: nativeApplicationVersion() ?? "unknown",
+  build_number: nativeBuildVersion() ?? "unknown",
 };
 
-// RN's SDK adds Android install referrers and paths itself. Replace its final
-// properties so those additions cannot expose campaign URLs or route identifiers.
-// With tracking off, only events go, each with the install ID and no account.
 function filterMobilePayload(event: TrackHandlerPayload): boolean {
   if (!mobileAnalytics.isSending()) return false;
   const installId = mobileAnalytics.anonymousProfileId();
@@ -53,9 +50,11 @@ export const mobileAnalytics = new MobileAnalytics(() => {
     process.env.EXPO_PUBLIC_APP_ENV !== "production" ||
     !clientId ||
     !clientSecret ||
-    (Platform.OS !== "ios" && Platform.OS !== "android")
+    (Platform.OS !== "ios" && Platform.OS !== "android") ||
+    !nativeApplication
   )
     return null;
+  const { OpenPanel }: typeof import("@openpanel/react-native") = require("@openpanel/react-native");
   const client = new OpenPanel({
     apiUrl: "https://analytics.openbot.run/api",
     clientId,
@@ -63,8 +62,6 @@ export const mobileAnalytics = new MobileAnalytics(() => {
     filter: filterMobilePayload,
     debug: false,
   });
-  // The SDK retries below its payload filter. Keep one signal for each consent
-  // period so even retries delayed until after opt-in remain aborted.
   let transport = new AbortController();
   const send = client.api.fetch.bind(client.api);
   client.api.fetch = (path, data, options) => send(path, data, { ...options, signal: transport.signal });

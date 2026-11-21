@@ -8,11 +8,14 @@ export const messages = {
   "status.agent.instructionsChanged": "Talimatlarını güncelledi",
   "status.agent.modelSwitchedForLimit": "Kullanım sınırına ulaşıldı. {model} modeline geçildi.",
   "status.agent.modelReturnedAfterLimit": "Kullanım sınırı bitti. {model} modeline geri dönüldü.",
+  "status.agent.routineSkippedRunOpen": "Atlandı: son çalıştırma henüz bitmemişti",
+  "status.agent.routineSkippedUsageLimit": "Atlandı: kullanım sınırına ulaşıldı",
   "status.agent.modelSwitchedForError": "Sağlayıcı hatası. {model} modeline geçildi.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} için kredi kalmadı. {model} modeline geçildi. Yeniden kullanmak için kredi ekleyin ve sonra seçin.",
   "status.agent.modelReturnedAfterError": "Sağlayıcı hatasından sonra {model} modeline geri dönüldü.",
   "status.agent.marketplaceSuggested": "Bir Pazaryeri uygulaması önerildi: {app}.",
+  "status.agent.settingShown": "Bir ayar gösterildi: {setting}.",
   "status.agent.channelMemberAdded": "{agent}, {member} ajanını kanala ekledi. İsteyen: {person}.",
   "status.agent.channelMemberRemoved": "{agent}, {member} ajanını kanaldan çıkardı. İsteyen: {person}.",
   "status.agent.channelInstructionsChanged": "{agent}, kanal talimatlarını değiştirdi. İsteyen: {person}.",
@@ -23,22 +26,41 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Ana ekranı yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureChannel":
     "Görüntü {channel} kanalında görünür ve bu sunucuda kanalı okuyan her üye onu görebilir.",
+  "status.agent.screenCapturePermissionNext": "Ardından macOS, OpenBot için Ekran Kaydı'na izin vermenizi isteyebilir.",
   "status.agent.screenCaptureDisplay": "{name} ekranını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureWindow": "{name} penceresini yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureRegion":
     "{x}, {y} konumundaki {width} × {height} noktalık ekran alanını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.reportProblem":
     "Bu, uygulama sürümü ve sisteminizle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
+  "status.agent.reportPhoneProblem":
+    "Bu; uygulama sürümü, sisteminiz ve telefonunuzun sürümü, sistemi ve destek günlüğüyle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
   "status.agent.sendIdea": "Bu, herkese açık bir GitHub issue'su olur. Adın gösterilmez.",
   "status.agent.feedbackRecentErrors": "Sohbetteki son hatalar:",
   "status.agent.feedbackSameAs": "#{issue} numaralı issue'ya eklenir",
   "status.agent.feedbackSent": "OpenBot ekibine gönderildi: {title}",
+  "status.agent.feedbackWithdrawn": "GitHub'dan kaldırıldı: {title}",
+  "status.agent.feedbackWithdrawCommand": "#{issue} numaralı raporu GitHub'dan kaldır",
+  "status.agent.feedbackWithdrawReason":
+    "Bu raporu artık kimse GitHub'da göremez. Bu işlem geri alınamaz. Düzeltmek için ajan düzeltilmiş bir rapor gönderebilir.",
+  "status.agent.feedbackWithdrawing": "Raporunuz GitHub'dan kaldırılıyor…",
   "status.agent.serverInstallCommand":
     "OpenBot'u başka bir bilgisayara {name} sunucusu olarak kuran ve hesabınızda oturum açan tek kullanımlık bir komut oluştur. Ajan onu orada çalıştırır.",
   "status.agent.serverInstallCard": "{name} sunucusu için kurulum komutu",
+  "status.agent.browserProfileNamed":
+    "{agents} ajanlarını {profile} tarayıcı profiline taşı. Onun oturum açma bilgilerini ve çerezlerini alırlar. Açık sekmeleri kapanır.",
+  "status.agent.commitCoAuthorOff": "Tüm ajanların commit'lerine OpenBot'u ortak yazar olarak eklemeyi durdur.",
+  "status.agent.commitCoAuthorOn": "Tüm ajanların commit'lerine OpenBot'u yeniden ortak yazar olarak ekle.",
+  "status.agent.browserProfileNew":
+    "Yeni {profile} tarayıcı profilini oluştur ve {agents} ajanlarını oraya taşı. Hiç oturum açma bilgisi yoktur. Açık sekmeleri kapanır.",
+  "status.agent.browserProfileShared":
+    "{agents} ajanlarını paylaşılan tarayıcı profiline taşı. Onun oturum açma bilgilerini ve çerezlerini alırlar. Açık sekmeleri kapanır.",
+  "status.agent.browserProfileOwn":
+    "{agents} ajanlarının her birine kendi tarayıcı profilini ver. Açık sekmeleri kapanır.",
   "status.agent.feedbackSending": "Geri bildiriminiz OpenBot ekibine gönderiliyor…",
   "status.agent.workflowDelete":
     "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",
+  "status.agent.deleteAgents": "{agents} ajanlarını sohbetleri ve dosyalarıyla birlikte silin. Bu işlem geri alınamaz.",
   "status.agent.screenCaptureProgress": "Ekranı yakalamak için izin isteniyor…",
   "status.agent.screenCaptureReviewing": "Ekran görüntüsü inceleniyor…",
   "status.agent.browserOpening": "Web sayfası açılıyor…",
@@ -48,12 +70,14 @@ export const messages = {
   "status.agent.browserActing": "Web sayfası kullanılıyor…",
   "status.agent.browserReviewing": "Web sayfası inceleniyor…",
   "status.agent.memoriesSearching": "Belleklerinde arıyor…",
+  "status.agent.chatsSearching": "Önceki sohbetlerinde arıyor…",
   "status.agent.memoriesSearched": {
     one: "Belleklerinde aradı: {count} bulundu",
     other: "Belleklerinde aradı: {count} bulundu",
   },
   "status.agent.memoriesUpdating": "Belleklerini güncelliyor…",
   "status.agent.skillUsing": "{name} becerisini kullanıyor…",
+  "status.agent.backdropSetting": "Arka plan değiştiriliyor…",
   "status.agent.skillReading": "Bir beceri okuyor…",
   "status.agent.toolStepFailed":
     "Bir araç adımı başarısız oldu; sonucu inceliyor ve sırada neyi deneyeceğine karar veriyor…",
@@ -86,8 +110,12 @@ export const messages = {
   "status.agent.memoryChanges": "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu.",
   "status.agent.memoryChangesWithConflicts":
     "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu, {notChanged} değiştirilmedi çünkü önce başka bir mesaj dizisi değiştirdi.",
+  "status.agent.mcpToolCall": "{name} MCP sunucusunun {tool} aracını çalıştır.",
+  "status.agent.uiBlockClosedByMessage": "Yeni bir mesajla kapatıldı",
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
+  "status.agent.planStopped": "Ajan, planında açık adımlar varken durdu. Devam etmesi için bir mesaj gönderin.",
   "status.agent.compactionContinues": "Ajan bağlamını sıkıştırırken bağlantı kesildi. Ajan devam ediyor.",
+  "status.agent.providerExitContinues": "Ajan yanıtını bitirmeden durdu. Ajan devam ediyor.",
   "status.agent.branchTitle": "Dallandırılmış sohbet",
 } as const satisfies PartialTranslation<typeof source>;

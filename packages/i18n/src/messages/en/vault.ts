@@ -1,12 +1,11 @@
 import { defineMessages } from "../../message";
 
-/** The Vault section of the server settings: logins, cards and contact info that agents fill into pages, and API keys. */
 export const messages = defineMessages("vault", {
   "vault.items.title": "Saved items",
   "vault.items.description":
-    "Every agent on this server can use these items. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a private file, not from the chat.",
+    "Every agent on this server can use these items. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a file, not from the chat.",
   "vault.items.scopedDescription":
-    "Each item is for the agents that you choose. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a file, not from the chat.",
+    "Each item is for the agents that you choose. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a file, not from the chat. All agents run as the same system user, so an agent can also read an API key file that is for other agents.",
   "vault.agents.label": "Agents",
   "vault.agents.all": "All agents",
   "vault.agents.some": "{chosen} of {total}",
@@ -124,7 +123,6 @@ export const messages = defineMessages("vault", {
   "vault.reset": "Reset Vault",
   "vault.resetTitle": "Reset the Vault?",
   "vault.resetDescription": "OpenBot deletes the Vault file and all items in it. You cannot undo this.",
-  // Chat card: an agent asks the user to add a Vault item. The agent never sees its secrets.
   "vault.request.private": "Goes to your Vault. {agent} never sees it.",
   "vault.request.privateUnnamed": "Goes to your Vault. The agent never sees it.",
   "vault.request.addLogin": "Add login",
@@ -133,7 +131,6 @@ export const messages = defineMessages("vault", {
   "vault.request.addApiKey": "Add API key",
   "vault.request.apiKeyPrivate": "Goes to your Vault, not into the chat.",
   "vault.request.saved": "Saved to Vault",
-  // Two-step (TOTP) code of a login: the live code, and the setup of its key in the login dialog.
   "vault.twoStep.title": "Two-step code",
   "vault.twoStep.on": "On",
   "vault.twoStep.off": "Off. Agents ask you for the code.",

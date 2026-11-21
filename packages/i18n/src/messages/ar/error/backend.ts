@@ -80,7 +80,12 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "انتظر حتى يتوقف العمل في هذه القناة، ثم احذف سجلها.",
   "error.backend.channelCompactUnavailable":
     "لا يمكن لأي عضو في هذه القناة ضغط سياقه الآن. يجب أن يرد العضو في القناة أولًا، وأن يدعم مزوده الضغط.",
+  "error.backend.channelCompactNoSession":
+    "لا توجد لأعضاء هذه القناة محادثة لضغطها بعد. اضغطها بعد أن يرد عضو في القناة.",
+  "error.backend.channelCompactNotSupported":
+    "لا يمكن لأي عضو في هذه القناة الضغط عند الطلب. الأعضاء الذين يدعمونه يضغطون سياقهم تلقائيًا عندما يكاد يمتلئ.",
   "error.backend.channelArchived": "استعد هذه القناة قبل إرسال الرسائل أو تغيير المهام.",
+  "error.backend.channelArchiveRunning": "أوقف العمل الجاري في هذه القناة، ثم احذفها.",
   "error.backend.channelReferenceUnavailable": "رسالة القناة المشار إليها غير متاحة.",
   "error.backend.channelTaskNotFound": "لم يتم العثور على مهمة القناة.",
   "error.backend.channelTaskComplete": "هذه المهمة مكتملة بالفعل.",
@@ -111,6 +116,8 @@ export const messages = {
   "error.backend.memoryGone": "هذه الذكرى لم تعد موجودة.",
   "error.backend.routineGone": "هذه المهمة الدورية لم تعد موجودة.",
   "error.backend.routineRunGone": "تشغيل المهمة الدورية هذا لم يعد موجودًا.",
+  "error.backend.routineRunFailedNoReason":
+    "توقف التشغيل بسبب خطأ، لكن لم يصل معه أي سبب. افتح التشغيل لترى ما فعله الوكيل.",
   "error.backend.turnNotStarted": "لم يبدأ المزوّد هذا الدور.",
   "error.backend.routineResultConnectionOff": "اتصال المراسلة هذا متوقف أو تمت إزالته. اختر مكانًا آخر.",
   "error.backend.routineResultNoDelivery": "لا توجد لهذا التشغيل إجابة لإرسالها مرة أخرى.",
@@ -187,6 +194,8 @@ export const messages = {
   "error.backend.interruptSelf": "لا يمكن للوكيل مقاطعة نفسه.",
   "error.backend.interruptOtherWork":
     "يعمل هذا الوكيل على مهمة لم تبدأها رسالتك. يمكن للمستخدم أو لمرسل تلك المهمة فقط إيقافها.",
+  "error.backend.interruptSharedWork":
+    "يعمل دور هذا الوكيل على رسالتك وأيضًا على رسالة من المستخدم أو من وكيل آخر. المستخدم وحده يمكنه إيقافه، باستخدام إيقاف الوكيل في محادثة ذلك الوكيل.",
   "error.backend.interruptStarting": "لا يزال هذا الوكيل يبدأ دورًا. حاول مرة أخرى بعد بدء الدور.",
   "error.backend.interruptNoSession": "لا يمكن لـ OpenBot مقاطعة هذا الوكيل لأن جلسة المزوّد غير متاحة.",
   "error.backend.memoryTextRequired": "يلزم نص الذكرى.",
@@ -203,7 +212,8 @@ export const messages = {
     "لدى هذا الوكيل بالفعل {count} انتظارات مفتوحة. أغلق انتظارًا باستخدام openbot.close_wait قبل فتح انتظار آخر.",
   "error.backend.agentWaitGone": "هذا الانتظار غير مفتوح. أغلقه الوكيل، أو ألغاه شخص ما.",
   "error.backend.agentWaitNoRequest": "يحتاج الانتظار إلى رسالة للمتابعة. لا توجد رسالة في هذا الدور.",
-  "error.backend.agentWaitOwnChatOnly": "افتح انتظارًا في دردشتك فقط. لا يمكن لمهمة قناة أو مراسلة أن تنتظر.",
+  "error.backend.agentWaitOwnChatOnly":
+    "افتح انتظارًا في دردشتك أو في سلسلة جانبية. لا يمكن لمحادثة قناة أو مراسلة أن تنتظر.",
   "error.backend.agentWaitNoteRequired": "اكتب ملاحظة قصيرة توضح سبب الانتظار.",
   "error.backend.agentWaitRoutineGone": "ليس لدى هذا الوكيل مهمة دورية بهذا المعرّف.",
   "error.backend.agentWaitNoRoutine":
@@ -221,11 +231,19 @@ export const messages = {
   "error.backend.mcpServerInvalid": "لا يمكن لـ OpenBot حفظ إعداد خادم MCP هذا.",
   "error.backend.mcpServerNoAnswer": "لم يُجب الخادم خلال {seconds} ثانية.",
   "error.backend.mcpSignInNotAccepted": "لم يقبل الخادم تسجيل الدخول هذا.",
+  "error.backend.mcpSignInAccountRefused":
+    "رفض الخادم الحساب الذي سجّلت الدخول به. تحقّق من أن هذا الحساب يمكنه استخدام الخدمة. لاستخدام حساب آخر، سجّل الخروج ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInClientRefused":
     "لم يقبل خادم تسجيل الدخول OpenBot عند إكمال تسجيل الدخول. سجّل الدخول مرة أخرى: سيسجّل OpenBot لدى الخادم مرة أخرى.",
+  "error.backend.mcpSignInAppRefused":
+    "لم يقبل خادم تسجيل الدخول تطبيق تسجيل الدخول لهذا الخادم. تحقّق من Client ID وClient secret لتطبيق تسجيل الدخول، ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpCommandNotFound": "لم يتم العثور على الأمر: {command}",
+  "error.backend.mcpProviderLimit":
+    "يمكن لهذا الوكيل استخدام عدد محدود فقط من خوادم MCP. لاستخدام هذا الخادم، أوقف خادم MCP لا يحتاجه الوكيل.",
   "error.backend.mcpRegistrationRefused":
     "لا يقبل خادم تسجيل الدخول OpenBot كتطبيق بعد. حسابك ليس السبب. استخدم طريقة أخرى للاتصال، مثل خادم MCP محلي.",
+  "error.backend.mcpRegistrationUnavailable":
+    "لا يستطيع خادم تسجيل الدخول تسجيل OpenBot كتطبيق. حسابك ليس السبب. للاتصال، احفظ هذا الخادم في المتجر، التطبيقات، ثم أضف إليه تطبيق تسجيل دخول.",
   "error.backend.mcpSignInAbandonedGeneric": "تم التخلي عن تسجيل الدخول.",
   "error.backend.mcpSignInForgotten": "تم نسيان تسجيل الدخول إلى MCP أثناء تشغيله.",
   "error.backend.mcpSignInAbandoned": "تم التخلي عن تسجيل الدخول إلى MCP.",
@@ -237,23 +255,40 @@ export const messages = {
     "يطلب هذا الخادم تسجيل الدخول، ولا يسجّل OpenBot الدخول إلا عبر https. غيّر URL إلى {url}.",
   "error.backend.mcpSignInCancelled": "تم إلغاء تسجيل الدخول.",
   "error.backend.mcpSignInTimedOut": "لم يكتمل تسجيل الدخول في المتصفح.",
+  "error.backend.mcpSignInRefused": "رفضت صفحة تسجيل الدخول الوصول. سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInResponseTimedOut": "لم تصل استجابة تسجيل الدخول في الوقت المحدد.",
   "error.backend.mcpSignInMetadataUnreadable":
     "تعذّر على OpenBot قراءة معلومات تسجيل الدخول لهذا الخادم. تحقق من عنوان الخادم وحاول مرة أخرى.",
   "error.backend.mcpSignInAnswerUnreadable":
     "أرسل خادم تسجيل الدخول ردًا لا يستطيع OpenBot قراءته. إذا كانت الخدمة تمنحك مفتاح API أو رمزًا، فأضفه إلى إعدادات هذا الخادم، ثم اختبر الاتصال مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
+  "error.backend.mcpServerExitedWithOutput": "توقف الخادم قبل أن يُجيب. كتب: {detail}",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
+  "error.backend.mcpServerStoppedDuringCall": "توقف خادم MCP قبل أن يرد على هذا الاستدعاء.",
   "error.backend.mcpToolSchemaRefused":
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
-    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح إعدادات MCP واختر تسجيل الدخول.",
+    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح {name} في المتجر، التطبيقات، واختر تسجيل الدخول.",
   "error.backend.mcpServerFailedForProvider":
-    "تعذّر على {provider} تشغيل خادم MCP {name}. افتح إعدادات MCP واختر اختبار الاتصال لمعرفة السبب.",
+    "تعذّر على {provider} تشغيل خادم MCP {name}. افتح {name} في المتجر، التطبيقات، واختر اختبار الاتصال لمعرفة السبب.",
+  "error.backend.mcpServerFailedInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}. أدواته غير متاحة لـ {provider}. يشغّل {provider} الخادم بنفسه، لذلك قد ينجح اختبار الاتصال في OpenBot. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم لم يردّ في الوقت المحدد. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم غير متاح الآن. انتظر بضع دقائق، ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "تعذّر على {provider} الوصول إلى خادم MCP {name}. افتح {name} في المتجر، التطبيقات، وتأكد من أن عنوانه صحيح وأن الخادم يعمل. ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.githubToolsNotStarted":
+    "تعذّر على {provider} الحصول على أدوات GitHub، لأن GitHub لم يردّ. افتح GitHub في المتجر، التطبيقات، واربطه مرة أخرى إذا طلب منك ذلك. ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpOAuthProxyUnavailable":
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":
     "انتهى تسجيل الدخول إلى خادم MCP هذا. يجب على المستخدم تسجيل الدخول إليه مرة أخرى في OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "تعذّر على OpenBot تجديد تسجيل الدخول إلى خادم MCP هذا الآن. يبقى تسجيل الدخول محفوظًا، وسيحاول الطلب التالي مرة أخرى. إذا استمر هذا الخطأ، يمكن للمستخدم تسجيل الخروج من الخادم في OpenBot ثم تسجيل الدخول مرة أخرى.",
   "error.backend.mcpServerUnreachable": "تعذّر على OpenBot الوصول إلى الخادم. تحقق من URL ومن شبكتك.",
   "error.backend.mcpLocalServerOff":
     "لا يُجيب أي خادم على {address} في هذا الحاسوب. شغّل الخادم، أو فعّله في التطبيق الذي يشغّله، ثم حاول مرة أخرى.",
@@ -283,6 +318,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "المجلد غير موجود أو حُذف بالفعل.",
   "error.backend.libraryFolderOtherAgent": "يمكن وضع الملف في مجلد تابع لوكيله فقط.",
   "error.backend.libraryFolderMoveInvalid": "لا يمكن نقل هذا المجلد إلى هناك.",
+  "error.backend.workflowFolderLimit": "يمكن أن يحتوي الخادم على {limit} من مجلدات مسارات العمل كحد أقصى.",
+  "error.backend.workflowFolderPlacementLimit": "توجد مسارات عمل كثيرة جدًا في المجلدات.",
   "error.backend.sectionNameDuplicate": "يجب أن تكون أسماء الأقسام فريدة.",
   "error.backend.directMessageRequired": "اكتب رسالة أولًا.",
   "error.backend.directMessageTooLong": "يمكن أن تحتوي الرسالة المباشرة على {limit} حرف كحد أقصى.",
@@ -312,12 +349,14 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط اختيار هذا الإجراء.",
   "error.backend.approvalInactive": "هذه الموافقة لم تعد نشطة.",
   "error.backend.approvalOwnerOnly": "يمكن لمالك الخادم فقط الموافقة على هذا الإجراء.",
+  "error.backend.feedbackNeedsPhone":
+    "يمكن لتطبيق OpenBot على الهاتف فقط إرسال هذا البلاغ، لأنه يضيف إصدار الهاتف وسجل الدعم. افتح هذه المحادثة على الهاتف. إذا ظهرت لك هذه الرسالة هناك، فحدّث تطبيق الهاتف.",
   "error.backend.takeoverInactive": "تولي التحكم في المتصفح هذا لم يعد نشطًا.",
   "error.backend.authSubmitting": "إرسال المصادقة قيد التنفيذ بالفعل.",
   "error.backend.apiKeySaveFailed": "تعذّر على OpenBot حفظ مفتاح API. حاول مرة أخرى.",
-  "error.backend.apiKeyNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط إدخال مفتاح API.",
   "error.backend.apiKeySaving": "يتم حفظ مفتاح API بالفعل.",
-  "error.backend.vaultItemNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط إضافة عنصر إلى الخزنة.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "تعذّر على OpenBot قراءة مفتاح API. أدخل مفتاحًا من 8000 حرف أو أقل، واختر من يمكنه استخدامه.",
   "error.backend.vaultItemSaving": "يتم حفظ عنصر الخزنة بالفعل.",
   "error.backend.authRequestInactive": "طلب المصادقة الآمنة هذا لم يعد نشطًا.",
   "error.backend.secureAuthUnavailable": "المصادقة الآمنة غير متاحة.",
@@ -338,6 +377,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "تغيّر هذا البروكسي بعد أن فتحته. راجعه مرة أخرى، ثم حاول مجددًا.",
   "error.backend.browserProxyUnreachable": "الوكيل {name} لا يستجيب، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserSystemProxyFailed":
+    "الوكيل في إعدادات الكمبيوتر الذي يشغّل OpenBot لا يستجيب أو رفض الاتصال، لذلك لم تُفتح الصفحة. تحقّق من إعدادات الوكيل في ذلك الكمبيوتر.",
   "error.backend.browserProxyComputerUnreachable":
     "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -356,7 +397,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "تعذّر تحميل النافذة المنبثقة. أعد محاولة تسجيل الدخول من الصفحة الأصلية.",
   "error.backend.browserTabNotFound": "لم يتم العثور على علامة تبويب المتصفح.",
   "error.backend.authActive": "المصادقة نشطة بالفعل.",
-  "error.backend.authHttpsRequired": "تتطلب المصادقة الآمنة HTTPS.",
+  "error.backend.authWebPageRequired": "تتطلب المصادقة الآمنة HTTP/HTTPS.",
   "error.backend.authDigitsRange": "تتطلب رموز المصادقة من 4 إلى 12 رقمًا.",
   "error.backend.authExpired": "انتهت صلاحية طلب المصادقة.",
   "error.backend.authDigitsRequired": "أدخل العدد المطلوب من الأرقام.",
@@ -372,6 +413,8 @@ export const messages = {
   "error.backend.mcpServerHttpCredentials": "أجاب الخادم بـ {status}. تحقق من مفتاح API أو بيانات الاعتماد الأخرى.",
   "error.backend.mcpServerHttpUrl":
     "أجاب الخادم بـ {status}. تحقق من URL. قد يكون الرابط خاطئًا أو منتهي الصلاحية أو محذوفًا.",
+  "error.backend.mcpServerBearerKey":
+    "يستخدم هذا الخادم مفتاح API، وليس تسجيل الدخول. في الترويسات، اجعل المفتاح Authorization والقيمة Bearer ثم مسافة ثم مفتاح API.",
   "error.backend.mcpSignInAppUrl": "يحتاج تطبيق تسجيل الدخول إلى URL خادم صالح.",
   "error.backend.mcpSignInAppClientId": "أدخل Client ID لتطبيق تسجيل الدخول.",
   "error.backend.mcpSignInAppIssuerChanged":
@@ -392,13 +435,16 @@ export const messages = {
   "error.backend.branchSourceBusy": "أوقف الدور الحالي قبل تفريع هذه الدردشة.",
   "error.backend.branchMessageNotFound": "يمكنك التفريع فقط من إجابة مكتملة للوكيل.",
   "error.backend.branchRemoteUnsupported": "التفريعات متاحة فقط للوكلاء على هذا الحاسوب.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "لإزالة هذا البلاغ، اطلب من الوكيل إزالته.",
   "error.backend.threadMoveRefused": "يمكن تشغيل الرسالة التي أرسلتها إلى هذا الوكيل وحده فقط في سلسلة جديدة.",
   "error.backend.taskTitleRequired": "امنح المهمة عنوانًا قصيرًا.",
   "error.backend.taskToolInvalid": "امنح المهمة عنوانًا من 120 حرفًا كحد أقصى ووصفًا موجزًا يوضح ما يجب فعله.",
+  "error.backend.taskControlInvalid": "أدخل taskId لمهمة بدأتها. تحتاج الرسالة أيضًا إلى نص.",
   "error.backend.taskOwnChatOnly": "ابدأ مهمة من دردشتك فقط. لا يمكن لقناة أو محادثة مراسلة أو مهمة أخرى بدء مهمة.",
   "error.backend.taskUnfinishedLimit":
     "لدى هذا الوكيل بالفعل {count} مهام غير مكتملة. ابدأ مهمة أخرى عند انتهاء إحداها.",
   "error.backend.taskOpenLimitReached": "لدى هذا الوكيل {count} مهام مفتوحة. أغلق مهمة، ثم ابدأ مهمة أخرى أو افتحها.",
   "error.backend.taskRemoteUnsupported": "المهام متاحة فقط للوكلاء على هذا الحاسوب.",
+  "error.backend.taskMessageFailed": "تعذّر على OpenBot إرسال الرسالة إلى المهمة. حاول مرة أخرى لاحقًا.",
   "error.backend.taskStartFailed": "تعذّر على OpenBot بدء المهمة. أنجز العمل في هذا الدور بدلًا من ذلك.",
 } as const satisfies PartialTranslation<typeof source>;

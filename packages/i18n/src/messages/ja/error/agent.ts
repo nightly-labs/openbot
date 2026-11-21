@@ -12,6 +12,18 @@ export const messages = {
     "ツールは実行されませんでした。tool_call の arguments はテキストではなく JSON オブジェクトにする必要があります。arguments をオブジェクトにして、もう一度呼び出してください。",
   "error.agent.toolCallDiscoveryTool":
     "ツールは実行されませんでした。tool_call では openbot.tool_search と openbot.tool_describe を実行できません。同じ引数で直接呼び出してください。",
+  "error.agent.toolCallEnvelopeKeys":
+    "ツールは実行されませんでした。tool_call が受け付けるのは name と arguments だけです。ツールの引数をオブジェクトとして arguments に入れ、もう一度呼び出してください。",
+  "error.agent.toolCallMissingName":
+    "ツールは実行されませんでした。tool_call に name がありません。tool_search が返す完全修飾名（例: openbot.history_read）を name に入れて、もう一度呼び出してください。",
+  "error.agent.toolCallUnknownTool":
+    "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。tool_search が返す正確な完全修飾名（例: openbot_browser.snapshot）を使ってください。",
+  "error.agent.toolCallUnknownToolSuggest":
+    "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。完全修飾名は {name} の可能性があります。その場合は、その名前でもう一度呼び出してください。",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe は {names} という名前の OpenBot ツールを見つけられませんでした。openbot.tool_search が一覧にする OpenBot とブラウザーのツールだけを説明し、MCP ツールは説明しません。",
+  "error.agent.toolDescribeDiscoveryNames":
+    "{names} は直接呼び出してください。tool_describe は検索ツールを説明しません。",
   "error.agent.routineScheduleArgumentsInvalid":
     "ルーティンのスケジュールが無効です: {detail} スケジュールを修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
   "error.agent.approvalWhileDeleting": "エージェントの削除中は承認できません。",
@@ -44,6 +56,12 @@ export const messages = {
   "error.agent.modelUnavailable": "選択したエージェントのモデルを使用できません。",
   "error.agent.modelProviderNotConnected":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} が接続されていません。",
+  "error.agent.modelProviderSignInRequired":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} へのサインインが必要です。{provider} にサインインしてから、もう一度お試しください。",
+  "error.agent.modelProviderNotInstalled":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} がインストールされていません。",
+  "error.agent.modelProviderOutdated":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} の更新が必要です。",
   "error.agent.modelListEmpty":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} はモデルを 1 つも返しませんでした。最後のエラー: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -56,6 +74,8 @@ export const messages = {
   "error.agent.modelNotListed": "モデル「{model}」は使用できません。使用できるモデル: {models}。",
   "error.agent.providerNotListed":
     "現在 {provider} のモデルを使用できません。list_models を呼び出して、使用できるモデルを確認してください。",
+  "error.agent.creatorModelNotListed":
+    "あなたのモデル「{model}」は現在モデル一覧にないため、新しいエージェントはこのモデルで開始できません。数秒後にもう一度試すか、list_models に表示されるモデルを provider と model に指定してください。",
   "error.agent.reasoningEffortUnsupported":
     "モデル「{model}」は推論レベル「{effort}」に対応していません。対応している推論レベル: {efforts}。",
   "error.agent.reasoningEffortNotConfigurable":
@@ -92,10 +112,18 @@ export const messages = {
     "このエージェントが使用していたエンドポイントは削除されました。別のモデルを選択してください。",
   "error.agent.turnStalled":
     "{provider} が応答しなくなったため、OpenBot はこのターンを終了しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
+  "error.agent.promptCancelled":
+    "{provider} が開始前にこのメッセージをキャンセルしました。メッセージをもう一度送信してください。",
   "error.agent.toolLoopStopped":
     "{provider} が失敗した手順を何度も繰り返したため、OpenBot はこのターンを停止しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
+  "error.agent.answerCutOff":
+    "エージェントが回答を終える前に停止したため、回答は完全ではありません。メッセージをもう一度送信してください。",
   "error.agent.compactionConnectionLost":
     "エージェントがコンテキストを圧縮している間に接続が切れたため、タスクが停止しました。インターネット接続を確認してから、メッセージを送って続けてください。",
+  "error.agent.compactionConnectionLostAddress":
+    "エージェントがコンテキストを圧縮している間に接続が切れたため、タスクが停止しました。インターネット接続を確認してください。{provider} の設定の「変数」にある {variable} が、モデルサービスの API アドレス（多くの場合 /v1 で終わります）であることも確認してください。その後、メッセージを送信してください。",
+  "error.agent.compactionLoopStopped":
+    "{provider} がコンテキストを何度も圧縮しましたが、毎回いっぱいのままで続行できなかったため、OpenBot はこのターンを停止しました。このエージェントに不要な MCP サーバーやコンピューター操作をオフにしてから、メッセージを送信してください。{provider} が圧縮するタイミングをあなたかエージェントが変更した場合は、その変更を元に戻してください。",
   "error.agent.selectedGone": "選択したエージェントはもう存在しません。",
   "error.agent.profileEndpointsChanged": "生成中にカスタムエンドポイントが変更されました。もう一度お試しください。",
   "error.agent.profileInvalid": "プロバイダーが無効なプロフィールを返しました。指示を修正してみてください。",
@@ -111,6 +139,12 @@ export const messages = {
   "error.agent.stopBeforeDelete": "削除する前に、エージェントを停止し、キュー内のメッセージをキャンセルしてください。",
   "error.agent.deleteIncomplete":
     "エージェントのデータを完全には削除できませんでした。エージェントの削除を再試行してください。",
+  "error.agent.deleteFolderInUse":
+    "別のエージェントの作業がまだこのエージェントのフォルダを使っています。その作業が終わったとき、または OpenBot を再起動したあとに、もう一度削除してください。",
+  "error.agent.deleteFolderLocked":
+    "別のプログラム（エージェントが起動したプログラムなど）がまだこのエージェントのフォルダを使っています。そのプログラムを閉じるか、このエージェントが動いているコンピューターを再起動してから、もう一度エージェントを削除してください。",
+  "error.agent.deleteWhenFolderFree":
+    "別のエージェントの作業がまだこのエージェントのフォルダを使っています。その作業が終わると、OpenBot がこのエージェントを削除します。",
   "error.agent.duplicationBusy": "このエージェントはすでに複製中です。",
   "error.agent.waitBeforeDuplicate": "複製する前に、エージェントが終わるまで待ち、キューを空にしてください。",
   "error.agent.saveOtherAgent": "この保存は別のエージェントのものです。",
@@ -152,8 +186,14 @@ export const messages = {
     "このサーバーはメモリーが不足しています。メッセージはキューで待機し、メモリーが空くと開始します。",
   "error.agent.workspaceOnlyToolMissing":
     "「ワークスペースのみ」には {tool} が必要ですが、OpenBot は見つけられませんでした。インストールするか、エージェントの設定で「フルアクセス」を選んでください。",
+  "error.agent.codexSandboxUnavailable":
+    "「ワークスペースのみ」には Codex のサンドボックスが必要ですが、このコンピューターでは Codex がサンドボックスを開始できないため、エージェントのコマンドが失敗します。エージェントの設定で「事前に確認」か「フルアクセス」を選んでください。",
   "error.agent.claudeSandboxUnavailable":
     "「ワークスペースのみ」には Claude のサンドボックスが必要ですが、このコンピューターでは Claude がサンドボックスを開始できません: {reason}。エージェントの設定で「フルアクセス」か別のプロバイダーを選んでください。",
+  "error.agent.claudeNoSandbox":
+    "このコンピューターでは Claude がサンドボックスを使えないため、「ワークスペースのみ」は使えません。エージェントの設定で「フルアクセス」か別のプロバイダーを選んでください。",
+  "error.agent.claudeSandboxBlocked":
+    "「ワークスペースのみ」には Claude のサンドボックスが必要ですが、このコンピューターでは Claude がサンドボックスを開始できないため、エージェントのコマンドが失敗します。エージェントの設定で「フルアクセス」か別のプロバイダーを選んでください。",
   "error.agent.screenCaptureOff":
     "このエージェントでは画面キャプチャがオフです。ユーザーはエージェントの設定で Computer Use をオンにできます。",
   "error.agent.screenCaptureUnavailable": "このコンピューターでは画面キャプチャを利用できません。",
@@ -161,6 +201,8 @@ export const messages = {
     "画面キャプチャは Slack、Discord、Telegram の会話では使えません。ほかの人がそのファイルを受け取るためです。",
   "error.agent.screenCaptureDeclined":
     "ユーザーはこの画面キャプチャを許可しませんでした。何もキャプチャされていません。",
+  "error.agent.mcpToolDeclined":
+    "ユーザーはこの MCP ツールの呼び出しを許可しませんでした。ツールは実行されていません。",
   "error.agent.screenCaptureWindowMissing":
     "そのウィンドウは現在開いていません。list_capture_sources を呼び出して、現在のウィンドウ ID を取得してください。",
   "error.agent.screenCaptureDisplayMissing":
@@ -169,6 +211,8 @@ export const messages = {
     "この領域は 1 つのディスプレイの中に収まっていません。list_capture_sources が返す 1 つのディスプレイの範囲内で、デスクトップのポイント座標を使ってください。",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot に画面収録の権限がありません。ユーザーに「システム設定」→「プライバシーとセキュリティ」→「画面収録とシステムオーディオ録音」を開いて OpenBot をオンにし、OpenBot を終了してから再度開くよう依頼してください。",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot にはまだ画面収録の権限がないため、ウインドウを一覧表示できません。ディスプレイをキャプチャするには、target screen で capture_screen を呼び出してください。ユーザーが先にキャプチャを承認し、その後 macOS がユーザーに権限を求めることがあります。",
   "error.agent.screenCaptureEmptyWindows":
     "Windows が空の画像を返しました。コンピューターのロックを解除し、保護されたコンテンツを閉じるようユーザーに依頼してください。組織のポリシーによって画面キャプチャが止められている場合もあります。",
   "error.agent.screenCaptureFailed": "画面キャプチャに失敗しました。もう一度お試しください。",

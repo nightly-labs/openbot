@@ -1,11 +1,3 @@
-// Checks that a Telegram answer notifies the people it mentions. Runs the real Telegram driver and
-// adapter; only Signal's relay of the Bot API calls is a stand-in, so no bot, account or network is
-// used. An answer with `@username` or `@<user id>` is a new post with live mentions, because an edit
-// notifies nobody, and the status post goes only after that post; an answer without one still edits
-// the status post; the plain-text fallback and a status post still mention nobody.
-//
-// Run: bun scripts/messaging-telegram-mentions-e2e.ts
-// Writes .openbot-build/messaging-telegram-mentions-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -42,9 +34,7 @@ interface Report {
 const report: Report = { steps: [], passed: false };
 const calls: Call[] = [];
 let nextMessageId = 500;
-/** While set, Telegram refuses the next HTML post as it refuses HTML that it cannot parse. */
 let refuseHtml = false;
-/** While set, Telegram refuses the next post, as for a chat that the bot left. */
 let refusePost = false;
 
 const unused = (): never => {
@@ -59,6 +49,7 @@ const ingress: MessagingIngress = {
   reconnect: () => {},
   discord: unused,
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
   telegram: {
     available: () => true,
     call<M extends TelegramCallMethod>(
@@ -102,7 +93,6 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
   }
 }
 
-/** The calls that `run` makes. */
 async function callsOf(run: () => Promise<unknown>): Promise<Call[]> {
   const from = calls.length;
   await run();
@@ -124,7 +114,7 @@ function parseModeOf(call: Call | undefined): string | undefined {
 
 const adapter = telegramDriver({ ingress }).createAdapter(
   { botId: BOT, chatId: CHAT, botUsername: "openbot_e2e_bot", chatTitle: "E2E group" },
-  { rateLimited: () => {} },
+  { connectionId: "telegram-e2e", rateLimited: () => {} },
 );
 const target = { platformChannelId: CHAT, replyThreadId: null };
 

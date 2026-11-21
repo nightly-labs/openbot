@@ -11,7 +11,6 @@ import {
   requestUser,
 } from "../../../../../../server/request-auth";
 
-// The company sign-in of a server. Only its owner reads or changes it.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/company-sign-in/")({
   server: {
     handlers: {

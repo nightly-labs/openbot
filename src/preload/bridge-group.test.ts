@@ -2,12 +2,7 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import { IPC_ENDPOINTS, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { beforeEach, expect, it, vi } from "vitest";
 
-// `bridgeGroup` builds these methods from `IPC_ENDPOINTS`, so no line of the preload names them.
-// These tests hold what the old literal methods held: the renderer sends at most its one input,
-// and nothing main answers or pushes reaches the renderer undecoded.
-
 const bridge = vi.hoisted(() => {
-  // The main window: the preload reads its URL for the server of a chat window.
   vi.stubGlobal("window", { addEventListener: () => {}, location: { search: "" } });
   const api: { current: OpenBotDesktopApi | null } = { current: null };
   return {
@@ -56,8 +51,6 @@ it("sends at most one input, and none when the caller passes none", async () => 
   bridge.invoke.mockResolvedValue({ text: "Hello" });
   const input = { audio: new Uint8Array([1, 2]) };
 
-  // A second argument is not part of the signature, but a renderer can still pass one: a method
-  // with fewer parameters fits a callback type that has more, such as an event handler.
   const transcribe: (value: typeof input, extra: string) => Promise<unknown> = api().voice.transcribe;
   await expect(transcribe(input, "extra")).resolves.toEqual({ text: "Hello" });
   expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_ENDPOINTS.voice.transcribe.channel, input);
@@ -67,7 +60,6 @@ it("sends at most one input, and none when the caller passes none", async () => 
   expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_ENDPOINTS.voice.getModelStatus.channel);
 });
 
-// Main reads the server from the scope and routes to it, so a wrong server acts on another host.
 it("scopes a request to the selected server unless the caller names one", async () => {
   bridge.invoke.mockResolvedValue([]);
 
@@ -82,7 +74,6 @@ it("scopes a request to the selected server unless the caller names one", async 
     payload: "agent-1",
   });
 
-  // A scope that carries nothing takes the server as its only argument.
   await api().agent.listAgents();
   expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_ENDPOINTS.agent.listAgents.channel, {
     serverId: LOCAL_SERVER_ID,
@@ -118,8 +109,6 @@ it("decodes an event and stops at unsubscribe", () => {
   expect(listener).toHaveBeenCalledTimes(1);
 });
 
-// The slug began in a URL a web page chose. A bad one is dropped, as the guard before it did,
-// rather than thrown into the listener of a window that did nothing wrong.
 it("drops a deep-link event that does not decode", () => {
   const channel = IPC_ENDPOINTS.plugins.openListing.channel;
   const listener = vi.fn();

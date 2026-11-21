@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Je bewerkt een bericht in de wachtrij. Sla de wijziging op of annuleer hem om het bericht te laten uitvoeren.",
   "composer.queueEdit.cancel": "Bewerking annuleren",
+  "composer.feedbackFix.body":
+    "Melding #{number} wordt gecorrigeerd. Verstuur het verzoek, of annuleer om de melding te laten zoals hij is.",
+  "composer.feedbackFix.cancel": "Annuleren",
   "composer.providerWait.offlineTitle": "Geen internetverbinding",
   "composer.providerWait.offline": "{provider} kan pas antwoorden als deze computer weer online is.",
   "composer.providerWait.silent": "{provider} heeft al {duration} geen update gestuurd.",
@@ -20,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",
   "composer.update.action": "Bijwerken",
+  "composer.imageInput.body":
+    "{model} krijgt alleen tekst en ziet de afbeeldingen die je bijvoegt dus niet. Als dit model afbeeldingen kan lezen, zet afbeeldingen ervoor aan.",
+  "composer.imageInput.label": "Afbeeldingen aanzetten voor {model}",
+  "composer.imageInput.pending": "Aanzetten…",
+  "composer.imageInput.action": "Afbeeldingen aan",
   "composer.usageLimit.credits":
     "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
   "composer.usageLimit.creditsResets":
@@ -48,6 +56,7 @@ export const messages = {
   "composer.picker.noSkills": "Deze agent heeft geen vaardigheden.",
   "composer.picker.noSkillMatch": "Geen vaardigheid gevonden voor “{query}”.",
   "composer.picker.skillsLoadFailed": "Vaardigheden zijn niet geladen.",
+  "composer.picker.skillProblem": "{name} is niet beschikbaar. {problem} Vraag de agent om het te herstellen.",
   "composer.token.attachment": "Bijgevoegd bestand {name} openen",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Vaardigheid {name}",
@@ -66,6 +75,8 @@ export const messages = {
     "Toegang tot de microfoon is geblokkeerd. Geef OpenBot toegang tot de microfoon in de systeeminstellingen.",
   "composer.voice.noMicrophone": "Er is geen microfoon beschikbaar.",
   "composer.voice.startFailed": "OpenBot kan de spraakopname niet starten.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot kan de microfoon niet openen. Sluit andere apps die hem gebruiken, controleer of hij is aangesloten en is toegestaan in de systeeminstellingen, en probeer het opnieuw.",
   "composer.voice.transcribeFailed": "OpenBot kan deze opname niet uitschrijven.",
   "composer.reply.toYou": "Antwoord op je bericht",
   "composer.reply.toAgent": "Antwoord aan agent",
@@ -93,7 +104,7 @@ export const messages = {
   "composer.voice.progress": "Spraakmodel downloaden {progress}%",
   "composer.voice.recording": "Spraakopname",
   "composer.voice.limitSoon": "De opname stopt over {seconds} seconden.",
-  "composer.voice.limitReached": "De opname is gestopt bij de limiet van 2 minuten. Wat je zei staat in het bericht.",
+  "composer.voice.limitReached": "De opname is gestopt bij de limiet van 10 minuten. Wat je zei staat in het bericht.",
   "composer.send.saveQueued": "Bericht in wachtrij opslaan",
   "composer.send.voice": "Spraakbericht sturen",
   "composer.send.message": "Bericht sturen",
@@ -113,10 +124,18 @@ export const messages = {
   "composer.error.holdQueued": "Kan het bericht in de wachtrij niet vasthouden om te bewerken.",
   "composer.error.cancelEdit": "Kan de bewerking in de wachtrij niet annuleren. Probeer het opnieuw.",
   "composer.error.updateQueued": "Kan het bericht in de wachtrij niet bijwerken. Probeer het opnieuw.",
+  "composer.queueEdit.received": "De agent heeft dit bericht al ontvangen, dus je bewerking is beëindigd.",
+  "composer.queueEdit.receivedKept":
+    "De agent heeft dit bericht al ontvangen, dus je bewerking is beëindigd. Je wijzigingen staan nog in het berichtvak.",
+  "composer.queueEdit.deletedKept":
+    "Dit bericht is verwijderd, dus je bewerking is beëindigd. Je wijzigingen staan nog in het berichtvak.",
+  "composer.queueEdit.endedKept":
+    "Deze bewerking is beëindigd voordat ze werd opgeslagen. Je wijzigingen staan nog in het berichtvak.",
   "composer.voice.prepareFailed": "Kan het spraakmodel niet voorbereiden. Probeer het opnieuw.",
   "composer.voice.noSpeechRecorded": "Er is geen spraak opgenomen.",
   "composer.voice.noSpeechDetected": "Er is geen spraak gedetecteerd.",
   "composer.voice.readFailed": "Kan het antwoord niet voorlezen.",
+  "composer.voice.languageUnsupported": "Kan het antwoord niet voorlezen. Deze taal is nog niet beschikbaar.",
   "composer.error.saveEditTryAgain": "Kan deze wijziging niet opslaan op deze computer. Probeer het opnieuw.",
   "composer.error.saveUnconfirmed": "Opslaan is niet bevestigd. Kies opnieuw Opslaan om het resultaat te controleren.",
   "composer.error.changeModel": "Kan het model niet wijzigen. Probeer het opnieuw.",
@@ -157,6 +176,7 @@ export const messages = {
   "composer.picker.section.files": "Bestanden",
   "composer.picker.section.tabs": "Browsertabbladen",
   "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In berichten",
   "composer.token.tab": "Browsertabblad {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Gesloten browsertabblad {name}",

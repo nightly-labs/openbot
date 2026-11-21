@@ -7,11 +7,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
 
-/**
- * Whether each provider account of this host can keep working on credits, for the usage-limit
- * notice of a joined server. Frozen by `usage-credits-v1`. A member gets the provider's own
- * sign-ins, as the released usage route gives; an owner or admin also gets the accounts after it.
- */
 export async function routeUsageCredits(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "getUsage">,
@@ -21,7 +16,6 @@ export async function routeUsageCredits(
   if (method !== "POST" || url.pathname !== USAGE_CREDITS_ROUTES.list) return "unmatched";
   if (!capabilities.has(USAGE_CREDITS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
-  // `readJson` has already run the body through the `usage-credits-v1` codec.
   await readJson(request);
   const signIns = (await runCauseEffect(agents.getUsage())).limits.filter((limit) => limit.accountId === undefined);
   const others =

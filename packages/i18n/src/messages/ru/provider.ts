@@ -134,9 +134,15 @@ export const messages = {
   "provider.picker.download": "Загрузка {name}",
   "provider.picker.search": "Поиск моделей",
   "provider.picker.noMatches": "Моделей по вашему запросу не найдено.",
+  "provider.picker.openrouterNoMatches":
+    "Моделей по вашему запросу не найдено. Настройки конфиденциальности, провайдеров и ограничений (guardrails) на openrouter.ai могут скрывать модели из этого списка.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Эти модели не работают с режимом «Рабочее пространство» в Windows и Linux. Чтобы использовать их, измените «Доступ» в настройках агента.",
   "provider.picker.olderModels": "Старые модели",
   "provider.picker.olderModelsList": "Старые модели {name}",
   "provider.picker.noModels": "У {name} нет доступных моделей.",
+  "provider.picker.endpointModelsInCustom": "{name} запускает ваши эндпоинты. Их модели — на вкладке «Свой».",
+  "provider.picker.showCustomModels": "Показать модели",
   "provider.picker.museNoModels":
     "Muse не прислал моделей для этой учётной записи. Возможно, Muse недоступен в стране, где работает этот агент. Выберите модель другого провайдера.",
   "provider.picker.customEmpty":
@@ -164,6 +170,8 @@ export const messages = {
   "provider.picker.selectEffort": "Выбрать уровень усилий",
   "provider.picker.custom": "Свой",
   "provider.picker.cliReady": "{cli} готов",
+  "provider.picker.modelSourceProvider": "Использует {name} из настроек {cli}",
+  "provider.picker.modelSourceCatalog": "Использует список моделей из настроек {cli}",
   "provider.status.signInRequired": "Нужно войти",
   "provider.model.free": "Бесплатно",
   "provider.model.new": "Новая",
@@ -234,6 +242,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Не удалось переподключиться.",
   "provider.account.add": "Добавить аккаунт",
   "provider.account.addLabel": "Добавить ещё один аккаунт {name}",
+  "provider.account.addWithCode": "Добавить аккаунт по коду",
   "provider.account.count": {
     one: "{count} аккаунт",
     few: "{count} аккаунта",
@@ -290,6 +299,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Не используется: {version} · установлена вами",
   "provider.settings.otherVersionDownloaded": "Не используется: {version} · загружена OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Некоторым моделям нужен компонент, которого нет в этой версии. Загрузите версию OpenBot, чтобы использовать их.",
   "provider.settings.useInstalledVersion": "Использовать свою",
   "provider.settings.useDownloadedVersion": "Использовать от OpenBot",
   "provider.settings.cache": "Кэш",
@@ -312,6 +323,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "По умолчанию Claude Code",
   "provider.settings.compactWindowTokens": "{size} токенов",
   "provider.settings.compactWindowLoadFailed": "Не удалось загрузить размер сжатия этого сервера.",
+  "provider.settings.environment": "Окружение",
+  "provider.settings.environmentVariables": "Переменные",
+  "provider.settings.environmentDescription":
+    "Ключи API, базовые адреса и другие настройки, которые получает каждый процесс {name}. Изменение действует, когда закончатся текущие ходы.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL с ключом OPENAI_API_KEY отправляет запросы ChatGPT к моделям по этому адресу.",
+  "provider.settings.environmentShellNote": "Команды, которые запускают агенты, могут читать эти значения.",
+  "provider.settings.environmentAdd": "Добавить переменную",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Значение",
+  "provider.settings.environmentSaved": "Сохранено",
+  "provider.settings.environmentSensitive": "Секретная",
+  "provider.settings.environmentNameLabel": "Имя переменной {index}",
+  "provider.settings.environmentValueLabel": "Значение {name}",
+  "provider.settings.environmentSensitiveLabel": "Держать {name} в секрете",
+  "provider.settings.environmentRemoveLabel": "Удалить {name}",
+  "provider.settings.environmentUnnamed": "переменная {index}",
+  "provider.settings.environmentPending":
+    "Сохранение перезапустит {name}, когда закончатся текущие ходы. Секретные значения остаются на сервере.",
+  "provider.settings.environmentDone": "Сохранено. {name} перезапустится, когда закончатся текущие ходы.",
+  "provider.settings.environmentDiscard": "Отменить",
+  "provider.settings.environmentSave": "Сохранить",
+  "provider.settings.environmentLoadFailed": "Не удалось загрузить переменные {name}.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {
     one: "{shown} из {count} модели видно в выборе модели.",
@@ -334,4 +368,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot выходит из {provider} на этом компьютере. {provider} CLI в терминале остаётся в своём аккаунте.",
+  "provider.settings.updateAll": "Обновить все",
 } as const satisfies PartialTranslation<typeof source>;

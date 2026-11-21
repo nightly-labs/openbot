@@ -23,8 +23,6 @@ const SUMMARY = {
 
 const DETAIL = { ...SUMMARY, versionId: "av-1", skills: [], routines: [] };
 
-// The shield, the Verified filter and the trust line read these flags. A Worker before them sends
-// none, and the agent is then a public one that OpenBot reviewed.
 describe("Marketplace agent decoding", () => {
   it.each([true, false])("keeps verified %s in a catalog page", (verified) => {
     const page = decodeMarketplaceAgentPage({ agents: [{ ...SUMMARY, verified }], nextCursor: null });

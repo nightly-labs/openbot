@@ -55,6 +55,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Deze lokale vaardigheid heeft geen revisie {revision}. De nieuwste revisie is {latest}.",
   "error.skill.localNameTaken": "Er bestaat al een lokale vaardigheid met deze naam. Herzie die in plaats daarvan.",
+  "error.skill.localNameClash":
+    "Deze naam en de lokale vaardigheid “{name}” worden allebei “{slug}”. Herzie die vaardigheid om haar te wijzigen. Wijzig de Latijnse letters of cijfers in deze naam om een nieuwe vaardigheid toe te voegen.",
   "error.skill.localKeepName": "Wijzig de naam van de vaardigheid niet als je haar herziet.",
   "error.skill.localRelativeFolder": "Gebruik een relatieve vaardigheidsmap in de huidige werkruimte van de agent.",
   "error.skill.localSourceOutside": "De bron van de vaardigheid moet in de werkruimte van de agent staan.",

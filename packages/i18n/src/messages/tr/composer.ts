@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Kuyruktaki bir mesajı düzenliyorsunuz. Çalışmasına izin vermek için düzenlemeyi kaydedin veya iptal edin.",
   "composer.queueEdit.cancel": "Düzenlemeyi iptal et",
+  "composer.feedbackFix.body":
+    "#{number} numaralı rapor düzeltiliyor. İsteği gönderin veya raporu olduğu gibi bırakmak için iptal edin.",
+  "composer.feedbackFix.cancel": "İptal",
   "composer.providerWait.offlineTitle": "İnternet bağlantısı yok",
   "composer.providerWait.offline": "Bu bilgisayar yeniden çevrimiçi olana kadar {provider} yanıt veremez.",
   "composer.providerWait.silent": "{provider} {duration} süredir bir şey göndermedi.",
@@ -20,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Devam etmek için {provider} uygulamasını çalıştığı bilgisayarda güncelleyin.",
   "composer.update.pending": "Güncelleniyor…",
   "composer.update.action": "Güncelle",
+  "composer.imageInput.body":
+    "{model} yalnızca metin alır, bu yüzden eklediğiniz görselleri görmez. Bu model görselleri okuyabiliyorsa görselleri açın.",
+  "composer.imageInput.label": "{model} için görselleri aç",
+  "composer.imageInput.pending": "Açılıyor…",
+  "composer.imageInput.action": "Görselleri aç",
   "composer.usageLimit.credits":
     "{provider} plan sınırınızın tamamını kullandınız. Ajanlarınız artık kredilerinizi kullanıyor.",
   "composer.usageLimit.creditsResets":
@@ -47,6 +55,7 @@ export const messages = {
   "composer.picker.noSkills": "Bu ajanın becerisi yok.",
   "composer.picker.noSkillMatch": "“{query}” ile eşleşen beceri yok.",
   "composer.picker.skillsLoadFailed": "Beceriler yüklenemedi.",
+  "composer.picker.skillProblem": "{name} kullanılamıyor. {problem} Düzeltmesi için ajana sor.",
   "composer.token.attachment": "Ekli dosyayı aç: {name}",
   "composer.token.agent": "Ajan {name}",
   "composer.token.skill": "Beceri {name}",
@@ -65,6 +74,8 @@ export const messages = {
     "Mikrofon erişimi engellendi. Sistem ayarlarından OpenBot'un mikrofonu kullanmasına izin verin.",
   "composer.voice.noMicrophone": "Kullanılabilir mikrofon yok.",
   "composer.voice.startFailed": "OpenBot ses kaydını başlatamadı.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot mikrofonu açamadı. Mikrofonu kullanan diğer uygulamaları kapatın, bağlı olduğundan ve sistem ayarlarında izin verildiğinden emin olun, sonra tekrar deneyin.",
   "composer.voice.transcribeFailed": "OpenBot bu kaydı metne dönüştüremedi.",
   "composer.reply.toYou": "Mesajınıza yanıt veriliyor",
   "composer.reply.toAgent": "Ajana yanıt veriliyor",
@@ -93,7 +104,7 @@ export const messages = {
   "composer.voice.progress": "Ses modeli indiriliyor %{progress}",
   "composer.voice.recording": "Ses kaydı",
   "composer.voice.limitSoon": "Kayıt {seconds} saniye içinde duracak.",
-  "composer.voice.limitReached": "Kayıt 2 dakika sınırında durdu. Söyledikleriniz mesajda.",
+  "composer.voice.limitReached": "Kayıt 10 dakika sınırında durdu. Söyledikleriniz mesajda.",
   "composer.send.saveQueued": "Kuyruktaki mesajı kaydet",
   "composer.send.voice": "Sesli mesaj gönder",
   "composer.send.message": "Mesaj gönder",
@@ -114,10 +125,17 @@ export const messages = {
   "composer.error.holdQueued": "Kuyruktaki mesaj düzenleme için bekletilemedi.",
   "composer.error.cancelEdit": "Kuyruk düzenlemesi iptal edilemedi. Tekrar deneyin.",
   "composer.error.updateQueued": "Kuyruktaki mesaj güncellenemedi. Tekrar deneyin.",
+  "composer.queueEdit.received": "Ajan bu mesajı zaten aldı, bu yüzden düzenlemeniz sona erdi.",
+  "composer.queueEdit.receivedKept":
+    "Ajan bu mesajı zaten aldı, bu yüzden düzenlemeniz sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
+  "composer.queueEdit.deletedKept":
+    "Bu mesaj silindi, bu yüzden düzenlemeniz sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
+  "composer.queueEdit.endedKept": "Bu düzenleme kaydedilmeden önce sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
   "composer.voice.prepareFailed": "Ses modeli hazırlanamadı. Tekrar deneyin.",
   "composer.voice.noSpeechRecorded": "Hiçbir konuşma kaydedilmedi.",
   "composer.voice.noSpeechDetected": "Hiçbir konuşma algılanmadı.",
   "composer.voice.readFailed": "Yanıt sesli okunamadı.",
+  "composer.voice.languageUnsupported": "Yanıt sesli okunamadı. Bu dil henüz desteklenmiyor.",
   "composer.error.saveEditTryAgain": "Bu düzenleme bu bilgisayarda kaydedilemedi. Tekrar deneyin.",
   "composer.error.saveUnconfirmed": "Kaydetme doğrulanmadı. Sonucu kontrol etmek için Kaydet'i tekrar deneyin.",
   "composer.error.changeModel": "Model değiştirilemedi. Tekrar deneyin.",
@@ -158,6 +176,7 @@ export const messages = {
   "composer.picker.section.files": "Dosyalar",
   "composer.picker.section.tabs": "Tarayıcı sekmeleri",
   "composer.picker.section.threads": "Mesaj dizileri",
+  "composer.picker.section.messages": "Mesajlarda",
   "composer.token.tab": "Tarayıcı sekmesi {name}",
   "composer.token.thread": "Mesaj dizisi {name}",
   "composer.token.unavailableTab": "Kapalı tarayıcı sekmesi {name}",

@@ -1,16 +1,3 @@
-// Changes each default in Server Settings › Agents of this computer in a running dev app, as a person
-// does, and checks that the window stays responsive (#5708). For each setting page it turns the
-// Default switch off and on, and waits until main saved each value. On Local scripts it chooses another "Requests an hour"; on
-// Quick acknowledgement it chooses another "Start the work". On the list it turns "Credit OpenBot in
-// commits" off and on. A Select reports its value again when
-// its options change. When the page saved that value as a new settings object, the settings and the
-// Select updated each other with no end, and the window froze in a release build. The dev build
-// stops such a loop with "Potential Infinite Loop Detected", so the check fails on that error, on
-// any page error, and when the renderer does not answer in time after a change.
-// Run it on a dev app while this computer is the selected server: the row below the nav of the user
-// settings opens the settings of the selected server. Restores the saved defaults at the end. Writes
-// .openbot-build/settings-agent-defaults/report-<port>.json. Needs `--port=<debugging port>` and
-// `--allow-mutations`, because it changes saved settings.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -21,7 +8,6 @@ import type { Page } from "playwright-core";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -29,7 +15,6 @@ declare global {
 }
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/settings-agent-defaults");
-/** An answer that takes longer than this after a change means that the renderer is busy. */
 const RESPONSE_DEADLINE_MS = 2_000;
 
 const SETTINGS = [
@@ -56,7 +41,6 @@ const session = await connectToDevApp(instance.remoteDebuggingPort, logger, {
   ownerPid: instance.pid,
 });
 const page = session.page;
-// The labels follow the language of the window, as on the computer of a person who uses another one.
 const t = translateFor(resolveLocale("system", await page.evaluate(() => document.documentElement.lang)));
 const pageErrors: string[] = [];
 page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -64,10 +48,6 @@ page.on("console", (message) => {
   if (/Potential Infinite Loop|REACTIVITY_HALTED/.test(message.text())) pageErrors.push(message.text());
 });
 
-/**
- * Fails when the renderer does not answer before the deadline. A loop keeps the renderer thread busy,
- * so a script cannot run. This does not use a frame: a window that another window covers paints none.
- */
 async function rendererAnswers(): Promise<number> {
   const started = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -87,11 +67,11 @@ function settingsTitle() {
 function agentsTab() {
   return page
     .getByRole("tablist", { name: t("server.settings.sections"), exact: true })
-    .getByRole("tab", { name: t("server.settings.agents"), exact: true });
+    .getByRole("tab", { name: t("server.settings.agentDefaultsTitle"), exact: true });
 }
 
 function agentsPanel() {
-  return page.getByRole("tabpanel", { name: t("server.settings.agents"), exact: true });
+  return page.getByRole("tabpanel", { name: t("server.settings.agentDefaultsTitle"), exact: true });
 }
 
 async function closeWhatsNew(): Promise<void> {
@@ -109,17 +89,16 @@ async function openAgentsTab(): Promise<void> {
       .getByRole("button", { name: t("app.rail.settings"), exact: true })
       .click();
   await settingsTitle().waitFor();
-  // The row below the nav of the user settings opens the settings of the selected server.
   await page.locator(".settings-page-switch").click();
   await agentsTab().click();
   await agentsPanel().waitFor();
-  // The tab keeps the setting page that was open last.
   if (await backToList().isVisible()) await backToList().click();
 }
 
-/** The "Agents" part of the `Agents › <setting>` path in the page header. */
 function backToList() {
-  return page.locator(".settings-page-path").getByRole("button", { name: t("server.settings.agents"), exact: true });
+  return page
+    .locator(".settings-page-path")
+    .getByRole("button", { name: t("server.settings.agentDefaultsTitle"), exact: true });
 }
 
 function savedDefaults(): Promise<AgentDefaults> {
@@ -143,7 +122,6 @@ async function waitForSaved(key: (typeof SETTINGS)[number]["key"], expected: boo
   );
 }
 
-/** Opens the Select, chooses the first option that is not the current one, and returns its label. */
 async function chooseOtherOption(trigger: ReturnType<Page["getByRole"]>): Promise<string> {
   await trigger.click();
   const option = page.getByRole("option", { selected: false }).first();
@@ -154,7 +132,6 @@ async function chooseOtherOption(trigger: ReturnType<Page["getByRole"]>): Promis
 }
 
 mkdirSync(OUT, { recursive: true });
-// The script reads and restores the defaults of this computer, so the settings it opens must be this computer's.
 const activeServer = (await page.evaluate(() => window.openbot.servers.list())).find((server) => server.active);
 assert.equal(activeServer?.kind, "local", "Select this computer in the server list, then run the script again.");
 const originalDefaults = await savedDefaults();
@@ -173,7 +150,6 @@ try {
     await toggle.waitFor({ state: "attached" });
     const start = await savedOn(setting.key);
     for (const next of [!start, start]) {
-      // The switch input is hidden behind its styled track, as in every SwitchField.
       await toggle.click({ force: true });
       await waitForSaved(setting.key, next);
       assert.equal(await toggle.isChecked(), next, `${t(setting.title)} does not show the saved value.`);
@@ -192,7 +168,6 @@ try {
         before,
       );
       steps.push({ setting: setting.key, action: `limit ${label}`, responseMs: await rendererAnswers() });
-      // A switch after a new limit is the reported way to freeze the window.
       await toggle.click({ force: true });
       await waitForSaved(setting.key, !start);
       steps.push({ setting: setting.key, action: "switch after limit", responseMs: await rendererAnswers() });
@@ -237,8 +212,6 @@ try {
       ),
     [originalDefaults, originalSteer] as const,
   );
-  // The settings of the window still hold the values that the test chose, and the next change in
-  // Settings would save them again. A reload reads the restored values from main.
   await page.reload();
   await page.getByRole("navigation", { name: t("app.rail.label"), exact: true }).waitFor();
   const report = { port, instance: instance.service, originalDefaults, originalSteer, steps, pageErrors };

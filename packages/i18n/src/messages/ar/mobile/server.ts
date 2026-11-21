@@ -138,8 +138,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "نفدت الكمية",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · تنتهي في {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · البيانات محفوظة حتى {date}",
   "mobile.server.hosted.state.payment": "في انتظار الدفع",
   "mobile.server.hosted.state.setup": "جارٍ الإعداد",
+  "mobile.server.hosted.state.restoring": "جارٍ استعادة البيانات",
   "mobile.server.hosted.state.starting": "جارٍ التشغيل",
   "mobile.server.hosted.state.running": "قيد التشغيل",
   "mobile.server.hosted.state.stopped": "متوقف",
@@ -295,6 +297,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "في الانتظار. يشغّل المضيف أكبر عدد من الأدوار تسمح به ذاكرته.",
   "mobile.server.threads.hold.agentBusy": "في انتظار انتهاء عمل آخر لهذا الوكيل.",
   "mobile.server.threads.hold.oneTurn": "في الانتظار. يشغّل مزوّد هذا الوكيل دورًا واحدًا في كل مرة.",
+  "mobile.server.threads.hold.signIn": "في الانتظار. يحتاج مزوّد هذا الوكيل إلى تسجيل الدخول.",
   "mobile.server.threads.offline": "اتصل بهذا الخادم لرؤية سلاسله.",
   "mobile.server.threads.loading": "جارٍ تحميل السلاسل…",
   "mobile.server.threads.loadFailed": "تعذّر تحميل سلاسل بعض الوكلاء.",
@@ -349,6 +352,13 @@ export const messages = {
   "mobile.server.settings.identityNotAllowed": "يمكن للمالك أو المسؤول فقط تغيير اسم الخادم وشعاره.",
   "mobile.server.settings.identityUnsupported": "حدّث OpenBot على هذا الخادم لتغيير اسمه وشعاره من هنا.",
   "mobile.server.settings.identityOffline": "اتصل بهذا الخادم لتغيير اسمه وشعاره.",
+  "mobile.server.settings.appearance": "الشكل واللون",
+  "mobile.server.settings.appearanceShape": "الشكل",
+  "mobile.server.settings.appearanceShapeOption": "الشكل {number}",
+  "mobile.server.settings.appearanceColor": "لون الخادم",
+  "mobile.server.settings.appearanceAutomatic": "تلقائي",
+  "mobile.server.settings.appearanceReset": "إعادة تعيين",
+  "mobile.server.settings.appearanceSaveFailed": "تعذّر حفظ شكل الخادم ولونه. أعد المحاولة.",
   "mobile.server.route.cropLogo": "قص الشعار",
   "mobile.server.members.remove": "إزالة العضو",
   "mobile.server.members.invitePeople": "دعوة أشخاص",
@@ -486,7 +496,6 @@ export const messages = {
   "mobile.server.route.provider": "المزوّد",
   "mobile.server.route.providerModels": "النماذج",
   "mobile.server.route.acpRegistry": "سجل ACP",
-  "mobile.server.route.mcp": "خوادم MCP",
   "mobile.server.route.mcpServer": "خادم MCP",
   "mobile.server.members.rowLabel": "{name}، {role}",
   "mobile.server.members.you": "{name} (أنت)",
@@ -528,7 +537,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "لا توجد منطقة زمنية تطابق هذا البحث.",
   "mobile.server.settings.timezoneMore": "اكتب المزيد من الاسم لرؤية مناطق زمنية أخرى.",
   "mobile.server.settings.timezoneDescription":
-    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل.",
+    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل. على الخادم، يستخدمها المتصفح أيضًا بعد إعادة التشغيل التالية.",
   "mobile.server.settings.timezoneLoading": "جارٍ تحميل المنطقة الزمنية…",
   "mobile.server.settings.timezoneLoadFailed": "تعذّر تحميل المنطقة الزمنية للخادم.",
   "mobile.server.settings.timezoneSaveFailed": "تعذّر حفظ المنطقة الزمنية. أعد المحاولة.",
@@ -630,6 +639,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "إضافة وكلاء",
   "mobile.server.browserProfiles.agentsHint":
     "تمنح النقرة الوكيلَ ملف التعريف هذا، أو تعيده إلى الملف المشترك. يُغلق التغيير علامات التبويب المفتوحة للوكيل.",
+  "mobile.server.browserProfiles.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل المنقول الدخول إلى هذه المواقع مرة أخرى.",
   "mobile.server.browserProfiles.clear": "مسح البيانات",
   "mobile.server.browserProfiles.clearTitle": "هل تريد مسح بيانات {name}؟",
   "mobile.server.browserProfiles.clearBody":
@@ -724,7 +735,7 @@ export const messages = {
   "mobile.server.vault.contacts": "معلومات الاتصال",
   "mobile.server.vault.apiKeys": "مفاتيح API",
   "mobile.server.vault.apiKeysFooter":
-    "يقرأ الوكلاء على {host} كل مفتاح من ملف خاص باسم متغيره. تبقى المفاتيح على {host}. لا يستطيع هذا الهاتف عرضها.",
+    "يقرأ الوكلاء على {host} كل مفتاح من ملف باسم متغيره. يعمل كل الوكلاء كمستخدم النظام نفسه، لذا يمكن للوكيل أيضًا قراءة ملف مفتاح مخصص لوكلاء آخرين. تبقى المفاتيح على {host}. لا يستطيع هذا الهاتف عرضها.",
   "mobile.server.vault.empty": "لا عناصر",
   "mobile.server.vault.addLogin": "إضافة بيانات تسجيل دخول",
   "mobile.server.vault.addCard": "إضافة بطاقة",
@@ -737,7 +748,7 @@ export const messages = {
   "mobile.server.vault.import": "استيراد كلمات المرور من ملف CSV",
   "mobile.server.vault.importing": "جارٍ الاستيراد…",
   "mobile.server.vault.importFooter":
-    "استخدم ملف تصدير لكلمات المرور من متصفح أو مدير كلمات مرور. يضيف {host} بيانات تسجيل الدخول فيه. ويتخطى الصف الذي ليس HTTPS أو بلا كلمة مرور أو المحفوظ مسبقًا. يحذف هذا الهاتف نسخته من الملف بعد قراءته.",
+    "استخدم ملف تصدير لكلمات المرور من متصفح أو مدير كلمات مرور. يضيف {host} بيانات تسجيل الدخول فيه. ويتخطى الصف ذا العنوان غير المدعوم أو بلا كلمة مرور أو المحفوظ مسبقًا. يحذف هذا الهاتف نسخته من الملف بعد قراءته.",
   "mobile.server.vault.importResult": "المضاف: {imported}. المتخطّى: {skipped}.",
   "mobile.server.vault.importTooLarge": "هذا الملف أكبر من أن يُرسل من هاتف. استورده في OpenBot على {host}.",
   "mobile.server.vault.importReadFailed": "تعذّرت قراءة الملف.",
@@ -751,7 +762,8 @@ export const messages = {
   "mobile.server.vault.saveFailed": "تعذّر حفظ العنصر. أعد المحاولة.",
   "mobile.server.vault.gone": "لم يعد هذا العنصر في الخزنة.",
   "mobile.server.vault.website": "موقع الويب",
-  "mobile.server.vault.websiteHint": "عنوان HTTPS. لا يملأ الوكلاء بيانات تسجيل الدخول هذه إلا على هذا الموقع.",
+  "mobile.server.vault.websiteHint":
+    "عنوان موقع ويب، مثل example.com. لا يملأ الوكلاء بيانات تسجيل الدخول هذه إلا على هذا الموقع.",
   "mobile.server.vault.username": "اسم المستخدم",
   "mobile.server.vault.password": "كلمة المرور",
   "mobile.server.vault.notes": "ملاحظات",
@@ -812,6 +824,17 @@ export const messages = {
   "mobile.server.vault.variableNameHint":
     "متغير البيئة الذي يقرؤه البرنامج: أحرف لاتينية كبيرة وأرقام و_. يجد الوكلاء المفتاح بهذا الاسم.",
   "mobile.server.vault.apiKey": "مفتاح API",
+  "mobile.server.vault.agents": "الوكلاء",
+  "mobile.server.vault.agentsAll": "كل الوكلاء",
+  "mobile.server.vault.agentsAllHint": "يشمل «كل الوكلاء» أيضًا كل وكيل يُضاف لاحقًا.",
+  "mobile.server.vault.agentsNone": "اختر وكيلًا واحدًا على الأقل.",
+  "mobile.server.vault.agentsSome": "{chosen} من {total}",
+  "mobile.server.vault.agentsListed": "الوكلاء: {agents}",
+  "mobile.server.vault.searchAgents": "البحث عن وكلاء",
+  "mobile.server.vault.noAgentMatches": "لا يوجد وكلاء يطابقون هذا البحث.",
+  "mobile.server.vault.agentOptions": "خيارات",
+  "mobile.server.vault.selectAll": "تحديد الكل",
+  "mobile.server.vault.deselectAll": "إلغاء التحديد",
   "mobile.server.vault.delete": "حذف العنصر",
   "mobile.server.vault.deleteTitle": "هل تريد حذف هذا العنصر؟",
   "mobile.server.vault.deleteBody": "لن يتمكن الوكلاء على {host} من استخدامه بعد الآن. لا يمكنك التراجع عن هذا.",
@@ -971,6 +994,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "في Proton Pass، أنشئ مفتاح وصول يمكنه قراءة الخزنة التي تشاركها مع OpenBot فقط، ثم الصقه هنا. يحتفظ {host} بالمفتاح؛ ولا يحتفظ به هذا الهاتف.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "لا تتضمن خطة Proton الخاصة بك أداة سطر الأوامر في Proton Pass. تحتاج إلى خطة Proton تتضمن Pass Plus. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطة حسابك، ثم أعد الربط.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} غير متاح على هذا الخادم.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "سجّل الدخول إلى {name} على هذا الهاتف. بعد ذلك ينشئ {host} خزنة مشتركة ومفتاح وصول للقراءة فقط لها، ويحتفظ بهذا المفتاح فقط. لا يرى الوكلاء أي كلمة مرور.",
@@ -1006,8 +1031,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "للقراءة فقط",
   "mobile.server.connectors.passwordManager.keyExpires": "للقراءة فقط. تنتهي صلاحيته في {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "انتهت صلاحيته في {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "تتطلب أداة سطر الأوامر في {name} خطة مدفوعة. غيّر خطة حسابك، ثم أعد الربط.",
   "mobile.server.connectors.passwordManager.expiredTitle": "انتهت صلاحية مفتاح {name}",
   "mobile.server.connectors.passwordManager.expiredBody":
     "لا يستطيع الوكلاء على {host} تسجيل الدخول ببيانات تسجيل الدخول المشتركة حتى تعيد الربط.",
@@ -1049,6 +1072,7 @@ export const messages = {
     "لا يستطيع OpenBot قراءة الرموز المميزة المحفوظة على {host}. اقطع اتصال مساحة العمل، ثم اربطها مجددًا.",
   "mobile.server.connectors.slack.helpRelay":
     "لا يستطيع OpenBot على {host} تلقي أحداث Slack. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
+  "mobile.server.connectors.slack.helpNotLinked": 'مساحة العمل هذه غير مرتبطة بـ {host}. اضغط "إعادة الاتصال" لربطها.',
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "يتلقى هذا الوكيل كل طلب من Slack. يرد على الطلبات القصيرة بنفسه، ويعطي العمل الآخر للوكيل المناسب، وينشر الإجابة في السلسلة.",
@@ -1099,6 +1123,7 @@ export const messages = {
     "لا يستطيع OpenBot قراءة الرموز المميزة المحفوظة على {host}. اقطع اتصال خادم Discord، ثم اربطه مجددًا.",
   "mobile.server.connectors.discord.helpRelay":
     "لا يستطيع OpenBot على {host} تلقي أحداث Discord. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
+  "mobile.server.connectors.discord.helpNotLinked": 'خادم Discord هذا غير مرتبط بـ {host}. اضغط "إعادة الاتصال" لربطه.',
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "يتلقى هذا الوكيل كل طلب من Discord. يرد على الطلبات القصيرة بنفسه، ويعطي العمل الآخر للوكيل المناسب، ويرد بالإجابة في القناة.",
@@ -1135,6 +1160,7 @@ export const messages = {
     "لا يستطيع OpenBot على {host} تلقي رسائل Telegram. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
   "mobile.server.connectors.telegram.helpError":
     "لا يستطيع OpenBot الوصول إلى هذه الدردشة. أعد الاتصال، أو اقطع اتصال الدردشة.",
+  "mobile.server.connectors.telegram.helpNotLinked": 'هذه الدردشة غير مرتبطة بـ {host}. اضغط "إعادة الاتصال" لربطها.',
   "mobile.server.connectors.telegram.retryAt": "طلب Telegram من OpenBot الانتظار. سيعيد المحاولة في {time}.",
   "mobile.server.connectors.telegram.linkTitle": "ربط دردشة",
   "mobile.server.connectors.telegram.linkAnother": "ربط دردشة أخرى",
@@ -1180,14 +1206,19 @@ export const messages = {
     "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.helpError":
     "لا يستطيع OpenBot الوصول إلى WhatsApp على هذا الرقم. أعد الربط، أو اقطع اتصال الرقم.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "لا يستطيع OpenBot قراءة المفاتيح المحفوظة لهذا الرقم. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.retryAt": "طلب WhatsApp من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "ربط مرة أخرى",
   "mobile.server.connectors.whatsapp.ownNumber": "رقم شخصي",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. أوقف هذا الخيار لرقم مخصص لـ OpenBot فقط.",
+    "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. لا يتلقى الآخرون أي رد. عند إيقافه، يرد OpenBot على الأشخاص غير المعروفين برمز.",
   "mobile.server.connectors.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
+    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. ويرسل أيضًا رسالة انتظار عندما ينتظر طلبٌ طلبًا سابقًا. أوقفها لإرسال الإجابة فقط.",
+  "mobile.server.connectors.whatsapp.statusReactions": "تفاعلات الحالة",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "يستقبل هذا الوكيل الرسائل الموجّهة إلى OpenBot من كل أرقامك المرتبطة. يجيب بنفسه عن الرسائل القصيرة، ويسند الأعمال الأخرى إلى الوكيل المناسب، ويجيب في WhatsApp.",
@@ -1202,10 +1233,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "الرقم",
   "mobile.server.connectors.whatsapp.kindPersonal": "رقمي الشخصي",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "يجيب OpenBot فقط عن دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم.",
+    "يجيب OpenBot فقط عن دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم. لا يتلقى الآخرون أي رد.",
   "mobile.server.connectors.whatsapp.kindDedicated": "رقم مخصص لـ OpenBot فقط",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "يحصل الأشخاص غير المعروفين على رمز ليعطوه لك. توافق عليهم هنا.",
+    "يرد OpenBot من هذا الرقم على كل شخص غير معروف برمز ليعطيه لك. توافق عليهم هنا.",
   "mobile.server.connectors.whatsapp.phoneLabel": "رقم الهاتف",
   "mobile.server.connectors.whatsapp.phoneDescription": "مع رمز الدولة، مثل ‎+44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "اكتب رقم الهاتف مع رمز الدولة.",
@@ -1251,7 +1282,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "اختياري. إذا تُرك فارغًا، تعرض القائمة رقم الهاتف.",
   "mobile.server.connectors.whatsapp.add": "إضافة",
   "mobile.server.connectors.whatsapp.groupTitle": "إضافة مجموعة",
-  "mobile.server.connectors.whatsapp.groupDescription": "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك عندما يذكرون الرقم أو يردّون على رسائله.",
   "mobile.server.connectors.whatsapp.groupSearch": "بحث في المجموعات",
   "mobile.server.connectors.whatsapp.groupsLoading": "جارٍ قراءة المجموعات…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "تعذّرت قراءة المجموعات على OpenBot",
@@ -1372,11 +1404,13 @@ export const messages = {
   "mobile.server.providers.accountsOnComputer":
     "يستخدم كل وكيل حسابًا واحدًا. اختره في إعدادات الوكيل. أضف حسابًا في OpenBot على حاسوب.",
   "mobile.server.providers.addAccount": "إضافة حساب",
+  "mobile.server.providers.addAccountWithCode": "إضافة حساب برمز",
   "mobile.server.providers.accountGone": "لم يعد هذا الحساب على هذا الخادم.",
   "mobile.server.providers.accountFailed": "تعذّر تغيير هذا الحساب. أعد المحاولة.",
   "mobile.server.providers.accountName": "الاسم",
   "mobile.server.providers.accountNameHint": "لك ولمسؤولي هذا الخادم فقط. اتركه فارغًا لعرض البريد الإلكتروني.",
   "mobile.server.providers.accountSignInAgain": "تسجيل الدخول مجددًا",
+  "mobile.server.providers.accountSignInWithCode": "تسجيل الدخول برمز",
   "mobile.server.providers.accountsKeyHint":
     "يستخدم كل وكيل حسابًا واحدًا. اختره في إعدادات الوكيل. يحتاج الحساب الجديد إلى مفتاح API خاص به.",
   "mobile.server.providers.accountChangeKey": "تغيير المفتاح",
@@ -1427,6 +1461,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "الافتراضي في Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} رمز",
   "mobile.server.providers.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
+  "mobile.server.environment.row": "المتغيرات",
+  "mobile.server.environment.title": "البيئة",
+  "mobile.server.environment.hint":
+    "مفاتيح API وعناوين URL الأساسية وإعدادات أخرى يحصل عليها كل عملية لـ {name}. يسري التغيير عند انتهاء الأدوار الجارية.",
+  "mobile.server.environment.codexHint":
+    "يرسل OPENAI_BASE_URL، مع OPENAI_API_KEY كمفتاح له، طلبات نماذج ChatGPT إلى ذلك العنوان.",
+  "mobile.server.environment.shellNote": "يمكن للأوامر التي يشغّلها الوكلاء قراءة هذه القيم.",
+  "mobile.server.environment.add": "إضافة متغير",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "القيمة",
+  "mobile.server.environment.saved": "محفوظة",
+  "mobile.server.environment.sensitive": "حساس",
+  "mobile.server.environment.remove": "إزالة",
+  "mobile.server.environment.save": "حفظ",
+  "mobile.server.environment.loadFailed": "تعذّر تحميل متغيرات {name}.",
+  "mobile.server.environment.invalid": "صحّح الأسماء أولًا.",
   "mobile.server.providers.disconnect": "قطع الاتصال",
   "mobile.server.providers.disconnectTitle": "هل تريد قطع اتصال {name}؟",
   "mobile.server.providers.disconnectBody":
@@ -1634,29 +1684,10 @@ export const messages = {
   "mobile.server.customProviders.removeTitle": "هل تريد إزالة {name}؟",
   "mobile.server.customProviders.removeBody": "لن يتمكن الوكلاء على هذا الخادم من استخدام نماذجه بعد الآن.",
   "mobile.server.customProviders.removeFailed": "تعذّر على OpenBot إزالة نقطة النهاية هذه.",
-  "mobile.server.settings.mcp": "خوادم MCP",
-  "mobile.server.settings.mcpCount": {
-    zero: "لا خوادم",
-    one: "خادم واحد",
-    two: "خادمان",
-    few: "{count} خوادم",
-    many: "{count} خادمًا",
-    other: "{count} خادم",
-  },
   "mobile.server.mcp.unsupported": "حدّث OpenBot على هذا الخادم لإدارة خوادم MCP من هنا.",
   "mobile.server.mcp.unavailable": "اتصل بهذا الخادم بصفتك مالكًا أو مسؤولًا لإدارة خوادم MCP فيه.",
   "mobile.server.mcp.accessUnsupported": "حدّث OpenBot على هذا الخادم لاختيار من يحصل على خوادم MCP.",
-  "mobile.server.mcp.description":
-    "تمنح خوادم MCP وكلاء هذا الخادم مزيدًا من الأدوات. لا يحصل وكلاء Claude وCodex إلا على الخوادم الموجودة في هذه القائمة.",
   "mobile.server.mcp.loading": "جارٍ تحميل خوادم MCP…",
-  "mobile.server.mcp.loadFailed": "تعذّر تحميل خوادم MCP.",
-  "mobile.server.mcp.empty": "لا توجد خوادم MCP بعد.",
-  "mobile.server.mcp.retry": "إعادة المحاولة",
-  "mobile.server.mcp.add": "إضافة خادم MCP",
-  "mobile.server.mcp.rowLabel": "{name}، {status}",
-  "mobile.server.mcp.enabled": "مفعّل",
-  "mobile.server.mcp.disabled": "معطّل",
-  "mobile.server.mcp.signedIn": "مسجّل الدخول",
   "mobile.server.mcp.gone": "لم يعد خادم MCP هذا على هذا الخادم.",
   "mobile.server.mcp.addTitle": "إضافة خادم MCP",
   "mobile.server.mcp.addConfirm": "إضافة",
@@ -1715,6 +1746,8 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "يطلب منك خادم MCP هذا تسجيل الدخول. سجّل الدخول من OpenBot على حاسوب، ثم اختبر مجددًا.",
+  "mobile.server.mcp.signIn": "تسجيل الدخول",
+  "mobile.server.mcp.signInHere": "يطلب خادم MCP هذا تسجيل الدخول. اضغط تسجيل الدخول، ثم اختبر مرة أخرى.",
   "mobile.server.mcp.signedInDescription": "{server} مسجّل الدخول إلى خادم MCP هذا.",
   "mobile.server.mcp.signOut": "تسجيل الخروج",
   "mobile.server.mcp.saveFailed": "تعذّر حفظ التغيير. أعد المحاولة.",
@@ -1776,6 +1809,7 @@ export const messages = {
     other: "{count} ساعة",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} دقيقة",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "التحديثات",
   "mobile.server.settings.updateAvailable": "يتوفر تحديث",
   "mobile.server.route.updates": "التحديثات",
@@ -2171,7 +2205,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "إلى",
   "mobile.server.transfer.copyNoAgents": "لا يوجد وكلاء على هذا الخادم.",
   "mobile.server.transfer.copyNotMoved":
-    "تُنسخ قنواتهم والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
+    "تُنسخ قنواتهم وتدفقات المهام الدورية ومسارات العمل والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
   "mobile.server.transfer.copySubmit": {
     zero: "لا وكلاء للنسخ",
     one: "نسخ وكيل واحد",
@@ -2180,6 +2214,10 @@ export const messages = {
     many: "نسخ {count} وكيلًا",
     other: "نسخ {count} وكيل",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "هل تريد نسخ وكلاء مكررين؟",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "يحتوي {server} بالفعل على وكلاء بهذه الأسماء: {names}. يضيف النسخ وكيلًا ثانيًا لكل واحد منهم. كل نسخة وكيل منفصل له دردشاته وملفاته وذكرياته.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "نسخ المكررين",
   "mobile.server.transfer.copying": "جارٍ النسخ…",
   "mobile.server.transfer.copyFailed": "لم يكتمل النسخ.",
   "mobile.server.transfer.copied": {
@@ -2193,4 +2231,41 @@ export const messages = {
   "mobile.server.transfer.copyAgents": "الوكلاء المطلوب نسخهم",
   "mobile.server.transfer.copyNext": "يستخدم الوكلاء المنسوخون قواعد الموافقة لـ {server}.",
   "mobile.server.transfer.copyNoServer": "اتصل بخادم آخر بصفتك مالكًا أو مسؤولًا لنسخ الوكلاء إليه.",
+  "mobile.server.route.ownerTransfer": "نقل الملكية",
+  "mobile.server.ownerTransfer.unavailable": "اتصل بهذا الخادم بصفتك المالك لنقل الملكية.",
+  "mobile.server.ownerTransfer.hosted": "يستضيف OpenBot هذا الخادم، لذا لا يمكن تغيير مالكه.",
+  "mobile.server.ownerTransfer.lede":
+    "يتلقى المالك الجديد بريدًا إلكترونيًا، ويجب أن يقبل وهو مسجّل الدخول بهذا البريد. بعد ذلك تُزال من هذا الخادم.",
+  "mobile.server.ownerTransfer.email": "بريد المالك الجديد",
+  "mobile.server.ownerTransfer.send": "إرسال",
+  "mobile.server.ownerTransfer.sending": "جارٍ الإرسال…",
+  "mobile.server.ownerTransfer.stays":
+    "تبقى الوكلاء والدردشات والمهام الدورية وتسجيلات الدخول إلى المزوّدين والمفاتيح المحفوظة وبيانات دخول الخزنة وتسجيلات دخول المتصفح والتطبيقات المتصلة على الخادم. ويمكن للمالك الجديد استخدامها.",
+  "mobile.server.ownerTransfer.expiry": "ينتهي الطلب بعد 7 أيام.",
+  "mobile.server.ownerTransfer.confirmTitle": "هل تجعل {email} المالك؟",
+  "mobile.server.ownerTransfer.confirmBody":
+    "عندما يقبل {email} يصبح مالك {server} وتفقد الوصول إليه. تبقى البيانات على الخادم. ينتهي الطلب بعد 7 أيام.",
+  "mobile.server.ownerTransfer.confirm": "نقل",
+  "mobile.server.ownerTransfer.sendFailed": "لم يُرسَل الطلب.",
+  "mobile.server.ownerTransfer.loadFailed": "تعذّرت قراءة النقل المعلّق.",
+  "mobile.server.ownerTransfer.pending": "بانتظار المالك الجديد",
+  "mobile.server.ownerTransfer.expires": "ينتهي في {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "يجب أن يقبل {email} وهو مسجّل الدخول بهذا البريد. حتى ذلك الحين تبقى أنت المالك.",
+  "mobile.server.ownerTransfer.cancel": "إلغاء النقل",
+  "mobile.server.ownerTransfer.cancelTitle": "هل تلغي النقل؟",
+  "mobile.server.ownerTransfer.cancelBody": "لن يتمكن {email} من قبوله بعد ذلك.",
+  "mobile.server.ownerTransfer.keep": "إبقاء",
+  "mobile.server.ownerTransfer.cancelFailed": "لم يُلغَ النقل.",
+  "mobile.server.ownerTransfer.incomingTitle": "هل تصبح مالك {server}؟",
+  "mobile.server.ownerTransfer.incomingBody":
+    "يريد {name} أن يجعلك مالك {server}. ستتحكم في الخادم بالكامل، وتبقى عليه وكلاؤه ودردشاته ومهامه الدورية وتسجيلات الدخول المحفوظة. ويفقد {name} الوصول. يمكن لأي شخص لا يزال يستطيع تسجيل الدخول إلى الكمبيوتر الذي يشغّل الخادم أن يستخدم حسابك في OpenBot. غيّر كلمات المرور ومفاتيح SSH على ذلك الكمبيوتر.",
+  "mobile.server.ownerTransfer.accept": "قبول",
+  "mobile.server.ownerTransfer.decline": "رفض",
+  "mobile.server.ownerTransfer.accepted": "أنت الآن مالك {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "تعذّر قبول النقل",
+  "mobile.server.ownerTransfer.declineFailed": "تعذّر رفض النقل",
+  "mobile.server.ownerTransfer.tryAgain": "حاول مرة أخرى لاحقًا.",
+  "mobile.server.providers.updateAll": "تحديث الكل",
+  "mobile.server.providers.updateAllFailed": "لم تبدأ بعض التحديثات. حاول مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

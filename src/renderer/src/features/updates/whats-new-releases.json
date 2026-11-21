@@ -1,5 +1,199 @@
 [
   {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Update each joined server to this version too. On a server, workflow step settings, Run from this step, owner transfer, the Update all button and many fixes for agents work only when the server has this version.",
+      "After this update, an older version of OpenBot cannot open your data."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Talk to an agent with push to talk. Hold the talk button or the talk key while you speak. OpenBot sends what you said when you let go. Change the key in Settings > Voice.",
+          "Start a workflow again from one step. In the step menu, select Run from this step. The steps before it keep their answers and do not run again.",
+          "See the settings and inputs that made the result of a workflow step. Select Settings on the step, then Use these settings to run it again in the same way.",
+          "Give your server to another OpenBot account. In Server Settings > Members, enter the email of the new owner. The server changes hands when they accept.",
+          "Update all providers at once. Settings > Providers shows Update all when one or more providers have an update."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot updates the provider CLIs that it downloaded each hour, when a new version is available. The update waits until the agents are idle.",
+          "Each thread of an agent can use the browser tabs that the main chat or another thread of that agent opened.",
+          "The Routines tab is gone from the sidebar. Routines still run. Manage them in the agent settings, on the Schedule page and in Server Settings > Routines."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Restart for a downloaded update now waits until the agents are idle, with Cancel restart. Before, OpenBot closed at once and stopped the agent's task.",
+          "An agent no longer stays \"working\" with its messages waiting after a restart or a usage limit. The stopped turn shows as interrupted, and the waiting messages start.",
+          "A busy server with many agents and joined devices no longer runs out of memory, and no longer freezes when it selects the next turn.",
+          "A message that you send after a pause no longer stays \"Not sent\" with \"Connect Claude to continue.\" when Claude is signed in.",
+          "Agent browser tabs that no one uses stop using the processor after 2 minutes."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Update each joined server to this version too. On a server, small copies of the pictures on the Workflows canvas, Custom video lengths and agents that finish a request without a \"continue\" work only when the server has this version.",
+      "On Linux, if OpenBot is still slow after the upgrade, delete the file `~/.config/OpenBot/gpu-crash.json` and start OpenBot again.",
+      "If you set Thinking under Provider settings for a Mistral agent, select the level again in the Effort menu and reset the old Thinking row."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Share your invite link in Settings > Invite friends. The tab shows your credit and the friends who joined. A friend gets 10% off each payment, and you get 10% of each paid invoice of your friend as credit.",
+          "Put nodes of a workflow canvas in a group. Select them and press Group (⌘G). Collapse a group into one stack card, and press Ungroup (⇧⌘G) to end it.",
+          "Give a video step on the workflow canvas any length that its Sunra or Higgsfield model makes. Select Custom in the Length menu and use the slider.",
+          "Open the Marketplace from the Apps row in the settings of an agent. Connect an app, or add your own MCP server with Add custom.",
+          "When you sign in on a new computer and your account already has servers, the first step shows them. Open one to continue with its agents and chats."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents finish your request without a \"continue\" from you. When a part of the request is not done, the agent continues with that part, at most 3 times. A question that needs your choice or approval still stops the agent.",
+          "Side panel tabs keep their title and one width. When the tabs do not fit, the row scrolls, and a menu at the end of the row lists the other tabs. A middle click closes a tab.",
+          "On a joined server, the pictures of the Workflows canvas show much faster. The canvas gets a small copy of each picture, and the full picture opens in the viewer.",
+          "A thread now looks like the agent's chat. Messages by one sender read as one block, and the steps of an answer show beside it."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A Claude or ChatGPT agent no longer stays on \"working\" for hours when the provider stops responding. After 15 minutes with no output (60 minutes while a tool runs), OpenBot ends the turn, and the queued messages continue.",
+          "With \"Use my Claude Code setup\" off, Claude agents no longer load your global Claude Code instructions and rules. Each turn is faster and costs less. To keep them, turn on \"Use my Claude Code setup\".",
+          "Your agents keep working while OpenBot downloads a provider update. A download that gets no data for one minute stops, and it continues from where it stopped when you try again.",
+          "Agents send messages to their teammate agents directly again. Before, a card asked you to approve each handoff, and work stopped until you approved.",
+          "An agent with automatic backup models moves to its next backup model in more cases, for example after a rate limit or when Gemini loses its connection to Google."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "After you install this version, you cannot go back to an older OpenBot version on this computer or server. This version makes the database smaller, and an older version cannot open it.",
+      "Update each joined server to this version too. On a server, custom image sizes, the Sunra and Higgsfield models and prices, and the faster load of many agents work only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "See the side threads of each agent in the sidebar. Select the arrow at the end of an agent row, or keep the pointer on the row to see all of its threads.",
+          "Filter the sidebar with the filter button at the end of the search field. Show only agents or channels, only unread chats or agents at work, or only the chats in the folders that you select.",
+          "Give an image step on the workflow canvas a custom size in pixels, or use the 4:5 or 5:4 aspect ratio.",
+          "The workflow canvas shows all the image and video models of Sunra and Higgsfield, and the Run button shows the price in credits.",
+          "Turn off Background blur and Moving agent faces in Settings > Appearance > Motion to make OpenBot faster on a slow computer."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Several people can edit one workflow at the same time. The canvas adds the changes of the other people as they save.",
+          "OpenBot uses much less CPU while many agents work, and you can type without delays.",
+          "Agents finish a checkout when the bank asks for a 3-D Secure code. When the code is in an email or SMS that the agent can read, the agent types it.",
+          "Server settings > Transfer > Copy to another server now also copies the workflows and routine flows of the agents."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "The OpenBot database uses much less space. After the update, OpenBot removes old copies of chat messages in small steps.",
+          "On Windows, an update shows its progress again.",
+          "A joined server with many agents, and a large channel, open faster.",
+          "Gemini chats with many images or a long history no longer stop working, and Gemini no longer asks you to sign in again when a new chat starts.",
+          "The desktop app connects again to a server on OpenBot v0.34.1 or older."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Update each joined server to this version too. On a server, the CRM, Add account with code, a backdrop that an agent sets, Library folders that agents organize and messages into a running Devin turn work only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Play an animated backdrop behind the whole window. Choose a scene, such as Koi pond or Fireflies, in Settings > Backdrop, or ask an agent to make one for you.",
+          "Keep leads, customers and payments on the new CRM page. It is experimental: an owner or admin turns it on in Server settings > Experimental. It can import from Stripe, and agents propose changes that an owner or admin approves.",
+          "Answer an agent in the agent dock chat. Allow or deny a command, answer a question, or finish a browser step without the main window.",
+          "Organize the Library with folder tiles, Favorites, Recent and Undo. Drag files onto New folder to make a folder, or ask an agent to organize its folders.",
+          "Add a ChatGPT (Codex), Grok or Claude account with a code. Open the menu next to Add account and select Add account with code.",
+          "A message that you send while a Devin or OpenCode agent works goes into the running turn. This needs Devin CLI 3000.12.57 or OpenCode 2.3.0, or later."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Settings have a new layout. Sections are in labeled groups, and Server settings has new Memory and Agent defaults sections. On macOS, OpenBot uses the system font.",
+          "Add and edit custom MCP servers in Marketplace > Apps. Server settings no longer has an MCP section.",
+          "In a chat with an agent, your bubbles now take the color of the agent's avatar. Change this in Settings > Appearance > Your bubbles.",
+          "A voice conversation no longer opens the side panel. A small bar at the top of the chat shows the voice controls."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A chat that loses its saved session, or gets too large, no longer stays broken. The agent starts a new session with the chat history and answers your message.",
+          "More agents move to their backup model when a usage limit or a provider error stops a turn, including Grok, Hermes and Claude agents.",
+          "Agents can use a saved login in more places, such as a sign-in form in a frame.",
+          "A routine stays on after a failed run, and a run that is due while the provider cannot start runs later.",
+          "OpenBot uses less CPU and battery: videos in the chat and in hidden browser tabs pause when you cannot see them."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Update each joined server to this version too. On a server, Stop for routine runs, files that agents send with no text, and API keys at their old path work only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Pinch on a touchpad or a touch screen to zoom in on the area under the pointer. Diagrams, canvases and the image viewer keep their own zoom.",
+          "Stop a routine run from the Routines canvas: select Stop in the top bar or in the routine details. The run ends as Cancelled.",
+          "Agents can send a file or an image with no text to a WhatsApp, Telegram, Slack or Discord chat.",
+          "Buy a Starter hosted server again. It has 25 GB of storage.",
+          "Use a ClinePass subscription with Cline agents. The model menu shows the ClinePass models."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "On the Canvas, drag a note, free text, a shape or a step by its text. A click on the text puts the caret where you clicked.",
+          "A message that you send while an Antigravity agent works goes into the running turn. This needs Antigravity CLI 1.5.0 or later.",
+          "A routine whose task says to stop when the work is done now pauses itself. Turn it on again from your list of routines.",
+          "The Vault now says that every agent can read the API key files of the other agents, because all agents run as the same system user."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Scripts, MCP servers and provider settings that read Vault API keys from their files work again after the update to 0.70.0.",
+          "A Claude agent keeps the model in its profile when Claude Code changes its default model.",
+          "When Claude stops a turn at the monthly spend limit, an agent with backup models continues on its next model.",
+          "Agents get the full transcript of a video that has captions, such as a YouTube video.",
+          "OpenBot uses less CPU: browser tabs that you do not see slow down, and the moving light on an agent's activity line is lighter."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

@@ -1,62 +1,4 @@
 #!/bin/bash
-# Moves the data of one hosted server from its boat sandbox to a VPS that an operator runs.
-# docs/hosted-servers.md#move-a-server-from-boat has the full list of steps, the row change in the
-# account service, and the rollback. This file does the parts that run on the machines, as root:
-#
-#   move-from-boat.sh prepare <hostname> <uid> <gid> <appimage-url> <appimage-sha256> <auth-api-url>
-#       On the VPS, from a copy of scripts/hosting, while the customer still uses the sandbox. Makes
-#       the service user with the IDs that it has in the sandbox (`id user` there), and installs
-#       OpenBot with provision.sh. OpenBot stays disabled, so a restart of the VPS does not start it.
-#
-#   move-from-boat.sh upgrade <appimage-url> <appimage-sha256> <auth-api-url>
-#       On a prepared VPS that has no data of a server. A disabled OpenBot does not update, so this
-#       installs a newer release with provision.sh, and OpenBot stays disabled.
-#
-#   move-from-boat.sh offer <machine ID>
-#       On a prepared VPS that has no data of a server, after the account service has the hash of the
-#       token. Reads the token of the machine from standard input, and installs and starts
-#       openbot-pool-wait.service: the machine then asks the account service for the server of a new
-#       customer, and starts OpenBot for it (docs/hosted-servers.md#a-new-server-on-a-pool-machine).
-#
-#   move-from-boat.sh withdraw
-#       On the VPS. Stops openbot-pool-wait.service and removes the token, so that the machine takes
-#       no new server. `prepare`, `upgrade` and `import` do this first.
-#
-#   move-from-boat.sh packages
-#       On the sandbox, while the customer still uses it. Prints the apt packages that the customer
-#       installed, for `install-packages`. It does not stop OpenBot.
-#
-#   move-from-boat.sh install-packages
-#       On the prepared VPS, before the export. Installs the apt packages that `packages` printed, from
-#       standard input, so that the import does not install them during the downtime.
-#
-#   move-from-boat.sh export <archive | ->
-#       On the sandbox. Stops OpenBot and keeps it stopped, then archives the home of the service user,
-#       the server keyring, and what the customer installed outside the home: directories in /opt and
-#       /usr/local, npm packages for all users, programs in /usr/local/bin, the crontab, and the names
-#       of the apt packages. It also archives each agent CLI of the image that the customer signed in
-#       to. It does not archive what the boat image has. The archive holds the account session, each
-#       provider sign-in and each key of the customer: move it only over SSH, and delete each copy
-#       after the import. With `-`, the archive goes to standard output and the messages to standard
-#       error: send it to the VPS through SSH, so that the sandbox needs no disk space for a copy.
-#
-#   move-from-boat.sh import <archive>
-#       On the prepared VPS. Restores the archive as the service user and compares the checksums. Puts
-#       the moved commands in ~/.local/bin, installs the crontab and the apt packages, and names each
-#       command that cannot start here and each item that the move did not copy. It does not start
-#       OpenBot.
-#
-#   move-from-boat.sh start
-#       On the VPS, after a complete import, when the row of the server names this machine and the
-#       sandbox is stopped. Enables and starts OpenBot.
-#
-#   move-from-boat.sh discard <hostname>
-#       On the VPS, for an import that failed or that must not start. Removes the restored data, the
-#       restored directories and the crontab, so that `import` can run again. The apt packages stay. It refuses after `start`: a server that ran here has data that
-#       no other machine has, and only a reinstall of the machine erases it.
-#
-# A second run of `export` makes the same archive again. `import` refuses a machine that already
-# has the data of a server.
 set -euo pipefail
 export LC_ALL=C
 umask 077
@@ -65,25 +7,16 @@ SERVICE_USER=user
 USER_HOME=/home/$SERVICE_USER
 KEYRING_HOME=/srv/openbot-hosted
 MANIFEST=$KEYRING_HOME/move-manifest
-# On the VPS, from the start of an import until `start`: `importing`, or `imported` and the checksum
-# of the restored database. While it is there, OpenBot did not run on the restored data.
 IMPORT_STATE=/var/lib/openbot-move-import
-# The machine ID and the token of openbot-pool-wait, of root.
 OFFER=/etc/openbot-pool
 OFFER_INSTALL=/usr/local/lib/openbot-pool
 DATABASE=$USER_HOME/.config/OpenBot/openbot.db
-# The files that must be the same on the two machines. The agent database is there only after an
-# agent made a table.
 CHECKED=(
   "$DATABASE"
   "$USER_HOME/OpenBot/Shared/Data/agent-data.db"
   "$USER_HOME/.config/openbot-hosted/keyring-password"
   "$KEYRING_HOME/keyrings/login.keyring"
 )
-# The files of boat, the X authorization of the old displays, and a cache that npm makes again.
-# The installed release in /opt/OpenBot is not in the archive: provision.sh installs it.
-# `import` deletes ~/.ascii and ~/.config/ascii of the boat agent. The agent can write there during the
-# export, and tar then fails (seen on 2026-11-12).
 EXCLUDED=(
   "--exclude=./home/$SERVICE_USER/.ascii"
   "--exclude=./home/$SERVICE_USER/.config/ascii"
@@ -91,9 +24,9 @@ EXCLUDED=(
   "--exclude=./home/$SERVICE_USER/.boatignore"
   "--exclude=./home/$SERVICE_USER/.Xauthority*"
   "--exclude=./home/$SERVICE_USER/.npm/_cacache"
+  "--exclude=./home/$SERVICE_USER/.npm/_npx"
+  "--exclude=./home/$SERVICE_USER/.cache"
 )
-# The caches of the browsers in the home, which the browser makes again. A tar pattern `*` also
-# matches `/`, so each pattern matches the folder in each profile.
 BROWSER_HOMES=".config/chromium .config/google-chrome .config/BraveSoftware/Brave-Browser"
 BROWSER_CACHES=("Cache" "Code Cache" "GPUCache" "GrShaderCache" "ShaderCache" "DawnCache" "DawnGraphiteCache"
   "DawnWebGPUCache" "GraphiteDawnCache" "component_crx_cache" "extensions_crx_cache")
@@ -102,17 +35,16 @@ for browser in $BROWSER_HOMES; do
     EXCLUDED+=("--exclude=./home/$SERVICE_USER/$browser/*/$cache")
   done
 done
-unset browser cache
-# ~/.cache stays in the archive. Not all of it is cache: Poetry keeps its virtual environments there,
-# and Playwright and Puppeteer keep browsers that they do not download again by themselves. On 57 moved
-# servers it had 170 MB for each server (probe of 2026-11-13).
-# The customer can install software outside the home: the service user owns /usr/local and /opt in
-# the sandbox and can use sudo. The move copies what the customer added there, and not what the
-# boat image has. These are the contents of the images in BASE_IMAGES (the value of
-# ~/.base-image-version), from new sandboxes on 2026-11-12, and what provision.sh adds. The other
-# images are from the moves of 2026-11-12 and 2026-11-13: their moves copied only the trees of
-# IMAGE_CLIS and trees of the customer.
-# A newer image can add more: the export then copies it too, and names each tree with its size.
+for cache in "${BROWSER_CACHES[@]}"; do
+  EXCLUDED+=("--exclude=./home/$SERVICE_USER/.config/OpenBot/$cache"
+    "--exclude=./home/$SERVICE_USER/.config/OpenBot/Partitions/*/$cache")
+done
+MANAGED_PROVIDERS="codex claude grok opencode antigravity cursor cline kimi devin copilot mistral pi muse"
+EXCLUDED+=("--exclude=./home/$SERVICE_USER/.config/OpenBot/provider-runtimes/.downloads")
+for provider in $MANAGED_PROVIDERS; do
+  EXCLUDED+=("--exclude=./home/$SERVICE_USER/.config/OpenBot/provider-runtimes/$provider")
+done
+unset browser cache provider
 BASE_IMAGES=" c4ed68db-513f-4b6d-a61a-64b99b0c2a2c 5f37c910-7706-423d-b524-5c66b09885d2
   035a4024-1725-41b0-b527-92345aa06e52 08f1b42f-5ca2-42b9-8810-4f614bf15435 2834754b-4ed4-4046-b59b-b873c7d7a341
   2f3898e2-33f8-4a3d-899c-c5a895ce9553 3260cfc8-62ef-47a7-8df7-359044f467f1 42c68752-21f8-440d-b16c-0d965e3e3657
@@ -121,8 +53,6 @@ BASE_IMAGES=" c4ed68db-513f-4b6d-a61a-64b99b0c2a2c 5f37c910-7706-423d-b524-5c66b
   b7419fa3-90e0-4b0f-a3a3-24b24b6c2ff4 e23c47d9-fa29-4a53-a391-35bafd1a289a e57a01f6-b5bd-4f54-9917-cbe29f4e76d1
   f27f3eeb-e2f4-4d96-9619-d72f13e35dd7 f48f0fb0-3c59-43b4-b447-f69aa4080ea9 f7702e0a-1a08-481c-b8d1-54c52cc43712
   fba0e34a-35a6-453a-b95d-ba4a2eda10db "
-# cursor-agent and hermes-agent are agent CLIs of newer images: IMAGE_CLIS adds them when the customer
-# signed in.
 BASE_OPT=" actions-runner ascii ascii-agent ascii-baremetal-setup cmake-3.31.3-linux-x86_64 containerd cursor-agent
   google gradle-8.12 kimi-code kotlinc moonlight-web OpenBot prime-agent sbt scala3 scala3-3.3.8
   scrcpy-linux-x86_64-v3.1 "
@@ -136,31 +66,17 @@ BASE_BIN=" agent ariana-fswatch ascii-binderfs-add ascii-desktop ascii-desktop-s
   pnpm pnpx poetry prime-agent racc rake rbs rdbg rdoc ri ruby rust-analyzer rustc rustfmt rustup sbt scala
   scalac scaladoc scrcpy scrcpy-server start-agents-server stop-agents-server sync-docker-firewall
   syntax_suggest test-unit typeprof uv vibe vibe-acp "
-# The image installs these apt packages by hand, but ~/.base-apt-packages.txt does not have them.
 BASE_APT=" gir1.2-javascriptcoregtk-4.1 gir1.2-webkit2-4.1 libatk1.0-dev libbz2-dev libcairo2-dev libegl1
   libffi-dev libfuse2t64 libgbm1 libgdk-pixbuf-2.0-0 libgdk-pixbuf2.0-dev libgl1-mesa-dri libgles2
   libglib2.0-0t64 libglib2.0-dev libgtk-3-0t64 libgtk-3-dev libjavascriptcoregtk-4.1-dev liblzma-dev
   libncurses-dev libpam-systemd libpango1.0-dev libreadline-dev librsvg2-dev libsdl2-2.0-0 libsoup-3.0-dev
   libsqlite3-dev libssl-dev libusb-1.0-0 libwebkit2gtk-4.1-0 libxml2-dev libyaml-dev openjdk-11-jdk
   pkg-config tk-dev zlib1g-dev "
-# The agent CLIs of the image, each with the files in the home that its sign-in makes. The move copies
-# such a CLI when the customer signed in to it: a VPS has no agent CLI, and OpenBot would ask the
-# customer to download it again. Without a sign-in, the move does not copy it, and OpenBot offers the
-# download on the VPS. Hermes keeps an API key in `.env`.
 IMAGE_CLIS=(
-  "/usr/local/lib/node_modules/@anthropic-ai/claude-code .claude/.credentials.json"
-  "/usr/local/lib/node_modules/@openai/codex .codex/auth.json"
-  "/usr/local/lib/node_modules/@earendil-works/pi-coding-agent .pi/agent/auth.json"
-  "/opt/cursor-agent .config/cursor/auth.json .cursor/auth.json"
   "/usr/local/lib/hermes-agent .hermes/auth.json .hermes/.env"
 )
-# The SHA-256 of sign-in files that the image writes and that have no sign-in: the `.env` of Hermes in
-# each image of BASE_IMAGES that has Hermes (seen on 2026-11-13).
 IMAGE_FILES=" ff8ca7fbf619841dedc57f117602b8fc860e69f041ec120a4e8deffa45590919 "
-# The folders of ~/.hermes that the Hermes of the image fills, about 1.5 GB. The move leaves them out
-# when it does not copy that Hermes. The settings, sessions and skills in ~/.hermes stay.
 HERMES_IMAGE_HOME="tools installs cache"
-# Files in the server keyring directory that only carry data from `export` to `import`.
 MOVED_BIN=$KEYRING_HOME/move-bin
 MOVED_CRONTAB=$KEYRING_HOME/move-crontab
 
@@ -169,7 +85,6 @@ fail() {
   exit 1
 }
 
-# One line for each file of CHECKED that exists: its SHA-256 and its path.
 checksums() {
   local file
   for file in "${CHECKED[@]}"; do
@@ -189,9 +104,6 @@ is_hosted_install() {
   [ "$(cat /opt/OpenBot/hosted/service-user 2>/dev/null)" = "$SERVICE_USER" ] && [ ! -e /opt/OpenBot/hosted/mode ]
 }
 
-# One line for each command that npm installed for all users: its name, its package and its
-# version. The image of a boat sandbox has agent commands of this type, such as `claude` and `codex`,
-# and the image of a VPS has none.
 system_clis() {
   local modules=/usr/local/lib/node_modules link target package version
   for link in /usr/local/bin/*; do
@@ -209,24 +121,18 @@ system_clis() {
   done
 }
 
-# The groups of the service user, without its own group. One line for each.
 extra_groups() {
   id -Gn "$SERVICE_USER" | tr ' ' '\n' | grep -vxF "$(id -gn "$SERVICE_USER")" || true
 }
 
-# True when the word is in the list: a string with a space before and after each word.
-# A list can go on more than one line, so each space or line break separates two names.
 listed() {
   [ -n "$1" ] && [[ " ${2//[[:space:]]/ } " == *" $1 "* ]]
 }
 
-# One part of a path, with no "/", no "." or "..", and no space.
 plain_name() {
   [[ $1 =~ ^[A-Za-z0-9@_+][A-Za-z0-9@._+-]*$ ]]
 }
 
-# The names in /usr/local/lib that programs of root read: a library, a unit, a module, a rule or a
-# configuration there runs as root. The service user must not own such a directory on the VPS.
 root_reads_lib() {
   case $1 in
     *.d | systemd | udev | firmware | modules | kernel | security | pkcs11 | ssl | openssl* | sane | gio | \
@@ -236,8 +142,6 @@ root_reads_lib() {
   return 1
 }
 
-# True for a directory that the import can give to the service user: one directory in /opt, in
-# /usr/local or in /usr/local/lib, or one npm package for all users. No program of root reads it.
 movable_tree() {
   local path=$1 rest
   case $path in
@@ -262,9 +166,6 @@ movable_tree() {
   esac
 }
 
-# One line for each directory outside the home that the customer added: in /opt, in /usr/local, in
-# /usr/local/lib, and each npm package for all users. Also each agent CLI of the image that the
-# customer signed in to.
 added_trees() {
   local path name entry
   for path in /opt/* /usr/local/* /usr/local/lib/*; do
@@ -290,12 +191,9 @@ added_trees() {
   done
 }
 
-# True when one of the sign-in files has a sign-in. $1 has the paths in the home, with a space between
-# them. An empty file, a file with only `{}` (Pi writes it before the first sign-in) or a file of
-# IMAGE_FILES has none.
 signed_in() {
   local file
-  # shellcheck disable=SC2086 # The paths of IMAGE_CLIS have no space.
+  # shellcheck disable=SC2086
   for file in $1; do
     file=$USER_HOME/$file
     [ -s "$file" ] && [ ! -L "$file" ] || continue
@@ -306,8 +204,6 @@ signed_in() {
   return 1
 }
 
-# The tar options that leave out the home files of a Hermes of the image that the move does not copy.
-# $1 has one moved tree on each line.
 home_exclusions() {
   local trees=$1 path name
   [ -d /usr/local/lib/hermes-agent ] || return 0
@@ -315,8 +211,6 @@ home_exclusions() {
   for name in $HERMES_IMAGE_HOME; do
     echo "--exclude=./${USER_HOME#/}/.hermes/$name"
   done
-  # The image puts commands in ~/.local/bin that start the Hermes of the image. Without it, OpenBot
-  # would find a Hermes that cannot start.
   for name in hermes hermes-acp hermes-agent; do
     path=$USER_HOME/.local/bin/$name
     if [ -f "$path" ] && [ ! -L "$path" ] && grep -qF /usr/local/lib/hermes-agent/ "$path"; then
@@ -325,9 +219,6 @@ home_exclusions() {
   done
 }
 
-# The commands in /usr/local/bin that the move keeps, in ~/.local/bin on the VPS: `link=<name> <path>`
-# for a link into a moved tree or into the home, and `file=<name>` for a program that the customer
-# put there. $1 has one moved tree on each line.
 added_commands() {
   local trees=$1 entry name target tree
   for entry in /usr/local/bin/*; do
@@ -352,8 +243,6 @@ added_commands() {
       echo "file=$name"
     fi
   done
-  # In a newer image, `/usr/local/bin/cursor-agent` is a shim of boat, and its link into the moved tree
-  # `/opt/cursor-agent` is in this image directory. Seen on 2026-11-12: Cursor had no command after a move.
   for entry in /usr/local/lib/ascii-harnesses/bin/*; do
     name=${entry##*/}
     plain_name "$name" && [ -L "$entry" ] || continue
@@ -369,9 +258,6 @@ added_commands() {
   done
 }
 
-# The commands of each moved npm package that the loop of added_commands did not give. The image
-# has some of them, such as `pi`, as a shim that is not a link. $1 has one moved tree on each line,
-# and $2 is the output of added_commands.
 package_commands() {
   local trees=$1 given=$2 tree name path
   while read -r tree; do
@@ -393,8 +279,6 @@ for name, path in (bins or {}).items():
   done <<<"$trees"
 }
 
-# Each package that the customer installed with apt: installed by hand, and not in the list that the
-# image keeps in the home or in BASE_APT.
 added_packages() {
   local base=$USER_HOME/.base-apt-packages.txt
   [ -s "$base" ] || return 0
@@ -404,10 +288,6 @@ added_packages() {
   done
 }
 
-# The systemd units that the customer added: a unit file in /etc/systemd/system of no package and not of
-# boat or OpenBot, and an enabled instance of a template, such as `wg-quick@wg0`. The move does not copy
-# units or their files in /etc, and such a unit can write to the home during the export.
-# Seen on 2026-11-12: a Beeper service, Syncthing and WireGuard.
 customer_units() {
   local file name
   for file in /etc/systemd/system/*.service /etc/systemd/system/*.timer /etc/systemd/system/*.socket \
@@ -420,7 +300,6 @@ customer_units() {
   for file in /etc/systemd/system/*.wants/*@?*; do
     [ -L "$file" ] || continue
     name=${file##*/}
-    # `wg-quick@wg0` is the private network of boat (10.77.0.0/16) in each sandbox since 2026-11-09.
     case $name in getty@* | serial-getty@* | autovt@* | wg-quick@wg0.service | openbot* | ascii-* | ariana-* | sunshine*)
       continue
       ;;
@@ -430,7 +309,28 @@ customer_units() {
   return 0
 }
 
-# What the move does not copy, for the report of the import.
+customer_folders() {
+  local uid
+  uid=$(id -u "$SERVICE_USER")
+  find / \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /tmp -o -path /var/tmp \
+    -o -path /home -o -path "$KEYRING_HOME" -o -path /opt -o -path /usr -o -path /snap -o -path /var/spool/cron \
+    -o -path /var/lib/docker -o -path /var/cache -o -path /var/crash -o -path /var/log \
+    -o -path '/var/lib/ascii*' -o -path /var/lib/ariana \) -prune \
+    -o ! -type d -uid "$uid" -print |
+    awk -F/ '{ n = $2 == "var" ? 4 : 3; if (n > NF - 1) n = NF - 1; f = ""
+      for (i = 2; i <= n; i++) f = f "/" $i; print f == "" ? $0 : f }' | sort -u
+}
+
+movable_folder() {
+  [[ $1 =~ ^/(srv/|mnt/|media/)?[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$ ]] || return 1
+  [ "$1" != "$KEYRING_HOME" ] || return 1
+  case $1 in
+    /bin | /boot | /cdrom | /dev | /etc | /gnu | /home | /initrd* | /lib* | /lost+found | /media | /mnt | /nix | \
+      /opt | /proc | /root | /run | /sbin | /snap | /srv | /swap* | /sys | /tmp | /usr | /var) return 1 ;;
+  esac
+  return 0
+}
+
 not_moved() {
   local count
   if command -v docker >/dev/null; then
@@ -444,33 +344,27 @@ not_moved() {
   [ -s "$USER_HOME/.base-apt-packages.txt" ] || echo "the apt packages: the image has no list of its packages"
 }
 
-# The version of Ubuntu, such as 24.04.
 os_version() {
   sed -n 's/^VERSION_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/os-release 2>/dev/null | head -n 1
 }
 
-# Empty when the machine has no import state.
 import_state() {
   sed -n '1p' "$IMPORT_STATE" 2>/dev/null || true
 }
 
-# True when OpenBot is neither enabled nor running, which is the state after `prepare`.
 openbot_is_off() {
   ! systemctl is-enabled --quiet openbot.service 2>/dev/null && ! openbot_runs
 }
 
-# True when the restored database is the file that `import` checked.
 database_is_unchanged() {
   local sum
   sum=$(sed -n 's/^database=//p' "$IMPORT_STATE")
   [ -n "$sum" ] && [ -f "$DATABASE" ] && [ "$(sha256sum "$DATABASE" | cut -d' ' -f1)" = "$sum" ]
 }
 
-# The machine must take no new server while an operator changes it. Without the token, the unit does
-# not start at the next boot.
 stop_offer() {
   rm -f "$OFFER/token"
-  if [ -e /etc/systemd/system/openbot-pool-wait.service ]; then
+  if [ -z "${OPENBOT_POOL_RESTORE:-}" ] && [ -e /etc/systemd/system/openbot-pool-wait.service ]; then
     systemctl disable --quiet --now openbot-pool-wait.service
   fi
 }
@@ -500,10 +394,10 @@ offer() {
     fail "This machine names no account service."
   install -d -m 0755 "$OFFER_INSTALL"
   install -m 0755 "$source/openbot-pool-wait" "$OFFER_INSTALL/openbot-pool-wait"
+  install -m 0755 "$0" "$OFFER_INSTALL/move-from-boat.sh"
   install -m 0644 "$source/openbot-pool-wait.service" /etc/systemd/system/openbot-pool-wait.service
   install -d -m 0700 "$OFFER"
   printf '%s\n' "$host" >"$OFFER/host"
-  # umask 077: only root reads the token.
   printf '%s\n' "$token" >"$OFFER/token"
   systemctl daemon-reload
   systemctl enable --quiet openbot-pool-wait.service
@@ -530,22 +424,16 @@ prepare() {
   owner=$(getent group "$gid" | cut -d: -f1 || true)
   [ -z "$owner" ] || fail "The group $owner has the ID $gid on this machine. Remove that group, then run this again."
 
-  # Before OpenBot starts: the X authorization of its displays has the hostname in it.
   hostnamectl set-hostname "$hostname"
   groupadd --gid "$gid" "$SERVICE_USER"
-  # Agents run shell commands as this user, so it gets a login shell, and no password.
   useradd --uid "$uid" --gid "$gid" --create-home --home-dir "$USER_HOME" --shell /bin/bash "$SERVICE_USER"
-  # provision.sh installs two files as the service user, who cannot read a directory in the home of
-  # root. So it runs from a copy that each user can read. The files have no secret.
   copy=$(mktemp -d /run/openbot-move.XXXXXX)
-  # shellcheck disable=SC2064 # The path is known now.
+  # shellcheck disable=SC2064
   trap "rm -rf '$copy'" EXIT
   cp -R "$source/." "$copy/"
   chmod -R u=rwX,go=rX "$copy"
-  # Installs and enables OpenBot, and does not start it.
   bash "$copy/provision.sh" "$SERVICE_USER" "$appimage_url" "$appimage_sha256" "$auth_api_url"
   is_hosted_install || fail "The install is not a hosted server of the user $SERVICE_USER."
-  # The row of the server does not name this machine yet, so no restart must start OpenBot.
   systemctl disable --quiet openbot.service
   if openbot_runs; then fail "OpenBot runs. Stop it."; fi
   echo "Installed OpenBot $(installed_version) on $hostname for the user $SERVICE_USER ($uid:$gid). It is disabled."
@@ -563,7 +451,7 @@ upgrade() {
     fail "This machine has the data of a server. Do not upgrade it here."
   if openbot_runs; then fail "OpenBot runs. Stop it."; fi
   copy=$(mktemp -d /run/openbot-move.XXXXXX)
-  # shellcheck disable=SC2064 # The path is known now.
+  # shellcheck disable=SC2064
   trap "rm -rf '$copy'" EXIT
   cp -R "$source/." "$copy/"
   chmod -R u=rwX,go=rX "$copy"
@@ -573,13 +461,13 @@ upgrade() {
   echo "Installed OpenBot $(installed_version). It is disabled."
 }
 
-# Prints the apt packages of the customer, as `install-packages` and the manifest read them.
 packages() {
   [ "$#" -eq 0 ] || fail "usage: $0 packages"
   id "$SERVICE_USER" >/dev/null 2>&1 || fail "This machine has no user $SERVICE_USER. It is not a boat sandbox."
   [ -s "$USER_HOME/.base-apt-packages.txt" ] || echo "The image has no list of its apt packages. The move installs no apt package." >&2
   added_packages | sed 's/^/apt=/'
   customer_units | sort -u | sed 's/^/unit=/'
+  customer_folders | sed 's/^/folder=/'
 }
 
 install_packages() {
@@ -589,12 +477,16 @@ install_packages() {
 }
 
 export_data() {
-  [ "$#" -eq 1 ] || fail "usage: $0 export <archive | ->"
-  local archive=$1 copy=$1 version
+  [ "$#" -ge 1 ] || fail "usage: $0 export <archive | -> [<folder>...]"
+  local archive=$1 copy=$1 version folder
+  shift
+  for folder in "$@"; do
+    movable_folder "$folder" || fail "The move cannot copy $folder, so this server stays on boat. Nothing was archived."
+    [ -d "$folder" ] && [ ! -L "$folder" ] || fail "$folder is not a folder in this sandbox. Nothing was archived."
+  done
   if [ "$archive" = - ]; then
     [ ! -t 1 ] || fail "Send the archive through SSH to the VPS, not to the terminal."
     copy="the copy of the archive"
-    # The archive goes to descriptor 3, and each message to standard error.
     exec 3>&1 1>&2
   else
     [ ! -e "$archive" ] || fail "$archive exists. Give a new path."
@@ -604,8 +496,6 @@ export_data() {
   [ -s "$USER_HOME/.config/OpenBot/openbot.db" ] || fail "The home of $SERVICE_USER has no OpenBot database."
   [ -s "$USER_HOME/.config/openbot-hosted/keyring-password" ] && [ -s "$KEYRING_HOME/keyrings/login.keyring" ] ||
     fail "The server keyring or its password file is missing. The server could not sign in after the move."
-  # While boat restores the disk, a directory can show no files. boat can start the restore some seconds
-  # after a resume (seen on 2026-11-12), so wait here: OpenBot still runs, and the customer sees no downtime.
   local waited=0
   while [ -e /var/lib/ascii-lazy/active ] && [ ! -e /var/lib/ascii-lazy/hydration-done ]; do
     [ "$waited" -lt 1800 ] || fail "boat still restores the disk of this sandbox after 30 minutes. Try again later."
@@ -613,15 +503,11 @@ export_data() {
     sleep 10
     waited=$((waited + 10))
   done
-  # boat makes some entries local only when they are read, and tar fails on a directory that changes so.
   [ "$waited" -eq 0 ] || find "$USER_HOME" -xdev -printf '' 2>/dev/null || true
   version=$(installed_version)
   [ -n "$version" ] || fail "The version of the installed OpenBot is not known."
 
-  # The same order as openbot-boat-pre-stop: the marker first, so that nothing starts OpenBot again.
   touch /run/openbot-pre-stop
-  # A timer of an earlier stop try of boat starts OpenBot when the marker is 5 minutes old. An export of
-  # many GB takes longer (seen on 2026-11-12: OpenBot started after 7 minutes, and tar failed).
   systemctl stop openbot-pre-stop-restart.timer 2>/dev/null || true
   systemctl stop openbot.service
   if openbot_runs; then fail "OpenBot still runs. Nothing was archived."; fi
@@ -636,6 +522,7 @@ export_data() {
       notes+="$tree: programs of root read it"$'\n'
     fi
   done < <(added_trees | sort -u)
+  for folder in "$@"; do members+=("./${folder#/}"); done
   commands=$(added_commands "$trees")
   commands+=$'\n'$(package_commands "$trees" "$commands")
   notes+=$(not_moved)
@@ -645,7 +532,7 @@ export_data() {
   done < <(home_exclusions "$trees")
 
   rm -rf "$MOVED_BIN" "$MOVED_CRONTAB"
-  # shellcheck disable=SC2064 # The paths are known now.
+  # shellcheck disable=SC2064
   trap "rm -rf '$MANIFEST' '$MOVED_BIN' '$MOVED_CRONTAB'" EXIT
   {
     printf 'uid=%s\ngid=%s\nversion=%s\nos=%s\n' "$(id -u "$SERVICE_USER")" "$(id -g "$SERVICE_USER")" "$version" "$(os_version)"
@@ -658,19 +545,15 @@ export_data() {
     printf '%s\n' "$notes" | sed '/^$/d; s/^/skipped=/'
   } >"$MANIFEST"
   chmod 0600 "$MANIFEST"
-  # The programs that the customer put in /usr/local/bin, and the crontab of the service user, go with
-  # the server keyring. `import` moves them to their places as the service user.
   while read -r name; do
     [ -n "$name" ] || continue
     install -d -m 0700 "$MOVED_BIN"
     cp --preserve=mode,timestamps --dereference "/usr/local/bin/$name" "$MOVED_BIN/$name"
   done < <(sed -n 's/^file=//p' <<<"$commands")
   if [ -s "/var/spool/cron/crontabs/$SERVICE_USER" ]; then
-    install -m 0600 "/var/spool/cron/crontabs/$SERVICE_USER" "$MOVED_CRONTAB"
+    crontab -u "$SERVICE_USER" -l >"$MOVED_CRONTAB"
   fi
 
-  # The manifest is the first member, so `import` reads it before it restores a file.
-  # tar also fails when a process outside openbot.service changes a file while tar reads it.
   local created=0
   if [ "$archive" = - ]; then
     tar --create --file - --numeric-owner --acls --xattrs --one-file-system --anchored --directory / \
@@ -690,7 +573,7 @@ export_data() {
   fi
   if [ -n "$trees" ]; then
     echo "The archive has these directories that the customer added outside the home:"
-    # shellcheck disable=SC2086 # One path on each line, with no space.
+    # shellcheck disable=SC2086
     du -sh $trees | sed 's/^/  /'
   fi
   if ! listed "$(cat "$USER_HOME/.base-image-version" 2>/dev/null)" "$BASE_IMAGES"; then
@@ -699,12 +582,10 @@ export_data() {
   echo "OpenBot stays stopped until this sandbox stops. Do not start it here after the VPS runs."
 }
 
-# Puts the moved commands in ~/.local/bin and installs the moved crontab, as the service user. A
-# command that ~/.local/bin has already stays as it is. $1 is the manifest.
 restore_commands() {
   local links
   links=$(sed -n 's/^link=//p' <<<"$1" | grep -E '^[A-Za-z0-9@_+][A-Za-z0-9@._+-]* /[A-Za-z0-9@._+/-]+$' || true)
-  # shellcheck disable=SC2016 # The service user's shell expands these.
+  # shellcheck disable=SC2016
   runuser -u "$SERVICE_USER" -- bash -c '
     set -u
     bin=$1 moved=$2 links=$3
@@ -729,12 +610,8 @@ restore_commands() {
   runuser -u "$SERVICE_USER" -- rm -f -- "$MOVED_CRONTAB"
 }
 
-# Removes what the boat agent server wrote to the home: its tokens (~/.ascii and the blocks of
-# ~/.bashrc), its `boat` and `box` commands, its `boat` skill, and its `computer` MCP server. That
-# server starts files of the image, and Pi waits for it until OpenBot stops the start of Pi. A part
-# that the customer changed stays when the move cannot know it is from boat.
 remove_boat_config() {
-  # shellcheck disable=SC2016 # The service user's shell expands these.
+  # shellcheck disable=SC2016
   runuser -u "$SERVICE_USER" -- bash -c '
     set -u
     cd "$HOME" || exit 1
@@ -815,14 +692,10 @@ for name in (".bashrc", ".profile", ".bash_profile", ".zshrc"):
 EOF'
 }
 
-# An npm package starts with `#!/usr/bin/env node`. The image of a sandbox has Node, and a VPS has
-# none. OpenBot downloads Bun to the home, and Bun runs a Node script when it starts with the name
-# `node`. So ~/.local/bin/node starts the Bun of OpenBot, which can change version after the move.
-# The login shell of an agent has ~/.local/bin in its PATH.
 add_node_command() {
   local node=$USER_HOME/.local/bin/node
   [ ! -e "$node" ] && [ ! -L "$node" ] || return 0
-  # shellcheck disable=SC2016 # The command expands these when it runs.
+  # shellcheck disable=SC2016
   runuser -u "$SERVICE_USER" -- bash -c 'umask 022 && cat >"$1" && chmod 0755 "$1"' _ "$node" <<'EOF'
 #!/bin/bash
 # The move from boat added this command. It starts the Bun of OpenBot as Node.
@@ -838,10 +711,6 @@ EOF
   fi
 }
 
-# Installs the apt packages that the customer installed in the sandbox, and names each package that
-# this machine cannot install. The service user has no root here, so a package that changes the
-# firewall, SSH or root access of this machine is not installed. A package that needs the removal of
-# a package of this machine, such as resolvconf, is not installed either. $1 is the manifest.
 install_packages_of() {
   local packages="" failed="" refused="" package
   while read -r package; do
@@ -862,7 +731,7 @@ install_packages_of() {
   [ -n "$packages" ] || return 0
   echo "Installing the apt packages that the customer installed in the sandbox:$packages"
   apt-get -o DPkg::Lock::Timeout=600 update -q >/dev/null || true
-  # shellcheck disable=SC2086 # One word for each package.
+  # shellcheck disable=SC2086
   if ! DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q --no-install-recommends --no-remove \
     $packages >/dev/null 2>&1; then
     for package in $packages; do
@@ -873,9 +742,6 @@ install_packages_of() {
   if [ -n "$failed" ]; then echo "This machine cannot install these apt packages of the sandbox:$failed"; fi
 }
 
-# Prints why the command at $1 cannot start on this machine, or nothing. It reads the command and does
-# not start it (ldd reads a program as the service user): a link must lead to a file, a script to its interpreter and to the program that it
-# starts with `exec`, and a program to each library that it loads.
 command_problem() {
   local path=$1 depth=${2:-0} real interpreter next rest
   real=$(readlink -f -- "$path") && [ -f "$real" ] || {
@@ -904,11 +770,9 @@ command_problem() {
   esac
 }
 
-# Names each command in ~/.local/bin that cannot start here, such as a program for another version
-# of Ubuntu or a link to a directory that the move did not copy. The service user reads them.
 report_commands() {
   local problems
-  # shellcheck disable=SC2016 # The service user's shell expands these.
+  # shellcheck disable=SC2016
   problems=$(runuser -u "$SERVICE_USER" -- bash -c "$(declare -f command_problem)"'
     PATH=$1:$PATH
     for command in "$1"/*; do
@@ -922,9 +786,8 @@ report_commands() {
 }
 
 import_data() {
-  [ "$#" -eq 1 ] && [ -f "$1" ] || fail "usage: $0 import <archive>"
-  local archive=$1 manifest version installed sums clis groups missing line trees present members group
-  # First: a machine that gets the data of a moved server must not also take a new one.
+  [ "$#" -ge 1 ] && [ -f "$1" ] || fail "usage: $0 import <archive> [<folder>...]"
+  local archive=$1 folder manifest version installed sums clis groups missing line trees present members group
   stop_offer
   is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
   openbot_is_off || fail "OpenBot is enabled or runs on this machine. It is not a prepared pool server."
@@ -932,23 +795,24 @@ import_data() {
     fail "An import did not get to its start on this machine. Run \"$0 discard $(hostname)\", then run the import again."
   [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$KEYRING_HOME/keyrings" ] ||
     fail "This machine has the data of a server."
+  shift
+  for folder in "$@"; do
+    movable_folder "$folder" || fail "The import cannot restore $folder. Nothing was restored."
+    [ ! -e "$folder" ] && [ ! -L "$folder" ] || fail "$folder is on this machine already. Nothing was restored."
+  done
 
-  # Only the manifest, to standard output: no file of the archive is on the disk yet.
   manifest=$(tar --extract --file "$archive" --to-stdout --occurrence=1 "./${MANIFEST#/}") || fail "The archive has no manifest."
   version=$(sed -n 's/^version=//p' <<<"$manifest")
   sums=$(sed -n 's/^sha256=//p' <<<"$manifest")
   [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ -n "$sums" ] || fail "The manifest has no version or no checksum."
   [ "$(sed -n 's/^uid=//p' <<<"$manifest"):$(sed -n 's/^gid=//p' <<<"$manifest")" = "$(id -u "$SERVICE_USER"):$(id -g "$SERVICE_USER")" ] ||
     fail "The user $SERVICE_USER has other IDs here than in the sandbox."
-  # An older OpenBot cannot open a database that a newer one migrated.
   installed=$(installed_version)
   if [ "$installed" != "$version" ] &&
     [ "$(printf '%s\n%s\n' "$installed" "$version" | sort -V | tail -n 1)" = "$version" ]; then
     fail "This machine has OpenBot ${installed:-of no known version}, and the sandbox had $version. Install $version or newer."
   fi
 
-  # The directories that the customer added outside the home. A directory that this machine has
-  # already stays as it is.
   trees="" present=""
   while read -r line; do
     [ -n "$line" ] || continue
@@ -958,23 +822,22 @@ import_data() {
   members=("./${USER_HOME#/}" "./${KEYRING_HOME#/}")
   group=$(id -gn "$SERVICE_USER")
 
-  # From here, only `discard` makes a second import possible. It removes the directories in the state.
   {
     echo importing
     printf '%s' "$trees" | sed 's/^/tree=/'
+    for folder in "$@"; do echo "folder=$folder"; done
   } >"$IMPORT_STATE"
-  # Each added directory is new and belongs to the service user. Its parents belong to root.
   while read -r line; do
     [ -n "$line" ] || continue
     (umask 022 && mkdir -p "${line%/*}")
     install -d -o "$SERVICE_USER" -g "$group" -m 0755 "$line"
     members+=("./${line#/}")
   done <<<"$trees"
-  # The archive is from a machine where an agent of the customer can get root, and the service user
-  # has no root here. So the service user restores it, and only its two directories and the new
-  # directories above: the kernel then refuses a file outside them, an owner that is not the service
-  # user, a device, a hard link to a file of root, and a file capability. A file that root or another
-  # user owned in the sandbox gets the service user as its owner.
+  for folder in "$@"; do
+    (umask 022 && mkdir -p "${folder%/*}")
+    install -d -o "$SERVICE_USER" -g "$group" -m 0755 "$folder"
+    members+=("./${folder#/}")
+  done
   runuser -u "$SERVICE_USER" -- tar --extract --file - --no-same-owner --same-permissions --acls --xattrs \
     --xattrs-include='user.*' --directory / "${members[@]}" <"$archive" ||
     fail "The archive was not restored. Run \"$0 discard $(hostname)\", then run the import again."
@@ -984,7 +847,6 @@ import_data() {
   if openbot_runs; then fail "OpenBot runs, and the import is not complete. Stop it."; fi
   restore_commands "$manifest"
   remove_boat_config || echo "The boat configuration was not removed from the home."
-  # An apt package can install Node, so the Bun command is added only after the packages.
   install_packages_of "$manifest"
   if grep -q '^/usr/local/lib/node_modules/' <<<"$trees" && ! command -v node >/dev/null; then add_node_command; fi
   if openbot_runs; then fail "OpenBot runs, and the import is not complete. Stop it."; fi
@@ -992,6 +854,7 @@ import_data() {
     echo imported
     printf 'database=%s\n' "$(sha256sum "$DATABASE" | cut -d' ' -f1)"
     printf '%s' "$trees" | sed 's/^/tree=/'
+    for folder in "$@"; do echo "folder=$folder"; done
   } >"$IMPORT_STATE"
   echo "Restored the server of OpenBot $version. This machine has OpenBot $installed, and it does not run."
   echo "Next: when the row of the server names this machine and the sandbox is stopped, run: $0 start"
@@ -1009,7 +872,6 @@ import_data() {
     printf 'The move did not copy these:\n%s\n' "$line"
   fi
 
-  # The manifest is text from the other machine: print only lines of the known shape.
   clis=$(sed -n 's/^cli=//p' <<<"$manifest" | grep -E '^[A-Za-z0-9._-]+ [@A-Za-z0-9._/-]+ [A-Za-z0-9.+-]+$' || true)
   missing=""
   while read -r line; do
@@ -1019,7 +881,7 @@ import_data() {
   done <<<"$clis"
   if [ -n "$missing" ]; then
     printf 'The sandbox had these commands from npm, and this machine does not have them:\n%s' "$missing"
-    echo "The customer did not sign in to these CLIs in the sandbox. OpenBot asks the customer to download a provider CLI before its first use."
+    echo "At start, OpenBot downloads the CLI of each provider that an agent uses. The customer downloads the CLI of another provider in OpenBot."
   fi
   groups=$(sed -n 's/^group=//p' <<<"$manifest" | grep -E '^[a-z_][a-z0-9_-]*$' || true)
   missing=""
@@ -1039,7 +901,6 @@ start() {
     fail "This machine has no complete import that waits for its start."
   openbot_is_off || fail "OpenBot is enabled or runs on this machine."
   database_is_unchanged || fail "The database is not the file that the import checked. Do not start OpenBot."
-  # First: from here OpenBot can change the data, so `discard` must refuse.
   rm -f "$IMPORT_STATE"
   systemctl enable --now openbot.service
   echo "OpenBot $(installed_version) is enabled and started. The host is online when its first sign-in ends."
@@ -1057,21 +918,47 @@ discard() {
   if [ "$state" = imported ] && ! database_is_unchanged; then
     fail "The database changed after the import. Nothing was removed. To erase this server, reinstall the machine."
   fi
-  # Not across a mount, and a link is removed, not followed.
   find "$USER_HOME" "$KEYRING_HOME" -xdev -mindepth 1 -delete
-  # The directories that the import made outside the home. A directory that was here before the
-  # import is not in the state.
   sed -n 's/^tree=//p' "$IMPORT_STATE" | while read -r tree; do
     if [ -n "$tree" ] && movable_tree "$tree"; then rm -rf --one-file-system -- "$tree"; fi
   done
+  sed -n 's/^folder=//p' "$IMPORT_STATE" | while read -r folder; do
+    if [ -n "$folder" ] && movable_folder "$folder"; then rm -rf --one-file-system -- "$folder"; fi
+  done
   if command -v crontab >/dev/null; then crontab -u "$SERVICE_USER" -r 2>/dev/null || true; fi
-  # The copy also gives the home the mode of /etc/skel, so set the mode of a new home again.
   cp -a /etc/skel/. "$USER_HOME/"
   chown -R "$SERVICE_USER:$(id -gn "$SERVICE_USER")" "$USER_HOME"
   mode=$(sed -n 's/^HOME_MODE[[:space:]]*//p' /etc/login.defs | head -n 1)
   chmod "${mode:-0750}" "$USER_HOME"
   rm -f "$IMPORT_STATE"
   echo "Removed the restored data on $(hostname). The apt packages of the import stay. The machine is prepared again: run the import."
+}
+
+restore() {
+  [ "$#" -eq 1 ] || fail "usage: $0 restore <sha256 of the encrypted archive> (the age key and the archive URL on standard input)"
+  local expected=$1 identity url dir key summer
+  [[ $expected =~ ^[0-9a-f]{64}$ ]] || fail "The checksum is not valid."
+  IFS= read -r identity || true
+  IFS= read -r url || true
+  [[ $identity =~ ^AGE-SECRET-KEY-1[0-9A-Z]{58}$ ]] || fail "Standard input has no age key."
+  [[ $url =~ ^https://[A-Za-z0-9.-]+/[^[:space:]]+$ ]] || fail "Standard input has no archive URL."
+  command -v age >/dev/null || fail "This machine has no age. Run leaseweb-bootstrap.sh again."
+  is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
+  openbot_is_off || fail "OpenBot is enabled or runs on this machine. It is not a prepared pool server."
+  dir=$(mktemp -d /var/tmp/openbot-restore.XXXXXX)
+  key=$(mktemp /run/openbot-restore-key.XXXXXX)
+  trap "rm -rf '$dir' '$key'" EXIT
+  printf '%s\n' "$identity" >"$key"
+  unset identity
+  mkfifo "$dir/sum"
+  sha256sum <"$dir/sum" | cut -c1-64 >"$dir/sha256" &
+  summer=$!
+  curl --fail --silent --show-error --proto '=https' "$url" | tee "$dir/sum" | age -d -i "$key" >"$dir/archive.tar" ||
+    fail "The archive was not downloaded or not decrypted. Nothing was restored."
+  wait "$summer"
+  rm -f "$key"
+  [ "$(cat "$dir/sha256")" = "$expected" ] || fail "The download is not the archive. Nothing was restored."
+  import_data "$dir/archive.tar"
 }
 
 [ "$(id -u)" -eq 0 ] || fail "Run this as root."
@@ -1086,7 +973,8 @@ case $command in
   install-packages) install_packages "$@" ;;
   export) export_data "$@" ;;
   import) import_data "$@" ;;
+  restore) restore "$@" ;;
   start) start "$@" ;;
   discard) discard "$@" ;;
-  *) fail "usage: $0 prepare|upgrade|offer|withdraw|packages|install-packages|export|import|start|discard (the top of this file has the arguments)" ;;
+  *) fail "usage: $0 prepare|upgrade|offer|withdraw|packages|install-packages|export|import|restore|start|discard (the top of this file has the arguments)" ;;
 esac

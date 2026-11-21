@@ -116,9 +116,16 @@ export const messages = {
   "provider.picker.download": "הורדת {name}",
   "provider.picker.search": "חיפוש מודלים",
   "provider.picker.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "provider.picker.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "המודלים האלה לא עובדים עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בהם, שנו את „הרשאות” בהגדרות הסוכן.",
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
   "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} מפעיל את נקודות הקצה המותאמות שלך. המודלים שלהן נמצאים בכרטיסייה מותאם אישית.",
+  "provider.picker.showCustomModels": "הצגת מודלים",
   "provider.picker.museNoModels":
     "Muse לא שלח מודלים עבור החשבון הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל. בחר מודל מספק אחר.",
   "provider.picker.customEmpty":
@@ -146,6 +153,8 @@ export const messages = {
   "provider.picker.selectEffort": "בחירת מאמץ",
   "provider.picker.custom": "מותאם אישית",
   "provider.picker.cliReady": "{cli} מוכן",
+  "provider.picker.modelSourceProvider": "משתמש ב-{name} מהגדרות {cli}",
+  "provider.picker.modelSourceCatalog": "משתמש ברשימת מודלים מהגדרות {cli}",
   "provider.status.signInRequired": "נדרשת התחברות",
   "provider.model.free": "חינם",
   "provider.model.new": "חדש",
@@ -221,6 +230,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "לא ניתן להתחבר מחדש.",
   "provider.account.add": "הוספת חשבון",
   "provider.account.addLabel": "הוספת חשבון {name} נוסף",
+  "provider.account.addWithCode": "הוספת חשבון עם קוד",
   "provider.account.count": { one: "חשבון אחד", two: "שני חשבונות", other: "{count} חשבונות" },
   "provider.account.numbered": "חשבון {number}",
   "provider.account.apiKey": "מפתח API",
@@ -321,6 +331,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · הורדה על ידי OpenBot",
   "provider.settings.otherVersionInstalledByUser": "לא בשימוש: {version} · הותקנה על ידיך",
   "provider.settings.otherVersionDownloaded": "לא בשימוש: {version} · הורדה על ידי OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "חלק מהמודלים צריכים רכיב שחסר בגרסה הזו. הורד את הגרסה של OpenBot כדי להשתמש בהם.",
   "provider.settings.useInstalledVersion": "השתמש בגרסה המותקנת",
   "provider.settings.useDownloadedVersion": "השתמש בגרסה של OpenBot",
   "provider.settings.update": "עדכון",
@@ -346,6 +358,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "ברירת המחדל של Claude Code",
   "provider.settings.compactWindowTokens": "{size} טוקנים",
   "provider.settings.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
+  "provider.settings.environment": "סביבה",
+  "provider.settings.environmentVariables": "משתנים",
+  "provider.settings.environmentDescription":
+    "מפתחות API, כתובות בסיס והגדרות אחרות שכל תהליך של {name} מקבל. שינוי חל כשהתורות הנוכחיים מסתיימים.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, עם OPENAI_API_KEY כמפתח שלו, שולח את בקשות המודל של ChatGPT לכתובת הזו.",
+  "provider.settings.environmentShellNote": "הפקודות שסוכנים מריצים יכולות לקרוא את הערכים האלה.",
+  "provider.settings.environmentAdd": "הוספת משתנה",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "ערך",
+  "provider.settings.environmentSaved": "נשמר",
+  "provider.settings.environmentSensitive": "רגיש",
+  "provider.settings.environmentNameLabel": "שם משתנה {index}",
+  "provider.settings.environmentValueLabel": "הערך של {name}",
+  "provider.settings.environmentSensitiveLabel": "לשמור את {name} בסוד",
+  "provider.settings.environmentRemoveLabel": "הסרת {name}",
+  "provider.settings.environmentUnnamed": "משתנה {index}",
+  "provider.settings.environmentPending":
+    "השמירה מפעילה מחדש את {name} כשהתורות הנוכחיים שלו מסתיימים. ערכים רגישים נשארים בשרת.",
+  "provider.settings.environmentDone": "נשמר. {name} יופעל מחדש כשהתורות הנוכחיים שלו יסתיימו.",
+  "provider.settings.environmentDiscard": "ביטול",
+  "provider.settings.environmentSave": "שמירה",
+  "provider.settings.environmentLoadFailed": "לא ניתן לטעון את המשתנים של {name}.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {
     one: "{shown} מתוך מודל אחד מוצג בבורר המודלים.",
@@ -380,4 +415,5 @@ export const messages = {
   },
   "provider.settings.disconnectLocalOnly":
     "OpenBot מנתק את {provider} במחשב הזה. ה-CLI של {provider} במסוף שלך נשאר מחובר.",
+  "provider.settings.updateAll": "עדכון הכול",
 } as const satisfies PartialTranslation<typeof source>;

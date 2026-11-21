@@ -11,6 +11,17 @@ export const messages = {
     "لم تعمل الأداة. في tool_call يجب أن تكون arguments كائن JSON وليست نصًا. أرسل الاستدعاء مرة أخرى مع arguments ككائن.",
   "error.agent.toolCallDiscoveryTool":
     "لم تعمل الأداة. لا يمكن لـ tool_call تشغيل openbot.tool_search أو openbot.tool_describe. استدعهما مباشرةً بالوسائط نفسها.",
+  "error.agent.toolCallEnvelopeKeys":
+    "لم تعمل الأداة. لا يقبل tool_call إلا name وarguments. ضع وسائط الأداة في arguments ككائن، ثم أرسل الاستدعاء مرة أخرى.",
+  "error.agent.toolCallMissingName":
+    "لم تعمل الأداة. لا يحتوي tool_call على name. ضع في name الاسم المؤهل الذي يعطيه tool_search، مثل openbot.history_read، ثم أرسل الاستدعاء مرة أخرى.",
+  "error.agent.toolCallUnknownTool":
+    "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. استخدم الاسم المؤهل الدقيق الذي يعطيه tool_search، مثل openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. قد يكون الاسم المؤهل {name}. إذا كان كذلك، فأرسل الاستدعاء مرة أخرى بهذا الاسم.",
+  "error.agent.toolDescribeUnknownNames":
+    "لم يعثر tool_describe على أداة OpenBot باسم {names}. يصف فقط أدوات OpenBot والمتصفح التي يسردها openbot.tool_search، وليس أدوات MCP.",
+  "error.agent.toolDescribeDiscoveryNames": "استدعِ {names} مباشرةً. لا يصف tool_describe أدوات البحث.",
   "error.agent.routineScheduleArgumentsInvalid":
     "جدول المهمة الدورية غير صالح: {detail} صحّح الجدول وحاول مرة أخرى. يعطي openbot.tool_describe المخطط.",
   "error.agent.approvalWhileDeleting": "لا يمكن منح الموافقة أثناء حذف الوكيل.",
@@ -37,6 +48,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "فشل إعداد الوكيل وتعذّرت إزالة الوكيل غير المكتمل.",
   "error.agent.modelUnavailable": "نموذج الوكيل المحدد غير متاح.",
   "error.agent.modelProviderNotConnected": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير متصل.",
+  "error.agent.modelProviderSignInRequired":
+    "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تسجيل الدخول. سجّل الدخول إلى {provider} ثم حاول مرة أخرى.",
+  "error.agent.modelProviderNotInstalled": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير مثبّت.",
+  "error.agent.modelProviderOutdated": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تحديث.",
   "error.agent.modelListEmpty":
     "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج. آخر خطأ: {detail}",
   "error.agent.modelListEmptyNoError": "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج.",
@@ -46,6 +61,8 @@ export const messages = {
   "error.agent.modelProviderMismatch": "النموذج المحدد لا ينتمي إلى هذا المزوّد.",
   "error.agent.modelNotListed": "النموذج «{model}» غير متاح. النماذج المتاحة: {models}.",
   "error.agent.providerNotListed": "لا يتوفر أي نموذج من {provider} الآن. استدعِ list_models لعرض النماذج المتاحة.",
+  "error.agent.creatorModelNotListed":
+    "نموذجك «{model}» غير موجود في قائمة النماذج الآن، لذلك لا يمكن أن يبدأ الوكيل الجديد عليه. حاول مرة أخرى بعد بضع ثوانٍ، أو عيّن provider وmodel إلى نموذج يعرضه list_models.",
   "error.agent.reasoningEffortUnsupported":
     "النموذج «{model}» لا يدعم مستوى الاستدلال «{effort}». المستويات المدعومة: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -76,10 +93,16 @@ export const messages = {
   "error.agent.endpointRemoved": "أُزيلت نقطة النهاية التي استخدمها هذا الوكيل. اختر نموذجًا آخر له.",
   "error.agent.turnStalled":
     "توقّف {provider} عن الاستجابة، لذا أنهى OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
+  "error.agent.promptCancelled": "ألغى {provider} هذه الرسالة قبل أن تبدأ. أرسل الرسالة مرة أخرى.",
   "error.agent.toolLoopStopped":
     "كرر {provider} خطوة فاشلة مرات كثيرة، لذلك أوقف OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
+  "error.agent.answerCutOff": "توقف الوكيل قبل أن ينهي إجابته، لذلك الإجابة غير كاملة. أرسل الرسالة مرة أخرى.",
   "error.agent.compactionConnectionLost":
     "توقف الاتصال أثناء ضغط الوكيل لسياقه، لذلك توقفت المهمة. تحقق من اتصالك بالإنترنت، ثم أرسل رسالة للمتابعة.",
+  "error.agent.compactionConnectionLostAddress":
+    "توقف الاتصال أثناء ضغط الوكيل لسياقه، لذلك توقفت المهمة. تحقق من اتصالك بالإنترنت. وتأكد أيضًا أن {variable} ضمن المتغيرات في إعدادات {provider} هو عنوان API لخدمة النموذج لديك، وغالبًا ما ينتهي بـ /v1. ثم أرسل رسالة.",
+  "error.agent.compactionLoopStopped":
+    "ضغط {provider} السياق مرارًا، وبقي ممتلئًا جدًا في كل مرة فلم يستطع المتابعة، لذلك أوقف OpenBot هذا الدور. أوقف خوادم MCP أو استخدام الكمبيوتر التي لا يحتاجها هذا الوكيل، ثم أرسل رسالة. إذا غيّرت أنت أو الوكيل وقت ضغط {provider}، فتراجع عن هذا التغيير.",
   "error.agent.selectedGone": "لم يعد الوكيل المحدد موجودًا.",
   "error.agent.profileEndpointsChanged": "تغيّرت نقاط النهاية المخصصة أثناء الإنشاء. أعد المحاولة.",
   "error.agent.profileInvalid": "أعاد المزوّد ملفًا تعريفيًا غير صالح. جرّب تعديل المطالبة.",
@@ -93,6 +116,12 @@ export const messages = {
   "error.agent.deletionBusy": "حذف الوكيل قيد التنفيذ بالفعل.",
   "error.agent.stopBeforeDelete": "أوقف الوكيل وألغِ رسائله في قائمة الانتظار قبل حذفه.",
   "error.agent.deleteIncomplete": "تعذّرت إزالة بيانات الوكيل بالكامل. أعد محاولة حذف الوكيل.",
+  "error.agent.deleteFolderInUse":
+    "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. احذف هذا الوكيل مرة أخرى عند انتهاء ذلك العمل، أو بعد إعادة تشغيل OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "لا يزال برنامج آخر يستخدم مجلد هذا الوكيل، مثل برنامج بدأه الوكيل. أغلق ذلك البرنامج أو أعد تشغيل الكمبيوتر الذي يعمل عليه هذا الوكيل، ثم احذف الوكيل مرة أخرى.",
+  "error.agent.deleteWhenFolderFree":
+    "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. يحذف OpenBot هذا الوكيل عند انتهاء ذلك العمل.",
   "error.agent.duplicationBusy": "يجري تكرار هذا الوكيل بالفعل.",
   "error.agent.waitBeforeDuplicate": "انتظر انتهاء الوكيل وإفراغ قائمة انتظاره قبل تكراره.",
   "error.agent.saveOtherAgent": "عملية الحفظ هذه تخص وكيلًا آخر.",
@@ -129,8 +158,14 @@ export const messages = {
   "error.agent.lowMemoryServer": "ذاكرة هذا الخادم منخفضة. تنتظر رسالتك في قائمة الانتظار وتبدأ عند توفر الذاكرة.",
   "error.agent.workspaceOnlyToolMissing":
     "يحتاج خيار «مساحة العمل فقط» إلى {tool}، ولم يجده OpenBot. ثبّته، أو اختر الوصول الكامل في إعدادات الوكيل.",
+  "error.agent.codexSandboxUnavailable":
+    "يحتاج خيار «مساحة العمل فقط» إلى بيئة Codex المعزولة، ولا يستطيع Codex تشغيلها على هذا الحاسوب، لذلك تفشل أوامر الوكيل. اختر «السؤال أولًا» أو «وصول كامل» في إعدادات الوكيل.",
   "error.agent.claudeSandboxUnavailable":
     "يحتاج خيار «مساحة العمل فقط» إلى بيئة Claude المعزولة، ولا يستطيع Claude تشغيلها على هذا الحاسوب: {reason}. اختر الوصول الكامل أو مزوّدًا آخر في إعدادات الوكيل.",
+  "error.agent.claudeNoSandbox":
+    "لا يستطيع Claude استخدام بيئة معزولة على هذا الحاسوب، لذا لا يعمل معه خيار «مساحة العمل فقط». اختر الوصول الكامل أو مزوّدًا آخر في إعدادات الوكيل.",
+  "error.agent.claudeSandboxBlocked":
+    "يحتاج خيار «مساحة العمل فقط» إلى بيئة Claude المعزولة، ولا يستطيع Claude تشغيلها على هذا الحاسوب، لذلك تفشل أوامر الوكيل. اختر الوصول الكامل أو مزوّدًا آخر في إعدادات الوكيل.",
   "error.agent.screenCaptureOff":
     "التقاط الشاشة متوقف لهذا الوكيل. يمكن للمستخدم تشغيل التحكم في الحاسوب في إعدادات الوكيل.",
   "error.agent.screenCaptureUnavailable": "التقاط الشاشة غير متاح على هذا الحاسوب.",
@@ -138,9 +173,14 @@ export const messages = {
     "لا يعمل التقاط الشاشة في محادثة Slack أو Discord أو Telegram، لأن أشخاصًا آخرين يتلقون ملفاته.",
   "error.agent.screenCaptureDeclined": "لم يسمح المستخدم بالتقاط الشاشة هذا. لم يُلتقط شيء.",
   "error.agent.mcpServerDeclined": "لم يسمح المستخدم بتغيير خادم MCP هذا. لم يتغير شيء.",
+  "error.agent.mcpToolDeclined": "لم يسمح المستخدم باستدعاء أداة MCP هذه. لم تعمل الأداة.",
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",
   "error.agent.mcpServerKeysMove":
-    "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في إعدادات الخادم، MCP.",
+    "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في المتجر، التطبيقات، {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "يشغّل خادم MCP {name} أمرًا محليًا، لذا لا يقبل ترويسات. اطلب من المستخدم إدخال مفاتيحه في المتجر، التطبيقات، {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "يمكن لمستخدم OpenBot هذا فقط، في محادثة معك، أن يعطي مفاتيح خادم MCP {name}. اطلب من المستخدم إدخالها في المتجر، التطبيقات، {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} جزء من OpenBot، لذلك لا يمكن لأدوات MCP اختباره أو تشغيله أو إيقافه أو إزالته. يتحكم فيه المستخدم على الحاسوب الذي يشغّل OpenBot: اتصال GitHub في المتجر، التطبيقات، GitHub، والتحكم في الحاسوب في الإعدادات، التحكم في الحاسوب.",
   "error.agent.mcpServerUnknown": "لا يوجد خادم MCP باسم {name}. استدعِ list_mcp_servers لمعرفة الأسماء.",
@@ -152,6 +192,8 @@ export const messages = {
     "المنطقة ليست داخل شاشة واحدة. استخدم نقاط سطح المكتب داخل حدود شاشة واحدة من list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "لا يملك OpenBot إذن «تسجيل الشاشة». اطلب من المستخدم فتح System Settings > Privacy & Security > Screen & System Audio Recording، وتشغيل OpenBot، ثم إنهاء OpenBot وفتحه مرة أخرى.",
+  "error.agent.screenCaptureListPermission":
+    "لا يملك OpenBot إذن «تسجيل الشاشة» بعد، لذا لا يمكنه سرد النوافذ. لالتقاط شاشة، استدعِ capture_screen مع target screen. يوافق المستخدم على الالتقاط أولًا، ثم قد يطلب macOS من المستخدم الإذن.",
   "error.agent.screenCaptureEmptyWindows":
     "أعاد Windows صورة فارغة. اطلب من المستخدم إلغاء قفل الحاسوب وإغلاق المحتوى المحمي. يمكن أيضًا لسياسة المؤسسة إيقاف التقاط الشاشة.",
   "error.agent.screenCaptureFailed": "فشل التقاط الشاشة. أعد المحاولة.",

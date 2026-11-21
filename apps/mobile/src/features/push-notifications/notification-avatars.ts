@@ -4,24 +4,16 @@ import { Platform } from "react-native";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { type AvatarFileAgent, agentAvatarFile, syncAvatarFolder } from "@/features/workspace/model/agent-avatar-file";
 
-/**
- * `OpenBotMessagingService.kt` reads this file and the pictures of its folder in the files folder of
- * the app (`Paths.document`), and shows the picture of the agent as the large icon of its
- * notification. iOS reads the pictures of the share extension (`share-extension.ts`).
- */
 const INDEX_FILE = "notification-avatars.json";
 const AVATAR_FOLDER = "notification-avatars";
-/** 64 dp at 3x, the size of the large icon of an Android notification. */
 const AVATAR_PIXELS = 192;
 
 export interface NotificationAvatar {
   serverId: string;
   id: string;
-  /** A file in `AVATAR_FOLDER`. */
   avatar: string;
 }
 
-/** Only Android reads the files. */
 export const notificationAvatarsSupported = Platform.OS === "android";
 
 export function notificationAvatarName(agent: AvatarFileAgent): string {
@@ -35,7 +27,6 @@ function decodeAvatar(value: unknown): NotificationAvatar | null {
   return { serverId: value.serverId, id: value.id, avatar: value.avatar };
 }
 
-/** The pictures that the app wrote last. */
 export function readNotificationAvatars(): NotificationAvatar[] {
   if (!notificationAvatarsSupported) return [];
   try {
@@ -51,10 +42,6 @@ export function readNotificationAvatars(): NotificationAvatar[] {
 
 let writtenIndex: string | null = null;
 
-/**
- * Writes the pictures that `index` names and are missing, from `agents`, and removes the pictures
- * that it no longer names. Then the index goes, so the service finds each picture.
- */
 export function writeNotificationAvatars(
   index: readonly NotificationAvatar[],
   agents: readonly AvatarFileAgent[],
@@ -71,7 +58,6 @@ export function writeNotificationAvatars(
   }
 }
 
-/** Sign-out removes the pictures. */
 export function resetNotificationAvatars(): void {
   writtenIndex = null;
   if (!notificationAvatarsSupported) return;

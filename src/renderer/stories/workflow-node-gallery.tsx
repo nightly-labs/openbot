@@ -1,8 +1,3 @@
-/**
- * The canvas of a node story. A press on a node selects it, a press on the canvas clears the
- * selection, and Delete in a node toolbar removes the node. Ports connect here too.
- */
-
 import {
   BoardProvider,
   createBoard,
@@ -10,6 +5,7 @@ import {
   type WfnFields,
   type WfnResult,
   type WfnRunStatus,
+  type WorkflowAgentProgress,
 } from "@openbot/ui/features/workflows/workflow-board";
 import type { WorkflowGitHubCanvas } from "@openbot/ui/features/workflows/workflow-github";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
@@ -21,33 +17,26 @@ export function NodeGallery(props: {
   selected?: string;
   edges?: readonly WfnEdge[];
   results?: Record<string, readonly WfnResult[]>;
-  /** The run state of each step when the story opens. Retry on a failed step runs it again. */
   status?: Record<string, WfnRunStatus>;
   errors?: Record<string, string>;
   locked?: readonly string[];
-  /** The choices of the nodes. The story catalogs when absent. */
   catalogs?: WorkflowCatalogs;
-  /** The GitHub of the GitHub cards. */
   github?: WorkflowGitHubCanvas;
-  /** Approve at an approval step runs the steps after it. Without it, and on Reject, the run does not go on. */
   runOnApprove?: boolean;
-  /** The fields of the nodes when the story opens, so every card that reads a field reads the same value. */
   fields?: Record<string, WfnFields>;
-  /** The result that a story run of a step records. Without it, or when it gives nothing, the kind of the node decides. */
   answer?: (id: string) => string | undefined;
+  progress?: (id: string) => WorkflowAgentProgress | undefined;
   children: JSX.Element;
 }) {
   const [run, setRun] = createStore<{ status: Record<string, WfnRunStatus> }>({
     status: untrack(() => ({ ...props.status })),
   });
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
-  /** How many images each image step drew, so the next run draws the next story image. */
   const drawn = new Map<string, number>();
   let stage: HTMLElement | undefined;
   onCleanup(() => {
     for (const timer of timers.values()) clearTimeout(timer);
   });
-  /** The result that a story run of the step records, from the kind of the node. */
   const answer = (id: string) => {
     const kind = stage?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"]`)?.dataset.kind;
     if (kind !== "image") return kind === undefined ? undefined : STEP_ANSWER[kind];
@@ -55,7 +44,6 @@ export function NodeGallery(props: {
     drawn.set(id, made);
     return STORY_IMAGES[made % STORY_IMAGES.length]?.name;
   };
-  /** Each step runs by itself for 1.4 s, then adds its result. */
   const runStep = (id: string) => {
     if (timers.has(id)) return;
     setRun((draft) => {
@@ -82,6 +70,7 @@ export function NodeGallery(props: {
     fields: untrack(() => props.fields),
     locked: untrack(() => props.locked),
     status: (id) => run.status[id],
+    progress: (id) => props.progress?.(id),
     error: (id) => props.errors?.[id],
     retry: runStep,
     runStep,
@@ -92,7 +81,6 @@ export function NodeGallery(props: {
       });
       for (const edge of props.edges ?? []) if (edge.from === id) runStep(edge.to);
     },
-    // Each trigger of the gallery has the schedule of the story workflow.
     schedule: () => STORY_SEED.schedule,
   });
   return (

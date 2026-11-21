@@ -1,15 +1,3 @@
-// Checks that a Codex subagent's own work shows as steps of its card. Runs the real agent service on a
-// temporary profile with a fake Codex app-server. In a turn, the fake:
-// 1. starts a subagent with a `spawnAgent` collab tool call that names the child thread `child-1`,
-// 2. sends items of the child thread (a command, a thought, a message) and an item of an unknown thread,
-// 3. ends the subagent with a `wait` call whose `agentsStates` holds its report,
-// 4. sends one more child item, which the ended subagent does not take.
-// The stored `<turn>:subagents` message must hold the child's steps in order and the report.
-// Before the subagent ends, Codex asks for MCP tool consent from its subagent threads (#8188): from
-// `child-1`, from `child-2` that a `subAgentActivity` item names, from an unknown thread, and from
-// `child-2` after it ended. The two running subagents must get a card in the parent chat and turn,
-// and the answer "Allow once"; the others are declined.
-// `bun run test:codex-subagent-steps`. Writes .openbot-build/codex-subagent-steps-e2e/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,7 +16,6 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -56,7 +43,6 @@ const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n")
 const step = (ms) => new Promise((done) => setTimeout(done, ms));
 const answers = new Map();
 let consents = 0;
-// Codex asks before a tool of an MCP server runs, from the thread of the agent that calls the tool.
 const consent = (threadId, turnId) =>
   new Promise((done) => {
     const id = "consent-" + ++consents;
@@ -65,6 +51,13 @@ const consent = (threadId, turnId) =>
       message: 'Allow the probe MCP server to run tool "echo"?', requestedSchema: { type: "object", properties: {} },
       _meta: { codex_approval_kind: "mcp_tool_call", persist: ["always"] } } });
   }).then((result) => (result && result.action) || "error");
+let toolCalls = 0;
+const readAgent = (threadId, turnId) =>
+  new Promise((done) => {
+    const id = "tool-" + ++toolCalls;
+    answers.set(id, done);
+    write({ id, method: "item/tool/call", params: { threadId, turnId, callId: id, namespace: "openbot", tool: "read_agent", arguments: {} } });
+  }).then((result) => (result && result.success ? JSON.parse(result.contentItems[0].text).id : "error"));
 async function runTurn(threadId, turnId) {
   const parent = (method, item) => write({ method, params: { threadId, turnId, item } });
   const child = (childThread, method, item) =>
@@ -85,10 +78,17 @@ async function runTurn(threadId, turnId) {
     v2: await consent("child-2", "child-turn-2"),
     unknown: await consent("child-unknown", "child-turn-x"),
   };
+  const readers = {
+    v1: await readAgent("child-1", "child-turn"),
+    v2: await readAgent("child-2", "child-turn-2"),
+    unknown: await readAgent("child-unknown", "child-turn-x"),
+  };
   parent("item/completed", activity("completed"));
   await step(20);
   consented.ended = await consent("child-2", "child-turn-2");
+  readers.ended = await readAgent("child-2", "child-turn-2");
   parent("item/completed", { type: "agentMessage", id: "consents-" + turnId, text: "Consents: " + JSON.stringify(consented) });
+  parent("item/completed", { type: "agentMessage", id: "readers-" + turnId, text: "Readers: " + JSON.stringify(readers) });
   const command = { type: "commandExecution", id: "cmd-1", command: "bun test", status: "inProgress" };
   child("child-1", "item/started", command);
   child("child-1", "item/completed", { ...command, status: "completed" });
@@ -175,6 +175,7 @@ interface Report {
   passed: boolean;
   cards?: Card[];
   consents?: Record<string, string>;
+  readers?: Record<string, string>;
   consentCards?: ConsentCard[];
   declineNotices?: number;
   error?: string;
@@ -185,6 +186,7 @@ const report: Report = { passed: false };
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -203,7 +205,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -281,7 +282,9 @@ try {
   report.consentCards = consentCards;
   report.declineNotices = declineNotices;
   const expectedConsents = { v1: "accept", v2: "accept", unknown: "decline", ended: "decline" };
-  // A subagent's card shows in the parent chat, in the parent turn.
+  const readersText = snapshot.messages.find((message) => message.text.startsWith("Readers: "))?.text ?? "";
+  report.readers = readersText ? JSON.parse(readersText.slice("Readers: ".length)) : {};
+  const expectedReaders = { v1: agent.id, v2: agent.id, unknown: "error", ended: "error" };
   const cardsInParent =
     consentCards.length === 2 &&
     consentCards.every(
@@ -290,10 +293,11 @@ try {
   report.passed =
     JSON.stringify(report.cards) === JSON.stringify(expected) &&
     JSON.stringify(report.consents) === JSON.stringify(expectedConsents) &&
+    JSON.stringify(report.readers) === JSON.stringify(expectedReaders) &&
     cardsInParent &&
     declineNotices === 2;
   if (!report.passed)
-    report.error ??= `Expected cards ${JSON.stringify(expected)}, consents ${JSON.stringify(expectedConsents)}, two consent cards in the parent chat and turn, and two decline notices.`;
+    report.error ??= `Expected cards ${JSON.stringify(expected)}, consents ${JSON.stringify(expectedConsents)}, readers ${JSON.stringify(expectedReaders)}, two consent cards in the parent chat and turn, and two decline notices.`;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {

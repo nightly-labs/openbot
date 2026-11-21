@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Les paquets de compétences ne peuvent pas contenir de liens symboliques.",
   "error.skill.expandedTooLarge": "La compétence décompressée doit faire moins de 10 Mo.",
   "error.skill.irregularEntry":
@@ -59,6 +58,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Cette compétence locale n’a pas de révision {revision}. Sa dernière révision est {latest}.",
   "error.skill.localNameTaken": "Une compétence locale porte déjà ce nom. Révisez-la plutôt.",
+  "error.skill.localNameClash":
+    "Ce nom et la compétence locale « {name} » donnent tous deux « {slug} ». Pour modifier cette compétence, révisez-la. Pour ajouter une compétence, changez les lettres latines ou les chiffres de ce nom.",
   "error.skill.localKeepName": "Gardez le même nom de compétence lors de sa révision.",
   "error.skill.localRelativeFolder":
     "Utilisez un dossier de compétence relatif dans l’espace de travail de l’agent actuel.",

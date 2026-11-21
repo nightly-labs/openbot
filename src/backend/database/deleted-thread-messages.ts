@@ -4,15 +4,8 @@ import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contract
 import { ORDER_KEY_COLUMNS, ORDER_KEY_DESC, ORDERED_THREAD_MESSAGES } from "./conversation-queries";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 import { unpinThreadHistory, unpinThreadMessage } from "./pinned-thread-messages";
+import { cachedStatement } from "./statement-cache";
 
-/**
- * The messages that a person deleted from a thread (`projection_deleted_thread_messages`).
- *
- * Pure functions over a connection that the caller holds. They open no transaction: the conversation
- * writer calls them inside its dispatch, so the delete, its event and its record commit together.
- */
-
-/** The ids that a person deleted from one thread. */
 export function deletedThreadMessageIds(db: DatabaseSync, threadId: string): Set<string> {
   const rows = databaseRows(
     db.prepare("SELECT message_id FROM projection_deleted_thread_messages WHERE thread_id = ?").all(threadId),
@@ -20,25 +13,23 @@ export function deletedThreadMessageIds(db: DatabaseSync, threadId: string): Set
   return new Set(rows.map((row) => requiredStringColumn(row, "message_id")));
 }
 
-/** The ids of the shown messages of a thread, in no order. */
 export function threadMessageIds(db: DatabaseSync, threadId: string): string[] {
   return databaseRows(
     db.prepare("SELECT message_id FROM projection_thread_messages WHERE thread_id = ?").all(threadId),
   ).map((row) => requiredStringColumn(row, "message_id"));
 }
 
-/** Whether a person deleted this message from the thread. */
 export function isDeletedThreadMessage(db: DatabaseSync, threadId: string, messageId: string): boolean {
   return (
     databaseRow(
-      db
-        .prepare("SELECT 1 AS deleted FROM projection_deleted_thread_messages WHERE thread_id = ? AND message_id = ?")
-        .get(threadId, messageId),
+      cachedStatement(
+        db,
+        "SELECT 1 AS deleted FROM projection_deleted_thread_messages WHERE thread_id = ? AND message_id = ?",
+      ).get(threadId, messageId),
     ) !== null
   );
 }
 
-/** The messages without the ones that a person deleted from the thread. */
 export function withoutDeletedMessages<T extends Pick<ConversationMessage, "id">>(
   db: DatabaseSync,
   threadId: string,
@@ -49,12 +40,6 @@ export function withoutDeletedMessages<T extends Pick<ConversationMessage, "id">
   return deleted.size === 0 ? [...messages] : messages.filter((message) => !deleted.has(message.id));
 }
 
-/**
- * Records the delete of one shown message. Each read cursor and read baseline on the message moves
- * to the message shown before it, so the messages after it keep their unread state. Then the thread's
- * earlier events lose the message, so a replay and the event log do not keep its text.
- * Call it before the projection row is removed: the shown order comes from that row.
- */
 export function recordDeletedThreadMessage(
   db: DatabaseSync,
   threadId: string,
@@ -89,12 +74,6 @@ function previousShownMessageId(db: DatabaseSync, threadId: string, messageId: s
   return row ? requiredStringColumn(row, "message_id") : null;
 }
 
-/**
- * Removes one message from the earlier events of its thread. A whole snapshot and a change list lose
- * the message. An event that carries only this message keeps its other keys, and an empty change list
- * replaces the message, so the replay still applies the active turn of the event. The detail of an
- * event and its activity row stay: they hold no message text.
- */
 function scrubDeletedMessageEvents(db: DatabaseSync, threadId: string, messageId: string): void {
   const needle = JSON.stringify(messageId).slice(1, -1);
   const rows = databaseRows(
@@ -114,13 +93,6 @@ function scrubDeletedMessageEvents(db: DatabaseSync, threadId: string, messageId
   }
 }
 
-/**
- * Records the delete of every shown message of a thread, for "Delete history". As
- * `recordDeletedThreadMessage` for each one, in a fixed number of statements: the read
- * cursors and baselines of the thread go back to "nothing read", and every earlier event of the
- * thread loses all its messages. An activity row that a replay filled with a whole event payload
- * loses them too. Call it before the projection rows are removed.
- */
 export function recordDeletedThreadHistory(db: DatabaseSync, threadId: string, deletedAt: string): void {
   db.prepare(
     `INSERT OR IGNORE INTO projection_deleted_thread_messages (thread_id, message_id, deleted_at)
@@ -133,12 +105,6 @@ export function recordDeletedThreadHistory(db: DatabaseSync, threadId: string, d
   scrubAllMessages(db, "projection_thread_activities", "thread_id = ?", threadId);
 }
 
-/**
- * Removes every message from the payloads of one thread's rows in `table`, one row at a time: a long
- * thread's events hold full snapshots, too large to read all at once. Only a payload with a snapshot
- * or a message key ("…Message" or "…Messages") can carry one. The alias is required: SQLite names a
- * `rowid` column after the `INTEGER PRIMARY KEY` that it aliases, such as `sequence`.
- */
 function scrubAllMessages(
   db: DatabaseSync,
   table: "orchestration_events" | "projection_thread_activities",
@@ -164,7 +130,6 @@ function scrubAllMessages(
   }
 }
 
-/** The payload without the messages that `isDeleted` names, or null when the payload carries none. */
 function scrubbedPayload(payload: DynamicRecord, isDeleted: (value: unknown) => boolean): DynamicRecord | null {
   const without = (messages: readonly unknown[]) => messages.filter((message) => !isDeleted(message));
   const next = { ...payload };

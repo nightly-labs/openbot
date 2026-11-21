@@ -10,7 +10,6 @@ export const messages = {
   "error.backend.webhookRouteUnavailable": "公共 Webhook 路由尚未就绪。请检查主机连接后重试。",
   "error.backend.webhookTestUnavailable": "主机现在无法接收测试事件。请确认它已登录，然后重试。",
   "error.backend.webhookTestFailed": "测试事件没有送达该自动化任务，请重试。",
-  // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "浏览器实时视图仅适用于远程主机。",
   "error.backend.browserViewUnsupported": "该远程主机不支持浏览器实时视图。",
   "error.backend.browserViewLimit": "这台主机上打开的浏览器视图过多。",
@@ -78,7 +77,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "请等此频道中的工作停止后再删除其历史记录。",
   "error.backend.channelCompactUnavailable":
     "此频道现在没有成员可以压缩上下文。成员必须先在频道中回答,且其提供方必须支持压缩。",
+  "error.backend.channelCompactNoSession": "此频道的成员还没有可压缩的对话。请在成员于频道中回答后再压缩。",
+  "error.backend.channelCompactNotSupported": "此频道没有成员可以按需压缩。支持的成员会在上下文快满时自动压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
+  "error.backend.channelArchiveRunning": "请先停止该频道中正在运行的工作，再删除它。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",
   "error.backend.channelTaskComplete": "该任务已完成。",
@@ -108,6 +110,7 @@ export const messages = {
   "error.backend.memoryGone": "该记忆已不存在。",
   "error.backend.routineGone": "该自动化任务已不存在。",
   "error.backend.routineRunGone": "该自动化任务的此次运行已不存在。",
+  "error.backend.routineRunFailedNoReason": "运行因错误而停止，但没有收到原因。打开这次运行，查看智能体做了什么。",
   "error.backend.turnNotStarted": "服务商未启动本轮对话。",
   "error.backend.routineResultConnectionOff": "该消息连接已关闭或已移除，请另选投递位置。",
   "error.backend.routineResultNoDelivery": "本次运行没有可再次发送的回答。",
@@ -181,6 +184,8 @@ export const messages = {
   "error.backend.routineRunNoSession": "由于服务商会话不可用，OpenBot 无法中断正在进行中的自动化任务运行。",
   "error.backend.interruptSelf": "助手不能中断自己。",
   "error.backend.interruptOtherWork": "该助手正在处理非你的消息发起的任务，只有用户或该任务的发送者才能停止它。",
+  "error.backend.interruptSharedWork":
+    "该助手的这一轮在处理你的消息，同时也在处理来自用户或其他助手的消息。只有用户可以在该助手的聊天中用“停止助手”停止它。",
   "error.backend.interruptStarting": "该助手仍在启动对话，请等对话开始后再试。",
   "error.backend.interruptNoSession": "由于服务商会话不可用，OpenBot 无法中断该助手。",
   "error.backend.memoryTextRequired": "需要填写记忆内容。",
@@ -197,7 +202,7 @@ export const messages = {
     "该助手已有 {count} 个未关闭的等待。请先用 openbot.close_wait 关闭一个等待，再开启新的等待。",
   "error.backend.agentWaitGone": "该等待未开启：可能是助手自己关闭了，或被他人取消。",
   "error.backend.agentWaitNoRequest": "等待需要一条消息才能继续，而本轮对话没有消息。",
-  "error.backend.agentWaitOwnChatOnly": "只能在自己的对话中开启等待。频道或消息任务无法等待。",
+  "error.backend.agentWaitOwnChatOnly": "请在自己的对话或侧边线程中开启等待。频道或消息对话无法等待。",
   "error.backend.agentWaitNoteRequired": "请用一句简短说明写清这个等待是为了什么。",
   "error.backend.agentWaitRoutineGone": "该助手没有这个 id 的自动化任务。",
   "error.backend.agentWaitNoRoutine":
@@ -215,11 +220,19 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot 无法保存此 MCP 服务器配置。",
   "error.backend.mcpServerNoAnswer": "服务器未在 {seconds} 秒内响应。",
   "error.backend.mcpSignInNotAccepted": "服务器未接受该登录。",
+  "error.backend.mcpSignInAccountRefused":
+    "服务器拒绝了你登录所用的账号。请确认该账号可以使用此服务。要使用其他账号，请先退出登录，再重新登录。",
   "error.backend.mcpSignInClientRefused":
     "完成登录时，登录服务器未接受 OpenBot。请重新登录，OpenBot 会重新向服务器注册。",
+  "error.backend.mcpSignInAppRefused":
+    "登录服务器未接受该服务器的登录应用。请检查登录应用的客户端 ID 和客户端密钥，然后重新登录。",
   "error.backend.mcpCommandNotFound": "未找到命令：{command}",
+  "error.backend.mcpProviderLimit":
+    "此智能体只能使用有限数量的 MCP 服务器。要使用此服务器，请关闭智能体不需要的 MCP 服务器。",
   "error.backend.mcpRegistrationRefused":
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",
+  "error.backend.mcpRegistrationUnavailable":
+    "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中保存此服务器，然后为它添加登录应用。",
   "error.backend.mcpSignInAbandonedGeneric": "登录已放弃。",
   "error.backend.mcpSignInForgotten": "MCP 登录在运行过程中被遗忘。",
   "error.backend.mcpSignInAbandoned": "MCP 登录已放弃。",
@@ -230,20 +243,36 @@ export const messages = {
   "error.backend.mcpSignInNeedsHttps": "该服务器要求登录，而 OpenBot 仅通过 https 登录。请把地址改为 {url}。",
   "error.backend.mcpSignInCancelled": "登录已取消。",
   "error.backend.mcpSignInTimedOut": "未在浏览器中完成登录。",
+  "error.backend.mcpSignInRefused": "登录页面拒绝了访问。请重新登录。",
   "error.backend.mcpSignInResponseTimedOut": "登录响应未及时返回。",
   "error.backend.mcpSignInMetadataUnreadable": "OpenBot 无法读取该服务器的登录信息。请检查服务器地址后重试。",
   "error.backend.mcpSignInAnswerUnreadable":
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
+  "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
+  "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
+  "error.backend.mcpServerStoppedDuringCall": "MCP 服务器在响应此次调用前停止了。",
   "error.backend.mcpToolSchemaRefused":
     "它的工具 {tool} 使用了这个提供方无法读取的输入格式。其他提供方的智能体仍会获得这个服务器。",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请打开 MCP 设置并选择“登录”。",
+    "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请在 市场、应用 中打开 {name} 并选择“登录”。",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} 无法启动 MCP 服务器 {name}。请打开 MCP 设置并选择“测试连接”查看原因。",
+    "{provider} 无法启动 MCP 服务器 {name}。请在 市场、应用 中打开 {name} 并选择“测试连接”查看原因。",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，{provider} 无法使用它的工具。{provider} 会自行启动服务器，因此 OpenBot 中的连接测试可能会成功。请开始新的聊天后再试一次。",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，因为服务器没有及时响应。请开始新的聊天后再试一次。",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，因为服务器现在不可用。请等几分钟，然后开始新的聊天再试一次。",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} 无法连接到 MCP 服务器 {name}。请在 市场、应用 中打开 {name}，确认地址正确并且服务器正在运行。然后开始新的聊天再试一次。",
+  "error.backend.githubToolsNotStarted":
+    "{provider} 无法获取 GitHub 工具，因为 GitHub 没有响应。请在 市场、应用 中打开 GitHub，如果它提示，请重新连接。然后开始新的聊天再试一次。",
   "error.backend.mcpOAuthProxyUnavailable": "OpenBot 无法为这台服务器建立本地登录连接。请重启 OpenBot 后再试一次。",
   "error.backend.mcpOAuthSignInNeeded": "该 MCP 服务器的登录已结束。用户需要在 OpenBot 中重新登录。",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot 暂时无法续期此 MCP 服务器的登录。登录信息已保留，下一次请求会重试。如果此错误持续出现，用户可以在 OpenBot 中退出该服务器的登录，然后重新登录。",
   "error.backend.mcpServerUnreachable": "OpenBot 无法连接该服务器。请检查地址与网络。",
   "error.backend.mcpLocalServerOff":
     "该电脑上 {address} 没有服务器在响应。请启动服务器，或在运行它的应用中开启它，然后重试。",
@@ -272,6 +301,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "该文件夹不存在或已被删除。",
   "error.backend.libraryFolderOtherAgent": "文件只能放入其所属助手的文件夹。",
   "error.backend.libraryFolderMoveInvalid": "无法将此文件夹移到那里。",
+  "error.backend.workflowFolderLimit": "一台服务器最多可有 {limit} 个工作流文件夹。",
+  "error.backend.workflowFolderPlacementLimit": "文件夹中的工作流过多。",
   "error.backend.sectionNameDuplicate": "分区名称必须唯一。",
   "error.backend.directMessageRequired": "请先写下消息内容。",
   "error.backend.directMessageTooLong": "私信最多可有 {limit} 个字符。",
@@ -301,12 +332,14 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "只有服务器所有者或管理员可以选择这个操作。",
   "error.backend.approvalInactive": "该审批已不再有效。",
   "error.backend.approvalOwnerOnly": "只有服务器所有者可以批准该操作。",
+  "error.backend.feedbackNeedsPhone":
+    "只有 OpenBot 手机应用可以发送这份报告，因为它会附上手机的版本和支持日志。请在手机上打开此对话。如果在手机上也看到这条消息，请更新手机应用。",
   "error.backend.takeoverInactive": "该浏览器接管已不再有效。",
   "error.backend.authSubmitting": "身份验证正在提交中。",
   "error.backend.apiKeySaveFailed": "OpenBot 无法保存 API 密钥，请重试。",
-  "error.backend.apiKeyNotAllowed": "只有服务器所有者或管理员可以输入 API 密钥。",
   "error.backend.apiKeySaving": "API 密钥正在保存中。",
-  "error.backend.vaultItemNotAllowed": "只有服务器所有者或管理员可以向保险库添加项目。",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot 无法读取 API 密钥。请输入不超过 8,000 个字符的密钥，并选择谁可以使用它。",
   "error.backend.vaultItemSaving": "该保险库项目正在保存中。",
   "error.backend.authRequestInactive": "该安全验证请求已不再有效。",
   "error.backend.secureAuthUnavailable": "安全验证不可用。",
@@ -326,6 +359,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "此代理在你打开后已被更改。请重新查看，然后再试一次。",
   "error.backend.browserProxyUnreachable": "代理 {name} 没有响应，因此页面没有打开。",
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
+  "error.backend.browserSystemProxyFailed":
+    "运行 OpenBot 的计算机设置中的代理没有响应或拒绝了连接，因此页面没有打开。请检查该计算机的代理设置。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
   "error.backend.browserProxyComputerLocalAddress":
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",
@@ -339,7 +374,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "弹窗加载失败。请从原页面重新尝试登录。",
   "error.backend.browserTabNotFound": "未找到该浏览器标签页。",
   "error.backend.authActive": "身份验证已在进行中。",
-  "error.backend.authHttpsRequired": "安全验证需要 HTTPS。",
+  "error.backend.authWebPageRequired": "安全验证需要 HTTP/HTTPS。",
   "error.backend.authDigitsRange": "验证码需为 4–12 位数字。",
   "error.backend.authExpired": "验证请求已过期。",
   "error.backend.authDigitsRequired": "请输入要求位数的数字。",
@@ -348,13 +383,14 @@ export const messages = {
   "error.backend.browserInputProtected": "验证期间浏览器输入受保护。",
   "error.backend.mcpServerHttpCredentials": "服务器返回 {status}。请检查 API 密钥或其他凭据。",
   "error.backend.mcpServerHttpUrl": "服务器返回 {status}。请检查地址，链接可能错误、过期或已删除。",
+  "error.backend.mcpServerBearerKey":
+    "此服务器使用 API 密钥，而不是登录。在“请求头”中，将键设为 Authorization，将值设为 Bearer、一个空格和你的 API 密钥。",
   "error.backend.mcpSignInAppUrl": "登录应用需要有效的服务器地址。",
   "error.backend.mcpSignInAppClientId": "请输入登录应用的客户端 ID。",
   "error.backend.mcpSignInAppIssuerChanged":
     "该 MCP 服务器的登录服务器已变更，因此 OpenBot 没有把登录应用发送给它。若该变更正确，请移除登录应用后重新添加。",
   "error.backend.mcpSignInAppNoServer": "请先把该 MCP 服务器保存为 URL 服务器，再添加登录应用。",
   "error.backend.mcpSignInAppUnavailable": "该电脑无法保存登录应用。",
-  // Tasks: conversations of one agent that run beside its own chat.
   "error.backend.taskMoveRefused": "只有你单独发给该助手的消息才能作为任务运行。",
   "error.backend.taskNotFound": "该任务不可用。",
   "error.backend.taskClosed": "该任务已关闭，请重新打开后再发送消息。",
@@ -368,12 +404,15 @@ export const messages = {
   "error.backend.branchSourceBusy": "请先停止当前回合，再为此聊天创建分支。",
   "error.backend.branchMessageNotFound": "只能从助手已完成的回答创建分支。",
   "error.backend.branchRemoteUnsupported": "分支仅适用于本电脑上的助手。",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "要删除此报告，请让助手删除它。",
   "error.backend.threadMoveRefused": "只有你单独发给该助手的消息才能在新话题中运行。",
   "error.backend.taskTitleRequired": "请给任务起一个简短的标题。",
   "error.backend.taskToolInvalid": "标题不超过 120 个字符，并写明要做什么。",
+  "error.backend.taskControlInvalid": "请提供你启动的任务的 taskId。消息还需要文本。",
   "error.backend.taskOwnChatOnly": "只能在自己的对话中启动任务。频道、消息对话或其他任务都无法启动任务。",
   "error.backend.taskUnfinishedLimit": "该助手已有 {count} 个未完成的任务。请等其中一个结束后再启动新任务。",
   "error.backend.taskOpenLimitReached": "该助手有 {count} 个未关闭的任务。请关闭一个任务，再启动或打开其他任务。",
   "error.backend.taskRemoteUnsupported": "任务仅适用于本电脑上的助手。",
+  "error.backend.taskMessageFailed": "OpenBot 无法将消息发送给该任务，请稍后重试。",
   "error.backend.taskStartFailed": "OpenBot 无法启动该任务，请改为在本轮对话中完成。",
 } as const satisfies PartialTranslation<typeof source>;

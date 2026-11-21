@@ -3,10 +3,12 @@ import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src
 import { createAccountAnalytics } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
+import { BillingService } from "./billing-service";
 import { captureBillingSnapshot } from "./billing-snapshots";
 import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
 import { runApiEffect } from "./effect-runtime";
 import { createHostedBilling } from "./hosted-billing";
+import { createHostedPoolAlert } from "./hosted-pool-alert";
 import { readHostedPool } from "./hosted-pool-snapshot";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
@@ -77,7 +79,6 @@ export function createWorkerHandler(
         ),
       );
       if (earlyResponse) return earlyResponse;
-      // Drawn from the HTML pages, so it renders them through the same handler.
       const markdown = await pageMarkdownResponse(request, fetchHandler);
       if (markdown) return markdown;
       const response = Promise.resolve(fetchHandler(request)).then((result) =>
@@ -104,7 +105,6 @@ export function createWorkerHandler(
         return;
       }
       const now = controller.scheduledTime;
-      // Retention starts after the hosted server check; delivery and site cleanup run beside both.
       const hostingThenRetention = Effect.gen(function* () {
         const hostingResult = bindings.BOAT_API_KEY ? yield* tickHostedServers(bindings, now) : null;
         if (hostingResult && Object.values(hostingResult).some(Boolean)) {
@@ -112,8 +112,6 @@ export function createWorkerHandler(
         }
         return isDailyRetentionRun(now) ? yield* prune(bindings.DB, now) : null;
       });
-      // Each job runs to its end, so a failure of one does not cut another. The first failure still
-      // fails the run.
       const [retention, , sites] = await runApiEffect(
         Effect.all(
           [
@@ -124,11 +122,12 @@ export function createWorkerHandler(
             ),
             Effect.exit(tickSalesAnalytics(bindings, now)),
             Effect.exit(tickHostedPool(bindings, now)),
+            Effect.exit(tickReferralCredit(bindings)),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]) =>
-            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]),
+          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit]) =>
+            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit]),
           ),
         ),
       );
@@ -138,7 +137,6 @@ export function createWorkerHandler(
   } satisfies ExportedHandler<WorkerBindings>;
 }
 
-/** Logs only the result and the error tag: the Cloudflare token never reaches a log. */
 async function runSignalEntryCheck(bindings: Partial<SignalEntryBindings>): Promise<void> {
   const result = await Effect.runPromise(
     Effect.result(checkSignalEntry(bindings, { fetch: (input, init) => fetch(input, init) })),
@@ -153,7 +151,12 @@ async function runSignalEntryCheck(bindings: Partial<SignalEntryBindings>): Prom
 }
 
 type SalesBindings = Pick<WorkerBindings, "DB"> &
-  Partial<Pick<WorkerBindings, "STRIPE_SECRET_KEY" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">>;
+  Partial<
+    Pick<
+      WorkerBindings,
+      "STRIPE_SECRET_KEY" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET" | "HOSTED_POOL_ALERT_WEBHOOK_URL"
+    >
+  >;
 
 const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings: SalesBindings, now: number) {
   if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
@@ -163,7 +166,8 @@ const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings:
     clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
     fetch: (input: string, init: RequestInit) => fetch(input, init),
   };
-  const payments = yield* Effect.exit(new BillingSales(options).processPending());
+  const saleAlert = createHostedPoolAlert(bindings.HOSTED_POOL_ALERT_WEBHOOK_URL, options.fetch);
+  const payments = yield* Effect.exit(new BillingSales({ ...options, saleAlert }).processPending());
   const snapshot = yield* Effect.exit(captureBillingSnapshot(bindings, now));
   const result = yield* new SalesAnalyticsDelivery(options).drain();
   console.info("Sales analytics delivery completed.", result);
@@ -171,11 +175,18 @@ const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings:
   yield* snapshot;
 });
 
-/**
- * Each 5 minutes, the machines of the operator by location, product and state, for the "Server pool"
- * dashboard (docs/hosted-servers.md#reuse-a-pool-machine). The scheduled handler has no `waitUntil`, so the
- * run waits for each send.
- */
+const tickReferralCredit = Effect.fn("ReferralCredit.tick")(function* (bindings: SalesBindings) {
+  const secretKey = bindings.STRIPE_SECRET_KEY?.trim();
+  if (!secretKey) return;
+  const billing = new BillingService({
+    database: bindings.DB,
+    secretKey,
+    webhookSecret: null,
+    fetch: (input, init) => fetch(input, init),
+  });
+  yield* billing.releaseReferralCredit();
+});
+
 const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {
   if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
   const groups = yield* readHostedPool(bindings.DB, now);
@@ -198,7 +209,6 @@ const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function
 ) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
-  // Only a server plan Checkout has a return token, so the fallback page names that kind.
   let destination = "/billing/return?kind=plan";
   if (token && bindings.DB && bindings.OPENPANEL_CLIENT_ID && bindings.OPENPANEL_CLIENT_SECRET) {
     const sales = new BillingSales({
@@ -217,8 +227,6 @@ const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function
         ),
       )) ?? destination;
   }
-  // Stripe opens this endpoint only as the cancel URL of Checkout. The stored return URL already has
-  // the flag; the fallback page needs it too, so that it does not say that billing changed.
   const location = new URL(destination, url.origin);
   location.searchParams.set("cancelled", "1");
   return new Response(null, {
@@ -245,15 +253,12 @@ function tickHostedServers(
   bindings: RemoteAuthEventBindings & Partial<Pick<WorkerBindings, HostedServerTickBindingKey>>,
   now: number,
 ) {
-  // The check sends the queued auth events once, after its last change. A delivery reads the time when
-  // it starts, so it reads every event that the check queued.
   let authEvents: Effect.Effect<void, RemoteFailure> | null = null;
   const remote = new RemoteControlPlane(bindings, {
     schedule: (delivery) => {
       authEvents = delivery;
     },
   });
-  // The cron waits for the analytics sends and server start commands itself. They never reject.
   const sends: Effect.Effect<void>[] = [];
   return Effect.gen(function* () {
     const result = yield* createHostedBilling(bindings, {
@@ -269,7 +274,6 @@ function tickHostedServers(
         Effect.all(
           [
             ...sends,
-            // The next cron sends the events again.
             (authEvents ?? Effect.void).pipe(
               Effect.catch(() => Effect.sync(() => console.warn("Remote auth event delivery failed."))),
             ),
