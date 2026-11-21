@@ -18,7 +18,7 @@ import { CustomAgentStore } from "../src/main/custom-agent-store";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, xorCipher } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-conformance-e2e");
-const NOT_COVERED = ["codex", "claude", "pi", "inception", "deepseek", "openrouter", "muse"] as const;
+const NOT_COVERED = ["codex", "claude", "pi", "inception", "deepseek", "openrouter", "trustedrouter", "muse"] as const;
 
 interface DriverCase {
   provider: AgentProviderId;

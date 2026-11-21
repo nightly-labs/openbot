@@ -626,6 +626,16 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     validateAccount: () => undefined,
   },
   {
+    id: "trustedrouter",
+    signIn: { kind: "external" },
+    cliProvider: "pi",
+    resolveCli: resolvePiCli,
+    createClient: (cli, timeout, context, confinement) => piClient("trustedrouter", cli, timeout, context, confinement),
+    createProfileClient: (cli, timeout, context) => piProfileClient("trustedrouter", cli, timeout, context),
+    authState: (account) => ({ kind: "trustedrouter", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
     id: "muse",
     signIn: { kind: "muse-device", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
     codeSignIn: { kind: "muse-device", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
