@@ -123,16 +123,17 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     setRawSource(false);
   });
   createEffect(
-    () => ({ preview: file(), sourceUrl: props.sourceUrl }),
-    ({ preview, sourceUrl }) => {
+    () => ({ preview: file(), sourceUrl: props.sourceUrl, pageUrl: props.pageUrl }),
+    ({ preview, sourceUrl, pageUrl }) => {
       if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
       currentPreviewUrl = null;
       if (!preview) {
         setPreviewUrl(null);
         return;
       }
-      if (sourceUrl && BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
-        setPreviewUrl(sourceUrl);
+      const directUrl = sourceUrl || (preview.previewKind === "pdf" ? pageUrl : null);
+      if (directUrl && BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
+        setPreviewUrl(directUrl);
         return;
       }
       if (!preview.bytes || !BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
