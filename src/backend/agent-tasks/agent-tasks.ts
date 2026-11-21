@@ -235,6 +235,24 @@ export class AgentTasks implements TaskLanes {
     return task;
   }
 
+  isSideThread(agentId: string, taskId: string): boolean {
+    const task = this.#store.task(taskId);
+    return task?.agentId === agentId && task.routineId === null;
+  }
+
+  waitThread(agentId: string, taskId: string): AgentThreadRecord | null {
+    if (!this.isSideThread(agentId, taskId)) return null;
+    const task = this.#store.task(taskId);
+    if (!task) return null;
+    if (task.closedAt === null) {
+      this.#conversation.registerTaskThread(agentId, task.threadId);
+      return task;
+    }
+    if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
+    this.reopen(task);
+    return this.#store.task(taskId);
+  }
+
   #followRoutineName(thread: AgentThreadRecord, title: string | null): AgentThreadRecord {
     if (!title || thread.title === title || thread.titleSource === "user") return thread;
     this.#store.retitle(thread.threadId, title);

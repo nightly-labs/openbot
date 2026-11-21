@@ -237,7 +237,7 @@ export const messages = {
   "error.backend.agentWaitGone": "この待機は開いていません。エージェントが閉じたか、誰かがキャンセルしました。",
   "error.backend.agentWaitNoRequest": "待機を続行するにはメッセージが必要です。このターンにはメッセージがありません。",
   "error.backend.agentWaitOwnChatOnly":
-    "待機は自分のチャットでのみ開いてください。チャンネルやメッセージングのタスクは待機できません。",
+    "待機は自分のチャットかサイドスレッドで開いてください。チャンネルやメッセージングの会話は待機できません。",
   "error.backend.agentWaitNoteRequired": "待機の目的を示す短いメモを入力してください。",
   "error.backend.agentWaitRoutineGone": "このエージェントにはこの ID のルーティンがありません。",
   "error.backend.agentWaitNoRoutine":
