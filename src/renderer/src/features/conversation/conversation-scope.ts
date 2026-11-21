@@ -2163,37 +2163,36 @@ export function createConversationViewScope(props: ConversationProps) {
     setActiveRightPanel(event.type === "dock" ? "browser-expanded" : "none");
   });
 
-  let browserWindowServerId: string | undefined;
-  createEffect(
-    () => ({ open: browserWindowShown(), canDetach: browserCanDetach(), serverId: props.server?.id }),
-    ({ open, canDetach, serverId }) => {
-      if (open && !canDetach) {
+  let browserWindowRequested = false;
+  const browserWindowState = (): "closed" | "open" | "unavailable" => {
+    if (!browserWindowShown()) return "closed";
+    return browserCanDetach() ? "open" : "unavailable";
+  };
+  createEffect(browserWindowState, (state) => {
+    const runtime = conversationRuntime(props);
+    if (state === "unavailable") {
+      setBrowserWindowOpen(false);
+      return;
+    }
+    if (state === "closed") {
+      if (!browserWindowRequested) return;
+      browserWindowRequested = false;
+      void runtime.browser.closeWindow();
+      return;
+    }
+    if (browserWindowRequested) return;
+    browserWindowRequested = true;
+    runtime.browser
+      .openWindow(untrack(browserWindowBounds) ?? undefined)
+      .then(saveBrowserWindowBounds)
+      .catch((error: unknown) => {
         setBrowserWindowOpen(false);
-        return;
-      }
-      const runtime = conversationRuntime(props);
-      if (!open) {
-        if (browserWindowServerId === undefined) return;
-        browserWindowServerId = undefined;
-        void runtime.browser.closeWindow();
-        return;
-      }
-      if (browserWindowServerId !== undefined && browserWindowServerId !== serverId) void runtime.browser.closeWindow();
-      browserWindowServerId = serverId ?? "";
-      runtime.browser
-        .openWindow(untrack(browserWindowBounds) ?? undefined)
-        .then(saveBrowserWindowBounds)
-        .catch((error: unknown) => {
-          setBrowserWindowOpen(false);
-          setScopedComposerError(currentText().t("browser.window.openFailed"), undefined, error);
-        });
-    },
-  );
+        setScopedComposerError(currentText().t("browser.window.openFailed"), undefined, error);
+      });
+  });
 
   const removeBrowserWindowListener = conversationRuntime(props).browser.onWindowEvent((event) => {
-    if (event.type === "bounds-changed") saveBrowserWindowBounds(event.bounds);
-    else if (event.type === "dock") reattachBrowserWindow();
-    else if (event.type === "hide") setBrowserWindowOpen(false);
+    if (event.type === "dock") reattachBrowserWindow();
   });
 
   onCleanup(() => {
@@ -2204,7 +2203,6 @@ export function createConversationViewScope(props: ConversationProps) {
     if (browserWindowResizeHandler) window.removeEventListener("resize", browserWindowResizeHandler);
     removeBrowserPictureInPictureListener();
     removeBrowserWindowListener();
-    if (browserWindowServerId !== undefined) void conversationRuntime(props).browser.closeWindow();
     if (props.browserEnabled !== false) {
       void conversationRuntime(props).browser.setVisible({ visible: false, target: "main" });
       void conversationRuntime(props).browser.closePictureInPicture();

@@ -60,11 +60,7 @@ export class DetachedBrowserWindow {
     savedBounds?: BrowserBounds,
   ): Effect.fn.Return<BrowserBounds, DetachedBrowserWindowFailed> {
     const existing = this.#window;
-    if (existing && !existing.isDestroyed()) {
-      existing.show();
-      existing.focus();
-      return existing.getBounds();
-    }
+    if (existing && !existing.isDestroyed()) return existing.getNormalBounds();
 
     const bounds = detachedBrowserWindowBounds(
       savedBounds,

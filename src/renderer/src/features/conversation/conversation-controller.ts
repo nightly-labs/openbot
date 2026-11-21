@@ -9,10 +9,15 @@ import type {
 import type { AgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { currentText } from "@openbot/ui/text";
 import type { UserErrorDetails } from "@openbot/user-errors";
-import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
+import { createEffect, createSignal, createStore, onCleanup, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { readSidePanelWidth } from "../../components/side-panel-width";
-import { BROWSER_PIP_STORAGE_KEY, BROWSER_WINDOW_STORAGE_KEY, readStoredBounds } from "./browser-bounds-storage";
+import {
+  BROWSER_PIP_STORAGE_KEY,
+  BROWSER_WINDOW_STORAGE_KEY,
+  readStoredBounds,
+  storeBounds,
+} from "./browser-bounds-storage";
 import type { ChatSearchMatch } from "./chat-search";
 import {
   appendDraftText,
@@ -28,7 +33,7 @@ import {
 } from "./composer-draft";
 import { type StoredComposerDrafts, writeComposerDraftsOnChange } from "./composer-draft-storage";
 import { composerDraftKey } from "./conversation-keys";
-import { releaseFilePreviewPage } from "./conversation-port";
+import { conversationPort, releaseFilePreviewPage } from "./conversation-port";
 import type {
   ComposerDraft,
   ConversationProps,
@@ -527,6 +532,30 @@ export function createServerConversationState(keepSidePanelFiles = false) {
     setSideQuestions,
     voiceSessions,
   };
+}
+
+type StableConversationState = ReturnType<typeof createStableConversationState>;
+
+export function followBrowserWindowEvents(
+  state: Pick<StableConversationState, "setBrowserWindowOpen" | "setBrowserWindowBounds">,
+) {
+  onCleanup(
+    conversationPort().browser.onWindowEvent((event) => {
+      if (event.type === "action") return;
+      if (event.type === "bounds-changed") {
+        state.setBrowserWindowBounds(event.bounds);
+        storeBounds(BROWSER_WINDOW_STORAGE_KEY, event.bounds);
+        return;
+      }
+      state.setBrowserWindowOpen(false);
+    }),
+  );
+}
+
+export function closeBrowserWindowWithServerScope(state: Pick<StableConversationState, "browserWindowOpen">) {
+  onCleanup(() => {
+    if (untrack(state.browserWindowOpen)) void conversationPort().browser.closeWindow();
+  });
 }
 
 export function createConversationController(props: Pick<ConversationProps, "onTypingChange">, persistDrafts = true) {

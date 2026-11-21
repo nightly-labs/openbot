@@ -15,8 +15,10 @@ import { ChannelsProvider } from "./features/channels/channels-context";
 import { readStoredComposerDrafts } from "./features/conversation/composer-draft-storage";
 import { ConversationProvider } from "./features/conversation/conversation-context";
 import {
+  closeBrowserWindowWithServerScope,
   createServerConversationState,
   createStableConversationState,
+  followBrowserWindowEvents,
 } from "./features/conversation/conversation-controller";
 import { ConversationControllerProvider } from "./features/conversation/conversation-controller-context";
 import { DirectMessagesProvider } from "./features/conversation/direct-messages-context";
@@ -60,6 +62,7 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
     !props.chatWindow,
     readStoredComposerDrafts(),
   );
+  if (!props.chatWindow) followBrowserWindowEvents(stableConversation);
   return (
     <PlatformProvider
       landingPreview={props.landingPreview}
@@ -133,6 +136,7 @@ function ScopedProviders(props: ParentProps<ScopedConversationProps>): JSX.Eleme
   const platform = usePlatform();
   const { activeServerId } = useServers();
   const keepSidePanelFiles = !platform.chatWindow && untrack(activeServerId) === LOCAL_SERVER_ID;
+  if (!platform.chatWindow) closeBrowserWindowWithServerScope(props.stableConversation);
   const conversationController = {
     ...props.stableConversation,
     ...createServerConversationState(keepSidePanelFiles),
