@@ -47,7 +47,7 @@ import {
   type AgentClient,
   AgentProcessExitError,
   type AgentProvider,
-  PROCESSOR_FEATURE_MISSING,
+  reportsMissingProcessorFeature,
 } from "./../agent-client";
 import { AppServerError, CodexAppServerClient } from "./../app-server-client";
 import {
@@ -2961,7 +2961,7 @@ export class ProviderRuntime implements ProviderPort {
       return new AgentProcessExitError(sourceText("error.provider.codexStateBusy"), null, { cause: detailed });
     if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
-    if (ILLEGAL_INSTRUCTION.test(error.message) && PROCESSOR_FEATURE_MISSING.test(detailed.message))
+    if (reportsMissingProcessorFeature(detailed.message, ILLEGAL_INSTRUCTION.test(error.message)))
       return new AgentProcessExitError(sourceText("error.provider.cpuUnsupported"), null, { cause: detailed });
     return detailed;
   }
