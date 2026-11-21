@@ -63,7 +63,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const threads = () => summary()?.threads;
   const readOnly = () => page()?.channel.archived === true;
   const memberThreadIds = createMemo(() => new Set(threads()?.map((thread) => thread.threadId)));
-  const memberAgentIds = createMemo(() => new Set(threads()?.map((thread) => thread.agentId)));
+  const memberAgentIds = createMemo(() => new Set(page()?.channel.members.map((member) => member.agentId)));
   const browserOwner = createMemo(() => {
     const channel = page()?.channel;
     const allowed = channel ? channelBrowserAgent(channel) : false;
@@ -291,7 +291,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     hasOlder: () => Boolean(page()?.olderCursor),
     unloadedHistory: () => unloadedHistory(page()),
     mentionAgents: () => {
-      const members = new Set(page()?.channel.members.map((member) => member.agentId));
+      const members = memberAgentIds();
       return channels.agents().filter((agent) => members.has(agent.id));
     },
     activeTurnId: () => activeRuns()[0] ?? null,

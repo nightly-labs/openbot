@@ -1,8 +1,7 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8 } from "fflate";
+import { unzipOfficeXml } from "./office-zip";
 
 export const WORD_DOCUMENT_MAX_BLOCKS = 5000;
-const MAX_ZIP_ENTRY_BYTES = 16 * 1024 * 1024;
-const MAX_ZIP_EXPANDED_BYTES = 32 * 1024 * 1024;
 const MAX_STYLE_DEPTH = 16;
 const DOCX_XML_ENTRY = /^word\/(?:document|styles|numbering)\.xml$/u;
 const RUN_CONTAINERS = new Set([
@@ -53,16 +52,23 @@ export interface WordDocumentData {
   truncated: boolean;
 }
 
-interface ParagraphStyle {
+interface WordStyle {
   basedOn: string | null;
   headingLevel: number | null;
   numbering: Element | null;
+  runProperties: Element | null;
+}
+
+interface OpenList {
+  block: WordBlock;
+  id: string;
 }
 
 interface DocumentContext {
-  styles: Map<string, ParagraphStyle>;
+  styles: Map<string, WordStyle>;
   orderedLists: Map<string, Set<string>>;
   blocks: WordBlock[];
+  openList: OpenList | null;
   units: number;
   truncated: boolean;
 }
@@ -93,10 +99,17 @@ function attribute(element: Element | null | undefined, name: string): string | 
 }
 
 function toggleOn(properties: Element | null, name: string): boolean {
-  const element = childElement(properties, name);
-  if (!element) return false;
-  const value = attribute(element, "val");
-  return value === null || !OFF_VALUES.has(value.toLowerCase());
+  return layeredToggle([properties], name);
+}
+
+function layeredToggle(layers: readonly (Element | null)[], name: string): boolean {
+  for (const layer of layers) {
+    const element = childElement(layer, name);
+    if (!element) continue;
+    const value = attribute(element, "val");
+    return value === null || !OFF_VALUES.has(value.toLowerCase());
+  }
+  return false;
 }
 
 function headingLevelForName(name: string | null): number | null {
@@ -114,18 +127,23 @@ function outlineLevel(paragraphProperties: Element | null): number | null {
   return Number.isInteger(level) && level >= 0 && level < 9 ? level + 1 : null;
 }
 
-function parseStyles(document: Document | null): Map<string, ParagraphStyle> {
-  const styles = new Map<string, ParagraphStyle>();
+function parseStyles(document: Document | null): Map<string, WordStyle> {
+  const styles = new Map<string, WordStyle>();
   if (!document) return styles;
   for (const style of Array.from(document.getElementsByTagNameNS("*", "style"))) {
-    if (attribute(style, "type") !== "paragraph") continue;
+    const type = attribute(style, "type");
+    if (type !== "paragraph" && type !== "character") continue;
     const id = attribute(style, "styleId");
     if (!id) continue;
-    const properties = childElement(style, "pPr");
+    const paragraphStyle = type === "paragraph";
+    const properties = paragraphStyle ? childElement(style, "pPr") : null;
     styles.set(id, {
       basedOn: attribute(childElement(style, "basedOn"), "val"),
-      headingLevel: headingLevelForName(attribute(childElement(style, "name"), "val")) ?? outlineLevel(properties),
+      headingLevel: paragraphStyle
+        ? (headingLevelForName(attribute(childElement(style, "name"), "val")) ?? outlineLevel(properties))
+        : null,
       numbering: childElement(properties, "numPr"),
+      runProperties: childElement(style, "rPr"),
     });
   }
   return styles;
@@ -153,8 +171,8 @@ function parseOrderedLists(document: Document | null): Map<string, Set<string>> 
   return lists;
 }
 
-function styleChain(context: DocumentContext, styleId: string | null): ParagraphStyle[] {
-  const chain: ParagraphStyle[] = [];
+function styleChain(context: DocumentContext, styleId: string | null): WordStyle[] {
+  const chain: WordStyle[] = [];
   let current = styleId;
   while (current && chain.length < MAX_STYLE_DEPTH) {
     const style = context.styles.get(current);
@@ -187,21 +205,27 @@ function runText(run: Element): string {
   return text;
 }
 
-function collectRuns(parent: Element, runs: WordRun[]): void {
+function runLayers(context: DocumentContext, run: Element, paragraphChain: WordStyle[]): (Element | null)[] {
+  const properties = childElement(run, "rPr");
+  const characterChain = styleChain(context, attribute(childElement(properties, "rStyle"), "val"));
+  return [properties, ...[...characterChain, ...paragraphChain].map((style) => style.runProperties)];
+}
+
+function collectRuns(context: DocumentContext, parent: Element, paragraphChain: WordStyle[], runs: WordRun[]): void {
   for (const child of Array.from(parent.children)) {
     if (child.localName === "r") {
       const text = runText(child);
       if (!text) continue;
-      const properties = childElement(child, "rPr");
+      const layers = runLayers(context, child, paragraphChain);
       runs.push({
         text,
-        bold: toggleOn(properties, "b"),
-        italic: toggleOn(properties, "i"),
-        underline: toggleOn(properties, "u"),
-        strike: toggleOn(properties, "strike") || toggleOn(properties, "dstrike"),
+        bold: layeredToggle(layers, "b"),
+        italic: layeredToggle(layers, "i"),
+        underline: layeredToggle(layers, "u"),
+        strike: layeredToggle(layers, "strike") || layeredToggle(layers, "dstrike"),
       });
     } else if (RUN_CONTAINERS.has(child.localName)) {
-      collectRuns(child, runs);
+      collectRuns(context, child, paragraphChain, runs);
     }
   }
 }
@@ -215,9 +239,13 @@ function sameFormat(left: WordRun, right: WordRun): boolean {
   );
 }
 
-function paragraphRuns(paragraph: Element): WordRun[] {
+function paragraphStyleChain(context: DocumentContext, paragraph: Element): WordStyle[] {
+  return styleChain(context, attribute(childElement(childElement(paragraph, "pPr"), "pStyle"), "val"));
+}
+
+function paragraphRuns(context: DocumentContext, paragraph: Element, chain: WordStyle[]): WordRun[] {
   const runs: WordRun[] = [];
-  collectRuns(paragraph, runs);
+  collectRuns(context, paragraph, chain, runs);
   const merged: WordRun[] = [];
   for (const run of runs) {
     const previous = merged.at(-1);
@@ -234,19 +262,31 @@ function hasText(runs: WordRun[]): boolean {
   return runs.some((run) => run.text.trim().length > 0);
 }
 
-function headingLevel(properties: Element | null, chain: ParagraphStyle[]) {
+function headingLevel(properties: Element | null, chain: WordStyle[]) {
   const level = outlineLevel(properties) ?? chain.find((style) => style.headingLevel !== null)?.headingLevel ?? null;
   if (level === null) return null;
   return WORD_HEADING_LEVELS[Math.min(Math.max(level, 1), 6) - 1] ?? null;
 }
 
-function listOrder(context: DocumentContext, properties: Element | null, chain: ParagraphStyle[]): boolean | null {
-  const numbering = childElement(properties, "numPr") ?? chain.find((style) => style.numbering)?.numbering ?? null;
-  if (!numbering) return null;
-  const id = attribute(childElement(numbering, "numId"), "val");
+function numberingValue(properties: Element | null, chain: WordStyle[], name: string): string | null {
+  const direct = attribute(childElement(childElement(properties, "numPr"), name), "val");
+  if (direct !== null) return direct;
+  for (const style of chain) {
+    const value = attribute(childElement(style.numbering, name), "val");
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+function listMembership(
+  context: DocumentContext,
+  properties: Element | null,
+  chain: WordStyle[],
+): { id: string; ordered: boolean } | null {
+  const id = numberingValue(properties, chain, "numId");
   if (id === null || id === "0") return null;
-  const level = attribute(childElement(numbering, "ilvl"), "val") ?? "0";
-  return context.orderedLists.get(id)?.has(level) ?? false;
+  const level = numberingValue(properties, chain, "ilvl") ?? "0";
+  return { id, ordered: context.orderedLists.get(id)?.has(level) ?? false };
 }
 
 function reserveUnit(context: DocumentContext): boolean {
@@ -258,40 +298,51 @@ function reserveUnit(context: DocumentContext): boolean {
   return true;
 }
 
+function addListItem(context: DocumentContext, list: { id: string; ordered: boolean }, runs: WordRun[]): void {
+  const previous = context.blocks.at(-1);
+  if (
+    previous?.kind === "list" &&
+    previous === context.openList?.block &&
+    context.openList.id === list.id &&
+    previous.ordered === list.ordered
+  ) {
+    previous.items.push(runs);
+    return;
+  }
+  const block: WordBlock = { kind: "list", ordered: list.ordered, items: [runs] };
+  context.blocks.push(block);
+  context.openList = { block, id: list.id };
+}
+
 function addParagraph(context: DocumentContext, paragraph: Element): void {
-  const runs = paragraphRuns(paragraph);
+  const chain = paragraphStyleChain(context, paragraph);
+  const runs = paragraphRuns(context, paragraph, chain);
   if (!hasText(runs) || !reserveUnit(context)) return;
   const properties = childElement(paragraph, "pPr");
-  const chain = styleChain(context, attribute(childElement(properties, "pStyle"), "val"));
   const level = headingLevel(properties, chain);
   if (level !== null) {
     context.blocks.push({ kind: "heading", level, runs });
     return;
   }
-  const ordered = listOrder(context, properties, chain);
-  if (ordered === null) {
+  const list = listMembership(context, properties, chain);
+  if (list === null) {
     context.blocks.push({ kind: "paragraph", runs });
     return;
   }
-  const previous = context.blocks.at(-1);
-  if (previous?.kind === "list" && previous.ordered === ordered) {
-    previous.items.push(runs);
-  } else {
-    context.blocks.push({ kind: "list", ordered, items: [runs] });
-  }
+  addListItem(context, list, runs);
 }
 
-function cellParagraphs(parent: Element, paragraphs: WordRun[][]): void {
+function cellParagraphs(context: DocumentContext, parent: Element, paragraphs: WordRun[][]): void {
   for (const child of childElements(parent)) {
     if (child.localName === "p") {
-      const runs = paragraphRuns(child);
+      const runs = paragraphRuns(context, child, paragraphStyleChain(context, child));
       if (hasText(runs)) paragraphs.push(runs);
     } else if (child.localName === "tbl") {
       for (const row of childElements(child, "tr")) {
-        for (const cell of childElements(row, "tc")) cellParagraphs(cell, paragraphs);
+        for (const cell of childElements(row, "tc")) cellParagraphs(context, cell, paragraphs);
       }
     } else if (BLOCK_CONTAINERS.has(child.localName)) {
-      cellParagraphs(child, paragraphs);
+      cellParagraphs(context, child, paragraphs);
     }
   }
 }
@@ -314,7 +365,7 @@ function addTable(context: DocumentContext, table: Element): void {
     if (!reserveUnit(context)) break;
     const cells = rowCells(row).map((cell) => {
       const paragraphs: WordRun[][] = [];
-      cellParagraphs(cell, paragraphs);
+      cellParagraphs(context, cell, paragraphs);
       const span = Number(attribute(childElement(childElement(cell, "tcPr"), "gridSpan"), "val"));
       return { paragraphs, columnSpan: Number.isInteger(span) && span > 1 ? span : 1 };
     });
@@ -336,25 +387,8 @@ function addBlocks(context: DocumentContext, parent: Element): void {
   }
 }
 
-function unzipWordDocument(bytes: Uint8Array) {
-  let expandedBytes = 0;
-  return unzipSync(bytes, {
-    filter: (file) => {
-      if (!DOCX_XML_ENTRY.test(file.name)) return false;
-      if (file.originalSize > MAX_ZIP_ENTRY_BYTES) {
-        throw new Error("The document preview is too large to read safely.");
-      }
-      expandedBytes += file.originalSize;
-      if (expandedBytes > MAX_ZIP_EXPANDED_BYTES) {
-        throw new Error("The document preview is too large to read safely.");
-      }
-      return true;
-    },
-  });
-}
-
 export function parseWordDocument(bytes: Uint8Array): WordDocumentData {
-  const files = unzipWordDocument(bytes);
+  const files = unzipOfficeXml(bytes, DOCX_XML_ENTRY);
   const document = xmlDocument(files["word/document.xml"]);
   const body = document ? document.getElementsByTagNameNS("*", "body")[0] : undefined;
   if (!body) throw new Error("The document has no readable body.");
@@ -362,6 +396,7 @@ export function parseWordDocument(bytes: Uint8Array): WordDocumentData {
     styles: parseStyles(xmlDocument(files["word/styles.xml"])),
     orderedLists: parseOrderedLists(xmlDocument(files["word/numbering.xml"])),
     blocks: [],
+    openList: null,
     units: 0,
     truncated: false,
   };
