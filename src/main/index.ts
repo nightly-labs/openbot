@@ -709,6 +709,7 @@ function registerIpcHandlers({
   mailbox,
   browser,
   browserPictureInPicture,
+  detachedBrowserWindow,
   localSignIn,
   browserDock,
   browserView,
@@ -1091,7 +1092,14 @@ function registerIpcHandlers({
       modelVisibility,
       closeChatNotifications,
     }),
-    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
+    ...browserIpcHandlers({
+      browserPictureInPicture,
+      detachedBrowserWindow,
+      browser,
+      remoteServers,
+      browserView,
+      localSignIn,
+    }),
   });
 }
 
