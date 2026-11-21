@@ -59,6 +59,7 @@ function canonicalBrowserUrl(url: string): string {
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
+  reattachBrowserWindow: () => void;
   closeBrowserPane: () => void;
 }
 
@@ -730,7 +731,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (!canTeachBrowserTask() || teach()) return;
     const tab = activeBrowserTab() ?? (await openBrowserAddress(BROWSER_NEW_TAB_URL, true));
     if (!tab || closingBrowserTabIds.has(tab.id)) return;
-    deps.panels.setActiveRightPanel("browser-expanded");
+    deps.panels.reattachBrowserWindow();
     setTeach({ phase: "ready", pending: false });
   }
 

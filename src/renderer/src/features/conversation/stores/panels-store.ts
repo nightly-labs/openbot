@@ -16,6 +16,7 @@ import { createEffect, createMemo, createSignal, onCleanup, type Store, type Sto
 import { createScopeGuard } from "../../../scope-lifetime";
 import { createAttachmentDownloads } from "../attachment-downloads";
 import { attachmentFilePreview } from "../attachment-preview";
+import { BROWSER_PIP_STORAGE_KEY, BROWSER_WINDOW_STORAGE_KEY, storeBounds } from "../browser-bounds-storage";
 import { releaseFilePreviewPage } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
 import type {
@@ -91,6 +92,9 @@ export interface PanelsStoreDeps {
   settingsModel: () => import("@openbot/contracts/ipc").AgentModelId;
   settingsReasoning: () => import("@openbot/contracts/ipc").AgentReasoningEffort;
   setBrowserPipBounds: (bounds: BrowserBounds | null) => void;
+  browserWindowOpen: () => boolean;
+  setBrowserWindowOpen: (open: boolean) => void;
+  setBrowserWindowBounds: (bounds: BrowserBounds | null) => void;
   sidebarFilePreview: () => SidebarFilePreview | null;
   setSidebarFilePreview: (preview: SidebarFilePreview | null) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
@@ -209,7 +213,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     deps.sidebarFilePreview()?.ownerAgentId === conversationOwnerId(deps.props);
 
   function setActiveRightPanel(mode: RightPanelMode, agentId = conversationOwnerId(deps.props)) {
+    if (mode === "browser-expanded" && deps.browserWindowOpen()) {
+      void conversationRuntime(deps.props).browser.focusWindow();
+      return;
+    }
+    showRightPanel(mode, agentId);
+  }
+
+  function showRightPanel(mode: RightPanelMode, agentId = conversationOwnerId(deps.props)) {
     if (!agentId) return;
+    if (mode === "browser-pip") deps.setBrowserWindowOpen(false);
     if (mode !== "file-preview") deps.invalidateFilePreviewGeneration();
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
@@ -284,16 +297,29 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   function saveBrowserPipBounds(bounds: BrowserBounds) {
     deps.setBrowserPipBounds(bounds);
-    window.localStorage.setItem(
-      "openbot:browser-pip-native-bounds",
-      [bounds.x, bounds.y, bounds.width, bounds.height].join(","),
-    );
+    storeBounds(BROWSER_PIP_STORAGE_KEY, bounds);
+  }
+
+  function saveBrowserWindowBounds(bounds: BrowserBounds) {
+    deps.setBrowserWindowBounds(bounds);
+    storeBounds(BROWSER_WINDOW_STORAGE_KEY, bounds);
+  }
+
+  function openBrowserWindow() {
+    const mode = activeRightPanel();
+    if (mode === "browser-expanded" || mode === "browser-pip") setActiveRightPanel("none");
+    deps.setBrowserWindowOpen(true);
+  }
+
+  function reattachBrowserWindow() {
+    deps.setBrowserWindowOpen(false);
+    showRightPanel("browser-expanded");
   }
 
   function hideBrowserPanel() {
     setActiveRightPanel("none");
     if (deps.props.browserEnabled !== false)
-      void conversationRuntime(deps.props).browser.setVisible({ visible: false });
+      void conversationRuntime(deps.props).browser.setVisible({ visible: false, target: "main" });
   }
 
   async function previewAttachment(attachment: AttachmentSummary, place: FileTabPlace = "tab") {
@@ -713,6 +739,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openRoutineRunMessage,
     showBrowserPip,
     saveBrowserPipBounds,
+    saveBrowserWindowBounds,
+    openBrowserWindow,
+    reattachBrowserWindow,
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,

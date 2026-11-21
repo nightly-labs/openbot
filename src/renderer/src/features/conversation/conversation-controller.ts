@@ -12,6 +12,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { readSidePanelWidth } from "../../components/side-panel-width";
+import { BROWSER_PIP_STORAGE_KEY, BROWSER_WINDOW_STORAGE_KEY, readStoredBounds } from "./browser-bounds-storage";
 import type { ChatSearchMatch } from "./chat-search";
 import {
   appendDraftText,
@@ -45,16 +46,6 @@ import { createPendingSendStore } from "./stores/pending-send-store";
 import type { SideQuestionState } from "./stores/side-question-store";
 import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
-
-const BROWSER_PIP_STORAGE_KEY = "openbot:browser-pip-native-bounds";
-
-function readBrowserPipBounds(): BrowserBounds | null {
-  const values = (window.localStorage.getItem(BROWSER_PIP_STORAGE_KEY) ?? "")
-    .split(",")
-    .map((value) => Number.parseFloat(value));
-  const [x = Number.NaN, y = Number.NaN, width = Number.NaN, height = Number.NaN] = values;
-  return values.length === 4 && [x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null;
-}
 
 export interface FeedbackFix {
   number: number;
@@ -273,7 +264,13 @@ export function createStableConversationState(
   const [voiceThreadKey, setVoiceThreadKey] = createSignal<string | undefined>(undefined);
   const [voiceLevels, setVoiceLevels] = createSignal<number[]>([]);
   const [voiceLimitReached, setVoiceLimitReached] = createSignal<ConversationTarget | null>(null);
-  const [browserPipBounds, setBrowserPipBounds] = createSignal<BrowserBounds | null>(readBrowserPipBounds());
+  const [browserPipBounds, setBrowserPipBounds] = createSignal<BrowserBounds | null>(
+    readStoredBounds(BROWSER_PIP_STORAGE_KEY),
+  );
+  const [browserWindowOpen, setBrowserWindowOpen] = createSignal(false);
+  const [browserWindowBounds, setBrowserWindowBounds] = createSignal<BrowserBounds | null>(
+    readStoredBounds(BROWSER_WINDOW_STORAGE_KEY),
+  );
   const [sidePanelWidth, setSidePanelWidth] = createSignal(readSidePanelWidth());
   const resources: ConversationResources = {
     agentActivityLabels: new Map(),
@@ -419,6 +416,10 @@ export function createStableConversationState(
     setVoiceLimitReached,
     browserPipBounds,
     setBrowserPipBounds,
+    browserWindowOpen,
+    setBrowserWindowOpen,
+    browserWindowBounds,
+    setBrowserWindowBounds,
     sidePanelWidth,
     setSidePanelWidth,
     resources,

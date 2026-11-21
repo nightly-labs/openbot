@@ -43,6 +43,7 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
 import { isBrowserSignedInPage } from "../browser-sign-in-page";
 import type { BrowserViewClient } from "../browser-view-client";
+import type { DetachedBrowserWindow } from "../detached-browser-window";
 import type { LocalSignInWindows } from "../local-sign-in-window";
 import {
   decodeBrowserControlState,
@@ -58,6 +59,8 @@ import {
   parseBrowserNavigate,
   parseBrowserOpen,
   parseBrowserTeachStop,
+  parseBrowserWindowAction,
+  parseBrowserWindowModel,
   parseLocalSignIn,
   parseLocalSignInFinish,
   parseVisibility,
@@ -68,6 +71,10 @@ import { optionalPayload, stringPayload } from "./validation";
 
 export interface BrowserIpcDependencies {
   browserPictureInPicture: Pick<BrowserPictureInPicture, "open" | "close" | "dock" | "hide">;
+  detachedBrowserWindow: Pick<
+    DetachedBrowserWindow,
+    "open" | "close" | "focus" | "dock" | "publishModel" | "model" | "sendAction"
+  >;
   browser: Pick<
     BrowserHost,
     | "open"
@@ -94,6 +101,7 @@ export interface BrowserIpcDependencies {
 
 export function browserIpcHandlers({
   browserPictureInPicture,
+  detachedBrowserWindow,
   browser,
   remoteServers,
   browserView,
@@ -391,8 +399,9 @@ export function browserIpcHandlers({
         return runCauseEffect(browserView.start(tabId, event.sender.id));
       }),
       stopLiveView: eventHandler((event) => runCauseEffect(browserView.stop(event.sender.id))),
-      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
-        routeToServer(remoteServers.activeServerId, {
+      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) => {
+        detachedBrowserWindow.close();
+        return routeToServer(remoteServers.activeServerId, {
           local: () => runCauseEffect(browserPictureInPicture.open(bounds)),
           remote: (serverId) =>
             runCauseEffect(
@@ -403,11 +412,25 @@ export function browserIpcHandlers({
                   : undefined,
               ),
             ),
-        }),
-      ),
+        });
+      }),
       closePictureInPicture: handler(() => browserPictureInPicture.close()),
       dockPictureInPicture: handler(() => browserPictureInPicture.dock()),
       hidePictureInPicture: handler(() => browserPictureInPicture.hide()),
+      openWindow: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) => {
+        browserPictureInPicture.close();
+        return runCauseEffect(detachedBrowserWindow.open(bounds));
+      }),
+      closeWindow: handler(() => detachedBrowserWindow.close()),
+      focusWindow: handler(() => detachedBrowserWindow.focus()),
+      dockWindow: eventHandler((event) => detachedBrowserWindow.dock(event.sender.id)),
+      publishWindowModel: eventPayloadHandler(parseBrowserWindowModel, (event, model) =>
+        detachedBrowserWindow.publishModel(event.sender.id, model),
+      ),
+      getWindowModel: eventHandler((event) => detachedBrowserWindow.model(event.sender.id)),
+      sendWindowAction: eventPayloadHandler(parseBrowserWindowAction, (event, action) =>
+        detachedBrowserWindow.sendAction(event.sender.id, action),
+      ),
     },
     browserInput: {
       sendLiveViewInput: payloadHandler(decodeBrowserViewInputValue, async (input) => browserView.sendInput(input)),

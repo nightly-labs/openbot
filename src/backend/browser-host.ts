@@ -530,6 +530,7 @@ export class BrowserHost {
   #bounds: BrowserBounds | null = null;
   #attachedView: WebContentsView | null = null;
   #pictureInPictureWindow: BrowserWindow | null = null;
+  #pictureInPictureShortcuts = false;
   #pictureInPictureOverlayView: WebContentsView | null = null;
   #mainPageListener: ((page: BrowserMainPage | null) => void) | null = null;
   #target: BrowserViewTarget = "main";
@@ -919,8 +920,9 @@ export class BrowserHost {
     return { tabs: this.listTabs(), activeTabId: this.#activeTabId };
   }
 
-  setPictureInPictureWindow(window: BrowserWindow | null): void {
+  setPictureInPictureWindow(window: BrowserWindow | null, options: { shortcuts?: boolean } = {}): void {
     this.#pictureInPictureWindow = window;
+    this.#pictureInPictureShortcuts = window !== null && options.shortcuts === true;
     if (!window && this.#target === "picture-in-picture") {
       this.#visible = false;
       this.#target = "main";
@@ -1941,6 +1943,7 @@ export class BrowserHost {
     const active = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
     if (active && input.visible) yield* this.#wake(active);
     yield* browserSync(() => {
+      if (!input.visible && input.target !== undefined && input.target !== this.#target) return;
       const restoreRendererFocus = !input.visible && this.#attachedView?.webContents.isFocused();
       this.#visible = input.visible;
       if (input.bounds) this.#bounds = validateBounds(input.bounds);
@@ -3638,12 +3641,10 @@ export class BrowserHost {
         this.#collapseOnEscape(tab);
         return;
       }
-      if (
-        isBrowserViewShortcut(input, process.platform === "darwin") &&
-        this.#mountedViews.get(tab.view) === this.#window
-      ) {
+      const shortcutWindow = this.#shortcutWindow(tab.view);
+      if (isBrowserViewShortcut(input, process.platform === "darwin") && shortcutWindow) {
         event.preventDefault();
-        this.#forwardKeyToWindow(input);
+        this.#forwardKeyToWindow(input, shortcutWindow);
         return;
       }
       if (!isCloseBrowserTabShortcut(input)) return;
@@ -3887,17 +3888,23 @@ export class BrowserHost {
     });
   }
 
-  #forwardKeyToWindow(input: Input): void {
-    if (this.#window.isDestroyed()) return;
+  #shortcutWindow(view: WebContentsView): BrowserWindow | null {
+    const mounted = this.#mountedViews.get(view);
+    if (mounted === this.#window) return mounted;
+    return this.#pictureInPictureShortcuts && mounted === this.#pictureInPictureWindow ? mounted : null;
+  }
+
+  #forwardKeyToWindow(input: Input, window: BrowserWindow = this.#window): void {
+    if (window.isDestroyed()) return;
     const keyCode = FORWARDED_KEY_CODES[input.key] ?? (input.key.length === 1 ? input.key.toUpperCase() : input.key);
     const modifiers: Array<"shift" | "control" | "alt" | "meta"> = [];
     if (input.shift) modifiers.push("shift");
     if (input.control) modifiers.push("control");
     if (input.alt) modifiers.push("alt");
     if (input.meta) modifiers.push("meta");
-    this.#window.webContents.focus();
-    this.#window.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
-    this.#window.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+    window.webContents.focus();
+    window.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+    window.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
   }
 
   #collapseOnEscape(tab: BrowserHostTab): void {

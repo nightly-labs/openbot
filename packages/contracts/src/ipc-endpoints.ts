@@ -234,6 +234,9 @@ import type {
   BrowserTeachStep,
   BrowserTeachStopInput,
   BrowserVisibilityInput,
+  BrowserWindowAction,
+  BrowserWindowEvent,
+  BrowserWindowModel,
 } from "./ipc-browser";
 import type { BrowserDockAction, BrowserDockFrame, BrowserDockPresentation } from "./ipc-browser-dock";
 import type {
@@ -1738,6 +1741,15 @@ export const IPC_ENDPOINTS = {
     dockPictureInPicture: request<undefined, void>()("browser:picture-in-picture-dock"),
     hidePictureInPicture: request<undefined, void>()("browser:picture-in-picture-hide"),
     pictureInPictureEvent: event<BrowserPictureInPictureEvent>()("browser:picture-in-picture-event"),
+    openWindow: request<BrowserBounds | undefined, BrowserBounds>()("browser:window-open"),
+    closeWindow: request<undefined, void>()("browser:window-close"),
+    focusWindow: request<undefined, void>()("browser:window-focus"),
+    dockWindow: request<undefined, void>()("browser:window-dock"),
+    publishWindowModel: request<BrowserWindowModel, void>()("browser:window-model-publish"),
+    getWindowModel: request<undefined, BrowserWindowModel | null>()("browser:window-model-get"),
+    sendWindowAction: request<BrowserWindowAction, void>()("browser:window-action"),
+    windowModel: event<BrowserWindowModel>()("browser:window-model-event"),
+    windowEvent: event<BrowserWindowEvent>()("browser:window-event"),
     openLocalSignIn: request<BrowserLocalSignInInput, BrowserLocalSignInEnd>()("browser:local-sign-in-open"),
     finishLocalSignIn: request<BrowserLocalSignInFinish, BrowserLocalSignInResult | null>()(
       "browser:local-sign-in-finish",

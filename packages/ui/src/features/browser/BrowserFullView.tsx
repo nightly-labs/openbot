@@ -167,7 +167,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       onClick={props.onBack}
     >
       <ArrowLeft aria-hidden="true" />
-      {t("browser.backToChat")}
+      {props.detached ? t("browser.pip.reattachTitle") : t("browser.backToChat")}
     </Button>
   );
 

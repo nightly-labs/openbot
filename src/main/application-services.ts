@@ -230,6 +230,7 @@ import { type CustomProviderChanges, createCustomProviderChanges } from "./custo
 import { CustomProviderStore } from "./custom-provider-store";
 import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
 import { desktopShowsAgentEvent } from "./desktop-notifications";
+import { DetachedBrowserWindow } from "./detached-browser-window";
 import { shouldAutoStartHost } from "./development-profile";
 import {
   applyDevelopmentRemoteAccount,
@@ -567,6 +568,7 @@ const TEARDOWN_ORDER = {
   mcpHostSignIns: 29,
   browser: 30,
   browserPictureInPicture: 40,
+  detachedBrowserWindow: 40.5,
   localSignIn: 41,
   browserDock: 42,
   browserView: 45,
@@ -662,6 +664,7 @@ export interface ApplicationServices {
   workflowFoldersService: WorkflowFoldersService;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
+  detachedBrowserWindow: DetachedBrowserWindow;
   localSignIn: LocalSignInWindows;
   browserDock: BrowserDockOverlay;
   browserView: BrowserViewClient;
@@ -1364,6 +1367,22 @@ export async function createApplicationServices({
     },
   });
   teardown.push(TEARDOWN_ORDER.browserPictureInPicture, "picture in picture", () => browserPictureInPicture.destroy());
+  const detachedBrowserWindow = new DetachedBrowserWindow({
+    mainWindow,
+    browser,
+    preloadPath: join(__dirname, "../preload/index.cjs"),
+    iconPath: appIconPath,
+    ...(developmentUrl === undefined ? {} : { developmentUrl }),
+    onEvent: (event) => {
+      const window = windows.getMainWindow();
+      if (!window || window.isDestroyed()) return;
+      sendToRenderer(window, IPC_ENDPOINTS.browser.windowEvent, event);
+    },
+    onModel: (window, model) => {
+      sendToRenderer(window, IPC_ENDPOINTS.browser.windowModel, model);
+    },
+  });
+  teardown.push(TEARDOWN_ORDER.detachedBrowserWindow, "the browser window", () => detachedBrowserWindow.destroy());
   const localSignIn = new LocalSignInWindows();
   teardown.push(TEARDOWN_ORDER.localSignIn, "the local sign-in window", () => Effect.runPromise(localSignIn.discard()));
   const browserDock = new BrowserDockOverlay({
@@ -4180,6 +4199,7 @@ export async function createApplicationServices({
     workflowFoldersService,
     browser,
     browserPictureInPicture,
+    detachedBrowserWindow,
     localSignIn,
     browserDock,
     browserView,

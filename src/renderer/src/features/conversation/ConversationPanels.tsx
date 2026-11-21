@@ -159,6 +159,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     agentActivity,
     browserSidebarOpen,
     browserExpandedOpen,
+    browserWindowShown,
     browserTabs,
     closeShownSidePanelFile,
     closeBrowserTab,
@@ -740,6 +741,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         </Portal>
       </Show>
 
+      <Show when={browserWindowShown()}>
+        <BrowserWindowBridge />
+      </Show>
+
       {channel ? (
         <Show when={settingsOpen()}>
           <channel.SettingsPane
@@ -907,6 +912,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
 
 const AgentSettingsPanel = lazy(loadAgentSettingsPanel);
 const BrowserFullViewAdapter = lazy(() => import("./BrowserFullViewAdapter"));
+const BrowserWindowBridge = lazy(() => import("./BrowserWindowBridge"));
 const FilePreviewPanel = lazy(() => import("./FilePreviewPanel"));
 const ChatFilesPanel = lazy(() => import("../files/ChatFilesPanel"));
 
