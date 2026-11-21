@@ -106,6 +106,7 @@ interface UpdateServiceOptions {
   currentUid?: number | undefined;
   platform?: NodeJS.Platform;
   appBundlePath?: string | undefined;
+  restartFromInstalledCopy?: ((bundlePath: string) => Effect.Effect<boolean>) | undefined;
   appImagePath?: string | undefined;
   logDirectory?: string;
   shipItDirectory?: string | undefined;
@@ -162,6 +163,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     Pick<
       UpdateServiceOptions,
       | "appBundlePath"
+      | "restartFromInstalledCopy"
       | "appImagePath"
       | "beforeInstall"
       | "checkSiblingInstances"
@@ -183,6 +185,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #installStarted = false;
   #pendingInstallRequests = 0;
   #installHandedOver = false;
+  #restartingFromInstalledCopy = false;
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   readonly #logLock = Semaphore.makeUnsafe(1);
@@ -555,6 +558,12 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         return yield* new UpdateOperationFailure({ cause: new Error(this.#siblingSessionMessage(siblings)) });
       const bundle = this.#options.platform === "darwin" ? this.#options.appBundlePath : undefined;
       if (bundle && (yield* isOnReadOnlyVolume(bundle))) {
+        if (this.#restartingFromInstalledCopy)
+          return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.restartStarted")) });
+        this.#restartingFromInstalledCopy = true;
+        const { restartFromInstalledCopy } = this.#options;
+        this.#restartingFromInstalledCopy = restartFromInstalledCopy ? yield* restartFromInstalledCopy(bundle) : false;
+        if (this.#restartingFromInstalledCopy) return;
         logger.warn("OpenBot update install refused: the application runs from a read-only volume.");
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.readOnlyLocation")) });
       }
