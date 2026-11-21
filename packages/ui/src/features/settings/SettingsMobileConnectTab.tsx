@@ -38,7 +38,7 @@ interface SettingsMobileConnectTabProps {
   canManageLink: boolean;
   canRevokeDevice: boolean;
   canSetRoute: boolean;
-  installRequest?: MobileInstallRequest | null;
+  installRequest?: MobileInstallRequest | null | undefined;
   onInstallRequestHandled?: (() => void) | undefined;
 }
 
