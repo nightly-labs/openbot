@@ -15,6 +15,7 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
+  RotateCcw,
   Select,
   SelectContent,
   SelectItem,
@@ -132,6 +133,8 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
               <ConfirmDialog
                 open={confirmingRestartNow() && restart().error === undefined}
                 initialFocus="cancel"
+                tone="default"
+                icon={<RotateCcw />}
                 title={t("update.idleRestart.restartNowTitle")}
                 description={t("update.idleRestart.restartNowDescription")}
                 confirmLabel={t("update.idleRestart.restartNow")}
