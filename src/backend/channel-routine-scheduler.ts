@@ -196,14 +196,14 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       for (const due of pending) {
         if (!active()) break;
         if (this.#excluded().has(due.routine.channelId)) continue;
-        const scheduledFor = yield* channelRoutineStep(() => {
+        const fire = yield* channelRoutineStep(() => {
           const current = this.#routines.get(due.routine.channelId, due.routine.id);
           if (!current?.active || current.trigger.id !== due.triggerId || current.trigger.nextRunAt !== due.nextRunAt)
             return null;
           changed.add(due.routine.channelId);
           if (due.schedule.kind === "once") {
             this.#routines.completeTrigger(due.routine.id, due.triggerId, now);
-            return this.#skipReason(current) ? null : due.nextRunAt;
+            return this.#skipReason(current) ? null : { routine: current, scheduledFor: due.nextRunAt };
           }
           const occurrence = collapseMissedOccurrences(
             current.trigger.schedule,
@@ -223,10 +223,10 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
             return null;
           }
           this.#routines.advanceTrigger(due.routine.id, due.triggerId, occurrence.nextRunAt.toISOString());
-          return occurrence.scheduledFor.toISOString();
+          return { routine: current, scheduledFor: occurrence.scheduledFor.toISOString() };
         });
-        if (!scheduledFor) continue;
-        yield* this.#fireEffect(due.routine, due.triggerId, scheduledFor);
+        if (!fire) continue;
+        yield* this.#fireEffect(fire.routine, due.triggerId, fire.scheduledFor);
       }
     }).pipe(
       Effect.ensuring(
