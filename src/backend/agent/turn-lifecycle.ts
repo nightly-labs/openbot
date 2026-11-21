@@ -191,6 +191,11 @@ function isRefusedGeminiToken(provider: string | undefined, message: string): bo
 }
 
 const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable", "rate_limit"]);
+const POOL_PASS_OVER_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "usage_limit",
+  "provider_unavailable",
+  "authentication",
+]);
 
 const COMPACTION_RETRY_CAUSES: ReadonlySet<CauseCode> = new Set(["network", "timeout"]);
 
@@ -1643,7 +1648,7 @@ export class TurnLifecycle {
           agentId &&
           errorTurnId !== null &&
           this.#runningTurns.has(errorTurnId) &&
-          (context.causeCode === "usage_limit" || context.causeCode === "provider_unavailable") &&
+          POOL_PASS_OVER_CAUSES.has(context.causeCode) &&
           this.#hooks.poolHasOtherAccount(agentId)
         )
           this.#markFailed(agentId, context.model, { message, context });
