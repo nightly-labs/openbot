@@ -1,6 +1,7 @@
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
+import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { feedbackApproval } from "@openbot/team-client/feedback-approval";
@@ -232,7 +233,7 @@ export function ConversationTimeline() {
   const readAloudAction = (message: AgentMessage) => {
     const agentId = props.agent?.id;
     if (props.runtime || !agentId || message.author !== "agent" || message.streaming || !message.body.trim()) return;
-    if (!speechModelReady()) return;
+    if (!speechModelReady() || !speechTextFromMarkdown(message.body)) return;
     return {
       reading: speechReading()?.messageId === message.id,
       onToggle: () =>

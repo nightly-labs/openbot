@@ -51,6 +51,7 @@ interface Reading {
   played: AudioBuffer[];
   lastPartAsked: boolean;
   askNext: (() => void) | undefined;
+  failure: Error | undefined;
 }
 
 interface SpokenPart {
@@ -331,6 +332,7 @@ export async function readAloud(
       result.firstAudioMs ??= Math.round(performance.now() - calledAt);
       result.seconds += seconds;
       await play(own, audio);
+      if (own.failure) throw own.failure;
       if (own.stopped) return result;
     }
     const messageId = source?.messageId;
@@ -448,6 +450,7 @@ function newReading(reply: boolean, agent: SpeechAgent | null = null): Reading {
     played: [],
     lastPartAsked: false,
     askNext: undefined,
+    failure: undefined,
   };
   reading = own;
   return own;
@@ -502,8 +505,9 @@ async function playBuffer(own: Reading, buffer: AudioBuffer, offset = 0): Promis
       resolve();
     };
     const failed = () => {
+      const cause = element.error;
       finish();
-      end(own);
+      fail(own, cause);
     };
     element.addEventListener("ended", finish);
     element.addEventListener("error", failed);
@@ -515,9 +519,14 @@ async function playBuffer(own: Reading, buffer: AudioBuffer, offset = 0): Promis
 
 function startElement(own: Reading, element: HTMLAudioElement): void {
   element.play().catch((error: unknown) => {
-    if (error instanceof DOMException && error.name === "AbortError") return;
-    end(own);
+    if (own.stopped || (error instanceof DOMException && error.name === "AbortError")) return;
+    fail(own, error);
   });
+}
+
+function fail(own: Reading, cause: unknown): void {
+  own.failure ??= new Error("", { cause });
+  end(own);
 }
 
 function wavFile(buffer: AudioBuffer): ArrayBuffer {
