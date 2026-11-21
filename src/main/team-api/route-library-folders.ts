@@ -36,16 +36,19 @@ function visibleLibraryFolders(
   };
 }
 
-function withoutHiddenWorkflowFiles(
+async function withoutHiddenWorkflowFiles(
   snapshot: LibraryFoldersSnapshot,
   workflowFiles: ReadonlyMap<string, { id: string }>,
-  workflowIds: ReadonlySet<string>,
-): LibraryFoldersSnapshot {
+  workflowIds: () => Promise<ReadonlySet<string>>,
+): Promise<LibraryFoldersSnapshot> {
+  const placed = Object.keys(snapshot.placement).filter((fileId) => workflowFiles.has(fileId));
+  if (placed.length === 0) return snapshot;
+  const shown = await workflowIds();
   const hidden = (fileId: string) => {
     const workflow = workflowFiles.get(fileId);
-    return workflow !== undefined && !workflowIds.has(workflow.id);
+    return workflow !== undefined && !shown.has(workflow.id);
   };
-  if (!Object.keys(snapshot.placement).some(hidden)) return snapshot;
+  if (!placed.some(hidden)) return snapshot;
   return {
     ...snapshot,
     placement: Object.fromEntries(Object.entries(snapshot.placement).filter(([fileId]) => !hidden(fileId))),
@@ -78,18 +81,26 @@ export async function routeLibraryFolders(
   if (!libraryFolders || !capabilities.has(LIBRARY_FOLDERS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.libraryFoldersUnsupported"));
   const body = await readJson(request);
-  const shownWorkflows = await workflowIds();
-  const visible = async (snapshot: LibraryFoldersSnapshot) =>
-    withoutHiddenWorkflowFiles(
-      visibleLibraryFolders(snapshot, hiddenAgentIds, canAdministerServer(member.role) ? null : agentIds()),
-      await runCauseEffect(libraryFolders.workflowFiles()),
-      shownWorkflows,
+  let shownWorkflows: Promise<ReadonlySet<string>> | undefined;
+  const shown = () => {
+    shownWorkflows ??= workflowIds();
+    return shownWorkflows;
+  };
+  const visible = async (snapshot: LibraryFoldersSnapshot) => {
+    const folders = visibleLibraryFolders(
+      snapshot,
+      hiddenAgentIds,
+      canAdministerServer(member.role) ? null : agentIds(),
     );
+    if (Object.keys(folders.placement).length === 0) return folders;
+    return withoutHiddenWorkflowFiles(folders, await runCauseEffect(libraryFolders.workflowFiles()), shown);
+  };
   if (url.pathname === LIBRARY_FOLDERS_ROUTES.read) return json(200, await visible(libraryFolders.snapshot()));
   const action = parseLibraryFolderAction(body);
+  const visibleWorkflows = await shown();
   try {
     const snapshot = await runCauseEffect(
-      libraryFolders.change(action, (agents) => requireFolderAccess(context, agents, hiddenAgentIds, shownWorkflows)),
+      libraryFolders.change(action, (agents) => requireFolderAccess(context, agents, hiddenAgentIds, visibleWorkflows)),
     );
     return json(200, await visible(snapshot));
   } catch (error) {

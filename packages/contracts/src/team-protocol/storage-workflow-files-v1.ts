@@ -41,14 +41,20 @@ export function withStorageWorkflowFiles(
   if (!isDynamicRecord(projected) || !isDynamicRecord(source)) return projected;
   const files = projected.files;
   const sourceFiles = source.files;
-  if (!Array.isArray(files) || !Array.isArray(sourceFiles) || files.length !== sourceFiles.length) return projected;
+  if (!Array.isArray(files) || !Array.isArray(sourceFiles)) return projected;
+  const workflows = new Map<unknown, unknown>(
+    sourceFiles.flatMap((sourceFile) =>
+      isDynamicRecord(sourceFile) && sourceFile.workflow !== undefined
+        ? [[sourceFile.id, sourceFile.workflow] as const]
+        : [],
+    ),
+  );
+  if (workflows.size === 0) return projected;
   return {
     ...projected,
-    files: files.map((file, index): TeamProtocolV2Json => {
-      const sourceFile = sourceFiles[index];
-      if (!isDynamicRecord(file) || !isDynamicRecord(sourceFile) || sourceFile.workflow === undefined) return file;
-      if (sourceFile.id !== file.id) invalid();
-      return { ...file, workflow: workflow(sourceFile.workflow) };
+    files: files.map((file): TeamProtocolV2Json => {
+      const tag = isDynamicRecord(file) ? workflows.get(file.id) : undefined;
+      return tag === undefined || !isDynamicRecord(file) ? file : { ...file, workflow: workflow(tag) };
     }),
   };
 }

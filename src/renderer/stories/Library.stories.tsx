@@ -134,7 +134,11 @@ const TEAM_FILES: readonly StoredFileRow[] = [
 ];
 
 const FOLDER_AGENTS = new Set(TEAM_AGENTS.map((agent) => agent.id));
-const FILE_AGENTS = new Map(TEAM_FILES.map((file) => [file.id, file.agentId] as const));
+const FILE_AGENTS = new Map(
+  [...TEAM_FILES, ...FILES_WORKFLOW_ROWS].flatMap((file) =>
+    file.agentId === null && file.workflow === undefined ? [] : [[file.id, file.agentId] as const],
+  ),
+);
 
 const FAVORITES = ["folder-launch", "agent:research"];
 

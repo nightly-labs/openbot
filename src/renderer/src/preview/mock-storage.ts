@@ -4,6 +4,7 @@ import {
   type GetStorageUsageInput,
   type StorageDesktopApi,
   type StorageUsage,
+  type StoredFileRow,
 } from "@openbot/contracts/ipc";
 import {
   FILES_AGENT_USAGE,
@@ -17,6 +18,10 @@ import {
 
 const GB = 1024 ** 3;
 const FREE_BYTES = 182 * GB;
+
+function placeableAgent(file: StoredFileRow | undefined): string | null | undefined {
+  return file?.agentId === null && file.workflow === undefined ? undefined : file?.agentId;
+}
 
 export function createMockStorage(onFoldersChanged: () => void = () => undefined): StorageDesktopApi {
   let files = structuredClone([...FILES_ROWS, ...FILES_WORKFLOW_ROWS]);
@@ -74,7 +79,7 @@ export function createMockStorage(onFoldersChanged: () => void = () => undefined
     changeLibraryFolders: async (action) => {
       libraryFolders = applyLibraryFolderAction(libraryFolders, action, {
         agentIds: { has: () => true },
-        fileAgent: (fileId) => files.find((file) => file.id === fileId)?.agentId,
+        fileAgent: (fileId) => placeableAgent(files.find((file) => file.id === fileId)),
       });
       onFoldersChanged();
       return structuredClone(libraryFolders);

@@ -112,6 +112,7 @@ function placeableAgent(known: KnownFiles, fileId: string): string | null | unde
 }
 
 const NO_FILES: KnownFiles = { at: 0, agents: new Map(), workflows: new Map() };
+const KEPT_FILES_MS = 60_000;
 
 export class LibraryFoldersService {
   readonly #sources: LibraryFoldersSources;
@@ -164,6 +165,7 @@ export class LibraryFoldersService {
       const agents = new Map(known.agents);
       const workflows = new Map(known.workflows);
       for (const fileId of fileIds) {
+        this.#unscanned.delete(fileId);
         agents.delete(fileId);
         workflows.delete(fileId);
       }
@@ -185,6 +187,8 @@ export class LibraryFoldersService {
   }
 
   #known: KnownFiles | null = null;
+  #keptAt = 0;
+  readonly #unscanned = new Set<string>();
 
   readonly #lookUp = Effect.fn("LibraryFolders.fileAgents")(function* (
     this: LibraryFoldersService,
@@ -193,9 +197,13 @@ export class LibraryFoldersService {
   ) {
     const missing = (known: KnownFiles) =>
       files.some(
-        (file) => !known.agents.has(file.id) && (file.storedAt === null || Date.parse(file.storedAt) >= known.at),
+        (file) =>
+          !known.agents.has(file.id) &&
+          !this.#unscanned.has(file.id) &&
+          (file.storedAt === null || Date.parse(file.storedAt) >= known.at),
       );
-    if (useKept && this.#known && !missing(this.#known)) return this.#known;
+    const fresh = Date.now() - this.#keptAt < KEPT_FILES_MS;
+    if (useKept && fresh && this.#known && !missing(this.#known)) return this.#known;
     const scan = () =>
       this.#sources.storage.usage({ scope: "host" }).pipe(
         Effect.map((usage) => {
@@ -205,12 +213,15 @@ export class LibraryFoldersService {
             workflows: new Map(usage.files.flatMap((file) => (file.workflow ? [[file.id, file.workflow]] : []))),
           };
           this.#known = known;
+          this.#keptAt = Date.now();
           return known;
         }),
       );
     const known = yield* scan();
     if (!missing(known)) return known;
     this.#sources.storage.invalidate();
-    return yield* scan();
+    const rescanned = yield* scan();
+    for (const file of files) if (!rescanned.agents.has(file.id)) this.#unscanned.add(file.id);
+    return rescanned;
   }).bind(this);
 }
