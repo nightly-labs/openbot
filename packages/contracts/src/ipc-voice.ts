@@ -5,8 +5,8 @@ export const VOICE_AUDIO_LIMITS = {
   sampleRate: 16_000,
   channels: 1,
   bitsPerSample: 16,
-  maximumSeconds: 120,
-  maximumWavBytes: 3_840_044,
+  maximumSeconds: 600,
+  maximumWavBytes: 19_200_044,
   maximumRecordingBytes: 1_048_576,
 } as const;
 

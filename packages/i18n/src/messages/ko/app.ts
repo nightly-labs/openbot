@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "{name}을(를) 다시 시작할 수 없어요",
   "app.provider.included": "{name}은(는) OpenBot에 포함돼 있어요.",
   "app.clipboard.copyFailed": "텍스트를 복사할 수 없어요.",
-  "app.voice.tooLong": "음성 녹음은 2분까지 가능해요.",
+  "app.voice.tooLong": "음성 녹음은 10분까지 가능해요.",
   "app.avatar.type": "PNG, JPEG, GIF 또는 WebP 이미지를 선택해 주세요.",
   "app.avatar.size": "10 MB보다 작은 이미지를 선택해 주세요.",
   "app.avatar.processingUnavailable": "이미지를 처리할 수 없어요.",
