@@ -63,7 +63,7 @@ export const routineScheduleZodSchema = z
   .describe("Routine schedule. Weekdays use 0 for Sunday through 6 for Saturday; clock values use HH:mm local time.");
 
 export const ROUTINE_INSTRUCTION_RULE =
-  "Each run starts a new session that sees only the newest chat messages, so write an instruction that a reader with no chat can follow. Name the service and the tool to use, such as openbot_browser for a website with the site and its signed-in tab, or the MCP tool or teammate. Also name the account, the steps, what to report and where, and when to report nothing. Do not write 'as before' or refer to the chat. A run cannot create, change, or delete routines; it can only pause its own routine when its task says to stop. So do not put a routine change in the instruction: make the routines now, or tell the user that a run cannot make them.";
+  "Each run starts a new session that sees only the newest chat messages, so write an instruction that a reader with no chat can follow. Name the service and the tool to use, such as openbot_browser for a website with the site and its signed-in tab, or the MCP tool or teammate. Also name the account, the steps, what to report and where, and when to report nothing. Do not write 'as before' or refer to the chat. A run cannot create, change, or delete routines; a timed run of an agent's own routine can still pause that routine when its task says to stop. So do not put a routine change in the instruction: make the routines now, or tell the user that a run cannot make them.";
 
 export const routineInstructionZodSchema = z
   .string()
