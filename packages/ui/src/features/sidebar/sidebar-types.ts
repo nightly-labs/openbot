@@ -133,6 +133,8 @@ export interface SidebarAgentThreads {
   load: (agentId: string) => void;
   onOpen: (agentId: string, threadId: string) => void;
   onNew?: ((agentId: string) => void) | undefined;
+  onArchive?: ((agentId: string, threadId: string) => void) | undefined;
+  onDelete?: ((agentId: string, threadId: string) => void) | undefined;
 }
 
 export interface SidebarChatHistory {
