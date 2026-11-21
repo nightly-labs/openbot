@@ -287,6 +287,7 @@ export function createWebWorkspace(
   });
   const [stepLines, setStepLines] = createSignal<TurnStepLines>({});
   let generation = 0;
+  let restartCapable = false;
   let selectedId: string | null = null;
   let hostId: string | null = null;
   let disposed = false;
@@ -487,12 +488,14 @@ export function createWebWorkspace(
       hostTaken(id) {
         if (disposed || id !== hostId) return;
         generation += 1;
+        restartCapable = false;
         hostLifecycle.endSleep();
         recoveryBlocked = true;
         recovery.suspend();
         setState((draft) => {
           draft.otherTab = true;
           draft.status = "offline";
+          draft.restartReady = false;
           draft.connectionError = null;
         });
       },
@@ -503,7 +506,7 @@ export function createWebWorkspace(
           (update.state === "offline" || update.hostOffline === true) && !update.code && !state.hostRestart;
         setState((draft) => {
           if (update.state !== "online") draft.status = update.state;
-          if (update.state !== "online") draft.restartReady = false;
+          draft.restartReady = update.state === "online" && restartCapable;
           if (update.state !== "online") syncedAt = 0;
           if (update.hostOffline) draft.hostOffline = true;
           else if (update.state !== "connecting") draft.hostOffline = false;
@@ -1160,9 +1163,11 @@ export function createWebWorkspace(
       deleteCachedWorkflows(hostId);
     }
     generation += 1;
+    restartCapable = false;
     selectedId = null;
     setState((draft) => {
       draft.revocationRevision += 1;
+      draft.restartReady = false;
       draft.workspaceLoaded = false;
       draft.synced = false;
       draft.agents = [];
@@ -1271,6 +1276,7 @@ export function createWebWorkspace(
     writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
     if (!sameHost) hostLifecycle.endSleep();
+    if (!sameHost) restartCapable = false;
     setState((draft) => {
       draft.host = host;
       draft.recovery = null;
@@ -1369,10 +1375,12 @@ export function createWebWorkspace(
       }
       const capabilities = await connecting;
       markRemoteSync("connected");
-      if (!disposed && current === generation)
+      if (!disposed && current === generation) {
+        restartCapable = capabilities.includes(HOST_RESTART_CAPABILITY);
         setState((draft) => {
-          draft.restartReady = capabilities.includes(HOST_RESTART_CAPABILITY);
+          draft.restartReady = restartCapable;
         });
+      }
       const [agents, agentStatus, models] = await (early.gate ?? readGate());
       if (disposed || current !== generation) return;
       revokedReconnect = false;
