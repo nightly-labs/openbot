@@ -524,6 +524,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             `Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report, so do not call the ${ROUTINE_NO_UPDATE_TOOL} tool after a pause.`,
           ]
         : ["Do not create, update, delete, or test routines during this run."]),
+      `When the task asks for a routine change that this run cannot make, do not stop: do the rest of the task, then call the ${ROUTINE_REPORT_FAILURE_TOOL} tool and tell the user to ask you for that change in a chat.`,
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
       ...(sources.skippedRoutineRuns ? [skippedRoutineRunsNote(sources.skippedRoutineRuns)] : []),
       "Nobody answers you during this run. Do all of the task in this turn: do not stop after a step to report progress or to ask whether to continue.",
