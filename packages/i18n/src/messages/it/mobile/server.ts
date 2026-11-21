@@ -608,6 +608,17 @@ export const messages = {
   "mobile.server.browserProxies.choiceHint":
     "«Automatico» usa le impostazioni proxy del computer su cui gira il server. Una modifica chiude le schede aperte del profilo.",
   "mobile.server.browserProxies.shareHint": "Per usare il tuo computer, condividilo nell'app desktop di OpenBot.",
+  "mobile.server.vault.agents": "Agenti",
+  "mobile.server.vault.agentsAll": "Tutti gli agenti",
+  "mobile.server.vault.agentsAllHint": "«Tutti gli agenti» include anche ogni agente aggiunto in seguito.",
+  "mobile.server.vault.agentsNone": "Scegli almeno un agente.",
+  "mobile.server.vault.agentsSome": "{chosen} di {total}",
+  "mobile.server.vault.agentsListed": "Agenti: {agents}",
+  "mobile.server.vault.searchAgents": "Cerca agenti",
+  "mobile.server.vault.noAgentMatches": "Nessun agente corrisponde a questa ricerca.",
+  "mobile.server.vault.agentOptions": "Opzioni",
+  "mobile.server.vault.selectAll": "Seleziona tutti",
+  "mobile.server.vault.deselectAll": "Deseleziona tutti",
   "mobile.server.route.connectors": "Connettori",
   "mobile.server.connectors.unavailable":
     "Connettiti a questo server come proprietario o amministratore per gestirne i connettori.",
