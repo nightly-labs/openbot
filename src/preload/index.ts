@@ -1564,6 +1564,7 @@ const openbotApi: OpenBotDesktopApi = {
     cancelScheduledRestart: decodeUpdateStatus,
     restartWhenIdle: decodeUpdateStatus,
     cancelIdleRestart: decodeUpdateStatus,
+    restartNow: decodeUpdateStatus,
     event: decodeUpdateStatus,
     preference: decodeUpdatePreference,
   }),

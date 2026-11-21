@@ -3567,6 +3567,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emit(updateListeners, updateStatus);
         return clone(updateStatus);
       },
+      restartNow: async () => {
+        const { idleRestart: _restarted, ...rest } = updateStatus;
+        updateStatus = rest;
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
       onEvent: (listener) => {
         updateListeners.add(listener);
         return () => updateListeners.delete(listener);
