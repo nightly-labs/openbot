@@ -377,6 +377,7 @@ interface ActiveTurn {
   lastActivityAt: number;
   stalled: boolean;
   hostRequests: number;
+  personRequests: number;
   stopRequested: boolean;
 }
 
@@ -850,6 +851,21 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           if (!turn) return;
           turn.hostRequests -= 1;
           turn.lastActivityAt = Date.now();
+        }),
+    );
+  }
+
+  #awaitPerson<A, E, R>(threadId: string, request: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> {
+    return Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const turn = this.#threads.get(threadId)?.activeTurn ?? null;
+        if (turn) turn.personRequests += 1;
+        return turn;
+      }),
+      () => this.#awaitHost(threadId, request),
+      (turn) =>
+        Effect.sync(() => {
+          if (turn) turn.personRequests -= 1;
         }),
     );
   }
@@ -1638,6 +1654,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       lastActivityAt: Date.now(),
       stalled: false,
       hostRequests: 0,
+      personRequests: 0,
       stopRequested: false,
     };
     const continues =
@@ -1690,7 +1707,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const messageId = promptUuid(runtime, clientId);
     takePrompt(runtime, messageId);
     runtime.activeTurn.messageIds.add(messageId);
-    const stopsRunningTools = runtime.activeTurn.toolCalls.size > 0;
+    const stopsRunningTools = runtime.activeTurn.toolCalls.size > 0 && runtime.activeTurn.personRequests === 0;
     if (stopsRunningTools) runtime.activeTurn.untakenSteerIds.add(messageId);
     runtime.input.push({
       type: "user",
@@ -2726,7 +2743,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       options: Array.isArray(question.options) ? question.options : undefined,
       ...(question.multiSelect === true ? { multiSelect: true } : {}),
     }));
-    const result = yield* this.#awaitHost(
+    const result = yield* this.#awaitPerson(
       threadId,
       this.#serverRequests.call("item/tool/requestUserInput", {
         threadId,
@@ -2753,7 +2770,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     request: Parameters<OnElicitation>[0],
     signal: AbortSignal,
   ): Effect.fn.Return<ElicitationResult> {
-    const result = yield* this.#awaitHost(
+    const result = yield* this.#awaitPerson(
       threadId,
       this.#serverRequests.call(
         "mcpServer/elicitation/request",
@@ -2788,7 +2805,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     toolInput: DynamicRecord,
     toolUseId: string,
   ): Effect.fn.Return<PermissionResult, ProviderClientOperationError> {
-    const result = yield* this.#awaitHost(
+    const result = yield* this.#awaitPerson(
       threadId,
       this.#serverRequests.call("item/fileChange/requestApproval", {
         threadId,

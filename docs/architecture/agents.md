@@ -1061,9 +1061,12 @@ it moves a running shell command to the background and stops other tools, a suba
 starts a new turn with the steer. The aborted result does not list the steer's uuid
 (`untakenSteerIds`), so the client closes the open tool calls and keeps the OpenBot turn open. The
 result of the steer's turn completes it. A stop from the person (`stopRequested`) still ends the turn
-as interrupted. A shell command that runs one script cannot change its plan: the steer reaches the
-model when the script is done. `scripts/claude-steer-now-e2e.ts` checks the turn with a stand-in CLI,
-and `scripts/steer-framing-bench.ts` measures the real CLIs.
+as interrupted. While a question, an elicitation or a write approval waits for the person
+(`personRequests`), the steer has no priority: the open card stays the one that Claude waits for, and
+the steer arrives after the answer. A shell command that runs one script cannot change its plan: the
+steer reaches the model when the script is done. `scripts/claude-steer-now-e2e.ts` checks the turn
+with a stand-in CLI, `scripts/question-steer-order-e2e.ts` checks the order during a question, and
+`scripts/steer-framing-bench.ts` measures the real CLIs.
 
 A message from another agent follows the recipient's busy-message mode, as a message from the person
 does: a request, an answer, a requested result, or a notice. When the mode is "steer", the provider
