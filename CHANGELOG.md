@@ -6,6 +6,29 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.76.1] - 2026-11-21
+
+### Added
+
+- Word documents (`.docx`) open in the file preview, with headings, lists, tables, and bold, italic,
+  underlined and struck text. Before, they opened only in another app.
+- The Files panel of a chat has a "Workspace folder" row at the top. It opens the workspace of the
+  agent, so you can see the files that are already in it. In a channel, select the agent whose
+  workspace you want to open. This also works on a joined server and in the web client.
+- Open the agent browser in its own window from the browser page menu. Move the window to a second
+  monitor and keep the chats on the main monitor. The window has tabs and an address bar, and it
+  opens again on the same monitor. "Reattach browser" moves the browser back to the chat window.
+
+### Fixed
+
+- Stop now ends a Claude agent's turn that shows "working" while Claude no longer runs it. Before, Stop did
+  nothing in this state: the agent stayed "working" for hours, and its new messages stayed in the queue
+  until OpenBot restarted. Now the turn ends as stopped, and the queued messages start. When the agent runs
+  on a joined server, the server must also be on this version.
+- On Linux, OpenBot uses the GPU again when an earlier version turned it off by mistake after a
+  reboot or a GPU reset. Before, OpenBot stayed slow and used much CPU, and on Wayland it also
+  started on XWayland, until you deleted `~/.config/OpenBot/gpu-crash.json` by hand.
+
 ## [0.76.0] - 2026-11-21
 
 ### Added
