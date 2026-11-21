@@ -5255,7 +5255,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #liveVoiceAccountId(agent: Pick<AgentSummary, "provider" | "providerAccountId"> | undefined): string | undefined {
-    return this.#providers.liveVoiceAccount() ?? (agent?.provider === "codex" ? agent.providerAccountId : undefined);
+    const agentAccount = agent?.provider === "codex" ? agent.providerAccountId : undefined;
+    const ownAccount = agentAccount === DEFAULT_PROVIDER_ACCOUNT_ID ? undefined : agentAccount;
+    return (
+      this.#providers.liveVoiceAccount() ?? ownAccount ?? this.#providers.codexPlanAccountInPlaceOfKey() ?? agentAccount
+    );
   }
 
   providerUsageResets(provider: AgentProvider): Effect.Effect<ProviderUsageResets[]> {
