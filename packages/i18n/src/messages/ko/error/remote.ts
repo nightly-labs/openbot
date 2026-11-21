@@ -23,6 +23,8 @@ export const messages = {
     "호스트에서 OpenBot의 화면 녹화를 허용하지 않았어요. 호스트에서 화면 녹화 권한을 허용한 다음 다시 시도해 주세요.",
   "error.remote.windowsSessionDisconnected":
     "호스트의 Windows 세션 연결이 끊겨 공유할 화면이 없어요. 호스트 화면에서 Windows에 로그인한 다음 다시 시도해 주세요.",
+  "error.remote.windowsCaptureDenied":
+    "호스트의 Windows가 OpenBot의 화면 녹화를 허용하지 않아요. 호스트 화면에서 Windows 잠금을 해제하고 관리자 확인 창을 모두 닫은 다음 다시 시도해 주세요. 계속 문제가 생기면 호스트를 다시 시작해 주세요.",
   "error.remote.macScreenLocked":
     "Mac이 잠겨 있어 화면을 공유할 수 없어요. Mac 화면에서 잠금을 해제한 다음 다시 시도해 주세요.",
   "error.remote.streamTooSlowLowerQuality":
