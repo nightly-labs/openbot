@@ -17,7 +17,7 @@ export const messages = {
   "error.remote.sessionCapacity": "L'host ha già quattro sessioni attive.",
   "error.remote.linuxNeedsX11": "Il desktop remoto su Linux richiede una sessione X11. Wayland non è supportato.",
   "error.remote.runtimeMissing":
-    "Il runtime di Sunshine e Moonlight Web manca o non è supportato su questo host. Installa la versione completa di OpenBot su un Mac, un host Windows x64 o un host Linux x64, poi riavvia OpenBot.",
+    "Il runtime di Sunshine e Moonlight Web manca o non è supportato su questo host. Installa la versione completa di OpenBot su un Mac, un host Windows x64 o un host Linux, poi riavvia OpenBot.",
   "error.remote.testActive": "Un test del desktop remoto è in corso. Riprova quando finisce.",
   "error.remote.screenRecordingDenied":
     "L'host non ha consentito a OpenBot di registrare lo schermo. Concedi la registrazione dello schermo sull'host, poi riprova.",
