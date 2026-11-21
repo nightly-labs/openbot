@@ -9,10 +9,20 @@ the fork so the case stays reproducible when upstream releases move on.
 
 ## Host
 
-- POCO X7 Pro (MediaTek Dimensity 8400-Ultra, 12 GB RAM, Android 17, ColorOS 17).
-- Packaged Linux arm64 build, `OPENBOT_SERVER=1`, `xvfb-run` (1280x800), started from
-  Android's init through an Arch Linux ARM chroot at `/data/arch`, uid 0.
-- UI is the Android app (`run.openbot.mobile`); no monitor, no desktop window.
+- POCO X7 Pro — global model `2412DPC0AG`, codename `rodin`, sold in China as
+  **Redmi Turbo 4** (this is the "Redmi" in the family). MediaTek Dimensity
+  8400-Ultra / MT6899, 8 cores, ARM Mali-G720 MC7.
+- 12 GB marketed / **10 GiB visible** in the chroot, 480 GB UFS, Android 17 (SDK 37),
+  build `CPH2873_17.0.0.110`, kernel `6.6.142-EVONIX-COS-O+-V4.5`, ColorOS 17
+  "TheLastBloom" (port by @NEESCHAL_3, flashed 2026-11-12).
+- Root: KernelSU Next v3.4.2 + SUSFS, manager `com.rifsxd.ksunext`. **Real chroot**,
+  not proot: Arch Linux ARM at `/data/arch` (f2fs), started from Android's init by a
+  KernelSU `service.d` script. The agent shell runs as uid 2000 (`deivi`) with
+  `CapEff=0`; root lives on the Android side via `su -c`.
+- Packaged Linux arm64 build of 0.75.0, `OPENBOT_SERVER=1`, `xvfb-run` (1280x800)
+  plus a second Xvfb for the agent browser (`OPENBOT_AGENT_DISPLAY`), started from
+  the chroot. UI is the Android app (`run.openbot.mobile`); no monitor, no desktop
+  window.
 
 Running this from native Termux would add a resident shell and its own runtime on top,
 so the packaged path above is the lighter of the two on this device. The numbers below

@@ -13,13 +13,17 @@ Bun for dev scripts, tests and checks; Electron is used for the shipped build).
 
 ## Reference host (the case this is designed for)
 
-- POCO X7 Pro / `rodin` (global model `2412DPC0AG`, China name Redmi Turbo 4),
-  MediaTek Dimensity 8400-Ultra / MT6899, 8 cores.
-- Android 17, ColorOS 17 "TheLastBloom" (port by @NEESCHAL_3), KernelSU Next.
-- 10 GiB RAM visible in the chroot (12 GB marketed), zram 12 GiB lz4 priority 100,
-  no writeback device; `MemAvailable` 1.5 GiB before zram, 3.4-3.7 GiB after.
-- Arch Linux ARM chroot at `/data/arch`, started from Android's init through a KernelSU
-  `service.d` script; OpenBot runs as `OPENBOT_SERVER=1` under `xvfb-run` today.
+- POCO X7 Pro / `rodin` — global model `2412DPC0AG`, sold in China as **Redmi Turbo 4**;
+  Dimensity 8400-Ultra / MT6899, 8 cores, Mali-G720 MC7.
+- Android 17 (SDK 37), build `CPH2873_17.0.0.110`, ColorOS 17 "TheLastBloom" (port by
+  @NEESCHAL_3), kernel `6.6.142-EVONIX-COS-O+-V4.5`; KernelSU Next v3.4.2 + SUSFS.
+- 10 GiB RAM visible in the chroot (12 GB marketed), 480 GB UFS; zram 12 GiB lz4
+  priority 100, no writeback device; `MemAvailable` 1.5 GiB before zram,
+  3.4-3.7 GiB after.
+- **Real chroot**, not proot: Arch Linux ARM at `/data/arch` (f2fs), started from
+  Android's init via a KernelSU `service.d` script. Agent shell is uid 2000 (`deivi`)
+  with `CapEff=0`; root is on the Android side via `su -c`. OpenBot runs as
+  `OPENBOT_SERVER=1` under two Xvfb displays (`xvfb-run` + `OPENBOT_AGENT_DISPLAY`).
 - Packaged arm64 build of 0.75.0. Native Termux would be heavier: it adds a resident shell
   and its own runtime on top of the server.
 
