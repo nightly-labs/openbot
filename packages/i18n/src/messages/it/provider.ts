@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "Installa {name}",
   "provider.aria.signIn": "Accedi a {name}",
   "provider.aria.codeFallback": "Accedi a {name} con un codice",
+  "provider.aria.addressFallback": "Incolla l’indirizzo di accesso per {name}",
   "provider.aria.moreActions": "Altre azioni per {name}",
 
   "provider.aria.use": "Usa {name} in OpenBot",
@@ -92,6 +93,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "In attesa. Questo accesso si interrompe tra {time}.",
   "provider.codeLogin.linkTitle": "Accedi a {name} su un altro dispositivo",
   "provider.codeLogin.pageTitle": "Accedi a {name}",
+  "provider.codeLogin.addressDescription":
+    "Completa l’accesso nel browser. Questa finestra si chiude quando l’accesso è completato.",
   "provider.codeLogin.pageDescription": "Questa pagina è aperta nel browser su {host}. Accedi da qui.",
   "provider.codeLogin.relayStarting": "Avvio dell'accesso a {name} su {host}…",
   "provider.codeLogin.pageOpening": "Apertura della pagina di accesso di {name} su {host}…",

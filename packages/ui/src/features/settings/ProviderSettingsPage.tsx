@@ -1407,11 +1407,16 @@ function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing
                 type="button"
                 variant="outline"
                 size="sm"
-                aria-label={t("provider.aria.codeFallback", { name: props.option.name })}
+                aria-label={t(
+                  row().alternative() === "address" ? "provider.aria.addressFallback" : "provider.aria.codeFallback",
+                  { name: props.option.name },
+                )}
                 disabled={props.disabled}
                 onClick={row().signInAlternative}
               >
-                {t("provider.action.signInWithCode")}
+                {t(
+                  row().alternative() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode",
+                )}
               </Button>
             </Show>
             <Show when={row().signingIn() && props.onCancelProviderSignIn}>

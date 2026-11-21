@@ -28,6 +28,7 @@ import { Effect } from "effect";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SignInRegion } from "../../backend/kimi-region";
+import type { LocalSignInPages } from "../local-sign-in-pages";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { parseProviderId } from "./app-inputs";
@@ -41,6 +42,7 @@ export interface ProviderIpcDependencies {
   providerRuntimes: ProviderRuntimeManager;
   credentials: ProviderCredentialStore;
   openLink: (url: string) => Promise<void>;
+  signInPages: Pick<LocalSignInPages, "opened" | "forget">;
 }
 
 export function providerIpcHandlers({
@@ -48,6 +50,7 @@ export function providerIpcHandlers({
   providerRuntimes,
   credentials,
   openLink,
+  signInPages,
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
   async function connect(provider: AgentProviderId, region: SignInRegion) {
     await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
@@ -57,6 +60,7 @@ export function providerIpcHandlers({
         async (value) => {
           const url = new URL(value);
           if (url.protocol !== "https:") throw new Error(sourceText("error.provider.httpsSignInLinkOnly"));
+          signInPages.opened(provider, url.toString());
           await openLink(url.toString());
         },
         region,
@@ -78,9 +82,10 @@ export function providerIpcHandlers({
         }
         return connect(provider, "mainland-cn");
       }),
-      cancelProviderSignIn: payloadHandler(parseProviderId, (provider) =>
-        runCauseEffect(service.cancelProviderSignIn(provider)),
-      ),
+      cancelProviderSignIn: payloadHandler(parseProviderId, (provider) => {
+        signInPages.forget(provider);
+        return runCauseEffect(service.cancelProviderSignIn(provider));
+      }),
       updateProviderCli: payloadHandler(parseManagedProviderId, async (provider) => {
         await runCauseEffect(providerRuntimes.downloadAndWait(provider));
         return service.getStatus();

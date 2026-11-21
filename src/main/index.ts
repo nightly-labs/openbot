@@ -701,6 +701,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
 function registerIpcHandlers({
   service,
   signInRelayClient,
+  localSignInPages,
   relayedMessagingInstalls,
   providerRuntimes,
   providerCredentials,
@@ -876,6 +877,7 @@ function registerIpcHandlers({
       providerRuntimes,
       credentials: providerCredentials,
       openLink,
+      signInPages: localSignInPages,
     }),
     ...voiceIpcHandlers({
       voice,
@@ -1028,6 +1030,7 @@ function registerIpcHandlers({
       customProviders: customProviderChanges,
       remoteServers,
       relay: signInRelayClient,
+      signInPages: localSignInPages,
     }),
     ...messagingIpcHandlers({
       messaging,

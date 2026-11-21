@@ -1,3 +1,4 @@
+import { browserAddressPasteSupported } from "@openbot/contracts/agent-providers";
 import { type AgentProviderId, agentProviderDescriptor, type ServerSummary } from "@openbot/contracts/ipc";
 import {
   hostSignInProviders,
@@ -6,9 +7,9 @@ import {
   serverCodeRouteProviders,
 } from "../servers/server-capabilities";
 
-export type ProviderSignInMethod = "browser" | "relay" | "host-page" | "code" | "use-app";
+export type ProviderSignInMethod = "browser" | "relay" | "host-page" | "code" | "use-app" | "address";
 
-export type ProviderCodeLoginMethod = Extract<ProviderSignInMethod, "relay" | "host-page" | "code">;
+export type ProviderCodeLoginMethod = Extract<ProviderSignInMethod, "relay" | "host-page" | "code" | "address">;
 
 export type ProviderConnectPlace =
   | { kind: "computer"; platform: string | undefined }
@@ -27,9 +28,10 @@ export function providerConnectRoute(
 ): ProviderConnectRoute {
   if (!place) return NO_ROUTE;
   if (place.kind === "computer") {
+    const address = place.platform !== undefined && browserAddressPasteSupported(provider, place.platform);
     return {
       connect: "browser",
-      alternative: localCodeSignInProviders(place.platform).includes(provider) ? "code" : null,
+      alternative: localCodeSignInProviders(place.platform).includes(provider) ? "code" : address ? "address" : null,
     };
   }
   const code = serverCodeRouteProviders(place.server).includes(provider);

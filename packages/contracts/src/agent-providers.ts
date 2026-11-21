@@ -602,6 +602,10 @@ export function pasteCodeSignInSupported(platform: string): boolean {
   return platform === "linux";
 }
 
+export function browserAddressPasteSupported(provider: AgentProviderId, platform: string): boolean {
+  return provider === "antigravity" && platform !== "win32";
+}
+
 export const CUSTOM_AGENT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
 const AGENT_IDS_RESERVED_AT_RELEASE = ["codex", "claude", "grok", "opencode", "antigravity", "acp", "custom"] as const;

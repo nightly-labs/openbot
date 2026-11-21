@@ -30,6 +30,7 @@ interface ProviderCodeLoginTarget {
   start: (provider: AgentProviderId) => Promise<ProviderCodeLoginStart>;
   submit?: (provider: AgentProviderId, code: string) => Promise<AgentStatus>;
   cancel: (provider: AgentProviderId) => Promise<AgentStatus>;
+  pasteAddress?: (provider: AgentProviderId, address: string) => Promise<void>;
   hostSignIn?: ProviderHostSignInTarget;
   relay?: ProviderRelayTarget;
   accountSignIn?: ProviderAccountSignInTarget;
@@ -114,14 +115,37 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   ): Promise<void> {
     if (method === "browser") return options.connectInBrowser?.(provider) ?? Promise.resolve();
     if (method === "use-app") setUseApp({ provider, opener });
+    else if (method === "address") openAddressPaste(provider, opener);
     else if (method === "relay" || method === "host-page" || method === "code")
       void startProviderCodeLogin(provider, method, opener);
     return Promise.resolve();
   }
 
+  function openAddressPaste(provider: AgentProviderId, opener: ProviderCodeLoginOpener | null): void {
+    codeLoginGeneration++;
+    clearCodeLoginExpiry();
+    codeLoginStarted = false;
+    codeLoginTarget = options.target();
+    codeLoginMethod = "address";
+    codeLoginAccount = undefined;
+    codeLoginAccountId = undefined;
+    setCodeLoginOpener(opener);
+    setCodeLoginProvider(provider);
+    setCodeLoginState({ phase: "address" });
+  }
+
+  async function pasteBrowserAddress(provider: AgentProviderId, address: string): Promise<void> {
+    const paste = codeLoginTarget?.pasteAddress;
+    if (!paste) throw new Error(currentText().t("error.mcp.relayEnded"));
+    const generation = codeLoginGeneration;
+    await paste(provider, address);
+    if (generation === codeLoginGeneration && codeLoginState().phase === "address")
+      setCodeLoginState({ phase: "verifying" });
+  }
+
   async function startProviderCodeLogin(
     provider: AgentProviderId,
-    method: ProviderCodeLoginMethod,
+    method: Exclude<ProviderCodeLoginMethod, "address">,
     opener: ProviderCodeLoginOpener | null,
     accountId?: string | null,
   ): Promise<void> {
@@ -391,7 +415,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     clearCodeLoginExpiry();
     setCodeLoginProvider(null);
     const target = codeLoginTarget;
-    if (!provider || !target) return;
+    if (!provider || !target || codeLoginMethod === "address") return;
     options.analytics?.drop(provider);
     if (codeLoginMethod === "code" && codeLoginAccount !== undefined) {
       const accountId = codeLoginAccountId;
@@ -437,15 +461,15 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
       actionToast.success(t("app.provider.connected", { name }), description ? { description } : {});
       return;
     }
-    const retry = {
-      label: t("app.provider.newCode"),
-      onClick: () => void startProviderCodeLogin(provider, method, opener, accountId),
-    };
+    const retry = (label: string) =>
+      method === "address"
+        ? {}
+        : { action: { label, onClick: () => void startProviderCodeLogin(provider, method, opener, accountId) } };
     if (outcome.kind === "expired") {
       actionToast.warning(t("app.provider.codeExpired", { name }), {
         ...{
           description: t("app.provider.codeExpiredDescription"),
-          action: retry,
+          ...retry(t("app.provider.newCode")),
         },
         report: { operation: "provider", source: "action", cause_code: "unknown" },
       });
@@ -454,7 +478,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     actionToast.error(t("app.provider.connectFailed", { name }), {
       ...{
         description: sourceText(outcome.message),
-        action: { ...retry, label: t("common.tryAgain") },
+        ...retry(t("common.tryAgain")),
       },
       report: { operation: "provider", source: "action", cause_code: "unknown" },
     });
@@ -501,6 +525,8 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   });
 
   const route = (provider: AgentProviderId) => providerConnectRoute(provider, options.place());
+  const signingIn = (provider: AgentProviderId) =>
+    options.agentStatus().providers?.find((row) => row.id === provider)?.connectionState === "connecting";
 
   return {
     connectKind: (provider) => {
@@ -510,6 +536,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     },
     alternativeKind: (provider) => {
       const alternative = route(provider).alternative;
+      if (alternative === "address") return signingIn(provider) ? "address" : null;
       return alternative === "code" ? "code" : alternative === "relay" ? "address" : null;
     },
     provider: codeLoginProvider,
@@ -538,6 +565,8 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
       return open ? open.relay.open(open.provider) : Promise.reject(new Error(currentText().t("error.mcp.relayEnded")));
     },
     pasteRelayAddress: (address) => {
+      const provider = codeLoginProvider();
+      if (provider && codeLoginState().phase === "address") return pasteBrowserAddress(provider, address);
       const open = openRelay();
       return open
         ? open.relay.paste(open.provider, address)
@@ -553,6 +582,7 @@ function isWaitingPhase(state: ProviderCodeLoginState): boolean {
     state.phase === "link" ||
     state.phase === "page" ||
     state.phase === "relay" ||
+    state.phase === "address" ||
     state.phase === "verifying"
   );
 }
