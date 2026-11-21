@@ -323,7 +323,30 @@ is the practical end state.
   `node_modules/electron/index.js` (original saved beside it); any `bun install`
   resets them, so re-apply from the README instructions.
 
-### What is already wired in this fork
+### Milestone 3 (2026-11-21 evening): the full agent stack under Bun
+
+The headless entry now runs the complete repository stack, measured live on the phone:
+
+- **AgentService (real)** with the opencode 2.2.5 binary the phone already runs in ACP
+  (`bundledExecutables`, `offProviders` = everything but opencode, the full HostMemory
+  contract with `subscribe`/`reserveTurn`): `agents=ready`, ACP process started, first
+  output in 660-846 ms, provider `available` listing **458 models**.
+- **OpenBotDatabase + AgentStore** (SQLite with WAL) and **MailboxStore** — real stores,
+  migrations at boot, roster on disk under the test userData.
+- **TeamStore** with a generated owner identity (`openbot-headless-owner.json`, 0600).
+- **TeamApiServer (real)** serving the team routes on `127.0.0.1` — the port is printed
+  at boot and appears in `/v1/status` as `apiUrl` with `server=online`.
+- Boot to control socket: **2.7-4.6 s** (the packaged host takes ~17 s to the same
+  point; its CLI waits 30 s — gate 5 now uses that reference). Process: **183 MB PSS**
+  with everything running, vs ~240 MB for the Electron main plus ~85 MB of Chromium
+  subprocesses. Latency p50 1.43 ms. 10/10 gates PASS.
+- Browser stub now implements the full `AgentBrowserHost` + TeamApiBrowser picks:
+  constructor-time subscriptions return unsubscribers (the AgentService boot requires
+  it), cleanups are no-ops, queries answer empty, actions refuse.
+
+Remaining for the app to see the agents: the WebRTC bridge (the server signs in and
+serves loopback, but the phone connects through the maintainer's signal network) and
+credentials for real model turns (`NO_PROVIDER_CREDENTIALS` is phase 1).
 
 `packages/server-headless/src/`:
 - `main.ts` — **milestone 2: runs the repository's own server code under Bun.**
