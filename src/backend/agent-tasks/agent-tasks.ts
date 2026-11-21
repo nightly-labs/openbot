@@ -670,7 +670,7 @@ export class AgentTasks implements TaskLanes {
     this: AgentTasks,
     task: AgentThreadRecord,
   ): Effect.fn.Return<void> {
-    const requestIds = this.#mailbox.requestsLeftByTask(task.agentId, task.taskId);
+    const requestIds = this.#requestsLeft(task);
     if (requestIds.length === 0) return;
     const queued = yield* this.#mailbox
       .enqueue({
@@ -710,13 +710,20 @@ export class AgentTasks implements TaskLanes {
       !task ||
       task.closedAt !== null ||
       this.#mailbox.taskAwaitsTeammate(task.agentId, taskId) ||
-      this.#mailbox.requestsLeftByTask(task.agentId, taskId).length === 0
+      this.#requestsLeft(task).length === 0
     )
       return;
     this.#store.setOutcome(taskId, "interrupted");
     this.changed(task.agentId);
     yield* this.releaseHeldRequests(task);
   });
+
+  #requestsLeft(task: AgentThreadRecord): string[] {
+    return this.#mailbox.requestsLeftByTask(task.agentId, task.taskId).filter((requestId) => {
+      const requesterId = this.#mailbox.requestSenderAgentId(requestId);
+      return requesterId !== null && this.#hooks.agent(requesterId) !== undefined;
+    });
+  }
 
   changed(agentId: string): void {
     this.#cancelProgressPublish(agentId);
