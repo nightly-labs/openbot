@@ -951,7 +951,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         }
         yield* providerCall(() => runtime.query.interrupt()).pipe(
           Effect.catch((failure) =>
-            stopped && (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn !== stopped)
+            (stopped && (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn !== stopped)) ||
+            (!stopped && turnId !== null)
               ? Effect.void
               : Effect.fail(failure),
           ),

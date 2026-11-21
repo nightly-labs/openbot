@@ -6913,6 +6913,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return (
       this.#turn.turnStartedAt(turnId) === null &&
       !this.#turn.isCompleting(turnId) &&
+      !this.#turn.hasEnded(turnId) &&
       this.#conversation.snapshotWithTurn(agentId, turnId) !== undefined
     );
   }
