@@ -31,6 +31,8 @@ export const messages = {
     "Ana makineyle bağlantı görüntü için çok yavaş. Tekrar deneyin: sonraki bağlantı daha düşük bir kalite kullanır.",
   "error.remote.streamTooSlow":
     "Ana makineyle bağlantı görüntü için çok yavaş. Daha hızlı bir ağ kullanın, ardından tekrar deneyin.",
+  "error.remote.noPictureSwitchEncoder":
+    "Ana makine görüntü göndermedi. Tekrar deneyin: sonraki bağlantı daha fazla bilgisayarda çalışan bir video ayarı kullanır.",
   "error.remote.teamSessionExpired": "Ekip oturumunun süresi doldu.",
   "error.remote.finishTestBeforeSwitch": "Ekranları değiştirmeden önce uzak masaüstü testini tamamlayın.",
   "error.remote.displayNotFound": "Uzak ekran bulunamadı.",

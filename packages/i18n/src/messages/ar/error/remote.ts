@@ -30,6 +30,8 @@ export const messages = {
   "error.remote.streamTooSlowLowerQuality":
     "الاتصال بالمضيف بطيء جدًا لعرض الصورة. أعد المحاولة: سيستخدم الاتصال التالي جودة أقل.",
   "error.remote.streamTooSlow": "الاتصال بالمضيف بطيء جدًا لعرض الصورة. استخدم شبكة أسرع، ثم أعد المحاولة.",
+  "error.remote.noPictureSwitchEncoder":
+    "لم يرسل المضيف أي صورة. أعد المحاولة: يستخدم الاتصال التالي إعداد فيديو يعمل على أجهزة كمبيوتر أكثر.",
   "error.remote.teamSessionExpired": "انتهت صلاحية جلسة الفريق.",
   "error.remote.finishTestBeforeSwitch": "أنهِ اختبار سطح المكتب البعيد قبل تبديل الشاشات.",
   "error.remote.displayNotFound": "الشاشة البعيدة غير موجودة.",

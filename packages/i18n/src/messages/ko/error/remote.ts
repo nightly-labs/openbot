@@ -31,6 +31,8 @@ export const messages = {
     "호스트와의 연결이 너무 느려서 화면을 표시할 수 없어요. 다시 시도해 주세요. 다음 연결은 더 낮은 화질을 사용해요.",
   "error.remote.streamTooSlow":
     "호스트와의 연결이 너무 느려서 화면을 표시할 수 없어요. 더 빠른 네트워크를 사용한 다음 다시 시도해 주세요.",
+  "error.remote.noPictureSwitchEncoder":
+    "호스트가 화면을 보내지 않았어요. 다시 시도해 주세요. 다음 연결에서는 더 많은 컴퓨터에서 작동하는 비디오 설정을 사용해요.",
   "error.remote.teamSessionExpired": "팀 세션이 만료되었어요.",
   "error.remote.finishTestBeforeSwitch": "디스플레이를 전환하기 전에 원격 데스크톱 테스트를 끝내 주세요.",
   "error.remote.displayNotFound": "원격 디스플레이를 찾을 수 없어요.",

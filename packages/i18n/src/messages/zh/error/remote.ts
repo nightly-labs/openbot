@@ -27,6 +27,7 @@ export const messages = {
   "error.remote.macScreenLocked": "Mac 已锁定，无法共享屏幕。请在 Mac 的屏幕上解锁，然后重试。",
   "error.remote.streamTooSlowLowerQuality": "与主机的连接太慢，无法显示画面。请重试：下一次连接将使用较低的画质。",
   "error.remote.streamTooSlow": "与主机的连接太慢，无法显示画面。请使用更快的网络，然后重试。",
+  "error.remote.noPictureSwitchEncoder": "主机没有发送画面。请重试：下一次连接会使用适用于更多电脑的视频设置。",
   "error.remote.teamSessionExpired": "团队会话已过期。",
   "error.remote.finishTestBeforeSwitch": "切换显示器前请先结束远程桌面测试。",
   "error.remote.displayNotFound": "未找到远程显示器。",
