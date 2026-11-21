@@ -149,6 +149,36 @@ Effect runtime the desktop host uses today. The audit of transitive Electron imp
 `src/backend/*` is the remaining unknown; if it is shallow, B is realistic, if deep, A
 is the practical end state.
 
+### Architecture audit result (subagent, 2026-11-21) — verdict: B is viable
+
+- **Reusable as-is:** `ServerMode` (control socket + `/v1/*`, pure `node:http`/`fs`/`net`,
+  `server-mode.ts:19,92-273`), `ServerSetupPage`, `TeamApiServer` + 122 routes and
+  zero Electron imports (`team-api-server.ts:1,551,678`), `HostService`, `TeamStore`,
+  `CentralAuthManager`, `HostedServerService`, `AgentService` + `src/backend/agent/*`
+  (ACP, routines, waits, `sendMessage`), `AutomationServer`, webhooks, i18n/contracts.
+- **Needs a thin adapter:** about 13 Electron symbols in `application-services.ts:66-73`
+  (`app.getPath/getVersion/isPackaged`, `powerMonitor`, `screen`, `Notification`, `Menu`,
+  `shell`, `BrowserWindow`/`WebContentsView`), plus `takeServerModeEnvironment`'s
+  `isPackaged` gate (`server-mode.ts:44`) and lifecycle in `index.ts:1412-1481`.
+  Replace with XDG paths/version, stubs, and top-level await for `app.whenReady()`.
+- **Transitive Electron in backend is shallow:** only **9 files** import Electron directly
+  (`src/backend/browser-host.ts:38-60`, `browser-host-tab.ts`, `browser-cdp.ts`,
+  `browser-recorder.ts`, `browser-navigation.ts`, `browser-consent.ts`,
+  `browser-challenge.ts`, `browser-policy.ts`, `pinch-zoom.ts`). All belong to
+  `openbot_browser`/GUI and are discardable on a headless host. Chain from `AgentService`
+  goes through tool router/catalog → `openbot-tools.ts`/`browser-tools.ts` → `browser-host.ts`.
+- **Discardable:** windows, 85 IPC groups, preload/renderer, 10 custom URL schemes,
+  Computer Use, `desktopCapturer`, tray/dock/notch/dynamic island, deep links, desktop
+  notifications.
+- **Option A** already exists as a Bash client over `control.sock`; a Bun version is a
+  low-risk formalization of that contract. **Option C** would touch ~70 files in
+  `src/main/` and `index.ts` (~1,900 lines) and has a worse RAM payoff than the renderer
+  patch already shipped: the remaining main process is 226-234 MB of Node/services, not
+  Chromium.
+- Caveat from the audit: it confirmed direct imports plus grep-inferred chains, not a
+  full transitive graph; it did not validate Bun compatibility of native addons or run
+  a build. Treat as a grounded feasibility signal, not a proven implementation.
+
 ## Non-goals for the first milestone
 
 - No Computer Use / GUI automation, desktop notifications, tray/dock, deep links or
