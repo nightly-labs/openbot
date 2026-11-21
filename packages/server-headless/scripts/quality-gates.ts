@@ -18,6 +18,8 @@
 //  10 COUNT     report: native modules reused vs stub adapters (informational).
 //  11 CREDENTIALS the REAL ProviderCredentialStore round-trips the encrypted envelope
 //               through the file-key cipher and a second instance reloads it.
+//  12 TABLES    the REAL shared-table stack (supervisor + the repository's database host
+//               entry as a Bun child, stdio protocol) answers create/insert/select.
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from "node:fs";
@@ -139,6 +141,43 @@ await systemOverhead("credentials", async () => {
     read === "gates-key" && status === "saved",
     `round-trip=${read === "gates-key"}, status=${status}`,
   );
+});
+
+// --- gate 12: the real shared-table stack (supervisor + Bun host child) --------------------
+await systemOverhead("tables", async () => {
+  const { AgentTables } = await import(join(ROOT, "src", "backend", "agent-data", "agent-tables.ts"));
+  const { AgentDatabaseSupervisor } = await import(
+    join(ROOT, "src", "backend", "agent-data", "agent-database-supervisor.ts")
+  );
+  const { spawnAgentDatabaseHostBun } = await import(join(SRC, "headless-database-host.ts"));
+  const { Effect } = await import("effect");
+
+  const tables = new (AgentTables as new (options: Record<string, unknown>) => never)({
+    sharedRoot: join(USER_DATA, "Shared"),
+    supervisor: new (AgentDatabaseSupervisor as new (options: Record<string, unknown>) => never)({
+      spawnHost: spawnAgentDatabaseHostBun,
+    }),
+  });
+  const service = tables as unknown as {
+    execute: (agentId: string, sql: string, parameters: unknown[]) => never;
+    query: (sql: string, parameters: unknown[]) => never;
+    dispose: () => void;
+  };
+  await Effect.runPromise(service.execute("gates-agent", "CREATE TABLE gates_probe (note TEXT NOT NULL)", []));
+  await Effect.runPromise(service.execute("gates-agent", "INSERT INTO gates_probe (note) VALUES (?)", ["hello bun host"]));
+  const read = (await Effect.runPromise(service.query("SELECT note FROM gates_probe", []))) as {
+    ok?: boolean;
+    value?: { rows: unknown[][] };
+    message?: string;
+  };
+  const rows = read.value?.rows ?? [];
+  report(
+    "12 TABLES",
+    "real host child (Bun) answers create/insert/select",
+    rows.length === 1 && rows[0]?.[0] === "hello bun host",
+    `rows=${JSON.stringify(rows)}${read.ok === false ? ` message=${read.message}` : ""}`,
+  );
+  service.dispose();
 });
 
 // --- gates 5-9: live server ---------------------------------------------------------------

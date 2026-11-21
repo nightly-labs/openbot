@@ -1,19 +1,22 @@
-// free-model-turn: milestone 4 — one full agent turn through the REAL stack under Bun.
+// free-model-turn: milestone 4+5 — full agent turns through the REAL stack under Bun.
 //
 //   bun packages/server-headless/scripts/free-model-turn.ts
 //
 // Spawns the headless server on a fresh work dir, pins the first agent to
 // opencode/deepseek-v4.1-flash-free (the OpenCode Zen free tier: no key, no account),
-// logs in as the headless owner over the loopback team API, sends one message through
-// POST /v1/agents/{id}/messages — the same route the mobile app uses — and polls the
-// conversation until the model's reply lands. Reports boot, send→reply and memory.
-// The turn touches the live free gateway; the deterministic part of milestone 4
-// (the real ProviderCredentialStore round-trip) lives in quality-gates.ts gate 11.
+// logs in as the headless owner over the loopback team API, and drives TWO turns through
+// POST /v1/agents/{id}/messages — the same route the mobile app uses:
+//   1. a plain reply turn (timed, memory sampled while the ACP child is alive);
+//   2. a TOOL turn: the model is asked to create a shared table and insert a row; the
+//      script then reads the shared agent-data.db to prove the tool path end to end
+//      (model → OpenBot tool router → supervisor → the repository's database host
+//      running as a Bun child over the stdio protocol).
+// The turns touch the live free gateway; the deterministic parts (cipher, credential
+// envelope, table round-trip) live in quality-gates.ts gates 3, 11 and 12.
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { request as httpRequest } from "node:http";
 import { randomUUID } from "node:crypto";
 
 const BUN = process.execPath;
@@ -28,6 +31,9 @@ const PROVIDER = process.env.OPENBOT_HEADLESS_PROVIDER ?? "opencode";
 const PROMPT =
   process.env.OPENBOT_HEADLESS_TURN_TEXT ??
   "Reply with exactly: headless bun turn ok. Do not use any tools.";
+const TOOL_PROMPT =
+  process.env.OPENBOT_HEADLESS_TOOL_TEXT ??
+  "Use your shared database tools to create a shared table named probe_free_turn with one text column note, insert the row hello bun tools into it, then reply done.";
 
 rmSync(WORK, { recursive: true, force: true });
 mkdirSync(USER_DATA, { recursive: true });
@@ -154,23 +160,6 @@ function threadMessages(value: unknown, out: Array<Record<string, unknown>> = []
   return out;
 }
 
-const clientMessageId = randomUUID();
-const sendStart = Date.now();
-const receipt = await call(
-  "POST",
-  `/v1/agents/${agent.id}/messages`,
-  { text: PROMPT, clientMessageId },
-  token,
-);
-if (receipt.status !== 202 || !receipt.json?.messageId) {
-  console.error(`FAIL send — ${receipt.status} ${JSON.stringify(receipt.json).slice(0, 300)}`);
-  child.kill("SIGKILL");
-  process.exit(1);
-}
-// The receipt messageId is the client idempotency id; the thread's turn id — what the
-// assistant reply carries — is the delivery id (ipc-queue.ts QueuedMessageReceipt).
-const turnId = (receipt.json.deliveries?.[0]?.id as string | undefined) ?? (receipt.json.messageId as string);
-
 // Process tree memory: the Bun server plus its ACP (opencode) child, sampled while the
 // turn runs so the idle-released ACP process is still alive at the measurement.
 function pssOf(pid: number): number | null {
@@ -213,44 +202,81 @@ function opencodePids(): number[] {
   return pids;
 }
 
-let replyText: string | null = null;
-let firstReplyMs: number | null = null;
-let acpChildren: number[] = [];
-for (let elapsed = 0; elapsed < 180_000; elapsed = Date.now() - sendStart) {
-  const children = [...new Set([...childPids(child.pid ?? 0), ...opencodePids()])].filter(
-    (pid) => (pssOf(pid) ?? 0) > 20,
-  );
-  if (children.length > 0) acpChildren = children;
-  const conversation = (await call("GET", `/v1/agents/${agent.id}/conversation`, null, token)).json;
-  const reply = threadMessages(conversation).find(
-    (message) =>
-      message.author === "assistant" && (message.turnId === turnId || message.id === `${turnId}:assistant`),
-  );
-  if (reply) {
-    firstReplyMs = Date.now() - sendStart;
-    replyText = typeof reply.text === "string" ? reply.text : JSON.stringify(reply).slice(0, 200);
-    break;
+async function sendAndWait(text: string): Promise<{ replyMs: number | null; replyText: string | null; acpChildren: number[] }> {
+  const sendStart = Date.now();
+  const receipt = await call("POST", `/v1/agents/${agent!.id}/messages`, { text, clientMessageId: randomUUID() }, token);
+  if (receipt.status !== 202 || !receipt.json?.messageId) {
+    return { replyMs: null, replyText: `send failed: ${receipt.status} ${JSON.stringify(receipt.json).slice(0, 200)}`, acpChildren: [] };
   }
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  // The receipt messageId is the client idempotency id; the thread's turn id — what the
+  // assistant reply carries — is the delivery id (ipc-queue.ts QueuedMessageReceipt).
+  const turnId = (receipt.json.deliveries?.[0]?.id as string | undefined) ?? (receipt.json.messageId as string);
+  let acpChildren: number[] = [];
+  for (let elapsed = 0; elapsed < 180_000; elapsed = Date.now() - sendStart) {
+    const children = [...new Set([...childPids(child.pid ?? 0), ...opencodePids()])].filter(
+      (pid) => (pssOf(pid) ?? 0) > 20,
+    );
+    if (children.length > 0) acpChildren = children;
+    const conversation = (await call("GET", `/v1/agents/${agent!.id}/conversation`, null, token)).json;
+    // Only the completed final answer closes the turn: thought/commentary items share
+    // the turn id, the final answer is always `${turnId}:assistant` (itemType final_answer).
+    const reply = threadMessages(conversation).find(
+      (message) =>
+        message.author === "assistant" &&
+        message.itemType === "final_answer" &&
+        (message.id === `${turnId}:assistant` || message.turnId === turnId),
+    );
+    if (reply) {
+      return {
+        replyMs: Date.now() - sendStart,
+        replyText: typeof reply.text === "string" ? reply.text : JSON.stringify(reply).slice(0, 200),
+        acpChildren,
+      };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  return { replyMs: null, replyText: null, acpChildren };
 }
 
-const serverPid = child.pid ?? 0;
-const serverPss = pssOf(serverPid);
-const acpPss = acpChildren.reduce((total, pid) => total + (pssOf(pid) ?? 0), 0);
+// --- turn 1: plain reply ---------------------------------------------------------------------
+const first = await sendAndWait(PROMPT);
+const serverPss = pssOf(child.pid ?? 0);
+const acpPss = first.acpChildren.reduce((total, pid) => total + (pssOf(pid) ?? 0), 0);
+
+// --- turn 2: the tool path (shared tables through the Bun database host child) ----------------
+const second = await sendAndWait(TOOL_PROMPT);
+let toolRow: string | null = null;
+const sharedDb = join(USER_DATA, "OpenBot", "Shared", "Data", "agent-data.db");
+if (existsSync(sharedDb)) {
+  try {
+    const { DatabaseSync } = await import("node:sqlite");
+    const db = new DatabaseSync(sharedDb, { readOnly: true });
+    const rows = db.prepare("SELECT note FROM probe_free_turn").all() as Array<{ note: unknown }>;
+    toolRow = rows.length > 0 ? String(rows[0].note) : null;
+    db.close();
+  } catch {
+    toolRow = null;
+  }
+}
 
 console.log(`model=${modelLine}`);
 console.log(`boot=${bootMs} ms (socket + agents ready + model pinned)`);
 console.log(`login=ok member=${myMemberId} agents=${agents.length}`);
 console.log(
-  replyText === null
+  first.replyText === null
     ? "reply=NONE (timeout 180 s)"
-    : `reply=${firstReplyMs} ms text="${(replyText ?? "").slice(0, 120).replace(/\n/g, " ")}"`,
+    : `reply=${first.replyMs} ms text="${(first.replyText ?? "").slice(0, 120).replace(/\n/g, " ")}"`,
 );
 console.log(
-  `pss server=${serverPss?.toFixed(1) ?? "?"} MiB acp=${acpPss.toFixed(1)} MiB (${acpChildren.length} child)`,
+  `pss server=${serverPss?.toFixed(1) ?? "?"} MiB acp=${acpPss.toFixed(1)} MiB (${first.acpChildren.length} child)`,
+);
+console.log(
+  second.replyText === null
+    ? "tool=NONE (model reply timeout)"
+    : `tool=${second.replyMs} ms reply="${(second.replyText ?? "").slice(0, 80).replace(/\n/g, " ")}" probe_free_turn.note="${toolRow ?? "missing"}"`,
 );
 
-const ok = replyText !== null;
+const ok = first.replyText !== null;
 child.kill("SIGTERM");
 await new Promise((resolve) => child.on("exit", resolve));
 writeFileSync(join(WORK, "turn.log"), output);

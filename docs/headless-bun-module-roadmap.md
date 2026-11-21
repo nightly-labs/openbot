@@ -410,6 +410,31 @@ maintainer's signal network), the database host child, and the real account logi
 (the CLI flow exists; the email login sends a code to the owner's email — not fired
 from the headless test yet).
 
+### Milestone 5 (2026-11-21 late): the shared-database host as a Bun child
+
+- **The repository's database host entry runs as a Bun child.** The packaged app forks
+  the bundled `agent-database-host.js` through Electron `utilityProcess`; the entry
+  source (`src/backend/agent-data/agent-database-host.ts`) ships a stdio fallback —
+  without a parentPort it speaks the frozen JSON-lines protocol over stdin/stdout. The
+  headless host (`headless-database-host.ts`) spawns that same source under Bun and
+  presents the `AgentDatabaseHostProcess` surface; the REAL `AgentDatabaseSupervisor`
+  and `AgentTables` sit on top, and the AgentService now receives `tables` instead of
+  `null` (native composition, application-services.ts:1784).
+- **A tool turn, measured**: `free-model-turn.ts` now drives a second turn that asks
+  the free model to create a shared table and insert a row. The model called the
+  OpenBot table tools on its own; the row `probe_free_turn.note = "hello bun tools"`
+  landed in `<userData>/OpenBot/Shared/Data/agent-data.db` — the full loop
+  (team API HTTP → mailbox → AgentService → ACP → model → tool router → supervisor →
+  Bun host child → SQLite) in **10.9 s**, with statement timings from the supervisor:
+  first write 19.4 ms (child start + provision), warm statements 0.03-2.8 ms.
+- **Leak fixed before it bit**: `AgentStore`'s default `openbotRoot` is
+  `homedir()/OpenBot`, which made the TEST host create agent workspaces under the live
+  server's real `/var/lib/openbot/OpenBot/Agents` (five empty directories, removed) and
+  would have pointed the shared tables at the production `Shared/`. The headless now
+  pins `openbotRoot` inside the test userData.
+- 12/12 quality gates PASS (new gate 12: real create/insert/select round-trip through
+  the Bun host child).
+
 ## Non-goals for the first milestone
 
 - No Computer Use / GUI automation, desktop notifications, tray/dock, deep links or

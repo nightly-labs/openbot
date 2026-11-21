@@ -1,19 +1,54 @@
 // headless-database-host: replaces utilityProcess.fork of
-// src/main/agent-database-host-process.ts:17 with a Bun/Node child process running the
-// same agent-database-host entry. The frozen line protocol is
-// src/backend/agent-data/agent-database-protocol.ts; the supervisor contract is in
-// agent-database-supervisor.ts.
-//
-// TODO (not implemented): the packaged app ships agent-database-host as part of the
-// Electron build; under Bun we fork the source entry directly and pass the protocol
-// over stdio, exactly as the desktop host does. Blocked on verifying which compiled
-// entry exists in the release tree and on node:sqlite behavior under Bun/arm64.
+// src/main/agent-database-host-process.ts:17 with a Bun child process running the REAL
+// database host entry. The entry (src/backend/agent-data/agent-database-host.ts, the same
+// file the packaged app bundles as agent-database-host.js) has a stdio fallback: without
+// an Electron parentPort it speaks the frozen JSON-lines protocol from
+// agent-database-protocol.ts over stdin/stdout — ready message first, one response per
+// request line, graceful dispose when stdin closes. No Electron, no utilityProcess.
 
-export interface SpawnAgentDatabaseHost {
-  (options: { entry: string; userData: string }): { pid: number; send(message: unknown): void; on(event: string, listener: (...args: never[]) => void): void };
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+import { join } from "node:path";
+import type {
+  AgentDatabaseHostMessage,
+  AgentDatabaseHostProcess,
+} from "../../../src/backend/agent-data/agent-database-protocol";
+
+const OUTPUT_TAIL_CHARS = 1_900;
+
+export function spawnAgentDatabaseHostBun(): AgentDatabaseHostProcess {
+  const entry = join(import.meta.dir, "..", "..", "..", "src", "backend", "agent-data", "agent-database-host.ts");
+  const child = spawn(process.execPath, [entry], { stdio: ["pipe", "pipe", "pipe"] });
+  const messageListeners: Array<(message: AgentDatabaseHostMessage) => void> = [];
+  let output = "";
+
+  const lines = createInterface({ input: child.stdout });
+  lines.on("line", (line: string) => {
+    if (line.trim().length === 0) return;
+    try {
+      const message = JSON.parse(line) as AgentDatabaseHostMessage;
+      for (const listener of messageListeners) listener(message);
+    } catch {
+      output = `${output}${line}\n`.slice(-OUTPUT_TAIL_CHARS);
+    }
+  });
+  child.stderr.on("data", (chunk: Buffer) => {
+    output = (output + chunk.toString()).slice(-OUTPUT_TAIL_CHARS);
+  });
+
+  return {
+    send: (request) => {
+      child.stdin.write(`${JSON.stringify(request)}\n`);
+    },
+    onMessage: (listener) => {
+      messageListeners.push(listener);
+    },
+    onExit: (listener) => {
+      child.once("exit", (code) => listener(code));
+    },
+    recentOutput: () => output.trim(),
+    kill: () => {
+      child.kill();
+    },
+  };
 }
-
-export const spawnAgentDatabaseHostBun: SpawnAgentDatabaseHost = (options) => {
-  // TODO: Bun.spawn([bun, options.entry], { stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, OPENBOT_AGENT_DATA: options.userData } })
-  throw new Error("headless database host spawn not implemented yet (see TODO in this file)");
-};

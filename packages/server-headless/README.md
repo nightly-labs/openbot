@@ -88,6 +88,28 @@ That is: `POST /v1/auth/login` over the loopback team API → Bearer →
 ACP → opencode 2.2.5 → the free model → the reply in the conversation. Cold turns
 (overlapping the agent-creation turn) run 4-6 s; steady-state turns 2.4-2.6 s.
 
+## The shared database host as a Bun child (milestone 5)
+
+The AgentService now receives real `tables`: the repository's database host entry
+(`src/backend/agent-data/agent-database-host.ts` — the file the packaged app bundles
+and forks via `utilityProcess`) runs as a **Bun child process** through its stdio
+fallback (JSON lines over stdin/stdout, no Electron parentPort), under the REAL
+`AgentDatabaseSupervisor` and `AgentTables`. The tool turn in `free-model-turn.ts`
+asks the free model to create a shared table; the model calls the table tools on its
+own and the row is verified straight from `agent-data.db`:
+
+```sh
+bun packages/server-headless/scripts/free-model-turn.ts
+# ...
+# tool=10891 ms reply="Done — table `probe_free_turn` created ..." probe_free_turn.note="hello bun tools"
+# TURN PASS
+```
+
+Supervisor timings on the phone: first write 19.4 ms (child start + provision), warm
+statements 0.03-2.8 ms. The test host pins `openbotRoot` inside its own userData, so
+agent workspaces and shared tables never touch the live `/var/lib/openbot/OpenBot`
+directory.
+
 ## Verified on the phone (2026-11-21)
 
 - `node:sqlite` with WAL works under Bun/arm64.

@@ -82,6 +82,9 @@ import { OpenBotDatabase } from "../../../src/backend/openbot-database";
 import { AgentStore } from "../../../src/backend/agent-store";
 import { MailboxStore } from "../../../src/backend/mailbox-store";
 import { AgentService } from "../../../src/backend/agent-service";
+import { AgentTables } from "../../../src/backend/agent-data/agent-tables";
+import { AgentDatabaseSupervisor } from "../../../src/backend/agent-data/agent-database-supervisor";
+import { spawnAgentDatabaseHostBun } from "./headless-database-host";
 import { ProviderCredentialStore } from "../../../src/main/provider-credential-store";
 import { createSecretStorage, SECRET_STORAGE_KEY_FILE } from "../../../src/main/secret-storage-cipher";
 import { AGENT_PROVIDERS } from "@openbot/contracts/agent-providers";
@@ -131,8 +134,11 @@ const hostMemory = {
 const centralAuth = createCentralAuthManager({ confirmSessionAtStart: false });
 
 // --- database, roster and mailbox (real SQLite stores) -------------------------------
+// openbotRoot is pinned INSIDE the test userData: the default (homedir()/OpenBot) would
+// create agent workspaces and the shared tables under the live server's real
+// /var/lib/openbot/OpenBot directory.
 const database = new OpenBotDatabase(userData);
-const store = new AgentStore(userData, homedir(), database);
+const store = new AgentStore(userData, homedir(), database, undefined as never, join(userData, "OpenBot"));
 await Effect.runPromise(store.initialize() as never).catch((error) => {
   console.error("The agent store did not initialize.", String(error));
   process.exit(1);
@@ -157,6 +163,27 @@ if (credentialLoadError) {
   );
 }
 
+// --- shared tables (real supervisor + REAL host child, spawned under Bun) --------------
+// Native (application-services.ts:1784): AgentTables over the shared agent-data.db with
+// an AgentDatabaseSupervisor whose host is a separate process. Here the host child is the
+// same repository entry the packaged app bundles, run under Bun through its stdio
+// fallback (JSON lines, no Electron parentPort) — see headless-database-host.ts.
+const tables = new AgentTables({
+  sharedRoot: store.sharedRoot,
+  supervisor: new AgentDatabaseSupervisor({
+    spawnHost: spawnAgentDatabaseHostBun,
+    onStatementSettled: (durationMs, request) => {
+      console.log(`agentdb.${request} ${durationMs} ms`);
+    },
+    onHostStartFailed: (failure) => {
+      console.warn(
+        `The shared data process ${failure.reason} (failed starts in a row: ${failure.consecutiveFailures}, next start after ${failure.retryAfterMs} ms).`,
+        failure.output.length > 0 ? `Its last output: ${failure.output}` : "It wrote no output.",
+      );
+    },
+  }),
+} as never);
+
 // --- agents (real service: opencode over ACP with the real credential store) -----------
 const browser = new HeadlessBrowserHost();
 const agentService = new AgentService({
@@ -178,7 +205,7 @@ const agentService = new AgentService({
   } as never,
   bundledExecutables: { opencode: existsSync(OPENCODE_BIN) ? OPENCODE_BIN : null },
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "opencode"),
-  tables: null,
+  tables: tables as never,
   hostMemory,
   hostTurnLimits: { turnLimit: () => turnLimit(), agentTaskLimit: () => 16 },
 } as never);
@@ -281,6 +308,9 @@ if (teamApiPort) console.log(`team api: http://localhost:${teamApiPort}`);
 void Effect.runPromise(centralAuth.initialize() as never)
   .then((state) => console.log(`account=${(state as { status: string } | null)?.status ?? "loading"}`))
   .catch((error) => console.warn("The account did not initialize.", String(error)));
+// Native (application-services.ts:4263): the shared database host prewarms in the
+// background once the socket is already serving.
+void Effect.runPromise(tables.prewarm() as never).catch(() => undefined);
 void Effect.runPromise(agentService.initialize() as never)
   .then(async () => {
     console.log("agents=ready");
@@ -325,6 +355,7 @@ void Effect.runPromise(agentService.initialize() as never)
 async function shutdown(signal: string): Promise<void> {
   const fail = setTimeout(() => process.exit(0), 5_000);
   fail.unref();
+  (tables as unknown as { dispose(): void }).dispose();
   await Effect.runPromise(teamApi.stop() as never).catch(() => undefined);
   await Effect.runPromise(serverMode.close() as never).catch(() => undefined);
   await Effect.runPromise(centralAuth.dispose() as never).catch(() => undefined);
