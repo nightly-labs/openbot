@@ -90,6 +90,7 @@ function orderedGrantsSql(spent: string): string {
            ), 0) AS before
       FROM credit_grants g, spent
      WHERE g.status = 'active' AND g.remaining_tenths > 0 AND spent.tenths > 0
+       AND g.expires_at > spent.created_at
        AND (g.user_id = spent.user_id OR g.server_id = spent.server_id)
   )`;
 }

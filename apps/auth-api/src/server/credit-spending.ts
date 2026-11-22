@@ -114,7 +114,7 @@ export function availableTenthsSql(column: WalletColumn, idParam: string): strin
     - (SELECT COALESCE(SUM(credits_tenths), 0) FROM credit_holds WHERE ${column} = ${idParam} AND status = 'held'))`;
 }
 
-function overdueGrantTenthsSql(column: WalletColumn, idParam: string, nowParam: string): string {
+export function overdueGrantTenthsSql(column: WalletColumn, idParam: string, nowParam: string): string {
   return `(SELECT COALESCE(SUM(remaining_tenths), 0) FROM credit_grants
     WHERE ${column} = ${idParam} AND status = 'active' AND expires_at <= ${nowParam})`;
 }
@@ -312,7 +312,7 @@ export class CreditSpending {
         this.#database
           .prepare(
             consumeGrantsSql(
-              `SELECT user_id, server_id, charged_tenths AS tenths FROM credit_holds
+              `SELECT user_id, server_id, charged_tenths AS tenths, created_at FROM credit_holds
                 WHERE job_id = ?1 AND status = 'charged'
                   AND NOT EXISTS (SELECT 1 FROM credit_ledger WHERE entry_id = 'spend:' || ?1)`,
             ),

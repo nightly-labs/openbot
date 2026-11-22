@@ -29,7 +29,7 @@ import { paymentReversal } from "./billing-sales";
 import { checkoutTax } from "./billing-tax";
 import { CreditAudit, creditAuditCode } from "./credit-audit";
 import { consumeGrantsSql, creditExpiring, expiringGrantsSql, moveGrantsSql } from "./credit-grants";
-import { availableTenthsSql } from "./credit-spending";
+import { availableTenthsSql, overdueGrantTenthsSql } from "./credit-spending";
 import {
   EARLY_START_METADATA,
   isBillingCurrency,
@@ -44,8 +44,10 @@ import {
 const PRICE_TTL_MS = 5 * 60 * 1_000;
 const priceCache = new Map<string, { expiresAt: number; prices: ReadonlyMap<string, StripePrice> }>();
 const SERVER_ROLES: readonly CreditServerRole[] = ["owner", "admin", "member"];
-const MOVED_GRANTS_SQL = `SELECT ?1 AS user_id, ?2 AS server_id, ?3 AS tenths
-  WHERE EXISTS (SELECT 1 FROM credit_ledger WHERE entry_id = ?4)`;
+function movedGrantsSql(nowParam: string): string {
+  return `SELECT ?1 AS user_id, ?2 AS server_id, ?3 AS tenths, ${nowParam} AS created_at
+    WHERE EXISTS (SELECT 1 FROM credit_ledger WHERE entry_id = ?4)`;
+}
 function ownedServerSql(serverParam: string, userParam: string): string {
   return `EXISTS (
     SELECT 1 FROM remote_hosts h
@@ -359,7 +361,7 @@ export class CreditService {
                entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at
              )
              SELECT ?1, ?2, ?3, ?4, 'transfer', ?5, ?6, ?7
-              WHERE ${availableTenthsSql(sourceColumn, "?8")} >= ?9
+              WHERE ${availableTenthsSql(sourceColumn, "?8")} - ${overdueGrantTenthsSql(sourceColumn, "?8", "?7")} >= ?9
                 AND ${ownedServerSql("?10", "?5")}`,
           )
           .bind(
@@ -375,9 +377,11 @@ export class CreditService {
             request.serverId,
           ),
         this.#database
-          .prepare(moveGrantsSql(MOVED_GRANTS_SQL, { user: "?5", server: "?6", transfer: "?7", now: "?8" }))
+          .prepare(moveGrantsSql(movedGrantsSql("?8"), { user: "?5", server: "?6", transfer: "?7", now: "?8" }))
           .bind(source.user, source.server, tenths, debitId, target.user, target.server, transferId, now),
-        this.#database.prepare(consumeGrantsSql(MOVED_GRANTS_SQL)).bind(source.user, source.server, tenths, debitId),
+        this.#database
+          .prepare(consumeGrantsSql(movedGrantsSql("?5")))
+          .bind(source.user, source.server, tenths, debitId, now),
         this.#database
           .prepare(
             `INSERT INTO credit_ledger(

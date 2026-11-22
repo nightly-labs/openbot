@@ -1428,13 +1428,29 @@ async function freeMonthlyCredits() {
     }),
   );
   check("a new job cannot use free credits after their end", overdue.code === "credits_spend_not_enough", overdue);
+  await run(
+    spending.hold({
+      jobId: "job-new",
+      wallet: { userId: OWNER.id },
+      actorUserId: OWNER.id,
+      modelId: "m",
+      credits: 100,
+    }),
+  );
+  await run(spending.settle("job-new", { outcome: "completed" }));
+  const untouched = (await grantRows(OWNER.id)).find((row) => row.user_id === OWNER.id && row.status === "active");
+  check(
+    "a job that started after the end of free credits pays with bought credits",
+    untouched?.remaining === 20,
+    untouched,
+  );
   await run(spending.settle("job-open", { outcome: "failed" }));
   const released = await run(grants.sweep());
   const after = await state(OWNER.id);
   const nextYear = await grantRows(OUTSIDER.id);
   check(
     "at the end of the month unused free credits expire, also the credits that a released job held",
-    after.balance === 2_000 && after.servers[0]?.balance === 0 && after.expiring === undefined,
+    after.balance === 1_900 && after.servers[0]?.balance === 0 && after.expiring === undefined,
     { released, after },
   );
   check(
