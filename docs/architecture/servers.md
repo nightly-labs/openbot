@@ -518,6 +518,17 @@ step and a webhook trigger, the `check` field of a condition, and `{{name}}` in 
 and a host before it keeps them but does not use them. A client shows the editors and the problems
 only on a host that advertises it.
 
+`workflows-format-v1` says that each workflow detail has `format` and `hostFormat`. `format` is the
+lowest workflow format that can show the graph (`workflowGraphFormat` in
+`packages/contracts/src/ipc-workflow-format.ts`). `hostFormat` is `WORKFLOW_FORMAT` of the host. The
+format number goes up without a new capability. A client opens a graph read-only (`needsNewerApp`)
+when its `format` is higher than the client's `WORKFLOW_FORMAT`, or when a node, edge, stroke or
+size has a property that the client does not know. The Team API codec drops unknown properties, so
+the format number is the protection for older clients. The host refuses a create or a save that adds
+or changes a step value that it does not know (`error.workflow.unknownValue`), and keeps a value that
+is already saved. A server transfer copies saved values as they are. A client shows content of a
+newer format only when `hostFormat` is at least that format.
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes

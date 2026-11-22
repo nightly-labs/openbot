@@ -6,6 +6,7 @@ export const messages = {
   "error.workflow.versionMissing": "لم يعد هذا الإصدار من سير العمل موجودًا.",
   "error.workflow.annotation": "لا يمكن أن تكون للنصوص والملاحظات والأشكال اتصالات.",
   "error.workflow.port": "لا يمكن للخطوة أن تأخذ هذا النوع من المدخلات.",
+  "error.workflow.unknownValue": "لا يعرف OpenBot هذا أحد إعدادات خطوة. حدّث OpenBot، ثم أعد المحاولة.",
   "error.workflow.branch": "الشرط وحده يمكن أن تكون له اتصالات «نعم» و«لا».",
   "error.workflow.conditionBranch": "يجب أن يكون كل اتصال من شرط «نعم» أو «لا».",
   "error.workflow.duplicateEdge": "لهاتين الخطوتين هذا الاتصال بالفعل.",

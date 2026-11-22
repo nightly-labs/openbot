@@ -39,6 +39,8 @@ import {
   type WorkflowMediaProviders,
   type WorkflowMediaServiceAccount,
   type WorkflowStepSettings,
+  workflowFormatIsNewer,
+  workflowGraphHasUnknownKey,
   workflowNodeHasUnknownValue,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
@@ -99,7 +101,12 @@ const detail = onRecord((record) => {
       !isDynamicRecord(edge) ||
       !(isUnknownName(WORKFLOW_PORT_TYPES, edge.type) || placeholders.has(edge.from) || placeholders.has(edge.to)),
   );
-  const newer = settings || placeholders.size > 0 || edges.length < graph.edges.length;
+  const newer =
+    workflowFormatIsNewer(record.format) ||
+    workflowGraphHasUnknownKey(graph) ||
+    settings ||
+    placeholders.size > 0 ||
+    edges.length < graph.edges.length;
   return { ...base, graph: { ...graph, nodes, edges }, ...(newer ? { needsNewerApp: true } : {}) };
 });
 

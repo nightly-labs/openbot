@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { isRoutineSchedule, type RoutineSchedule } from "./ipc-routines";
+import { isWorkflowFormat } from "./ipc-workflow-format";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 export const WORKFLOW_NODE_KINDS = [
@@ -659,6 +660,8 @@ export interface WorkflowDetail {
   revision: number;
   triggers: WorkflowTriggerState[];
   needsNewerApp?: true;
+  format?: number;
+  hostFormat?: number;
 }
 
 export interface WorkflowVersion {
@@ -925,7 +928,9 @@ export function isWorkflowDetail(value: unknown): value is WorkflowDetail {
     isRevision(value.revision) &&
     Array.isArray(value.triggers) &&
     value.triggers.every(isTriggerState) &&
-    (value.needsNewerApp === undefined || value.needsNewerApp === true)
+    (value.needsNewerApp === undefined || value.needsNewerApp === true) &&
+    (value.format === undefined || isWorkflowFormat(value.format)) &&
+    (value.hostFormat === undefined || isWorkflowFormat(value.hostFormat))
   );
 }
 

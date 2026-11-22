@@ -544,19 +544,9 @@ try {
     prTrigger,
   );
   assert.ok(prTrigger);
-  const storedBad = await runCauseEffect(
-    workflows.saveGraph({
-      workflowId: reviewId,
-      baseRevision: reviewDetail.revision,
-      graph: {
-        ...reviewDetail.graph,
-        nodes: reviewDetail.graph.nodes.map((node) =>
-          node.id === prTrigger.id ? { ...node, fields: { ...node.fields, event: "pull_request.opened" } } : node,
-        ),
-      },
-    }),
-  );
-  assert.ok(storedBad.ok);
+  database.connection
+    .prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = ?")
+    .run(JSON.stringify({ ...prTrigger.fields, event: "pull_request.opened" }), reviewId, prTrigger.id);
   const otherField = await call("event-kept", "edit_workflow", {
     workflowId: reviewId,
     ops: [{ op: "update", node: prTrigger.id, fields: { filters: "notBot" } }],

@@ -5,6 +5,7 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.versionMissing": "This version of the workflow no longer exists.",
   "error.workflow.annotation": "Text, notes and shapes cannot have connections.",
   "error.workflow.port": "A step cannot take this type of input.",
+  "error.workflow.unknownValue": "This OpenBot does not know a setting of a step. Update OpenBot, then try again.",
   "error.workflow.branch": "Only a condition can have yes and no connections.",
   "error.workflow.conditionBranch": "Each connection from a condition must be yes or no.",
   "error.workflow.duplicateEdge": "These two steps already have this connection.",

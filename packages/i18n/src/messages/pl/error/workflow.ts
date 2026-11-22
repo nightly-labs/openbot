@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "Ta wersja przepływu pracy już nie istnieje.",
   "error.workflow.annotation": "Teksty, notatki i kształty nie mogą mieć połączeń.",
   "error.workflow.port": "Krok nie może przyjąć tego typu danych.",
+  "error.workflow.unknownValue":
+    "Ten OpenBot nie zna ustawienia jednego z kroków. Zaktualizuj OpenBot i spróbuj ponownie.",
   "error.workflow.branch": "Tylko warunek może mieć połączenia tak i nie.",
   "error.workflow.conditionBranch": "Każde połączenie z warunku musi być tak albo nie.",
   "error.workflow.duplicateEdge": "Te dwa kroki mają już to połączenie.",

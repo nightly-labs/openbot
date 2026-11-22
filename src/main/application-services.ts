@@ -3039,7 +3039,7 @@ export async function createApplicationServices({
           workflowRuntime
             .listWithGraphs()
             .pipe(Effect.map((list) => list.map(({ summary, graph }) => ({ title: summary.title, graph })))),
-        createWorkflow: (input) => workflowRuntime.create(input),
+        createWorkflow: (input) => workflowRuntime.createCopy(input),
       },
       signedInProviders: () =>
         (service.getStatus().providers ?? [])
