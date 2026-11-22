@@ -645,11 +645,7 @@ export class TurnLifecycle {
       this.#compaction.abandonCompaction(turn.threadId);
       this.#keepTurnTiming(turnId, turn);
       yield* this.#completeTurn(turn.agentId, turn.threadId, turnId, quietStop ? "completed" : "interrupted").pipe(
-        Effect.catchCause((cause) =>
-          reportOriginalFailure(cause, (failure) =>
-            this.#hooks.emitError("turn_completion_failed", failure, turn.agentId),
-          ),
-        ),
+        Effect.catchCause((cause) => this.#reportCompletionFailure(cause, turn.agentId)),
       );
     }
     for (const threadId of endedChildren) this.#endCodexChild(threadId, "interrupted");
@@ -1456,11 +1452,7 @@ export class TurnLifecycle {
           return;
         }
         yield* this.#completeTurn(agentId, threadId, turnId, status).pipe(
-          Effect.catchCause((cause) =>
-            reportOriginalFailure(cause, (failure) =>
-              this.#hooks.emitError("turn_completion_failed", failure, agentId),
-            ),
-          ),
+          Effect.catchCause((cause) => this.#reportCompletionFailure(cause, agentId)),
         );
         return;
       }
@@ -2593,6 +2585,12 @@ export class TurnLifecycle {
       ),
   );
 
+  #reportCompletionFailure(cause: Cause.Cause<TurnOperationFailed>, agentId: string): Effect.Effect<void> {
+    if (Cause.hasInterruptsOnly(cause))
+      return Effect.sync(() => logger.info("A turn completion step was stopped.", { agentId }));
+    return reportOriginalFailure(cause, (failure) => this.#hooks.emitError("turn_completion_failed", failure, agentId));
+  }
+
   readonly settleOrphanedTurn = Effect.fn("TurnLifecycle.settleOrphanedTurn")(function* (
     this: TurnLifecycle,
     agentId: string,
@@ -2600,8 +2598,7 @@ export class TurnLifecycle {
     turnId: string,
     terminal: "failed" | "interrupted",
   ) {
-    const report = (cause: Cause.Cause<TurnOperationFailed>) =>
-      reportOriginalFailure(cause, (failure) => this.#hooks.emitError("turn_completion_failed", failure, agentId));
+    const report = (cause: Cause.Cause<TurnOperationFailed>) => this.#reportCompletionFailure(cause, agentId);
     const running = this.#runningTurns.get(turnId);
     const runningThreadId = running?.threadId ?? threadId;
     if (running) this.#keepTurnTiming(turnId, running);
