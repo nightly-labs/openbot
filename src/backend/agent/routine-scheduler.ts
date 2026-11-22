@@ -109,6 +109,10 @@ export interface RoutineHooks {
 const logger = createOpenBotLogger("routine-scheduler");
 
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
+const RUN_REFUSED_ROUTINE_TOOLS: ReadonlySet<string> = new Set(["create_routine", "delete_routine", "test_routine"]);
+const RUN_ROUTINE_TOOL_REFUSAL =
+  "A routine run cannot create, delete, or test routines. Do not try again in this run, and say in your report that the change was not made.";
+const RUNS_CHANGE_ROUTINES_SWITCH = "Runs can change routines";
 const SKIPPED_WHILE_CLOSED = "Skipped: OpenBot was closed at the scheduled time.";
 
 function skippedRuns(scheduledFor: string, missed: RoutineMissedRuns) {
@@ -225,6 +229,10 @@ export class RoutineScheduler implements RoutineDueSource {
       }
     }
     return this.#timezone();
+  }
+
+  runChangesRoutines(run: Pick<RoutineRun, "agentId" | "routineId">): boolean {
+    return this.#routines.getRecord(run.agentId, run.routineId)?.runsChangeRoutines === true;
   }
 
   wokenWaits(deliveryId: string): AgentWait[] {
@@ -585,8 +593,9 @@ export class RoutineScheduler implements RoutineDueSource {
     params: DynamicToolCallParams,
     senderAgentId: string,
     requestedByPerson: () => boolean,
+    runRoutineIds: () => readonly string[],
   ): Effect.Effect<OpenBotToolResponse | null, RoutineOperationFailed> {
-    return this.#handleTool(params, senderAgentId, requestedByPerson).pipe(
+    return this.#handleTool(params, senderAgentId, requestedByPerson, runRoutineIds).pipe(
       Effect.catchDefect((cause) => Effect.fail(new RoutineOperationFailed({ cause }))),
       Effect.catch((failure) =>
         failure.cause instanceof RoutineInputError
@@ -619,7 +628,11 @@ export class RoutineScheduler implements RoutineDueSource {
     params: DynamicToolCallParams,
     senderAgentId: string,
     requestedByPerson: () => boolean,
+    runRoutineIds: () => readonly string[],
   ) {
+    if (RUN_REFUSED_ROUTINE_TOOLS.has(params.tool) && runRoutineIds().length > 0)
+      throw new RoutineInputError(RUN_ROUTINE_TOOL_REFUSAL);
+
     if (params.tool === "list_routines") {
       const args = routineToolArguments(params.arguments, ["agentId", "routineId"]);
       const agentId = this.#toolAgentId(args, senderAgentId);
@@ -825,6 +838,8 @@ export class RoutineScheduler implements RoutineDueSource {
         hasUpdate = true;
       }
       if (!hasUpdate) throw new RoutineInputError("At least one routine update is required.");
+      const runs = runRoutineIds();
+      if (runs.length > 0) this.#requireRunUpdate(input, senderAgentId, runs);
       if (this.#requireToolRoutine(input.agentId, input.routineId).trigger.kind === "webhook") {
         throw new RoutineInputError(`Routine ${input.routineId} is a webhook routine. Use update_webhook_routine.`);
       }
@@ -1320,6 +1335,33 @@ export class RoutineScheduler implements RoutineDueSource {
       ...(run.missed ? { skipped: skippedRuns(run.scheduledFor, run.missed) } : {}),
       ...(reason ? { reason } : {}),
     };
+  }
+
+  #requireRunUpdate(input: UpdateRoutineInput, senderAgentId: string, runRoutineIds: readonly string[]): void {
+    const changed = Object.keys(input).filter((key) => key !== "agentId" && key !== "routineId");
+    const ownPause =
+      input.agentId === senderAgentId &&
+      runRoutineIds.includes(input.routineId) &&
+      changed.length === 1 &&
+      input.active === false;
+    if (ownPause) return;
+    const locked = runRoutineIds
+      .map((routineId) => ({ routineId, routine: this.#routines.getRecord(senderAgentId, routineId) }))
+      .find(({ routine }) => routine?.runsChangeRoutines !== true);
+    if (locked) {
+      throw new RoutineInputError(
+        locked.routine
+          ? `The runs of routine "${locked.routine.name}" cannot change routines. Only the user can allow it, with the "${RUNS_CHANGE_ROUTINES_SWITCH}" switch of this routine in Routines settings. Do not try again in this run, and say in your report that the change was not made.`
+          : "This run cannot change routines. Do not try again in this run, and say in your report that the change was not made.",
+      );
+    }
+    if (input.agentId !== senderAgentId)
+      throw new RoutineInputError("A routine run can change only the routines of its own agent.");
+    const other = changed.find((key) => key !== "schedule" && key !== "active");
+    if (other !== undefined)
+      throw new RoutineInputError(
+        `A routine run can change only the schedule and active of a routine, not ${other}. Make no other change.`,
+      );
   }
 
   #requireToolRoutine(agentId: string, routineId: string): OwnedRoutineRecord {

@@ -27,6 +27,7 @@ interface RoutineSaveInput {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
   trigger?: EventRoutineTriggerInput;
 }
 
@@ -55,6 +56,7 @@ export interface RoutinesPort {
   missedPolicy: boolean;
   onceSchedule: boolean;
   runIn: boolean;
+  runChanges: boolean;
   list: () => Promise<RoutineEditorRecord[]>;
   listRuns: (routineId: string, limit: number) => Promise<RoutineRunFields[]>;
   save: (input: RoutineSaveInput) => Promise<RoutineSaveResult>;
@@ -107,6 +109,7 @@ export function agentRoutinesPort(
   runPlace = localHost,
   resultsServerId?: string | RoutineResultsCalls,
   onceSchedule = localHost,
+  runChanges = localHost,
 ): RoutinesPort {
   const results = localHost || resultsServerId ? agentRoutineResults(agentId, resultsServerId) : undefined;
   return {
@@ -116,13 +119,26 @@ export function agentRoutinesPort(
     missedPolicy: localHost,
     onceSchedule,
     runIn: runPlace,
+    runChanges,
     list: () => api.listRoutines(agentId),
     listRuns: (routineId, limit) => api.listRoutineRuns({ agentId, routineId, limit }),
-    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy, runIn }) => {
+    save: ({
+      routineId,
+      name,
+      instruction,
+      active,
+      timezone,
+      schedule,
+      limitPolicy,
+      missedPolicy,
+      runIn,
+      runsChangeRoutines,
+    }) => {
       const policy = {
         ...(localHost && limitPolicy ? { limitPolicy } : {}),
         ...(localHost && missedPolicy ? { missedPolicy } : {}),
         ...(runPlace && runIn ? { runIn } : {}),
+        ...(runChanges && runsChangeRoutines !== undefined ? { runsChangeRoutines } : {}),
       };
       return (
         routineId
@@ -167,6 +183,7 @@ export function channelRoutinesPort(
     missedPolicy: localHost,
     onceSchedule,
     runIn: false,
+    runChanges: false,
     list: () => api.listChannelRoutines(channelId),
     listRuns: (routineId, limit) => api.listChannelRoutineRuns({ channelId, routineId, limit }),
     save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy }) => {
@@ -195,7 +212,7 @@ export function eventRoutinesPort(
   api: EventRoutinesApi,
   legacy: Pick<
     RoutinesPort,
-    "listRuns" | "subscribe" | "runCommand" | "missedPolicy" | "onceSchedule" | "runIn" | "results"
+    "listRuns" | "subscribe" | "runCommand" | "missedPolicy" | "onceSchedule" | "runIn" | "runChanges" | "results"
   >,
 ): RoutinesPort {
   const { runCommand, results } = legacy;
@@ -208,6 +225,7 @@ export function eventRoutinesPort(
     missedPolicy: missedPolicyKept,
     onceSchedule: legacy.onceSchedule,
     runIn: legacy.runIn,
+    runChanges: legacy.runChanges,
     list: () => api.listRoutines({ owner }),
     listRuns: recoveryRuns
       ? async (routineId, limit) => {
@@ -218,7 +236,19 @@ export function eventRoutinesPort(
         }
       : legacy.listRuns,
     events: { owner, api },
-    save: ({ routineId, name, instruction, active, timezone, schedule, trigger, limitPolicy, missedPolicy, runIn }) =>
+    save: ({
+      routineId,
+      name,
+      instruction,
+      active,
+      timezone,
+      schedule,
+      trigger,
+      limitPolicy,
+      missedPolicy,
+      runIn,
+      runsChangeRoutines,
+    }) =>
       api.saveRoutine({
         ...(routineId ? { id: routineId } : {}),
         owner,
@@ -230,6 +260,7 @@ export function eventRoutinesPort(
         ...(limitPolicy ? { limitPolicy } : {}),
         ...(missedPolicyKept && missedPolicy ? { missedPolicy } : {}),
         ...(legacy.runIn && runIn ? { runIn } : {}),
+        ...(legacy.runChanges && runsChangeRoutines !== undefined ? { runsChangeRoutines } : {}),
       }),
     remove: (routineId) => api.deleteRoutine({ id: routineId, owner }),
     test: (routineId) => api.testRoutine({ id: routineId, owner }),

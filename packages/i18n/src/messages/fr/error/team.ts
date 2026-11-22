@@ -82,6 +82,8 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Les couleurs d’agents ne sont pas prises en charge par cette connexion.",
   "error.team.chatColorsUnsupported": "Les couleurs de discussion ne sont pas prises en charge par cette connexion.",
   "error.team.routineRunPlaceUnsupported": "Cette connexion ne peut pas changer l’endroit où une routine s’exécute.",
+  "error.team.routineRunChangesUnsupported":
+    "Cette connexion ne peut pas autoriser les exécutions d’une routine à modifier des routines.",
   "error.team.routinePauseReasonsUnsupported": "Cette connexion ne peut pas montrer pourquoi une routine est en pause.",
   "error.team.activeQueuesUnsupported": "Cette connexion ne peut pas afficher les files d’attente de tous les agents.",
   "error.team.routinesOnceUnsupported":

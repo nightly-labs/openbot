@@ -309,6 +309,7 @@ export function parseCreateRoutine(value: unknown): CreateRoutineInput {
     ...optionalLimitPolicy(value.limitPolicy),
     ...optionalMissedPolicy(value.missedPolicy),
     ...optionalRunPlace(value.runIn),
+    ...optionalRunChanges(value.runsChangeRoutines),
   };
 }
 
@@ -332,6 +333,7 @@ export function parseUpdateRoutine(value: unknown): UpdateRoutineInput {
     optionalLimitPolicy(value.limitPolicy),
     optionalMissedPolicy(value.missedPolicy),
     optionalRunPlace(value.runIn),
+    optionalRunChanges(value.runsChangeRoutines),
   );
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
@@ -347,6 +349,12 @@ function optionalMissedPolicy(value: unknown): { missedPolicy?: RoutineMissedPol
   if (value === undefined) return {};
   if (!isOneOf(ROUTINE_MISSED_POLICIES, value)) throw new Error("Invalid routine missed-run policy.");
   return { missedPolicy: value };
+}
+
+function optionalRunChanges(value: unknown): { runsChangeRoutines?: boolean } {
+  if (value === undefined) return {};
+  if (!isBoolean(value)) throw new Error("runsChangeRoutines must be a boolean.");
+  return { runsChangeRoutines: value };
 }
 
 function optionalRunPlace(value: unknown): { runIn?: RoutineRunPlace } {

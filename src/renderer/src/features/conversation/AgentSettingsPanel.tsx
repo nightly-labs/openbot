@@ -99,6 +99,7 @@ interface AgentSettingsPanelProps
   eventRoutines?: EventRoutinesApi | undefined;
   routines?: AgentRoutinesApi | undefined;
   routineRunPlace?: boolean | undefined;
+  routineRunChanges?: boolean | undefined;
   routinesOnce?: boolean | undefined;
   routineRunCommand?: ((input: TestRoutineInput) => Promise<string>) | undefined;
   routineResultsServerId?: string | RoutineResultsCalls | undefined;
@@ -229,6 +230,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       props.localHost === true || props.routineRunPlace === true,
       props.routineResultsServerId,
       props.localHost === true || props.routinesOnce === true,
+      props.localHost === true || props.routineRunChanges === true,
     ),
   );
   const routinesPort = createMemo(() => {

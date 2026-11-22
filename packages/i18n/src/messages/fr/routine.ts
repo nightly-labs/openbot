@@ -342,6 +342,11 @@ export const messages = {
   "routine.settings.missedPolicy.runOnce": "Exécuter une fois à l’ouverture d’OpenBot",
   "routine.settings.runInThread": "Exécuter dans un fil séparé",
   "routine.settings.runInSaveFailed": "La routine est enregistrée, mais pas son réglage de fil séparé. Réessayez.",
+  "routine.settings.runsChangeRoutines": "Les exécutions peuvent modifier les routines",
+  "routine.settings.runsChangeRoutinesHint":
+    "Les exécutions de cette routine peuvent modifier la planification des routines de cet agent et les activer ou les désactiver.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "La routine est enregistrée, mais pas son réglage de modification des routines. Réessayez.",
   "routine.settings.resultDestination": "Envoyer les réponses à",
   "routine.settings.resultDestination.none": "Seulement cette discussion",
   "routine.settings.resultDestination.place": "{connection} · {place}",

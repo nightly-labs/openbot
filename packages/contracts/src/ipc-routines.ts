@@ -153,6 +153,7 @@ export interface RoutineFields {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
   pausedByRun?: RoutinePausedByRun;
   createdAt: string;
   updatedAt: string;
@@ -174,6 +175,7 @@ export function isRoutineFields(value: unknown): value is RoutineFields {
     (value.limitPolicy === undefined || isOneOf(ROUTINE_LIMIT_POLICIES, value.limitPolicy)) &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
+    (value.runsChangeRoutines === undefined || isBoolean(value.runsChangeRoutines)) &&
     (value.pausedByRun === undefined || isRoutinePausedByRun(value.pausedByRun)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
@@ -274,6 +276,7 @@ export interface CreateRoutineInput {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
 }
 
 export interface UpdateRoutineInput {
@@ -286,6 +289,7 @@ export interface UpdateRoutineInput {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
 }
 
 export interface DeleteRoutineInput {

@@ -2215,8 +2215,11 @@ export class OpenBotToolRouter {
           ? "This run reported that the task could not be done. A failure is not a stop condition, so this routine stays on. Give your answer as usual."
           : "This run ended with nothing to report. Nothing to report is not a stop condition, so this routine stays on. This is not a failure: do not report one. End your turn now.",
       );
-    const routineResult = yield* this.#routines.handleTool(params, senderAgentId, () =>
-      this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
+    const routineResult = yield* this.#routines.handleTool(
+      params,
+      senderAgentId,
+      () => this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
+      () => this.#turnRoutineIds(senderAgentId, params.turnId),
     );
     const pausedRoutine =
       runPause !== null && routineResult?.success
@@ -2958,6 +2961,12 @@ export class OpenBotToolRouter {
       ownRun?.kind === "routine" &&
       this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
     return active ? { agentId: senderAgentId, routineId, scheduledFor: ownRun.scheduledFor } : null;
+  }
+
+  #turnRoutineIds(agentId: string, turnId: string): string[] {
+    return this.#mailbox
+      .findDeliveriesByTurn(agentId, turnId)
+      .flatMap(({ delivery }) => (delivery.sender.kind === "routine" ? [delivery.sender.routineId] : []));
   }
 
   #endRoutineRunTurn(params: DynamicToolCallParams, ended: "failed" | "quiet"): ("resumed" | "kept" | "failed")[] {

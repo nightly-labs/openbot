@@ -130,6 +130,12 @@ import {
   type RoutinePauseReasonEntry,
 } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import {
+  decodeRoutineRunChanges,
+  decodeRoutineRunChangesList,
+  ROUTINE_RUN_CHANGES_ROUTES,
+  type RoutineRunChangesEntry,
+} from "@openbot/contracts/team-protocol/routine-run-changes-v1";
+import {
   decodeRoutineRunPlace,
   decodeRoutineRunPlaces,
   ROUTINE_RUN_PLACE_ROUTES,
@@ -906,6 +912,39 @@ export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunP
   });
 }
 
+export function withRoutineRunChanges<R extends { id: string; runsChangeRoutines?: boolean }>(
+  routines: readonly R[],
+  entries: readonly RoutineRunChangesEntry[],
+): R[] {
+  if (entries.length === 0) return [...routines];
+  const changesOf = new Map(entries.map((entry) => [entry.routineId, entry.runsChangeRoutines]));
+  return routines.map((routine) => {
+    const runsChangeRoutines = changesOf.get(routine.id);
+    return runsChangeRoutines === undefined ? routine : { ...routine, runsChangeRoutines };
+  });
+}
+
+export function listRoutineRunChanges(request: TeamApiRequest, agentId: string): Promise<RoutineRunChangesEntry[]> {
+  return request("POST", ROUTINE_RUN_CHANGES_ROUTES.list, decodeRoutineRunChangesList, { agentId });
+}
+
+export async function setRoutineRunChanges<R extends { id: string; runsChangeRoutines?: boolean }>(
+  request: TeamApiRequest,
+  agentId: string,
+  routine: R,
+  runsChangeRoutines: boolean | undefined,
+  created = false,
+): Promise<R> {
+  if (runsChangeRoutines === undefined) return routine;
+  const set = request("POST", ROUTINE_RUN_CHANGES_ROUTES.set, decodeRoutineRunChanges, {
+    agentId,
+    routineId: routine.id,
+    runsChangeRoutines,
+  });
+  const entry = created ? await set.catch(() => ({ runsChangeRoutines: false })) : await set;
+  return { ...routine, runsChangeRoutines: entry.runsChangeRoutines };
+}
+
 export function withRoutinePauseReasons<R extends { id: string; active: boolean }>(
   routines: readonly R[],
   reasons: readonly RoutinePauseReasonEntry[],
@@ -927,6 +966,7 @@ export function teamAgentRoutinesApi(
   runPlaces: () => boolean = () => false,
   once: () => boolean = () => false,
   pauseReasons: () => boolean = () => false,
+  runChanges: () => boolean = () => false,
 ): TeamAgentRoutinesApi {
   const send: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
   const withRunPlace = async (
@@ -943,45 +983,66 @@ export function teamAgentRoutinesApi(
     const place = created ? await placed.catch(() => ({ runIn: "chat" as const })) : await placed;
     return { ...routine, runIn: place.runIn };
   };
+  const withRunChanges = (routine: Routine, runsChangeRoutines: boolean | undefined, created = false) =>
+    runChanges() ? setRoutineRunChanges(request, routine.agentId, routine, runsChangeRoutines, created) : routine;
   return {
     listRoutines: async (agentId) => {
-      const [list, places, reasons, extra] = await Promise.all([
+      const [list, places, reasons, extra, changes] = await Promise.all([
         request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
         runPlaces()
           ? request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId })
           : Promise.resolve([]),
         pauseReasons() ? listRoutinePauseReasons(request, agentId) : Promise.resolve([]),
         once() ? listOnceAgentRoutines(send, agentId) : Promise.resolve([]),
+        runChanges() ? listRoutineRunChanges(request, agentId) : Promise.resolve([]),
       ]);
-      return [...withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons), ...extra];
+      return withRoutineRunChanges(
+        [...withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons), ...extra],
+        changes,
+      );
     },
-    createRoutine: async ({ runIn, ...input }) => {
+    createRoutine: async ({ runIn, runsChangeRoutines, ...input }) => {
       if (isOnceSchedule(input.schedule)) {
         requireReleasedScheduleOn(input.schedule, once());
-        return createOnceAgentRoutine(send, { ...input, ...(runIn === undefined ? {} : { runIn }) });
+        return withRunChanges(
+          await createOnceAgentRoutine(send, { ...input, ...(runIn === undefined ? {} : { runIn }) }),
+          runsChangeRoutines,
+          true,
+        );
       }
-      return withRunPlace(
-        await request(
-          "POST",
-          TEAM_API_ROUTES.agent.routines(input.agentId),
-          decodeRoutine,
-          decodeTeamProtocolV2Json(input),
+      return withRunChanges(
+        await withRunPlace(
+          await request(
+            "POST",
+            TEAM_API_ROUTES.agent.routines(input.agentId),
+            decodeRoutine,
+            decodeTeamProtocolV2Json(input),
+          ),
+          runIn,
+          true,
         ),
-        runIn,
+        runsChangeRoutines,
         true,
       );
     },
-    updateRoutine: async ({ runIn, ...input }) => {
-      if (once()) return updateAgentRoutineOnce(send, { ...input, ...(runIn === undefined ? {} : { runIn }) });
+    updateRoutine: async ({ runIn, runsChangeRoutines, ...input }) => {
+      if (once())
+        return withRunChanges(
+          await updateAgentRoutineOnce(send, { ...input, ...(runIn === undefined ? {} : { runIn }) }),
+          runsChangeRoutines,
+        );
       requireReleasedScheduleOn(input.schedule, false);
-      return withRunPlace(
-        await request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          decodeRoutine,
-          decodeTeamProtocolV2Json(input),
+      return withRunChanges(
+        await withRunPlace(
+          await request(
+            "PATCH",
+            TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+            decodeRoutine,
+            decodeTeamProtocolV2Json(input),
+          ),
+          runIn,
         ),
-        runIn,
+        runsChangeRoutines,
       );
     },
     deleteRoutine: ({ agentId, routineId }) =>

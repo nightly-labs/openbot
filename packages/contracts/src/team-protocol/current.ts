@@ -181,6 +181,7 @@ import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "./routine-quiet-answers-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "./routine-results-whatsapp-v1";
+import { ROUTINE_RUN_CHANGES_CAPABILITY } from "./routine-run-changes-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
@@ -423,6 +424,7 @@ export {
   ROUTINE_QUIET_ANSWERS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
+  ROUTINE_RUN_CHANGES_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINES_ONCE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
@@ -799,6 +801,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [STORAGE_WORKFLOW_FILES_CAPABILITY, V10],
   [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
   [CHANNEL_FOLDERS_CAPABILITY, V10],
+  [ROUTINE_RUN_CHANGES_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

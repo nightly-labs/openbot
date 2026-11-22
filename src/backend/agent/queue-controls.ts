@@ -318,6 +318,7 @@ export class QueueControls {
                 context.delivery.sender.kind === "routine"
                   ? this.#routines.timezoneForDelivery(input.deliveryId)
                   : undefined,
+              routineChangesRoutines: routineRun ? this.#routines.runChangesRoutines(routineRun) : false,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
               taskReport: this.#drain.taskReport(context),
               taskReportWaiting: this.#drain.taskReportWaiting(context),

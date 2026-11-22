@@ -106,6 +106,7 @@ export function webEventRoutinesApi(
   once: () => boolean = () => false,
   pauseReasons: () => boolean = () => false,
   agentSecret: () => boolean = () => false,
+  runChanges: () => boolean = () => false,
 ): EventRoutinesApi {
   const run = <A>(effect: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> =>
     runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
@@ -127,8 +128,9 @@ export function webEventRoutinesApi(
       return agentSecret() ? giveSecretToAgent : undefined;
     },
     getStatus: () => run(getEventStatus(request)),
-    listRoutines: (input) => run(listEventRoutines(request, input, recovery(), runPlaces(), once(), pauseReasons())),
-    saveRoutine: (input) => run(saveEventRoutine(request, input, recovery(), runPlaces(), once())),
+    listRoutines: (input) =>
+      run(listEventRoutines(request, input, recovery(), runPlaces(), once(), pauseReasons(), runChanges())),
+    saveRoutine: (input) => run(saveEventRoutine(request, input, recovery(), runPlaces(), once(), runChanges())),
     deleteRoutine: (input) => run(deleteEventRoutine(request, input)),
     testRoutine: (input) => run(testEventRoutine(request, input)),
     rotateSecret: (input) => run(rotateEventRoutineSecret(request, input)),

@@ -776,6 +776,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               routinesOnce={
                 props.server?.kind === "remote" && serverSupportsCapability(props.server, "routines-once-v1")
               }
+              routineRunChanges={
+                props.server?.kind === "remote" && serverSupportsCapability(props.server, "routine-run-changes-v1")
+              }
               routineResultsServerId={routineResultsServerId()}
               routineRunCommand={routineRunCommand()}
               folders={folderCalls()}

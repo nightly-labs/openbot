@@ -21,6 +21,7 @@ import {
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_RUN_CHANGES_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-changes-v1";
 import {
   decodeRoutineRunCommandResponse,
   ROUTINE_RUN_COMMAND_CAPABILITY,
@@ -86,6 +87,7 @@ function webHostAdmin(
   routinesOnceEnabled?: () => boolean,
   routinePauseReasonsEnabled?: () => boolean,
   webhookAgentSecretEnabled?: () => boolean,
+  routineRunChangesEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   const eventRoutines = webEventRoutinesApi(
     (...args) => request()(...args),
@@ -96,6 +98,7 @@ function webHostAdmin(
     () => routinesOnceEnabled?.() === true,
     () => routinePauseReasonsEnabled?.() === true,
     () => webhookAgentSecretEnabled?.() === true,
+    () => routineRunChangesEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -177,6 +180,7 @@ export function createWebConversationRuntime(
 ): ConversationRuntime {
   const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
   const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
+  const routineRunChangesEnabled = () => hasCapability?.(ROUTINE_RUN_CHANGES_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const attachmentMedia = createWebAttachmentMedia(remote, hostId);
@@ -493,6 +497,7 @@ export function createWebConversationRuntime(
             () => routineRunPlaceEnabled?.() === true,
             routinesOnceEnabled,
             routinePauseReasonsEnabled,
+            routineRunChangesEnabled,
           ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
@@ -513,6 +518,7 @@ export function createWebConversationRuntime(
           routinesOnceEnabled,
           routinePauseReasonsEnabled,
           () => eventsEnabled?.() === true && hasCapability?.(WEBHOOK_AGENT_SECRET_CAPABILITY) === true,
+          routineRunChangesEnabled,
         )
       : undefined,
   };

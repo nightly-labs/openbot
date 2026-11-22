@@ -331,6 +331,11 @@ export const messages = {
   "routine.settings.runInThread": "別のスレッドで実行",
   "routine.settings.runInSaveFailed":
     "ルーティンは保存されましたが、別スレッドの設定は保存されていません。もう一度お試しください。",
+  "routine.settings.runsChangeRoutines": "実行時にルーティンを変更できる",
+  "routine.settings.runsChangeRoutinesHint":
+    "このルーティンの実行時に、このエージェントのルーティンのスケジュールを変更したり、オン・オフを切り替えたりできます。",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "ルーティンは保存されましたが、ルーティンを変更する設定は保存されていません。もう一度お試しください。",
   "routine.settings.resultDestination": "回答の送信先",
   "routine.settings.resultDestination.none": "このチャットのみ",
   "routine.settings.resultDestination.place": "{connection} · {place}",

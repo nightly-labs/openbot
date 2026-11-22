@@ -947,6 +947,7 @@ export class DrainScheduler {
                 item.delivery.sender.kind === "routine"
                   ? this.#routines.timezoneForDelivery(item.delivery.id)
                   : undefined,
+              routineChangesRoutines: routineRun ? this.#routines.runChangesRoutines(routineRun) : false,
               answeredRoutine: this.answeredRoutine(item.delivery),
               taskReport: this.taskReport(item),
               taskReportWaiting: this.taskReportWaiting(item),

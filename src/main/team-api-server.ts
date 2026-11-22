@@ -152,6 +152,7 @@ import {
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
+  ROUTINE_RUN_CHANGES_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
@@ -464,6 +465,7 @@ import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutinePauseReasons } from "./team-api/route-routine-pause-reasons";
 import { routeRoutineResults } from "./team-api/route-routine-results";
+import { routeRoutineRunChanges } from "./team-api/route-routine-run-changes";
 import { routeRoutineRunCommand } from "./team-api/route-routine-run-command";
 import { routeRoutineRunPlace } from "./team-api/route-routine-run-place";
 import { routeRoutinesOnce } from "./team-api/route-routines-once";
@@ -1232,6 +1234,11 @@ export class TeamApiServer {
         return;
       if (
         (await routeRoutinePauseReasons(context, this.#options.agents, this.#options.routineRunPlaces, hidden)) ===
+        "handled"
+      )
+        return;
+      if (
+        (await routeRoutineRunChanges(context, this.#options.agents, this.#options.routineRunPlaces, hidden)) ===
         "handled"
       )
         return;
@@ -2809,6 +2816,7 @@ export class TeamApiServer {
         if (capability === ROUTINE_RUN_COMMAND_CAPABILITY) return this.#options.admin?.routineRunCommand !== undefined;
         if (capability === ROUTINE_RUN_PLACE_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
         if (capability === ROUTINE_PAUSE_REASONS_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
+        if (capability === ROUTINE_RUN_CHANGES_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
         if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
         if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
         if (capability === WEBHOOK_AGENT_SECRET_CAPABILITY) return this.#options.events !== undefined;

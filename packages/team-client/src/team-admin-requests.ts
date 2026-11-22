@@ -415,8 +415,11 @@ import {
 } from "./routines-once";
 import {
   listRoutinePauseReasons,
+  listRoutineRunChanges,
+  setRoutineRunChanges,
   type TeamApiRequest,
   withRoutinePauseReasons,
+  withRoutineRunChanges,
   withRoutineRunPlaces,
 } from "./team-api-requests";
 
@@ -590,12 +593,19 @@ export function listEventRoutines(
   runPlaces = false,
   once = false,
   pauseReasons = false,
+  runChanges = false,
 ): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
   const routines = listReleasedEventRoutines(request, input, recovery, runPlaces, pauseReasons);
-  if (!once) return routines;
-  const onceRoutines = adminCall(() => listOnceEventRoutines(onceSend(request), input.owner));
-  return Effect.all([routines, onceRoutines], { concurrency: "unbounded" }).pipe(
-    Effect.map(([released, extra]) => [...released, ...extra]),
+  const onceRoutines = once
+    ? adminCall(() => listOnceEventRoutines(onceSend(request), input.owner))
+    : Effect.succeed<EventRoutine[]>([]);
+  const { owner } = input;
+  const changes =
+    runChanges && owner.kind === "agent"
+      ? adminCall(() => listRoutineRunChanges(request, owner.id))
+      : Effect.succeed([]);
+  return Effect.all([routines, onceRoutines, changes], { concurrency: "unbounded" }).pipe(
+    Effect.map(([released, extra, entries]) => withRoutineRunChanges([...released, ...extra], entries)),
   );
 }
 
@@ -629,15 +639,26 @@ export function saveEventRoutine(
   recovery = false,
   runPlaces = false,
   once = false,
+  runChanges = false,
 ): Effect.Effect<SaveEventRoutineResult, TeamAdminRequestError> {
-  const released = saveReleasedEventRoutine(request, input, recovery, runPlaces);
-  const schedule = input.trigger.kind === "schedule" ? input.trigger.schedule : undefined;
-  if (!once) {
-    if (isOnceSchedule(schedule)) return Effect.fail(new TeamAdminRequestError({ cause: routinesOnceUnsupported() }));
-    return released;
-  }
-  return adminCall(() => saveOnceEventRoutine(onceSend(request), input)).pipe(
-    Effect.flatMap((saved) => (saved === null ? released : Effect.succeed(saved))),
+  const { runsChangeRoutines, ...fields } = input;
+  const released = saveReleasedEventRoutine(request, fields, recovery, runPlaces);
+  const schedule = fields.trigger.kind === "schedule" ? fields.trigger.schedule : undefined;
+  const saved = once
+    ? adminCall(() => saveOnceEventRoutine(onceSend(request), fields)).pipe(
+        Effect.flatMap((result) => (result === null ? released : Effect.succeed(result))),
+      )
+    : isOnceSchedule(schedule)
+      ? Effect.fail(new TeamAdminRequestError({ cause: routinesOnceUnsupported() }))
+      : released;
+  const { owner } = fields;
+  if (!runChanges || owner.kind !== "agent" || runsChangeRoutines === undefined) return saved;
+  return saved.pipe(
+    Effect.flatMap((result) =>
+      adminCall(() =>
+        setRoutineRunChanges(request, owner.id, result.routine, runsChangeRoutines, input.id === undefined),
+      ).pipe(Effect.map((routine) => ({ ...result, routine }))),
+    ),
   );
 }
 

@@ -346,6 +346,11 @@ export const messages = {
   "routine.settings.runInThread": "In einem eigenen Thread ausführen",
   "routine.settings.runInSaveFailed":
     "Die Routine ist gespeichert, die Einstellung für den eigenen Thread aber nicht. Versuche es erneut.",
+  "routine.settings.runsChangeRoutines": "Läufe dürfen Routinen ändern",
+  "routine.settings.runsChangeRoutinesHint":
+    "Läufe dieser Routine dürfen den Zeitplan der Routinen dieses Agenten ändern und sie ein- oder ausschalten.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "Die Routine ist gespeichert, die Einstellung zum Ändern von Routinen aber nicht. Versuche es erneut.",
   "routine.settings.resultDestination": "Antworten senden an",
   "routine.settings.resultDestination.none": "Nur dieser Chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

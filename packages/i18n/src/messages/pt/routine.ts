@@ -326,6 +326,11 @@ export const messages = {
   "routine.settings.missedPolicy.runOnce": "Executar uma vez quando o OpenBot abrir",
   "routine.settings.runInThread": "Executar em um tópico separado",
   "routine.settings.runInSaveFailed": "A rotina foi salva, mas a configuração de tópico separado não. Tente de novo.",
+  "routine.settings.runsChangeRoutines": "Execuções podem alterar rotinas",
+  "routine.settings.runsChangeRoutinesHint":
+    "As execuções desta rotina podem alterar o agendamento das rotinas deste agente e ativá-las ou desativá-las.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "A rotina foi salva, mas a configuração para alterar rotinas não. Tente de novo.",
   "routine.settings.resultDestination": "Enviar respostas para",
   "routine.settings.resultDestination.none": "Somente este chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

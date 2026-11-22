@@ -574,6 +574,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:routine-report-failure
 
+      - name: Run the routine run changes E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:routine-run-changes
+
       - name: Run the routine skipped runs report E2E test
         if: ${{ !cancelled() }}
         run: bun run test:routine-skipped-runs-report
@@ -895,6 +899,7 @@ jobs:
             .openbot-build/usage-read-pacing-e2e/
             .openbot-build/routine-fresh-session-e2e/
             .openbot-build/routine-report-failure-e2e/
+            .openbot-build/routine-run-changes-e2e/
             .openbot-build/routine-skipped-runs-report-e2e/
             .openbot-build/agent-webhook-routine-e2e/
             .openbot-build/agent-channel-manage-e2e/

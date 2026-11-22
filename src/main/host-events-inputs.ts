@@ -56,6 +56,8 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
     throw invalidEventInput();
   }
   if (input.runIn !== undefined && input.runIn !== "chat" && input.runIn !== "thread") throw invalidEventInput();
+  if (input.runsChangeRoutines !== undefined && typeof input.runsChangeRoutines !== "boolean")
+    throw invalidEventInput();
   return {
     ...(input.id === undefined ? {} : { id: requiredString(input.id, 128) }),
     owner: owner(input.owner),
@@ -74,6 +76,7 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
     ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
     ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
     ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
+    ...(input.runsChangeRoutines === undefined ? {} : { runsChangeRoutines: input.runsChangeRoutines }),
   };
 }
 
