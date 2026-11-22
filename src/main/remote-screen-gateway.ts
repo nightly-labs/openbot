@@ -190,6 +190,10 @@ export class RemoteScreenGateway {
     return this.#screenRecordingDenied;
   }
 
+  needsX11Session(): boolean {
+    return this.#linuxWithoutX11;
+  }
+
   readonly recheckScreenRecording = Effect.fn("RemoteScreenGateway.recheckScreenRecording")(
     function* (this: RemoteScreenGateway): Effect.fn.Return<boolean, RemoteWorkflowError> {
       if (this.#linuxWithoutX11 || !this.#options.runtimePaths) return this.#screenRecordingDenied;

@@ -609,6 +609,7 @@ export const messages = {
     "Nie ma osobnego hasła do pulpitu zdalnego. Ustawienia poniżej określają, kto może sterować tym komputerem.",
   "server.desktop.componentInstalled": "Komponent hosta zainstalowany",
   "server.desktop.componentNotInstalled": "Komponent hosta niezainstalowany",
+  "server.desktop.needsX11Session": "Wymaga sesji X11",
   "server.desktop.sessions": "Tryb bez nadzoru: {unattended} · Aktywne sesje: {active}/{max}",
   "server.desktop.unattendedEnabled": "włączony",
   "server.desktop.unattendedUnavailable": "niedostępny",

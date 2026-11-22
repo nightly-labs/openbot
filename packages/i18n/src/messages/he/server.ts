@@ -645,6 +645,7 @@ export const messages = {
     "אין סיסמה נפרדת לשולחן עבודה מרוחק. ההגדרות שלהלן קובעות מי יכול לשלוט במחשב הזה.",
   "server.desktop.componentInstalled": "רכיב המארח מותקן",
   "server.desktop.componentNotInstalled": "רכיב המארח אינו מותקן",
+  "server.desktop.needsX11Session": "נדרש סשן X11",
   "server.desktop.sessions": "ללא השגחה: {unattended} · סשנים פעילים: {active}/{max}",
   "server.desktop.unattendedEnabled": "מופעל",
   "server.desktop.unattendedUnavailable": "אינו זמין",

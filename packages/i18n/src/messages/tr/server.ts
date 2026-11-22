@@ -550,6 +550,7 @@ export const messages = {
     "Uzak masaüstü için ayrı bir parola yok. Bu bilgisayarı kimin kontrol edebileceğini aşağıdaki ayarlar belirler.",
   "server.desktop.componentInstalled": "Ana makine bileşeni yüklendi",
   "server.desktop.componentNotInstalled": "Ana makine bileşeni yüklenmedi",
+  "server.desktop.needsX11Session": "X11 oturumu gerekli",
   "server.desktop.sessions": "Katılımsız: {unattended} · Etkin oturumlar: {active}/{max}",
   "server.desktop.unattendedEnabled": "etkin",
   "server.desktop.unattendedUnavailable": "kullanılamıyor",

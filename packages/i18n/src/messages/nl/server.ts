@@ -613,6 +613,7 @@ export const messages = {
     "Er is geen apart wachtwoord voor extern bureaublad. Met de instellingen hieronder kies je wie deze computer mag bedienen.",
   "server.desktop.componentInstalled": "Hostonderdeel geïnstalleerd",
   "server.desktop.componentNotInstalled": "Hostonderdeel niet geïnstalleerd",
+  "server.desktop.needsX11Session": "X11-sessie nodig",
   "server.desktop.sessions": "Onbeheerd: {unattended} · Actieve sessies: {active}/{max}",
   "server.desktop.unattendedEnabled": "ingeschakeld",
   "server.desktop.unattendedUnavailable": "niet beschikbaar",

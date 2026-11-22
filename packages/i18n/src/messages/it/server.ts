@@ -543,6 +543,7 @@ export const messages = {
     "Non c'è una password separata per il desktop remoto. Le impostazioni qui sotto scelgono chi può controllare questo computer.",
   "server.desktop.componentInstalled": "Componente dell'host installato",
   "server.desktop.componentNotInstalled": "Componente dell'host non installato",
+  "server.desktop.needsX11Session": "Serve una sessione X11",
   "server.desktop.sessions": "Non presidiato: {unattended} · Sessioni attive: {active}/{max}",
   "server.desktop.unattendedEnabled": "attivo",
   "server.desktop.unattendedUnavailable": "non disponibile",

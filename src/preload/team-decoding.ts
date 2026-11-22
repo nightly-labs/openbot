@@ -106,6 +106,7 @@ export function decodeHostStatus(value: unknown): HostStatus {
     apiOnline: requiredBoolean(status, "apiOnline"),
     remoteDesktopReady: requiredBoolean(status, "remoteDesktopReady"),
     remoteDesktopScreenRecordingDenied: requiredBoolean(status, "remoteDesktopScreenRecordingDenied"),
+    remoteDesktopNeedsX11Session: requiredBoolean(status, "remoteDesktopNeedsX11Session"),
     remoteDesktopUnattended: requiredBoolean(status, "remoteDesktopUnattended"),
     remoteDesktopActiveSessions: requiredNumber(status, "remoteDesktopActiveSessions"),
     remoteDesktopMaxSessions: requiredNumber(status, "remoteDesktopMaxSessions"),

@@ -532,6 +532,7 @@ export const messages = {
     "リモートデスクトップ用の別のパスワードはありません。このコンピューターを操作できるユーザーは下の設定で選びます。",
   "server.desktop.componentInstalled": "ホストコンポーネント導入済み",
   "server.desktop.componentNotInstalled": "ホストコンポーネント未導入",
+  "server.desktop.needsX11Session": "X11 セッションが必要",
   "server.desktop.sessions": "無人アクセス: {unattended} · アクティブなセッション: {active}/{max}",
   "server.desktop.unattendedEnabled": "有効",
   "server.desktop.unattendedUnavailable": "利用不可",

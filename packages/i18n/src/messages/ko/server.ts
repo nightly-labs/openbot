@@ -589,6 +589,7 @@ export const messages = {
     "원격 데스크톱용 별도 비밀번호는 없어요. 아래 설정에서 이 컴퓨터를 제어할 수 있는 사람을 선택해요.",
   "server.desktop.componentInstalled": "호스트 구성 요소 설치됨",
   "server.desktop.componentNotInstalled": "호스트 구성 요소 설치되지 않음",
+  "server.desktop.needsX11Session": "X11 세션 필요",
   "server.desktop.sessions": "무인 접속: {unattended} · 활성 세션: {active}/{max}",
   "server.desktop.unattendedEnabled": "사용 중",
   "server.desktop.unattendedUnavailable": "사용 불가",

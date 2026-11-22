@@ -551,6 +551,7 @@ export const messages = {
     "Il n’y a pas de mot de passe distinct pour le bureau à distance. Les réglages ci-dessous choisissent qui peut contrôler cet ordinateur.",
   "server.desktop.componentInstalled": "Composant hôte installé",
   "server.desktop.componentNotInstalled": "Composant hôte non installé",
+  "server.desktop.needsX11Session": "Session X11 requise",
   "server.desktop.sessions": "Sans surveillance : {unattended} · Sessions actives : {active}/{max}",
   "server.desktop.unattendedEnabled": "activé",
   "server.desktop.unattendedUnavailable": "non disponible",
