@@ -832,6 +832,9 @@ export function createWorkflowsController(
       return row;
     });
 
+  const hostDownload = host.downloadMedia;
+  const downloadMedia = hostDownload ? (attachmentId: string) => reported(hostDownload(attachmentId)) : undefined;
+
   return {
     detail: () => stored()?.detail,
     failed,
@@ -842,6 +845,7 @@ export function createWorkflowsController(
     slack,
     pictures,
     uploadPicture,
+    downloadMedia,
     readOnly: () => lock() !== undefined,
     github,
     props,
