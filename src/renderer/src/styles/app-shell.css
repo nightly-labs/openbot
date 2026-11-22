@@ -1172,6 +1172,11 @@ textarea {
   height: 1px;
   background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
   content: "";
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.server-menu-credits-line[data-highlighted] + .server-menu-credits-buy::before {
+  opacity: 0;
 }
 
 .server-menu-credits-buy-icon {
