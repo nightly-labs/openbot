@@ -24,7 +24,7 @@ import { createEffect, createMemo, createSignal, onCleanup, untrack } from "soli
 import { groupAgentMessageMarkers, markOpenAgentMessages, teammateTurnAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
-import { narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
+import { heldWhileWritten, narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -518,16 +518,6 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 }
 
 const STALE_STREAM_MS = 3_000;
-
-function heldWhileWritten(message: AgentMessage): boolean {
-  return (
-    message.author === "agent" &&
-    message.streaming === true &&
-    message.kind === "text" &&
-    !message.imageGeneration &&
-    !message.videoGeneration
-  );
-}
 
 export function withQuestionContext(
   shown: AgentMessage[],

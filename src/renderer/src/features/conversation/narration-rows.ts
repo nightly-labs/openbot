@@ -28,6 +28,25 @@ export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef
   return rows;
 }
 
+export function naturalThreadRows(
+  messages: readonly AgentMessage[],
+  provider: AgentProviderRef | undefined,
+  activeTurnId: string | null | undefined,
+): AgentMessage[] {
+  const turns: AgentMessage[][] = [];
+  const listed = messages.flatMap((message) => {
+    if (message.kind !== "thinking") return [message];
+    const rows = [...narrationRows(message, provider), message];
+    turns.push(rows);
+    return rows;
+  });
+  const held = (message: AgentMessage) =>
+    heldWhileWritten(message) &&
+    Boolean(activeTurnId) &&
+    (message.turnId === undefined || message.turnId === activeTurnId);
+  return placeUpdatesAfterSteers(listed, turns).filter((message) => !held(message));
+}
+
 export function placeTurnRowsByTime(rows: readonly AgentMessage[], turns: readonly AgentMessage[][]): AgentMessage[] {
   const timed = turns.flatMap((turn) => {
     let at = "";
@@ -104,4 +123,14 @@ function turnSteerTimes(rows: readonly AgentMessage[]): Map<string, string> {
     if (steerAt !== undefined) steerTimes.set(turnId, steerAt);
   }
   return steerTimes;
+}
+
+export function heldWhileWritten(message: AgentMessage): boolean {
+  return (
+    message.author === "agent" &&
+    message.streaming === true &&
+    message.kind === "text" &&
+    !message.imageGeneration &&
+    !message.videoGeneration
+  );
 }
