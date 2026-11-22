@@ -110,7 +110,7 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
   const settled = () => props.items.every((item) => awaitingReplyEnded(item.state));
   const stopIcon = () => props.stopDisplay === "icon";
   const failed = () => props.items.filter((item) => item.state === "failed").length;
-  const ended = () => settled() && failed() > 0;
+  const ended = () => failed() > 0 && done() + failed() === total();
   return (
     <section
       style={{ "--task-list-play-state": playState() }}
