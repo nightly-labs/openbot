@@ -20,6 +20,7 @@ export { default as Bold } from "lucide-solid/icons/bold";
 export { default as BookMarked } from "lucide-solid/icons/book-marked";
 export { default as BookOpen } from "lucide-solid/icons/book-open";
 export { default as Bot } from "lucide-solid/icons/bot";
+export { default as Braces } from "lucide-solid/icons/braces";
 export { default as Brain } from "lucide-solid/icons/brain";
 export { default as BriefcaseBusiness } from "lucide-solid/icons/briefcase-business";
 export { default as BringToFront } from "lucide-solid/icons/bring-to-front";

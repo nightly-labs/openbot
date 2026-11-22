@@ -5,8 +5,10 @@ import {
   WORKFLOW_TRIGGER_FIELDS_FORMAT,
   type WorkflowAnswerProblem,
   type WorkflowAnswerScope,
+  type WorkflowAnswerSource,
   type WorkflowGraph,
   workflowAnswerProblems,
+  workflowAnswerSources,
   workflowInputAnswerFields,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -202,6 +204,7 @@ export interface WfnBoard {
   setFields: (id: string, values: WfnFields) => void;
   githubTriggers: (id: string) => string[];
   answerNames: (id: string) => readonly string[];
+  answerSources: (id: string) => readonly WorkflowAnswerSource[];
   answerProblems: (id: string) => readonly WorkflowAnswerProblem[];
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
@@ -859,6 +862,10 @@ export function createBoard(options: BoardOptions) {
     answerNames: (id) => {
       const graph = options.graph?.();
       return graph ? [...workflowInputAnswerFields(graph, id, answerScope()).keys()] : [];
+    },
+    answerSources: (id) => {
+      const graph = options.graph?.();
+      return graph ? workflowAnswerSources(graph, id, graph.edges, answerScope()) : [];
     },
     answerProblems: (id) => answerProblemsByNode().get(id) ?? NO_ANSWER_PROBLEMS,
     inputs: (id, type) =>

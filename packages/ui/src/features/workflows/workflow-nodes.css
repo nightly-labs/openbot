@@ -1363,17 +1363,46 @@ fieldset.wfn-picker-group {
   display: flex;
   flex-direction: column;
   gap: 0;
-  width: 240px;
+  width: 320px;
   max-height: min(240px, var(--kb-popper-content-available-height, 240px));
   padding: 0;
   overflow: hidden;
 }
 
 .wfn-name-option {
+  flex: none;
+  max-width: 60%;
   overflow: hidden;
   font-family: var(--openbot-font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.wfn-name-source {
+  min-width: 0;
+  margin-inline-start: auto;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-name-box {
+  position: relative;
+  display: grid;
+  min-height: 0;
+}
+
+.wfn-stage :where(.wfn-name-box:has(> .wfn-name-insert)) > .wfn-input {
+  padding-inline-end: var(--openbot-space-6);
+}
+
+.wfn-name-insert {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  color: var(--openbot-text-muted);
 }
 
 .ui-popover-menu-surface.wfn-popover.wfn-step-settings {
@@ -3945,7 +3974,7 @@ svg.wfn-shape-surface {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-media-control-scrim);
   color: var(--openbot-media-control-text);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   line-height: 1.6;
 }
