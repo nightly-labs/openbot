@@ -1128,17 +1128,6 @@ textarea {
   color: var(--openbot-text-secondary);
 }
 
-.server-menu-credits {
-  order: 1;
-  flex: 0 0 auto;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.server-menu-row:has(.server-menu-credits) > .agent-context-submenu-chevron {
-  order: 2;
-}
-
 .server-menu-credit-value {
   font-variant-numeric: tabular-nums;
 }

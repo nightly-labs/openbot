@@ -10,8 +10,8 @@
   to 40% on the largest. A dollar pack has fewer credits than the euro pack at the same price. Each
   pack shows how many images and videos it buys with named models. Each purchase gets an invoice
   with VAT. The Terms now have a credits section: bought credits do not expire and are not refunded.
-- The server menu shows the credits of each server. A card at the top shows your credits, with a
-  Get button to buy more. On the buy page, a server owner can move their own credits to the server.
+- In the server menu, the submenu of each server shows its credits. A card at the top shows your
+  credits, with a Get button to buy more. On the buy page, a server owner can move their own credits to the server.
   This works in the desktop app and in the web client.
 - Free monthly credits with a paid license. After the free trial, each paid month gives the license
   owner 50 credits with Starter, or 100 credits plus 50 for each extra user with Team. A yearly

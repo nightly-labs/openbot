@@ -146,12 +146,6 @@ export function ServerMenu(props: ServerMenuProps) {
     return state?.available ? state : null;
   };
   const serverWallet = (serverId: string) => credits()?.servers.find((wallet) => wallet.serverId === serverId) ?? null;
-  const serverCreditLabels = (serverId: string) => {
-    const wallet = serverWallet(serverId);
-    return wallet
-      ? [t("billing.credits.amount", { count: wallet.balance, amount: format.number(wallet.balance) })]
-      : [];
-  };
   function openCredits(serverId: string | null): void {
     props.credits?.onOpen(serverId);
   }
@@ -334,7 +328,6 @@ export function ServerMenu(props: ServerMenuProps) {
                         server().name,
                         ...serverStatusLabels(server(), t),
                         ...serverPlanStatusLabels(server(), planDeletesAt(server().id), t, format),
-                        ...serverCreditLabels(server().id),
                       ].join(", ")}
                       aria-current={server().active ? "true" : undefined}
                       data-cuelume-navigate=""
@@ -351,11 +344,6 @@ export function ServerMenu(props: ServerMenuProps) {
                         <BellOff class="server-menu-muted size-3" aria-hidden="true" />
                       </Show>
                       <ServerPlanChip server={server()} deleteAt={planDeletesAt(server().id)} />
-                      <Show when={serverWallet(server().id)}>
-                        {(wallet) => (
-                          <CreditAmount value={format.number(wallet().balance)} class="server-menu-credits" />
-                        )}
-                      </Show>
                       <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
                     </DropdownMenu.SubTrigger>
                     <DropdownMenu.Portal>
