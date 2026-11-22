@@ -252,6 +252,39 @@ class DiscordAdapter implements MessagingAdapter {
     return { skipped, firstId: null };
   });
 
+  readonly postFileWithText = Effect.fnUntraced(function* (
+    this: DiscordAdapter,
+    target: MessageTarget,
+    markdown: string,
+    file: MessagingAnswerFile,
+  ) {
+    const chunks = chunkMarkdown(markdown, CHUNK_CHARACTERS);
+    const content = chunks.length === 1 ? (chunks[0] ?? "") : "";
+    if (!content.trim()) return null;
+    const bytes = yield* readAtMost(file.path, DISCORD_UPLOAD_BYTES_LIMIT).pipe(
+      Effect.catch(() => Effect.succeed(null)),
+    );
+    if (bytes === null || bytes.byteLength === 0) return null;
+    return yield* this.#call(
+      {
+        op: "upload",
+        guildId: this.#guildId,
+        channelId: target.platformChannelId,
+        replyTo: target.replyThreadId,
+        filename: file.name,
+        content,
+      },
+      decodeDiscordMessageId,
+      { bytes, mimeType: file.mimeType },
+    ).pipe(
+      Effect.catch((failure) =>
+        failure.cause instanceof DiscordApiError && failure.cause.code === "invalid_request"
+          ? Effect.succeed(null)
+          : Effect.fail(failure),
+      ),
+    );
+  });
+
   readonly history = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     platformChannelId: string,
