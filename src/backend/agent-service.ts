@@ -158,7 +158,6 @@ import {
   type SkillLearningMode,
   sameAgentBrowserProfile,
   sameAgentModelChoice,
-  savedCustomModelId,
   WORKFLOW_CATALOG_PROVIDERS,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX,
@@ -1125,13 +1124,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         savedEndpoints: () =>
           new Map(
-            credentials.customProviders().map((endpoint) => {
-              const harness = endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
-              return [
-                endpoint.id,
-                { harness, models: endpoint.models.map((model) => savedCustomModelId(endpoint.id, harness, model.id)) },
-              ];
-            }),
+            credentials.customProviders().map((endpoint) => [
+              endpoint.id,
+              {
+                harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+                modelIds: endpoint.models.map((model) => model.id),
+              },
+            ]),
           ),
         modelsChanged: () => this.#emit({ type: "status", status: this.getStatus() }),
         stopProfileClients: () =>
