@@ -11,6 +11,20 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Pominięto: poprzednie uruchomienie jeszcze się nie zakończyło",
   "status.agent.routineSkippedUsageLimit": "Pominięto: osiągnięto limit użycia",
   "status.agent.modelSwitchedForError": "Błąd dostawcy. Przełączono na {model}.",
+  "status.agent.modelSwitchedForRateLimit": {
+    one: "{previous} osiągnął krótki limit zapytań. Przełączono na {model}. Powrót za około {count} minutę.",
+    few: "{previous} osiągnął krótki limit zapytań. Przełączono na {model}. Powrót za około {count} minuty.",
+    many: "{previous} osiągnął krótki limit zapytań. Przełączono na {model}. Powrót za około {count} minut.",
+    other: "{previous} osiągnął krótki limit zapytań. Przełączono na {model}. Powrót za około {count} minuty.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    one: "{previous} zatrzymał się z powodu błędu. Przełączono na {model}. Powrót za około {count} minutę.",
+    few: "{previous} zatrzymał się z powodu błędu. Przełączono na {model}. Powrót za około {count} minuty.",
+    many: "{previous} zatrzymał się z powodu błędu. Przełączono na {model}. Powrót za około {count} minut.",
+    other: "{previous} zatrzymał się z powodu błędu. Przełączono na {model}. Powrót za około {count} minuty.",
+  },
+  "status.agent.modelSwitchedForNotOffered":
+    "{previous} nie jest teraz dostępny dla tego konta. Przełączono na {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} nie ma już kredytów. Przełączono na {model}. Aby znowu go używać, dodaj kredyty, a potem go wybierz.",
   "status.agent.modelReturnedAfterError": "Po błędzie dostawcy przełączono z powrotem na {model}.",

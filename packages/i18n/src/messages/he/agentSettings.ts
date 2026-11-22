@@ -88,7 +88,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "כש-{model} מגיע למגבלת השימוש שלו לפני ש-{name} מתחיל לכתוב, {name} שואל אותך באיזה מודל להשתמש.",
   "agentSettings.backupModels.introAutomatic":
-    "כש-{model} מגיע למגבלת השימוש שלו, {name} עובר למודל הזמין הראשון לפי הסדר. {name} עובר גם כש-{model} נכשל בשגיאת ספק לפני ש-{name} מתחיל לכתוב.",
+    "כש-{model} מגיע למגבלת השימוש שלו, {name} עובר למודל הזמין הראשון לפי הסדר. {name} עובר גם כש-{model} נכשל בשגיאת ספק.",
   "agentSettings.backupModels.ask": "לשאול לפני המעבר",
   "agentSettings.backupModels.order": "סדר",
   "agentSettings.backupModels.listLabel": "מודלי גיבוי, לפי הסדר",

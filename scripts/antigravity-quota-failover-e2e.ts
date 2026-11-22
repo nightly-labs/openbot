@@ -4,7 +4,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, type AgentEvent } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, type AgentEvent, MODEL_SWITCH_ITEM_TYPES } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -40,11 +41,13 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-credits-a", "gemini-credits-b", "gemini-hidden", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
 const update = (sessionId, value) => write({ method: "session/update", params: { sessionId, update: value } });
+const offered = (currentValue) => [{ id: "model", name: "Model", category: "model", type: "select", currentValue,
+  options: MODELS.filter((modelId) => modelId !== "gemini-hidden").map((value) => ({ value, name: value })) }];
 let sessions = 0;
 function handle(message) {
   const params = message.params ?? {};
@@ -57,6 +60,10 @@ function handle(message) {
     current.set(params.sessionId, params.modelId);
     return write({ id: message.id, result: {} });
   }
+  if (message.method === "session/set_config_option") {
+    current.set(params.sessionId, params.value);
+    return write({ id: message.id, result: { configOptions: offered(params.value) } });
+  }
   if (message.method === "session/prompt") {
     const text = params.prompt.map((block) => block.text ?? "").join("");
     const model = current.get(params.sessionId) ?? MODELS[0];
@@ -66,6 +73,8 @@ function handle(message) {
     const gone = model.startsWith("gemini-gone") && text.includes("GONE-NOW");
     const credits = model.startsWith("gemini-credits-") && text.includes("CREDITS-NOW");
     log({ model, quota: quota || credits, rate: rate || net || gone, text });
+    if (model === "gemini-hidden" && text.includes("HIDE-NEXT"))
+      update(params.sessionId, { sessionUpdate: "config_option_update", configOptions: offered("gemini-flash") });
     if (credits) {
       if (text.includes("ACT-FIRST"))
         update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
@@ -129,6 +138,7 @@ interface CaseReport {
   model: string | undefined;
   prompts: { model: string; quota: boolean; rate: boolean; continuation: boolean; workSteps: boolean }[];
   errors: number;
+  notes: string[];
   passed: boolean;
 }
 
@@ -247,6 +257,9 @@ async function runCase(
         workSteps: prompt.text.includes("Read notes.txt"),
       })),
     errors: events.slice(since).filter((event) => event.type === "error" && event.agentId === agent.id).length,
+    notes: (await runCauseEffect(agents.readConversation(agent.id))).messages
+      .filter((message) => message.itemType === MODEL_SWITCH_ITEM_TYPES["provider-error"])
+      .map((message) => message.text),
     passed: false,
   };
   report.cases.push(result);
@@ -313,6 +326,11 @@ try {
     ],
     "The message runs again on the backup after a rate limit.",
   );
+  assert.deepEqual(
+    rate.notes,
+    [sourceText("status.agent.modelSwitchedForRateLimit", { previous: "gemini-rate", model: BACKUP, count: 10 })],
+    "The chat names the rate limit and the return time.",
+  );
   rate.passed = true;
 
   const rateAfter = await runCase(
@@ -347,6 +365,11 @@ try {
       ],
       `${name}: the message runs again on the backup.`,
     );
+    assert.deepEqual(
+      moved.notes,
+      [sourceText("status.agent.modelSwitchedForErrorUntilReturn", { previous: model, model: BACKUP, count: 10 })],
+      `${name}: the chat names the stopped model and the return time.`,
+    );
     moved.passed = true;
   }
 
@@ -372,12 +395,72 @@ try {
     credits.passed = true;
   }
 
+  const hiddenCase: CaseReport = {
+    name: "model not offered before the next message",
+    status: "",
+    model: undefined,
+    prompts: [],
+    errors: 0,
+    notes: [],
+    passed: false,
+  };
+  report.cases.push(hiddenCase);
+  const hidden = await runCauseEffect(
+    agents.createAgent({
+      name: hiddenCase.name,
+      description: "Checks a model that the session stops offering.",
+      avatarSeed: "gemini-hidden",
+      avatarHue: null,
+      provider: "antigravity",
+      model: "gemini-hidden",
+      initialMessage: "Hello.",
+    }),
+  );
+  await waitFor(`${hiddenCase.name}: the first turn`, () => idle(hidden.id));
+  await runCauseEffect(
+    agents.updateAgent({
+      agentId: hidden.id,
+      backupModels: { automatic: true, order: [{ provider: "antigravity", model: BACKUP }] },
+    }),
+  );
+  const hiddenBefore = prompts().length;
+  for (const text of ["HIDE-NEXT", "After the model list changed."]) {
+    const receipt = await runCauseEffect(agents.sendMessage({ agentId: hidden.id, text }));
+    const deliveryId = receipt.deliveries[0]?.id;
+    assert.ok(deliveryId, `${hiddenCase.name}: the message has a delivery`);
+    hiddenCase.status = await waitFor(`${hiddenCase.name}: "${text}" to end`, () => {
+      const value = mailbox.getDelivery(deliveryId)?.delivery.status;
+      return value === "completed" || value === "failed" || value === "interrupted" ? value : null;
+    });
+  }
+  hiddenCase.model = store.list().find((candidate) => candidate.id === hidden.id)?.model;
+  hiddenCase.prompts = prompts()
+    .slice(hiddenBefore)
+    .map((prompt) => ({ model: prompt.model, quota: false, rate: false, continuation: false, workSteps: false }));
+  hiddenCase.notes = (await runCauseEffect(agents.readConversation(hidden.id))).messages
+    .filter((message) => message.itemType === MODEL_SWITCH_ITEM_TYPES["provider-error"])
+    .map((message) => message.text);
+  assert.deepEqual(
+    hiddenCase.prompts.map((prompt) => prompt.model),
+    ["gemini-hidden", BACKUP],
+    "The next message runs on the backup when the session stops offering the model.",
+  );
+  assert.equal(hiddenCase.status, "completed", `${hiddenCase.name}: the next message completes`);
+  assert.equal(hiddenCase.model, BACKUP, `${hiddenCase.name}: the agent is on the backup model`);
+  assert.deepEqual(
+    hiddenCase.notes,
+    [sourceText("status.agent.modelSwitchedForNotOffered", { previous: "gemini-hidden", model: BACKUP })],
+    "The chat says that the account does not offer the model now, with no return time.",
+  );
+  hiddenCase.passed = true;
+
   const channelCase: CaseReport = {
     name: "quota on a channel task, switch without asking",
     status: "",
     model: undefined,
     prompts: [],
     errors: 0,
+    notes: [],
     passed: false,
   };
   report.cases.push(channelCase);

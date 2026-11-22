@@ -397,7 +397,7 @@ export const messages = {
   "mobile.agent.backupModels.intro":
     "عندما يبلغ {model} حد استخدامه قبل أن يبدأ {name} الكتابة، يسألك {name} عن النموذج الذي يستخدمه.",
   "mobile.agent.backupModels.introAutomatic":
-    "عندما يبلغ {model} حد الاستخدام، ينتقل {name} إلى أول نموذج متاح في الترتيب. وينتقل {name} أيضًا عندما يفشل {model} بخطأ من المزوّد قبل أن يبدأ {name} بالكتابة.",
+    "عندما يبلغ {model} حد الاستخدام، ينتقل {name} إلى أول نموذج متاح في الترتيب. وينتقل {name} أيضًا عندما يفشل {model} بخطأ من المزوّد.",
   "mobile.agent.backupModels.ask": "السؤال قبل التبديل",
   "mobile.agent.backupModels.order": "الترتيب",
   "mobile.agent.backupModels.empty": "لم يُحدَّد ترتيب. يعرض {name} كل نموذج متاح.",

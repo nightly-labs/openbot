@@ -15,6 +15,15 @@ export const messages = defineMessages("status.agent", {
   "status.agent.routineSkippedRunOpen": "Skipped: the last run had not finished",
   "status.agent.routineSkippedUsageLimit": "Skipped: usage limit reached",
   "status.agent.modelSwitchedForError": "Provider error. Switched to {model}.",
+  "status.agent.modelSwitchedForRateLimit": {
+    one: "{previous} reached a short rate limit. Switched to {model}. Switches back in about {count} minute.",
+    other: "{previous} reached a short rate limit. Switched to {model}. Switches back in about {count} minutes.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    one: "{previous} stopped with an error. Switched to {model}. Switches back in about {count} minute.",
+    other: "{previous} stopped with an error. Switched to {model}. Switches back in about {count} minutes.",
+  },
+  "status.agent.modelSwitchedForNotOffered": "{previous} is not available for this account now. Switched to {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
   "status.agent.modelReturnedAfterError": "Switched back to {model} after the provider error.",

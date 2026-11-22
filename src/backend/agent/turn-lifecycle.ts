@@ -1137,7 +1137,15 @@ export class TurnLifecycle {
   #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
     const resetDelayMs = providerResetDelayMs(failover.message);
     const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
-    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, failover.context.causeCode === "authentication");
+    this.#usageLimits.failed(
+      agentId,
+      model,
+      resetDelayMs,
+      spent,
+      failover.context.causeCode === "authentication",
+      false,
+      failover.context.causeCode === "rate_limit",
+    );
   }
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {

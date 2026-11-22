@@ -1169,6 +1169,13 @@ button.chat-action-target:active,
   padding-inline-end: var(--openbot-space-1-5);
 }
 
+.chat-action-marker-model-switch .chat-action-marker-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
 .chat-action-target-name,
 .chat-action-target > span:last-child {
   min-width: 0;

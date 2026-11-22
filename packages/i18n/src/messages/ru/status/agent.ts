@@ -11,6 +11,20 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Пропущено: предыдущий запуск ещё не завершился",
   "status.agent.routineSkippedUsageLimit": "Пропущено: достигнут лимит использования",
   "status.agent.modelSwitchedForError": "Ошибка провайдера. Переключено на {model}.",
+  "status.agent.modelSwitchedForRateLimit": {
+    one: "{previous} достиг кратковременного лимита запросов. Переключено на {model}. Возврат примерно через {count} минуту.",
+    few: "{previous} достиг кратковременного лимита запросов. Переключено на {model}. Возврат примерно через {count} минуты.",
+    many: "{previous} достиг кратковременного лимита запросов. Переключено на {model}. Возврат примерно через {count} минут.",
+    other:
+      "{previous} достиг кратковременного лимита запросов. Переключено на {model}. Возврат примерно через {count} минуты.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    one: "{previous} остановился из-за ошибки. Переключено на {model}. Возврат примерно через {count} минуту.",
+    few: "{previous} остановился из-за ошибки. Переключено на {model}. Возврат примерно через {count} минуты.",
+    many: "{previous} остановился из-за ошибки. Переключено на {model}. Возврат примерно через {count} минут.",
+    other: "{previous} остановился из-за ошибки. Переключено на {model}. Возврат примерно через {count} минуты.",
+  },
+  "status.agent.modelSwitchedForNotOffered": "{previous} сейчас недоступен для этого аккаунта. Переключено на {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "У {previous} закончились кредиты. Выполнено переключение на {model}. Чтобы снова использовать эту модель, пополните кредиты и выберите её.",
   "status.agent.modelReturnedAfterError": "После ошибки провайдера снова используется {model}.",
