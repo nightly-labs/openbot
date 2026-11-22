@@ -10,8 +10,10 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type LogValue, redactSecrets, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
+import { CONTEXT_COMPACTION_THRESHOLD } from "./agent/context-compaction";
 import { withoutTurnContext } from "./agent/developer-instructions";
 import { secretElicitationField } from "./agent/prompts";
+import { isContextTooSmallFailure } from "./agent/provider-diagnostics";
 import { waitForSuccessfulProcess } from "./agent/provider-status";
 import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
@@ -250,7 +252,35 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         ? sourceText("error.provider.modelServiceRefusedReason", { reason })
         : sourceText("error.provider.modelServiceRefused");
     }
+    if (message && isContextTooSmallFailure(message)) return this.#contextTooSmall(message);
     return this.#redact(message ?? "Pi model request failed.");
+  }
+
+  readonly #compactionFailure = Effect.fn("PiAgentClient.compactionFailure")(function* (
+    this: PiAgentClient,
+    thread: PiThread,
+    failure: ProviderClientOperationError,
+  ) {
+    const message = failure.cause instanceof Error ? failure.cause.message : "";
+    if (!isContextTooSmallFailure(message)) return yield* failure;
+    const full = yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
+      Effect.map((stats) =>
+        Option.exists(
+          Schema.decodeUnknownOption(PiContextUsage)(getRecord(stats, "contextUsage")),
+          (usage) => usage.tokens / usage.contextWindow >= CONTEXT_COMPACTION_THRESHOLD,
+        ),
+      ),
+      Effect.orElseSucceed(() => false),
+    );
+    return yield* full ? providerFailure(new Error(this.#contextTooSmall(message))) : failure;
+  });
+
+  #contextTooSmall(reason: string): string {
+    logger.warn("A Pi request does not fit the model's context window.", {
+      provider: this.provider,
+      reason: this.#redact(reason),
+    });
+    return sourceText("error.provider.opencodeContextTooSmall");
   }
 
   #secretValues(): string[] {
@@ -442,7 +472,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       case "thread/compact/start": {
         const id = yield* providerSync(() => requiredString(params, "threadId"));
         const thread = yield* this.#thread(id, params);
-        yield* thread.gate.withPermit(thread.rpc.request({ type: "compact" }, timeoutMs ?? 120_000));
+        yield* thread.gate
+          .withPermit(thread.rpc.request({ type: "compact" }, timeoutMs ?? 120_000))
+          .pipe(Effect.catch((failure) => this.#compactionFailure(thread, failure)));
         yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
           Effect.tap((stats) => Effect.sync(() => this.#notifyContextUsage(thread, stats))),
           Effect.ignore,
