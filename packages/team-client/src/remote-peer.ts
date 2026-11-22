@@ -81,7 +81,7 @@ const peerDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch
 const deviceFileError = () => new FileTransferError({ message: sourceText("error.remote.attachmentChanged") });
 
 import { createRemoteFileReceiver } from "./file-download";
-import { createRemoteFileSender, FileTransferError, type RemoteFileUpload } from "./file-upload";
+import { createRemoteFileSender, FileTransferError, fileTransferError, type RemoteFileUpload } from "./file-upload";
 import { markRemoteSync, type RemoteRequestProfile, startRemoteRequest } from "./sync-profile";
 
 export type { RemoteFileUpload } from "./file-upload";
@@ -104,6 +104,7 @@ export type RemoteTeamEvent = AgentEvent | TeamRealtimeEvent | LiveVoiceEvent;
 export type RemoteLargeDownload = {
   maxBytes: number;
   mimeType?: string | undefined;
+  file?: string | undefined;
 };
 
 export type RemoteTeamCommand =
@@ -195,8 +196,13 @@ function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
 
 function decodeRemoteLargeDownload(value: unknown): RemoteLargeDownload | null {
   if (!isDynamicRecord(value) || !isNumber(value.maxBytes)) return null;
-  if (value.mimeType === undefined) return { maxBytes: value.maxBytes };
-  return isString(value.mimeType) ? { maxBytes: value.maxBytes, mimeType: value.mimeType } : null;
+  if (!(value.mimeType === undefined || isString(value.mimeType))) return null;
+  if (!(value.file === undefined || (isString(value.file) && value.file.length > 0))) return null;
+  return {
+    maxBytes: value.maxBytes,
+    ...(value.mimeType === undefined ? {} : { mimeType: value.mimeType }),
+    ...(value.file === undefined ? {} : { file: value.file }),
+  };
 }
 
 export function decodeRemoteTeamCommand(value: unknown): {
@@ -317,6 +323,7 @@ export interface RemoteTeamPeerActions {
   onTeamEvent: (hostId: string, event: RemoteTeamEvent) => Promise<void>;
   digestUploadFile?: (ref: string) => Promise<string>;
   readUploadFile?: (part: { ref: string; offset: number; length: number }) => Promise<string>;
+  writeDownloadFile?: (part: { ref: string; base64: string; append: boolean }) => Promise<void>;
 }
 interface ActionsRef {
   current: RemoteTeamPeerActions;
@@ -512,6 +519,15 @@ export function createRemoteTeamPeer(
         ),
     },
   );
+  const downloadTarget = (ref: string | undefined) => {
+    const write = actions.current.writeDownloadFile;
+    if (ref === undefined || !write) return undefined;
+    return {
+      ref,
+      write: (base64: string, append: boolean) =>
+        peerCall(() => write({ ref, base64, append })).pipe(Effect.mapError(fileTransferError)),
+    };
+  };
   const downloads = createRemoteFileReceiver((data) =>
     Effect.suspend(() => {
       const state = peer;
@@ -1762,7 +1778,11 @@ export function createRemoteTeamPeer(
       const releaseDownload =
         largeDownload === undefined
           ? null
-          : downloads.allow(Math.min(largeDownload.maxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES), largeDownload.mimeType);
+          : downloads.allow(
+              Math.min(largeDownload.maxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES),
+              largeDownload.mimeType,
+              downloadTarget(largeDownload.file),
+            );
       const stopDownloadWatch = download ? downloads.watch(download.size, download.onProgress) : null;
       return yield* Effect.gen(function* () {
         const bodyTransferId = upload ? yield* files.upload(upload, delivery?.queued) : null;
