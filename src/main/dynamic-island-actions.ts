@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { Effect } from "effect";
+import type { PromptResponder } from "../backend/agent/attention-registry";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 
@@ -15,10 +16,10 @@ export type CriticalAction = Extract<
 >;
 
 export interface DynamicIslandActionAgent {
-  respondToPrompt(input: {
-    requestId: string | number;
-    answers: Record<string, string[]>;
-  }): Effect.Effect<void, AgentLifecycleFailed>;
+  respondToPrompt(
+    input: { requestId: string | number; answers: Record<string, string[]> },
+    responder?: PromptResponder,
+  ): Effect.Effect<void, AgentLifecycleFailed>;
   respondToApproval(input: {
     requestId: string | number;
     decision: "accept" | "decline";
@@ -71,7 +72,7 @@ export const performDynamicIslandCriticalAction = Effect.fn("DynamicIsland.criti
   if (action.type === "answer-prompt") {
     const input = { requestId: action.requestId, answers: action.answers };
     return yield* action.serverId === LOCAL_SERVER_ID
-      ? local.respondToPrompt(input)
+      ? local.respondToPrompt(input, { sender: sender(), privileged: true })
       : remote
           .request(action.serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, { method: "POST", body: input })
           .pipe(Effect.asVoid);
