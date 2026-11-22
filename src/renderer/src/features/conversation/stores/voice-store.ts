@@ -131,7 +131,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceSubmitRequest = undefined;
     const generation = ++resources.voiceRequestGeneration;
     deps.setVoicePhase("preparing");
-    deps.setVoiceModelProgress(0);
+    deps.setVoiceModelProgress(null);
     let stream: MediaStream | undefined;
     let cloud: VoiceCloudStream | undefined;
     try {
@@ -278,7 +278,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   }
 
   const removeVoiceModelListener = conversationRuntime(deps.props).voice.onModelStatus((status) => {
-    if (deps.voicePhase() !== "preparing" || status.modelId !== preparingModelId) return;
+    if (deps.voicePhase() !== "preparing" || status.modelId !== preparingModelId || status.phase !== "downloading")
+      return;
     deps.setVoiceModelProgress(status.progress);
   });
   onCleanup(removeVoiceModelListener);

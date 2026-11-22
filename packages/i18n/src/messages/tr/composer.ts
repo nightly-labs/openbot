@@ -67,6 +67,7 @@ export const messages = {
   "composer.voice.stop": "Ses kaydını durdur",
   "composer.voice.cancel": "Ses kaydını iptal et",
   "composer.voice.preparing": "Ses modeli indiriliyor",
+  "composer.voice.starting": "Ses kaydı başlatılıyor",
   "composer.voice.requesting": "Mikrofon erişimi isteniyor",
   "composer.voice.transcribing": "Sesli istem metne dönüştürülüyor",
   "composer.voice.start": "Sesle istem oluştur",
