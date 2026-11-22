@@ -1,6 +1,23 @@
 import { parseWorkflowAnswerSpec, type WorkflowAnswerType } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Input, Plus, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, X } from "@openbot/ui";
+import {
+  Button,
+  CircleDot,
+  DecimalsArrowRight,
+  Hash,
+  Input,
+  LetterText,
+  List,
+  Plus,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  ToggleLeft,
+  X,
+} from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { type Accessor, createEffect, createSignal, For, type Setter, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 
@@ -27,6 +44,15 @@ const ANSWER_TYPE_TEXT = {
   list: "workflow.answer.type.list",
   choice: "workflow.answer.type.choice",
 } as const satisfies Record<WorkflowAnswerType, AppTextKey>;
+
+const ANSWER_TYPE_ICON = {
+  text: () => <LetterText aria-hidden="true" />,
+  number: () => <DecimalsArrowRight aria-hidden="true" />,
+  integer: () => <Hash aria-hidden="true" />,
+  "yes/no": () => <ToggleLeft aria-hidden="true" />,
+  list: () => <List aria-hidden="true" />,
+  choice: () => <CircleDot aria-hidden="true" />,
+} satisfies Record<WorkflowAnswerType, () => JSX.Element>;
 
 const LINE_BREAK = /[\n;]/u;
 const ONE_OF = /^one of\s+/iu;
@@ -129,18 +155,20 @@ export function AnswerRows(props: { value: string; locked: boolean; onChange: (v
   };
   return (
     <div
-      class="wfn-answer-rows"
+      class="wfn-answer-fields"
       ref={(element: HTMLDivElement) => {
         container = element;
       }}
     >
-      <For each={rows()}>
-        {(row) => <AnswerFieldRow row={row} locked={props.locked} onChange={save} onRemove={() => remove(row)} />}
-      </For>
+      <div class="wfn-answer-rows">
+        <For each={rows()}>
+          {(row) => <AnswerFieldRow row={row} locked={props.locked} onChange={save} onRemove={() => remove(row)} />}
+        </For>
+      </div>
       <Show when={!props.locked}>
         <Button variant="ghost" size="sm" class="wfn-answer-add" onClick={add}>
           <Plus aria-hidden="true" />
-          {t("workflow.answer.add")}
+          <span>{t("workflow.answer.add")}</span>
         </Button>
       </Show>
     </div>
@@ -152,6 +180,36 @@ function AnswerFieldRow(props: { row: AnswerRow; locked: boolean; onChange: () =
   const row = props.row;
   return (
     <div class="wfn-answer-row">
+      <Select<WorkflowAnswerType>
+        options={ANSWER_TYPES}
+        value={row.type()}
+        disabled={props.locked}
+        placement="bottom-start"
+        onChange={(next) => {
+          if (next === null || next === row.value.type) return;
+          row.value.type = next;
+          row.setType(next);
+          props.onChange();
+        }}
+        itemComponent={(item) => (
+          <SelectItem item={item.item}>
+            <span class="wfn-answer-type-item">
+              {ANSWER_TYPE_ICON[item.item.rawValue]()}
+              {t(ANSWER_TYPE_TEXT[item.item.rawValue])}
+            </span>
+          </SelectItem>
+        )}
+      >
+        <SelectTrigger
+          size="sm"
+          class="wfn-answer-type"
+          aria-label={t("workflow.answer.typeLabel")}
+          title={t(ANSWER_TYPE_TEXT[row.type()])}
+        >
+          <SelectValue<WorkflowAnswerType>>{(state) => ANSWER_TYPE_ICON[state.selectedOption()]()}</SelectValue>
+        </SelectTrigger>
+        <SelectContent data-wfn-portal="" />
+      </Select>
       <Input
         size="sm"
         class="wfn-answer-name"
@@ -169,36 +227,10 @@ function AnswerFieldRow(props: { row: AnswerRow; locked: boolean; onChange: () =
           props.onChange();
         }}
       />
-      <Select<WorkflowAnswerType>
-        options={ANSWER_TYPES}
-        value={row.type()}
-        disabled={props.locked}
-        placement="bottom-start"
-        onChange={(next) => {
-          if (next === null || next === row.value.type) return;
-          row.value.type = next;
-          row.setType(next);
-          props.onChange();
-        }}
-        itemComponent={(item) => <SelectItem item={item.item}>{t(ANSWER_TYPE_TEXT[item.item.rawValue])}</SelectItem>}
+      <Show
+        when={row.type() === "choice"}
+        fallback={<span class="wfn-answer-kind">{t(ANSWER_TYPE_TEXT[row.type()])}</span>}
       >
-        <SelectTrigger size="sm" class="wfn-answer-type" aria-label={t("workflow.answer.typeLabel")}>
-          <SelectValue<WorkflowAnswerType>>{(state) => t(ANSWER_TYPE_TEXT[state.selectedOption()])}</SelectValue>
-        </SelectTrigger>
-        <SelectContent data-wfn-portal="" />
-      </Select>
-      <Show when={!props.locked}>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          class="wfn-answer-remove"
-          aria-label={t("workflow.answer.remove")}
-          onClick={() => props.onRemove()}
-        >
-          <X aria-hidden="true" />
-        </Button>
-      </Show>
-      <Show when={row.type() === "choice"}>
         <Input
           size="sm"
           class="wfn-answer-values"
@@ -213,6 +245,17 @@ function AnswerFieldRow(props: { row: AnswerRow; locked: boolean; onChange: () =
             props.onChange();
           }}
         />
+      </Show>
+      <Show when={!props.locked}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="wfn-answer-remove"
+          aria-label={t("workflow.answer.remove")}
+          onClick={() => props.onRemove()}
+        >
+          <X aria-hidden="true" />
+        </Button>
       </Show>
     </div>
   );
