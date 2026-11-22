@@ -134,6 +134,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "يحتوي مفتاح المزوّد على مسافة أو حرف لا يمكن أن يحتويه المفتاح.",
   "error.provider.noModel": "لا يتوفر نموذج للمزوّد المحدد.",
   "error.provider.noModelNamed": "لا يتوفر نموذج لدى {provider}.",
+  "error.provider.acpModelsNotLoaded": "تعذّر على {provider} تحميل نماذجه. أرسل رسالتك مرة أخرى.",
   "error.provider.acpNoModels": "لم تُعلن واجهة ACP CLI عن أي نماذج ACP. لن يخمّن OpenBot نموذجًا بديلًا.",
   "error.provider.endpointRemoveBusy": "انتظر حتى ينتهي الدور النشط وقائمة الانتظار قبل إزالة نقطة النهاية هذه.",
   "error.provider.codexOutdated": "إصدار Codex CLI {version} قديم جدًا. يتطلب OpenBot الإصدار 0.156.0 أو أحدث.",

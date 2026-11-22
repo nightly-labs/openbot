@@ -96,6 +96,7 @@ export interface AcpFlavor {
   probeCloseDelayMs?: number;
   effortCategories?: readonly string[];
   sessionProcesses?: true;
+  modelsLoadWithSession?: true;
   sessionProcessesBefore?: string;
   sdkHarness?: {
     failedSession(stderrLine: string): string | undefined;

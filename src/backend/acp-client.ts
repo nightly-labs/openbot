@@ -32,7 +32,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
-import { AcpConfiguration, type AcpModel, currentModelFromSessionSetup } from "./acp-configuration";
+import { AcpConfiguration, type AcpModel, currentModelFromSessionSetup, sessionListsModels } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
 import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpRetryCause } from "./acp-flavor";
 import {
@@ -1608,7 +1608,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#ensureInitializedEffect();
     if (!this.#signedIn) return yield* providerFailure(new Error(this.options.signInMessage));
     const requestedThreadId = getString(params, "threadId");
-    if (!resume || !requestedThreadId) return yield* this.#openThread(params, false);
+    if (!resume || !requestedThreadId) return yield* this.#openThreadWithModels(params, false);
     const held = this.#threads.get(requestedThreadId);
     const recovering = held && !held.activeTurn && held.needsResume;
     if (
@@ -1644,7 +1644,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#requireConnection().closeSession({ sessionId: requestedThreadId, ...this.#forcedClose }),
       ).pipe(this.#backgroundTimeout("session/close"), Effect.ignore);
     }
-    const exit = yield* Effect.exit(this.#openThread(params, true));
+    const exit = yield* Effect.exit(this.#openThreadWithModels(params, true));
     if (recovering && Exit.isSuccess(exit)) {
       held.mcp.close();
       yield* held.relays;
@@ -1653,6 +1653,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (this.#startingThreads.get(requestedThreadId) === completion) this.#startingThreads.delete(requestedThreadId);
     return yield* exit;
   }, Effect.uninterruptible);
+
+  #openThreadWithModels(
+    params: unknown,
+    resume: boolean,
+  ): Effect.Effect<{ thread: { id: string } }, ProviderClientOperationError> {
+    return this.#openThread(params, resume).pipe(
+      Effect.catchIf(
+        (failure) => failure.cause instanceof SessionModelsNotLoadedError,
+        () => {
+          logger.warn("An agent session opened without its model list. The session opens again.", {
+            provider: this.provider,
+          });
+          return this.#openThread(params, resume);
+        },
+      ),
+    );
+  }
 
   readonly #openThread = Effect.fn("AcpAgentClient.openThread")(function* (
     this: AcpAgentClient,
@@ -1716,6 +1733,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             let id: string;
             let configOptions: SessionConfigOption[];
             let currentModelId: string | null;
+            let listsModels: boolean;
             const ownMcpServerNames = this.#ownMcpServerNames(cwd);
             const handoff = acpMcpServers(
               providerResult(
@@ -1774,6 +1792,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               id = requestedThreadId;
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
+              listsModels = sessionListsModels(response);
             } else {
               const created = providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta }));
               const response = providerResult(
@@ -1784,7 +1803,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
+              listsModels = sessionListsModels(response);
             }
+            if (
+              sessionTransport &&
+              this.#flavor.modelsLoadWithSession &&
+              !listsModels &&
+              this.#models.length > 0 &&
+              this.#requestedModel(params)
+            )
+              return yield* providerFailure(
+                new SessionModelsNotLoadedError(
+                  sourceText("error.provider.acpModelsNotLoaded", { provider: this.#label }),
+                ),
+              );
             const openedAt = Date.now();
             const connectLimit = this.#flavor.mcpConnectLimitMs;
             if (connectLimit !== undefined && this.#supportsSessionResume && mcp.dropped(sentAt, connectLimit)) {
@@ -4550,6 +4582,13 @@ function isDynamicToolResult(value: unknown): value is DynamicToolResult {
         ((item.type === "inputText" && isString(item.text)) || (item.type === "inputImage" && isString(item.imageUrl))),
     )
   );
+}
+
+class SessionModelsNotLoadedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SessionModelsNotLoadedError";
+  }
 }
 
 class MissingAcpSessionError extends Error {
