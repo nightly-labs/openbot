@@ -2092,6 +2092,7 @@ export async function createApplicationServices({
       return passwordManagers.list().some((status) => status.manager === manager && status.state === "connected");
     },
     mcpAgentAccess: (mcpServerId, agentId) => mcpAccessStore.allowsAgent(mcpServerId, agentId),
+    hiddenModels: (provider) => modelVisibility.hiddenIn(provider),
     prepareMcpTest: (config) =>
       prepareToolRuntimeForTest(config, {
         startToolRuntimes: () => {

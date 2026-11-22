@@ -125,7 +125,8 @@ export const messages = {
     "Ces modèles ne fonctionnent pas avec « Espace de travail seul » sous Windows et Linux. Pour les utiliser, modifiez « Accès » dans les réglages de l’agent.",
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
-  "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
+  "provider.picker.noModels":
+    "Aucun modèle {name} ne s’affiche ici. S’ils sont désactivés, un admin peut les activer dans Réglages du serveur > Fournisseurs > {name} > Modèles.",
   "provider.picker.endpointModelsInCustom":
     "{name} exécute vos points de terminaison personnalisés. Leurs modèles sont dans l’onglet Personnalisé.",
   "provider.picker.showCustomModels": "Voir les modèles",

@@ -140,7 +140,8 @@ export const messages = {
     "Te modele nie działają z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby ich użyć, zmień „Dostęp” w ustawieniach agenta.",
   "provider.picker.olderModels": "Starsze modele",
   "provider.picker.olderModelsList": "Starsze modele {name}",
-  "provider.picker.noModels": "Brak dostępnych modeli od: {name}.",
+  "provider.picker.noModels":
+    "Nie widać tu modeli od: {name}. Jeśli są wyłączone, administrator może je włączyć w Ustawienia serwera > Dostawcy > {name} > Modele.",
   "provider.picker.endpointModelsInCustom": "{name} obsługuje Twoje własne endpointy. Ich modele są na karcie Własny.",
   "provider.picker.showCustomModels": "Pokaż modele",
   "provider.picker.museNoModels":
