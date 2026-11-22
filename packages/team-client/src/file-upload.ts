@@ -38,14 +38,20 @@ const CHUNK_BYTES = 60 * 1024;
 const FILE_PART_BYTES = 16 * CHUNK_BYTES;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
-const MINIMUM_UPLOAD_RATE = 256;
+const UPLOAD_IDLE_MS = 60_000;
+
+type PendingUpload = {
+  acknowledged: (receivedThrough: number) => void;
+  reject: (error: Error) => void;
+  error: Error | null;
+};
 
 export function createRemoteFileSender<E, R>(
   send: (data: string | ArrayBuffer) => Effect.Effect<void, E, R>,
   createId: () => string,
   reader?: RemoteFileReader,
 ) {
-  const pending = new Map<string, { opened: () => void; reject: (error: Error) => void; error: Error | null }>();
+  const pending = new Map<string, PendingUpload>();
   const sendFrame = (data: string | ArrayBuffer) => send(data).pipe(Effect.mapError(fileTransferError));
   const upload = Effect.fn("RemoteFileSender.upload")(function* (
     input: RemoteFileUpload,
@@ -56,30 +62,32 @@ export function createRemoteFileSender<E, R>(
     const source = yield* uploadSource(input);
     if (pending.size !== 0) return yield* busy();
     const transferId = createId();
-    const acknowledged = Deferred.makeUnsafe<void, FileTransferError>();
-    const opened = () => {
-      Deferred.doneUnsafe(acknowledged, Effect.void);
-    };
+    const opened = Deferred.makeUnsafe<void, FileTransferError>();
     const reject = (error: Error) => {
-      Deferred.doneUnsafe(acknowledged, Effect.fail(fileTransferError(error)));
+      Deferred.doneUnsafe(opened, Effect.fail(fileTransferError(error)));
     };
-    const transfer: { opened: () => void; reject: (error: Error) => void; error: Error | null } = {
-      opened,
+    const stall = () => {
+      transfer.error = new Error(sourceText("error.remote.uploadTimeout"));
+      reject(transfer.error);
+    };
+    let timer = setTimeout(stall, UPLOAD_IDLE_MS);
+    let receivedByHost = -1;
+    const transfer: PendingUpload = {
+      acknowledged: (receivedThrough) => {
+        Deferred.doneUnsafe(opened, Effect.void);
+        if (receivedThrough <= receivedByHost || transfer.error) return;
+        receivedByHost = receivedThrough;
+        clearTimeout(timer);
+        timer = setTimeout(stall, UPLOAD_IDLE_MS);
+      },
       reject,
       error: null,
     };
     pending.set(transferId, transfer);
-    const timer = setTimeout(
-      () => {
-        transfer.error = new Error(sourceText("error.remote.uploadTimeout"));
-        reject(transfer.error);
-      },
-      Math.max(60_000, source.size / MINIMUM_UPLOAD_RATE),
-    );
     return yield* Effect.gen(function* () {
       yield* Effect.all(
         [
-          Deferred.await(acknowledged),
+          Deferred.await(opened),
           sendFrame(
             encodeTeamProtocolV2Frame({
               version: 2,
@@ -166,7 +174,7 @@ export function createRemoteFileSender<E, R>(
       const frame = decodeTeamProtocolV2FileControlFrame(data);
       const transfer = pending.get(frame.transferId);
       if (!transfer) return;
-      if (frame.type === "file-ack") transfer.opened();
+      if (frame.type === "file-ack") transfer.acknowledged(frame.receivedThrough);
       if (frame.type === "file-cancel") {
         transfer.error = new Error(sourceText("error.remote.attachmentRejected"));
         transfer.reject(transfer.error);
