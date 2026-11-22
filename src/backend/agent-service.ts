@@ -621,6 +621,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hostMemory = null,
       hostTurnLimits,
       busyMessageMode = () => DEFAULT_BUSY_MESSAGE_MODE,
+      approvalAutomation,
     } = options;
     this.#developmentDefaults = developmentDefaults;
     this.#busyMessageMode = busyMessageMode;
@@ -1334,6 +1335,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
       importedHistory: (threadId) => store.database.threadHasEvent(threadId, HISTORY_IMPORTED_EVENT),
       routineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
+      ...(approvalAutomation === undefined
+        ? {}
+        : { asksFirst: (agentId: string) => !approvalAutomation.autoApproves(agentId) }),
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
