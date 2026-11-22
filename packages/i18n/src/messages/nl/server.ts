@@ -408,6 +408,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "Agents op deze server gebruiken dit model om het geluid van video’s zonder ondertiteling uit te schrijven.",
   "server.settings.voiceModel.loadFailed": "Kan het spraakherkenningsmodel van de server niet laden.",
+  "server.settings.voiceModel.group": "Op deze server",
+  "server.settings.voiceModel.removeLabel": "{name} van deze server verwijderen",
   "server.settings.turnLimit": "Threads tegelijk",
   "server.settings.turnLimitDescription":
     "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",

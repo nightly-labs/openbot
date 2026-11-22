@@ -386,6 +386,8 @@ export const messages = {
   "server.settings.voiceModel.section": "语音识别",
   "server.settings.voiceModel.description": "此服务器上的助手使用此模型转写没有字幕的视频中的声音。",
   "server.settings.voiceModel.loadFailed": "无法加载服务器的语音识别模型。",
+  "server.settings.voiceModel.group": "此服务器上",
+  "server.settings.voiceModel.removeLabel": "从此服务器移除 {name}",
   "server.settings.turnLimit": "同时运行的话题数",
   "server.settings.turnLimitDescription": "此服务器上可以同时运行的助手话题数。话题越多，占用的内存越多。",
   "server.settings.turnLimitAutomatic": "自动（{count}）",

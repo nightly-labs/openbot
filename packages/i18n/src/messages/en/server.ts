@@ -446,6 +446,8 @@ export const messages = defineMessages("server", {
   "server.settings.voiceModel.description":
     "Agents on this server use this model to transcribe the sound of videos that have no captions.",
   "server.settings.voiceModel.loadFailed": "Could not load the speech recognition model of the server.",
+  "server.settings.voiceModel.group": "On this server",
+  "server.settings.voiceModel.removeLabel": "Remove {name} from this server",
   "server.settings.turnLimit": "Threads at the same time",
   "server.settings.turnLimitDescription":
     "How many agent threads can run at the same time on this server. More threads use more memory.",

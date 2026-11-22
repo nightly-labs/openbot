@@ -403,6 +403,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "Агенты на этом сервере используют эту модель, чтобы расшифровывать звук видео без субтитров.",
   "server.settings.voiceModel.loadFailed": "Не удалось загрузить модель распознавания речи сервера.",
+  "server.settings.voiceModel.group": "На этом сервере",
+  "server.settings.voiceModel.removeLabel": "Удалить {name} с этого сервера",
   "server.settings.turnLimit": "Ветки одновременно",
   "server.settings.turnLimitDescription":
     "Сколько веток агентов может выполняться одновременно на этом сервере. Больше веток — больше памяти.",

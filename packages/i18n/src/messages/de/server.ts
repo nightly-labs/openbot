@@ -400,6 +400,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "Agenten auf diesem Server verwenden dieses Modell, um den Ton von Videos ohne Untertitel zu transkribieren.",
   "server.settings.voiceModel.loadFailed": "Das Spracherkennungsmodell des Servers konnte nicht geladen werden.",
+  "server.settings.voiceModel.group": "Auf diesem Server",
+  "server.settings.voiceModel.removeLabel": "{name} von diesem Server entfernen",
   "server.settings.turnLimit": "Threads gleichzeitig",
   "server.settings.turnLimitDescription":
     "Wie viele Agent-Threads auf diesem Server gleichzeitig laufen können. Mehr Threads brauchen mehr Arbeitsspeicher.",

@@ -387,6 +387,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "このサーバーのエージェントは、字幕のない動画の音声をこのモデルで文字起こしします。",
   "server.settings.voiceModel.loadFailed": "サーバーの音声認識モデルを読み込めませんでした。",
+  "server.settings.voiceModel.group": "このサーバー",
+  "server.settings.voiceModel.removeLabel": "このサーバーから {name} を削除",
   "server.settings.turnLimit": "同時に実行するスレッド",
   "server.settings.turnLimitDescription":
     "このサーバーで同時に実行できるエージェントのスレッド数です。スレッドが多いほどメモリーを多く使います。",

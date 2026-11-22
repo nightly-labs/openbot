@@ -395,6 +395,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "Os agentes deste servidor usam este modelo para transcrever o som de vídeos que não têm legendas.",
   "server.settings.voiceModel.loadFailed": "Não foi possível carregar o modelo de reconhecimento de fala do servidor.",
+  "server.settings.voiceModel.group": "Neste servidor",
+  "server.settings.voiceModel.removeLabel": "Remover {name} deste servidor",
   "server.settings.turnLimit": "Tópicos ao mesmo tempo",
   "server.settings.turnLimitDescription":
     "Quantos tópicos de agentes podem ser executados ao mesmo tempo neste servidor. Mais tópicos usam mais memória.",

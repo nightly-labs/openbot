@@ -149,6 +149,7 @@ export function ServerVoiceModelSetting(
             }}
             disabled={props.disabled}
             mount={props.menuMount}
+            onServer
           />
         </Show>
       </ItemGroup>

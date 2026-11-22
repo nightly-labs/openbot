@@ -392,6 +392,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "Bu sunucudaki ajanlar, altyazısı olmayan videoların sesini yazıya dökmek için bu modeli kullanır.",
   "server.settings.voiceModel.loadFailed": "Sunucunun konuşma tanıma modeli yüklenemedi.",
+  "server.settings.voiceModel.group": "Bu sunucuda",
+  "server.settings.voiceModel.removeLabel": "{name} modelini bu sunucudan kaldır",
   "server.settings.turnLimit": "Aynı anda mesaj dizileri",
   "server.settings.turnLimitDescription":
     "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",

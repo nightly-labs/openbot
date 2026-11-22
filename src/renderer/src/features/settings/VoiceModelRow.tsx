@@ -86,6 +86,7 @@ interface VoiceModelRowProps<Id extends string> {
   action?: JSX.Element | undefined;
   disabled: boolean;
   mount: HTMLElement | undefined;
+  onServer?: boolean;
 }
 
 export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) {
@@ -98,7 +99,11 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
       ids: props.choices.filter((choice) => choice.place === place).map((choice) => choice.id),
     })).filter((group) => group.ids.length > 0);
   const groupName = (place: ModelPlace) =>
-    place === "local" ? t("settings.voice.model.group.local") : VOICE_KEY_PROVIDER_NAMES[place];
+    place !== "local"
+      ? VOICE_KEY_PROVIDER_NAMES[place]
+      : props.onServer
+        ? t("server.settings.voiceModel.group")
+        : t("settings.voice.model.group.local");
   const phase = () => props.file?.status?.phase;
   const fileText = (): string | null => {
     const file = props.file;
@@ -149,7 +154,11 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
               variant="ghost"
               size="sm"
               type="button"
-              aria-label={t("settings.voice.model.removeLabel", { name: name() })}
+              aria-label={
+                props.onServer
+                  ? t("server.settings.voiceModel.removeLabel", { name: name() })
+                  : t("settings.voice.model.removeLabel", { name: name() })
+              }
               onClick={() => props.onRemove()}
             >
               {t("common.remove")}

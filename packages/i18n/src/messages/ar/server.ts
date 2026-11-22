@@ -468,6 +468,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "يستخدم الوكلاء على هذا الخادم هذا النموذج لتفريغ صوت مقاطع الفيديو التي لا تحتوي على ترجمة نصية.",
   "server.settings.voiceModel.loadFailed": "تعذّر تحميل نموذج التعرّف على الكلام الخاص بالخادم.",
+  "server.settings.voiceModel.group": "على هذا الخادم",
+  "server.settings.voiceModel.removeLabel": "إزالة {name} من هذا الخادم",
   "server.settings.turnLimit": "السلاسل في الوقت نفسه",
   "server.settings.turnLimitDescription":
     "عدد سلاسل الوكلاء التي يمكن تشغيلها في الوقت نفسه على هذا الخادم. السلاسل الأكثر تستخدم ذاكرة أكثر.",

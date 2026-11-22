@@ -442,6 +442,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "הסוכנים בשרת הזה משתמשים במודל הזה כדי לתמלל את הקול של סרטונים שאין להם כתוביות.",
   "server.settings.voiceModel.loadFailed": "לא ניתן לטעון את מודל זיהוי הדיבור של השרת.",
+  "server.settings.voiceModel.group": "בשרת הזה",
+  "server.settings.voiceModel.removeLabel": "הסרת {name} מהשרת הזה",
   "server.settings.turnLimit": "שרשורים בו־זמנית",
   "server.settings.turnLimitDescription":
     "כמה שרשורים של סוכנים יכולים לרוץ בו־זמנית בשרת הזה. יותר שרשורים משתמשים ביותר זיכרון.",

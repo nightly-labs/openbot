@@ -404,6 +404,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "Agenci na tym serwerze używają tego modelu, aby transkrybować dźwięk filmów bez napisów.",
   "server.settings.voiceModel.loadFailed": "Nie udało się wczytać modelu rozpoznawania mowy serwera.",
+  "server.settings.voiceModel.group": "Na tym serwerze",
+  "server.settings.voiceModel.removeLabel": "Usuń {name} z tego serwera",
   "server.settings.turnLimit": "Wątki jednocześnie",
   "server.settings.turnLimitDescription":
     "Ile wątków agentów może działać jednocześnie na tym serwerze. Więcej wątków zużywa więcej pamięci.",

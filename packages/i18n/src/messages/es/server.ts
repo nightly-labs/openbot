@@ -396,6 +396,8 @@ export const messages = {
   "server.settings.voiceModel.description":
     "Los agentes de este servidor usan este modelo para transcribir el sonido de los vídeos que no tienen subtítulos.",
   "server.settings.voiceModel.loadFailed": "No se pudo cargar el modelo de reconocimiento de voz del servidor.",
+  "server.settings.voiceModel.group": "En este servidor",
+  "server.settings.voiceModel.removeLabel": "Quitar {name} de este servidor",
   "server.settings.turnLimit": "Hilos a la vez",
   "server.settings.turnLimitDescription":
     "Cuántos hilos de agentes pueden ejecutarse a la vez en este servidor. Más hilos usan más memoria.",
