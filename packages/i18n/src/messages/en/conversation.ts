@@ -140,6 +140,7 @@ export const messages = defineMessages("conversation", {
   "conversation.voice.talkMode.open": "Open microphone",
   "conversation.voice.talkMode.push": "Push to talk",
   "conversation.voice.holdToTalk": "Hold to talk",
+  "conversation.voice.downloading": "Getting ready {progress}%",
   "conversation.voice.spaceKey": "Space",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

@@ -143,6 +143,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "Açık mikrofon",
   "conversation.voice.talkMode.push": "Bas konuş",
   "conversation.voice.holdToTalk": "Konuşmak için basılı tutun",
+  "conversation.voice.downloading": "Hazırlanıyor %{progress}",
   "conversation.voice.spaceKey": "Boşluk",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

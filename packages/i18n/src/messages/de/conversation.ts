@@ -144,6 +144,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "Offenes Mikrofon",
   "conversation.voice.talkMode.push": "Push-to-Talk",
   "conversation.voice.holdToTalk": "Zum Sprechen gedrückt halten",
+  "conversation.voice.downloading": "Wird vorbereitet {progress}%",
   "conversation.voice.spaceKey": "Leertaste",
   "conversation.voice.key.ctrl": "Strg",
   "conversation.voice.key.alt": "Alt",

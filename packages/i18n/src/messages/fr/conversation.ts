@@ -144,6 +144,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "Micro ouvert",
   "conversation.voice.talkMode.push": "Appuyer pour parler",
   "conversation.voice.holdToTalk": "Maintenez pour parler",
+  "conversation.voice.downloading": "Préparation {progress} %",
   "conversation.voice.spaceKey": "Espace",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

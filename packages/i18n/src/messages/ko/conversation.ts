@@ -141,6 +141,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "마이크 항상 켜기",
   "conversation.voice.talkMode.push": "눌러서 말하기",
   "conversation.voice.holdToTalk": "누르고 있는 동안 말하기",
+  "conversation.voice.downloading": "준비 중 {progress}%",
   "conversation.voice.spaceKey": "스페이스",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

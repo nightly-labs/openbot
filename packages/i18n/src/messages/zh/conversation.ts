@@ -138,6 +138,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "麦克风常开",
   "conversation.voice.talkMode.push": "按键说话",
   "conversation.voice.holdToTalk": "按住即可说话",
+  "conversation.voice.downloading": "正在准备 {progress}%",
   "conversation.voice.spaceKey": "空格",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

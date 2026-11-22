@@ -2,10 +2,12 @@ import {
   type ConversationMessage,
   DEFAULT_SPEECH_SETTINGS,
   LOCAL_SERVER_ID,
+  SPEECH_MODEL,
   type SpeechModelStatus,
   VOICE_AUDIO_LIMITS,
   VOICE_MODELS,
   VOICE_STREAM_LIMITS,
+  type VoiceModelId,
   type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
@@ -143,7 +145,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   const serverKind = deps.serverId === LOCAL_SERVER_ID ? "local" : "remote";
   let ownServer = false;
   const downloadListeners: Array<() => void> = [];
-  let downloadingModel: string | null = null;
+  const downloads: Array<{ modelId: string; bytes: number; share: number }> = [];
   const transcription = () => {
     if (ownServer) return "server";
     return cloud ? "cloud" : "local";
@@ -207,17 +209,31 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   });
 
   function showDownload(status: VoiceModelStatus | SpeechModelStatus): void {
-    if (status.modelId !== downloadingModel || status.phase !== "downloading" || disposed) return;
+    const index = downloads.findIndex((download) => download.modelId === status.modelId);
+    if (index < 0 || status.phase !== "downloading" || disposed) return;
+    downloads.forEach((download, position) => {
+      if (position < index) download.share = 1;
+    });
+    const current = downloads[index];
+    if (current) current.share = (status.progress ?? 0) / 100;
+    const total = downloads.reduce((sum, download) => sum + download.bytes, 0);
+    const received = downloads.reduce((sum, download) => sum + download.share * download.bytes, 0);
     setState((draft) => {
-      draft.downloadProgress = status.progress ?? 0;
+      draft.downloadProgress = Math.min(100, Math.floor((received / total) * 100));
     });
   }
 
-  function watchDownload(modelId: string): void {
-    downloadingModel = modelId;
-    setState((draft) => {
-      draft.downloadProgress = null;
-    });
+  function planDownloads(
+    speechModel: SpeechModelStatus | null,
+    dictationModelId: VoiceModelId,
+    dictationStatuses: VoiceModelStatus[] | null,
+  ): void {
+    if (speechModel?.modelId === SPEECH_MODEL.id && speechModel.phase !== "ready")
+      downloads.push({ modelId: speechModel.modelId, bytes: SPEECH_MODEL.bytes, share: 0 });
+    const dictation = VOICE_MODELS.find((candidate) => candidate.id === dictationModelId);
+    const dictationReady = dictationStatuses?.find((status) => status.modelId === dictationModelId)?.phase === "ready";
+    if (dictation?.kind === "local" && !dictationReady)
+      downloads.push({ modelId: dictation.id, bytes: dictation.bytes, share: 0 });
   }
 
   function removeDownloadListeners(): void {
@@ -239,17 +255,19 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     try {
       const speech = speechPort().voice;
       downloadListeners.push(speech.onSpeechModelStatus(showDownload), deps.voice.onModelStatus(showDownload));
-      const [server, turnPauseMs] = await Promise.all([
+      const [server, turnPauseMs, settings, dictationStatuses] = await Promise.all([
         speech.getServer(),
         speech.getSpeechSettings().then(
-          (settings) => settings.turnPauseMs,
+          (speechSettings) => speechSettings.turnPauseMs,
           () => DEFAULT_SPEECH_SETTINGS.turnPauseMs,
         ),
+        deps.voice.getSettings(),
+        speech.getModelStatuses().catch(() => null),
       ]);
       turnEndSilenceMs = turnPauseMs;
       const speechModel = server?.routes.speech ? null : await speech.getSpeechModelStatus();
+      planDownloads(speechModel, settings.modelId, dictationStatuses);
       if (speechModel && speechModel.phase !== "ready") {
-        watchDownload(speechModel.modelId);
         const downloadAt = performance.now();
         const status = await speech.downloadSpeechModel().catch((error: unknown) => {
           analytics.track("speech_model_action", {
@@ -272,8 +290,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         });
         if (status.phase !== "ready") throw new Error(status.message ?? currentText().t("conversation.voice.error"));
       }
-      const settings = await deps.voice.getSettings();
-      watchDownload(settings.modelId);
       const model = await deps.voice.prepareModel();
       if (own !== generation || disposed) return;
       if (model.phase !== "ready")
