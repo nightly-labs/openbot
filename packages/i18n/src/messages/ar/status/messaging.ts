@@ -53,6 +53,8 @@ export const messages = {
     "يوجد OpenBot آخر مرتبط برقم واتساب هذا، لذلك قد تصلك إجابتان. لإصلاح ذلك، افتح الأجهزة المرتبطة في واتساب على هاتفك وسجّل الخروج من OpenBot الذي لا تستخدمه.",
   "status.messaging.whatsappPaused":
     "توقّف OpenBot عن الرد هنا لمدة 10 دقائق: وصلت رسائل كثيرة جدًا في وقت قصير. إذا كان OpenBot آخر مرتبطًا بهذا الرقم، فافتح الأجهزة المرتبطة في واتساب على هاتفك وسجّل الخروج من OpenBot الذي لا تستخدمه.",
+  "status.messaging.whatsappNotDelivered": "لم يقبل واتساب هذه الإجابة، لذلك لم يستلمها الشخص.",
+  "status.messaging.whatsappPartlyDelivered": "لم يقبل واتساب هذه الإجابة كاملة، لذلك استلم الشخص جزءًا منها فقط.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "يجيب في WhatsApp ويسأل الفريق",
 } as const satisfies PartialTranslation<typeof source>;

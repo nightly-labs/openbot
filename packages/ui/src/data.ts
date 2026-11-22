@@ -160,6 +160,7 @@ export type ChatActionMarkerModel =
   | { kind: "model-switch"; reason: ModelSwitchReason; text: string; timestamp: string }
   | { kind: "channel-change"; text: string; timestamp: string }
   | { kind: "vault-change"; text: string; timestamp: string }
+  | { kind: "messaging-undelivered"; text: string; timestamp: string }
   | { kind: "plan-continuation"; text: string; timestamp: string }
   | { kind: "sign-in-failure"; provider: AgentProviderId; text: string; timestamp: string }
   | {

@@ -179,6 +179,7 @@ async function boot<T>(use: (threads: MessagingThreads) => Promise<T>): Promise<
     interrupt: unused,
     forgetThread: () => Effect.void,
     ownChat: () => false,
+    appendSystemMessage: () => {},
     contextSession: () => null,
     progressUpdates: () => null,
   });

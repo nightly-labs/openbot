@@ -335,6 +335,17 @@ export function isPlanContinuationMarker(message: ConversationMessage): boolean 
   );
 }
 
+export const MESSAGING_UNDELIVERED_ITEM_TYPE = "messaging-undelivered";
+
+export function isMessagingUndeliveredMarker(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    message.status === "completed" &&
+    message.itemType === MESSAGING_UNDELIVERED_ITEM_TYPE
+  );
+}
+
 export const SIGN_IN_FAILURE_ITEM_TYPE_PREFIX = "sign-in-failure:";
 
 export function signInFailureProvider(message: ConversationMessage): AgentProviderId | null {

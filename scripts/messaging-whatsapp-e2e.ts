@@ -5,7 +5,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Boom } from "@hapi/boom";
-import type { MessagingConnection, WhatsAppLinkState } from "@openbot/contracts/ipc";
+import {
+  MESSAGING_UNDELIVERED_ITEM_TYPE,
+  type MessagingConnection,
+  type WhatsAppLinkState,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import {
   newStoreKey,
@@ -911,6 +915,63 @@ try {
         await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `answer request again ${index}`);
       }
       return { posted };
+    });
+
+    await step("refused answer: the agent's chat says that WhatsApp did not deliver it (#14456)", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+      assert.ok(request, "No request waits in the owner's chat.");
+      await runCauseEffect(mailbox.markStarting(request.delivery.id));
+      const scope = Effect.runSync(Scope.make());
+      const turn = { agentId: link.agentId, threadId: link.threadId, turnId: "turn-refused-answer" };
+      agents.messaging.event({ type: "turn-started", ...turn }, scope);
+      const answer = "Your report is ready.";
+      const snapshot = database.readConversation(link.agentId, link.threadId);
+      snapshot.messages.push({
+        id: `${turn.turnId}:answer`,
+        turnId: turn.turnId,
+        author: "assistant",
+        text: answer,
+        createdAt: new Date().toISOString(),
+        status: "completed",
+      });
+      database.persistStreamingMessage({ snapshot, messageId: `${turn.turnId}:answer`, eventType: "item.completed" });
+      const attempts = () =>
+        phone.sent.filter(
+          (sent) =>
+            sent.jid === OWNER_JID &&
+            "text" in sent.content &&
+            sent.content.text === answer &&
+            !("edit" in sent.content),
+        ).length;
+      const notices = () =>
+        database
+          .readConversation(link.agentId, link.threadId)
+          .messages.filter((message) => message.itemType === MESSAGING_UNDELIVERED_ITEM_TYPE);
+      phone.refused.set(OWNER_JID, "463");
+      try {
+        await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
+        agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
+        await until(() => notices().length > 0, "the not-delivered line in the agent's chat");
+      } finally {
+        phone.refused.delete(OWNER_JID);
+      }
+      const [notice] = notices();
+      assert.equal(notices().length, 1, "The refused answer got more than one line.");
+      assert.equal(notice?.author, "system");
+      assert.equal(notice?.text, sourceText("status.messaging.whatsappNotDelivered"));
+      assert.ok(!notice?.text.includes("463"), "The line shows the WhatsApp error code.");
+      assert.equal(attempts(), 1, "OpenBot posted a refused answer again.");
+      const messages = database.readConversation(link.agentId, link.threadId).messages;
+      assert.equal(messages.at(-1)?.id, notice?.id, "The line is not after the refused answer.");
+      assert.equal(connection(messaging)?.state, "connected", "A refused answer changed the connection state.");
+      for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
+        const again = message({ chat: OWNER_JID, fromMe: true, text: `refused request again ${index}` });
+        phone.current().receive([again]);
+        await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `refused request again ${index}`);
+      }
+      return { notice: notice?.text, attempts: attempts() };
     });
 
     await step(

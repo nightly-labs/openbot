@@ -52,6 +52,8 @@ export const messages = {
     "此 WhatsApp 号码还关联了另一个 OpenBot，所以你可能会收到两条回复。要解决此问题，请在手机上的 WhatsApp 中打开“已关联设备”，然后退出你不用的 OpenBot。",
   "status.messaging.whatsappPaused":
     "短时间内收到的消息太多，OpenBot 已在此暂停回复 10 分钟。如果此号码还关联了另一个 OpenBot，请在手机上的 WhatsApp 中打开“已关联设备”，然后退出你不用的 OpenBot。",
+  "status.messaging.whatsappNotDelivered": "WhatsApp 没有接受这条回答，所以对方没有收到。",
+  "status.messaging.whatsappPartlyDelivered": "WhatsApp 没有接受这条回答的全部内容，所以对方只收到了一部分。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp 调度助手",
   "status.messaging.whatsappOrchestratorTitle": "在 WhatsApp 中回答并调度团队",
 } as const satisfies PartialTranslation<typeof source>;

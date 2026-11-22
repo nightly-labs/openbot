@@ -388,13 +388,12 @@ interface MessageRowShared {
   };
 }
 
-function ContextResetMarkerRow({ muted }: { muted: ViewStyle["backgroundColor"] }) {
-  const { t } = useText();
+function MarkerRow({ muted, label }: { muted: ViewStyle["backgroundColor"]; label: string }) {
   return (
     <View accessible className="flex-row items-center gap-3 py-2">
       <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
-      <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-        {t("mobile.chat.contextReset")}
+      <Typography.Paragraph type="body-sm" style={{ color: muted, flexShrink: 1, textAlign: "center" }}>
+        {label}
       </Typography.Paragraph>
       <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
     </View>
@@ -556,7 +555,7 @@ const MessageRow = memo(function MessageRow({
   selecting?: boolean;
   shared: MessageRowShared;
 }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
   const waiting = awaitingFirstWord(message, shared, arriving, revealed);
   const bubble = message.kind === "message" && !outbox && !message.streaming && !waiting ? message : null;
@@ -772,7 +771,9 @@ const MessageRow = memo(function MessageRow({
     ) : message.kind === "routine-run-group" ? (
       <RoutineRunGroupRow key={message.id} group={message} />
     ) : message.kind === "context-reset" ? (
-      <ContextResetMarkerRow key={message.id} muted={muted} />
+      <MarkerRow key={message.id} muted={muted} label={t("mobile.chat.contextReset")} />
+    ) : message.kind === "notice" ? (
+      <MarkerRow key={message.id} muted={muted} label={sourceText(message.text)} />
     ) : message.kind === "app-suggestion" ? (
       <ChatAppSuggestion key={message.id} serverId={serverId} messageId={message.id} appId={message.appId} />
     ) : message.kind === "mcp-sign-in" ? (
