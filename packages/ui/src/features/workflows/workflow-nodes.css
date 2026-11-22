@@ -410,7 +410,7 @@
 
 .wfn-stage .wfn-toolbar .wfn-tool-action[data-tone="danger"]:is(:hover, :focus-visible) {
   background: color-mix(in srgb, var(--openbot-danger) 16%, transparent);
-  color: var(--openbot-danger-text);
+  color: var(--openbot-warning-text);
 }
 
 .wfn-toolbar-separator {
@@ -1398,6 +1398,37 @@ fieldset.wfn-picker-group {
   padding-inline-end: var(--openbot-space-6);
 }
 
+.wfn-name-field {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  outline: 0;
+  font-family: var(--openbot-font-sans);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.wfn-name-field:empty::before {
+  position: absolute;
+  inset-inline: 0;
+  color: var(--openbot-text-muted);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.wfn-name-chip {
+  height: auto;
+  margin-inline: 1px;
+  padding-block: 0;
+  vertical-align: baseline;
+  line-height: inherit;
+}
+
+.wfn-name-chip[data-problem] {
+  background: var(--openbot-warning-soft);
+  color: var(--openbot-warning-text);
+}
+
 .wfn-name-insert {
   position: absolute;
   inset-block-end: 0;
@@ -1953,7 +1984,7 @@ fieldset.wfn-picker-group {
   border-radius: var(--openbot-radius-sm);
   background: var(--wfn-card);
   box-shadow: 0 0 0 1px var(--openbot-danger-border);
-  color: var(--openbot-danger-text);
+  color: var(--openbot-warning-text);
   font-size: var(--openbot-text-sm);
   white-space: nowrap;
   pointer-events: none;
@@ -1980,7 +2011,7 @@ fieldset.wfn-picker-group {
   border-radius: var(--openbot-radius-pill);
   background: color-mix(in srgb, var(--openbot-danger) 14%, var(--wfn-card));
   box-shadow: 0 0 0 1px var(--openbot-danger-border);
-  color: var(--openbot-danger-text);
+  color: var(--openbot-warning-text);
   opacity: 1;
   scale: 1;
   transition-property: opacity, scale, background-color;
@@ -1990,7 +2021,7 @@ fieldset.wfn-picker-group {
 
 .wfn-stage .wfn-edge-actions .wfn-edge-remove:hover {
   background: color-mix(in srgb, var(--openbot-danger) 28%, var(--wfn-card));
-  color: var(--openbot-danger-text);
+  color: var(--openbot-warning-text);
 }
 
 @starting-style {
@@ -2113,7 +2144,7 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-run-time[data-failed] {
-  color: var(--openbot-danger-text);
+  color: var(--openbot-warning-text);
 }
 
 @keyframes wfn-run-time-out {
@@ -2521,7 +2552,7 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-strip-item[data-failed] {
-  color: var(--openbot-danger-text);
+  color: var(--openbot-warning-text);
 }
 
 .wfn-strip-failed {
@@ -2614,7 +2645,7 @@ fieldset.wfn-picker-group {
 .wfn-media-failed-icon {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  color: var(--openbot-danger-text);
+  color: var(--openbot-warning-text);
 }
 
 .wfn-media-failed-reason {
@@ -2934,7 +2965,7 @@ fieldset.wfn-picker-group {
 }
 
 @supports (animation-timeline: scroll()) {
-  .wfn-node :is(textarea, .wfn-field-result p),
+  .wfn-node :is(textarea, .wfn-name-field, .wfn-field-result p),
   .wfn-strip-list {
     --wfn-fade-size: var(--openbot-space-4);
     --wfn-fade-side: to bottom;
@@ -3542,8 +3573,8 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-alert[data-tone="danger"] {
-  background: var(--openbot-danger-soft);
-  color: var(--openbot-danger-text);
+  background: var(--openbot-warning-soft);
+  color: var(--openbot-warning-text);
 }
 
 .wfn-alert[data-tone="warning"] {

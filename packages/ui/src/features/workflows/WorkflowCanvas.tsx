@@ -447,13 +447,24 @@ function textFont(node: HTMLElement) {
   return input ? Number.parseFloat(getComputedStyle(input).fontSize) : TEXT_FONT.min;
 }
 
-const DRAG_FIELD = "textarea, input.wfn-input, input.wfn-step-name";
+const DRAG_FIELD = "textarea, input.wfn-input, input.wfn-step-name, .wfn-name-field";
 
 const ITEM_FIELD = ".wfn-note-input, .wfn-shape-input, .wfn-text-input, .wfn-step-name";
 
-function caretAt(field: HTMLTextAreaElement | HTMLInputElement, x: number, y: number) {
+function caretAt(field: HTMLElement, x: number, y: number): () => void {
   const position = document.caretPositionFromPoint?.(x, y);
-  return position?.offsetNode === field ? position.offset : field.value.length;
+  if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+    const caret = position?.offsetNode === field ? position.offset : field.value.length;
+    return () => field.setSelectionRange(caret, caret);
+  }
+  return () => {
+    const selection = document.getSelection();
+    if (position && field.contains(position.offsetNode)) selection?.collapse(position.offsetNode, position.offset);
+    else {
+      selection?.selectAllChildren(field);
+      selection?.collapseToEnd();
+    }
+  };
 }
 
 const NO_DRAG = [
@@ -1670,7 +1681,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           draft[id] = snapPoint({ x: at.x, y: at.y - label });
         });
       canvas.select([id]);
-      element?.querySelector<HTMLElement>(".wfn-card textarea")?.focus();
+      element?.querySelector<HTMLElement>(".wfn-card :is(textarea, .wfn-name-field)")?.focus();
     });
   };
 
@@ -2561,7 +2572,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           start: WfnPoint;
           origin: WfnPoint;
           moved: boolean;
-          focus?: { field: HTMLTextAreaElement | HTMLInputElement; caret: number };
+          focus?: { field: HTMLElement; place: () => void };
           group: readonly { id: string; origin: WfnPoint }[];
           box: Box;
           others: readonly Box[];
@@ -2601,7 +2612,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (event.target instanceof Element && event.target.closest(":popover-open")) return;
       if (
         event.target instanceof Element &&
-        event.target.closest(event.ctrlKey ? "[data-wfn-portal]" : "textarea, [data-wfn-portal]")
+        event.target.closest(event.ctrlKey ? "[data-wfn-portal]" : "textarea, .wfn-name-field, [data-wfn-portal]")
       )
         return;
       event.preventDefault();
@@ -2840,9 +2851,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       }
       if (current.kind === "node" && !current.moved) {
         if (current.focus && event.type !== "pointercancel") {
-          const { field, caret } = current.focus;
+          const { field, place } = current.focus;
           field.focus({ preventScroll: true });
-          field.setSelectionRange(caret, caret);
+          place();
         }
         if (current.group.length > 1 && !current.whole) canvas.select([current.id]);
       }
@@ -2988,7 +2999,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const id = target.closest<HTMLElement>("[data-node-id]")?.dataset.nodeId;
       const at = id && !board.isLocked(id) ? positions[id] : undefined;
       if (id && at) {
-        const field = target.closest<HTMLTextAreaElement | HTMLInputElement>(DRAG_FIELD);
+        const field = target.closest<HTMLElement>(DRAG_FIELD);
         if (field && document.activeElement === field) return;
         if (event.shiftKey) return;
         const edits = field !== null && (board.isSelected(id) || !field.matches(ITEM_FIELD));
@@ -3014,7 +3025,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           group: moving,
           box,
           others: shownBoxes(live().flatMap((node) => (members.includes(node.id) ? [] : [node.id]))),
-          ...(field && edits ? { focus: { field, caret: caretAt(field, event.clientX, event.clientY) } } : {}),
+          ...(field && edits ? { focus: { field, place: caretAt(field, event.clientX, event.clientY) } } : {}),
         };
       } else if (!target.closest("[data-node-id]")) {
         event.preventDefault();
@@ -3207,7 +3218,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           return () =>
             node
               .querySelector<HTMLElement>(
-                ".wfn-card :is(textarea, input, button:not(:disabled)), .wfn-text-input, textarea, input",
+                ".wfn-card :is(textarea, .wfn-name-field, input, button:not(:disabled)), .wfn-text-input, textarea, input",
               )
               ?.focus();
         if (event.shiftKey && event.code === "Digit1") return () => fitView(true);

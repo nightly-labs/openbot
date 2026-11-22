@@ -6,7 +6,7 @@ import { AnswerProblems } from "./workflow-answer-parts";
 import { resultValue, useBoard, type WfnPortType } from "./workflow-board";
 import { DISCORD_OUTPUT_DEFAULTS, DiscordIcon, DiscordOutputRows } from "./workflow-discord-parts";
 import { GITHUB_OUTPUT_DEFAULTS, GitHubIcon, GitHubOutputRows, useGitHubOutputReady } from "./workflow-github-parts";
-import { NameTextarea } from "./workflow-name-textarea";
+import { NameField } from "./workflow-name-field";
 import {
   type Choice,
   FailureAlert,
@@ -199,7 +199,7 @@ export function OutputNode(props: {
       </SettingRows>
       <Show when={messageShown()}>
         <Field class="wfn-block-field">
-          <NameTextarea
+          <NameField
             node={props.id}
             class="wfn-input"
             aria-label={t("workflow.output.message")}

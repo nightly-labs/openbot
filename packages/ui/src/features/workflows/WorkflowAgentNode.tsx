@@ -10,7 +10,7 @@ import { useBoard } from "./workflow-board";
 import { InputPictures } from "./workflow-input-pictures";
 import type { WorkflowCatalogs } from "./workflow-model";
 import { modelOption } from "./workflow-model-pills";
-import { NameTextarea } from "./workflow-name-textarea";
+import { NameField } from "./workflow-name-field";
 import {
   asString,
   Field,
@@ -162,7 +162,7 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
         <Show when={pictures().length > 0}>
           <InputPictures sources={pictures()} />
         </Show>
-        <NameTextarea
+        <NameField
           node={props.id}
           class="wfn-input"
           aria-label={t("workflow.agent.task")}

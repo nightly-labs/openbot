@@ -410,7 +410,10 @@ function copyFields(fields: Record<string, WfnFields>): Record<string, WfnFields
 
 export function isEditable(element: Element | null): boolean {
   return (
-    element instanceof HTMLElement && (element.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName))
+    element instanceof HTMLElement &&
+    (element.isContentEditable ||
+      element.classList.contains("wfn-name-field") ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName))
   );
 }
 

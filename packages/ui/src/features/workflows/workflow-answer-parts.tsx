@@ -13,7 +13,7 @@ import { asString, ToolAction, useField } from "./workflow-node-parts";
 
 type AnswerKey = typeof WORKFLOW_ANSWER_FIELD | typeof WORKFLOW_CHECK_FIELD;
 
-function answerProblemText(t: AppTranslate, problem: WorkflowAnswerProblem): string {
+export function answerProblemText(t: AppTranslate, problem: WorkflowAnswerProblem): string {
   switch (problem.code) {
     case "spec":
       switch (problem.spec.code) {

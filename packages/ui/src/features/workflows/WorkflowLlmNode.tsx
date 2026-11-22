@@ -6,7 +6,7 @@ import { AnswerAction, AnswerProblems, AnswerSummary } from "./workflow-answer-p
 import { useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
-import { NameTextarea } from "./workflow-name-textarea";
+import { NameField } from "./workflow-name-field";
 import {
   asProvider,
   asString,
@@ -77,7 +77,7 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
       }
     >
       <Field class="wfn-field-task">
-        <NameTextarea
+        <NameField
           node={props.id}
           class="wfn-input"
           aria-label={t("workflow.prompt.title")}
@@ -110,7 +110,7 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
         </div>
       </Field>
       <Field class="wfn-field-system">
-        <NameTextarea
+        <NameField
           node={props.id}
           class="wfn-input"
           aria-label={t("workflow.llm.system")}
