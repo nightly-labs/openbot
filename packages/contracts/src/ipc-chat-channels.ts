@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import type { AvatarImageInput } from "./ipc-agents";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
+import { isChannelFolderPaths } from "./ipc-channel-folders";
 import { type ConversationMessage, isConversationMessage } from "./ipc-conversation-messages";
 import { optionalHistoryExtent } from "./ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
@@ -93,6 +94,7 @@ export interface Channel extends ChannelDraft {
   revision: number;
   createdAt: string;
   imageUrl?: string | null;
+  folders?: string[];
 }
 
 export interface SetChannelImageInput {
@@ -329,7 +331,8 @@ export function isChannel(value: unknown): value is Channel {
     typeof value.archived === "boolean" &&
     sequence(value.revision) &&
     isBoundedString(value.createdAt, 80) &&
-    (value.imageUrl === undefined || value.imageUrl === null || isBoundedString(value.imageUrl, 2048))
+    (value.imageUrl === undefined || value.imageUrl === null || isBoundedString(value.imageUrl, 2048)) &&
+    (value.folders === undefined || isChannelFolderPaths(value.folders))
   );
 }
 

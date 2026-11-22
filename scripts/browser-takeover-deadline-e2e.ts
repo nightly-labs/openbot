@@ -819,6 +819,131 @@ try {
     },
   );
 
+  await step(
+    "a saved login that an agent script blocks goes back to the agent at once, with no card (#14181)",
+    async () => {
+      const vaultFills: string[] = [];
+      const vaultEvents: AgentEvent[] = [];
+      const attention: string[] = [];
+      const vaultRegistry = new AttentionRegistry({
+        conversation: {
+          agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
+          publicThreadId: (_agentId, threadId) => threadId,
+          ensureSnapshot: () => snapshot,
+          emitConversation: () => {
+            snapshot.revision += 1;
+          },
+        },
+        browser: {
+          listTabs: () => tabs,
+          toolCanUseTab: (params, tabId) =>
+            tabs.some(
+              (candidate) =>
+                candidate.id === tabId &&
+                candidate.ownerAgentId === params.ownerAgentId &&
+                candidate.ownerThreadId === params.threadId,
+            ),
+          prepareSecret: () =>
+            Effect.sync(() => ({
+              ...preparedSecret(),
+              agentScriptedOrigin: true,
+              vaultFillable: true,
+              submit: (secret: string) =>
+                Effect.sync(() => {
+                  vaultFills.push(secret);
+                  return "submitted" as const;
+                }),
+            })),
+          beginTakeover: () => Effect.void,
+          endTakeover: () => {},
+        },
+        hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
+        routines: {
+          markNeedsAttention: (turnId) => attention.push(`needs:${turnId}`),
+          markRunningForTurn: (turnId) => attention.push(`running:${turnId}`),
+        },
+        emit: (event) => vaultEvents.push(event),
+        emitError: () => {},
+        emitRuntimeSnapshot: () => {},
+        lateAnswerTarget: () => ({}),
+        passwordVault: {
+          connected: () => true,
+          loginsFor: () =>
+            Effect.succeed([
+              { id: "openbot:a", title: "Account A", username: "a@example.test", hasOneTimePassword: false },
+            ]),
+          secretFor: (loginId) => Effect.succeed(loginId === "openbot:a" ? VAULT_SECRET : null),
+        },
+      });
+      const cards = () => vaultEvents.filter((event) => event.type === "browser-takeover-requested").length;
+      const signIn = (loginId?: string) => {
+        const id = nextRequest++;
+        return runCauseEffect(
+          vaultRegistry.surfaceBrowserTakeover(client, {
+            id,
+            method: "item/tool/call",
+            params: {
+              threadId: THREAD,
+              turnId: `turn-scripted-${id}`,
+              callId: `call-${id}`,
+              namespace: "openbot_browser",
+              tool: "submit_secret",
+              arguments: {
+                tabId: TAB,
+                method: "password",
+                targets: [{ kind: "css", selector: "#password" }],
+                submission: "click",
+                submitTarget: { kind: "css", selector: "#submit" },
+                ...(loginId === undefined ? {} : { loginId }),
+              },
+            },
+          }),
+        );
+      };
+      const cancelledBefore = browserLog.filter((entry) => entry === "secret-cancelled").length;
+      const scripted = signIn("openbot:a");
+      let answered = false;
+      void scripted.finally(() => {
+        answered = true;
+      });
+      while (cards() === 0 && !answered) await new Promise((done) => setImmediate(done));
+      assert.equal(cards(), 0, "a password card opened for a skip that the agent can fix");
+      const skipped = answerOf(await scripted);
+      assert.equal(skipped.success, false, "the skipped saved login was reported as a success");
+      assert.match(skipped.next ?? "", /evaluate/u, "the agent did not get the reason for the skip");
+      assert.match(skipped.next ?? "", /navigate direction=reload/u, "the agent did not get the reload step");
+      assert.match(skipped.next ?? "", /request_takeover/u, "the agent did not get the takeover fallback");
+      assert.equal(cards(), 0, "a password card opened for a skip that the agent can fix");
+      assert.deepEqual(vaultFills, [], "a saved password was filled while an agent script can run");
+      assert.equal(vaultRegistry.runtimeAttention().pendingBrowserTakeovers.length, 0, "the takeover stayed open");
+      assert.equal(
+        browserLog.filter((entry) => entry === "secret-cancelled").length,
+        cancelledBefore + 1,
+        "the secure input lock of the tab was not released",
+      );
+      assert(!attention.some((entry) => entry.startsWith("needs:")), "the routine was marked as waiting for the user");
+      const unnamed = signIn();
+      let unnamedAnswered = false;
+      void unnamed.finally(() => {
+        unnamedAnswered = true;
+      });
+      while (cards() === 0 && !unnamedAnswered) await new Promise((done) => setImmediate(done));
+      const card = vaultRegistry.runtimeAttention().pendingBrowserTakeovers[0];
+      assert(card?.secret, "no password card for a sign-in without loginId");
+      await runCauseEffect(
+        vaultRegistry.respondToBrowserSecret({
+          requestId: card.requestId,
+          agentId: AGENT,
+          decision: "submit",
+          secret: SECRET,
+        }),
+      );
+      assert.equal(answerOf(await unnamed).status, "completed");
+      assert.deepEqual(vaultFills, [SECRET], "the card did not fill what the user typed");
+      return { skipped, cards: cards() };
+    },
+  );
+
   await writeFile(
     resolve(OUT, "report.json"),
     `${JSON.stringify({ ok: true, steps, browserLog, limitedLog, releasedAnswers }, null, 2)}\n`,

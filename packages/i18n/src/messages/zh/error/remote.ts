@@ -22,9 +22,12 @@ export const messages = {
   "error.remote.screenRecordingDenied": "主机未允许 OpenBot 录制屏幕。请在主机上授予屏幕录制权限后重试。",
   "error.remote.windowsSessionDisconnected":
     "主机上的 Windows 会话已断开，没有可共享的屏幕。请在主机的屏幕上登录 Windows，然后重试。",
+  "error.remote.windowsCaptureDenied":
+    "主机上的 Windows 不允许 OpenBot 录制屏幕。请在主机的屏幕上解锁 Windows 并关闭所有管理员提示，然后重试。如果问题仍然存在，请重启主机。",
   "error.remote.macScreenLocked": "Mac 已锁定，无法共享屏幕。请在 Mac 的屏幕上解锁，然后重试。",
   "error.remote.streamTooSlowLowerQuality": "与主机的连接太慢，无法显示画面。请重试：下一次连接将使用较低的画质。",
   "error.remote.streamTooSlow": "与主机的连接太慢，无法显示画面。请使用更快的网络，然后重试。",
+  "error.remote.noPictureSwitchEncoder": "主机没有发送画面。请重试：下一次连接会使用适用于更多电脑的视频设置。",
   "error.remote.teamSessionExpired": "团队会话已过期。",
   "error.remote.finishTestBeforeSwitch": "切换显示器前请先结束远程桌面测试。",
   "error.remote.displayNotFound": "未找到远程显示器。",

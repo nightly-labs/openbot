@@ -56,6 +56,7 @@ export const messages = defineMessages("agent", {
   "agent.dock.closeOnLeave": "Close when you click away",
   "agent.dock.openInMain": "Open in the main window",
   "agent.dock.openWindow": "Open in new window",
+  "agent.dock.openPage": "Open {title}",
   "agent.dock.remove": "Remove from the dock",
   "agent.dock.send": "Send",
   "agent.dock.working": "Working…",

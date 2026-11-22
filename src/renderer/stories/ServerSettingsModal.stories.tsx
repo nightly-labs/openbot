@@ -88,6 +88,7 @@ export const LocalFirstSetup: Story = {
       apiOnline: false,
       remoteDesktopReady: false,
       remoteDesktopScreenRecordingDenied: false,
+      remoteDesktopNeedsX11Session: false,
       remoteDesktopUnattended: false,
       remoteDesktopActiveSessions: 0,
       remoteDesktopMaxSessions: 4,

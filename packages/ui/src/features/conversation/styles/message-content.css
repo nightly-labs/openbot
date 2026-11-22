@@ -1626,6 +1626,10 @@
   color: var(--file-reference-color);
 }
 
+.ui-bubble.message-bubble-colored.message-bubble-solid > .ui-bubble-content .message-file-reference {
+  color: var(--message-solid-text);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .ui-button.message-file-reference:hover:not(:disabled),
   .composer-file-reference:hover {

@@ -15,6 +15,7 @@ import {
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { WORKFLOW_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
+import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
@@ -57,6 +58,7 @@ export interface WorkflowHost {
   mediaTransparentSupported(): boolean;
   mediaSizeSupported(): boolean;
   agentFilesSupported(): boolean;
+  answersSupported(): boolean;
   stepSettingsSupported(): boolean;
   foldersSupported(): boolean;
   folders(): Promise<WorkflowFoldersSnapshot>;
@@ -282,6 +284,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaTransparentSupported,
     mediaSizeSupported,
     agentFilesSupported,
+    answersSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_ANSWERS_CAPABILITY),
     stepSettingsSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_STEP_SETTINGS_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl,

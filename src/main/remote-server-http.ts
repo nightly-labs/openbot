@@ -48,6 +48,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               channelIsolation: true,
               channelPicture: true,
               channelBrowser: true,
+              providerManyAccounts: true,
             }),
           )
         : codec.encodeRequest(method, path, options.body, {
@@ -113,7 +114,9 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               channelSeenSubtasks: true,
               channelTaskWaits: true,
               mcpManyServers: true,
+              providerManyAccounts: true,
               routineResultsWhatsApp: true,
+              storageWorkflowFiles: true,
             })
           : codec.decodeResponse(method, path, response.status, input),
       catch: (cause) =>

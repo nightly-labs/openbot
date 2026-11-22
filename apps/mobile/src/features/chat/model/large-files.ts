@@ -34,9 +34,13 @@ export function requestLargeFile(serverId: string, attachmentId: string) {
   useRequestedFiles.setState(({ keys }) => ({ keys: new Set(keys).add(key) }));
 }
 
-export function largeDownloadOf(attachment: AttachmentSummary): RemoteLargeDownload | undefined {
+export function largeDownloadOf(attachment: AttachmentSummary, file?: string): RemoteLargeDownload | undefined {
   return attachment.size > MOBILE_ATTACHMENT_BYTES
-    ? { maxBytes: attachment.size, mimeType: attachment.mimeType || "application/octet-stream" }
+    ? {
+        maxBytes: attachment.size,
+        mimeType: attachment.mimeType || "application/octet-stream",
+        ...(file ? { file } : {}),
+      }
     : undefined;
 }
 

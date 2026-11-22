@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken taken die tegelijk lopen, het account voor live spraak, de OpenBot-geheugenschakelaar, workflowmappen, getypeerde workflowantwoorden en meer dan 10 accounts van één aanbieder alleen als de server deze versie heeft.",
+      "Na deze update kan een oudere versie van OpenBot je gegevens niet openen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Een agent kan losstaand werk splitsen in taken die tegelijk lopen. Elk resultaat komt terug in de hoofdchat, en de agent voegt de resultaten voor je samen.",
+          "Bekijk alle open threads van een agent in het nieuwe tabblad Threads van het zijpaneel. Het tabblad toont het aantal threads dat op je wacht.",
+          "Wijzig je sneltoetsen in het nieuwe tabblad Toetsenbord van Instellingen. Nieuwe sneltoetsen starten een thread en gaan naar de volgende en de vorige thread.",
+          "Workflows openen in tabbladen, en workflowstappen kunnen getypeerde antwoorden geven. Schrijf {{name}} om een antwoord in een latere stap te gebruiken.",
+          "Upload een MP4- of WebM-video als vensterachtergrond in Instellingen > Weergave.",
+          "Kies het ChatGPT-account dat GPT live spraak gebruikt in Instellingen > Spraak."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een aanbieder houdt tot 20 accounts. Eerder was de limiet 10.",
+          "Dicteren neemt op tot 10 minuten op. Eerder stopte het na 2 minuten.",
+          "Een thread laadt oudere berichten wanneer je bij de bovenkant scrolt. Je hoeft niet op een knop te klikken."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een geplande routine schakelt zichzelf niet meer stilletjes uit wanneer een uitvoering niets te melden heeft.",
+          "Een lange chat behoudt al zijn berichten, in de juiste volgorde, terwijl een antwoord binnenkomt.",
+          "Een gekoppeld WhatsApp-nummer stopt niet meer met het ontvangen van berichten terwijl het nog «Verbonden» toont.",
+          "Op Windows voeren OpenCode-agents weer opdrachten uit. Eerder mislukten ze vaak met «opencode-pty request timed out».",
+          "Een agent die je hebt gedempt stuurt je geen melding meer wanneer hij in een kanaal antwoordt."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

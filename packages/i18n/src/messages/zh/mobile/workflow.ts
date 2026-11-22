@@ -93,6 +93,7 @@ export const messages = {
   "mobile.workflow.output.chatChannel": "OpenBot 频道",
   "mobile.workflow.output.file": "文件",
   "mobile.workflow.status.running": "运行中",
+  "mobile.workflow.status.waiting": "排队中",
   "mobile.workflow.status.approval": "等你处理",
   "mobile.workflow.status.stopping": "正在停止",
   "mobile.workflow.status.done": "已完成",

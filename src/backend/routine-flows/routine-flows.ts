@@ -278,9 +278,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
             const sources = incoming.map((link) => ({ link, step: steps.get(link.fromAgentId) }));
             if (sources.some(({ step }) => !step || step.status === "running")) continue;
             const answered = sources.filter(
-              ({ step }) =>
-                step?.status === "succeeded" &&
-                !(step.agentId === run.agentId && step.output === null && quietRoutineRun(run)),
+              ({ step }) => step?.status === "succeeded" && !(step.output === null && quietRoutineRun(run)),
             );
             if (answered.length === 0) {
               const skipped = store.addStep({ runId: run.id, agentId, input: "", status: "skipped" });

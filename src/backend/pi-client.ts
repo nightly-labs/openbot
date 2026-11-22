@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { access, writeFile } from "node:fs/promises";
+import { access, open, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
@@ -10,8 +10,10 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type LogValue, redactSecrets, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
+import { CONTEXT_COMPACTION_THRESHOLD } from "./agent/context-compaction";
 import { withoutTurnContext } from "./agent/developer-instructions";
 import { secretElicitationField } from "./agent/prompts";
+import { isContextTooSmallFailure } from "./agent/provider-diagnostics";
 import { waitForSuccessfulProcess } from "./agent/provider-status";
 import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
@@ -85,6 +87,8 @@ const PI_TURN_STALL_MS = 10 * 60_000;
 
 const PI_THREAD_IDLE_RELEASE_MS = 5 * 60_000;
 
+const PI_LONG_CACHE_TTL_MS = 60 * 60_000;
+
 const PI_START_TIMEOUT_MS = 120_000;
 
 const PI_IDLE_THREAD_LIMIT = 1;
@@ -117,6 +121,10 @@ const PiSessionUsage = Schema.Struct({
     cacheWrite: Schema.Number,
   }),
 });
+
+const PiSessionHeader = Schema.Struct({ type: Schema.Literal("session"), cwd: Schema.optional(Schema.String) });
+
+const PI_SESSION_HEADER_BYTES = 65_536;
 
 const PiSessionCost = Schema.Struct({ cost: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)) });
 
@@ -185,6 +193,7 @@ interface ClientEvents {
 
 export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "request";
+  readonly #cacheTtls = new Map<string, number>();
   readonly provisionalAnswers = true;
   readonly turnContext = true;
   readonly imageInput = (): boolean => true;
@@ -243,7 +252,35 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         ? sourceText("error.provider.modelServiceRefusedReason", { reason })
         : sourceText("error.provider.modelServiceRefused");
     }
+    if (message && isContextTooSmallFailure(message)) return this.#contextTooSmall(message);
     return this.#redact(message ?? "Pi model request failed.");
+  }
+
+  readonly #compactionFailure = Effect.fn("PiAgentClient.compactionFailure")(function* (
+    this: PiAgentClient,
+    thread: PiThread,
+    failure: ProviderClientOperationError,
+  ) {
+    const message = failure.cause instanceof Error ? failure.cause.message : "";
+    if (!isContextTooSmallFailure(message)) return yield* failure;
+    const full = yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
+      Effect.map((stats) =>
+        Option.exists(
+          Schema.decodeUnknownOption(PiContextUsage)(getRecord(stats, "contextUsage")),
+          (usage) => usage.tokens / usage.contextWindow >= CONTEXT_COMPACTION_THRESHOLD,
+        ),
+      ),
+      Effect.orElseSucceed(() => false),
+    );
+    return yield* full ? providerFailure(new Error(this.#contextTooSmall(message))) : failure;
+  });
+
+  #contextTooSmall(reason: string): string {
+    logger.warn("A Pi request does not fit the model's context window.", {
+      provider: this.provider,
+      reason: this.#redact(reason),
+    });
+    return sourceText("error.provider.opencodeContextTooSmall");
   }
 
   #secretValues(): string[] {
@@ -268,6 +305,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     this.#disarmIdle(thread);
     yield* Effect.gen(function* () {
       yield* thread.rpc.stop();
+      yield* keepEmptySession(thread.id);
       thread.mcp.close();
       yield* thread.extension.close();
     }).pipe(Effect.ensuring(thread.keyExtension ? thread.keyExtension.close().pipe(Effect.orDie) : Effect.void));
@@ -434,7 +472,13 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       case "thread/compact/start": {
         const id = yield* providerSync(() => requiredString(params, "threadId"));
         const thread = yield* this.#thread(id, params);
-        yield* thread.gate.withPermit(thread.rpc.request({ type: "compact" }, timeoutMs ?? 120_000));
+        yield* thread.gate
+          .withPermit(thread.rpc.request({ type: "compact" }, timeoutMs ?? 120_000))
+          .pipe(Effect.catch((failure) => this.#compactionFailure(thread, failure)));
+        yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
+          Effect.tap((stats) => Effect.sync(() => this.#notifyContextUsage(thread, stats))),
+          Effect.ignore,
+        );
         response = {};
         break;
       }
@@ -649,7 +693,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         if (thread?.turn) this.#background(this.#finish(thread, "failed", error.message, "provider_exited"));
         this.emit("exit", error);
       });
-      const args = keyExtension ? ["--extension", keyExtension.path] : [];
+      const startsOnSession = resume && requestedId && (yield* piSessionOpensAtStart(requestedId));
+      const switchesSession = resume && requestedId && !startsOnSession;
+      const args = [
+        ...(startsOnSession && requestedId ? ["--session", requestedId] : []),
+        ...(keyExtension ? ["--extension", keyExtension.path] : []),
+      ];
       const withExtensions = modelKey !== undefined && extensionModels.has(modelKey);
       args.push(
         ...(this.options.profileGeneration
@@ -667,12 +716,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       if (!this.#running) return yield* providerFailure(new Error(sourceText("error.provider.piStopped")));
       const environment = { ...extension?.environment, ...keyExtension?.environment };
       yield* providerSync(() => this.#spawn(rpc, cwd, args, environment));
-      if (resume && requestedId) {
+      if (switchesSession) {
         const loaded = yield* rpc.request({ type: "switch_session", sessionPath: requestedId }, PI_START_TIMEOUT_MS);
         if (loaded.cancelled === true)
           return yield* providerFailure(new Error(sourceText("error.provider.piResumeCancelled")));
       }
-      const state = yield* rpc.request({ type: "get_state" }, resume && requestedId ? undefined : PI_START_TIMEOUT_MS);
+      const state = yield* rpc.request({ type: "get_state" }, switchesSession ? undefined : PI_START_TIMEOUT_MS);
       const id = getString(state, "sessionFile");
       if (!id || (resume && id !== requestedId))
         return yield* providerFailure(new Error(sourceText("error.provider.piSessionIdentity")));
@@ -684,23 +733,6 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         if (!known) {
           extensionModels.add(modelKey);
           return null;
-        }
-      }
-      if (!resume) {
-        const created = yield* providerCall(async () => {
-          try {
-            await writeFile(id, "", { flag: "wx", mode: 0o600 });
-            return true;
-          } catch (cause) {
-            if (cause instanceof Error && "code" in cause && cause.code === "EEXIST") return false;
-            throw cause;
-          }
-        });
-        if (created) {
-          const loaded = yield* rpc.request({ type: "switch_session", sessionPath: id });
-          const persisted = yield* rpc.request({ type: "get_state" });
-          if (loaded.cancelled === true || getString(persisted, "sessionFile") !== id)
-            return yield* providerFailure(new Error(sourceText("error.provider.piResumeCancelled")));
         }
       }
       mcp.setThreadId(id);
@@ -926,6 +958,30 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     turn.items.set(id, { id, type: "userMessage", content: [{ type: "text", text }] });
   }
 
+  promptCacheTtlMs(externalThreadId: string): number | null {
+    return this.#cacheTtls.get(externalThreadId) ?? null;
+  }
+
+  #observeCacheWrite(threadId: string, usage: DynamicRecord | null): void {
+    const written = typeof usage?.cacheWrite === "number" ? usage.cacheWrite : 0;
+    const writtenForHour = typeof usage?.cacheWrite1h === "number" ? usage.cacheWrite1h : 0;
+    if (written <= 0) return;
+    if (writtenForHour >= written) this.#cacheTtls.set(threadId, PI_LONG_CACHE_TTL_MS);
+    else this.#cacheTtls.delete(threadId);
+  }
+
+  #notifyContextUsage(thread: PiThread, stats: unknown): void {
+    const context = Schema.decodeUnknownOption(PiContextUsage)(getRecord(stats, "contextUsage"));
+    if (Option.isNone(context)) return;
+    this.#notify("thread/tokenUsage/updated", thread, {
+      tokenUsage: {
+        last: { totalTokens: context.value.tokens },
+        modelContextWindow: context.value.contextWindow,
+        estimated: true,
+      },
+    });
+  }
+
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {
     const safe =
       method === "openbot/usage" ||
@@ -994,6 +1050,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     } else if (record.type === "message_end") {
       const message = getRecord(record, "message");
       if (getString(message, "role") !== "assistant") return;
+      this.#observeCacheWrite(thread.id, getRecord(message, "usage"));
       const id = `${turn.id}:message:${turn.messageIndex++}`;
       for (const key of turn.items.keys()) if (key.startsWith(`${id}:`)) turn.items.delete(key);
       for (const item of piMessageItems(message, id)) {
@@ -1046,15 +1103,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       });
     yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
       Effect.flatMap((stats) => {
-        const context = Schema.decodeUnknownOption(PiContextUsage)(getRecord(stats, "contextUsage"));
-        if (Option.isSome(context))
-          this.#notify("thread/tokenUsage/updated", thread, {
-            tokenUsage: {
-              last: { totalTokens: context.value.tokens },
-              modelContextWindow: context.value.contextWindow,
-              estimated: true,
-            },
-          });
+        this.#notifyContextUsage(thread, stats);
         const cost = Schema.decodeUnknownOption(PiSessionCost)(stats);
         return providerSync(() => ({
           ...Schema.decodeUnknownSync(PiSessionUsage)(stats),
@@ -1074,7 +1123,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       ),
       Effect.catch(() => Effect.void),
     );
-    const append = this.options.history?.append;
+    const keepsHistory = !isRecord(thread.params) || thread.params.persistSession !== false;
+    const append = keepsHistory ? this.options.history?.append : undefined;
     if (append) {
       const saved = yield* Effect.exit(
         append(thread.id, {
@@ -1274,6 +1324,38 @@ function requireSessionFile(sessionFile: string): Effect.Effect<void, ProviderCl
       ),
     ),
   );
+}
+
+function piSessionOpensAtStart(sessionFile: string): Effect.Effect<boolean> {
+  return providerCall(async () => {
+    const handle = await open(sessionFile, "r");
+    try {
+      const { buffer, bytesRead } = await handle.read(
+        Buffer.alloc(PI_SESSION_HEADER_BYTES),
+        0,
+        PI_SESSION_HEADER_BYTES,
+        0,
+      );
+      if (bytesRead === 0) return true;
+      const text = buffer.toString("utf8", 0, bytesRead);
+      const end = text.indexOf("\n");
+      if (end < 0) return false;
+      const header = Schema.decodeUnknownOption(Schema.fromJsonString(PiSessionHeader))(text.slice(0, end));
+      if (Option.isNone(header)) return false;
+      const cwd = header.value.cwd;
+      if (!cwd) return true;
+      return access(cwd).then(
+        () => true,
+        () => false,
+      );
+    } finally {
+      await handle.close();
+    }
+  }).pipe(Effect.orElseSucceed(() => false));
+}
+
+function keepEmptySession(sessionFile: string): Effect.Effect<void> {
+  return providerCall(() => writeFile(sessionFile, "", { flag: "wx", mode: 0o600 })).pipe(Effect.ignore);
 }
 
 function isNamespace(value: unknown): value is DynamicToolNamespace {

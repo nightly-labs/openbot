@@ -108,6 +108,7 @@ export function nextActions(
   const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const reasons = { before, loops, latest };
   const due = new Set<string>();
+  const thisRound = new Set<string>();
   const actions: WalkAction[] = [];
   for (const nodeId of graphOrder(graph.nodes, forward, scope)) {
     const current = latest.get(nodeId);
@@ -123,8 +124,10 @@ export function nextActions(
       const source = latest.get(edge.from);
       return source !== undefined && edgeActive(edge, source) && newer(edge);
     });
-    if (current && !nextPass && !ahead.some(newer)) continue;
+    const inputChanges = ahead.some((edge) => newer(edge) || thisRound.has(edge.from));
+    if (current && !nextPass && !inputChanges) continue;
     due.add(nodeId);
+    if (!current || inputChanges) thisRound.add(nodeId);
     if (ahead.some((edge) => due.has(edge.from) || isWaiting(latest.get(edge.from)))) continue;
     const outside = (before.get(nodeId) ?? []).length > edges.length;
     const answered = edges.some((edge) => {
@@ -300,6 +303,17 @@ function edgeInputs(join: boolean, edges: readonly WorkflowEdge[], reasons: Reas
   });
 }
 
+export function endedWithoutAnswer(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): boolean {
+  const source = latest.get(nodeId);
+  if (!source) return false;
+  const reasons = { before: incoming(graph.edges), loops: workflowLoopEdges(graph.nodes, graph.edges), latest };
+  return missingAnswer(source, reasons, new Set()) !== null;
+}
+
 function missingAnswer(source: StoredWorkflowStep, reasons: Reasons, seen: Set<string>): string | null {
   if (source.status === "failed") return withError("No answer: this step failed.", source.error);
   if (source.status === "stopped") return withError("No answer: this step was stopped.", source.error);
@@ -427,7 +441,7 @@ export function modelStepPrompt(system: string, prompt: string, input: string): 
 const TRANSPARENT_ASK = {
   codex: "Give it a transparent background: a cut-out PNG with clear pixels around the subject.",
   grok: "Put the subject on one flat, solid background colour, with no shadow, floor, gradient or texture, and keep a margin around the subject. Use pure green #00FF00, or pure magenta #FF00FF when the subject is green. Do not use that colour in the subject.",
-} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra" | "higgsfield">, string>;
+} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra" | "higgsfield" | "openbot">, string>;
 
 export function mediaStepPrompt(
   fields: WorkflowFields,
@@ -437,7 +451,7 @@ export function mediaStepPrompt(
   provider: WorkflowMediaProvider,
 ): string {
   const ask =
-    provider === "sunra" || provider === "higgsfield"
+    provider === "sunra" || provider === "higgsfield" || provider === "openbot"
       ? ""
       : kind === "video"
         ? `Make one video of ${specs.duration} seconds at ${specs.resolution ?? "720p"}, aspect ratio ${specs.aspect}.`

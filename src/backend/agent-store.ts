@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { createReadStream, promises as nodeFsPromises } from "node:fs";
 import {
   copyFile,
   cp,
@@ -10,11 +10,11 @@ import {
   readlink,
   realpath,
   rename,
-  rm,
   rmdir,
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -151,6 +151,12 @@ const LEGACY_AGENTS_IMPORT_COMMAND_ID = "legacy-import:bots:v1";
 const CLAUDE_FAST_MODE_RESET_COMMAND_ID = "agent-fast-mode:claude-reset:v1";
 
 const logger = createOpenBotLogger("agent-store");
+
+const fsPromisesWithoutAsarArchives: typeof nodeFsPromises = process.versions.electron
+  ? createRequire(import.meta.url)("original-fs").promises
+  : nodeFsPromises;
+
+const { rm } = fsPromisesWithoutAsarArchives;
 
 const AGENT_FILES_REMOVAL = { recursive: true, force: true, maxRetries: 10, retryDelay: 150 } as const;
 

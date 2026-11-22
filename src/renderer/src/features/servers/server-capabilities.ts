@@ -98,6 +98,8 @@ export function serverSupportsCapability(
       capability === "browsing-memory-v1" ||
       capability === "browser-teach-v1" ||
       capability === "prompt-cache-ttl-v1" ||
+      capability === "prompt-cache-ttl-pi-v1" ||
+      capability === "cache-expiry-compaction-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
@@ -165,7 +167,8 @@ export function serverSupportsCapability(
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
       capability === "owner-transfer-v1" ||
-      capability === "provider-detection-v1") &&
+      capability === "provider-detection-v1" ||
+      capability === "workspace-directory-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

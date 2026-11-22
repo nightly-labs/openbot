@@ -96,6 +96,8 @@ export const messages = {
     "Os membros deste canal ainda não têm uma conversa para compactar. Compacte depois que um membro responder no canal.",
   "error.backend.channelCompactNotSupported":
     "Nenhum membro deste canal pode compactar sob demanda. Os membros que suportam isso compactam o contexto automaticamente quando ele está quase cheio.",
+  "error.backend.channelCompactProviderUnavailable":
+    "O provedor dos membros do canal não está funcionando agora. Atualize os provedores e compacte o canal de novo.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
   "error.backend.channelArchiveRunning": "Pare o trabalho em andamento neste canal e depois exclua-o.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
@@ -237,7 +239,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Esta espera não está aberta. O agente a fechou ou alguém a cancelou.",
   "error.backend.agentWaitNoRequest": "Uma espera precisa de uma mensagem para continuar. Este turno não tem mensagem.",
   "error.backend.agentWaitOwnChatOnly":
-    "Abra uma espera apenas no seu próprio chat. Uma tarefa de canal ou de mensagens não pode esperar.",
+    "Abra uma espera no seu próprio chat ou em uma thread lateral. Uma conversa de canal ou de mensagens não pode esperar.",
   "error.backend.agentWaitNoteRequired": "Escreva uma nota curta que diga para que serve a espera.",
   "error.backend.agentWaitRoutineGone": "Este agente não tem nenhuma rotina com este id.",
   "error.backend.agentWaitNoRoutine":
@@ -280,6 +282,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Este servidor pede login. Entre nele pelo OpenBot no computador anfitrião.",
   "error.backend.mcpSignInNeedsHttps":
     "Este servidor pede login, e o OpenBot só faz login por https. Altere a URL para {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Este servidor só faz login em {url}. Altere a URL para este endereço e depois entre de novo.",
   "error.backend.mcpSignInCancelled": "O login foi cancelado.",
   "error.backend.mcpSignInTimedOut": "O login não foi concluído no navegador.",
   "error.backend.mcpSignInRefused": "A página de login recusou o acesso. Entre novamente.",
@@ -388,6 +392,7 @@ export const messages = {
     "Só o app do OpenBot para celular pode enviar este relato, porque ele adiciona a versão e o registro de suporte do celular. Abra este chat no celular. Se você vir esta mensagem lá, atualize o app do celular.",
   "error.backend.takeoverInactive": "Este controle manual do navegador não está mais ativo.",
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
+  "error.backend.apiKeyListFailed": "O OpenBot não conseguiu ler as chaves de API salvas.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",
   "error.backend.apiKeySaving": "A chave de API já está sendo salva.",
   "error.backend.apiKeyAnswerUnreadable":

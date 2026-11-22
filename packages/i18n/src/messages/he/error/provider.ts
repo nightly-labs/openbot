@@ -137,6 +137,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "מפתח הספק מכיל רווח או תו שאסור שיופיע במפתח.",
   "error.provider.noModel": "לספק שנבחר אין מודל זמין.",
   "error.provider.noModelNamed": "ל-{provider} אין מודל זמין.",
+  "error.provider.acpModelsNotLoaded": "{provider} לא הצליח לטעון את המודלים שלו. יש לשלוח שוב את ההודעה.",
   "error.provider.acpNoModels": "ה-CLI של ACP לא פרסם אף מודל ACP. OpenBot לא ינחש מודל חלופי.",
   "error.provider.endpointRemoveBusy": "יש להמתין לסיום הפעולה הפעילה והתור לפני הסרת נקודת הקצה הזו.",
   "error.provider.codexOutdated": "Codex CLI {version} ישן מדי. OpenBot דורש גרסה 0.156.0 ומעלה.",
@@ -229,6 +230,7 @@ export const messages = {
     "OpenCode Go דחה את הבקשה. מפתח API חדש לא יפתור את זה. ייתכן שהתוכנית שלך ב-OpenCode Go לא פעילה, או ש-OpenCode Go חוסם את הרשת שלך: חלק מהשירותים חוסמים VPN, שרתי Proxy או מדינות מסוימות. ודא ב-OpenCode Console שהתוכנית פעילה, או כבה את ה-VPN, ואז נסה שוב. אפשר גם לבחור מודל אחר.",
   "error.provider.opencodeServiceFailure":
     "OpenCode לא הצליח להשלים את הפעולה הזו כי השירות המקומי שלו נכשל. יש לנסות שוב. אם השגיאה נמשכת, יש לחבר מחדש את OpenCode בהגדרות.",
+  "error.provider.opencodeStillStarting": "OpenCode לא סיים להיטען בזמן. OpenBot ינסה שוב.",
   "error.provider.opencodeRateLimited":
     "ספק המודלים דחה את הבקשה בגלל מגבלת הקצב שלו. יש להמתין כמה דקות או לבחור מודל אחר, ואז לנסות שוב.\n{detail}",
   "error.provider.opencodeBilling":
@@ -256,6 +258,8 @@ export const messages = {
     "OpenCode לא הצליח לקרוא את החשיבה של המודל הזה ברמת המאמץ הזו. יש לבחור רמת מאמץ נמוכה יותר או מודל אחר, ואז לשלוח את ההודעה שוב.",
   "error.provider.opencodeModelNotServed":
     "ספק המודל לא מציע כרגע את המודל הזה לחשבון שלך. יש לבחור מודל אחר ולשלוח את ההודעה שוב.",
+  "error.provider.opencodeSafetyBlocked":
+    "ספק המודל חסם את ההודעה הזאת בגלל כללי הבטיחות שלו. יש לשלוח את הבקשה שוב במילים אחרות. אם הוא חוסם גם את ההודעות הבאות, יש להתחיל צ'אט חדש או לבחור מודל אחר.",
   "error.provider.opencodeNetwork":
     "OpenCode לא הצליח להתחבר לספק המודלים. יש לבדוק את חיבור הרשת של המחשב שמריץ את OpenBot ואז לנסות שוב.\n{detail}",
   "error.provider.codexStateBusy":
@@ -267,6 +271,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "המעבד של המחשב הזה לא יכול להריץ את הספק הזה. השתמש בספק אחר.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode לא הצליח לפתוח את מסד הנתונים שלו כי גרסה חדשה יותר של OpenCode שינתה אותו. יש לעדכן את OpenCode לגרסה 2 ומעלה ואז לנסות שוב.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok לא הופעל כי ההגדרה allowed_models בקובץ התצורה שלו לא כוללת את מודל ברירת המחדל שלו. הוסיפו את מודל ברירת המחדל ל-allowed_models, או הסירו את allowed_models, ואז נסו שוב.",
   "error.provider.opencodeNoAnswer": "מודל OpenCode סיים את הפעולה בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
@@ -397,6 +403,8 @@ export const messages = {
     "הצ'אט הזה נעשה גדול מדי לשליחה למודל. תמונות בצ'אט גורמות לכך לעיתים קרובות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
+  "error.provider.opencodeInputRefused":
+    "המודל דחה את התוכן של הצ'אט הזה ולא מסר את הסיבה. קובץ בצ'אט, כמו PDF או תמונה, יכול לגרום לזה. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב בלי הקובץ, או לבחור מודל אחר.",
   "error.provider.opencodeCompactionFailed":
     "המודל לא הצליח לסכם את הצ'אט הארוך הזה כדי לפנות מקום בחלון ההקשר. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל חזק יותר.",
   "error.provider.museMcpStartupFault":
@@ -497,12 +505,14 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "ההגדרה הזו אינה זמינה בסשן הנוכחי של הספק.",
   "error.provider.sessionSettingInvalid": "הערך הזה אינו זמין עבור ההגדרה.",
   "error.provider.sessionSettingsBusy": "יש להמתין לסיום הפעולה הנוכחית לפני שינוי הגדרת סשן.",
+  "error.provider.sessionSettingsTimedOut": "הסשן של הסוכן לא הגיב בזמן. יש לנסות שוב.",
   "error.provider.piOutdated": "Pi {version} ישן מדי. יש להתקין Pi 1.1.0 ומעלה לתמיכה מקורית ב-RPC וב-MCP.",
   "error.provider.nativeMissing": "ה-CLI של {provider} אינו מותקן. יש להוריד אותו בהגדרות.",
   "error.provider.nativeNotStarted": "לא ניתן להפעיל את ה-CLI של {provider}.",
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",
+  "error.provider.acpSessionStale": "{provider} לא הצליח לטעון את הגרסה האחרונה של הצ'אט הזה. יש לשלוח את ההודעה שוב.",
   "error.provider.acpModelNotOffered": "{provider} לא מציע כעת את {model}. בחרו מודל אחר לסוכן הזה ונסו שוב.",
   "error.provider.piStopped": "Pi אינו פועל. יש לחבר את Pi ולנסות שוב.",
   "error.provider.piSessionMissing": "קובץ הסשן של Pi אינו זמין במחשב הזה.",
@@ -544,6 +554,8 @@ export const messages = {
   "error.provider.museTurnFailed": "הפעולה של Muse נכשלה.",
   "error.provider.museModelUnavailable":
     "Muse לא יכול להשתמש במודל הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל, או שלחשבון הזה אין גישה למודל. בחר מודל אחר ונסה שוב.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse לא הצליח להשלים את הבקשה. Muse משתמש במפתח Meta API השמור, לא בהתחברות שלך. יש להחליף את המפתח, או להסיר אותו בהגדרות כדי להשתמש בהתחברות.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse לא יכול ליצור פרופיל בלי גישה לכלים חיצוניים. יש להשתמש בספק אחר כדי ליצור את הפרופיל, ואז לבחור ב-Muse עבור הסוכן.",
   "error.provider.museAuthUnverified": "האימות של Muse לא אומת. יש להתחבר במחשב המארח, או להגדיר מפתח API של Meta.",

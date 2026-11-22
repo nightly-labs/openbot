@@ -377,3 +377,41 @@ export const AgentsWaitingForInput: Story = {
 export const CompactAgentsWaitingForInput: Story = {
   render: () => <WaitingForInputPlayground compact />,
 };
+
+function paywallServers(role: "owner" | "member"): MockOpenBotOptions {
+  if (!storyLocalServer || !storyRemoteServer) return {};
+  return {
+    servers: [
+      { ...storyLocalServer, active: false },
+      {
+        ...storyRemoteServer,
+        active: true,
+        role,
+        paymentRequired: true,
+        ...(role === "owner"
+          ? {
+              customPlan: {
+                name: "Business",
+                amount: 89_000,
+                currency: "eur",
+                interval: "month",
+                vcpu: 16,
+                memoryGb: 64,
+                storageGb: 500,
+                personalizedSupport: true,
+              },
+            }
+          : {}),
+      },
+    ],
+    agents: [],
+  };
+}
+
+export const CustomServerPaywall: Story = {
+  render: () => <SidebarStatePlayground compact={false} serverView="menu" options={paywallServers("owner")} />,
+};
+
+export const CustomServerPaywallMember: Story = {
+  render: () => <SidebarStatePlayground compact={false} serverView="menu" options={paywallServers("member")} />,
+};

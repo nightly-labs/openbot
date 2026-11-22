@@ -68,6 +68,7 @@ export interface ServerConnectionNoticeProps {
   loadingScene?: "pile" | "quiet";
   hideDetails?: boolean;
   onRetry: () => void;
+  onWaitedLong?: ((waited: boolean) => void) | undefined;
   onManage?: () => void;
   upsell?: { onSeePlans: () => void } | null | undefined;
 }
@@ -96,6 +97,13 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
     setWaitedLong(true);
     setToastClosed(false);
   });
+  createEffect(
+    () => props.initial && !props.ready && waitedLong(),
+    (waited) => {
+      props.onWaitedLong?.(waited);
+    },
+  );
+  onCleanup(() => props.onWaitedLong?.(false));
   const retry = () => {
     setToastClosed(false);
     if (props.initial && !urgent()) setWaitedLong(false);

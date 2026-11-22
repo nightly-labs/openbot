@@ -17,6 +17,7 @@ import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut, deviceSendShortcut } from "../../send-shortcut-preference";
+import { remoteAgentError } from "../agents/agent-error-text";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
@@ -28,9 +29,11 @@ import type { ConversationThreads } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
+import { narrationRows, naturalThreadRows } from "./narration-rows";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { withQuestionContext } from "./stores/scroll-store";
 import { createTurnSteps } from "./turn-steps";
+import { createTurnStreamHold } from "./turn-stream-hold";
 import { useTurnTrace } from "./turn-trace";
 
 export function ConversationThread() {
@@ -91,7 +94,15 @@ export function ConversationThread() {
     [],
     { key: "id" },
   );
-  const shownMessages = createMemo(() => withQuestionContext(messages, messages, props.prompt?.turnId));
+  const streamHeld = createTurnStreamHold(() => props.threads?.open?.activeTurnId);
+  const shownMessages = createMemo(() =>
+    withQuestionContext(
+      props.responseStyle === "natural" ? naturalThreadRows(messages, props.agent?.provider, streamHeld) : messages,
+      messages,
+      props.prompt?.turnId,
+      (thinking) => narrationRows(thinking, props.agent?.provider),
+    ),
+  );
   const turnSteps = createTurnSteps({
     messages: () => messages,
     lines: () => undefined,
@@ -233,6 +244,7 @@ export function ConversationThread() {
           </Show>
           <AgentThreadView
             scrollRef={setThreadScrollElement}
+            failureText={props.server && props.server.kind !== "local" ? remoteAgentError : undefined}
             showFullMessage={(message) =>
               threadSearchOpen() && chatSearchOpensMessage(message.body, threadSearchQuery())
             }
@@ -308,6 +320,7 @@ export function ConversationThread() {
             copiedMessageId={copiedMessageId()}
             compactMessageActions={compactMessageActions()}
             bubbleStyle={bubbleStyle()}
+            responseStyle={props.responseStyle}
             onBranch={branch(current().threads)}
             onDeleteMessage={deleteMessage(current().threads)}
             messagePins={threadPins(current().threads.open?.id)}

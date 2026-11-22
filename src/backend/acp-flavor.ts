@@ -79,11 +79,13 @@ export interface AcpFlavor {
     error: unknown,
     method: "load" | "resume",
   ): "wait-for-start" | "list-sessions" | "confirm-missing" | null;
+  stillStarting?(error: unknown): boolean;
   lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
   refusesUntilRestart?(error: unknown): boolean;
   lostServerUntilRestart?(error: unknown): boolean;
   serverLost?(error: unknown): boolean;
   sessionBusy?(error: unknown): boolean;
+  staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
@@ -94,6 +96,7 @@ export interface AcpFlavor {
   probeCloseDelayMs?: number;
   effortCategories?: readonly string[];
   sessionProcesses?: true;
+  modelsLoadWithSession?: true;
   sessionProcessesBefore?: string;
   sdkHarness?: {
     failedSession(stderrLine: string): string | undefined;
@@ -151,6 +154,7 @@ export interface AcpFlavor {
   planUsedUpChunk?: RegExp;
   connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
+  mcpCallInputNamesServer?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
@@ -301,6 +305,15 @@ function hermesRefusal(error: unknown): boolean {
   );
 }
 
+function kimiStaleSession(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32600 &&
+    isRecord(error.data) &&
+    error.data.code === "session.stale"
+  );
+}
+
 function hermesSessionBusy(error: unknown): boolean {
   return (
     error instanceof RequestError &&
@@ -399,6 +412,7 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpToolsFixedAtStart: true,
   turnStallMs: 12 * 60_000,
+  staleSession: kimiStaleSession,
 };
 
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
@@ -494,7 +508,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },
-  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true },
+  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true, staleSession: kimiStaleSession },
   "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
 };
 

@@ -8,12 +8,12 @@ import {
   type CustomProviderModel,
   type CustomProviderSummary,
   canPreviewAttachment,
-  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
   queueHoldWorker,
   routineRunsTurn,
+  savedCustomModelId,
 } from "@openbot/contracts/ipc";
 import {
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
@@ -78,6 +78,7 @@ export function ConversationComposer() {
     retryUpload,
     awaitingReplies,
     dismissAwaitingReplies,
+    stopAwaitingReply,
     openWaitingAgent,
     composerFocusRequest,
     composerHasContent,
@@ -220,7 +221,7 @@ export function ConversationComposer() {
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
   const waitsVisible = () => waitItems().length > 0 && Boolean(props.onCancelWait);
   const queueRows = () => (queueOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
-  const voiceAvailable = () => !channel && !props.runtime;
+  const voiceAvailable = () => !props.runtime;
   const speaking = () => {
     const reading = speechReading();
     return reading &&
@@ -321,7 +322,9 @@ export function ConversationComposer() {
     if (!currentDraft().attachments.some((attachment) => attachment.kind === "image")) return undefined;
     const endpoint = customProviderOfModel(agent.model, props.customProviders ?? []);
     if (endpoint?.harness !== "pi") return undefined;
-    const model = endpoint.models.find((item) => composedCustomModelId(endpoint.id, item.id) === agent.model);
+    const model = endpoint.models.find(
+      (item) => savedCustomModelId(endpoint.id, endpoint.harness, item.id) === agent.model,
+    );
     if (!model || (model.inputs ?? CUSTOM_PROVIDER_DEFAULT_INPUTS.pi).includes("image")) return undefined;
     return { endpoint, model };
   });
@@ -532,7 +535,8 @@ export function ConversationComposer() {
                 onSteer={
                   props.activeTurnId && !channel && steers() && !steerRefused() ? props.onSteerQueuedMessage : undefined
                 }
-                onStop={channel && !channel.readOnly() ? channel.stopAwaitingReply : undefined}
+                onStop={channel ? (channel.readOnly() ? undefined : channel.stopAwaitingReply) : stopAwaitingReply}
+                stopDisplay={channel ? undefined : "icon"}
               />
             )}
           </ComposerStackCard>
@@ -717,6 +721,7 @@ export function ConversationComposer() {
                 startedAt={compaction()?.startedAt ?? 0}
                 expectedMs={compaction()?.expectedMs}
                 status={compaction()?.status}
+                reason={compaction()?.reason}
                 onDone={() =>
                   setDismissedCompactions((current) => ({ ...current, [currentChatConversationKey() ?? ""]: id }))
                 }
@@ -881,7 +886,7 @@ export function ConversationComposer() {
                   levels={voiceLevels()}
                   elapsedSeconds={voiceElapsedSeconds()}
                   modelProgress={voiceModelProgress()}
-                  blocked={!props.agent || !agentReady() || threadVoiceBusy()}
+                  blocked={!(props.agent || channel) || !agentReady() || threadVoiceBusy()}
                   onStart={() => void startVoiceRecording()}
                   onCancel={cancelVoiceRecording}
                   onFinish={stopVoiceRecording}

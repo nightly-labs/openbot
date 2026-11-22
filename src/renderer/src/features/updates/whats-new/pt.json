@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Atualize também para esta versão cada servidor em que você entrou. Em um servidor, tarefas executadas ao mesmo tempo, a conta de voz ao vivo, a opção de memória do OpenBot, as pastas de fluxo de trabalho, as respostas tipadas dos fluxos de trabalho e mais de 10 contas de um mesmo provedor funcionam só quando o servidor tem esta versão.",
+      "Depois desta atualização, uma versão mais antiga do OpenBot não consegue abrir os seus dados."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Um agente pode dividir trabalhos não relacionados em tarefas executadas ao mesmo tempo. Cada resultado volta para o chat principal, e o agente combina os resultados para você.",
+          "Veja todos os tópicos abertos de um agente na nova aba Tópicos do painel lateral. A aba mostra o número de tópicos que esperam por você.",
+          "Altere seus atalhos de teclado na nova aba Teclado de Configurações. Os novos atalhos iniciam um tópico e levam para o próximo e para o anterior.",
+          "Fluxos de trabalho abrem em abas, e as etapas podem dar respostas tipadas. Escreva {{name}} para usar uma resposta em uma etapa posterior.",
+          "Envie um vídeo MP4 ou WebM como fundo da janela em Configurações > Aparência.",
+          "Escolha a conta do ChatGPT que a voz ao vivo do GPT usa em Configurações > Voz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Um provedor mantém até 20 contas. Antes, o limite era 10.",
+          "O ditado grava por até 10 minutos. Antes, parava em 2 minutos.",
+          "Um tópico carrega mensagens mais antigas quando você rola perto do topo. Você não precisa clicar em um botão."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Uma rotina agendada não se desliga mais em silêncio quando uma execução não tem nada para relatar.",
+          "Um chat longo mantém todas as mensagens, na ordem correta, enquanto uma resposta chega.",
+          "Um número do WhatsApp vinculado não para mais de receber mensagens enquanto ainda mostra \"Conectado\".",
+          "No Windows, os agentes OpenCode voltam a executar comandos. Antes, eles costumavam falhar com \"opencode-pty request timed out\".",
+          "Um agente que você silenciou não envia mais uma notificação quando responde em um canal."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

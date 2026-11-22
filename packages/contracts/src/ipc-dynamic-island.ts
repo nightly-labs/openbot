@@ -78,6 +78,7 @@ export interface DynamicIslandQuestionItem {
   id: string;
   header: string;
   question: string;
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
 }
@@ -385,6 +386,7 @@ function isQuestionItem(value: unknown): value is DynamicIslandQuestionItem {
     isShortString(value.id, INPUT_LIMITS.identifier) &&
     isShortString(value.header, INPUT_LIMITS.promptHeader) &&
     isShortString(value.question, INPUT_LIMITS.promptQuestion) &&
+    (value.detail === undefined || isShortString(value.detail, INPUT_LIMITS.promptQuestion)) &&
     isBoolean(value.isSecret) &&
     (value.options === null ||
       (Array.isArray(value.options) &&

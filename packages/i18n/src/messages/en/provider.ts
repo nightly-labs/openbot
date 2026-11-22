@@ -313,6 +313,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.codexKeyInUse":
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "provider.settings.codexKeyAlternative": "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "provider.settings.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "provider.settings.addKey": "Add key",
   "provider.settings.changeKey": "Change key",
   "provider.settings.runtime": "Runtime",
@@ -332,10 +333,14 @@ export const messages = defineMessages("provider", {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt cache",
   "provider.settings.promptCacheDescription":
-    "How long Claude keeps the context of an agent in the cache between turns.",
+    "How long Claude and Pi keep the context of an agent in the cache between turns.",
   "provider.settings.promptCacheHour": "1 hour",
-  "provider.settings.promptCacheDefault": "Claude Code default",
+  "provider.settings.promptCacheDefault": "Provider default",
   "provider.settings.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "provider.settings.cacheExpiryCompaction": "Compact before the cache expires",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "When a chat with 200K or more tokens of context is idle with a 1 hour cache, the agent compacts the context before the cache expires. Then the next message does not read the full context again with no cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Could not load the compaction setting of this server.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Use my Claude Code setup",
   "provider.settings.claudeUserSetupDescription":

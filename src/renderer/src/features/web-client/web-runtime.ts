@@ -450,6 +450,7 @@ export interface WebRuntimeEvents {
   accessDenied?(hostId: string, error: WebHostConnectionError): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
+  serversChanged?(): Promise<void>;
   hostState?(hostId: string, state: WebHostState): void;
   hostSessionRevoked?(): void;
   hostTaken?(hostId: string): void;
@@ -604,6 +605,7 @@ export function createWebWorkspaceRuntime(
     onHostStreamData: (data) => browserView.receive(data),
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
+    onAccountServersChanged: async () => events.serversChanged?.(),
   };
   const hostProtocols = {
     get: (id: string) => savedHostProtocol(accountId, id),

@@ -382,6 +382,7 @@ export const messages = {
   "mobile.server.route.timezone": "Strefa czasowa",
   "mobile.server.route.personality": "Osobowość agenta",
   "mobile.server.route.agents": "Agenci",
+  "mobile.server.route.voiceModel": "Rozpoznawanie mowy",
   "mobile.server.settings.storage": "Pamięć dyskowa",
   "mobile.server.route.storage": "Pamięć dyskowa",
   "mobile.server.route.storageFiles": "Wszystkie pliki",
@@ -517,6 +518,19 @@ export const messages = {
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego strefę czasową.",
   "mobile.server.settings.timezoneUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego strefę czasową.",
+  "mobile.server.settings.voiceModelDescription":
+    "Agenci na tym serwerze używają tego modelu, aby transkrybować dźwięk filmów bez napisów.",
+  "mobile.server.settings.voiceModelLoading": "Wczytywanie rozpoznawania mowy…",
+  "mobile.server.settings.voiceModelLoadFailed": "Nie udało się wczytać modelu rozpoznawania mowy serwera.",
+  "mobile.server.settings.voiceModelSaveFailed": "Nie udało się zmienić modelu rozpoznawania mowy. Spróbuj ponownie.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego rozpoznawanie mowy.",
+  "mobile.server.settings.voiceModelReady": "Gotowy",
+  "mobile.server.settings.voiceModelDownloading": "Pobieranie: {percent}",
+  "mobile.server.settings.voiceModelSize": "Pobieranie {size}",
+  "mobile.server.settings.voiceModelDownload": "Pobierz",
+  "mobile.server.settings.voiceModelCancel": "Zatrzymaj",
+  "mobile.server.settings.voiceModelRemove": "Usuń",
   "mobile.server.settings.keySection": "Klucz serwera",
   "mobile.server.settings.keyChanged": "Ostatnia zmiana",
   "mobile.server.settings.keyChange": "Zmień klucz",
@@ -1248,11 +1262,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Nie udało się zmienić modeli. Spróbuj ponownie.",
   "mobile.server.providers.promptCache": "Pamięć podręczna promptów",
   "mobile.server.providers.promptCacheHint":
-    "Jak długo Claude trzyma kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu Claude.",
-  "mobile.server.providers.promptCacheDefault": "Domyślne Claude Code",
+    "Jak długo Claude i Pi trzymają kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu dostawcy.",
+  "mobile.server.providers.promptCacheDefault": "Domyślne ustawienie dostawcy",
   "mobile.server.providers.promptCacheHour": "1 godzina",
   "mobile.server.providers.promptCacheLoadFailed":
     "Nie udało się wczytać czasu pamięci podręcznej promptów tego serwera.",
+  "mobile.server.providers.cacheExpiryCompaction": "Kompaktuj przed wygaśnięciem pamięci podręcznej",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Gdy czat z kontekstem 200K lub więcej tokenów jest nieaktywny z pamięcią podręczną na 1 godzinę, agent kompaktuje kontekst przed jej wygaśnięciem. Wtedy następna wiadomość nie czyta całego kontekstu ponownie bez pamięci podręcznej.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Nie udało się wczytać ustawienia kompaktowania tego serwera.",
   "mobile.server.providers.compactWindow": "Kompaktuj czaty przy",
   "mobile.server.providers.compactWindowHint":
     "Claude Code streszcza starsze tury czatu, gdy czat osiągnie ten rozmiar. Mniej to szybsze i tańsze tury. Więcej zachowuje więcej szczegółów. Model z mniejszym oknem kompaktuje przy własnym limicie.",
@@ -1307,6 +1326,8 @@ export const messages = {
     "ChatGPT używa tego klucza, a nie Twojego planu ChatGPT. OpenAI nalicza opłatę za każde żądanie na klucz. Użycie planu nie jest pokazywane.",
   "mobile.server.providers.codexKeyAlternative":
     "Lub zaloguj się kluczem API OpenAI. OpenAI nalicza opłatę za każde żądanie na klucz.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse używa tego klucza, a nie Twojego logowania. Aby używać logowania, usuń klucz.",
   "mobile.server.providers.sectionUse": "Użycie",
   "mobile.server.providers.unused": "Żaden agent go nie używa",
   "mobile.server.providers.usedByCount": {

@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "פתיחה בצ'אט",
   "conversation.threads.archive": "העברה לארכיון",
   "conversation.threads.archived": "בארכיון",
+  "conversation.threads.archivedOlder": "הצגת שרשורים ישנים יותר",
   "conversation.threads.restore": "שחזור",
   "conversation.threads.deleteUndo.title": "{title} נמחק",
   "conversation.threads.hold.threadLimit": {
@@ -149,6 +150,8 @@ export const messages = {
   "conversation.voice.key.metaWin": "Win",
   "conversation.voice.key.metaLinux": "Super",
   "conversation.voice.key.enter": "Enter",
+  "conversation.voice.key.tab": "Tab",
+  "conversation.voice.key.escape": "Esc",
   "conversation.voice.interrupt": "הפסקה",
   "conversation.voice.start": "התחלת שיחה קולית",
   "conversation.voice.end": "סיום השיחה הקולית",

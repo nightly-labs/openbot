@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Abrir no chat",
   "conversation.threads.archive": "Arquivar",
   "conversation.threads.archived": "Arquivados",
+  "conversation.threads.archivedOlder": "Ver tópicos anteriores",
   "conversation.threads.restore": "Restaurar",
   "conversation.threads.deleteUndo.title": "{title} excluído",
   "conversation.threads.hold.threadLimit": {
@@ -148,6 +149,8 @@ export const messages = {
   "conversation.voice.key.metaWin": "Win",
   "conversation.voice.key.metaLinux": "Super",
   "conversation.voice.key.enter": "Enter",
+  "conversation.voice.key.tab": "Tab",
+  "conversation.voice.key.escape": "Esc",
   "conversation.voice.interrupt": "Interromper",
   "conversation.voice.start": "Iniciar conversa por voz",
   "conversation.voice.end": "Encerrar a conversa por voz",

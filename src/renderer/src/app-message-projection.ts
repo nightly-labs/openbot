@@ -30,7 +30,7 @@ import {
   skillConversationEvent,
   skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
-import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { markdownImageNames, markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type {
@@ -610,11 +610,13 @@ export function withoutAgent<T>(values: Record<string, T>, agentId: string): Rec
 }
 
 function cleanPreview(preview: string): string {
-  const cleaned = markdownPreviewText(cleanAgentMessageText(preview))
+  if (!preview.trim()) return currentText().t("app.agent.noMessages");
+  const text = cleanAgentMessageText(preview);
+  const cleaned = markdownPreviewText(text)
     .replace(/\binbox\s+at\s+zero\b[:,]?\s*/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
-  return cleaned || currentText().t("app.agent.noMessages");
+  return cleaned || markdownImageNames(text).join(", ");
 }
 
 function formatTime(value: string): string {

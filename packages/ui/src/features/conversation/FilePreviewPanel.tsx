@@ -29,6 +29,7 @@ import { type CodeToken, fileCodeLanguage, highlightedCodeLines } from "@openbot
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import type { QuoteShortcutModifier } from "@openbot/ui/features/conversation/SelectionActions";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
+import { WordFilePreview } from "@openbot/ui/features/conversation/WordFilePreview";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -390,6 +391,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         </Show>
         <Show when={previewKind() === "spreadsheet"}>
           <SpreadsheetFilePreview class="file-preview-spreadsheet" bytes={file()?.bytes ?? null} />
+        </Show>
+        <Show when={previewKind() === "document"}>
+          <WordFilePreview class="file-preview-markdown" bytes={file()?.bytes ?? null} />
         </Show>
         <Show when={previewKind() === "none"}>
           <div class="file-preview-unsupported">

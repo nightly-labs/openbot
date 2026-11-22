@@ -5,6 +5,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type AgentAccessChange,
+  type StorageUsage,
+  type StoredFileRow,
+  WORKFLOW_FORMAT,
   WORKFLOW_GROUP_FIELDS,
   WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
@@ -30,12 +33,22 @@ import {
   teamCapabilitiesForProtocol,
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
+import { LIBRARY_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/library-folders-v1";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-workflow-files-v1";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
+import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import {
+  WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_CODECS,
+  WORKFLOWS_CREDIT_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CODECS,
@@ -94,18 +107,24 @@ import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
+import { LIBRARY_FOLDERS_FILE, LibraryFoldersStore } from "../src/backend/library-folders-store";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
+import { WORKFLOW_FOLDERS_FILE, WorkflowFoldersStore } from "../src/backend/workflow-folders-store";
+import { type WorkflowFileOwnerSources, workflowFileOwners } from "../src/backend/workflows/workflow-file-owners";
 import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../src/backend/workflows/workflow-store";
 import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
 import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/workflows";
+import { LibraryFoldersService } from "../src/main/library-folders-service";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
 let sunraSignedIn = false;
+let mediaFileId = "e2e-media-file";
+const sharedFileAgents = new Map<string, string>();
 let higgsfieldSignedIn = false;
 let serviceAccounts: WorkflowMediaAccountCredits[] = [];
 const mediaAccounts: (string | null)[] = [];
@@ -162,6 +181,22 @@ const CINEMA_MODEL: WorkflowMediaCatalogModel = {
   transparent: false,
 };
 let liveModels: readonly WorkflowMediaCatalogModel[] = [LIVE_MODEL];
+const CREDIT_MODEL: WorkflowMediaCatalogModel = {
+  id: "openbot-video_e2e",
+  provider: "openbot",
+  providerModel: "video_e2e",
+  name: "Video e2e",
+  maker: "ByteDance",
+  kinds: ["video"],
+  aspects: ["16:9", "9:16"],
+  durations: [5, 10],
+  resolutions: ["720p"],
+  transparent: false,
+  options: [{ name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" }],
+  inputs: ["frames"],
+};
+let creditModels: readonly WorkflowMediaCatalogModel[] = [];
+let creditBalance: { available: number; quota: number | null } | null = null;
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
 const handoffs: { agentId: string; text: string; sourcePaths: readonly string[] }[] = [];
@@ -324,6 +359,9 @@ interface Host {
   database: OpenBotDatabase;
   agents: AgentService;
   workflows: WorkflowsHandle;
+  workflowStore: WorkflowStore;
+  workflowFolders: WorkflowFoldersStore;
+  deletedFiles: Set<string>;
   server: InstanceType<typeof TeamApiServer>;
   team: InstanceType<typeof TeamStore>;
   port: number;
@@ -348,10 +386,33 @@ async function startHost(): Promise<Host> {
   if (!team.getIdentity()) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
   const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
   const deliveries = new Map<string, string>();
+  const workflowStore = new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") });
+  const runs = new WorkflowRunStore({ database });
+  const workflowFolders = new WorkflowFoldersStore(join(userData, WORKFLOW_FOLDERS_FILE));
+  await runCauseEffect(workflowFolders.initialize());
+  const deletedFiles = new Set<string>();
+  const scan = () =>
+    Effect.sync(() =>
+      workflowLibraryScan(
+        {
+          outputs: () => runs.mediaOutputs(),
+          workflows: () => workflowStore.list(),
+          folders: (workflowIds) => workflowFolders.getSnapshot({ workflowIds }),
+        },
+        deletedFiles,
+      ),
+    );
+  const libraryFolderStore = new LibraryFoldersStore(join(userData, LIBRARY_FOLDERS_FILE));
+  await runCauseEffect(libraryFolderStore.initialize());
+  const libraryFolders = new LibraryFoldersService({
+    store: libraryFolderStore,
+    storage: { usage: scan, invalidate: () => undefined },
+    agents: () => agents.listAgents(),
+  });
   const workflows = await Effect.runPromise(
     createWorkflows({
-      store: new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") }),
-      runs: new WorkflowRunStore({ database }),
+      store: workflowStore,
+      runs,
       github: new WorkflowGitHubStore({ database }),
       githubApp: () => null,
       delivery: (deliveryId) => {
@@ -391,8 +452,15 @@ async function startHost(): Promise<Host> {
           sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
           higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
           accounts: serviceAccounts,
+          openbot: creditBalance,
         }),
-      mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? liveModels : [] }),
+      mediaCatalog: (only) =>
+        Effect.succeed({
+          models:
+            only === "openbot"
+              ? creditModels
+              : [...(higgsfieldSignedIn ? liveModels : []), ...(only === undefined ? creditModels : [])],
+        }),
       mediaPrice: (request) =>
         Effect.sync(() => {
           priceRequests.push(request);
@@ -409,7 +477,7 @@ async function startHost(): Promise<Host> {
           prompt: request.prompt,
           aspect: request.specs.aspect,
         });
-        if (request.account === null) return Effect.succeed("e2e-media-file");
+        if (request.account === null) return Effect.succeed(mediaFileId);
         return agents.generateWorkflowMedia(request).pipe(
           Effect.mapError((failure) => ({
             message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.mediaFailed"),
@@ -433,6 +501,18 @@ async function startHost(): Promise<Host> {
     appVersion: HOST_VERSION,
     hiddenAgents: agents,
     agentAccess: access,
+    storage: {
+      usage: scan,
+      deleteFile: (fileId) =>
+        Effect.sync(() => {
+          deletedFiles.add(fileId);
+          return undefined;
+        }),
+      clear: unused,
+      disk: unused,
+      diskUse: unused,
+    },
+    libraryFolders,
     workflows: {
       ...workflows,
       get: (workflowId) =>
@@ -457,7 +537,43 @@ async function startHost(): Promise<Host> {
     },
   });
   const port = await Effect.runPromise(server.start());
-  return { database, agents, workflows, server, team, port };
+  return { database, agents, workflows, workflowStore, workflowFolders, deletedFiles, server, team, port };
+}
+
+function workflowLibraryScan(sources: WorkflowFileOwnerSources, deleted: ReadonlySet<string>): StorageUsage {
+  const scannedAt = new Date(0).toISOString();
+  return {
+    scope: "host",
+    agentId: null,
+    conversationId: null,
+    scannedAt,
+    freeBytes: null,
+    breakdown: [],
+    agents: [],
+    conversations: [],
+    files: [...workflowFileOwners(sources)]
+      .filter(([id]) => !deleted.has(id))
+      .map(
+        ([id, owner]): StoredFileRow => ({
+          id,
+          name: `${id}.png`,
+          size: 1,
+          kind: "image",
+          mimeType: "image/png",
+          previewKind: "none",
+          previewUrl: null,
+          source: "generated",
+          agentId: sharedFileAgents.get(id) ?? null,
+          conversation: null,
+          messageId: null,
+          createdAt: owner.createdAt ?? scannedAt,
+          status: "available",
+          deletable: true,
+          workflow: owner.workflow,
+        }),
+      ),
+    truncated: false,
+  };
 }
 
 async function stopHost(): Promise<void> {
@@ -537,6 +653,7 @@ function v9Headers(token: string): Record<string, string> {
 
 type RefusalKey =
   | "error.workflow.missing"
+  | "error.workflow.unknownValue"
   | "error.workflow.versionMissing"
   | "error.workflow.tooLargeToSend"
   | "error.team.agentViewOnly"
@@ -1191,6 +1308,168 @@ try {
     assert.throws(() => WORKFLOWS_CODECS.get(WORKFLOWS_ROUTES.runs)?.request({ workflowId: "w", limit: 51 }));
     return { placeholder: "note, locked", edges: 0, run: "manual/stopped", save: save.status };
   });
+
+  await step(
+    "format: the host sends its format, refuses a new unknown value, keeps a saved one, and a newer format opens read-only",
+    async () => {
+      const model: WorkflowNode = { id: "model", kind: "llm", at: at(300), fields: { prompt: "Hi.", effort: "high" } };
+      const graph: WorkflowGraph = { nodes: [promptNode, model], edges: [], strokes: [] };
+      const withEffort = (effort: string, x = 300): WorkflowGraph => ({
+        ...graph,
+        nodes: [promptNode, { ...model, at: at(x), fields: { ...model.fields, effort } }],
+      });
+      const target = await hostWorkflow("Format", graph);
+      const read = await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: target.id });
+      assert.deepEqual([read.format, read.hostFormat], [1, WORKFLOW_FORMAT]);
+      const save = (next: WorkflowGraph) => ({ workflowId: target.id, baseRevision: target.revision, graph: next });
+      await refused(
+        WORKFLOWS_ROUTES.saveGraph,
+        ownerToken,
+        save(withEffort("ludicrous")),
+        400,
+        "error.workflow.unknownValue",
+      );
+      await refused(
+        WORKFLOWS_ROUTES.create,
+        ownerToken,
+        { title: "Format copy", graph: withEffort("ludicrous") },
+        400,
+        "error.workflow.unknownValue",
+      );
+      current()
+        .database.connection.prepare(
+          "UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = 'model'",
+        )
+        .run(JSON.stringify({ ...model.fields, effort: "ludicrous" }), target.id);
+      const kept = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, save(withEffort("ludicrous", 420)));
+      assert.equal(kept.ok, true, JSON.stringify(kept));
+      const stored = current()
+        .workflowStore.detail(target.id)
+        ?.graph.nodes.find((node) => node.id === "model");
+      assert.deepEqual([stored?.fields.effort, stored?.at.x], ["ludicrous", 420]);
+      const copy = await ok(WORKFLOWS_ROUTES.create, ownerToken, {
+        title: "Format duplicate",
+        graph: withEffort("ludicrous", 452),
+      });
+      const copyId = text(record(copy.summary, "summary").id, "workflow id");
+      const copied = current()
+        .workflowStore.detail(copyId)
+        ?.graph.nodes.find((node) => node.id === "model");
+      assert.equal(copied?.fields.effort, "ludicrous", "A duplicate of a saved unknown value was not kept.");
+      await refused(
+        WORKFLOWS_ROUTES.create,
+        ownerToken,
+        { title: "Format changed copy", graph: withEffort("plaid") },
+        400,
+        "error.workflow.unknownValue",
+      );
+      const newer = answer(WORKFLOWS_ROUTES.get, { ...read, format: WORKFLOW_FORMAT + 1 }, decodeRemoteWorkflowDetail);
+      assert.equal(newer.needsNewerApp, true, "A graph of a newer format was not read-only.");
+      const same = answer(WORKFLOWS_ROUTES.get, read, decodeRemoteWorkflowDetail);
+      assert.equal(same.needsNewerApp, undefined, "A graph of this format was marked read-only.");
+      const unknownKey = decodeRemoteWorkflowDetail({
+        ...read,
+        graph: { ...graph, nodes: [{ ...promptNode, group: "a" }, model] },
+      });
+      assert.equal(unknownKey.needsNewerApp, true, "A node with an unknown property was not read-only.");
+      return { format: read.format, hostFormat: read.hostFormat, refused: 3, kept: "ludicrous", duplicated: true };
+    },
+  );
+
+  await step(
+    "registry values: an unknown setting value shows read-only; an unknown trigger type needs an admin",
+    async () => {
+      const shownWith = (node: WorkflowNode) =>
+        answer(
+          WORKFLOWS_ROUTES.get,
+          {
+            summary: { id: "w", title: "Values", steps: 2, updatedAt: "2026-11-22T00:00:00.000Z", lastRun: null },
+            graph: { nodes: [promptNode, node], edges: [], strokes: [] },
+            revision: 1,
+            triggers: [],
+          },
+          decodeRemoteWorkflowDetail,
+        ).needsNewerApp;
+      const node = (kind: WorkflowNode["kind"], fields: WorkflowNode["fields"]): WorkflowNode => ({
+        id: "step",
+        kind,
+        at: at(300),
+        fields,
+      });
+      const unknown = {
+        effort: node("llm", { provider: "codex", effort: "turbo" }),
+        conditionEffort: node("condition", { rule: "x", effort: "turbo" }),
+        action: node("output", { target: "discord", action: "edit" }),
+        emoji: node("output", { target: "slack", action: "react", emoji: "🚀" }),
+        reason: node("output", { target: "github", action: "close", reason: "duplicate" }),
+        media: node("image", { media: "audio" }),
+        aspect: node("image", { media: "image", aspect: "2:1" }),
+        voice: node("image", { media: "video", voice: "zed" }),
+        event: node("trigger", { trigger: "github", event: "release.published" }),
+        filter: node("trigger", { trigger: "github", event: "issue.opened", filters: "notBot\nnewFilter" }),
+      };
+      for (const [name, value] of Object.entries(unknown))
+        assert.equal(shownWith(value), true, `An unknown ${name} value was not shown read-only.`);
+      const known = {
+        effort: node("llm", { provider: "codex", effort: "ultra" }),
+        emptyEffort: node("llm", { provider: "codex", effort: "" }),
+        telegramEmoji: node("output", { target: "telegram", action: "react", emoji: "👌" }),
+        discordEmoji: node("output", { target: "discord", action: "react", emoji: "❌" }),
+        githubAction: node("output", { target: "github", action: "label.add", labelsFrom: "agent", item: "input" }),
+        reason: node("output", { target: "github", action: "close", reason: "notPlanned" }),
+        aspect: node("image", { media: "image", aspect: "custom", width: 512, height: 512, background: "transparent" }),
+        voice: node("image", { media: "video", voice: "eve" }),
+        filters: node("trigger", { trigger: "github", event: "pr.merged", filters: "notBot\ntitle\nbranch" }),
+        mention: node("trigger", { trigger: "slack", event: "mention" }),
+        chatChannel: node("output", { target: "chat-channel", channelId: "channel-e2e" }),
+      };
+      for (const [name, value] of Object.entries(known))
+        assert.equal(shownWith(value), undefined, `A known ${name} value was shown read-only.`);
+      const created = await ok(WORKFLOWS_ROUTES.create, ownerToken, { title: "Registry", graph: agentGraph(open) });
+      const workflowId = text(record(created.summary, "summary").id, "workflow id");
+      const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId })).revision);
+      const triggerGraph = (fields: WorkflowNode["fields"]): WorkflowGraph => ({
+        nodes: [{ id: "newer-trigger", kind: "trigger", at: at(0), fields }, agentNode("agent", open)],
+        edges: [{ id: "edge", from: "newer-trigger", to: "agent", type: "text" }],
+        strokes: [],
+      });
+      const newerFields = { trigger: "newchat", event: "mention" };
+      const newer = triggerGraph(newerFields);
+      const denied = await refused(
+        WORKFLOWS_ROUTES.saveGraph,
+        member,
+        { workflowId, baseRevision: before, graph: newer },
+        403,
+        "error.team.adminRequired",
+      );
+      const ownerNew = await refused(
+        WORKFLOWS_ROUTES.saveGraph,
+        ownerToken,
+        { workflowId, baseRevision: before, graph: newer },
+        400,
+        "error.workflow.unknownValue",
+      );
+      const owner = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+        workflowId,
+        baseRevision: before,
+        graph: triggerGraph({ trigger: "manual" }),
+      });
+      assert.equal(owner.ok, true);
+      current()
+        .database.connection.prepare(
+          "UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = 'newer-trigger'",
+        )
+        .run(JSON.stringify(newerFields), workflowId);
+      const memberView = await ok(WORKFLOWS_ROUTES.get, member, { workflowId });
+      assert.equal(decodeRemoteWorkflowDetail(memberView).needsNewerApp, true);
+      return {
+        unknown: Object.keys(unknown).length,
+        known: Object.keys(known).length,
+        memberNewTrigger: denied,
+        ownerNewTrigger: ownerNew,
+      };
+    },
+  );
 
   await step("webhook: the URL goes to the owner only, and only the owner makes a new secret", async () => {
     const graph: WorkflowGraph = {
@@ -1942,6 +2221,63 @@ try {
   );
 
   await step(
+    "credit media: the host advertises workflows-credit-media-v1 to protocol 10; its catalog and credits routes return the credit models and balance, and the service catalogs never list a credit model",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        decodeTeamProtocolSupportExpanded((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body)
+          .capabilities;
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_CREDIT_MEDIA_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_CREDIT_MEDIA_CAPABILITY));
+      const codec = (route: string) => {
+        const found =
+          WORKFLOWS_CREDIT_MEDIA_CODECS.get(route) ??
+          WORKFLOWS_MEDIA_CATALOG_V2_CODECS.get(route) ??
+          WORKFLOWS_MEDIA_CATALOG_CODECS.get(route);
+        assert.ok(found, `No codec for ${route}.`);
+        return found;
+      };
+      const raw = async (route: string, capabilities: readonly string[] = TEAM_CURRENT_CAPABILITIES) =>
+        call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V10, capabilities });
+      const read = async (route: string) => {
+        codec(route).request({});
+        const response = await raw(route);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return codec(route).response(response.status, response.body);
+      };
+      higgsfieldSignedIn = true;
+      creditModels = [CREDIT_MODEL];
+      creditBalance = { available: 350.5, quota: null };
+      try {
+        const catalog = await read(WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog);
+        assert.deepEqual(catalog, { models: [CREDIT_MODEL] });
+        const credits = await read(WORKFLOWS_CREDIT_MEDIA_ROUTES.credits);
+        assert.deepEqual(credits, { openbot: { available: 350.5, quota: null } });
+        const catalogV2 = await read(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog);
+        assert.deepEqual(catalogV2, { models: [LIVE_MODEL] });
+        const catalogV1 = await read(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog);
+        assert.deepEqual(catalogV1, { models: [LIVE_MODEL] });
+        creditBalance = null;
+        const signedOut = await read(WORKFLOWS_CREDIT_MEDIA_ROUTES.credits);
+        assert.deepEqual(signedOut, { openbot: null });
+        const old = await raw(
+          WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog,
+          TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== WORKFLOWS_CREDIT_MEDIA_CAPABILITY),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        return { catalog, credits, catalogV2, catalogV1, signedOut, old: old.status };
+      } finally {
+        higgsfieldSignedIn = false;
+        creditModels = [];
+        creditBalance = null;
+      }
+    },
+  );
+
+  await step(
     "service accounts: the host advertises workflows-media-service-account-v1 to a protocol 10 peer; a member reads each account and its credits; a step on a missing account fails and never falls back",
     async () => {
       const capabilities = async (protocol: number) =>
@@ -2040,7 +2376,7 @@ try {
   );
 
   await step(
-    "agent files: the host advertises workflows-agent-files-v1 to a protocol 10 peer; an agent step gets each connected picture and a note to use them together; a missing file fails the step",
+    "agent files: the host advertises workflows-agent-files-v1 and workflows-answers-v1 to a protocol 10 peer; an agent step gets each connected picture and a note to use them together; a missing file fails the step",
     async () => {
       const capabilities = async (protocol: number) =>
         list(
@@ -2049,6 +2385,8 @@ try {
         );
       assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_AGENT_FILES_CAPABILITY));
       assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_AGENT_FILES_CAPABILITY));
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_ANSWERS_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_ANSWERS_CAPABILITY));
       const run = async (fileIds: readonly string[]) => {
         const title = ["Agent files", fileIds.length, ...fileIds].join(" ");
         const workflow = await hostWorkflow(title, {
@@ -2224,6 +2562,177 @@ try {
       assert.deepEqual(older, { settings: null, sources: null });
 
       return { first: firstRead, second: secondRead, old, hiddenWorkflowRead, hidden, missing, older };
+    },
+  );
+
+  await step(
+    "library: workflow media files carry their workflow and folder; a member gets only the files of workflows they can see, and not one in a thread of a closed or removed agent; a peer without storage-workflow-files-v1 gets no tag",
+    async () => {
+      const imageGraph: WorkflowGraph = {
+        nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields: { model: "gpt-image" } }],
+        edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+        strokes: [],
+      };
+      const produce = async (title: string, fileId: string) => {
+        const workflow = await hostWorkflow(title, imageGraph);
+        mediaFileId = fileId;
+        const { run } = await runCauseEffect(
+          current().workflows.startRun({ workflowId: workflow.id, requestId: requestId() }),
+        );
+        const image = await settled(run.id, "image");
+        mediaFileId = "e2e-media-file";
+        assert.equal(image.status, "done", JSON.stringify(image.error));
+        return workflow;
+      };
+      const shots = await produce("Library shots", "e2e-library-shots");
+      const loose = await produce("Library loose", "e2e-library-loose");
+      const hidden = await produce("Library hidden", "e2e-library-hidden");
+      const withClosed = await runCauseEffect(
+        current().workflows.saveGraph({
+          workflowId: hidden.id,
+          baseRevision: hidden.revision,
+          graph: { ...imageGraph, nodes: [...imageGraph.nodes, agentNode("agent", closed)] },
+        }),
+      );
+      assert.ok(withClosed.ok, "The graph with the closed agent did not save.");
+      const known = new Set(
+        current()
+          .workflowStore.list()
+          .map((summary) => summary.id),
+      );
+      await runCauseEffect(
+        current().workflowFolders.mutate(
+          { type: "create", id: "folder-library-e2e", name: "Campaign", workflowIds: [shots.id] },
+          { workflowIds: known },
+        ),
+      );
+
+      const usage = async (token: string, capabilities: readonly string[]) => {
+        const response = await call("POST", STORAGE_ROUTES.usage, {
+          token,
+          body: { scope: "host" },
+          protocol: TEAM_PROTOCOL_V10,
+          capabilities,
+        });
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        const decoded = teamSideRouteCodec(STORAGE_ROUTES.usage)?.response(
+          STORAGE_ROUTES.usage,
+          response.status,
+          response.body,
+          { storageWorkflowFiles: true },
+        );
+        return list(record(decoded, "usage").files, "files")
+          .map((file) => record(file, "file"))
+          .filter((file) => text(file.id, "file id").startsWith("e2e-library-"))
+          .map((file) => ({ id: file.id, workflow: file.workflow ?? null }));
+      };
+      const current10 = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10);
+      assert.ok(current10.includes(STORAGE_WORKFLOW_FILES_CAPABILITY), "Protocol 10 does not list the capability.");
+      const older = current10.filter((capability) => capability !== STORAGE_WORKFLOW_FILES_CAPABILITY);
+      const campaign = { id: "folder-library-e2e", name: "Campaign" };
+      const shotsRow = { id: "e2e-library-shots", workflow: { id: shots.id, name: "Library shots", folder: campaign } };
+      const looseRow = { id: "e2e-library-loose", workflow: { id: loose.id, name: "Library loose", folder: null } };
+      const hiddenRow = { id: "e2e-library-hidden", workflow: { id: hidden.id, name: "Library hidden", folder: null } };
+
+      const owner = await usage(ownerToken, current10);
+      assert.deepEqual(owner, [shotsRow, looseRow, hiddenRow]);
+      const memberRows = await usage(member, current10);
+      assert.deepEqual(memberRows, [shotsRow, looseRow]);
+      const memberShared: { agentId: string; rows: Awaited<ReturnType<typeof usage>> }[] = [];
+      for (const agentId of [closed, "agent-e2e-removed"]) {
+        sharedFileAgents.set("e2e-library-loose", agentId);
+        assert.deepEqual(await usage(ownerToken, current10), [shotsRow, looseRow, hiddenRow]);
+        const rows = await usage(member, current10);
+        memberShared.push({ agentId, rows });
+        assert.deepEqual(rows, [shotsRow], `The member got a workflow file of a thread of ${agentId}.`);
+      }
+      sharedFileAgents.delete("e2e-library-loose");
+      const olderOwner = await usage(ownerToken, older);
+      assert.deepEqual(
+        olderOwner,
+        [shotsRow, looseRow, hiddenRow].map((row) => ({ id: row.id, workflow: null })),
+      );
+      const olderMember = await usage(member, older);
+      assert.deepEqual(
+        olderMember,
+        [shotsRow, looseRow].map((row) => ({ id: row.id, workflow: null })),
+      );
+      return { owner, member: memberRows, memberShared, olderOwner, olderMember };
+    },
+  );
+
+  await step(
+    "library: a workflow file moves into any agent's folder, out again and is deleted; a member cannot place a file of a hidden workflow",
+    async () => {
+      const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10);
+      const folders = async (token: string, body: unknown) =>
+        call("POST", body === undefined ? LIBRARY_FOLDERS_ROUTES.read : LIBRARY_FOLDERS_ROUTES.actions, {
+          token,
+          body: body ?? {},
+          protocol: TEAM_PROTOCOL_V10,
+          capabilities,
+        });
+      const placementOf = (response: { status: number; body: unknown }) => {
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        const placement = record(record(response.body, "folders").placement, "placement");
+        return Object.fromEntries(Object.entries(placement).filter(([fileId]) => fileId.startsWith("e2e-library-")));
+      };
+      const create = async (id: string, agentId: string, name: string) =>
+        placementOf(await folders(ownerToken, { type: "create", id, agentId, name }));
+      await create("library-open", open, "Open shots");
+      await create("library-chatter", chatter, "Chatter shots");
+      await create("library-viewer", viewer, "Viewer shots");
+      const place = (token: string, fileId: string, folderId: string | null) =>
+        folders(token, { type: "place", fileIds: [fileId], folderId });
+
+      const placed = placementOf(await place(ownerToken, "e2e-library-shots", "library-open"));
+      assert.deepEqual(placed, { "e2e-library-shots": "library-open" });
+      const moved = placementOf(await place(ownerToken, "e2e-library-shots", "library-chatter"));
+      assert.deepEqual(moved, { "e2e-library-shots": "library-chatter" });
+
+      const memberPlaced = placementOf(await place(member, "e2e-library-loose", "library-chatter"));
+      assert.deepEqual(memberPlaced, {
+        "e2e-library-shots": "library-chatter",
+        "e2e-library-loose": "library-chatter",
+      });
+      const hiddenFile = await place(member, "e2e-library-hidden", "library-chatter");
+      assert.equal(hiddenFile.status, 404, JSON.stringify(hiddenFile.body));
+      const viewOnly = await place(member, "e2e-library-loose", "library-viewer");
+      assert.equal(viewOnly.status, 403, JSON.stringify(viewOnly.body));
+      placementOf(await place(ownerToken, "e2e-library-loose", "library-viewer"));
+      const outOfViewer = await place(member, "e2e-library-loose", "library-chatter");
+      assert.equal(outOfViewer.status, 403, JSON.stringify(outOfViewer.body));
+      placementOf(await place(ownerToken, "e2e-library-loose", "library-chatter"));
+      const unknownFile = await place(ownerToken, "e2e-no-such-file", "library-open");
+      assert.equal(unknownFile.status, 404, JSON.stringify(unknownFile.body));
+      const ownerHidden = placementOf(await place(ownerToken, "e2e-library-hidden", "library-open"));
+      assert.equal(ownerHidden["e2e-library-hidden"], "library-open");
+
+      const hiddenUnfile = await place(member, "e2e-library-hidden", null);
+      assert.equal(hiddenUnfile.status, 404, JSON.stringify(hiddenUnfile.body));
+      const unfiled = placementOf(await place(member, "e2e-library-loose", null));
+      assert.deepEqual(unfiled, { "e2e-library-shots": "library-chatter" });
+      const memberRead = placementOf(await folders(member, undefined));
+      assert.deepEqual(memberRead, { "e2e-library-shots": "library-chatter" });
+
+      const remove = (token: string, fileId: string) =>
+        call("POST", STORAGE_ROUTES.deleteFile, { token, body: { fileId }, protocol: TEAM_PROTOCOL_V10, capabilities });
+      const memberDelete = await remove(member, "e2e-library-shots");
+      assert.equal(memberDelete.status, 403, JSON.stringify(memberDelete.body));
+      const ownerDelete = await remove(ownerToken, "e2e-library-shots");
+      assert.equal(ownerDelete.status, 200, JSON.stringify(ownerDelete.body));
+      assert.ok(current().deletedFiles.has("e2e-library-shots"));
+      const afterDelete = placementOf(await folders(ownerToken, undefined));
+      assert.deepEqual(afterDelete, { "e2e-library-hidden": "library-open" });
+      const listed = await call("POST", STORAGE_ROUTES.usage, {
+        token: ownerToken,
+        body: { scope: "host" },
+        protocol: TEAM_PROTOCOL_V10,
+        capabilities,
+      });
+      const ids = list(record(listed.body, "usage").files, "files").map((file) => text(record(file, "file").id, "id"));
+      assert.ok(!ids.includes("e2e-library-shots"), JSON.stringify(ids));
+      return { placed, moved, memberPlaced, unfiled, memberRead, afterDelete };
     },
   );
 

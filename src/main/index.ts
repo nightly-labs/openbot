@@ -85,9 +85,11 @@ import { billingIpcHandlers } from "./ipc/billing-handlers";
 import { bitwardenConnectorIpcHandlers } from "./ipc/bitwarden-connector-handlers";
 import { browserDockIpcHandlers } from "./ipc/browser-dock-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
+import { channelFolderIpcHandlers } from "./ipc/channel-folder-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { creditsIpcHandlers } from "./ipc/credits-handlers";
 import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
@@ -708,6 +710,7 @@ function registerIpcHandlers({
   mailbox,
   browser,
   browserPictureInPicture,
+  detachedBrowserWindow,
   localSignIn,
   browserDock,
   browserView,
@@ -724,6 +727,7 @@ function registerIpcHandlers({
   agentHostSettings,
   agentDefaultsSettings,
   agentFolders,
+  channelFolders,
   agentInstructions,
   browserProfiles,
   language,
@@ -746,6 +750,7 @@ function registerIpcHandlers({
   serverPersonality,
   promptCacheTtl,
   claudeUserSetup,
+  cacheExpiryCompaction,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -774,6 +779,7 @@ function registerIpcHandlers({
   billing,
   referral,
   license,
+  credits,
   hostedServers,
   localServers,
   routineFeed,
@@ -789,6 +795,7 @@ function registerIpcHandlers({
   hermesImport,
   instanceTransfer,
   voice,
+  hostVoiceModel,
   speech,
   voiceServer,
   dynamicIsland,
@@ -893,6 +900,12 @@ function registerIpcHandlers({
       getMainWindow: getDialogParent,
       translate: language.translate,
     }),
+    ...channelFolderIpcHandlers({
+      folders: channelFolders,
+      remoteServers,
+      getMainWindow: getDialogParent,
+      translate: language.translate,
+    }),
     ...agentInstructionsIpcHandlers({ files: agentInstructions, remoteServers }),
     ...hostedSiteIpcHandlers({
       hostedSites,
@@ -909,6 +922,7 @@ function registerIpcHandlers({
     ...billingIpcHandlers({ billing }),
     ...referralIpcHandlers({ referral }),
     ...licenseIpcHandlers({ license }),
+    ...creditsIpcHandlers({ credits }),
     ...routineFeedIpcHandlers({ routineFeed }),
     ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
@@ -998,6 +1012,7 @@ function registerIpcHandlers({
       host,
       remoteServers,
       serverTimezone,
+      voiceModel: hostVoiceModel,
       hostTurnLimits,
       serverPersonality,
       agentMemoryLimit,
@@ -1007,6 +1022,7 @@ function registerIpcHandlers({
       machineAlerts,
       promptCacheTtl,
       claudeUserSetup,
+      cacheExpiryCompaction,
       claudeCompactWindow,
       providerEnvironment,
       modelVisibility,
@@ -1083,7 +1099,14 @@ function registerIpcHandlers({
       modelVisibility,
       closeChatNotifications,
     }),
-    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
+    ...browserIpcHandlers({
+      browserPictureInPicture,
+      detachedBrowserWindow,
+      browser,
+      remoteServers,
+      browserView,
+      localSignIn,
+    }),
   });
 }
 

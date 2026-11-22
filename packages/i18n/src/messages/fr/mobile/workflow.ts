@@ -96,6 +96,7 @@ export const messages = {
   "mobile.workflow.output.chatChannel": "Canal OpenBot",
   "mobile.workflow.output.file": "Fichier",
   "mobile.workflow.status.running": "En cours",
+  "mobile.workflow.status.waiting": "En file d’attente",
   "mobile.workflow.status.approval": "Vous attend",
   "mobile.workflow.status.stopping": "Arrêt",
   "mobile.workflow.status.done": "Terminé",
