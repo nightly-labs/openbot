@@ -4,13 +4,14 @@ import {
   type WorkflowAnswerProblem,
   type WorkflowAnswerSource,
   type WorkflowAnswerType,
+  type WorkflowNodeKind,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Braces, IconButton, Listbox, Popover } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, createUniqueId, Show, untrack } from "solid-js";
 import { referenceChipClasses } from "../../reference-chip";
 import { useText } from "../../text";
-import { KIND_LABEL } from "./WorkflowAddMenu";
+import { addItem, KIND_LABEL } from "./WorkflowAddMenu";
 import { answerProblemText } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 
@@ -23,8 +24,14 @@ interface NameQuery {
 
 interface NameOption {
   name: string;
+  kind: WorkflowNodeKind;
   steps: string[];
   detail: string;
+}
+
+interface NameMatch {
+  option: NameOption;
+  at: number;
 }
 
 interface Snapshot {
@@ -74,11 +81,38 @@ function nameOptions(t: AppTranslate, sources: readonly WorkflowAnswerSource[]):
     const step = sourceStep(t, source);
     for (const field of source.fields) {
       const known = options.get(field.name);
-      if (!known) options.set(field.name, { name: field.name, steps: [step], detail: fieldDetail(t, field) });
+      if (!known)
+        options.set(field.name, {
+          name: field.name,
+          kind: source.node.kind,
+          steps: [step],
+          detail: fieldDetail(t, field),
+        });
       else if (!known.steps.includes(step)) known.steps.push(step);
     }
   }
   return [...options.values()];
+}
+
+function matchNames(options: readonly NameOption[], typed: string): NameMatch[] {
+  const needle = typed.toLowerCase();
+  const found = options.flatMap((option) => {
+    const at = option.name.toLowerCase().indexOf(needle);
+    return at < 0 ? [] : [{ option, at }];
+  });
+  return [...found.filter((match) => match.at === 0), ...found.filter((match) => match.at > 0)];
+}
+
+function MatchedName(props: { name: string; at: number; size: number }) {
+  return (
+    <span class="wfn-name-option">
+      {props.name.slice(0, props.at)}
+      <Show when={props.size > 0}>
+        <span class="wfn-name-match">{props.name.slice(props.at, props.at + props.size)}</span>
+      </Show>
+      {props.name.slice(props.at + props.size)}
+    </span>
+  );
 }
 
 function withName(text: string, query: NameQuery, name: string): Snapshot {
@@ -256,21 +290,21 @@ export function NameField(props: NameFieldProps) {
         problems.set(problem.name, answerProblemText(t, problem));
     return problems;
   });
-  const names = createMemo(() => {
-    const found = query();
-    if (!found) return [];
-    const typed = found.typed.toLowerCase();
-    return available().filter((option) => option.name.toLowerCase().startsWith(typed));
-  });
-  const open = () => names().length > 0;
-  const activeOption = () => names()[Math.min(active(), names().length - 1)];
+  const typed = () => query()?.typed ?? "";
+  const names = createMemo(() => (query() ? matchNames(available(), typed()) : []));
+  const open = () => query() !== null && available().length > 0;
+  const activeMatch = () => names()[Math.min(active(), names().length - 1)];
+  const activeOption = () => activeMatch()?.option;
   const activeKeys = () => {
     const option = activeOption();
     return option ? [option.name] : [];
   };
-  const optionId = (option: NameOption | undefined) => `${listId}-${option ? names().indexOf(option) : -1}`;
-  const activeId = () => (open() ? optionId(activeOption()) : undefined);
-  const listControls = () => (open() ? listId : undefined);
+  const optionId = (match: NameMatch) => `${listId}-${names().indexOf(match)}`;
+  const activeId = () => {
+    const match = open() ? activeMatch() : undefined;
+    return match ? optionId(match) : undefined;
+  };
+  const listControls = () => (open() && names().length > 0 ? listId : undefined);
   const expanded = () => (open() ? "true" : "false");
   const editable = () => (props.readonly ? "false" : "plaintext-only");
   const current = (element: HTMLElement): Snapshot => {
@@ -388,7 +422,7 @@ export function NameField(props: NameFieldProps) {
     }
     if (!open()) return;
     const count = names().length;
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if ((event.key === "ArrowDown" || event.key === "ArrowUp") && count > 0) {
       event.preventDefault();
       event.stopPropagation();
       setActive((index) => (index + (event.key === "ArrowDown" ? 1 : count - 1)) % count);
@@ -509,41 +543,48 @@ export function NameField(props: NameFieldProps) {
             onCloseAutoFocus={(event: Event) => event.preventDefault()}
           >
             <Show when={open()}>
-              <Listbox.Root<NameOption>
-                as="div"
-                id={listId}
-                aria-label={t("workflow.names.title")}
-                class="wfn-picker-list wfn-model-list"
-                options={names()}
-                optionValue={(option) => option.name}
-                optionTextValue={(option) => option.name}
-                selectionMode="single"
-                disallowEmptySelection={true}
-                allowDuplicateSelectionEvents={true}
-                shouldUseVirtualFocus={true}
-                shouldSelectOnPressUp={true}
-                value={activeKeys()}
-                onChange={(keys) => {
-                  const name = keys.values().next().value;
-                  if (name) choose(name);
-                }}
-                renderItem={(item) => (
-                  <Listbox.Item
-                    item={item}
-                    id={optionId(item.rawValue)}
-                    class="wfn-picker-row"
-                    onPointerDown={(event: PointerEvent) => event.preventDefault()}
-                  >
-                    <span class="wfn-name-option">{item.rawValue.name}</span>
-                    <span class="wfn-name-source">
-                      {t("workflow.names.source", {
-                        step: item.rawValue.steps.join(", "),
-                        detail: item.rawValue.detail,
-                      })}
-                    </span>
-                  </Listbox.Item>
-                )}
-              />
+              <Show when={names().length > 0} fallback={<p class="wfn-name-empty">{t("workflow.picker.noMatches")}</p>}>
+                <Listbox.Root<NameMatch>
+                  as="div"
+                  id={listId}
+                  aria-label={t("workflow.names.title")}
+                  class="wfn-picker-list wfn-model-list"
+                  options={names()}
+                  optionValue={(match) => match.option.name}
+                  optionTextValue={(match) => match.option.name}
+                  selectionMode="single"
+                  disallowEmptySelection={true}
+                  allowDuplicateSelectionEvents={true}
+                  shouldUseVirtualFocus={true}
+                  shouldSelectOnPressUp={true}
+                  value={activeKeys()}
+                  onChange={(keys) => {
+                    const name = keys.values().next().value;
+                    if (name) choose(name);
+                  }}
+                  renderItem={(item) => (
+                    <Listbox.Item
+                      item={item}
+                      id={optionId(item.rawValue)}
+                      class="wfn-picker-row wfn-name-row"
+                      onPointerDown={(event: PointerEvent) => event.preventDefault()}
+                    >
+                      <span class="wfn-menu-icon" data-kind={item.rawValue.option.kind} aria-hidden="true">
+                        {addItem(item.rawValue.option.kind).icon()}
+                      </span>
+                      <span class="wfn-name-text">
+                        <MatchedName name={item.rawValue.option.name} at={item.rawValue.at} size={typed().length} />
+                        <span class="wfn-name-source">
+                          {t("workflow.names.source", {
+                            step: item.rawValue.option.steps.join(", "),
+                            detail: item.rawValue.option.detail,
+                          })}
+                        </span>
+                      </span>
+                    </Listbox.Item>
+                  )}
+                />
+              </Show>
             </Show>
           </Popover.Content>
         </Popover.Portal>
