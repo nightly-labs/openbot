@@ -489,7 +489,12 @@ export class WorkflowRunStore {
       .run(status, reason, status === "sent" ? at : null, at, stepId);
   }
 
-  page(workflowId: string, before: string | undefined, limit: number): WorkflowRunPage {
+  page(
+    workflowId: string,
+    before: string | undefined,
+    limit: number,
+    shown: (step: StoredWorkflowStep) => WorkflowStep = publicStep,
+  ): WorkflowRunPage {
     const db = this.#database.connection;
     const cursor = before === undefined ? null : runCursor(before);
     const rows = databaseRows(
@@ -517,8 +522,8 @@ export class WorkflowRunStore {
           ).map(toStep)
         : [];
     return {
-      runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(publicStep) })),
-      soloSteps: soloSteps.map(publicStep),
+      runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(shown) })),
+      soloSteps: soloSteps.map(shown),
       nextBefore: rows.length > limit && last ? `${last.startedAt}|${last.id}` : null,
     };
   }

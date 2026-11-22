@@ -658,6 +658,7 @@ function compactStep(step: WorkflowStep, nodes: ReadonlyMap<string, WorkflowNode
     nodeId: step.nodeId,
     ...stepLabel(nodes.get(step.nodeId)),
     status: step.status,
+    ...(step.waiting ? { waitsInAgentQueue: true } : {}),
     ...(step.branch ? { branch: step.branch } : {}),
     ...(step.error ? { error: step.error } : {}),
     ...(step.output ? { output: cut(step.output) } : {}),
