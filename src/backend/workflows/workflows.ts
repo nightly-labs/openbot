@@ -137,6 +137,7 @@ import {
   readAnswer,
   readableAnswerInputs,
   stepAnswer,
+  type TemplateReader,
   templateValues,
   webhookAnswerEvent,
 } from "./workflow-answers";
@@ -1140,7 +1141,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                   kind: "approval",
                   workflowId: step.workflowId,
                   workflowTitle: titleOf(step.workflowId),
-                  text: fillWorkflowTemplate(fieldText(node, "question"), templateValuesOf(step, run)),
+                  text: fillWorkflowTemplate(fieldText(node, "question"), templateValuesOf(step, run, "person")),
                 });
               }
               return;
@@ -1190,9 +1191,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const found = stepGraph(step, run);
           return found ? stepAnswer(found.graph, step.nodeId, found.latest) : {};
         };
-        const templateValuesOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null) => {
+        const templateValuesOf = (
+          step: StoredWorkflowStep,
+          run: StoredWorkflowRun | null,
+          reader: TemplateReader = "model",
+        ) => {
           const found = stepGraph(step, run);
-          return found ? templateValues(found.graph, step.nodeId, found.latest) : new Map<string, string>();
+          return found ? templateValues(found.graph, step.nodeId, found.latest, reader) : new Map<string, string>();
         };
 
         const stepInput = (

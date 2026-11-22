@@ -372,17 +372,22 @@ changed, on this computer and on a joined host.
 - Typed answers (`ipc-workflow-answers.ts` in the contracts, `workflow-answers.ts` in the backend) are
   plain text in `node.fields`, so the wire and the database do not change, and a client that does not
   know them keeps them. `answer` on an agent, a model step or a webhook trigger lists the fields of
-  its answer, one for each line as `name: type`: `text`, `number`, `yes/no`, `list`, or labels such as
-  `high|normal|low`; `name?` is optional. A model step asks for one JSON object and tries once more
-  with the problems; an agent step gets one more handoff (key `workflow-step:<id>:answer`) and then
+  its answer, one for each line as `name: type`: `text`, `number`, `integer` (`int`), `yes/no`,
+  `list`, or labels such as `high|normal|low`; `name?` is optional. Values are strict: a number is a
+  JSON number or decimal text, an integer is a safe integer, and a list is a JSON array. A model or
+  agent reply with no JSON object, or with a key that is not a field (names are case-sensitive), is a
+  problem. A model step asks for one JSON object and tries once more with the problems; an agent step gets one more handoff (key `workflow-step:<id>:answer`) and then
   fails with `answerInvalid`. The step keeps the checked JSON as its output. A webhook trigger checks
-  the request body when it arrives and answers 400 when a field is missing or wrong. `check` on a
+  the request body when it arrives and answers 400 when a field is missing or wrong, or when a key
+  differs from a field only in case; other extra keys are dropped. `check` on a
   condition (`priority = high and count > 2`, `urgent`, `not done`, `title contains "refund"`, joined
   with `and` and `or`) tests the answers before it and makes no model call. `{{name}}` in an agent
   task, a model prompt or system text, or an approval question takes the value of that field. Only
   the names that a connected step before it declares are replaced; other `{{...}}` text stays as it
-  is. Text and list values come in JSON quotes, because they can hold text from outside OpenBot, also
-  when a model or an agent copies webhook text into its answer. A step reads the answers of the connected steps before it, through conditions and
+  is. In a model or agent text, a text value comes in JSON quotes and a list comes as a JSON array,
+  because they can hold text from outside OpenBot, also when a model or an agent copies webhook text
+  into its answer. An approval question is for a person, so it gets plain text. In a check, a quote
+  starts only at the start of a value, so `it's` is a word. A step reads the answers of the connected steps before it, through conditions and
   approvals, in run order (`workflowAnswerSources`); an output shows them as `name: value` lines.
   In a manual run, the trigger reads its answer from the run input as a JSON object.
   `edit_workflow` refuses an edit that adds an answer problem (`workflowAnswerProblems`) and tells

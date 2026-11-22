@@ -15,6 +15,7 @@ import {
   workflowAnswerInstruction,
   workflowAnswerLines,
   workflowAnswerSources,
+  workflowAnswerTemplateText,
   workflowAnswerValueText,
 } from "@openbot/contracts/ipc";
 import type { ReceivedWebhookEvent } from "../routine-store";
@@ -56,20 +57,24 @@ export function stepAnswer(
   return Object.fromEntries(givenAnswers(graph, nodeId, latest).flatMap(({ answer }) => Object.entries(answer)));
 }
 
-const QUOTED_TYPES: ReadonlySet<WorkflowAnswerField["type"]> = new Set(["text", "list"]);
+export type TemplateReader = "model" | "person";
 
 export function templateValues(
   graph: WorkflowGraph,
   nodeId: string,
   latest: ReadonlyMap<string, StoredWorkflowStep>,
+  reader: TemplateReader = "model",
 ): Map<string, string> {
   const values = new Map<string, string>();
   for (const { fields } of workflowAnswerSources(graph, nodeId)) for (const field of fields) values.set(field.name, "");
   for (const { source, answer } of givenAnswers(graph, nodeId, latest))
     for (const field of source.fields) {
       if (!Object.hasOwn(answer, field.name)) continue;
-      const text = workflowAnswerValueText(answer[field.name]);
-      values.set(field.name, QUOTED_TYPES.has(field.type) ? JSON.stringify(text) : text);
+      const value = answer[field.name];
+      values.set(
+        field.name,
+        reader === "person" ? workflowAnswerValueText(value) : workflowAnswerTemplateText(field, value),
+      );
     }
   return values;
 }
@@ -111,7 +116,9 @@ export function answerFixAsk(
 export type ReadAnswer = { output: string } | { problems: WorkflowAnswerValueProblem[] };
 
 export function readAnswer(fields: readonly WorkflowAnswerField[], text: string): ReadAnswer {
-  const { answer, problems } = checkWorkflowAnswer(fields, lastJsonObject(text) ?? {});
+  const record = lastJsonObject(text);
+  if (!record) return { problems: [{ name: fields.map((field) => field.name).join(", "), problem: "json" }] };
+  const { answer, problems } = checkWorkflowAnswer(fields, record, "refuse");
   return problems.length > 0 ? { problems } : { output: JSON.stringify(answer) };
 }
 
@@ -125,7 +132,7 @@ export function webhookAnswerEvent(
 ): { event: ReceivedWebhookEvent } | { problems: WorkflowAnswerValueProblem[] } {
   const fields = workflowAnswerFieldsOf(trigger);
   if (fields.length === 0) return { event };
-  const { answer, problems } = checkWorkflowAnswer(fields, event.data);
+  const { answer, problems } = checkWorkflowAnswer(fields, event.data, "refuseMiscased");
   if (problems.length > 0) return { problems };
   const data = Object.fromEntries(
     Object.entries(answer).map(([name, value]) => [name, typeof value === "object" ? [...value] : value]),

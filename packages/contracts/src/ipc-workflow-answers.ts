@@ -4,7 +4,7 @@ import { type DynamicRecord, isDynamicRecord } from "./runtime-values";
 export const WORKFLOW_ANSWER_FIELD = "answer";
 export const WORKFLOW_CHECK_FIELD = "check";
 export const WORKFLOW_ANSWER_MAX_FIELDS = 20;
-export type WorkflowAnswerType = "text" | "number" | "yes/no" | "list" | "choice";
+export type WorkflowAnswerType = "text" | "number" | "integer" | "yes/no" | "list" | "choice";
 
 export interface WorkflowAnswerField {
   name: string;
@@ -34,8 +34,8 @@ const TYPE_WORDS: Readonly<Record<string, WorkflowAnswerType>> = {
   text: "text",
   string: "text",
   number: "number",
-  integer: "number",
-  int: "number",
+  integer: "integer",
+  int: "integer",
   float: "number",
   "yes/no": "yes/no",
   yesno: "yes/no",
@@ -138,15 +138,21 @@ function typeHint(field: WorkflowAnswerField): string {
   }
 }
 
-export type WorkflowAnswerValueProblem = { name: string; problem: "missing" | "type" | "label" };
+export type WorkflowAnswerValueProblem = {
+  name: string;
+  problem: "missing" | "type" | "label" | "unknown" | "json";
+};
+
+export type WorkflowAnswerExtraKeys = "refuse" | "refuseMiscased" | "ignore";
 
 export function checkWorkflowAnswer(
   fields: readonly WorkflowAnswerField[],
   value: unknown,
+  extraKeys: WorkflowAnswerExtraKeys = "ignore",
 ): { answer: WorkflowAnswer; problems: WorkflowAnswerValueProblem[] } {
   const record: DynamicRecord = isDynamicRecord(value) ? value : {};
   const entries: [string, WorkflowAnswerValue][] = [];
-  const problems: WorkflowAnswerValueProblem[] = [];
+  const problems: WorkflowAnswerValueProblem[] = extraKeyProblems(fields, record, extraKeys);
   for (const field of fields) {
     const raw = Object.hasOwn(record, field.name) ? record[field.name] : undefined;
     const checked = raw === undefined || raw === null || raw === "" ? undefined : answerValue(field, raw);
@@ -159,6 +165,21 @@ export function checkWorkflowAnswer(
   return { answer: Object.fromEntries(entries), problems };
 }
 
+function extraKeyProblems(
+  fields: readonly WorkflowAnswerField[],
+  record: DynamicRecord,
+  extraKeys: WorkflowAnswerExtraKeys,
+): WorkflowAnswerValueProblem[] {
+  if (extraKeys === "ignore") return [];
+  const names = new Set(fields.map((field) => field.name));
+  const folded = new Set(fields.map((field) => field.name.toLowerCase()));
+  return Object.keys(record)
+    .filter((key) => !names.has(key) && (extraKeys === "refuse" || folded.has(key.toLowerCase())))
+    .map((key) => ({ name: key, problem: "unknown" }));
+}
+
+const DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/u;
+
 const isBlank = (value: WorkflowAnswerValue) => value === "" || (typeof value === "object" && value.length === 0);
 
 function answerValue(field: WorkflowAnswerField, raw: unknown): WorkflowAnswerValue | { problem: "type" | "label" } {
@@ -166,9 +187,12 @@ function answerValue(field: WorkflowAnswerField, raw: unknown): WorkflowAnswerVa
     case "text":
       if (typeof raw === "string") return raw.trim();
       return typeof raw === "number" || typeof raw === "boolean" ? String(raw) : { problem: "type" };
-    case "number": {
-      const number = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw.trim()) : Number.NaN;
-      return Number.isFinite(number) && !(typeof raw === "string" && raw.trim() === "") ? number : { problem: "type" };
+    case "number":
+    case "integer": {
+      const number =
+        typeof raw === "number" ? raw : typeof raw === "string" && DECIMAL.test(raw.trim()) ? Number(raw) : Number.NaN;
+      const fits = field.type === "integer" ? Number.isSafeInteger(number) : Number.isFinite(number);
+      return fits ? number : { problem: "type" };
     }
     case "yes/no": {
       if (typeof raw === "boolean") return raw;
@@ -178,7 +202,8 @@ function answerValue(field: WorkflowAnswerField, raw: unknown): WorkflowAnswerVa
       return { problem: "type" };
     }
     case "list": {
-      const items = Array.isArray(raw) ? raw : [raw];
+      if (!Array.isArray(raw)) return { problem: "type" };
+      const items: unknown[] = raw;
       const texts = items.flatMap((item) =>
         typeof item === "string" ? [item.trim()] : typeof item === "number" ? [String(item)] : [],
       );
@@ -193,15 +218,22 @@ function answerValue(field: WorkflowAnswerField, raw: unknown): WorkflowAnswerVa
 }
 
 export function workflowAnswerFixText(problems: readonly WorkflowAnswerValueProblem[]): string {
-  return problems
-    .map(({ name, problem }) =>
-      problem === "missing"
-        ? `${name} is missing`
-        : problem === "label"
-          ? `${name} is not one of the labels`
-          : `${name} has the wrong type`,
-    )
-    .join("; ");
+  return problems.map(valueProblemText).join("; ");
+}
+
+function valueProblemText({ name, problem }: WorkflowAnswerValueProblem): string {
+  switch (problem) {
+    case "missing":
+      return `${name} is missing`;
+    case "label":
+      return `${name} is not one of the labels`;
+    case "unknown":
+      return `${name} is not one of the fields (names are case-sensitive)`;
+    case "json":
+      return "the reply has no JSON object";
+    case "type":
+      return `${name} has the wrong type`;
+  }
 }
 
 export function lastJsonObject(text: string): DynamicRecord | null {
@@ -246,6 +278,12 @@ function balancedEnd(text: string, start: number): number {
     }
   }
   return -1;
+}
+
+export function workflowAnswerTemplateText(field: WorkflowAnswerField, value: WorkflowAnswerValue | undefined): string {
+  if (value === undefined) return "";
+  if (field.type === "text" || field.type === "list") return JSON.stringify(value);
+  return workflowAnswerValueText(value);
 }
 
 export function workflowAnswerValueText(value: WorkflowAnswerValue | undefined): string {
@@ -337,7 +375,7 @@ function splitWords(text: string, word: "and" | "or"): string[] {
       if (character === quote) quote = null;
       continue;
     }
-    if (character === '"' || character === "'") {
+    if ((character === '"' || character === "'") && opensQuote(text[index - 1])) {
       quote = character;
       continue;
     }
@@ -351,6 +389,8 @@ function splitWords(text: string, word: "and" | "or"): string[] {
   parts.push(text.slice(start).trim());
   return parts.filter(Boolean).length === parts.length ? parts : [];
 }
+
+const opensQuote = (previous: string | undefined) => previous === undefined || /[\s=<>!]/u.test(previous);
 
 export function workflowCheckPasses(check: WorkflowCheck, answer: WorkflowAnswer): boolean {
   return check.some((group) =>
@@ -480,7 +520,7 @@ export function nodeAnswerProblems(graph: WorkflowGraph, node: WorkflowNode): Wo
   const fieldOf = (name: string): WorkflowAnswerField | null | undefined => {
     const options = available.get(name);
     if (!options) return undefined;
-    const kinds = new Set(options.map((option) => `${option.type}:${option.labels.join("|")}`));
+    const kinds = new Set(options.map((option) => `${numberKind(option.type)}:${option.labels.join("|")}`));
     return kinds.size === 1 ? (options[0] ?? null) : null;
   };
   const conflicts = new Set<string>();
@@ -512,12 +552,15 @@ export function nodeAnswerProblems(graph: WorkflowGraph, node: WorkflowNode): Wo
   return problems;
 }
 
+const numberKind = (type: WorkflowAnswerType) => (type === "integer" ? "number" : type);
+
 function testFits(test: WorkflowCheckTest, field: WorkflowAnswerField): boolean {
   if (test.operator === "set" || test.operator === "unset") return true;
   const ordered = test.operator === ">" || test.operator === ">=" || test.operator === "<" || test.operator === "<=";
   const value = test.value.trim().toLowerCase();
   switch (field.type) {
     case "number":
+    case "integer":
       return Number.isFinite(Number(value)) || (test.operator === "contains" && value.length > 0);
     case "yes/no":
       return (test.operator === "=" || test.operator === "!=") && ["yes", "no", "true", "false"].includes(value);
