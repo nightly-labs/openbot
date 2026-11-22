@@ -186,7 +186,8 @@ function userMustFixStart(reason: string | null | undefined): reason is string {
     reason === sourceText("error.provider.realtimeLimitZero") ||
     reason === sourceText("error.provider.cpuUnsupported") ||
     reason === sourceText("error.provider.geminiSettingsUnreadable") ||
-    reason === sourceText("error.provider.geminiAccountSettingsUnreadable")
+    reason === sourceText("error.provider.geminiAccountSettingsUnreadable") ||
+    reason === sourceText("error.provider.grokDefaultModelNotAllowed")
   );
 }
 const CODEX_SERVICE_UNREACHABLE = new Set([
