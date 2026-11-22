@@ -54,6 +54,7 @@ export interface AcpFlavor {
     permitted(request: { _meta?: unknown; title?: string | null }): GeneratedMediaKind | null;
   };
   clientInfo?: { name: string; title: string; version: string };
+  clientCapabilities?: { _meta?: { parameterizedModelPicker?: true } };
   sessionNotFound?(error: RequestError, sessionId: string): boolean | null;
   authRequiredSignsOut?: boolean;
   turnFailure?(
@@ -397,6 +398,7 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   processWideModel: true,
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,
+  clientCapabilities: { _meta: { parameterizedModelPicker: true } },
 };
 
 export const KIMI_ACP_FLAVOR: AcpFlavor = {

@@ -1132,6 +1132,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cursor-model-set
 
+      - name: Run the Cursor reasoning effort E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:cursor-reasoning-effort
+
       - name: Run the Cline free models E2E test
         if: ${{ !cancelled() }}
         run: bun run test:cline-free-models
@@ -1184,6 +1188,7 @@ jobs:
             .openbot-build/opencode-background-turn-e2e/
             .openbot-build/cursor-stream-closed-e2e/
             .openbot-build/cursor-model-set-e2e/
+            .openbot-build/cursor-reasoning-effort-e2e/
             .openbot-build/cline-free-models-e2e/
             .openbot-build/cline-plan-limit-failover-e2e/
             .openbot-build/provider-transcript-replay-e2e/
