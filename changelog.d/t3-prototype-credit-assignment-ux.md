@@ -29,5 +29,7 @@
   A batch makes up to 4 results with an OpenBot model at the same time. Each result is a separate
   charge, and a failed result uses no credits.
   When your credits do not pay for the full batch, you cannot start the step.
+  A new video step starts at the default length of its model. A model that takes only a first frame
+  shows no last-frame input.
   This works on this computer, on a joined server and in the web client.
   A joined server must also be on the new version to show these models.
