@@ -27,6 +27,7 @@ export interface ProviderAccountActions {
   signOut?: ((provider: AgentProviderId) => Promise<void>) | undefined;
   setPool?: ((provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => Promise<void>) | undefined;
   setLiveVoiceAccount?: ((accountId: string | null) => Promise<void>) | undefined;
+  maxAccounts?: number | undefined;
   local?: boolean | undefined;
 }
 

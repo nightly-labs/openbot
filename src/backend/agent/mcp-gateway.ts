@@ -21,6 +21,7 @@ import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import {
   type McpOAuthAuthority,
+  type McpSignInAddressOutcome,
   type McpSignInOffer,
   type McpSignInOpener,
   mcpOAuthAccountKey,
@@ -283,19 +284,44 @@ export class McpGateway {
             signIn: (url) => stored.signIn(url, open, options.deepLinkRedirectUrl),
           }
         : (stored ?? undefined);
-    const oauth = options.interactive ? opened : silent;
-    const outcome = yield* inspectMcpServer(
-      config,
-      undefined,
-      this.#toolRuntimes(),
-      oauth,
-      options.signInPlace ?? null,
-    ).pipe(toMcpGatewayFailed);
-    if (options.interactive) return { toolCount: outcome.toolCount, error: outcome.error };
+    if (options.interactive) {
+      const outcome = yield* inspectMcpServer(
+        config,
+        undefined,
+        this.#toolRuntimes(),
+        opened,
+        options.signInPlace ?? null,
+      ).pipe(toMcpGatewayFailed);
+      return { toolCount: outcome.toolCount, error: outcome.error };
+    }
+    const outcome = yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
     yield* this.#refreshForTestedTools(config, outcome);
     const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
     const error = refused ? sourceText("error.backend.mcpRegistrationUnavailable") : outcome.error;
     return { toolCount: outcome.toolCount, error };
+  });
+
+  readonly #probeStoredSignIn = Effect.fnUntraced(function* (
+    this: McpGateway,
+    config: McpServerConfig,
+    oauth: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined,
+    signInPlace: McpSignInPlace | null,
+  ) {
+    const probe = inspectMcpServer(config, undefined, this.#toolRuntimes(), oauth, signInPlace).pipe(
+      toMcpGatewayFailed,
+    );
+    const outcome = yield* probe;
+    const stored = this.#oauth;
+    if (outcome.needs !== "sign_in" || !oauth || !stored || config.transport !== "http") return outcome;
+    const rejected = yield* stored.accessToken(config.url).pipe(toMcpGatewayFailed);
+    if (rejected === null) return outcome;
+    const renewed = yield* stored.refreshAccessToken(config.url, rejected).pipe(toMcpGatewayFailed);
+    if (renewed === null) return outcome;
+    const retried = yield* probe;
+    if (retried.needs !== "sign_in") return retried;
+    if (yield* stored.endRefusedSignIn(config.url, renewed).pipe(toMcpGatewayFailed))
+      yield* this.#hooks.refreshAllAgentRuntimes();
+    return retried;
   });
 
   readonly #refreshForTestedTools = Effect.fnUntraced(function* (
@@ -325,9 +351,7 @@ export class McpGateway {
     const silent: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined = stored
       ? { accessToken: (url) => stored.accessToken(url), signIn: () => null }
       : undefined;
-    const outcome = yield* inspectMcpServer(normalized, undefined, this.#toolRuntimes(), silent, "here").pipe(
-      toMcpGatewayFailed,
-    );
+    const outcome = yield* this.#probeStoredSignIn(normalized, silent, "here");
     if (tested) yield* this.#refreshForTestedTools(normalized, outcome);
     return outcome;
   });
@@ -391,6 +415,10 @@ export class McpGateway {
 
   signInLink(url: string): string | null {
     return this.#oauth?.signInLink(url) ?? null;
+  }
+
+  receiveSignInAddress(url: string, address: string): McpSignInAddressOutcome {
+    return this.#oauth?.receiveSignInAddress(url, address) ?? "ended";
   }
 
   readonly signOut = Effect.fn("McpGateway.signOut")(function* (this: McpGateway, input: SignOutMcpServerInput) {

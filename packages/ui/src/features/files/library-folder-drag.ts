@@ -13,7 +13,7 @@ const SCROLL_EDGE_PX = 48;
 const SCROLL_STEP_PX = 14;
 
 export type LibraryDragItem =
-  | { kind: "files"; agentId: string | null; ids: string[]; label: string }
+  | { kind: "files"; agentId: string | null; anyAgent: boolean; ids: string[]; label: string }
   | { kind: "folder"; agentId: string; folderId: string; label: string };
 
 export type LibraryDropTarget =
@@ -124,7 +124,7 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
     const spring = under?.closest("[data-library-spring]")?.getAttribute("data-library-spring") ?? null;
     if (under?.closest("[data-library-out]")) {
       if (item.kind !== "files") return NO_PROBE;
-      if (item.agentId === null) return { target: null, blocked: "mixed", spring: null };
+      if (item.agentId === null) return { target: null, blocked: item.anyAgent ? null : "mixed", spring: null };
       const inFolder = item.ids.some((id) => options.folderIdOfFile(id) !== undefined);
       return { target: inFolder ? { kind: "out", agentId: item.agentId } : null, blocked: null, spring: null };
     }
@@ -135,7 +135,9 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
         return { target: openedTarget(item, opened), blocked: null, spring: null };
       return { target: null, blocked: null, spring: spring && options.isCollapsed(spring) ? spring : null };
     }
-    if (agentId !== item.agentId)
+    const anyAgent = item.kind === "files" && item.anyAgent;
+    if (anyAgent && !options.organizes(agentId)) return { target: null, blocked: null, spring: null };
+    if (!anyAgent && agentId !== item.agentId)
       return { target: null, blocked: item.agentId === null ? "mixed" : "agent", spring: null };
     return { target: dropTargetIn(item, row, agentId, y), blocked: null, spring: null };
   }

@@ -742,11 +742,14 @@ export function createWorkflowsController(
         }),
       );
     },
-    onRunStep: (nodeId) => {
+    onRunStep: (nodeId, takes = 1) => {
       const kind = stored()?.detail.graph.nodes.find((node) => node.id === nodeId)?.kind;
       start(
         "run_step",
-        (workflowId) => host.workflows.runStep({ workflowId, nodeId, requestId: crypto.randomUUID() }),
+        async (workflowId) => {
+          for (let take = 0; take < takes; take += 1)
+            await host.workflows.runStep({ workflowId, nodeId, requestId: crypto.randomUUID() });
+        },
         kind,
       );
     },

@@ -52,9 +52,8 @@ import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { serversPort } from "../servers/servers-port";
-import { appSettingLinkTarget } from "../settings/setting-link-targets";
+import { appSettingRowOpener } from "../settings/setting-link-targets";
 import { useSettings } from "../settings/settings-context";
-import { settingsTabShown } from "../settings/settings-tabs";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
@@ -480,14 +479,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           setPendingPluginSlug(request.appId);
           setSkillsMarketplaceOpen(true);
         }}
-        appSettingOpener={(settingId) => {
-          const target = appSettingLinkTarget(settingId, platform.appInfo()?.platform);
-          const shown = settingsTabShown(target.tab, {
-            platform: platform.appInfo()?.platform,
-            chatWindow: platform.chatWindow !== null,
-          });
-          return shown ? () => openAppSettingRow(target.tab, target.row) : undefined;
-        }}
+        appSettingOpener={appSettingRowOpener(
+          () => ({ platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null }),
+          openAppSettingRow,
+        )}
         onOpenMcpSignIn={(() => {
           const server = activeServer();
           if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;

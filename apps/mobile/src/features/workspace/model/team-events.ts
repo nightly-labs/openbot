@@ -123,6 +123,7 @@ export function syncEventQueries(
       queryKeys.providerStatus(scope, serverId),
       queryKeys.providerModels(scope, serverId),
       queryKeys.providerPromptCache(scope, serverId),
+      queryKeys.providerCacheExpiryCompaction(scope, serverId),
       queryKeys.providerCompactWindow(scope, serverId),
       queryKeys.agentModels(scope, serverId),
     ])

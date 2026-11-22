@@ -17,6 +17,7 @@ interface Report {
   archivedAtStart?: string[];
   restore?: { archived: boolean; restored: boolean };
   parallel?: { first: { owner: string | null; state: string }; second: { owner: string | null; state: string } };
+  sameAgentInTwoChannels?: { agentId: string; first: string; third: string };
   ownChatBesideChannelTurn?: { busy: boolean; hold: unknown; channelTaskState: string };
   otherAgentRan?: { agentId: string; busy: boolean };
   taskBesideChannelTurn?: { state: string; channelTaskState: string };
@@ -69,6 +70,25 @@ try {
     first: { owner: firstTask.ownerAgentId, state: firstTask.state },
     second: { owner: secondTask.ownerAgentId, state: secondTask.state },
   };
+
+  const third = await client.create("E2E third", [a.id, d.id], a.id);
+  await client.send(third.id, LONG_PROMPT, a.id);
+  const [firstDuringThird, thirdPage] = await waitFor(
+    page,
+    "the same agent runs a task in a second channel",
+    () => Promise.all([client.read(first.id), client.read(third.id)]),
+    ([one, two]) => runningTask(two, a.id) !== undefined || runningTask(one, a.id) === undefined,
+  );
+  report.sameAgentInTwoChannels = {
+    agentId: a.id,
+    first: firstDuringThird.tasks.find((item) => item.id === firstTask.id)?.state ?? "missing",
+    third: runningTask(thirdPage, a.id)?.state ?? "not running",
+  };
+  assert.ok(
+    runningTask(firstDuringThird, a.id),
+    "The first channel turn ended before the second channel started; use a longer prompt.",
+  );
+  assert.ok(runningTask(thirdPage, a.id), "The agent did not start its task in the second channel.");
 
   await client.sendToAgent(a.id, SHORT_PROMPT);
   const [ownChat, duringOwnChat] = await waitFor(

@@ -20,11 +20,11 @@ import {
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, registerSecretValue, toLogValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
-import { InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
+import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
 import { type ModelRequest, requestedRuntime } from "../backend/agent/model-tools";
 import type { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
@@ -215,6 +215,7 @@ export class AutomationServer {
     } catch (error) {
       if (error instanceof HttpError) return send(response, error.status, { error: error.message });
       if (error instanceof InactiveAttentionRequest) return send(response, 409, { error: error.message });
+      if (error instanceof ForbiddenAttentionAnswer) return send(response, 403, { error: error.message });
       if (error instanceof AgentSettingsRefused) return send(response, 409, { error: error.message });
       if (error instanceof ContextResetBusyError) return send(response, 409, { error: error.message });
       logger.warn("An automation request failed.", error);
@@ -413,9 +414,30 @@ async function readBody(request: IncomingMessage): Promise<string | null> {
   return body === null ? null : body.toString("utf8");
 }
 
+const ROUTING_ID_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "agentId",
+  "recipientAgentId",
+  "threadId",
+  "turnId",
+  "requestId",
+  "messageId",
+  "deliveryId",
+  "runId",
+  "providerAccountId",
+]);
+
 function send(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
-  response.end(JSON.stringify(toLogValue(body)));
+  response.end(JSON.stringify(responseValue(body)));
+}
+
+function responseValue(value: unknown, key?: string): LogValue {
+  if (key !== undefined && ROUTING_ID_KEYS.has(key) && isString(value)) return value;
+  if (Array.isArray(value)) return value.map((entry) => responseValue(entry));
+  if (isDynamicRecord(value))
+    return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, responseValue(entry, name)]));
+  return toLogValue(value);
 }
 
 async function readJson(request: IncomingMessage): Promise<DynamicRecord> {

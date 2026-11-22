@@ -262,6 +262,7 @@ export const messages = {
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
   "provider.settings.geminiKeyReplacesAccount":
     "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
+  "provider.settings.museKeyInUse": "O Muse usa esta chave, não o seu login. Para usar o seu login, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",
@@ -273,10 +274,15 @@ export const messages = {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompts",
   "provider.settings.promptCacheDescription":
-    "Por quanto tempo o Claude mantém o contexto de um agente no cache entre os turnos.",
+    "Por quanto tempo Claude e Pi mantêm o contexto de um agente no cache entre turnos.",
   "provider.settings.promptCacheHour": "1 hora",
-  "provider.settings.promptCacheDefault": "Padrão do Claude Code",
+  "provider.settings.promptCacheDefault": "Padrão do provedor",
   "provider.settings.promptCacheLoadFailed": "Não foi possível carregar a duração do cache de prompts deste servidor.",
+  "provider.settings.cacheExpiryCompaction": "Compactar antes de o cache expirar",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Quando um chat com 200K ou mais tokens de contexto fica ocioso com um cache de 1 hora, o agente compacta o contexto antes de o cache expirar. Assim a próxima mensagem não lê todo o contexto de novo sem cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "Não foi possível carregar a configuração de compactação deste servidor.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Usar minha configuração do Claude Code",
   "provider.settings.claudeUserSetupDescription":

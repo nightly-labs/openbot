@@ -23,12 +23,16 @@ export const messages = {
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",
   "error.remote.windowsSessionDisconnected":
     "Ana makinedeki Windows oturumunun bağlantısı kesik, bu yüzden paylaşılacak ekran yok. Ana makinenin ekranında Windows'ta oturum açın, ardından tekrar deneyin.",
+  "error.remote.windowsCaptureDenied":
+    "Ana makinedeki Windows, OpenBot'un ekranı kaydetmesine izin vermiyor. Ana makinenin ekranında Windows'un kilidini açın, yönetici onay pencerelerini kapatın, ardından tekrar deneyin. Sorun devam ederse ana makineyi yeniden başlatın.",
   "error.remote.macScreenLocked":
     "Mac kilitli, bu yüzden ekranını paylaşamıyor. Mac'in kilidini kendi ekranında açın, ardından tekrar deneyin.",
   "error.remote.streamTooSlowLowerQuality":
     "Ana makineyle bağlantı görüntü için çok yavaş. Tekrar deneyin: sonraki bağlantı daha düşük bir kalite kullanır.",
   "error.remote.streamTooSlow":
     "Ana makineyle bağlantı görüntü için çok yavaş. Daha hızlı bir ağ kullanın, ardından tekrar deneyin.",
+  "error.remote.noPictureSwitchEncoder":
+    "Ana makine görüntü göndermedi. Tekrar deneyin: sonraki bağlantı daha fazla bilgisayarda çalışan bir video ayarı kullanır.",
   "error.remote.teamSessionExpired": "Ekip oturumunun süresi doldu.",
   "error.remote.finishTestBeforeSwitch": "Ekranları değiştirmeden önce uzak masaüstü testini tamamlayın.",
   "error.remote.displayNotFound": "Uzak ekran bulunamadı.",

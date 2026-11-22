@@ -21,6 +21,7 @@ import {
 import { createSignal, For, Show } from "solid-js";
 import { isApiKeyAccount, providerAccountName } from "../../components/provider-accounts";
 import { useText } from "../../text";
+import { creditModelMakerNamed, MakerLogo } from "../credits/MakerLogo";
 import { createPickerFades, type PickerChip, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
 import { Hint } from "./workflow-board";
 import { resolutionsBySize } from "./workflow-media-step";
@@ -37,6 +38,17 @@ interface PayerEntry {
 const ALL = "all";
 const entryKey = (provider: string, accountId: string | null) => (accountId ? `${provider}:${accountId}` : provider);
 const rowValue = (entry: string, model: string) => `${entry}|${model}`;
+
+function ModelLogo(props: { model: WorkflowImageModel }) {
+  return (
+    <Show
+      when={props.model.provider === "openbot" && creditModelMakerNamed(props.model.maker)}
+      fallback={<ProviderLogo provider={props.model.provider} class="wfn-model-logo" />}
+    >
+      {(maker) => <MakerLogo maker={maker()} mono />}
+    </Show>
+  );
+}
 
 function span(values: readonly string[]): string | undefined {
   const sorted = resolutionsBySize(values);
@@ -127,7 +139,7 @@ export function MediaModelPicker(props: {
           .map((model) => ({
             value: rowValue(entry.key, model.id),
             label: model.name,
-            tile: () => <ProviderLogo provider={model.provider} class="wfn-model-logo" />,
+            tile: () => <ModelLogo model={model} />,
             chips: [
               ...specChips(model),
               ...(key === ALL

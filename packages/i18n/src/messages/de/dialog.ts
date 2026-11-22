@@ -4,6 +4,7 @@ import type { messages as source } from "../en/dialog";
 export const messages = {
   "dialog.chooseSiteDirectory": "Verzeichnis für eine statische Website auswählen",
   "dialog.chooseAgentFolder": "Ordner für {agent} auswählen",
+  "dialog.chooseChannelFolder": "Ordner für {channel} auswählen",
   "dialog.chooseAgentExclusion": "Ordner auswählen, den {agent} nicht ändern darf",
   "dialog.chooseSkill": "Fähigkeitsordner oder ZIP auswählen",
   "dialog.filter.skillPackages": "Fähigkeitspakete",

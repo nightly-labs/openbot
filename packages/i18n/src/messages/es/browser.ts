@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Cerrar ventana emergente del navegador",
   "browser.pip.reattachFailed": "OpenBot no pudo volver a acoplar el navegador.",
   "browser.pip.closeFailed": "OpenBot no pudo cerrar la ventana emergente del navegador.",
+  "browser.window.open": "Abrir navegador en una ventana nueva",
+  "browser.window.openFailed": "OpenBot no pudo abrir la ventana del navegador.",
   "browser.popupBlocked.title": "Ventana emergente bloqueada",
   "browser.popupBlocked.dismiss": "Descartar mensaje de ventana emergente",
   "browser.liveView.label": "Vista en directo de la página en el servidor",

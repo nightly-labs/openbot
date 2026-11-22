@@ -283,8 +283,12 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    plan of the server, such as a renewal paid just now, keeps it. A cancel at the period end after a
    refund of that period also deletes the server when the period ends. A refund that fails after it
    succeeded does not bring the server back. A dispute (`charge.dispute.created`, an inquiry too)
-   cancels the plan of the disputed invoice now, so Stripe does not charge that card again. After a
-   dispute the server stops with `plan_ended` and keeps its disk. The Worker finds the plan through
+   cancels the plan of the disputed invoice now, so Stripe does not charge that card again. When the
+   subscription started less than 30 days before the dispute (Stripe `start_date`,
+   `DISPUTE_DELETES_SERVER_MS`), the webhook also deletes the server at once, as for a refund. An
+   inquiry (a dispute `status` that starts with `warning_`, `isDisputeInquiry`) takes no money back,
+   so it never deletes the server. After an inquiry or a later dispute the server stops with
+   `plan_ended` and keeps its disk for 14 days. The Worker finds the plan through
    the invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment
    that is not an OpenBot plan invoice changes nothing.
 8. **Plan change.** The Customer Portal has no plan change (`subscription_update` is off), so only an
@@ -717,6 +721,40 @@ each claim, so a VM that has no working session cannot sign in after the change;
 A start that cannot reach the account server does not use the claim. The start retry signs in
 again with backoff (30 s to 10 min) and then publishes the host.
 
+## Watchdog
+
+Before it starts OpenBot, `openbot-hosted-server` starts itself again with `--watchdog` in the
+background. Main rewrites `~/.config/OpenBot/openbot-run-marker-v1.json` every 60 s from its event
+loop (`src/main/run-marker.ts`). The watchdog reads the file every 30 s. When the content does not
+change in 20 reads (10 minutes) after it changed once in this run, the watchdog logs "OpenBot did not
+update its heartbeat for 600 seconds" and sends `SIGKILL` to the process in
+`/run/openbot/openbot.pid`. `Restart=always` starts the service again 10 s later. The watchdog does
+nothing:
+
+- before the first change of the file in this run;
+- until the start finishes: `openbot-start-attempts-v1.json` in the same folder has
+  `"attempt":null` only after the migrations, the services and the renderer load. Migrations and the
+  database `quick_check` run on the main thread and can take longer than 10 minutes on a large
+  database;
+- while the run marker does not have `"state":"running"`. Quitting and the server safe mode stop the
+  heartbeat, and the safe mode stays alive to keep the host reachable;
+- when the folder of the file has less than 1 MB free, because main ignores a failed write;
+- when the process in the pid file is not `openbot` in the cgroup of the service.
+
+The watchdog counts reads and does not compare clock times, so a boat resume, which moves the clock
+forward, does not stop OpenBot. It does not help when the whole machine stops responding; that needs a
+reboot of the VM.
+
+On 2026-11-21 a Standard server on Leaseweb (0.75.0) ran out of memory: agent dev servers, browser
+tabs and Docker used 11 GB and 6 GB of swap. The Team WebRTC bridge did not answer its checks, and
+main crashed it. The main thread then stopped in a blocking read of a Unix socket
+(`unix_seqpacket_recvmsg`, probably the reply of the zygote) and never returned. Main wrote no log
+line and used no CPU, and the host stayed off Signal for 24 hours until a restart. The Chromium call
+that blocked is not confirmed: the processes were gone after the restart.
+`scripts/hosted-watchdog-e2e.ts` (`bun run test:hosted-watchdog`) runs the watchdog with a 1 s
+interval against fake apps that write, stop writing or never write the file, that did not finish
+their start, that quit, or that are not `openbot`.
+
 ## Memory
 
 One systemd unit holds OpenBot, its browser tabs and every agent process: one `claude` process for
@@ -978,12 +1016,14 @@ env="bunx @dotenvx/dotenvx@2.38.2 run --quiet -f apps/auth-api/.env.production -
 $env bun scripts/hosting/leaseweb-pool.ts free
 # 2. See the plan, then do it.
 $env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
-  --name="<server name>"
+  --name="<server name>" --plan="<plan name>" --price=499 --vcpu=16 --memory=64 --storage=500 --support
 $env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
-  --name="<server name>" --apply
+  --name="<server name>" --plan="<plan name>" --price=499 --vcpu=16 --memory=64 --storage=500 --support --apply
 ```
 
-When it ends, the owner sees the server in the app, and can invite the other members.
+When it ends, the owner sees the server in the app, and can invite the other members. With
+`--plan`, the owner sees the paywall of that plan first. To set, change or remove the plan of a
+server that runs already, see [The plan of a custom server](#the-plan-of-a-custom-server).
 
 - With no `--apply`, it only shows what it would do. It refuses a VPS with a reference, and a VPS of
   the hosted pool.
@@ -1132,6 +1172,59 @@ account: the key of the German account does not list a server in Amsterdam. The 
 account, which has the test VPS in Frankfurt, is `LEASEWEB_API_KEY_DE` in the same file. The keys of
 the accounts that have the Signal machines are `LEASEWEB_API_KEY_US`, `LEASEWEB_API_KEY_AU` and
 `LEASEWEB_API_KEY_SG`.
+
+### The plan of a custom server
+
+A custom server can have one plan. When the owner opens the server, the app shows a paywall with that
+plan, and the owner pays it in Stripe Checkout. Until the payment, the other members see a screen
+that asks them to wait for the owner. A server with no plan has no paywall.
+
+When the billing country is in the EU, the UK or Turkey and the account has no VAT ID, the paywall
+asks the owner to accept that the service starts during the 14-day withdrawal period, as the hosted
+plans page does. Subscribe stays off until the owner selects the checkbox. The Worker writes the time
+of the request to `openbot_early_start_at` on the Checkout Session and the subscription.
+
+`custom --plan=...` sets the plan at the setup. `custom-plan` shows, sets, changes or removes the
+plan of a server that runs already. It takes the OpenBot server ID, which is the last line of the
+`custom` command and the `host_id` in D1, not the VPS ID:
+
+```sh
+# Show the plan and the subscription status.
+$env bun scripts/hosting/leaseweb-pool.ts custom-plan <server ID>
+# See the change, then do it.
+$env bun scripts/hosting/leaseweb-pool.ts custom-plan <server ID> --plan="<plan name>" --price=499 \
+  --vcpu=16 --memory=64 --storage=500 --support
+$env bun scripts/hosting/leaseweb-pool.ts custom-plan <server ID> --plan="<plan name>" --price=499 \
+  --vcpu=16 --memory=64 --storage=500 --support --apply
+# Remove the paywall.
+$env bun scripts/hosting/leaseweb-pool.ts custom-plan <server ID> --remove --apply
+```
+
+| Flag | Value |
+| --- | --- |
+| `--plan` | The plan name that the owner sees, 1 to 60 characters. Stripe shows it as `OpenBot <plan name>`. |
+| `--price` | The price of one period, before tax, for example `499` or `499.50`. |
+| `--currency` | `eur` (default), `usd`, `pln` or `brl`. |
+| `--interval` | `month` (default) or `year`. |
+| `--vcpu`, `--memory`, `--storage` | The spec that the paywall shows: vCPU, memory in GB, storage in GB. |
+| `--support` | The paywall shows personalized support. |
+| `--remove` | `custom-plan` only: remove the plan and the paywall. |
+| `--env=test` | Use the test D1 (`openbot-auth-test`). |
+| `--env=local` | `custom-plan` only: use the local D1 of `bun run dev:api` in this worktree. No Cloudflare token is necessary. |
+
+- The plan is a row of the D1 table `custom_server_offers`. `custom` writes it after the D1 owner
+  check.
+- `custom-plan` refuses a hosted server: its plan is a hosted plan.
+- A plan changes, or goes, only while the server has no paid subscription and no open checkout. A
+  checkout stays open for 35 minutes, and a change in that time could lose the payment. When the
+  server pays already, change that subscription in Stripe.
+- Checkout uses a Stripe price made for the session (`price_data`), with the metadata
+  `openbot_kind=custom_server` and the server ID. The webhook stores the subscription and its status.
+  The status `active`, `trialing` or `past_due` removes the paywall; any other status shows it again.
+- Each change, from Stripe or from `custom` and `custom-plan`, sends `account-servers-changed` to the
+  active members, and the apps read the server list again. The Worker sends the events of the
+  operator commands at its next cron run, within one minute.
+- The paywall is in the apps only. The server itself does not stop when the plan is not paid.
 
 ### A new server on a pool machine
 
@@ -1917,7 +2010,8 @@ date of the cancel message. One sync sends one message: a cancel that Stripe sto
 change of plan or users sends no cancel message. A change of plan or users sends no purchase message.
 A server order with a license sends two messages, one for each subscription. A subscription that ends
 after its owner cancelled the renewal sends the cancel message and, later, the end message. A deleted
-server and a dispute end the plan at once. The reason is `not paid` when the last
+server and a dispute end the plan at once; a dispute in the first 30 days of the subscription also
+deletes the server. The reason is `not paid` when the last
 payment of the plan had failed, and `cancelled` in each other case. The boat message goes out only
 after the Worker stores the boat start, so a lost race, a retry of a boat attempt, or a pool change
 whose answer was lost sends nothing. A failed send logs one line and is not sent again. Without the

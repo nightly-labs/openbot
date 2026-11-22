@@ -12,6 +12,10 @@ export const messages = {
   "error.voice.prepareRequired":
     "Локальная расшифровка голоса недоступна. Выполните `bun run voice:prepare` и перезапустите OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot не смог расшифровать эту запись.",
+  "error.voice.videoModelMissing":
+    "В разделе «Настройки» → «Голос» не настроена модель распознавания речи для записей.",
+  "error.voice.videoModelMissingServer":
+    "На этом сервере не настроена модель распознавания речи. Владелец или администратор может настроить модель в настройках сервера, в разделе «Распознавание речи».",
   "error.voice.cloud.keyRequired": "Добавьте API-ключ {provider} в разделе «Настройки» → «Голос».",
   "error.voice.cloud.keyRejected": "{provider} не принял API-ключ. Проверьте ключ в разделе «Настройки» → «Голос».",
   "error.voice.cloud.quotaExceeded": "Квота {provider} исчерпана.",
@@ -24,6 +28,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Скачайте модель синтеза речи в разделе «Настройки» → «Голос».",
   "error.voice.speech.timedOut": "Время чтения ответа вслух истекло.",
   "error.voice.speech.failed": "OpenBot не смог прочитать ответ вслух.",
+  "error.voice.speech.providerRefused": "{provider} отказался создать аудио: {reason}",
   "error.voice.recordingNotKept": "OpenBot не смог сохранить голосовую запись.",
   "error.voice.live.timedOut": "Живой голос Codex не запустился вовремя. Попробуйте ещё раз.",
   "error.voice.live.failed": "Живой голос остановлен: {reason}",

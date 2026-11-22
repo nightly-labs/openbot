@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, aynı anda çalışan görevler, canlı ses hesabı, OpenBot bellek anahtarı, iş akışı klasörleri, türü tanımlı iş akışı yanıtları ve bir sağlayıcının 10'dan fazla hesabı yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bir ajan, birbirinden bağımsız işleri aynı anda çalışan görevlere ayırabilir. Her sonuç ana sohbete geri döner ve ajan sonuçları sizin için birleştirir.",
+          "Yan panelin yeni Mesaj dizileri sekmesinde bir ajanın açık tüm mesaj dizilerini görün. Sekme, sizi bekleyen mesaj dizilerinin sayısını gösterir.",
+          "Kısayollarınızı Ayarlar'ın yeni Klavye sekmesinde değiştirin. Yeni kısayollar yeni bir mesaj dizisi başlatır ve sonraki ile önceki mesaj dizisine geçer.",
+          "İş akışları sekmelerde açılır ve iş akışı adımları türü tanımlı yanıt verebilir. Bir yanıtı sonraki bir adımda kullanmak için {{name}} yazın.",
+          "Ayarlar > Görünüm bölümünden pencere arka planı olarak MP4 veya WebM videosu yükleyin.",
+          "Ayarlar > Ses bölümünden GPT canlı sesinin kullandığı ChatGPT hesabını seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bir sağlayıcı 20 hesaba kadar tutar. Önceden sınır 10'du.",
+          "Dikte en fazla 10 dakika kaydeder. Önceden 2 dakikada duruyordu.",
+          "Yukarı kaydırdığınızda bir mesaj dizisi eski mesajları yükler. Bir düğmeye tıklamanız gerekmez."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Zamanlanmış bir rutin, bir çalıştırmanın bildirecek bir şeyi olmadığında artık sessizce kendini kapatmaz.",
+          "Uzun bir sohbet, bir yanıt akarken tüm mesajlarını doğru sırada tutar.",
+          "Bağlı bir WhatsApp numarası hâlâ \"Bağlandı\" yazarken mesaj almayı artık durdurmaz.",
+          "Windows'ta OpenCode ajanları komutları yeniden çalıştırır. Önceden sık sık \"opencode-pty request timed out\" hatasıyla başarısız oluyordu.",
+          "Sessize aldığınız bir ajan, bir kanalda yanıt verdiğinde artık size bildirim göndermez."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

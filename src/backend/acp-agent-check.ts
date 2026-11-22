@@ -7,7 +7,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { CUSTOM_AGENT_LIMITS, type CustomAgentCheckResult } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { OPENBOT_ACP_CLIENT_CAPABILITIES, OPENBOT_ACP_CLIENT_INFO } from "./acp-client";
 import { type AcpModel, modelsFromSessionSetup } from "./acp-configuration";
@@ -20,6 +20,8 @@ import {
 } from "./provider-client-effects";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 import { TimeoutError } from "./with-timeout";
+
+const logger = createOpenBotLogger("acp-agent-check");
 
 const AGENT_CHECK_TIMEOUT_MS = 20_000;
 const MODEL_LIST_TIMEOUT_MS = 10_000;
@@ -117,7 +119,12 @@ export const checkAcpAgent = Effect.fn("AcpAgent.check")((target: AgentCheckTarg
           Effect.ensuring(Effect.suspend(() => (child ? stopGroup(child) : Effect.void)).pipe(Effect.orDie)),
         );
       }),
-    (folder) => providerCall(() => rm(folder, { recursive: true, force: true })).pipe(Effect.orDie),
+    (folder) =>
+      providerCall(() => rm(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => logger.warn("An agent check folder was not removed.", toLogValue(error.cause))),
+        ),
+      ),
   ),
 );
 
@@ -194,22 +201,31 @@ function processStreams(
       child.stdin.end();
     },
   });
+  let open = true;
+  let enqueue: (chunk: Buffer) => void = () => undefined;
+  let close: () => void = () => undefined;
   const input = new ReadableStream<Uint8Array>({
     start: (controller) => {
-      let open = true;
-      child.stdout.on("data", (chunk: Buffer) => {
+      enqueue = (chunk) => {
         if (open) controller.enqueue(new Uint8Array(chunk));
-      });
-      child.stdout.once("end", () => {
+      };
+      close = () => {
         if (!open) return;
         open = false;
         controller.close();
-      });
+      };
+      child.stdout.on("data", enqueue);
+      child.stdout.once("end", close);
       child.stdout.once("error", (error) => {
         if (!open) return;
         open = false;
         controller.error(error);
       });
+    },
+    cancel: () => {
+      open = false;
+      child.stdout.off("data", enqueue);
+      child.stdout.off("end", close);
     },
   });
   child.stdin.on("error", () => undefined);

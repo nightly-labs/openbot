@@ -7,9 +7,11 @@ import {
   ServerPanelLoadNotice,
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { createServerPaywall } from "@openbot/ui/features/servers/ServerPaywall";
 import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { appPort } from "./app-port";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
 import { AgentDockHost, useAgentDockPlacement } from "./features/agent-dock/AgentDockHost";
 import { useAgents } from "./features/agents/agents-context";
@@ -34,6 +36,7 @@ import { createServerConnectionToast } from "./features/servers/server-connectio
 import { useServerScope } from "./features/servers/server-scope";
 import { followsServerUpdate, ServerUpdateDialogHost } from "./features/servers/server-update-flow";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
@@ -45,6 +48,7 @@ import { WindowBackdrop } from "./features/window/WindowBackdrop";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
 import { useWindowPage } from "./features/window/window-page-context";
+import { useWorkspaceShortcuts } from "./features/window/workspace-shortcuts";
 import { useLayout } from "./layout";
 import { usePlatform } from "./platform";
 import { startupLoadingScene } from "./startup-animation-preference";
@@ -58,7 +62,7 @@ export function WorkspaceShell(props: {
 }) {
   const platform = usePlatform();
   const chatWindow = platform.chatWindow !== null;
-  const { sourceText, t } = useText();
+  const { sourceText, t, errorMessage } = useText();
   const scope = useServerScope();
   const settings = useSettings();
   const channels = useChannels();
@@ -82,7 +86,8 @@ export function WorkspaceShell(props: {
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const agentDockPlacement = useAgentDockPlacement();
   const windowAgentDock = () => agentDockPlacement() === "window" && activeServer() !== undefined;
-  const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled } = useAgents();
+  const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled, openAgentSetup } =
+    useAgents();
   const { conversations, retryConversation } = useConversation();
   const activeConversation = () => conversations[activeAgent()?.id ?? ""];
   const { activeDirectMember } = useDirectMessages();
@@ -140,7 +145,16 @@ export function WorkspaceShell(props: {
       if (unsupported) usage.closeUsage();
     },
   );
+  const paywall = createServerPaywall({
+    server: activeServer,
+    subscribe: (request) => serversPort().hostedServers.openCustomCheckout(request),
+    billingDetails: appPort().billing,
+    errorMessage: (error) => errorMessage(error, t("server.paywall.checkoutFailed")),
+  });
+  const fullScreenServer = () => planScreenShown() || paywall.server() !== null;
   const blockedRemoteServer = createMemo(() => {
+    const paywallServer = paywall.server();
+    if (paywallServer) return paywallServer;
     const server = activeServer();
     if (server?.kind !== "remote" || server.hostedSleep) return null;
     return server.state === "incompatible" ||
@@ -164,12 +178,16 @@ export function WorkspaceShell(props: {
     "workspace-ready": () => remote() && scope.loaded(),
     "conversation-ready": () => remote() && activeConversation()?.loaded === true,
   });
-  const offlineUpsell = createHostedUpsellOffline(
-    () => remote() && activeServer()?.issue?.reference === "signal/host_unavailable",
-  );
+  const hostUnavailable = () => remote() && activeServer()?.issue?.reference === "signal/host_unavailable";
+  const offlineUpsell = createHostedUpsellOffline(hostUnavailable);
   const connectionFailure = () => {
     if (activeServer()?.hostRestart?.state === "restarting") return null;
     const issue = activeServer()?.issue;
+    if (issue && hostUnavailable() && activeServer()?.hosted !== true)
+      return {
+        message: t("server.connection.computerOffline", { name: activeServer()?.name ?? "" }),
+        reference: issue.reference ?? null,
+      };
     if (issue) return { message: sourceText(issue.message), reference: issue.reference ?? null };
     return scope.connection.failed ? scope.connection.failure : null;
   };
@@ -311,6 +329,23 @@ export function WorkspaceShell(props: {
         : [],
     );
   if (!chatWindow) {
+    useWorkspaceShortcuts({
+      newAgent: () => {
+        if (!activeServer() || platform.landingPreview) return false;
+        channels.close();
+        openAgentSetup();
+        return true;
+      },
+      toggleSidebar: () => {
+        if (layout.sidebarClosed()) layout.expandSidebar();
+        else layout.setSidebarClosed(true);
+        return true;
+      },
+      showShortcuts: () => {
+        settings.openAppSettings(undefined, "keyboard");
+        return true;
+      },
+    });
     createHostRestartToasts(() => remoteHosts().filter((host) => !followsServerUpdate(host.id)));
     createRoutineTimezonePrompt(() => desktopRoutineZoneTargets(servers()));
   }
@@ -348,6 +383,7 @@ export function WorkspaceShell(props: {
           }
           hidden={remoteDesktopWorkspaceVisible()}
           blockedServer={blockedRemoteServer()}
+          paywall={paywall}
           onRetryServer={retryBlockedServer}
           planDeletesAt={planDeletesAt}
           onRenewPlan={renewServerPlan}
@@ -355,7 +391,7 @@ export function WorkspaceShell(props: {
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
-              <Show when={!planScreenShown()}>
+              <Show when={!fullScreenServer()}>
                 <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
               </Show>
             </Show>

@@ -22,6 +22,11 @@ export const messages = {
   "channel.panel.close": "Закрыть панель канала",
   "channel.settings.title": "Настройки канала",
   "channel.settings.memories": "Память",
+  "channel.settings.folders.title": "Папки",
+  "channel.settings.folders.description":
+    "Все участники канала {channel} могут изменять файлы и выполнять команды в этих папках.",
+  "channel.settings.folders.toastAdded": "Участники канала {channel} теперь могут изменять файлы в {folder}",
+  "channel.settings.folders.toastRemoved": "Участники канала {channel} больше не могут изменять файлы в {folder}",
   "channel.settings.isolated": "Хранить память в этом канале",
   "channel.settings.isolatedDescription":
     "Агенты сохраняют то, что узнали здесь, как память канала. Их другие чаты её не видят.",

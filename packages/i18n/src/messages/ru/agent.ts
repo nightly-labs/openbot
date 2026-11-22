@@ -57,6 +57,7 @@ export const messages = {
   "agent.dock.closeOnLeave": "Закрывать при щелчке вне чата",
   "agent.dock.openInMain": "Открыть в главном окне",
   "agent.dock.openWindow": "Открыть в новом окне",
+  "agent.dock.openPage": "Открыть {title}",
   "agent.dock.remove": "Убрать из дока",
   "agent.dock.send": "Отправить",
   "agent.dock.working": "Работает…",

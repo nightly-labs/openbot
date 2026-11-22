@@ -109,7 +109,7 @@ process.stdin.on("data", (chunk) => {
       queued = [];
     } else if (message.type === "user") {
       if (question) {
-        log("message-during-question");
+        log(message.priority === "now" ? "message-during-question-stops-it" : "message-during-question");
         queued.push(message);
       } else if (JSON.stringify(message.message).includes(${JSON.stringify(MESSAGE)})) {
         log("message-after-question");
