@@ -136,6 +136,7 @@ export class ContextCompaction {
   readonly #graceMs: number;
   readonly #display = new Map<string, Omit<AgentContextState, "agentId" | "threadId">>();
   readonly #awaitingPostCompaction = new Set<string>();
+  readonly #usageWhileCompacting = new Map<string, NonNullable<AgentContextState["usage"]>>();
   readonly #estimating = new Set<string>();
   readonly #durations = new Map<string, number>();
   readonly #changed: () => void;
@@ -217,6 +218,7 @@ export class ContextCompaction {
       estimated,
       ...(categories ? { categories } : {}),
     };
+    if (display.compaction?.status === "running") this.#usageWhileCompacting.set(threadId, display.usage);
     const after = display.compaction?.status === "completed" && this.#awaitingPostCompaction.delete(threadId);
     if (after && display.compaction) display.compaction.afterTokens = usedTokens;
     this.#display.set(threadId, display);
@@ -244,6 +246,7 @@ export class ContextCompaction {
   ): void {
     const display = this.#display.get(threadId) ?? { usage: null, compaction: null };
     if (status === "running" && display.compaction?.status === "running") return;
+    if (status !== "completed") this.#usageWhileCompacting.delete(threadId);
     const previous =
       status === "running"
         ? display.compaction?.status === "running"
@@ -537,6 +540,7 @@ export class ContextCompaction {
             if (started && client.contextCompaction === "request" && budget.phase === "requested") {
               this.markCompacted(threadId);
               this.finish(agentId, threadId, "completed");
+              this.#replayUsageWhileCompacting(threadId);
             }
           }),
         ),
@@ -562,6 +566,21 @@ export class ContextCompaction {
         ),
       );
   });
+
+  #replayUsageWhileCompacting(threadId: string): void {
+    const usage = this.#usageWhileCompacting.get(threadId);
+    this.#usageWhileCompacting.delete(threadId);
+    if (!usage) return;
+    this.observeUsage(
+      threadId,
+      usage.usedTokens,
+      usage.windowTokens,
+      usage.nativeManaged,
+      usage.autoCompactAt,
+      usage.estimated,
+      usage.categories,
+    );
+  }
 
   claimTurn(agentId: string, threadId: string, turnId: string): boolean {
     const budget = this.#budgets.get(threadId);
@@ -605,6 +624,7 @@ export class ContextCompaction {
     const displayed = this.#display.delete(threadId);
     this.#durations.delete(threadId);
     this.#awaitingPostCompaction.delete(threadId);
+    this.#usageWhileCompacting.delete(threadId);
     this.#estimating.delete(threadId);
     this.#cacheExpiry.cancel(threadId);
     if (displayed) this.#emitChanged();
@@ -661,6 +681,7 @@ export class ContextCompaction {
     this.#display.clear();
     this.#durations.clear();
     this.#awaitingPostCompaction.clear();
+    this.#usageWhileCompacting.clear();
     this.#estimating.clear();
   }
 

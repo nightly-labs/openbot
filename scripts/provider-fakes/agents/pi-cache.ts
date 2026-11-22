@@ -3,6 +3,11 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { isDynamicRecord, type DynamicRecord as RpcRecord } from "@openbot/contracts/runtime-values";
 
+if (process.argv.includes("--version")) {
+  process.stdout.write("1.6.0\n");
+  process.exit(0);
+}
+
 const LARGE_TOKENS = 611_000;
 const COMPACTED_TOKENS = 19_400;
 const CONTEXT_WINDOW = 1_000_000;
@@ -68,6 +73,12 @@ const handlers: Record<string, (command: RpcRecord) => void> = {
     answer(command, { summary: "Summary.", firstKeptEntryId: "entry-1", tokensBefore });
   },
   abort: (command) => answer(command),
+  clear_queue: (command) => answer(command, { steering: [], followUp: [] }),
+  get_messages: (command) => answer(command, { messages: [] }),
+  get_available_models: (command) =>
+    answer(command, { models: [{ provider: "openrouter", id: "fake/cache", name: "Fake cache", reasoning: false }] }),
+  set_model: (command) => answer(command, { provider: "openrouter", id: "fake/cache" }),
+  set_thinking_level: (command) => answer(command),
 };
 
 let exited = false;
