@@ -273,6 +273,8 @@ export interface NameFieldProps {
   readonly?: boolean;
 }
 
+const CARET_KEYS: ReadonlySet<string> = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"]);
+
 export function NameField(props: NameFieldProps) {
   const board = useBoard();
   const { t } = useText();
@@ -522,7 +524,8 @@ export function NameField(props: NameFieldProps) {
         }}
         onKeyDown={onKeyDown}
         onKeyUp={(event: KeyboardEvent) => {
-          if (event.key.startsWith("Arrow") && !open()) look();
+          if (open() && (event.key === "ArrowUp" || event.key === "ArrowDown")) return;
+          if (CARET_KEYS.has(event.key)) look();
         }}
         onPointerUp={() => look()}
         onBlur={() => setQuery(null)}

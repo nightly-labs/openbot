@@ -1355,6 +1355,22 @@ try {
         .workflowStore.detail(target.id)
         ?.graph.nodes.find((node) => node.id === "model");
       assert.deepEqual([stored?.fields.effort, stored?.at.x], ["ludicrous", 420]);
+      const copy = await ok(WORKFLOWS_ROUTES.create, ownerToken, {
+        title: "Format duplicate",
+        graph: withEffort("ludicrous", 452),
+      });
+      const copyId = text(record(copy.summary, "summary").id, "workflow id");
+      const copied = current()
+        .workflowStore.detail(copyId)
+        ?.graph.nodes.find((node) => node.id === "model");
+      assert.equal(copied?.fields.effort, "ludicrous", "A duplicate of a saved unknown value was not kept.");
+      await refused(
+        WORKFLOWS_ROUTES.create,
+        ownerToken,
+        { title: "Format changed copy", graph: withEffort("plaid") },
+        400,
+        "error.workflow.unknownValue",
+      );
       const newer = answer(WORKFLOWS_ROUTES.get, { ...read, format: WORKFLOW_FORMAT + 1 }, decodeRemoteWorkflowDetail);
       assert.equal(newer.needsNewerApp, true, "A graph of a newer format was not read-only.");
       const same = answer(WORKFLOWS_ROUTES.get, read, decodeRemoteWorkflowDetail);
@@ -1364,7 +1380,7 @@ try {
         graph: { ...graph, nodes: [{ ...promptNode, group: "a" }, model] },
       });
       assert.equal(unknownKey.needsNewerApp, true, "A node with an unknown property was not read-only.");
-      return { format: read.format, hostFormat: read.hostFormat, refused: 2, kept: "ludicrous" };
+      return { format: read.format, hostFormat: read.hostFormat, refused: 3, kept: "ludicrous", duplicated: true };
     },
   );
 

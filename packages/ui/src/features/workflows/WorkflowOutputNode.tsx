@@ -113,7 +113,7 @@ export function OutputNode(props: {
   const [message, setMessage] = useTextField(() => props.id, "message", "");
   const sendsText = () =>
     target() !== "file" && (!HOST_TARGETS.includes(target()) || textAction(board.field(props.id, "action")));
-  const messageShown = () => sendsText() && (message() !== "" || (board.features()?.format ?? 1) >= MESSAGE_FORMAT);
+  const messageShown = () => message() !== "" || (sendsText() && (board.features()?.format ?? 1) >= MESSAGE_FORMAT);
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
   const githubReady = useGitHubOutputReady(() => props.id);

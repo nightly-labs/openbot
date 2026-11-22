@@ -2,8 +2,11 @@ import { isCreditAmount } from "./credits";
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { isRoutineSchedule, type RoutineSchedule } from "./ipc-routines";
-import { isWorkflowFormat } from "./ipc-workflow-format";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+
+export function isWorkflowFormat(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
+}
 
 export const WORKFLOW_NODE_KINDS = [
   "text",

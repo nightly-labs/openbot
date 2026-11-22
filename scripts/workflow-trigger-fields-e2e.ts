@@ -167,7 +167,16 @@ try {
     notify("tell", { title: "{{title}}" }),
   ]);
   const plainGitHub = chain(githubTrigger, [notify("tell", {})]);
+  const titled = chain(githubTrigger, [notify("tell", { title: "{{title}}" })]);
   report.formats = {
+    note: workflowGraphFormat({
+      ...plainGitHub,
+      nodes: [...plainGitHub.nodes, node("note", "text", 600, { text: "{{title}}" })],
+    }),
+    otherBranch: workflowGraphFormat({
+      ...titled,
+      nodes: [...titled.nodes, node("other", "llm", 600, { prompt: "Sort it.", answer: "title: text" })],
+    }),
     branches: workflowGraphFormat(githubBranches),
     checkOnly: workflowGraphFormat(chain(githubTrigger, [node("check", "condition", 300, { check: "actor = ana" })])),
     declared: workflowGraphFormat(declared),
@@ -179,7 +188,9 @@ try {
       report.formats.branches === WORKFLOW_TRIGGER_FIELDS_FORMAT &&
       report.formats.checkOnly === WORKFLOW_TRIGGER_FIELDS_FORMAT &&
       report.formats.declared === 2 &&
-      report.formats.plain === 1,
+      report.formats.plain === 1 &&
+      report.formats.note === 1 &&
+      report.formats.otherBranch === WORKFLOW_TRIGGER_FIELDS_FORMAT,
     report.formats,
   );
 

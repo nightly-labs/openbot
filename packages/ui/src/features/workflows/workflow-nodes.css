@@ -4169,7 +4169,7 @@ svg.wfn-shape-surface {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-media-control-scrim);
   color: var(--openbot-media-control-text);
-  font-size: var(--openbot-text-sm);
+  font-size: var(--openbot-text-xs);
   font-weight: var(--openbot-weight-medium);
   line-height: 1.6;
 }
