@@ -178,6 +178,7 @@ interface Call {
   approvals: string[];
   signInCards: string[];
   added: string[];
+  removed: string[];
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-agent-mcp-tools-"));
@@ -226,6 +227,7 @@ try {
     const approvals: string[] = [];
     const signInCards: string[] = [];
     const added: string[] = [];
+    const removed: string[] = [];
     const response = await runCauseEffect(
       handleMcpServerTool(using, {
         tool,
@@ -245,6 +247,10 @@ try {
           Effect.sync(() => {
             added.push(config.id);
           }),
+        removed: (mcpServerId) =>
+          Effect.sync(() => {
+            removed.push(mcpServerId);
+          }),
       }),
     );
     const text = response.contentItems[0]?.type === "inputText" ? response.contentItems[0].text : "{}";
@@ -258,6 +264,7 @@ try {
       approvals,
       signInCards,
       added,
+      removed,
     };
     calls.push(entry);
     return entry;
@@ -282,6 +289,7 @@ try {
       approvals: [],
       signInCards,
       added: [],
+      removed: [],
     };
     calls.push(entry);
     return entry;
@@ -497,9 +505,11 @@ try {
   const unknown = await call("an unknown name", "test_mcp_server", { name: "nothing" });
   assert.equal(unknown.success, false);
 
+  const calendarId = row("calendar")?.id;
   const removed = await call("remove a server", "remove_mcp_server", { name: "calendar" });
   assert.equal(removed.success, true);
   assert.equal(row("calendar"), undefined);
+  assert.deepEqual(removed.removed, [calendarId], "a removed server drops who added it");
 
   const githubGateway = new McpGateway({
     servers: store,

@@ -309,7 +309,9 @@ export class McpGateway {
     const renewed = yield* stored.refreshAccessToken(config.url, rejected).pipe(toMcpGatewayFailed);
     if (renewed === null) return outcome;
     const retried = yield* probe;
-    if (retried.needs === "sign_in") yield* stored.endRefusedSignIn(config.url, renewed).pipe(toMcpGatewayFailed);
+    if (retried.needs !== "sign_in") return retried;
+    if (yield* stored.endRefusedSignIn(config.url, renewed).pipe(toMcpGatewayFailed))
+      yield* this.#hooks.refreshAllAgentRuntimes();
     return retried;
   });
 
