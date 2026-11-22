@@ -580,6 +580,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: ${{ matrix.platform == 'win32' && 'bun run package:win:verify' || matrix.platform == 'linux' && matrix.architecture == 'arm64' && 'bun run package:linux:arm64' || matrix.platform == 'linux' && 'bun run package:linux' || 'bun run package:verify' }}
 
+      - name: Verify the Linux ARM64 package
+        if: matrix.target == 'linux-arm64'
+        run: bun run verify:package:linux
+
   pin:
     name: Open runtime lock PR
     needs: [prepare, publish, verify-published]

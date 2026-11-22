@@ -160,7 +160,8 @@ linux:
     - from: build/remote-desktop-runtime
       to: remote-desktop-runtime
       filter:
-        - "*"
+        - "source-manifest.json"
+        - "DISTRIBUTION-SHA256SUMS.txt"
         - "licenses/**"
         - "sources/**"
     - from: build/remote-desktop-runtime/linux/${arch}
