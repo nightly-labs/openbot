@@ -637,12 +637,14 @@ type HostRequestActions = Pick<
   | "downloadMessageFile"
 >;
 
-function decodeHostFile(value: unknown): RemoteFileUpload {
+function decodeHostFile(value: unknown, savedFile?: string): RemoteFileUpload {
   if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
     throw new Error("The host returned an invalid file.");
   const file = value.file;
   const saved =
-    isDynamicRecord(file) && isString(file.ref) && isNumber(file.size) ? { ref: file.ref, size: file.size } : null;
+    savedFile !== undefined && isDynamicRecord(file) && file.ref === savedFile && isNumber(file.size)
+      ? { ref: savedFile, size: file.size }
+      : null;
   return { name: value.name, mimeType: value.mimeType, base64: value.base64, ...(saved ? { file: saved } : {}) };
 }
 
@@ -1705,7 +1707,7 @@ export function createHostRequestActions({
         request(
           "GET",
           TEAM_API_ROUTES.attachment(attachmentId),
-          decodeHostFile,
+          (value) => decodeHostFile(value, largeDownload?.file),
           undefined,
           serverId,
           undefined,

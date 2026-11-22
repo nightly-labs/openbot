@@ -213,9 +213,11 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
       const open = [...allowances].filter(
         (entry) => !entry.taken && (entry.mimeType === undefined || entry.mimeType === frame.mimeType),
       );
+      const targeted = open.filter((entry) => entry.target && frame.size === entry.maxBytes);
+      const onlyTarget = targeted.length === 1 ? targeted[0] : undefined;
       const allowance =
         frame.size > MOBILE_ATTACHMENT_BYTES
-          ? (open.find((entry) => entry.target && frame.size === entry.maxBytes) ??
+          ? (onlyTarget ??
             open.find((entry) => !entry.target && frame.size <= entry.maxBytes) ??
             open.find((entry) => frame.size <= entry.maxBytes))
           : undefined;
@@ -254,7 +256,7 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
         base64: [],
         buffered: 0,
         carry: new Uint8Array(0),
-        target: allowance?.maxBytes === frame.size ? allowance.target : undefined,
+        target: allowance !== undefined && allowance === onlyTarget ? allowance.target : undefined,
         saved: false,
         digest: frame.sha256,
         complete: false,

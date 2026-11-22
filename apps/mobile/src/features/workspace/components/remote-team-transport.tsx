@@ -129,7 +129,9 @@ async function keepDownloadedFile(uri: string, size: number) {
   const file = new File(uri);
   if (file.exists && file.size === size) return removePartialFile(uri);
   try {
-    await partialFile(uri).move(file, { overwrite: true });
+    const part = partialFile(uri);
+    if (part.size !== size) throw new Error(sourceText("error.remote.downloadIncompleteRetry"));
+    await part.move(file, { overwrite: true });
   } catch (error) {
     removePartialFile(uri);
     throw error;
