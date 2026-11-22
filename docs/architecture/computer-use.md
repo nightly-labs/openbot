@@ -149,7 +149,7 @@ call, and `end_session` counts as a call, so the display stayed on for up to 10 
 agent stopped, against the user's display sleep setting. The tap reports each provider tool call.
 `ComputerUseDisplayAwake` (`computer-use-display-awake.ts`) then holds Electron's
 `prevent-display-sleep` blocker, the same assertion, from each call. A `turn-completed` event
-releases it when no turn runs, and it is always released 600 s after the last call, as the driver's
+without `continues` releases it when no turn runs, so the hold stays between the turns of one task, and it is always released 600 s after the last call, as the driver's
 guard was. A call outside a turn, such as background provider work, thus keeps the driver's hold
 time, and the display never stays on longer than before. The guard exists because display sleep locks the
 session, and a locked session gives Computer Use no windows and no input. OpenBot's own

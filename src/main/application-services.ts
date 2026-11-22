@@ -2527,7 +2527,7 @@ export async function createApplicationServices({
   );
   service.on("event", (event) => {
     if (event.type === "turn-started") startComputerUseHighlight();
-    if (event.type === "turn-completed") computerUseDisplayAwake.turnEnded();
+    if (event.type === "turn-completed" && !event.continues) computerUseDisplayAwake.turnEnded();
   });
   if (!setupState.completed || service.enabledMcpServers().length > 0)
     Effect.runFork(providerRuntimes.ensureToolRuntimes());
