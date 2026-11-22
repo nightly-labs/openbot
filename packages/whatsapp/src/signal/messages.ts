@@ -1,8 +1,3 @@
-// Wire formats of the Signal messages that WhatsApp uses: SignalMessage (`msg`),
-// PreKeySignalMessage (`pkmsg`), SenderKeyMessage (`skmsg`) and SenderKeyDistributionMessage.
-// Every serialized message starts with the version byte 0x33. Public keys on the wire have 33 bytes
-// with the type byte 0x05. A missing integer field has the protobuf default 0.
-
 import { DJB_KEY_TYPE } from "./curve";
 import { ProtoFields, ProtoWriter } from "./protobuf";
 
@@ -18,17 +13,14 @@ export interface SignalMessage {
 }
 
 export interface ParsedSignalMessage extends SignalMessage {
-  /** Version byte and protobuf bytes as received: the MAC covers these bytes. */
   body: Uint8Array;
   mac: Uint8Array;
 }
 
 export interface PreKeySignalMessage {
-  /** One-time prekey ID, or undefined when the sender used no one-time prekey. */
   preKeyId: number | undefined;
   baseKey: Uint8Array;
   identityKey: Uint8Array;
-  /** The complete serialized SignalMessage, with its version byte and MAC. */
   message: Uint8Array;
   registrationId: number;
   signedPreKeyId: number;
@@ -41,7 +33,6 @@ export interface SenderKeyMessage {
 }
 
 export interface ParsedSenderKeyMessage extends SenderKeyMessage {
-  /** Version byte and protobuf bytes as received: the signature covers these bytes. */
   signed: Uint8Array;
   signature: Uint8Array;
 }
@@ -50,11 +41,9 @@ export interface SenderKeyDistributionMessage {
   keyId: number;
   iteration: number;
   chainKey: Uint8Array;
-  /** 33-byte signing public key. */
   signingKey: Uint8Array;
 }
 
-/** Returns the version byte and the protobuf of a SignalMessage, without the MAC. */
 export function encodeSignalMessageBody(message: SignalMessage): Uint8Array {
   return withVersion(
     new ProtoWriter()
@@ -98,7 +87,6 @@ export function decodePreKeySignalMessage(serialized: Uint8Array): PreKeySignalM
   const fields = new ProtoFields(serialized.subarray(1));
   const preKeyId = fields.uint32(1);
   return {
-    // Prekey ID 0 means "no one-time prekey".
     preKeyId: preKeyId ? preKeyId : undefined,
     baseKey: requireWireKey(fields.requireBytes(2, "baseKey"), "baseKey"),
     identityKey: requireWireKey(fields.requireBytes(3, "identityKey"), "identityKey"),
@@ -108,7 +96,6 @@ export function decodePreKeySignalMessage(serialized: Uint8Array): PreKeySignalM
   };
 }
 
-/** Returns the version byte and the protobuf of a SenderKeyMessage, without the signature. */
 export function encodeSenderKeyMessageBody(message: SenderKeyMessage): Uint8Array {
   return withVersion(
     new ProtoWriter().uint32(1, message.keyId).uint32(2, message.iteration).bytes(3, message.ciphertext).finish(),
@@ -153,7 +140,6 @@ export function decodeSenderKeyDistributionMessage(serialized: Uint8Array): Send
   };
 }
 
-/** Accepts a message only when both nibbles of the version byte are 3. */
 function checkVersion(serialized: Uint8Array): void {
   const version = serialized[0];
   if (version !== VERSION_BYTE) {

@@ -1,13 +1,9 @@
 import type { ChatVisualKey } from "@openbot/contracts/chat-visual";
-import { isGlobalSearchShortcut } from "../../global-search-shortcut";
+import { SHORTCUT_COMMANDS } from "@openbot/ui/features/settings/keyboard-shortcuts";
+import { matchesShortcut } from "../../keyboard-shortcut-preference";
 import { isOpenSettingsShortcut } from "../settings/settings-shortcut";
 
-/**
- * The app shortcuts that a visual reply's page gives to the app while the page has the focus:
- * search, Settings, and a server by its number. The app's own handlers then check the key again.
- * Any other chord stays in the page.
- */
 export function isChatVisualAppShortcut(key: ChatVisualKey): boolean {
-  if (isGlobalSearchShortcut(key) || isOpenSettingsShortcut(key)) return true;
+  if (isOpenSettingsShortcut(key) || SHORTCUT_COMMANDS.some((command) => matchesShortcut(key, command))) return true;
   return (key.metaKey || key.ctrlKey) && !key.altKey && !key.shiftKey && /^[1-9]$/u.test(key.key);
 }

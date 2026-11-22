@@ -27,12 +27,7 @@ export interface ImageGenerationProps {
   aspectRatio: ImageGenerationAspectRatio;
   attachment?: AttachmentSummary | undefined;
   error?: string | undefined;
-  /**
-   * The image file is on its way, such as a file that the web client reads from the host. The stage
-   * shows its dots at the size of the image, so the chat does not grow when the image shows.
-   */
   loading?: boolean | undefined;
-  /** `origin` is the clicked image, for a viewer that zooms out of it. */
   onPreview?: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
 }
@@ -40,9 +35,6 @@ export interface ImageGenerationProps {
 export function ImageGeneration(props: ImageGenerationProps) {
   const { t, errorMessage } = useText();
   const [previewError, setPreviewError] = createSignal(false);
-  // The ratio stays when the URL changes: a sent image gets the URL of its stored copy, and the
-  // image keeps its size and pixels until that copy loads. An image that loaded before in this window
-  // has its shape before it loads again.
   const [imageSize, setImageSize] = createSignal(untrack(() => rememberedMediaSize(props.attachment?.id)));
   const imageUrl = createSteadyImageUrl(() => props.attachment?.previewUrl);
   let image: HTMLImageElement | undefined;
@@ -54,13 +46,10 @@ export function ImageGeneration(props: ImageGenerationProps) {
     const id = props.attachment?.id;
     if (id) rememberMediaSize(id, size);
   };
-  // Keyed by the drawn URL: a URL that failed is not tried again while the new one loads.
   createEffect(
     () => imageUrl(),
     () => {
       setPreviewError(false);
-      // An image in the memory cache, such as one the composer showed, is complete at once. A lazy
-      // image fires `load` frames later, and the box would be square until then.
       if (image?.complete) readRatio(image);
     },
   );
@@ -95,19 +84,11 @@ export function ImageGeneration(props: ImageGenerationProps) {
     isAttachment()
       ? t("chat.image.download", { name: props.attachment?.name ?? t("chat.image.attachedFallback") })
       : t("chat.image.downloadGenerated");
-  /**
-   * The size of the loaded image. Until it loads, the size that the host read from the file, or the
-   * size that the model was asked for while it makes the image.
-   */
   const knownSize = () => imageSize() ?? imagePixelSize(props.resolution);
   const size = () => {
     const known = knownSize();
     return known ? t("chat.media.size", { width: known.width, height: known.height }) : props.resolution;
   };
-  /**
-   * The size of the frame. The host writes the size and the frame of the file together. An older row
-   * has a size that the model was asked for, which can disagree with its frame; that row keeps its frame.
-   */
   const frameSize = () => {
     const loaded = imageSize();
     if (loaded) return loaded;
@@ -117,14 +98,12 @@ export function ImageGeneration(props: ImageGenerationProps) {
   const stageRatio = () => {
     const known = frameSize();
     if (hasFailure() && !isAttachment()) return FAILED_MEDIA_RATIO;
-    // A file that is on its way has the frame of its size, so the chat does not move when it shows.
     if (props.status === "completed" && known) return `${known.width} / ${known.height}`;
     return mediaRatioValue(props.aspectRatio, "image");
   };
   const preview = (event: MouseEvent & { currentTarget: HTMLElement }) => {
     if (props.attachment) props.onPreview?.(props.attachment, event.currentTarget);
   };
-  /** An attached image shows alone. A generated image says what it is under it. */
   const showsMeta = () => props.loading !== true && (!hasImage() || !isAttachment());
 
   return (

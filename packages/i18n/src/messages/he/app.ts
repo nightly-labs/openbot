@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "לא ניתן להפעיל מחדש את {name}",
   "app.provider.included": "{name} כלול ב-OpenBot.",
   "app.clipboard.copyFailed": "לא ניתן להעתיק את הטקסט.",
-  "app.voice.tooLong": "הקלטות קוליות מוגבלות לשתי דקות.",
+  "app.voice.tooLong": "הקלטות קוליות מוגבלות ל-10 דקות.",
   "app.avatar.type": "יש לבחור תמונת PNG, JPEG, GIF או WebP.",
   "app.avatar.size": "יש לבחור תמונה קטנה מ-10 MB.",
   "app.avatar.processingUnavailable": "עיבוד תמונות אינו זמין.",

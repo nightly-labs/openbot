@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.skill", {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Skill packages cannot contain symbolic links.",
   "error.skill.expandedTooLarge": "The expanded skill must be under 10 MB.",
   "error.skill.irregularEntry": "Skill packages can contain only regular files and folders.",
@@ -60,7 +59,6 @@ export const messages = defineMessages("error.skill", {
   "error.skill.localMissingSkillFile": "The skill folder needs SKILL.md at its root.",
   "error.skill.pathSymlink": "Skill paths cannot contain symbolic links.",
   "error.skill.folderNotRead": "{provider} does not read {folder}. Copy this folder to {target}.",
-  // Skills from a public GitHub link. {repository} is "owner/name". {folder} is "owner/name/path".
   "error.skill.githubLinkInvalid": "Paste a link to a GitHub repository or folder.",
   "error.skill.githubNotFound": "OpenBot cannot open {repository}. The repository is private, or it does not exist.",
   "error.skill.githubNoSkills": "There is no SKILL.md in {folder}.",

@@ -1,5 +1,3 @@
-// The agent of `acp-mcp-server-names-e2e.ts`. It logs the MCP server names of each session request
-// and refuses a name with a character outside `[A-Za-z0-9_-]`, as Antigravity does (#2801).
 import { type AcpHandler, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 let sessions = 0;

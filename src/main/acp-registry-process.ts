@@ -5,7 +5,6 @@ import { cliSpawnTarget } from "../backend/cli";
 import { stopWindowsProcessTree } from "../backend/windows-process-tree";
 import { ProviderRuntimeFailure, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
 
-/** Owns the installer's process group until every cancellation cleanup step has finished. */
 export const runRegistryInstaller = Effect.fn("AcpRegistry.runInstaller")(function* (
   executable: string,
   args: string[],
@@ -66,9 +65,7 @@ export const runRegistryInstaller = Effect.fn("AcpRegistry.runInstaller")(functi
           Effect.sync(() => {
             try {
               if (child.pid) process.kill(-child.pid, value);
-            } catch {
-              /* The owned group has already exited. */
-            }
+            } catch {}
           });
         yield* signal("SIGTERM");
         yield* Deferred.await(closed).pipe(

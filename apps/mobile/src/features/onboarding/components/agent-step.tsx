@@ -40,47 +40,27 @@ import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
+import { rubberBand } from "@/shared/lib/worklet-math";
 
-// The characters stand on a stage: one in the middle at full size, a neighbour on each side,
-// smaller, lower and dimmer, as on a character select screen.
 const ITEM_WIDTH = 140;
 const AVATAR_SIZE = 128;
 const NEIGHBOUR_SCALE = 0.56;
 const NEIGHBOUR_DROP = 26;
 const GLOW_SIZE = 190;
 const STAGE_HEIGHT = AVATAR_SIZE + 96;
-// A character's body fills about two thirds of its frame. The empty choice matches the body.
 const CUSTOM_SIZE = 84;
-// How far a flick carries: its speed times this many seconds, in choices.
 const MOMENTUM_SECONDS = 0.18;
-// The snap after a drag keeps the finger's speed; a tap settles without overshoot.
 const SNAP_SPRING = { duration: 400, dampingRatio: 0.8 };
 const SETTLE_SPRING = { duration: 400, dampingRatio: 1 };
-// The character in the middle smiles when the stage has rested this long.
 const SETTLE_MS = 450;
-// A face takes this long to relax from its smile; the character draws live until it is done.
 const RELAX_MS = 650;
-// The description follows the name by one beat.
 const TEXT_FOLLOW_MS = 50;
-// Characters fly onto the stage: the middle one first, then each neighbour after it.
 const ARRIVE_FROM = 300;
 const ARRIVE_STAGGER_MS = 70;
-// On the way out, the neighbours step this far aside and fade.
 const STEP_ASIDE = 240;
-// The text under the stage follows the characters.
 const TEXT_DELAY_MS = 260;
-// Reduce Motion: the stage still follows the finger, then settles quickly with no spring.
 const REDUCED_SNAP = { duration: 200, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
 
-/** Resistance past the first and the last choice: the stage moves a third as far as the finger. */
-function rubberBand(value: number, max: number): number {
-  "worklet";
-  if (value < 0) return value / 3;
-  if (value > max) return max + (value - max) / 3;
-  return value;
-}
-
-/** One character on the stage. It shrinks, sinks and fades with its distance from the middle. */
 function StageItem({
   animated,
   index,
@@ -94,29 +74,22 @@ function StageItem({
   children,
 }: {
   index: number;
-  /** The choice in the middle. */
   choice: number;
-  /** The scroll position in characters: 0 at the first one, 1 at the second. */
   progress: SharedValue<number>;
   focused: boolean;
   motion: OnboardingMotion;
-  /** The direction the step came from: 1 going forward, -1 coming back. */
   arrivingFrom: 1 | -1;
   leaving: "forward" | "back" | null;
   onPress: () => void;
-  /** The face of this character moves, so its drawing cannot be cached. */
   animated: boolean;
   children: ReactNode;
 }) {
   const offset = index - choice;
-  // Forward, everyone comes in from the right. Coming back, the neighbours come in from their sides,
-  // and the chosen one shows in place when the hero has landed on it.
   const fromX = arrivingFrom === 1 ? ARRIVE_FROM : Math.sign(offset) * ARRIVE_FROM * 0.6;
   const arrival =
     arrivingFrom === -1 && offset === 0
       ? handOffEntering(motion, HERO_LANDS_MS)
       : arriveEntering(motion, fromX, 40 + Math.abs(offset) * ARRIVE_STAGGER_MS);
-  // Forward, the chosen one stays for the hero and the others step aside; back, all go right.
   const staying = leaving === "forward" && focused;
   const away = leaving === "back" ? 1 : offset < 0 ? -1 : 1;
   const full = motion === "full";
@@ -142,8 +115,6 @@ function StageItem({
           transitionTimingFunction: EASE_OUT_CSS,
         }}
       >
-        {/* A character with a still face is drawn once and moved as a cached image: its filter
-            and mask are not drawn again on each frame of a swipe. */}
         <Animated.View
           style={[{ width: ITEM_WIDTH, alignItems: "center" }, style]}
           renderToHardwareTextureAndroid={!animated}
@@ -158,11 +129,6 @@ function StageItem({
   );
 }
 
-/**
- * A soft light in the colour of one choice. It shows while that choice is in the middle, and fades
- * once per change of choice rather than on each frame of a swipe: a large blurred shadow is
- * expensive to compose.
- */
 function Glow({ color, visible, motion }: { color: string; visible: boolean; motion: OnboardingMotion }) {
   return (
     <Animated.View
@@ -191,7 +157,6 @@ function Dot({ index, progress }: { index: number; progress: SharedValue<number>
   return <Animated.View className="size-1.5 rounded-full bg-foreground" style={style} />;
 }
 
-/** The first agent: swipe through the starting roles, or start from scratch at the end. */
 export function AgentStep({
   motion,
   choice,
@@ -202,26 +167,19 @@ export function AgentStep({
 }: {
   motion: OnboardingMotion;
   choice: number;
-  /** The position of the picker, shared with the colour behind the whole flow. */
   progress: SharedValue<number>;
-  /** The characters are leaving: forward to the next step, or back to the welcome. */
   leaving: "forward" | "back" | null;
-  /** The direction the step came from. */
   direction: 1 | -1;
   onChoiceChange: (index: number) => void;
 }) {
   const { t } = useText();
   const insets = useSafeAreaInsets();
   const muted = String(useThemeColor("muted"));
-  // The flow pads the steps by the side insets, so the stage is that much narrower than the column.
   const stageWidth = useColumnWidth() - insets.left - insets.right;
   const side = (stageWidth - ITEM_WIDTH) / 2;
   const last = CHOICE_COUNT - 1;
   const full = motion === "full";
 
-  // The stage follows a finger anywhere on the step, not only on the characters. Past the first
-  // and the last choice it resists, and on release it springs to the nearest choice with the speed
-  // of the finger, so a flick carries on.
   const start = useSharedValue(0);
   const pan = useMemo(
     () =>
@@ -233,7 +191,7 @@ export function AgentStep({
           start.set(progress.get());
         })
         .onUpdate((event) => {
-          progress.set(rubberBand(start.get() - (event.translationX * END_X) / ITEM_WIDTH, last));
+          progress.set(rubberBand(start.get() - (event.translationX * END_X) / ITEM_WIDTH, last, 1 / 3));
         })
         .onEnd((event) => {
           const velocity = (-event.velocityX * END_X) / ITEM_WIDTH;
@@ -246,18 +204,12 @@ export function AgentStep({
         }),
     [full, last, progress, start],
   );
-  // A character that reaches the middle ticks like a picker detent: once per character, never
-  // per frame.
-  // Faces stay still while the stage moves: a change of face redraws a filter and a mask on each
-  // frame. The character in the middle smiles once the stage has come to rest.
   const [settled, setSettled] = useState(choice);
   useEffect(() => {
     if (settled === choice) return;
     const timer = setTimeout(() => setSettled(choice), SETTLE_MS);
     return () => clearTimeout(timer);
   }, [choice, settled]);
-  // The smile goes as soon as the character leaves the middle. That character keeps drawing live
-  // until its face has relaxed, so it eases back instead of jumping; then it is cached again.
   const smiling = settled === choice ? settled : null;
   const [relaxing, setRelaxing] = useState<number | null>(null);
   const lastSmile = useRef<number | null>(smiling);
@@ -280,7 +232,6 @@ export function AgentStep({
     [],
   );
   const live = (index: number) => full && (index === smiling || index === relaxing);
-  // The text slides in from the side the user swipes towards.
   const previousChoice = useRef(choice);
   const swipeDirection = useRef<1 | -1>(1);
   if (previousChoice.current !== choice) {
@@ -300,7 +251,6 @@ export function AgentStep({
       if (previous !== null && index !== previous) scheduleOnRN(snap, index);
     },
   );
-  /** Brings a choice to the middle, after a tap or an accessibility action. */
   const moveTo = useCallback(
     (index: number) => {
       progress.set(
@@ -311,7 +261,6 @@ export function AgentStep({
     },
     [full, progress],
   );
-  // The row runs toward the end of the layout: to the left in a right-to-left layout.
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -END_X * progress.get() * ITEM_WIDTH }] }));
 
   const role = choice === CUSTOM_CHOICE ? null : (ONBOARDING_ROLES[choice] ?? null);
@@ -353,11 +302,9 @@ export function AgentStep({
             {CHOICE_SWATCHES.map((color, index) => (
               <Glow key={color} color={color} visible={index === choice} motion={motion} />
             ))}
-            {/* The hero takes over from the character in the middle when the user goes on. */}
             <View className="absolute">
               <HeroSlot size={AVATAR_SIZE} />
             </View>
-            {/* The shadow of the character in the middle keeps it standing on the stage. */}
             <View
               pointerEvents="none"
               className="absolute rounded-full bg-foreground"
@@ -380,8 +327,6 @@ export function AgentStep({
                   leaving={leaving}
                   onPress={() => moveTo(index)}
                 >
-                  {/* Each frame of a moving face is drawn again, so only the character in
-                    the middle animates. The others hold their face. */}
                   <BloubAvatarPreview
                     seed={item.avatarSeed}
                     hue={item.avatarHue}
@@ -402,7 +347,6 @@ export function AgentStep({
                 leaving={leaving}
                 onPress={() => moveTo(CUSTOM_CHOICE)}
               >
-                {/* The same size as the body of a character, not its whole frame. */}
                 <View className="items-center justify-center" style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}>
                   <View
                     className="items-center justify-center rounded-full"
@@ -422,47 +366,48 @@ export function AgentStep({
           </View>
           <Animated.View
             entering={popEntering(motion, TEXT_DELAY_MS)}
-            className="items-center gap-2 px-8"
-            style={{
-              opacity: leaving ? 0 : 1,
-              transitionProperty: "opacity",
-              transitionDuration: motion === "none" ? 0 : 200,
-              transitionTimingFunction: EASE_OUT_CSS,
-            }}
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden
           >
-            {/* The name and the text fade to the next ones in place. */}
-            <View className="min-h-10 w-full">
-              <Animated.View
-                key={choice}
-                entering={slideSwapEntering(motion, swipeDirection.current)}
-                exiting={slideSwapExiting(motion)}
-                className="absolute inset-x-0 top-0"
-              >
-                <Typography.Heading type="h2" align="center" numberOfLines={1} className="tracking-openbot-tight">
-                  {title}
-                </Typography.Heading>
-              </Animated.View>
-            </View>
-            {/* The old text fades out and the new one in, in the same place. */}
-            <View className="min-h-16 w-full">
-              <Animated.View
-                key={choice}
-                entering={slideSwapEntering(motion, swipeDirection.current, TEXT_FOLLOW_MS)}
-                exiting={slideSwapExiting(motion)}
-                className="absolute inset-x-0 top-0"
-              >
-                <Typography.Paragraph align="center" color="muted">
-                  {description}
-                </Typography.Paragraph>
-              </Animated.View>
-            </View>
-            <View className="flex-row justify-center gap-2 pt-2" pointerEvents="none">
-              {CHOICE_SWATCHES.map((color, index) => (
-                <Dot key={color} index={index} progress={progress} />
-              ))}
-            </View>
+            <Animated.View
+              className="items-center gap-2 px-8"
+              style={{
+                opacity: leaving ? 0 : 1,
+                transitionProperty: "opacity",
+                transitionDuration: motion === "none" ? 0 : 200,
+                transitionTimingFunction: EASE_OUT_CSS,
+              }}
+            >
+              <View className="min-h-10 w-full">
+                <Animated.View
+                  key={choice}
+                  entering={slideSwapEntering(motion, swipeDirection.current)}
+                  exiting={slideSwapExiting(motion)}
+                  className="absolute inset-x-0 top-0"
+                >
+                  <Typography.Heading type="h2" align="center" numberOfLines={1} className="tracking-openbot-tight">
+                    {title}
+                  </Typography.Heading>
+                </Animated.View>
+              </View>
+              <View className="min-h-16 w-full">
+                <Animated.View
+                  key={choice}
+                  entering={slideSwapEntering(motion, swipeDirection.current, TEXT_FOLLOW_MS)}
+                  exiting={slideSwapExiting(motion)}
+                  className="absolute inset-x-0 top-0"
+                >
+                  <Typography.Paragraph align="center" color="muted">
+                    {description}
+                  </Typography.Paragraph>
+                </Animated.View>
+              </View>
+              <View className="flex-row justify-center gap-2 pt-2" pointerEvents="none">
+                {CHOICE_SWATCHES.map((color, index) => (
+                  <Dot key={color} index={index} progress={progress} />
+                ))}
+              </View>
+            </Animated.View>
           </Animated.View>
         </Animated.View>
       </View>

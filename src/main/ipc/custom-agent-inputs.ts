@@ -1,6 +1,3 @@
-// The custom agent payloads. `save` and `check` carry environment values, often an API key, so no
-// message here quotes a value.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type CheckCustomAgentInput,
@@ -17,7 +14,6 @@ import { sourceText } from "@openbot/i18n/source";
 import { agentCommandForm } from "../../backend/acp-agent-command";
 import { isObject, requireString } from "./validation";
 
-/** The change service rejects reserved IDs only when creating a new agent. */
 function parseAgentId(value: unknown): string {
   if (!isString(value) || !isCustomAgentId(value)) throw new Error(sourceText("error.provider.customAgentIdInvalid"));
   return value;
@@ -41,7 +37,6 @@ function parseArgs(value: unknown): string[] {
   return [...value];
 }
 
-/** `value: null` keeps the saved value. An empty value is a value: some agents read a flag as set. */
 function parseEnv(value: unknown): CustomAgentEnvInput[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > CUSTOM_AGENT_LIMITS.env) {
@@ -62,7 +57,6 @@ function parseEnv(value: unknown): CustomAgentEnvInput[] {
   return env;
 }
 
-/** Absent or empty is no usage prompt. */
 function parseUsagePrompt(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
   if (!isCustomAgentUsagePrompt(value)) throw new Error(sourceText("error.provider.customAgentUsagePromptInvalid"));

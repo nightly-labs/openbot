@@ -4,7 +4,6 @@ import { decodeStatusFile, type StatusFile } from "./model";
 import { ISSUES_URL, StatusPage } from "./StatusPage";
 import "./document.css";
 
-/** The update workflow writes `status.json` about every 5 minutes. */
 const RELOAD_MS = 60_000;
 
 function StatusApp() {
@@ -19,7 +18,6 @@ function StatusApp() {
       setStatus(decodeStatusFile(await response.json()));
       setFailed(false);
     } catch {
-      // The last status stays on the page. The message shows only when nothing has loaded.
       setFailed(true);
     }
     setNow(new Date().toISOString());

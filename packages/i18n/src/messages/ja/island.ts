@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/island";
 
 export const messages = {
-  // The Dynamic Island window over the MacBook notch or on an external display.
   "island.surface.label": "OpenBot の MacBook ノッチ",
   "island.surface.labelIsland": "OpenBot の Dynamic Island",
   "island.surface.interactionArea": "Dynamic Island の操作エリア",

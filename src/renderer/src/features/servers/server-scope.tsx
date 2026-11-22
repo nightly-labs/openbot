@@ -17,7 +17,7 @@ import {
   onSettled,
   untrack,
 } from "solid-js";
-import { isGlobalSearchShortcut } from "../../global-search-shortcut";
+import { matchesShortcut } from "../../keyboard-shortcut-preference";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -42,27 +42,6 @@ import { useServerSwitch } from "./server-switch";
 import { useServers } from "./servers-context";
 import { serversPort } from "./servers-port";
 
-/**
- * One mount per server. Everything below this provider is disposed and rebuilt
- * when the active server changes, which is what removed the twenty-setter
- * teardown `selectServer` used to run and the `resetForServer` slice every
- * per-server domain exported for it.
- *
- * First mount and server switches use the same required reads. Status, models
- * and agents must all succeed before the workspace is ready. Optional reads
- * do not block the workspace. Same-server recovery keeps loaded data.
- *
- * `loaded` replaces `dynamicIslandLoadedServerId`. The old flag had to name a
- * server because one global signal described whichever server was current; here
- * the scope *is* the server, so it is a boolean that starts false on every mount
- * and cannot describe the wrong one. `DynamicIslandBridge` reads it to avoid
- * publishing a half-loaded workspace to main.
- *
- * The two window listeners live here rather than in the global bootstrap because
- * both read scoped state: ⌘K needs the navigation domain, and focus needs the
- * open agent chat, its read state and the open direct conversation. They are
- * registered per mount, which is what the returned cleanup is for.
- */
 const ServerScope = createSimpleContext({
   name: "Server scope",
   init: () => {
@@ -118,16 +97,13 @@ const ServerScope = createSimpleContext({
       useConversation();
 
     const [bootstrapReady, setBootstrapReady] = createSignal(false);
-    /** The channel rows of the saved frame, with no text. The sidebar shows them until the host lists channels. */
     const [frameChannels, setFrameChannels] = createSignal<ChannelSummary[]>([]);
     const [connection, setConnection] = createStore<{
       hasContent: boolean;
-      /** The workspace was ready once. A saved frame sets `hasContent` before that, so the startup screen waits for this. */
       synced: boolean;
       loading: boolean;
       sequence: number | undefined;
       failed: boolean;
-      /** Why the last load failed, for the connection notice. Null when `failed` is false. */
       failure: UserErrorDetails | null;
       panelsFailed: boolean;
       panelsLoading: boolean;
@@ -144,11 +120,6 @@ const ServerScope = createSimpleContext({
       recovery: { phase: "connecting", attempt: 0, remainingSeconds: 0 },
     });
     const selectedServer = () => servers().find((candidate) => candidate.id === activeServerId());
-    // Main refuses a remote request until it knows the account. A load started before then fails, and
-    // the workspace shows that failure for a moment when the account comes.
-    // The host gives its capabilities one round trip after the connection opens. A load started
-    // before then skips the data that needs a capability, and a second full load must follow it.
-    // Main ends the wait also when the capability read fails.
     const transportReady = () => {
       const server = selectedServer();
       if (server?.kind !== "remote") return true;
@@ -160,7 +131,6 @@ const ServerScope = createSimpleContext({
       connection.sequence === selectedServer()?.connectionSequence &&
       connection.recovery.phase === "online" &&
       transportReady();
-    // Only a reconnect shows the notice over the workspace. The first load keeps the startup screen.
     createEffect(loaded, (ready) => {
       if (ready)
         setConnection((draft) => {
@@ -187,18 +157,15 @@ const ServerScope = createSimpleContext({
       },
     );
     const owner = getOwner();
-    /** This scope still owns the screen - the successor to `activeServerId() !== serverId`. */
     const scopeIsCurrent = (): boolean => !(owner && isDisposed(owner));
 
     const signedInAccount = () => {
       const auth = centralAuth();
       return auth.status === "signed_in" ? auth.user.id : null;
     };
-    /** The account signed in when the last load started. Undefined until a load starts. */
     let loadedAccount: string | null | undefined;
 
     let loadGeneration = 0;
-    /** The connection that the load in progress reads, with the host capabilities known. Undefined when no such load runs. */
     let loadingSequence: number | undefined;
     async function loadWorkspace(): Promise<void> {
       loadingSequence = undefined;
@@ -227,8 +194,6 @@ const ServerScope = createSimpleContext({
         draft.failure = null;
         draft.loading = true;
       });
-      // The panels do not wait for the agents: a starting host answers its layout at once but holds the
-      // agent list until its agents load, and agents shown before their sections show ungrouped.
       void loadPanels();
       const [status, models, agents, reads] = await Promise.all([
         serversPort().agent.getStatus(serverId),
@@ -251,7 +216,6 @@ const ServerScope = createSimpleContext({
       });
       if (server?.kind === "remote" && loadedAccount)
         saveRemoteWorkspaceFrame(loadedAccount, serverId, { agents, models });
-      // By id: a chat window can show a server that the main window does not.
       void serversPort()
         .servers.getPresenceFor(serverId)
         .then((value) => {
@@ -282,7 +246,6 @@ const ServerScope = createSimpleContext({
       const reads = [
         loadSidebarLayout(server)
           .then((value) => {
-            // A layout event can land while this read is in flight. The newer revision stays.
             if (value && isCurrent()) {
               setSidebarLayout((current) => (value.revision >= current.revision ? value : current));
               if (account && server) saveRemoteWorkspaceFrame(account, server.id, { sidebarLayout: value });
@@ -290,11 +253,8 @@ const ServerScope = createSimpleContext({
           })
           .catch(failed),
       ];
-      // A server with `sidebar-pins-v1` keeps the pins of the user for all of their devices. Until it
-      // answers, and when it cannot, the pins of this computer stay.
       if (server && serverSupportsCapability(server, SIDEBAR_PINS_CAPABILITY))
         void syncActiveServerPins().catch(() => undefined);
-      // A joined server without `agent-hidden-v1` has no hidden agents.
       if (server && serverSupportsCapability(server, AGENT_HIDDEN_CAPABILITY)) {
         reads.push(
           serversPort()
@@ -307,14 +267,11 @@ const ServerScope = createSimpleContext({
             .catch(failed),
         );
       }
-      // The user's own level of each agent, for the mute item of the agent menu and for the sounds.
-      // A read that fails keeps the menu as it is: an event or the next load gives the levels.
       if (server && serverSupportsCapability(server, AGENT_NOTIFICATION_LEVELS_CAPABILITY)) {
         const appliedBefore = ownAgentLevelsApplied();
         void serversPort()
           .agent.listAgentNotificationLevels(server.id)
           .then((value) => {
-            // A write or an event during the read is newer than its answer.
             if (isCurrent() && ownAgentLevelsApplied() === appliedBefore) applyOwnAgentLevels(value);
           })
           .catch(() => undefined);
@@ -346,7 +303,7 @@ const ServerScope = createSimpleContext({
     onSettled(() => {
       const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
         if (
-          !isGlobalSearchShortcut(event) ||
+          !matchesShortcut(event, "globalSearch") ||
           centralAuth().status !== "signed_in" ||
           setupState()?.completed !== true
         ) {
@@ -357,8 +314,6 @@ const ServerScope = createSimpleContext({
         setGlobalSearchVisibility(!globalSearchOpen());
       };
       window.addEventListener("keydown", handleGlobalSearchShortcut);
-      // `Platform` owns the flag and registers its own listener first, so
-      // `appFocused()` already reads true by the time this one runs.
       const handleWindowFocus = () => {
         flush(() => {
           clearRecentReplies();
@@ -366,9 +321,6 @@ const ServerScope = createSimpleContext({
           if (agentId && isAgentChatOpen(agentId) && (conversations[agentId]?.read?.unreadCount ?? 0) > 0) {
             requestConversationRead(agentId);
           }
-          // `conversationVisible` rather than the bare focus this listener runs on: the
-          // agent branch above asks the same question through `isAgentChatOpen`, and a
-          // direct message the Usage report covers was no more seen than an agent reply.
           const memberId = activeDirectMemberId();
           if (memberId && conversationVisible() && (directConversations()[memberId]?.readState?.unreadCount ?? 0) > 0) {
             void markDirectMessagesRead(memberId).catch(() => undefined);
@@ -389,9 +341,6 @@ const ServerScope = createSimpleContext({
       };
     });
 
-    // A joined server shows the frame of its last load while it connects: the sidebar and the agents,
-    // read-only under the connection notice. The first read replaces it. A setup that is not done
-    // shows its own flow, and an empty roster waits for the host, which opens the setup sheet.
     createEffect(
       createMemo(() => {
         const server = selectedServer();
@@ -419,7 +368,6 @@ const ServerScope = createSimpleContext({
         }),
     );
 
-    // A hide, a restore or a move updates the frame at once, so the next start does not show the old sidebar.
     createEffect(
       () => {
         const server = selectedServer();
@@ -437,8 +385,6 @@ const ServerScope = createSimpleContext({
       },
     );
 
-    // The frames and the cached workflows go with the account, with a server that leaves the list, and
-    // with ended access.
     createEffect(
       () => centralAuth().status === "signed_out",
       (signedOut) => {
@@ -481,17 +427,11 @@ const ServerScope = createSimpleContext({
       (request) =>
         untrack(() => {
           if (request?.serverId !== activeServerId()) return;
-          // This scope starts a load when its server comes online. A request for a new connection, or
-          // for the capabilities that came with it, asks for that same load. A second load would read
-          // all again and hold the workspace for one more round trip.
           if (request.connectionSequence !== undefined && request.connectionSequence === loadingSequence) return;
           recovery.refresh();
         }),
     );
 
-    // Read states and direct threads belong to the signed-in reader. At a cold start the saved account
-    // can restore after the first load, which then had no reader, so a sign-in, or another account,
-    // loads the workspace again.
     createEffect(signedInAccount, (account) =>
       untrack(() => {
         if (account && loadedAccount !== undefined && account !== loadedAccount) recovery.refresh();
@@ -506,10 +446,6 @@ const ServerScope = createSimpleContext({
       },
     );
 
-    // "Select this agent once you are on its server" - written before the switch
-    // by the marketplace and the Dynamic Island, consumed by whichever scope the
-    // switch lands in. It is taken rather than read so a later mount cannot
-    // replay it.
     createEffect(
       () => pendingAgentSelection(),
       (agentId) => {

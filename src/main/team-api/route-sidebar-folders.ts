@@ -10,10 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
 
-/**
- * `sidebar-folders-v1`: the sidebar layout with the parent of each folder. Any member reads and changes
- * it, as with `/v1/sidebar-layout`, and an agent that this peer cannot see cannot be placed.
- */
 export async function routeSidebarFolders(
   context: TeamApiRequestContext,
   sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate">,

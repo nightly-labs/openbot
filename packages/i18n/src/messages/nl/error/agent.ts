@@ -57,6 +57,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Het gekozen model van de agent is niet beschikbaar.",
   "error.agent.modelProviderNotConnected":
     "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} is niet verbonden.",
+  "error.agent.modelProviderSignInRequired":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} vraagt om aanmelding. Meld je aan bij {provider} en probeer het opnieuw.",
+  "error.agent.modelProviderNotInstalled":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} is niet geïnstalleerd.",
+  "error.agent.modelProviderOutdated":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} heeft een update nodig.",
   "error.agent.modelListEmpty":
     "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} gaf geen modellen. Laatste fout: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -138,6 +144,10 @@ export const messages = {
     "De gegevens van de agent konden niet volledig worden verwijderd. Probeer de agent opnieuw te verwijderen.",
   "error.agent.deleteFolderInUse":
     "Werk van een andere agent gebruikt de map van deze agent nog. Verwijder deze agent opnieuw als dat werk klaar is, of nadat je OpenBot opnieuw start.",
+  "error.agent.deleteFolderLocked":
+    "Een ander programma gebruikt de map van deze agent nog, bijvoorbeeld een programma dat de agent heeft gestart. Sluit dat programma of start de computer waarop deze agent draait opnieuw op en verwijder de agent daarna opnieuw.",
+  "error.agent.deleteWhenFolderFree":
+    "Werk van een andere agent gebruikt de map van deze agent nog. OpenBot verwijdert deze agent als dat werk klaar is.",
   "error.agent.duplicationBusy": "Deze agent wordt al gedupliceerd.",
   "error.agent.waitBeforeDuplicate": "Wacht tot de agent klaar is en de wachtrij leeg is voordat je hem dupliceert.",
   "error.agent.saveOtherAgent": "Deze opslag hoort bij een andere agent.",
@@ -196,6 +206,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "De MCP-server reageerde niet, dus is hij niet opgeslagen. {error}",
   "error.agent.mcpServerKeysMove":
     "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Marktplaats, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "De MCP-server {name} voert een lokale opdracht uit en neemt dus geen headers aan. Vraag de gebruiker de sleutels in te voeren in Marktplaats, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "Alleen de gebruiker van deze OpenBot kan in een chat met jou de sleutels van de MCP-server {name} geven. Vraag de gebruiker ze in te voeren in Marktplaats, Apps, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} is een onderdeel van OpenBot, dus de MCP-tools kunnen deze niet testen, aan- of uitzetten of verwijderen. De gebruiker beheert deze op de computer waarop OpenBot draait: de GitHub-koppeling in Marktplaats, Apps, GitHub, en PC-besturing in Instellingen, PC-besturing.",
   "error.agent.mcpServerUnknown": "Er is geen MCP-server met de naam {name}. Roep list_mcp_servers aan voor de namen.",
@@ -207,6 +221,8 @@ export const messages = {
     "Het gebied valt niet binnen één beeldscherm. Gebruik bureaubladpunten binnen de grenzen van één beeldscherm uit list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot heeft geen toestemming voor schermopname. Vraag de gebruiker om Systeeminstellingen > Privacy en beveiliging > Scherm- en systeemaudio-opname te openen, OpenBot aan te zetten en OpenBot daarna te stoppen en opnieuw te openen.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot heeft nog geen toestemming voor schermopname en kan de vensters daarom niet tonen. Roep capture_screen aan met target screen om een scherm vast te leggen. De gebruiker keurt de opname eerst goed, daarna kan macOS de gebruiker om toestemming vragen.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows gaf een leeg beeld. Vraag de gebruiker om de computer te ontgrendelen en beschermde inhoud te sluiten. Ook een beleid van de organisatie kan schermopname blokkeren.",
   "error.agent.screenCaptureFailed": "De schermopname is mislukt. Probeer het opnieuw.",

@@ -11,6 +11,7 @@ import type {
   MobileConnectedDevice,
   MobileConnectLink,
   MobileConnectTicket,
+  ReferralDesktopApi,
   RemoteNetworkRoute,
   RemoteNetworkRouteState,
   ServerNotificationLevel,
@@ -31,12 +32,15 @@ import { BillingPanel } from "@openbot/ui/features/billing/BillingPanel";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
+import { ReferralPanel } from "@openbot/ui/features/referral/ReferralPanel";
+import { createReferralStore } from "@openbot/ui/features/referral/referral-store";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import {
   SettingsDialogShell,
   SettingsNavGroupLabel,
   type SettingsPagePlacement,
 } from "@openbot/ui/features/settings/SettingsDialogShell";
+import type { MobileInstallRequest } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -48,6 +52,7 @@ import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import type { CodexLiveAccess } from "../speech/codex-live-access";
+import type { LiveVoiceAccountChoice } from "./LiveVoiceAccountRow";
 import { licenseContactUs, trackLicenseEvent } from "./license-analytics";
 import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
@@ -55,6 +60,7 @@ import { renderProfileShareImage } from "./profile-share-image";
 import { type AgentDockSettingsModel, SettingsAgentDockTab } from "./SettingsAgentDockTab";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
+import { SettingsKeyboardTab } from "./SettingsKeyboardTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
 import { SettingsVoiceTab } from "./SettingsVoiceTab";
 import { dynamicIslandSettingsShown, navItem, navItems, type SettingsTab, settingsTabShown } from "./settings-tabs";
@@ -64,24 +70,15 @@ export interface SettingsModalProps {
   open: boolean;
   value: GeneralSettingsValue;
   onValueChange: (value: GeneralSettingsValue) => void;
-  /** True when the saved preferences could not be read, so the rows show default values. */
   preferencesLoadFailed?: boolean;
-  /** Reads the saved preferences again. */
   onRetryPreferencesLoad?: () => void;
   appInfo: AppInfo | null;
-  /** True in a window that shows one chat (#2964). It has no Dynamic Island tab: the main window owns the island. */
   chatWindow?: boolean;
-  /** The built-in display's notch, null when it has none, or undefined before main answers. */
   builtInDisplayGeometry?: DynamicIslandGeometry | undefined;
-  /** The agents of the active server for the Agent dock tab. Without it, the tab does not show. */
   agentDock?: AgentDockSettingsModel | undefined;
-  /** The servers that the Notifications and Dynamic Island tabs list. */
   servers?: readonly ServerSummary[];
-  /** Writes the notification level of a server. Resolves after `servers` shows it. */
   onSetServerNotificationLevel?: ((serverId: string, level: ServerNotificationLevel) => Promise<void>) | undefined;
-  /** Mutes a server on this computer. No duration mutes until the user unmutes. */
   onSetServerMuted?: ((serverId: string, muted: boolean, durationMs?: number) => Promise<void>) | undefined;
-  /** The server that the Notifications tab moves to. Each nonce moves once. */
   notificationFocusRequest?: { serverId: string; nonce: number } | null | undefined;
   updateStatus: UpdateStatus;
   onUpdateAction: () => Promise<void>;
@@ -89,10 +86,10 @@ export interface SettingsModalProps {
   onCancelScheduledRestart?: () => Promise<void>;
   onRestartWhenIdle?: () => Promise<void>;
   onCancelIdleRestart?: () => Promise<void>;
+  onRestartNow?: () => Promise<void>;
   account: CentralAuthUser;
   onUpdateAccountName: (name: string) => Promise<void>;
   onUpdateAccountAvatar: (image: AvatarImageInput | null) => Promise<void>;
-  /** Saves the chat color of the account. Members of each server of the user see it. */
   onSetChatColor: (color: AvatarColor | null) => Promise<void>;
   onCreateMobileConnect?: () => Promise<MobileConnectTicket>;
   onCancelMobileConnect?: () => Promise<void>;
@@ -108,39 +105,25 @@ export interface SettingsModalProps {
   onSignOut?: (() => Promise<void>) | undefined;
   processAvatarFile?: (file: File) => Promise<AvatarImageInput>;
   billingApi?: BillingDesktopApi;
-  /** The commercial license of the account. It shows only when the account server sells licenses. */
+  referralApi?: ReferralDesktopApi | undefined;
   licenseApi?: LicenseDesktopApi | undefined;
-  /** Opens the sales contact, for a license with more users than the app sells. */
   onContactUs?: (() => void) | undefined;
-  /** The account's hosted servers. The tab is shown only when the account server offers them. */
   hostedServersApi?: HostedServersDesktopApi | undefined;
-  /** Opens the add server dialog from the Hosted servers tab. */
   onAddHostedServer?: (() => void) | undefined;
-  /** Whether Codex on this computer can open live voice. Undefined while it is not known. */
   codexLiveAccess?: CodexLiveAccess | undefined;
-  /** Opens the Providers section of this computer, where Codex signs in for live voice. */
+  liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   onConnectCodex?: (() => void) | undefined;
-  /** A hosted server that the server menu asked to delete. Each nonce opens its confirmation once. */
   hostedServerDeleteRequest?: { serverId: string; nonce: number } | null;
+  mobileInstallRequest?: MobileInstallRequest | null;
+  onMobileInstallRequestHandled?: (() => void) | undefined;
   onTestNotification?: () => void | Promise<void>;
-  /** Opens the operating system notification settings. Shown only on macOS and Windows. */
   onOpenNotificationSettings?: () => void | Promise<void>;
   restoreFocusTarget?: HTMLElement | null;
-  /** The tab shown when the modal is created. Read once; the user moves between tabs after that. */
   initialTab?: SettingsTab | undefined;
-  /** The tab shown each time the modal opens. Without it, the modal shows the tab that was open last. */
   openTab?: SettingsTab | undefined;
-  /** Where the settings page shows, or nothing while the page is not on screen. */
   page: SettingsPagePlacement | undefined;
 }
 
-/**
- * The dialog shell: the tab list, the header, and one delegation per panel.
- *
- * Every panel's state is a store created here rather than inside its tab, because Kobalte unmounts
- * an unselected `Tabs.Content` when the dialog closes. A list owned by the tab would lose the rows
- * it is showing while it refetches on reopen.
- */
 export function SettingsModal(props: SettingsModalProps) {
   const i18n = useI18n();
   const [activeTab, setActiveTab] = createSignal<SettingsTab>(
@@ -157,6 +140,10 @@ export function SettingsModal(props: SettingsModalProps) {
   const billing = createBillingStore(
     () => props.billingApi,
     () => props.open && activeTab() === "billing",
+  );
+  const referral = createReferralStore(
+    () => props.referralApi,
+    () => props.open && activeTab() === "referral",
   );
   const license = createLicenseStore(
     () => props.licenseApi,
@@ -214,11 +201,13 @@ export function SettingsModal(props: SettingsModalProps) {
         value === "app-behavior" ||
         value === "notifications" ||
         value === "voice" ||
+        value === "keyboard" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
         (value === "agent-dock" && agentDockShown()) ||
         value === "computer-use" ||
         value === "profile" ||
         value === "billing" ||
+        value === "referral" ||
         value === "mobile-connect" ||
         value === "updates"
       ) {
@@ -229,7 +218,6 @@ export function SettingsModal(props: SettingsModalProps) {
     activationMode: "automatic" as const,
   };
 
-  /** Shown above the rows that the preference read fills, while those rows show default values. */
   const preferencesLoadError = () => (
     <Show when={props.preferencesLoadFailed}>
       <Alert tone="danger" role="alert" report={{ operation: "settings", source: "system", cause_code: "unknown" }}>
@@ -368,7 +356,13 @@ export function SettingsModal(props: SettingsModalProps) {
             selectMount={modalElement}
             codexLiveAccess={props.codexLiveAccess}
             onConnectCodex={props.onConnectCodex}
+            liveVoiceAccount={props.liveVoiceAccount}
+            platform={props.appInfo?.platform}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="keyboard" class="settings-modal-tab-panel" data-tab="keyboard">
+          <SettingsKeyboardTab />
         </Tabs.Content>
 
         <Show when={dynamicIslandShown()}>
@@ -426,6 +420,10 @@ export function SettingsModal(props: SettingsModalProps) {
           />
         </Tabs.Content>
 
+        <Tabs.Content value="referral" class="settings-modal-tab-panel" data-tab="referral">
+          <ReferralPanel store={referral} available={props.referralApi !== undefined} />
+        </Tabs.Content>
+
         <Tabs.Content value="mobile-connect" class="settings-modal-tab-panel" data-tab="mobile-connect">
           <SettingsMobileConnectTab
             store={mobileConnect}
@@ -434,6 +432,8 @@ export function SettingsModal(props: SettingsModalProps) {
             canManageLink={Boolean(props.onCreateMobileConnectLink && props.onRevokeMobileConnectLink)}
             canRevokeDevice={Boolean(props.onRevokeMobileConnectedDevice)}
             canSetRoute={Boolean(props.onSetRemoteNetworkRoute)}
+            installRequest={props.open ? props.mobileInstallRequest : null}
+            onInstallRequestHandled={props.onMobileInstallRequestHandled}
           />
         </Tabs.Content>
 

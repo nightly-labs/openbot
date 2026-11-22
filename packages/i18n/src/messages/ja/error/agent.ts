@@ -56,6 +56,12 @@ export const messages = {
   "error.agent.modelUnavailable": "選択したエージェントのモデルを使用できません。",
   "error.agent.modelProviderNotConnected":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} が接続されていません。",
+  "error.agent.modelProviderSignInRequired":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} へのサインインが必要です。{provider} にサインインしてから、もう一度お試しください。",
+  "error.agent.modelProviderNotInstalled":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} がインストールされていません。",
+  "error.agent.modelProviderOutdated":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} の更新が必要です。",
   "error.agent.modelListEmpty":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} はモデルを 1 つも返しませんでした。最後のエラー: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -135,6 +141,10 @@ export const messages = {
     "エージェントのデータを完全には削除できませんでした。エージェントの削除を再試行してください。",
   "error.agent.deleteFolderInUse":
     "別のエージェントの作業がまだこのエージェントのフォルダを使っています。その作業が終わったとき、または OpenBot を再起動したあとに、もう一度削除してください。",
+  "error.agent.deleteFolderLocked":
+    "別のプログラム（エージェントが起動したプログラムなど）がまだこのエージェントのフォルダを使っています。そのプログラムを閉じるか、このエージェントが動いているコンピューターを再起動してから、もう一度エージェントを削除してください。",
+  "error.agent.deleteWhenFolderFree":
+    "別のエージェントの作業がまだこのエージェントのフォルダを使っています。その作業が終わると、OpenBot がこのエージェントを削除します。",
   "error.agent.duplicationBusy": "このエージェントはすでに複製中です。",
   "error.agent.waitBeforeDuplicate": "複製する前に、エージェントが終わるまで待ち、キューを空にしてください。",
   "error.agent.saveOtherAgent": "この保存は別のエージェントのものです。",
@@ -201,6 +211,8 @@ export const messages = {
     "この領域は 1 つのディスプレイの中に収まっていません。list_capture_sources が返す 1 つのディスプレイの範囲内で、デスクトップのポイント座標を使ってください。",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot に画面収録の権限がありません。ユーザーに「システム設定」→「プライバシーとセキュリティ」→「画面収録とシステムオーディオ録音」を開いて OpenBot をオンにし、OpenBot を終了してから再度開くよう依頼してください。",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot にはまだ画面収録の権限がないため、ウインドウを一覧表示できません。ディスプレイをキャプチャするには、target screen で capture_screen を呼び出してください。ユーザーが先にキャプチャを承認し、その後 macOS がユーザーに権限を求めることがあります。",
   "error.agent.screenCaptureEmptyWindows":
     "Windows が空の画像を返しました。コンピューターのロックを解除し、保護されたコンテンツを閉じるようユーザーに依頼してください。組織のポリシーによって画面キャプチャが止められている場合もあります。",
   "error.agent.screenCaptureFailed": "画面キャプチャに失敗しました。もう一度お試しください。",

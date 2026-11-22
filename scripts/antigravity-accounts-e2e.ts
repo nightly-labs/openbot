@@ -1,20 +1,3 @@
-// Adds a second Gemini account end to end on the real driver, `ProviderRuntime` and account store,
-// with a fake Antigravity CLI that prints its version, takes its folders as `--gemini-dir` (an absolute
-// path) and `--app-data-dir`, and keeps its token in `antigravity-oauth-token` there, as
-// the CLI 1.5.3 and later do when `WSL_DISTRO_NAME` is set. A local `node:http` fake of Google's Code
-// Assist service (`OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`) answers the usage reads. Checks that a
-// CLI before 1.5.3 offers no account after the first; that the first spawn copies the refresh token of
-// a 1.4 `acp_token.json` into a new token file at mode 0600 before the CLI starts, writes the sign-in
-// method and a marker, and keeps the old file; that a sign-in on the host opens Google's page through
-// OpenBot's `open` command and writes the token in the account's folder only; that every process gets
-// the flags of its own folder and `WSL_DISTRO_NAME`, that the first account keeps the saved API key and
-// no account process gets it; that the account lists its own models (#5217) and its usage reading sends
-// only its own token; that a Reconnect signs the account out first; that Remove deletes the folder;
-// that a new account stays when its usage reading fails after the sign-in; that the first account's
-// token files are never changed or moved; that the marker stops a second copy after the new token is
-// deleted; and that a 1.4 folder whose settings name another sign-in is not copied.
-// `bun scripts/antigravity-accounts-e2e.ts`.
-// Writes .openbot-build/antigravity-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -39,13 +22,6 @@ const TOKEN_FILE = "antigravity-oauth-token";
 const LEGACY_TOKEN_FILE = "acp_token.json";
 const MARKER = "openbot-token-imported";
 
-// Each process appends its argv, its folder and its environment, and each method it was called with,
-// to `FAKE_AGY_LOG`. The folder comes from the flags only, as the real CLI ignores `GEMINI_HOME`.
-// `authenticate` with `oauth-personal` gives Google's page to the `open` (macOS) or `xdg-open` (Linux)
-// command that it finds first on `PATH`, as the real CLI does. It runs only OpenBot's own command, in
-// an `openbot-sign-in-*` folder, so no real browser opens. It writes the token when the file
-// `FAKE_AGY_APPROVE` exists: the test writes it when the page opens. A folder other than
-// `FAKE_AGY_FREE_HOME` is a paid plan, which also serves `gemini-fake-pro`.
 const fakeAntigravity = (version: string) => `#!/usr/bin/env node
 if (process.argv[2] === "--version") {
   process.stdout.write("${version}\\n");
@@ -213,11 +189,9 @@ const savedEnvironment = {
 process.env.FAKE_AGY_LOG = log;
 process.env.FAKE_AGY_APPROVE = approve;
 process.env.FAKE_AGY_FREE_HOME = defaultHome;
-// The first account's folder: the runtime's own processes inherit it. Never the user's `~/.gemini`.
 process.env.GEMINI_HOME = defaultHome;
 delete process.env.OPENBOT_ANTIGRAVITY_PATH;
 
-/** Code Assist answers each usage read; `usageFails` makes it answer 500. */
 const quotaCalls: QuotaCall[] = [];
 let usageFails = false;
 const quotaServer = createServer((request, response) => {
@@ -271,7 +245,6 @@ async function exists(path: string): Promise<boolean> {
   );
 }
 
-/** A managed install, `<root>/<version>/bin/antigravity`. */
 async function cli(version: string): Promise<string> {
   const executable = join(root, "antigravity", version, "bin", "antigravity");
   await mkdir(join(root, "antigravity", version, "bin"), { recursive: true });
@@ -280,7 +253,6 @@ async function cli(version: string): Promise<string> {
   return executable;
 }
 
-/** Writes a 1.4 server's folder: its token file and, when given, the chosen sign-in. */
 async function legacyFolder(folder: string, refreshToken: string, signIn?: string): Promise<string> {
   await mkdir(folder, { recursive: true });
   const legacy = JSON.stringify({
@@ -297,7 +269,6 @@ async function legacyFolder(folder: string, refreshToken: string, signIn?: strin
 const database = new OpenBotDatabase(join(root, "profile"));
 const agents = new AgentStore(join(root, "profile"), join(root, "home"), database);
 
-/** The agents that run a turn now. */
 const busyAgents = new Set<string>();
 
 function createRuntime(executable: string, accounts: ProviderAccountStore): ProviderRuntime {
@@ -343,14 +314,12 @@ async function stop(runtime: ProviderRuntime): Promise<void> {
   for (const client of await runCauseEffect(runtime.dispose())) await runCauseEffect(client.stop());
 }
 
-/** Opens Google's page as a host's live view does: the user finishes the sign-in there. */
 const pageOpened: string[] = [];
 async function openPage(url: string): Promise<void> {
   pageOpened.push(url);
   await writeFile(approve, "");
 }
 
-/** Whether a process got the flags of `home` and `WSL_DISTRO_NAME`, as the driver must pass them. */
 function startedIn(entry: LogEntry, home: string): boolean {
   const geminiDir = entry.argv?.find((arg) => arg.startsWith("--gemini-dir="))?.slice("--gemini-dir=".length);
   return (
@@ -364,10 +333,8 @@ function startedIn(entry: LogEntry, home: string): boolean {
 
 let runtime: ProviderRuntime | undefined;
 try {
-  // The first account was signed in on 1.4: its token is in the old file.
   const defaultLegacy = await legacyFolder(defaultData, "first-account", "oauth-personal");
 
-  // 1. A CLI before 1.5.3 may ignore the folder flags, so it offers no account after the first.
   const oldStore = new ProviderAccountStore(join(root, "old-accounts.json"), join(root, "old-accounts"));
   await runCauseEffect(oldStore.load());
   runtime = createRuntime(await cli("1.5.2"), oldStore);
@@ -382,7 +349,6 @@ try {
   assert.equal(connectError, sourceText("error.provider.accountsUnsupported", { provider: "Gemini" }));
   assert.equal(oldStore.list().length, 0);
 
-  // The first spawn copied the 1.4 refresh token before the CLI started, and kept the old file.
   const imported = await readFile(join(defaultData, TOKEN_FILE), "utf8");
   const importedToken = JSON.parse(imported);
   report.tokenImport = {
@@ -408,7 +374,6 @@ try {
   await stop(runtime);
   runtime = undefined;
 
-  // 2. A sign-in on the host: Google's page opens, and the token goes in the account's folder.
   await rm(log, { force: true });
   const store = new ProviderAccountStore(join(root, "accounts.json"), join(root, "accounts"));
   await runCauseEffect(store.load());
@@ -427,9 +392,6 @@ try {
   assert.equal(await readFile(join(defaultData, TOKEN_FILE), "utf8"), imported);
   assert.equal(await readFile(join(defaultData, LEGACY_TOKEN_FILE), "utf8"), defaultLegacy);
 
-  // The account check reads the account's own models: its plan serves one that the first account's
-  // does not, and the catalogue of the first account stays as it was. The row carries only that one;
-  // the picker adds it to the catalogue, which keeps the models an admin turned off out (#5217).
   report.models = {
     firstAccount: runtime
       .listModels()
@@ -444,9 +406,6 @@ try {
     ["gemini-fake", "gemini-fake-pro"],
   );
 
-  // 3. The first account keeps the saved key. Every process of the new account runs in its folder,
-  // the sign-in and the account check included, and none of them gets the key. Each process gets the
-  // folder flags and `WSL_DISTRO_NAME`.
   const starts = (await entries()).filter((entry) => entry.event === "start");
   const firstAccount = starts.filter((entry) => entry.home === defaultHome);
   const accountProcesses = starts.filter((entry) => entry.home === accountHome);
@@ -474,8 +433,6 @@ try {
     "an account process never authenticates with the key",
   );
 
-  // The check read the account's usage from Code Assist with its own token. The first account has a
-  // saved key, so its token is never sent.
   const usage = await runCauseEffect(runtime.accountUsage());
   report.accountUsage = {
     quotaCalls: [...quotaCalls],
@@ -491,7 +448,6 @@ try {
   );
   assert.equal(report.accountUsage.usedPercent, 50, "the account's reading is its own quota");
 
-  // 4. A Reconnect signs the account out, so it waits while an agent on the account runs a turn.
   await runCauseEffect(agents.initialize());
   const created = await runCauseEffect(
     agents.createAgent({ name: "Second", description: "", avatarSeed: "second", avatarHue: null }),
@@ -515,7 +471,6 @@ try {
   assert.equal(report.busyReconnect.loggedOut, false);
   assert.ok(report.busyReconnect.agentProcessKept);
 
-  // When no turn runs, it stops the agent's process, which kept the old token, and signs out first.
   await runCauseEffect(runtime.signInProviderAccountOnHost("antigravity", account.id, openPage));
   const reconnect = (await entries()).filter(
     (entry) => entry.home === accountHome && (entry.event === "logout" || entry.event === "authenticate"),
@@ -530,7 +485,6 @@ try {
   assert.equal(report.reconnect.accountState, "connected");
   assert.equal(pageOpened.length, 2);
 
-  // A usage read of an idle account starts no process.
   const startsBeforeUsage = (await entries()).filter((entry) => entry.event === "start").length;
   await runCauseEffect(runtime.accountUsage());
   report.idleUsage = {
@@ -538,13 +492,11 @@ try {
   };
   assert.equal(report.idleUsage.processesStarted, 0);
 
-  // 5. Remove deletes the account's folder with its token.
   await runCauseEffect(runtime.removeProviderAccount("antigravity", account.id));
   report.remove = { folderLeft: await exists(accountHome), rows: accountRows(runtime)?.length ?? 0 };
   assert.equal(report.remove.folderLeft, false);
   assert.equal(report.remove.rows, 1);
 
-  // 6. A new account whose usage reading fails after the sign-in stays: the sign-in worked.
   await rm(log, { force: true });
   quotaCalls.length = 0;
   usageFails = true;
@@ -564,7 +516,6 @@ try {
   assert.equal(report.failedUsage.accountState, "connected");
   usageFails = false;
 
-  // The first account's token files were never changed or moved.
   report.firstAccountTokens = {
     legacyUnchanged: (await readFile(join(defaultData, LEGACY_TOKEN_FILE), "utf8")) === defaultLegacy,
     importedUnchanged: (await readFile(join(defaultData, TOKEN_FILE), "utf8")) === imported,
@@ -574,8 +525,6 @@ try {
   await stop(runtime);
   runtime = undefined;
 
-  // 7. The marker stops a second copy: after a sign-out deletes the new token, the old one must not
-  // sign the account in again.
   await rm(join(defaultData, TOKEN_FILE));
   await rm(log, { force: true });
   runtime = createRuntime(await cli("1.5.4"), store);
@@ -592,7 +541,6 @@ try {
   await stop(runtime);
   runtime = undefined;
 
-  // 8. A 1.4 folder whose settings name the API key sign-in: its token is not a Google sign-in to copy.
   const keyHome = join(root, "key-gemini");
   const keyData = join(keyHome, "antigravity-acp");
   const keyLegacy = await legacyFolder(keyData, "not-a-google-sign-in", "gemini-api-key");

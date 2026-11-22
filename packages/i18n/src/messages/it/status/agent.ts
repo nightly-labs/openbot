@@ -28,6 +28,8 @@ export const messages = {
     "Acquisizione dello schermo principale e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureChannel":
     "L'immagine appare nel canale {channel} e ogni membro di questo server che legge il canale può vederla.",
+  "status.agent.screenCapturePermissionNext":
+    "Poi macOS può chiederti di consentire a OpenBot la registrazione dello schermo.",
   "status.agent.screenCaptureDisplay":
     "Acquisizione dello schermo {name} e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureWindow":
@@ -73,6 +75,7 @@ export const messages = {
   "status.agent.browserActing": "Uso della pagina web…",
   "status.agent.browserReviewing": "Analisi della pagina web…",
   "status.agent.memoriesSearching": "Ricerca nelle sue memorie…",
+  "status.agent.chatsSearching": "Ricerca nelle sue chat precedenti…",
   "status.agent.memoriesSearched": {
     one: "Ha cercato nelle sue memorie: {count} trovata",
     other: "Ha cercato nelle sue memorie: {count} trovate",
@@ -114,8 +117,6 @@ export const messages = {
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
   "status.agent.mcpToolCall": "Eseguire lo strumento {tool} del server MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Chiuso da un nuovo messaggio",
-  "status.agent.finishCheckContinues":
-    "La richiesta non è ancora completata. L’agente continua ({current} di {limit}).",
   "status.agent.nextStepContinues":
     "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",

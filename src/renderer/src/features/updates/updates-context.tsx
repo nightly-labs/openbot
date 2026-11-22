@@ -7,14 +7,6 @@ import { createIdleRestartToast } from "./idle-restart-toast";
 import { createScheduledUpdateToast } from "./scheduled-update-toast";
 import { idleRestartTarget, updatesPort } from "./updates-port";
 
-/**
- * The updater, as the renderer sees it: one status main pushes, and one button
- * whose meaning depends on that status.
- *
- * Ungated - the app is fully usable while the updater is still checking, so
- * nothing waits on it, and consumers read `FALLBACK_UPDATE_STATUS` meanwhile.
- * It depends on no other domain, which is why it is the smallest one to move.
- */
 const Updates = createSimpleContext({
   name: "Updates",
   init: () => {
@@ -31,23 +23,16 @@ const Updates = createSimpleContext({
       return unsubscribe;
     });
 
-    /**
-     * One button, four meanings. `ready` installs; `available` and a failed
-     * download retry the download; everything else checks again. The status
-     * main pushes back is applied here rather than waited for, so the button
-     * settles even if the event is slower than the call.
-     */
     async function runAction(): Promise<void> {
       const analytics = desktopAnalytics.scope();
       const current = status();
-      // Host-managed tenants never act: the host owns check, download and install timing.
-      // The button is disabled too; this is the second lock for callers that reach past it.
       if (current.managedByHost === true) return;
       const phase = current.phase;
       if (phase === "ready") {
         try {
-          await updatesPort().update.install();
-          analytics.track("update_action", { action: "install", result: "succeeded", phase: "installing" });
+          const next = await updatesPort().update.install();
+          setStatus(next);
+          analytics.track("update_action", { action: "install", result: "succeeded", phase: next.phase });
         } catch (error) {
           analytics.track("update_action", {
             action: "install",
@@ -85,14 +70,12 @@ const Updates = createSimpleContext({
       }
     }
 
-    /** Removes a restart that a server admin asked for. The update stays downloaded. */
     async function cancelScheduledRestart(): Promise<void> {
       setStatus(await updatesPort().update.cancelScheduledRestart());
     }
 
     createScheduledUpdateToast({ status, cancel: cancelScheduledRestart });
 
-    /** Restarts OpenBot when no work runs. A downloaded update is installed by the same restart. */
     async function restartWhenIdle(): Promise<void> {
       setStatus(await updatesPort().update.restartWhenIdle(idleRestartTarget(status())));
     }
@@ -101,9 +84,13 @@ const Updates = createSimpleContext({
       setStatus(await updatesPort().update.cancelIdleRestart());
     }
 
+    async function restartNow(): Promise<void> {
+      setStatus(await updatesPort().update.restartNow());
+    }
+
     createIdleRestartToast({ status, cancel: cancelIdleRestart });
 
-    return { status, runAction, cancelScheduledRestart, restartWhenIdle, cancelIdleRestart };
+    return { status, runAction, cancelScheduledRestart, restartWhenIdle, cancelIdleRestart, restartNow };
   },
 });
 

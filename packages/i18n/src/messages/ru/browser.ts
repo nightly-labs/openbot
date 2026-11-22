@@ -60,6 +60,8 @@ export const messages = {
   "browser.pip.close": "Закрыть окно браузера",
   "browser.pip.reattachFailed": "OpenBot не удалось вернуть браузер в боковую панель.",
   "browser.pip.closeFailed": "OpenBot не удалось закрыть окно браузера.",
+  "browser.window.open": "Открыть браузер в новом окне",
+  "browser.window.openFailed": "OpenBot не удалось открыть окно браузера.",
   "browser.popupBlocked.title": "Всплывающее окно заблокировано",
   "browser.popupBlocked.dismiss": "Скрыть сообщение о всплывающем окне",
   "browser.liveView.label": "Страница на сервере в реальном времени",

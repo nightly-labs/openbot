@@ -230,7 +230,6 @@ export function CrmPayments(props: { crm: CrmViewModel }) {
   const layout = sheetLayout(crm, "payments", ordered, shown);
   const viewItems = createMemo(() => CRM_PAY_VIEWS.map((id) => ({ id, label: t(PAY_VIEW_KEY[id]) })));
 
-  // The history and the full list need the paid payments, which the page loads only when they show.
   createEffect(pay, (view) => {
     if (view === "history" || view === "all") crm.loadPaid();
   });

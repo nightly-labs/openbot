@@ -45,6 +45,11 @@ export const messages = {
   "update.idleRestart.description": "Новые запуски регулярных задач ждут перезапуска.",
   "update.idleRestart.waitingFor": "Ожидание: {reasons}.",
   "update.idleRestart.cancel": "Отменить перезапуск",
+  "update.idleRestart.restartNow": "Перезапустить сейчас",
+  "update.idleRestart.restartNowTitle": "Перезапустить OpenBot сейчас?",
+  "update.idleRestart.restartNowDescription":
+    "Незавершённые ходы агентов и запуски регулярных задач сейчас остановятся.",
+  "update.idleRestart.keepWaiting": "Ждать дальше",
   "update.idleRestart.cancelFailed": "Не удалось отменить перезапуск.",
   "update.idleRestart.requestFailed": "Не удалось запланировать перезапуск.",
   "update.idleRestart.failedTitle": "OpenBot не перезапустился",

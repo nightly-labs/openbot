@@ -4,12 +4,12 @@ import type { Readable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import { redactText } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
+import { perfCount } from "../backend/perf-probe-hooks";
 import { desktopCall, desktopFailure, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 
 const MAX_LOG_BYTES = 1024 * 1024;
 const MAX_LINE_CHARACTERS = 8_000;
 
-/** The appends for each file run one at a time, so a rotation never races a write. */
 const queues = new Map<string, Deferred.Deferred<void>>();
 
 export const appendRemoteDiagnosticLog = Effect.fn("RemoteDesktop.appendDiagnosticLog")(function* (
@@ -17,6 +17,7 @@ export const appendRemoteDiagnosticLog = Effect.fn("RemoteDesktop.appendDiagnost
   name: string,
   message: string | Uint8Array,
 ) {
+  perfCount("log.diagnosticAppend");
   const safeName = name.replace(/[^a-zA-Z0-9_-]/gu, "-").slice(0, 80);
   const path = join(directory, `${safeName}.log`);
   const clean = Buffer.from(message).toString("utf8").split("\n").map(redactDiagnosticLine).join("\n");
@@ -36,19 +37,10 @@ export const appendRemoteDiagnosticLog = Effect.fn("RemoteDesktop.appendDiagnost
   );
 }, Effect.uninterruptible);
 
-// The shared rules need `=` or `:` after a credential name. Sunshine and Moonlight also print
-// `token <value>`, which this log redacted before it used them.
 function redactDiagnosticLine(line: string): string {
   return redactText(line).replace(/token[=: ]+[A-Za-z0-9._-]{8,}/giu, "[redacted]");
 }
 
-/**
- * Hands a process stream's output on in whole lines, so a secret that arrives split across two
- * chunks is redacted as one value. Each stream keeps its own carry-over and decoder: stdout and
- * stderr interleave, and one shared between them would join a line neither printed. The last line
- * is handed on when the stream ends, newline or not. A line longer than the limit is cut there and
- * the rest of it dropped, because a piece written on its own could hold a secret no rule matches.
- */
 export function forwardDiagnosticLines(stream: Readable | null | undefined, forward: (text: string) => void): void {
   const decoder = new StringDecoder("utf8");
   let partial = "";
@@ -76,10 +68,6 @@ export function forwardDiagnosticLines(stream: Readable | null | undefined, forw
   });
 }
 
-/**
- * Cuts a line to the limit, and drops the word the limit falls in: a secret or a header name cut in
- * two no longer matches the rule that would redact it, and its first part is most of the value.
- */
 function cutLine(line: string): string {
   return line.length > MAX_LINE_CHARACTERS ? line.slice(0, MAX_LINE_CHARACTERS).replace(/\S+$/u, "") : line;
 }
@@ -110,7 +98,6 @@ export const stopRemoteProcess = Effect.fn("RemoteDesktop.stopProcess")(function
   child: ManagedChildProcess,
   graceMs = 2_000,
 ) {
-  // A child that a signal ended has already emitted its exit event.
   if (child.exitCode !== null || child.signalCode !== null || child.killed) return;
   yield* Effect.callback<void, RemoteDesktopOperationError>((resume) => {
     let complete = false;

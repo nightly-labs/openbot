@@ -7,14 +7,6 @@ interface AgentMessageRow {
   marker: AgentMessageMarkerModel;
 }
 
-/**
- * Joins consecutive messages to and from other agents into one row, so a long exchange between
- * agents does not fill the chat. The row keeps the id of the first message, so it stays the same row
- * while the exchange grows. The stored messages stay unchanged.
- *
- * A run stops at the first unread message and at a new day, so the unread divider and the day
- * separator keep a row of their own.
- */
 export function groupAgentMessageMarkers(
   messages: readonly AgentMessage[],
   firstUnreadMessageId?: string | null,
@@ -56,11 +48,6 @@ export function groupAgentMessageMarkers(
   return rows;
 }
 
-/**
- * Sets on the marker of each agent message that has text or quiet answers whether they show under
- * the marker. `open` holds the exchange ids of the open messages, and `answers` the quiet answers by
- * exchange id (`teammateTurnAnswers`). A message with neither gets no toggle.
- */
 export function markOpenAgentMessages(
   messages: readonly AgentMessage[],
   open: ReadonlySet<string>,
@@ -74,14 +61,6 @@ export function markOpenAgentMessages(
   });
 }
 
-/**
- * The quiet answers of each turn that teammate updates or requests started, by the exchange id of the
- * last such message of the turn. An update wants no answer, and a request got its answer with the
- * agent's own reply, so when nothing in the turn was for the user, OpenBot kept the agent's text as
- * quiet answers (#6821, #7465). They show under the marker of that message, which starts closed, as
- * the answers of a quiet routine run show under its run. A reply to this agent's message is never
- * quiet. A turn with no such message keeps its quiet answers in place.
- */
 export function teammateTurnAnswers(messages: readonly AgentMessage[]): Map<string, AgentMessage[]> {
   const updateByTurn = new Map<string, string>();
   for (const message of messages) {
@@ -105,22 +84,16 @@ export function teammateTurnAnswers(messages: readonly AgentMessage[]): Map<stri
   return answers;
 }
 
-/** A message with attachments draws them under its marker, so it keeps a row of its own. */
 function groupableMarker(message: AgentMessage): AgentMessageMarkerModel | null {
   if (message.actionMarker?.kind !== "agent-message") return null;
   if (message.exchange?.direction === "incoming" && (message.attachments?.length ?? 0) > 0) return null;
   return message.actionMarker;
 }
 
-/** Whether a message falls on a new day after the previous one, so a day separator comes between them. */
 export function startsDay(previous: AgentMessage, current: AgentMessage): boolean {
   return current.createdAt !== undefined && dayMarkerLabel(previous.createdAt, current.createdAt) !== null;
 }
 
-/**
- * The ids of the messages in a group row of agent messages, routine runs or skill installs, separated
- * by spaces, so a search or focus request finds the row.
- */
 export function groupedMessageIds(message: AgentMessage | undefined): string | undefined {
   const marker = message?.actionMarker;
   if (marker?.kind === "agent-message-group") return marker.messages.map((entry) => entry.id).join(" ");

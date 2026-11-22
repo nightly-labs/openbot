@@ -8,17 +8,11 @@ import { useServers } from "../servers/servers-context";
 import { agentTasksPort } from "./agent-tasks-port";
 import { createAgentTasks } from "./agent-tasks-state";
 
-/**
- * The side threads of the active server. A joined server shows them when it has the `agent-tasks-v1`
- * routes, renames and deletes them only with `agent-threads-v1`, and branches only with
- * `agent-thread-branches-v1`.
- */
 const AgentTasks = createSimpleContext({
   name: "AgentTasks",
   init: () => {
     const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { activeAgentId, agentStatus } = useAgents();
-    // The server scope makes this state again for each server, so the server is fixed here.
     const scopeServerId = untrack(activeServerId);
     const local = () => {
       const server = activeServer();
@@ -37,7 +31,6 @@ const AgentTasks = createSimpleContext({
       messageDeletable: () => local() || activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY),
       pageable: () => local() || activeServerSupportsCapability(AGENT_THREAD_PAGES_CAPABILITY),
       aroundReadable: () => local() || activeServerSupportsCapability(MESSAGE_PINS_CAPABILITY),
-      // A server switch or reconnect reads the lists again, and so does a start of the agent.
       reloadKey: () => {
         const server = activeServer();
         return `${server?.id ?? ""}:${server?.state ?? ""}:${agentStatus().phase}`;

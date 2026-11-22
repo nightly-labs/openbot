@@ -96,7 +96,7 @@ export const messages = {
   "composer.voice.progress": "正在下载语音模型 {progress}%",
   "composer.voice.recording": "录音中",
   "composer.voice.limitSoon": "录音将在 {seconds} 秒后停止。",
-  "composer.voice.limitReached": "录音已在 2 分钟上限处停止，你说的内容已放入消息。",
+  "composer.voice.limitReached": "录音已在 10 分钟上限处停止，你说的内容已放入消息。",
   "composer.send.saveQueued": "保存排队消息",
   "composer.send.voice": "发送语音消息",
   "composer.send.message": "发送消息",

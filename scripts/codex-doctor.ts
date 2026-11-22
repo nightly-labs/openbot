@@ -33,7 +33,6 @@ try {
       }
     : null;
 
-  // Machine-readable: doctor result JSON consumed by tooling.
   process.stdout.write(
     `${JSON.stringify(
       {
@@ -50,7 +49,6 @@ try {
 
   if (strict && account.account?.type !== "chatgpt") process.exitCode = 1;
 } catch (error) {
-  // Machine-readable: doctor failure JSON consumed by tooling.
   process.stderr.write(
     `${JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2)}\n`,
   );

@@ -2,12 +2,10 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/messaging";
 
 export const messages = {
-  // Errors of a Slack workspace connection, which the host sends.
   "error.messaging.notConnected": "Bu Slack çalışma alanı bağlı değil.",
   "error.messaging.unsupported": "Bu bilgisayar Slack'e bağlanamıyor.",
   "error.messaging.relayUnavailable":
     "OpenBot bu bilgisayarda Slack etkinliklerini alamıyor. Oturum açın, bu bilgisayara bir ad verin ve tekrar deneyin.",
-  // Bir Discord sunucusu bağlantısının ana makinenin gönderdiği hataları.
   "error.messaging.discordNotConnected": "Bu Discord sunucusu bağlı değil.",
   "error.messaging.discordUnsupported": "Bu bilgisayar Discord'a bağlanamıyor.",
   "error.messaging.discordRelayUnavailable":
@@ -21,7 +19,6 @@ export const messages = {
   "error.messaging.telegramRelayUnreachable":
     "OpenBot bu bilgisayardan hizmetine bağlanamıyor. İnternet bağlantısını, VPN'i, proxy'yi veya güvenlik duvarını kontrol edin ve tekrar deneyin.",
   "error.messaging.telegramServiceUnavailable": "OpenBot şu anda Telegram'ı bağlayamıyor. Daha sonra tekrar deneyin.",
-  // Bağlı bir WhatsApp numarasının ana makinenin gönderdiği hataları.
   "error.messaging.whatsappNotConnected": "Bu WhatsApp numarası bağlı değil.",
   "error.messaging.whatsappUnsupported": "Bu bilgisayar WhatsApp'a bağlanamıyor.",
   "error.messaging.whatsappTooManySenders": "Bir WhatsApp numarası en fazla 200 kişiye ve gruba izin verebilir.",

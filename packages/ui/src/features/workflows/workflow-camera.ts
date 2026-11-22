@@ -1,10 +1,3 @@
-/**
- * The motion of the canvas camera. A zoom step keeps the centre of the view still. A longer move
- * zooms out, pans and zooms in again on the shortest path (van Wijk and Nuij, as `interpolateZoom`
- * of d3 that Higgsfield uses), so the eye keeps its place. The durations and the curves come from
- * the motion tokens.
- */
-
 import { rendererDuration } from "../conversation/activity-timing";
 
 export interface Camera {
@@ -13,14 +6,11 @@ export interface Camera {
   scale: number;
 }
 
-/** A step of the zoom: the centre of the view stays still. A flight: the shortest zoom-and-pan path. */
 export type CameraMotion = "step" | "flight";
 
 const RHO = Math.SQRT2;
 
-/** The camera at a point of the move, from 0 to 1, for a view of this size. */
 function cameraPath(from: Camera, to: Camera, view: { width: number; height: number }) {
-  // The path works on the centre of the view in the world and the width of the view in the world.
   const x0 = (view.width / 2 - from.x) / from.scale;
   const y0 = (view.height / 2 - from.y) / from.scale;
   const w0 = view.width / from.scale;
@@ -52,7 +42,6 @@ function cameraPath(from: Camera, to: Camera, view: { width: number; height: num
   };
 }
 
-/** The curve of a `cubic-bezier()` token, as a function of time from 0 to 1. */
 function curve(token: string): (t: number) => number {
   const value = getComputedStyle(document.documentElement).getPropertyValue(token);
   const points = /cubic-bezier\(([^)]+)\)/.exec(value)?.[1]?.split(",").map(Number);
@@ -60,7 +49,6 @@ function curve(token: string): (t: number) => number {
   const at = (a: number, b: number, s: number) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
   return (t: number) => {
     if (t <= 0 || t >= 1) return Math.min(Math.max(t, 0), 1);
-    // The curve is monotonic in x, so halving finds the point for this time.
     let low = 0;
     let high = 1;
     for (let step = 0; step < 24; step += 1) {
@@ -72,10 +60,6 @@ function curve(token: string): (t: number) => number {
   };
 }
 
-/**
- * Moves the camera from one place to another over some frames, and returns a function that stops
- * it. Each frame goes to `apply`. With reduced motion, the camera goes to its place at once.
- */
 export function glideCamera(
   from: Camera,
   to: Camera,
@@ -91,7 +75,6 @@ export function glideCamera(
     apply(to, true);
     return () => {};
   }
-  // A step starts fast, so quick presses chain into one zoom. A flight starts and ends soft.
   const ease = curve(motion === "step" ? "--openbot-ease-out" : "--openbot-ease-in-out");
   const path = cameraPath(from, to, view);
   const start = performance.now();

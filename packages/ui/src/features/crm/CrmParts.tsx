@@ -40,18 +40,12 @@ import { FIELD_KEY, matches, PAY_STATE_KEY, payState, payVariant, SOURCE_KEY } f
 import type { CrmViewModel } from "./crm-state";
 import { useCrmText } from "./crm-text";
 
-/**
- * The open form dialog. A list that opens in the dialog mounts in it: at the body, the list is on the
- * popover layer, under the dialog, and the modal dialog hides it from assistive technology.
- */
 export const CrmPopupLayer = createContext<() => HTMLElement | undefined>(() => undefined);
 
-/** The element that a list of a select mounts in: the form dialog, or the body outside a dialog. */
 export function usePopupMount(): () => HTMLElement | undefined {
   return useContext(CrmPopupLayer);
 }
 
-/** The first letter of a customer, in place of a logo. */
 export function Logo(props: { name: string }) {
   return (
     <span class="crm-logo" aria-hidden="true">
@@ -71,7 +65,6 @@ export function Empty(props: { title: string; done?: boolean }) {
   );
 }
 
-/** An agent with its avatar. With `label`, the name shows; without it, only a screen reader reads it. */
 export function Owner(props: { crm: CrmViewModel; id: string | null; label?: boolean }) {
   return (
     <span class="crm-owner" title={props.label ? undefined : props.crm.agentName(props.id)}>
@@ -91,10 +84,8 @@ export function Owner(props: { crm: CrmViewModel; id: string | null; label?: boo
   );
 }
 
-/** The option of the owner picker for a customer with no owner. */
 const NO_OWNER = "none";
 
-/** Finds an agent by name, so the list works for a server with many agents. */
 export function OwnerSelect(props: {
   crm: CrmViewModel;
   value: string | null;
@@ -102,7 +93,6 @@ export function OwnerSelect(props: {
   labelledBy?: string;
   label?: string;
 }) {
-  // The picker keeps one options array while the agents stay the same.
   const options = createMemo(() => [NO_OWNER, ...props.crm.agents().map((agent) => agent.id)]);
   const idOf = (option: string) => (option === NO_OWNER ? null : option);
   const mount = usePopupMount();
@@ -127,15 +117,12 @@ export function OwnerSelect(props: {
   );
 }
 
-/** A value in the drawer. A click edits it in place; Enter or a click outside saves, Escape cancels. */
 export function TextField(props: {
   label: string;
   value: string;
   display?: string | undefined;
   type?: "text" | "email" | "tel" | "url" | undefined;
-  /** Shows after the label, such as a mark that agents do not see the value. */
   mark?: JSX.Element;
-  /** A long value, such as notes. Enter adds a line; Cmd or Ctrl with Enter saves. */
   multiline?: boolean | undefined;
   maxLength?: number | undefined;
   onSave: (value: string) => void;
@@ -224,7 +211,6 @@ export function TextField(props: {
   );
 }
 
-/** The customer name as a heading. A click on it edits it. An empty name is not saved. */
 export function NameField(props: { value: string; onSave: (value: string) => void }) {
   const { t } = useText();
   const [editing, setEditing] = createSignal(false);
@@ -277,7 +263,6 @@ export function NameField(props: { value: string; onSave: (value: string) => voi
   );
 }
 
-/** A short fixed list. `options` must stay the same array while the control shows. */
 export function ChoiceSelect<T extends string>(props: {
   options: T[];
   value: T;
@@ -327,7 +312,6 @@ export function ChoiceField<T extends string>(props: {
   );
 }
 
-/** A form control that names itself with a label element, for controls that are not inputs. */
 export function LabelledControl(props: { label: string; children: (labelId: string) => JSX.Element; wide?: boolean }) {
   const labelId = createUniqueId();
   return (
@@ -365,7 +349,6 @@ export function Glance(props: { label: string; value: string; detail?: string | 
   );
 }
 
-/** A lock after a field label when agents do not see the field. A click shows the field to agents again. */
 export function PrivateMark(props: { crm: CrmViewModel; field: CrmTextField }) {
   const { t } = useText();
   const label = () => t(FIELD_KEY[props.field]);
@@ -385,7 +368,6 @@ export function PrivateMark(props: { crm: CrmViewModel; field: CrmTextField }) {
   );
 }
 
-/** The tags of a customer, and a picker that finds a tag or makes a new one. */
 export function TagPicker(props: { crm: CrmViewModel; customer: CrmCustomer }) {
   const { t } = useText();
   const crm = props.crm;
@@ -477,7 +459,6 @@ export function TagPicker(props: { crm: CrmViewModel; customer: CrmCustomer }) {
   );
 }
 
-/** The status badge. A click opens the statuses: pick one, or type a name to make a new one. */
 export function StatusPicker(props: { crm: CrmViewModel; customer: CrmCustomer }) {
   const { t } = useText();
   const crm = props.crm;
@@ -562,7 +543,6 @@ export function StatusPicker(props: { crm: CrmViewModel; customer: CrmCustomer }
   );
 }
 
-/** Buttons that pick one view, with the number of items in each. */
 export function Chips<T extends string>(props: {
   label: string;
   items: readonly { id: T; label: string }[];
@@ -593,7 +573,6 @@ export function Chips<T extends string>(props: {
   );
 }
 
-/** Marks open payments as paid and tells the user. A source marks its own payments, so they are left out. */
 export function useMarkPaid(crm: CrmViewModel) {
   const { t } = useText();
   return async (payments: readonly CrmPayment[]) => {
@@ -603,10 +582,6 @@ export function useMarkPaid(crm: CrmViewModel) {
   };
 }
 
-/**
- * The mark of a row that a payment source keeps: people and agents cannot change it. On a customer
- * (`linked`), the source sets only the id; the other fields stay editable.
- */
 export function SourceMark(props: { source: CrmSourceKind; linked?: boolean }) {
   const { t } = useText();
   const name = () => t(SOURCE_KEY[props.source]);
@@ -621,7 +596,6 @@ export function SourceMark(props: { source: CrmSourceKind; linked?: boolean }) {
   );
 }
 
-/** The actions of one payment, in the sheet and in the drawer. A payment that a source keeps has only its mark. */
 export function PaymentMenu(props: { crm: CrmViewModel; payment: CrmPayment; inPanel?: boolean }) {
   return (
     <Show when={props.payment.source} keyed fallback={<PaymentActions {...props} />}>
@@ -711,10 +685,6 @@ function PaymentActions(props: { crm: CrmViewModel; payment: CrmPayment; inPanel
   );
 }
 
-/**
- * The actions of one plan in the drawer. Ending a plan removes its open payments after the end. A plan
- * that a source keeps has only its mark.
- */
 export function PlanMenu(props: { crm: CrmViewModel; customer: CrmCustomer; plan: CrmPlan }) {
   return (
     <Show when={props.plan.source} keyed fallback={<PlanActions {...props} />}>
@@ -756,7 +726,6 @@ function PlanActions(props: { crm: CrmViewModel; customer: CrmCustomer; plan: Cr
   );
 }
 
-/** Which agents can read the CRM and suggest changes. The list has a search for servers with many agents. */
 export function AgentAccess(props: { crm: CrmViewModel }) {
   const { t } = useText();
   const [query, setQuery] = createSignal("");
@@ -809,7 +778,6 @@ export function AgentAccess(props: { crm: CrmViewModel }) {
   );
 }
 
-/** The scrolling body of a drawer panel, with edge fades and middle-click autoscroll. */
 export function SideBody(props: { children: JSX.Element }) {
   const fades = createScrollFades();
   const autoScroll = createAutoScroll();
@@ -828,7 +796,6 @@ export function SideBody(props: { children: JSX.Element }) {
   );
 }
 
-/** The state of a payment as a badge: paid, late or upcoming. */
 export function PayStateBadge(props: { crm: CrmViewModel; payment: CrmPayment }) {
   const { t } = useText();
   const state = () => payState(props.payment, props.crm.today());

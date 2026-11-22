@@ -12,7 +12,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.webhookTestUnavailable":
     "The host cannot take the test event now. Make sure it is signed in, then try again.",
   "error.backend.webhookTestFailed": "The test event did not reach the routine. Try again.",
-  // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "A live browser view is only for a remote host.",
   "error.backend.browserViewUnsupported": "This remote host does not support a live browser view.",
   "error.backend.browserViewLimit": "Too many browser views are open on this host.",
@@ -223,7 +222,8 @@ export const messages = defineMessages("error.backend", {
     "This agent already has {count} open waits. Close a wait with openbot.close_wait before you open another one.",
   "error.backend.agentWaitGone": "This wait is not open. The agent closed it, or someone cancelled it.",
   "error.backend.agentWaitNoRequest": "A wait needs a message to continue. This turn has no message.",
-  "error.backend.agentWaitOwnChatOnly": "Open a wait only in your own chat. A channel or messaging task cannot wait.",
+  "error.backend.agentWaitOwnChatOnly":
+    "Open a wait in your own chat or in a side thread. A channel or messaging conversation cannot wait.",
   "error.backend.agentWaitNoteRequired": "Give a short note that says what the wait is for.",
   "error.backend.agentWaitRoutineGone": "This agent has no routine with this id.",
   "error.backend.agentWaitNoRoutine":
@@ -289,6 +289,12 @@ export const messages = defineMessages("error.backend", {
     "{provider} could not start the MCP server {name}. Its tools are not available to {provider}. {provider} starts the server itself, so the connection test in OpenBot can pass. Start a new chat to try again.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} could not start the MCP server {name}, because the server did not answer in time. Start a new chat to try again.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} could not start the MCP server {name}, because the server is not available now. Wait a few minutes, then start a new chat to try again.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} could not reach the MCP server {name}. Open {name} in Marketplace, Apps, and make sure that its address is correct and that the server is running. Then start a new chat to try again.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} could not get the GitHub tools, because GitHub did not answer. Open GitHub in Marketplace, Apps, and connect it again if it asks you to. Then start a new chat to try again.",
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
@@ -335,6 +341,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.libraryFolderGone": "The folder does not exist or is already deleted.",
   "error.backend.libraryFolderOtherAgent": "A file can go only into a folder of its agent.",
   "error.backend.libraryFolderMoveInvalid": "This folder cannot go there.",
+  "error.backend.workflowFolderLimit": "A server can have up to {limit} workflow folders.",
+  "error.backend.workflowFolderPlacementLimit": "Too many workflows are in folders.",
   "error.backend.sectionNameDuplicate": "Section names must be unique.",
   "error.backend.directMessageRequired": "Write a message first.",
   "error.backend.directMessageTooLong": "A direct message can have up to {limit} characters.",
@@ -370,10 +378,11 @@ export const messages = defineMessages("error.backend", {
     "Only the OpenBot phone app can send this report, because it adds the phone's version and support log. Open this chat on the phone. If you see this message there, update the phone app.",
   "error.backend.takeoverInactive": "This browser takeover is no longer active.",
   "error.backend.authSubmitting": "Authentication submission is already in progress.",
+  "error.backend.apiKeyListFailed": "OpenBot could not read the saved API keys.",
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
-  "error.backend.apiKeyNotAllowed": "Only the server owner or an admin can enter an API key.",
   "error.backend.apiKeySaving": "The API key is already being saved.",
-  "error.backend.vaultItemNotAllowed": "Only the server owner or an admin can add an item to the Vault.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot could not read the API key. Enter a key of 8,000 characters or less, and select who can use it.",
   "error.backend.vaultItemSaving": "The Vault item is already being saved.",
   "error.backend.authRequestInactive": "This secure authentication request is no longer active.",
   "error.backend.secureAuthUnavailable": "Secure authentication is unavailable.",
@@ -415,7 +424,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.popupLoadFailed": "The popup could not load. Retry sign-in from the original page.",
   "error.backend.browserTabNotFound": "Browser tab not found.",
   "error.backend.authActive": "Authentication is already active.",
-  "error.backend.authHttpsRequired": "Secure authentication requires HTTPS.",
+  "error.backend.authWebPageRequired": "Secure authentication requires HTTP or HTTPS.",
   "error.backend.authDigitsRange": "Authentication codes require 4–12 digits.",
   "error.backend.authExpired": "Authentication request expired.",
   "error.backend.authDigitsRequired": "Enter the requested number of digits.",
@@ -441,12 +450,10 @@ export const messages = defineMessages("error.backend", {
     "The sign-in server of this MCP server changed, so OpenBot did not send it the sign-in app. If the change is correct, remove the sign-in app and add it again.",
   "error.backend.mcpSignInAppNoServer": "Save this MCP server as a URL server before you add a sign-in app.",
   "error.backend.mcpSignInAppUnavailable": "This computer cannot keep a sign-in app.",
-  // Tasks: conversations of one agent that run beside its own chat.
   "error.backend.taskMoveRefused": "Only a message that you sent to this agent alone can run as a task.",
   "error.backend.taskNotFound": "This task is not available.",
   "error.backend.taskClosed": "This task is closed. Open it again to send a message.",
   "error.backend.taskStillRunning": "This task still runs. Wait until it stops, then close it.",
-  // Side threads. Hosts before side threads send the task texts above, so those keys stay.
   "error.backend.threadNotFound": "This thread is not available.",
   "error.backend.threadStillRunning": "This thread still runs. Stop it, then try again.",
   "error.backend.threadArchived": "This thread is archived. Restore it to send a message.",
@@ -461,6 +468,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.threadMoveRefused": "Only a message that you sent to this agent alone can run in a new thread.",
   "error.backend.taskTitleRequired": "Give the task a short title.",
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",
+  "error.backend.taskControlInvalid": "Give the taskId of a task that you started. A message also needs text.",
   "error.backend.taskOwnChatOnly":
     "Start a task only from your own chat. A channel, a messaging conversation or another task cannot start one.",
   "error.backend.taskUnfinishedLimit":
@@ -468,5 +476,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.taskOpenLimitReached":
     "This agent has {count} open tasks. Close a task, then start or open another one.",
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",
+  "error.backend.taskMessageFailed": "OpenBot could not send the message to the task. Try again later.",
   "error.backend.taskStartFailed": "OpenBot could not start the task. Do the work in this turn instead.",
 });

@@ -1,15 +1,3 @@
-/**
- * Everything that configures the default Electron session: the renderer's Content-Security-Policy,
- * its permission handlers, and the custom protocols that serve the packaged renderer bundle,
- * attachments, visual reply pages, avatars and server logos.
- *
- * **This module body must stay side-effect free.** The main entry point imports it, and an import
- * evaluates before the entry point's own statements - which is where `app.setPath("userData", ...)`
- * and `app.enableSandbox()` run. Anything executed at this module's top level would therefore run
- * against the wrong profile and an unsandboxed default. Every function here touches
- * `session.defaultSession` only when called, and each is called from inside `app.whenReady()`.
- */
-
 import { readFile, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
@@ -57,8 +45,6 @@ export function configureRendererPermissions(): void {
   session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) =>
     canCheckRendererPermission(permission, requestingOrigin, details),
   );
-  // The frame that asks decides, not its window: a visual reply frame inside the trusted window
-  // must not get the microphone or the clipboard.
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
     const mediaTypes = ("mediaTypes" in details ? details.mediaTypes : undefined) ?? [];
     callback(
@@ -77,12 +63,12 @@ export interface AttachmentProtocolDependencies {
   remoteServers: RemoteServerManager;
 }
 
-/**
- * True when the address asks for the small copy of a picture: `?preview=1`. Only a joined server's
- * file has one. A file of this computer reads from its disk in some milliseconds.
- */
 function asksForPreview(url: URL): boolean {
   return url.searchParams.get("preview") === "1";
+}
+
+function asksToOpen(url: URL): boolean {
+  return url.searchParams.get("open") === "1";
 }
 
 export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: AttachmentProtocolDependencies): void {
@@ -120,7 +106,13 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const attachment = await runCauseEffect(
         asksForPreview(url)
           ? remoteServers.downloadAttachmentPreview(attachmentId, serverId)
-          : remoteServers.downloadAttachment(attachmentId, serverId, true, remoteAttachmentPreviewSize(url)),
+          : remoteServers.downloadAttachment(
+              attachmentId,
+              serverId,
+              true,
+              remoteAttachmentPreviewSize(url),
+              !asksToOpen(url),
+            ),
       );
       return bytesResponse(
         attachment.bytes,
@@ -135,13 +127,10 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
         canAnswerRemoteRanges(attachment) ? request.headers.get("Range") : undefined,
       );
     } catch (error) {
-      // The image shows only a download icon, so the log is the only record of why it failed.
       logger.warn("A remote attachment could not be shown.", { cause: toLogValue(error) });
       return new Response("Not found", { status: 404 });
     }
   });
-  // A visual reply page: an HTML attachment with the frame script, in a sandbox. See
-  // `chat-visual-protocol.ts`.
   session.defaultSession.protocol.handle("openbot-visual", async (request) => {
     try {
       const url = new URL(request.url);

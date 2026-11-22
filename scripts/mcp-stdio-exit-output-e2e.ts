@@ -1,20 +1,3 @@
-/**
- * The connection test of a stdio MCP server says why the server stopped (#10137).
- *
- * Starts real stdio servers through `testMcpServer` and checks these cases:
- * - a server that writes its reason to stderr and stops shows that reason, and a configured
- *   secret value that it writes is masked;
- * - a server that stops without output keeps the old message;
- * - a server that writes 200 KB to stderr and answers each request after 1 second still passes,
- *   because the pipe is read all the time;
- * - a long stderr keeps only its end, within the error limit;
- * - a secret value that crosses the point where the shown end starts is masked, not shown in part;
- * - the colour codes of a terminal logger are removed.
- *
- * Writes `.openbot-build/mcp-stdio-exit-output-e2e.json`.
- *
- * Run: `bun scripts/mcp-stdio-exit-output-e2e.ts`
- */
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -27,7 +10,6 @@ import { testMcpServer } from "../src/backend/mcp-probe";
 
 const SECRET = "wp-secret-7f3a9c1e5b";
 
-/** A stdio MCP server: `MODE` chooses how it fails or answers. */
 const SERVER = `
 const mode = process.env.MODE;
 if (mode === "reason") {
@@ -37,7 +19,6 @@ if (mode === "reason") {
 }
 if (mode === "silent") process.exit(1);
 if (mode === "split") {
-  // The value starts 1,010 characters before the end, so the last 1,000 hold only its end.
   process.stderr.write("site " + process.env.WP_TOKEN + "\\n" + "y".repeat(990));
   process.exit(1);
 }
@@ -49,7 +30,6 @@ if (mode === "long") {
   process.stderr.write("first line that is cut away\\n" + "x".repeat(5000) + "\\nlast line: missing WP_URL\\n");
   process.exit(1);
 }
-// "slow": fill far more than a pipe buffer, then answer late.
 process.stderr.write("log line\\n".repeat(25000));
 let buffer = "";
 process.stdin.setEncoding("utf8");

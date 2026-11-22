@@ -5,10 +5,6 @@ import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves a table or
-// its marker; a newer or incomplete history is accepted; an edge, trigger, step or delivery can point
-// to nothing; deleting a workflow leaves its rows behind; deleting a node leaves its edges and trigger.
-// These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -31,7 +27,6 @@ const WORKFLOW_TABLES = [
 ];
 const EMPTY_WORKFLOW_TABLES = {
   ...Object.fromEntries(WORKFLOW_TABLES.map((table) => [table, []])),
-  // Migration 51 runs after 46 and adds this empty table.
   projection_messaging_allowed_senders: [],
   projection_deleted_thread_messages: [],
   browser_proxies: [],
@@ -59,7 +54,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A Discord connection, the place an output step posts to, from schema 25 on. */
 function seedConnection(db: DatabaseSync): void {
   db.prepare(`INSERT INTO projection_messaging_connections
     (connection_id, platform, workspace_id, workspace_name, enabled, bot_user_id, app_id, orchestrator_agent_id,
@@ -82,10 +76,6 @@ function seed(db: DatabaseSync, version: number): void {
       VALUES ('0123456789abcdef0123456789abcdef', 'Work', 30, '2026-01-02', '2026-01-02')`).run();
 }
 
-/**
- * Every row of every table, by table name. Migration 47 replaces the empty task table with the thread
- * table; `agent-thread-migration.test.ts` checks that move.
- */
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
 function contents(db: DatabaseSync): Contents {
@@ -100,11 +90,13 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** The source rows, and each agent memory has no site, as migration 60 adds it. */
-function withNoMemorySite(before: Contents): Contents {
+function withLaterColumns(before: Contents): Contents {
   return {
     ...before,
     projection_agent_memories: (before.projection_agent_memories ?? []).map((row) => ({ ...row, site: null })),
+    ...(before.workflow_steps && {
+      workflow_steps: before.workflow_steps.map((row) => ({ ...row, settings_json: null, sources_json: null })),
+    }),
   };
 }
 
@@ -113,13 +105,12 @@ function workflowTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 67 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
 }
 
-/** One workflow with a trigger, an agent and an output, one run, and a step of each kind of row. */
 function seedWorkflow(db: DatabaseSync): void {
   db.exec(`
     INSERT INTO workflows (workflow_id, title, created_at, updated_at)
@@ -164,12 +155,11 @@ describe("workflow migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db, version);
-      // The earlier migrations run first; the rows after them are what v46 must keep.
       if (version < 45) migrateUpTo(db, 45);
       if (version < 25) seedConnection(db);
       const before = contents(db);
       migrateOpenBotDatabase(db);
-      expect(contents(db)).toEqual({ ...withNoMemorySite(before), ...EMPTY_WORKFLOW_TABLES });
+      expect(contents(db)).toEqual({ ...withLaterColumns(before), ...EMPTY_WORKFLOW_TABLES });
       expectHealthy(db);
     },
   );
@@ -187,7 +177,7 @@ describe("workflow migration", () => {
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual({ ...withNoMemorySite(before), ...EMPTY_WORKFLOW_TABLES });
+    expect(contents(db)).toEqual({ ...withLaterColumns(before), ...EMPTY_WORKFLOW_TABLES });
     expectHealthy(db);
   });
 
@@ -195,9 +185,9 @@ describe("workflow migration", () => {
     const db = databaseAt(45);
     seed(db, 45);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(68,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=68; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(workflowTables(db)).toEqual([]);
@@ -246,7 +236,6 @@ describe("workflow migration", () => {
     seed(db, 45);
     migrateOpenBotDatabase(db);
     seedWorkflow(db);
-    // A copy keeps the node ids, so its keys are the same text as the first workflow's.
     db.exec(`INSERT INTO workflows (workflow_id, title, created_at, updated_at)
       VALUES ('workflow-2', 'Competitor watch copy', '2026-01-04', '2026-01-04')`);
     const run = (workflowId: string, runId: string, number: number) =>
@@ -270,13 +259,8 @@ describe("workflow migration", () => {
   });
 });
 
-// Migration 49 rebuilds the run table to add the GitHub run source, and adds the GitHub tables. Failure
-// modes: the rebuild loses or changes a run, or a step or output delivery loses its run; a failed
-// upgrade leaves the staging table, the GitHub tables or the marker; the old CHECK survives; a GitHub
-// row can point to nothing, or outlive its workflow, run or trigger node.
 const GITHUB_TABLES = ["workflow_github_actions", "workflow_github_deliveries", "workflow_github_runs"];
 const EMPTY_GITHUB_TABLES = Object.fromEntries(GITHUB_TABLES.map((table) => [table, []]));
-/** Migration 51 runs after 49 and 50 and adds this empty table. */
 const EMPTY_V54_TABLES = {
   projection_deleted_thread_messages: [],
   browser_proxies: [],
@@ -301,7 +285,6 @@ function githubRun(runId: string, number: number): string {
       '{"nodes":[],"edges":[],"strokes":[]}', 'done', '2026-01-05', '2026-01-05')`;
 }
 
-/** A GitHub run of the seeded workflow, with its item, its delivery and one change it made. */
 function seedGitHub(db: DatabaseSync): void {
   db.exec(githubRun("run-2", 2));
   db.exec(`
@@ -331,7 +314,7 @@ describe("workflow GitHub migration", () => {
 
     migrateOpenBotDatabase(db);
 
-    expect(contents(db)).toEqual({ ...withNoMemorySite(before), ...EMPTY_GITHUB_TABLES, ...EMPTY_LATER_TABLES });
+    expect(contents(db)).toEqual({ ...withLaterColumns(before), ...EMPTY_GITHUB_TABLES, ...EMPTY_LATER_TABLES });
     expectHealthy(db);
     expect(runSourceCheck(db)).toContain("'github'");
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE '%_v49'").all()).toEqual([]);
@@ -344,7 +327,6 @@ describe("workflow GitHub migration", () => {
       { name: "workflow_runs_open" },
       { name: "workflow_runs_recent" },
     ]);
-    // The steps still belong to the run: deleting it deletes the step and its delivery.
     db.exec("DELETE FROM workflow_runs WHERE run_id='run-1'");
     expect(count(db, "workflow_steps")).toBe(1);
     expect(count(db, "workflow_output_deliveries")).toBe(0);
@@ -365,7 +347,7 @@ describe("workflow GitHub migration", () => {
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual({ ...withNoMemorySite(before), ...EMPTY_GITHUB_TABLES, ...EMPTY_LATER_TABLES });
+    expect(contents(db)).toEqual({ ...withLaterColumns(before), ...EMPTY_GITHUB_TABLES, ...EMPTY_LATER_TABLES });
     expectHealthy(db);
   });
 
@@ -375,9 +357,9 @@ describe("workflow GitHub migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(68,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=46");
+    db.exec("DELETE FROM schema_migrations WHERE version=68; DELETE FROM schema_migrations WHERE version=46");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 46");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);
@@ -399,7 +381,6 @@ describe("workflow GitHub migration", () => {
       `INSERT INTO workflow_github_deliveries (workflow_id, node_id, delivery_id, event, repository, number,
           pull_request, title, received_at, outcome, reason, payload)
         VALUES ('workflow-1', 'trigger', 'delivery-3', 'comment', ${values})`;
-    // An item with a missing part, a skip with no reason, a reason with no skip, a payload on a started row.
     fails(delivery("'octo/repo', NULL, 0, 'Title', '2026-01-05', 'started', NULL, NULL"));
     fails(delivery("'octo/repo', 8, 0, 'Title', '2026-01-05', 'skipped', NULL, NULL"));
     fails(delivery("'octo/repo', 8, 0, 'Title', '2026-01-05', 'started', 'filter', NULL"));
@@ -439,9 +420,6 @@ describe("workflow GitHub migration", () => {
   });
 });
 
-// Migration 50 rebuilds the run table again to add the Discord run source. Failure modes: the rebuild
-// loses or changes a run, or a step, output delivery or GitHub row loses its run; a failed upgrade
-// leaves the staging table or the marker; the old CHECK survives; the run indexes are lost.
 function discordRun(runId: string, number: number): string {
   return `INSERT INTO workflow_runs (run_id, workflow_id, number, trigger_node_id, source, idempotency_key,
       graph_revision, graph_json, payload, status, started_at, updated_at)
@@ -462,8 +440,8 @@ describe("workflow Discord migration", () => {
 
     expect(contents(db)).toEqual(
       version >= 49
-        ? { ...withNoMemorySite(before), ...EMPTY_LATER_TABLES }
-        : { ...withNoMemorySite(before), ...EMPTY_GITHUB_TABLES, ...EMPTY_LATER_TABLES },
+        ? { ...withLaterColumns(before), ...EMPTY_LATER_TABLES }
+        : { ...withLaterColumns(before), ...EMPTY_GITHUB_TABLES, ...EMPTY_LATER_TABLES },
     );
     expectHealthy(db);
     expect(runSourceCheck(db)).toContain("'discord'");
@@ -480,7 +458,6 @@ describe("workflow Discord migration", () => {
     ]);
     db.exec(discordRun("run-3", 3));
     expect(count(db, "workflow_runs")).toBe(version >= 49 ? 3 : 2);
-    // The steps and GitHub rows still belong to their runs: deleting a run deletes them.
     db.exec("DELETE FROM workflow_runs WHERE run_id='run-1'");
     expect(count(db, "workflow_steps")).toBe(1);
     expect(count(db, "workflow_output_deliveries")).toBe(0);
@@ -506,7 +483,7 @@ describe("workflow Discord migration", () => {
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual({ ...withNoMemorySite(before), ...EMPTY_LATER_TABLES });
+    expect(contents(db)).toEqual({ ...withLaterColumns(before), ...EMPTY_LATER_TABLES });
     expectHealthy(db);
   });
 
@@ -516,18 +493,15 @@ describe("workflow Discord migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(68,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=47");
+    db.exec("DELETE FROM schema_migrations WHERE version=68; DELETE FROM schema_migrations WHERE version=47");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 47");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);
   });
 });
 
-// Migration 52 rebuilds the run table again to add the Telegram run source. Failure modes: the rebuild
-// loses or changes a run, including a Discord run, or a step, output delivery or GitHub row loses its run;
-// a failed upgrade leaves the staging table or the marker; the old CHECK survives; the run indexes are lost.
 function telegramRun(runId: string, number: number): string {
   return `INSERT INTO workflow_runs (run_id, workflow_id, number, trigger_node_id, source, idempotency_key,
       graph_revision, graph_json, payload, status, started_at, updated_at)
@@ -548,7 +522,7 @@ describe("workflow Telegram migration", () => {
     migrateOpenBotDatabase(db);
 
     expect(contents(db)).toEqual({
-      ...withNoMemorySite(before),
+      ...withLaterColumns(before),
       ...(version >= 49 ? {} : EMPTY_GITHUB_TABLES),
       ...(version >= 51 ? EMPTY_V54_TABLES : EMPTY_LATER_TABLES),
     });
@@ -568,7 +542,6 @@ describe("workflow Telegram migration", () => {
     ]);
     db.exec(telegramRun("run-3", 3));
     expect(count(db, "workflow_runs")).toBe((version >= 49 ? 3 : 2) + (version >= 50 ? 1 : 0));
-    // The steps and GitHub rows still belong to their runs: deleting a run deletes them.
     db.exec("DELETE FROM workflow_runs WHERE run_id='run-1'");
     expect(count(db, "workflow_steps")).toBe(1);
     expect(count(db, "workflow_output_deliveries")).toBe(0);
@@ -595,7 +568,7 @@ describe("workflow Telegram migration", () => {
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual({ ...withNoMemorySite(before), ...EMPTY_V54_TABLES });
+    expect(contents(db)).toEqual({ ...withLaterColumns(before), ...EMPTY_V54_TABLES });
     expectHealthy(db);
   });
 
@@ -605,19 +578,15 @@ describe("workflow Telegram migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(68,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=48");
+    db.exec("DELETE FROM schema_migrations WHERE version=68; DELETE FROM schema_migrations WHERE version=48");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 48");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);
   });
 });
 
-// Migration 53 rebuilds the run table again to add the Slack run source. Failure modes: the rebuild loses
-// or changes a run, such as a Discord run of schema 50 or a Telegram run of schema 52, a WhatsApp sender of
-// schema 51 is lost, or a step, output delivery or GitHub row loses its run; a failed upgrade leaves the
-// staging table or the marker; the old CHECK survives; the run indexes are lost.
 function slackRun(runId: string, number: number): string {
   return `INSERT INTO workflow_runs (run_id, workflow_id, number, trigger_node_id, source, idempotency_key,
       graph_revision, graph_json, payload, status, started_at, updated_at)
@@ -625,7 +594,6 @@ function slackRun(runId: string, number: number): string {
       '{"nodes":[],"edges":[],"strokes":[]}', 'Mention 界', 'done', '2026-01-07', '2026-01-07')`;
 }
 
-/** A WhatsApp allowed sender of schema 51, on the connection that `seed` adds. */
 const WHATSAPP_SENDER = `INSERT INTO projection_messaging_allowed_senders
     (connection_id, sender_id, kind, name, created_at) VALUES ('connection-1', '48600100200', 'contact', 'Ana', '2026-01-04')`;
 
@@ -644,7 +612,7 @@ describe("workflow Slack migration", () => {
     migrateOpenBotDatabase(db);
 
     expect(contents(db)).toEqual({
-      ...withNoMemorySite(before),
+      ...withLaterColumns(before),
       ...(version >= 49 ? {} : EMPTY_GITHUB_TABLES),
       ...(version >= 51 ? EMPTY_V54_TABLES : EMPTY_LATER_TABLES),
     });
@@ -667,7 +635,6 @@ describe("workflow Slack migration", () => {
     expect(count(db, "workflow_runs")).toBe(
       (version >= 49 ? 3 : 2) + (version >= 50 ? 1 : 0) + (version >= 52 ? 1 : 0),
     );
-    // The steps and GitHub rows still belong to their runs: deleting a run deletes them.
     db.exec("DELETE FROM workflow_runs WHERE run_id='run-1'");
     expect(count(db, "workflow_steps")).toBe(1);
     expect(count(db, "workflow_output_deliveries")).toBe(0);
@@ -696,7 +663,7 @@ describe("workflow Slack migration", () => {
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
-    expect(contents(db)).toEqual({ ...withNoMemorySite(before), ...EMPTY_V54_TABLES });
+    expect(contents(db)).toEqual({ ...withLaterColumns(before), ...EMPTY_V54_TABLES });
     expectHealthy(db);
   });
 
@@ -706,9 +673,9 @@ describe("workflow Slack migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(68,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=48");
+    db.exec("DELETE FROM schema_migrations WHERE version=68; DELETE FROM schema_migrations WHERE version=48");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 48");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);

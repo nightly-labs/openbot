@@ -1,20 +1,3 @@
-// The agent of the refused tool schema cases in `antigravity-mcp-load-failure-e2e.ts` (#7228). The
-// Antigravity CLI 1.5.6 checks each MCP tool schema when it builds the toolbox of a prompt. When it
-// refuses one, it writes the tool only to its own log, answers "Agent execution terminated due to
-// error." and ends the turn as a success. A session keeps the servers that its process started, also
-// after a resume without them. This fake does the same: a session with the server `resend` refuses
-// `mcp_resend_get-contact`, and a prompt with `REFUSE_TOOL=<tool>` refuses that tool, as for a server from the
-// user's own `mcp_config.json`. A prompt with `CLI_1_5_9` gets the answer of the CLI 1.5.9, which names
-// the tool (#9568). The real 1.5.9 also logs the line; this fake does not, so only the answer can
-// name the tool. From #7482: the CLI saves the schema of each tool of a server that it starts, and
-// Google refuses a request whose tool has an array with no `items` or an empty `enum` value. Its
-// answer names the tool only by its place in the request. A session with the server `ticktick` (or,
-// from #11746, `bling`, whose field has `items` but is not an array) gets
-// that answer, in the log or, with `CLI_1_5_9`, in the answer. From #11063: the real CLI 1.5.9 and
-// 1.5.10 refuse the tool of a server that the session had when it opened again from the second prompt
-// of a process that resumed it without that server. A prompt with `SERVERS_RETURN` does the same.
-// From #12358: the CLI sends each number in an `enum` as an empty value, so a session with the
-// server `aave` gets Google's answer for an empty `enum` value too.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
@@ -36,7 +19,6 @@ interface SavedTool {
   parameters: { type: "object"; properties: object };
 }
 
-/** The tool schemas that the CLI saves for a server that it starts. Only `ticktick`, `bling` and `aave` have tools that Google refuses. */
 const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
   ticktick: [
     { name: "list_tasks", parameters: { type: "object", properties: { tags: { type: "array" } } } },
@@ -45,7 +27,6 @@ const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
       parameters: { type: "object", properties: { status: { type: "string", enum: ["open", ""] } } },
     },
   ],
-  // From #11746: `items` on a field that is not an array.
   bling: [
     {
       name: "listAccountReceivables",
@@ -55,14 +36,12 @@ const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
       },
     },
   ],
-  // From #12358: a number `enum`, which the CLI sends as empty values.
   aave: [
     {
       name: "get_reserve_holders",
       parameters: { type: "object", properties: { limit: { type: "number", enum: [10, 50] } } },
     },
   ],
-  // Fields with the same name as refused ones, which Google accepts.
   atlas: [
     { name: "search", parameters: { type: "object", properties: { tags: { type: "string" } } } },
     {
@@ -88,12 +67,9 @@ const GOOGLE_REFUSALS: Partial<Record<string, string>> = {
   ].join("\n"),
 };
 
-/** The servers of each session that this process started. A resume does not change them. */
 const started = new Map<string, string[]>();
-/** The prompts of each session that this process answered. */
 const answered = new Map<string, number>();
 let sessions = 0;
-/** The servers that each session opened with, kept on disk as the CLI keeps its conversations. */
 const openedWith = (sessionId: string) => join(appData, "sessions", sessionId);
 
 function record(request: AcpRequest, sessionId: string): void {

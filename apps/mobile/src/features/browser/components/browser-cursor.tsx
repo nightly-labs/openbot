@@ -21,16 +21,11 @@ import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reani
 import Svg, { Path } from "react-native-svg";
 import type { Point, Rect, Zoom } from "../model/live-view-geometry";
 
-/** The drawn size of the pointer, in points. It does not grow with the zoom, as a real pointer does not. */
 const CURSOR_SIZE = 26;
-/** The icons are drawn in a 24-unit box. */
 const UNITS = 24;
-// The pointer shows over any page, so it is black with a white edge, as a desktop pointer is.
-// These are the pointer's own colors, not theme colors.
 const INK = "#000000";
 const EDGE = "#ffffff";
 
-/** The icon of each cursor, and the point of the icon that is the pointer's position. */
 const GLYPHS: Record<
   Exclude<BrowserViewCursor, "default" | "none" | "progress">,
   { icon: LucideIcon; hotspot: Point }
@@ -58,11 +53,9 @@ const GLYPHS: Record<
 const ARROW_HOTSPOT: Point = { x: 5, y: 3 };
 
 function glyph(cursor: BrowserViewCursor) {
-  // A page that hides its pointer still needs one on a phone, so `none` shows the arrow.
   return cursor === "default" || cursor === "none" || cursor === "progress" ? null : GLYPHS[cursor];
 }
 
-/** The page's cursor at the pointer, over the frame. It takes no touches. */
 export function BrowserCursor({
   cursor,
   pointer,
@@ -70,9 +63,7 @@ export function BrowserCursor({
   zoom,
 }: {
   cursor: BrowserViewCursor;
-  /** The pointer, as a fraction of the page. */
   pointer: SharedValue<Point>;
-  /** The page fitted into the stage, before the zoom. */
   fitted: SharedValue<Rect>;
   zoom: SharedValue<Zoom>;
 }) {
@@ -118,7 +109,6 @@ function Arrow() {
   );
 }
 
-/** A line icon drawn twice: a wide white line under a black one, so it shows on dark and light pages. */
 function OutlinedIcon({ icon: Icon }: { icon: LucideIcon }) {
   return (
     <View style={{ width: CURSOR_SIZE, height: CURSOR_SIZE }}>

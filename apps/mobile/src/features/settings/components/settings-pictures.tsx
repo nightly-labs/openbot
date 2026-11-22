@@ -13,26 +13,15 @@ import { ScopedTheme } from "uniwind";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { END_X } from "@/shared/lib/text-direction";
 
-// Grey wireframe pictures for the picture choices in Settings. Each one is still until `play` grows,
-// then plays its demonstration once. Reduced motion keeps them still. Colors come from the theme
-// tokens; only a message color picture shows a real color, because the color is the setting.
-
-/** The curve of an iOS sheet or keyboard: a fast start and a long, soft end. */
 const SLIDE = Easing.bezier(0.32, 0.72, 0, 1);
 const OUT = Easing.out(Easing.cubic);
 const IN_OUT = Easing.inOut(Easing.quad);
-/** A line types out from the start of the reading direction: the left, or the right in RTL. */
 const LINE_START_ORIGIN = END_X === 1 ? "0% 50%" : "100% 50%";
 
-/**
- * Runs `run` once for each new tap: when `play` grows. A change of reduced motion or of a prop does
- * not play the demonstration again. With reduced motion, the picture stays still.
- */
 function useDemonstration(play: number, run: () => void) {
   const reduced = useReducedMotion();
   const played = useRef(play);
   useEffect(() => {
-    // `play` goes back to 0 when another option is tapped. Only a larger value is a new tap.
     const grew = play > played.current;
     played.current = play;
     if (grew && !reduced) run();
@@ -43,7 +32,6 @@ function presetColor(id: ChatColorPresetId): string {
   return CHAT_COLOR_PRESETS.find((preset) => preset.id === id)?.value ?? CHAT_COLOR_PRESETS[0].value;
 }
 
-/** A line of text or a bar in a picture. `strong` is a darker line, such as your own message. */
 function Bar({ className, strong = false }: { className: string; strong?: boolean }) {
   return (
     <View
@@ -53,7 +41,6 @@ function Bar({ className, strong = false }: { className: string; strong?: boolea
   );
 }
 
-/** An agent face: the shape of an avatar with two eyes. */
 function Face({ className, eyeStyle }: { className: string; eyeStyle?: ReturnType<typeof useAnimatedStyle> }) {
   return (
     <View className={`items-center justify-center rounded-[7px] ${className}`}>
@@ -66,7 +53,6 @@ function Face({ className, eyeStyle }: { className: string; eyeStyle?: ReturnTyp
   );
 }
 
-/** Settings > Animations: an agent face and a reply. With full motion, the face moves and the reply types out. */
 export function MotionPicture({ full, play }: { full: boolean; play: number }) {
   const lift = useSharedValue(0);
   const blink = useSharedValue(1);
@@ -117,7 +103,6 @@ export function MotionPicture({ full, play }: { full: boolean; play: number }) {
   );
 }
 
-/** A small chat in the theme around it: two messages and your reply. */
 function ThemeScene() {
   return (
     <View className="absolute inset-0 bg-sheet">
@@ -128,10 +113,6 @@ function ThemeScene() {
   );
 }
 
-/**
- * Settings > Appearance > Theme. System shows both themes side by side; its demonstration turns
- * the picture dark and then light, as the phone does through the day.
- */
 export function ThemePicture({ mode, play }: { mode: "system" | "light" | "dark"; play: number }) {
   const dark = useSharedValue(0);
   const light = useSharedValue(0);
@@ -155,7 +136,6 @@ export function ThemePicture({ mode, play }: { mode: "system" | "light" | "dark"
       <ScopedTheme theme="light">
         <ThemeScene />
       </ScopedTheme>
-      {/* The dark half keeps the full width of the picture, so its lines continue those of the light half. */}
       <View className="absolute inset-y-0 right-0 w-1/2 overflow-hidden">
         <View className="absolute inset-y-0 right-0 w-[200%]">
           <ScopedTheme theme="dark">
@@ -177,10 +157,6 @@ export function ThemePicture({ mode, play }: { mode: "system" | "light" | "dark"
   );
 }
 
-/**
- * Settings > Appearance > Message color: your message above an agent's reply. With Agent color,
- * the demonstration changes your message through the colors of three agents.
- */
 export function MessageColorPicture({
   mode,
   customColor,
@@ -230,13 +206,8 @@ export function MessageColorPicture({
   );
 }
 
-/** The height of the keyboard in a message field picture. */
 const KEYBOARD_HEIGHT = 36;
 
-/**
- * Settings > Conversations > Message field. The demonstration opens and closes the keyboard; a
- * compact field grows into the full field while the keyboard is open.
- */
 export function ComposerPicture({ compact, play }: { compact: boolean; play: number }) {
   const open = useSharedValue(0);
   const small = useSharedValue(1);
@@ -279,16 +250,10 @@ export function ComposerPicture({ compact, play }: { compact: boolean; play: num
   );
 }
 
-/** The part of the picture that the chat moves aside for the panel. */
 const PANEL_SHARE = 0.54;
 
-/** With "off", the chat moves a little with the swipe and comes back: no screen opens. */
 const OFF_NUDGE = 0.08;
 
-/**
- * Settings > Conversations > swipe in an agent chat. The picture shows the panel open beside the
- * chat; the demonstration closes it and opens it again, as a swipe does. "Off" shows only the chat.
- */
 export function SwipePicture({ target, play }: { target: "question" | "threads" | "browser" | "off"; play: number }) {
   const width = useSharedValue(0);
   const shown = useSharedValue(1);
@@ -299,7 +264,6 @@ export function SwipePicture({ target, play }: { target: "question" | "threads" 
         ? withSequence(withTiming(0, { duration: 220, easing: OUT }), withTiming(1, { duration: 360, easing: SLIDE }))
         : withSequence(withTiming(0, slide), withDelay(600, withTiming(1, slide)));
   });
-  // React Native mirrors the layout in RTL (the panel opens from the left), but not translateX.
   const chatStyle = useAnimatedStyle(() => ({
     transform: [
       {

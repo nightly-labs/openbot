@@ -7,17 +7,12 @@ import { QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps, PromptAnswerOptions } from "./conversation-types";
 
-/**
- * The question that the open thread waits for, as a card. The agent's chat and an open side thread show it.
- * `elementRef` gets the card, for the chat that keeps it in view. `onAnswer` replaces the view's answer.
- * `registerComposerAnswer` lets the message box of the same chat answer the question.
- */
 export function ConversationQuestionPrompt(props: {
   elementRef?: (element: HTMLElement | undefined) => void;
   onAnswer?: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>;
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
 }) {
-  const { props: view, openExternalMessageUrl } = useConversationViewScope();
+  const { props: view, openExternalMessageUrl, keepUnsentPromptAnswer } = useConversationViewScope();
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
     const prompt = view.prompt;
@@ -30,10 +25,6 @@ export function ConversationQuestionPrompt(props: {
     cachedPrompt = { key, prompt };
     return cachedPrompt;
   });
-  /**
-   * The block of the waiting prompt draws it as a card. Until the block's message arrives, or when the
-   * agent asked without one, the prompt's questions draw it.
-   */
   const pendingPromptBlock = createMemo(() => (keyedPrompt() ? view.promptUiBlock : undefined));
   const answer = (answers: Record<string, string[]>, options?: PromptAnswerOptions) =>
     (props.onAnswer ?? view.onAnswerPrompt)(answers, options);
@@ -68,6 +59,7 @@ export function ConversationQuestionPrompt(props: {
                   elementRef={(element) => props.elementRef?.(element)}
                   onAnswer={answer}
                   canEditPreview={serverSupportsCapability(view.server, UI_BLOCK_PREVIEW_EDIT_CAPABILITY)}
+                  onUnsentPreviewChange={keepUnsentPromptAnswer}
                   onAnswered={presentResolution}
                 />
               )}

@@ -22,6 +22,11 @@ export const messages = {
   "channel.panel.close": "Kanal panelini kapat",
   "channel.settings.title": "Kanal ayarları",
   "channel.settings.memories": "Bellekler",
+  "channel.settings.folders.title": "Klasörler",
+  "channel.settings.folders.description":
+    "{channel} kanalının tüm üyeleri bu klasörlerde dosyaları değiştirebilir ve komut çalıştırabilir.",
+  "channel.settings.folders.toastAdded": "{channel} üyeleri artık {folder} içindeki dosyaları değiştirebilir",
+  "channel.settings.folders.toastRemoved": "{channel} üyeleri artık {folder} içindeki dosyaları değiştiremez",
   "channel.settings.isolated": "Bellekleri bu kanalda tut",
   "channel.settings.isolatedDescription":
     "Ajanlar burada öğrendiklerini kanal belleği olarak kaydeder. Diğer sohbetleri bunları görmez.",

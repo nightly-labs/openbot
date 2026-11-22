@@ -1,6 +1,3 @@
-// Run: bun scripts/routine-cron-syntax-e2e.ts --phase=before
-// Phase selects the report folder only. All phases require invalid writes to fail.
-// Uses only synthetic SQLite state, the real routine store, scheduler and mailbox.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -26,8 +23,6 @@ import { RoutineTimer } from "../src/backend/routine-timer";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const NOW = new Date("2035-01-01T00:01:00.000Z");
-// Each save must fail. The value is the next run that the released parser reads after the 00:10 run.
-// `Number` reads hex, exponent, sign and fraction forms, so a stored row with them still runs.
 const RELEASED_NEXT_RUN: Record<string, string> = {
   "*/10/garbage * * * *": "2035-01-01T00:20:00.000Z",
   ",10 * * * *": "2035-01-01T01:00:00.000Z",
@@ -44,7 +39,6 @@ const RELEASED_NEXT_RUN: Record<string, string> = {
   "0 1.0 * * *": "2035-01-01T01:00:00.000Z",
 };
 const INVALID = Object.keys(RELEASED_NEXT_RUN);
-// Leading zeros are plain decimal digits, so saves keep them.
 const VALID = ["*/10 * * * *", "0,10 * * * *", "0-50/10 * * * *", "00-50/010 * * * *"];
 const SOURCES = [
   "scripts/routine-cron-syntax-e2e.ts",
@@ -159,7 +153,6 @@ async function openFixture(root: string): Promise<Fixture> {
       () => store.list(),
     );
     const runtime = conversation;
-    // The scheduler has no running host here. Each pass gets an explicit clock, so no timer races it.
     const timer = new RoutineTimer(
       () => [],
       () => false,
@@ -168,7 +161,13 @@ async function openFixture(root: string): Promise<Fixture> {
     const waits = new AgentWaits({
       store: new AgentWaitStore({ database }),
       mailbox,
-      hooks: { emit: () => {}, ownsRoutine: () => true, hasRoutine: () => true, requireKnownAgent: () => {} },
+      hooks: {
+        emit: () => {},
+        ownsRoutine: () => true,
+        hasRoutine: () => true,
+        requireKnownAgent: () => {},
+        isSideThread: () => false,
+      },
     });
     const scheduler = new RoutineScheduler({
       store,
@@ -184,13 +183,13 @@ async function openFixture(root: string): Promise<Fixture> {
         scheduleDrain: () => {},
         interrupt: () => Effect.void,
         awaitDrain: () => undefined,
-        // Provider draining and snapshot delivery are outside this scheduler proof.
         syncMailboxMessages: () => {},
         listAgents: () => store.list(),
         excludedAgents: () => new Set(),
         isRunning: () => false,
         usageLimited: () => false,
         routineThread: () => null,
+        waitThread: () => null,
         routineDeleted: () => Effect.void,
       },
     });
@@ -230,7 +229,6 @@ function input(fixture: Fixture, expression: string) {
   };
 }
 
-// Snapshot every table, including event and command receipts, to detect partial writes.
 function persisted(fixture: Fixture): string {
   const db = fixture.database.connection;
   const tables = databaseRows(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all());
@@ -290,7 +288,6 @@ function invalidWrite(fixture: Fixture, row: CaseResult, expression: string, ope
   row.unchanged = before === after;
   row.routinesAfter = fixture.runs.list(fixture.agentId).map(outcome);
   row.attemptedWriteCount = totalChanges(fixture) - changes;
-  // Report all outcomes before checking them. A failure must not skip other cases.
   assert.ok(row.rejected, "Invalid schedule must be rejected by the domain store.");
   assert.ok(row.rejection?.domainError, "Rejection must be a RoutineInputError.");
   assert.ok(row.unchanged, "Rejected input must leave all stored data unchanged.");
@@ -300,7 +297,6 @@ function invalidWrite(fixture: Fixture, row: CaseResult, expression: string, ope
 async function delivery(fixture: Fixture, row: CaseResult, routine: Routine, expectedNext: string): Promise<void> {
   const due = routine.trigger.nextRunAt;
   assert.equal(due, "2035-01-01T00:10:00.000Z");
-  // Await the real scheduler pass and committed mailbox writes, without a provider drain or sleeps.
   await runCauseEffect(fixture.scheduler.processDue(new Date(due)));
   const runs = fixture.runs.listRuns(fixture.agentId, routine.id);
   const messages = fixture.mailbox
@@ -350,13 +346,11 @@ async function validControl(fixture: Fixture, row: CaseResult, expression: strin
 
 async function legacyControl(fixture: Fixture, row: CaseResult, expression: string): Promise<void> {
   const routine = fixture.runs.create(input(fixture, "*/10 * * * *"), NOW);
-  // This is a released row fixture, not a new invalid create. Only its stored schedule is replaced.
   fixture.database.connection
     .prepare("UPDATE projection_routine_triggers SET schedule_json = ? WHERE routine_id = ?")
     .run(JSON.stringify({ kind: "custom", expression }), routine.id);
   fixture.database.close();
   await runCauseEffect(fixture.database.initialize());
-  // Reinitialize closes and reopens the real SQLite file. Reads must preserve the released expression.
   const loaded = fixture.runs.list(fixture.agentId).find((entry) => entry.id === routine.id);
   assert.ok(loaded);
   row.loaded = outcome(loaded);
@@ -444,7 +438,6 @@ function validChannelControl(fixture: Fixture, row: CaseResult, expression: stri
   assert.deepEqual(runs.get(fixture.channelId, routine.id), routine);
   row.loaded = outcome(routine);
   assert.equal(routine.trigger.nextRunAt, "2035-01-01T00:10:00.000Z");
-  // Exercise valid record create and changed schedule saves at the same domain boundary.
   const fields = channelInput(fixture, expression);
   const record = runs.saveRecord(
     fixture.channelId,
@@ -493,7 +486,6 @@ async function legacyChannelControl(fixture: Fixture, row: CaseResult, expressio
   assert.equal(edited.instruction, "Edited synthetic instruction");
   assert.deepEqual(edited.trigger, loaded.trigger);
   assert.deepEqual(runs.get(fixture.channelId, routine.id), edited);
-  // The released parser still finds the stored occurrence without channel execution.
   const due = runs.due(new Date(loaded.trigger.nextRunAt));
   assert.equal(due.length, 1);
   assert.equal(due[0]?.routine.id, routine.id);

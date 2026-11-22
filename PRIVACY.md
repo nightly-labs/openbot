@@ -5,8 +5,10 @@ browser data, and team data stay on the computer that runs OpenBot. The one exce
 encrypted copy that the signed-in mobile app keeps of what it shows (see the mobile section below).
 The optional OpenBot account
 service stores the minimum central data needed for email sign-in, account avatars, remote host
-configuration, memberships, invitations, logical sessions, and the account's product analytics
-answer.
+configuration, memberships, invitations, ownership transfers, logical sessions, and the account's
+product analytics answer. An ownership transfer keeps the server, the email that the owner entered
+and the two accounts, also after it ends, so that a server plan of the earlier owner still counts
+for the server.
 
 The optional browser client at `/app` connects to the computer that runs OpenBot. Conversation
 and attachment data travel through the existing encrypted host connection, not through the
@@ -92,8 +94,8 @@ profile of your account ID, as the apps do at sign-in. It does this also when pr
 off on your devices, so that the paid account is not anonymous in the sales data. The email is not
 copied into the events.
 
-For each email that the account service sends from its mailbox (a sign-in code, an invitation, a contact
-message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
+For each email that the account service sends from its mailbox (a sign-in code, an invitation, an
+ownership transfer, a contact message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
 event has no account ID, email address, name or message content.
 
 Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
@@ -218,8 +220,10 @@ without account credentials. The phone sends no request to a plugin vendor until
 that vendor's app. A key the user types, or the grant of a browser sign-in, goes only to the user's
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
-counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
-Mobile never sends scanned QR values, install-referrer URLs or route identifiers. It does not
+connection step times, the kind of connection path (direct or relayed, and UDP, TCP or TLS), whether
+the phone uses a VPN or a proxy app (never its name or an address), counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
+Mobile does not read the Android install referrer from Google Play. It never sends scanned QR values,
+install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
@@ -255,7 +259,11 @@ it gets on your account and sends it to OpenPanel with your account ID. To remov
 browser, clear the site data of openbot.run. When you open a discount link (an openbot.run address
 with `?promo=CODE`), the website saves the code and the time in its `localStorage` for 30 days. When
 you pay on the web, the web client sends the code to the account service, which gives it to Stripe
-for that Checkout page. It is not sent to analytics. When you choose a language on the website, it saves
+for that Checkout page. It is not sent to analytics. When you open an invite link (an openbot.run
+address with `?ref=CODE`), the website saves the code and the time in its `localStorage` for 30 days.
+When you sign in on the web, the web client sends the code to the account service and removes it from
+`localStorage`. On the desktop, on the web and on the phone, you can also type an invite link or code
+on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. The invite page shows the first name from the profile of the account that made the link to anyone who opens the link. It shows no other name, picture or email. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
@@ -346,8 +354,8 @@ when there is no install ID.
   connection took, rounded, and how long each fixed step of it took; whether it was the first
   connection to that server since the app started; whether the session was new or saved; how many
   attempts failed before it; and, for a hosted server, how long the server took to start. The first
-  attempt that fails after a connection also sends the last step that finished. The server ID,
-  address, session, ticket and keys are not sent.
+  attempt that fails after a connection also sends the last step that finished. It also sends the short
+  name of the OpenBot Signal machine that the connection used, as the connection ticket names it. The server ID, address, session, ticket and keys are not sent.
 - **Turn times.** When a turn completes, the host sends how long the message waited in the queue, how
   long the provider took to start the turn and, when it had to start, its process, and how long until
   the first output. These are times only; the messages are not sent.
@@ -445,6 +453,17 @@ The service stores:
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
   Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
   deletes them after the end of the next year.
+- invite links: the invite code of each account that opened Invite friends, and for each account that
+  signed up with an invite link or an invite code, the account that invited
+  it and the time. When an invited account pays, the service compares the Stripe card fingerprints of
+  the two accounts. It does not keep them; when they match, it keeps only the time when it ended the
+  invite. For each paid
+  invoice of an invited account, the service keeps the Stripe invoice ID, the two account IDs, the
+  amount without tax, the credit that it gave in Stripe and the Stripe balance transaction ID, and
+  for a refund or a lost dispute, the credit that it took back. The account that invited sees the
+  first name and the initial of the last name of each invited account, the day it joined, whether
+  it pays now, has no plan or stopped paying, and the credit that the invited account gave it, which is
+  10% of what the invited account paid. It never sees an email or a plan of an invited account. Deleting either account removes these rows.
 - hosted sites: the hostname, title, description, framework, state, owner account ID, lifecycle
   times, and for each deployment the file list, sizes and content types. The published site files
   are in R2. Anyone can read a published site. Deleting a site removes its files.
@@ -551,9 +570,23 @@ account service stores a hash of the token of that request and the time of the l
 no customer data. The account service stores the Leaseweb server ID with the server. So that an operator can
 find the server in the Leaseweb portal, the operator gives it a reference in Leaseweb: your account
 email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
-delete the server, or 30 days after its plan ends with no renewal, the account service deletes the old
+delete the server, when its plan is cancelled with a refund, when a payment of a plan less than 30 days old is disputed, or 14 days after its plan ends with no renewal, the account service deletes the old
 sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
-its reference to `pool-free`.
+its reference to `pool`.
+
+When the plan of a server on a virtual server ends with no refund, an operator moves the server's
+disk into an archive, so that the virtual server can take a new server. This occurs within a day
+after the plan ends, or 3 to 4 days after it when the last payment failed. The virtual server
+encrypts the archive with a new key before it sends it, and sends it straight to
+[Backblaze B2](https://www.backblaze.com) in the EU (the Netherlands), also from a virtual server in the United States. Backblaze
+stores the encrypted archive and has no key to read it. When Backblaze has all of the archive, the
+operator reinstalls the virtual server, which erases its disk. The account service stores the
+archive key, encrypted with a key that only the account service has, and the server ID, size,
+checksum and Backblaze name of the archive, with its times. When you renew the plan, the server
+gets its data back from the archive. The operator deletes the archive and the key within a day
+after 14 days from the end of the plan, after you delete the server or your account, or after the
+plan is cancelled with a refund. Backblaze deletes each archive by itself 16 days after it was
+made. The account service keeps the other values of the archive with the server record.
 
 ## Central data retention
 
@@ -863,6 +896,10 @@ your account email, the plan or the license tier and its number of users, the bi
 currency, and the list amount or the amount of the payment. It has no card data, no Stripe ID and no
 server ID. Discord keeps the message under its own policy.
 
+When your hosted server plan ends and the OpenBot team stores the data of the server in its archive,
+the same channel gets one message with your account email, the plan, the first 8 characters of the
+server ID, the size of the archive and the ID of the machine.
+
 ## Data stored on the OpenBot computer
 
 Saved agent memories, their inclusion settings, and their full-text search index stay in the local
@@ -1030,8 +1067,9 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   Vault file, or, where Windows does not allow links, a copy of the key that is readable only by the user
   and follows the same rules. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
-  joined server, only an owner or admin can check it, the box starts unchecked, and the password goes
-  to that server's Vault, not to the Vault of the computer where it was typed. The
+  joined server, the box starts checked, any member can save, and the password goes to that server's
+  Vault, not to the Vault of the computer where it was typed. All agents of that server can then sign
+  in with it. Only an owner or admin can show it in the server's Vault. The
   first card fill on a site waits for the server owner's approval; team members and messaging
   services cannot give it. The card then keeps that site and the origins of its card frames, and
   later fills there need no approval; the user can remove a site in the card. The
@@ -1136,6 +1174,10 @@ sheet shows; Copy in that sheet puts them on the phone's clipboard only when the
 or the phone unlock before a session, ends the session when the app leaves the foreground, and on
 Android does not allow screenshots or screen recording of the screen while it is open.
 
+On Android, the phone app turns off Content Capture for its window. The system's content capture
+service, such as Android System Intelligence, does not get the text of the app's screens, such as chat
+messages. Accessibility services and autofill do not change.
+
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
 R2. The Signal service does not proxy them or write them to logs. The host does not need a public
@@ -1164,6 +1206,11 @@ Network traffic can also occur when:
 - the local Claude Agent SDK connects to Anthropic through Claude CLI;
 - a user or an agent visits a page in the embedded browser;
 - a user submits text that is not a web address in the browser address bar, which sends the query to Google Search;
+- a user clicks a web link in a chat of the desktop app or the web client, and it opens in the
+  system browser or a new browser tab. OpenBot adds `utm_source=openbot` to the address, so the
+  site can see that the visit came from OpenBot. It adds nothing else. It does not change a link that already has a `utm_source`,
+  a link to a local or private address, or a link with sign-in or signature values such as `state`,
+  `code`, `token` or `X-Amz-Signature`;
 - a locally installed Codex plugin connects to its service;
 - an MCP server the user enabled is reached at its own address, and, when that server asks for a
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
@@ -1616,18 +1663,19 @@ short-lived signed addresses, in transit only.
   database holds the chat name and IDs, which agent is the Telegram Orchestrator, and one row per
   conversation that an agent answers. The messages of that conversation are kept as a conversation
   of that agent, with the Telegram name of each author, and files people send are kept with the
-  agent's attachments. The names of authors and the last messages of a chat are also kept in memory
-  for context, until OpenBot quits. Workspace memories are kept for each chat, as for Slack.
-  Disconnect makes the bot leave the chat, unlinks it and keeps the conversations and the workspace
-  memories; deleting an agent removes its conversations.
+  agent's attachments. The names of authors are also kept in memory for context, until OpenBot
+  quits. The messages of the chat that OpenBot sees, also those that do not address it, are kept in
+  the database for 90 days after they arrive, with the names of their files, so that an agent can
+  read them after a restart. Workspace memories are kept for each chat, as for Slack.
+  Disconnect makes the bot leave the chat, unlinks it, deletes the saved messages and keeps the
+  conversations and the workspace memories; deleting an agent removes its conversations.
 - **Read from Telegram.** Every message of a linked chat, the files in them, the names of their
   authors and the name of the chat. The OpenBot bot has privacy mode off, because with it on,
   Telegram does not send a plain mention to a bot that is not a group admin. A request starts only
   from a message that mentions the bot, a reply to it, another message of a reply chain that an
   agent answers, or a message of a direct chat. A new conversation in a group can start a workflow
-  run instead; see [Workflows](#workflows). The other messages of a group stay in the
-  computer's memory until OpenBot quits, and an agent can read the last of them with its history
-  tool, as for Slack.
+  run instead; see [Workflows](#workflows). The other messages of a group are saved on the
+  host as above, and an agent can read the last of them with its history tool, as for Slack.
 - **Given to the Telegram Orchestrator.** Every new Telegram request goes first to the orchestrator
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.
@@ -1845,8 +1893,8 @@ Gemini agents stay on this computer: OpenBot does not show them to team members.
 To show the remaining Gemini quota in Usage, OpenBot reads the access token from the server's token file
 and asks Google's Code Assist service (`cloudcode-pa.googleapis.com` and
 `daily-cloudcode-pa.googleapis.com`) for the account's project and quota, as the Antigravity app does.
-The requests carry that token and a User-Agent with the Antigravity desktop app's version, your
-operating system and processor type. They contain no conversation, file, or model data. With an API key
+The requests carry that token and a User-Agent with the Antigravity desktop app's client name, version
+and build number, your operating system and processor type. They contain no conversation, file, or model data. With an API key
 sign-in, or an expired token, OpenBot sends nothing and shows no Gemini usage. OpenBot does not send that
 usage to its maintainer.
 
@@ -2212,6 +2260,23 @@ Notifications only inform: they have no buttons.
 
 Settings > Notifications turns this off, and sets the preview and the sound. Android also lists one
 notification channel for each sound in the system settings of the app.
+
+## Phone background refresh
+
+While you are signed in, the phone app reads your servers in the background, so it shows current
+agents, chats and channels when you open it. iOS starts this refresh through Background App Refresh,
+and Android through its job scheduler, at most once every 15 minutes. The system decides when it
+runs, and it can run it less often or not at all. The app refreshes only while it is still in the
+memory of the phone.
+
+A refresh uses the same encrypted host connection and the same requests as the app on screen, for at
+most 25 seconds. It sends no new data to the hosts, the OpenBot services, Apple or Google. The phone
+keeps what it reads in the same encrypted copy that it keeps for an offline start. During a refresh,
+the hosts know that the app is not on screen, so they continue to send notifications, and the app does
+not mark a chat as read.
+
+On iPhone, Settings > General > Background App Refresh turns this off. Signing out stops it on both
+phones.
 
 ## Optional macOS Host Manager
 

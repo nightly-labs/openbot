@@ -236,7 +236,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Una espera necesita un mensaje para continuar. Este turno no tiene ningún mensaje.",
   "error.backend.agentWaitOwnChatOnly":
-    "Abre una espera solo en tu propio chat. Una tarea de canal o de mensajería no puede esperar.",
+    "Abre una espera en tu propio chat o en un hilo lateral. Una conversación de canal o de mensajería no puede esperar.",
   "error.backend.agentWaitNoteRequired": "Escribe una nota breve que diga para qué es la espera.",
   "error.backend.agentWaitRoutineGone": "Este agente no tiene ninguna rutina con este id.",
   "error.backend.agentWaitNoRoutine":
@@ -305,6 +305,12 @@ export const messages = {
     "{provider} no pudo iniciar el servidor MCP {name}. Sus herramientas no están disponibles para {provider}. {provider} inicia el servidor por su cuenta, así que la prueba de conexión en OpenBot puede funcionar. Inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} no pudo iniciar el servidor MCP {name}, porque el servidor no respondió a tiempo. Inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} no pudo iniciar el servidor MCP {name}, porque el servidor no está disponible ahora. Espera unos minutos y luego inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} no pudo conectar con el servidor MCP {name}. Abre {name} en Marketplace, Apps, y comprueba que su dirección es correcta y que el servidor está en marcha. Luego inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} no pudo obtener las herramientas de GitHub, porque GitHub no respondió. Abre GitHub en Marketplace, Apps, y vuelve a conectarlo si te lo pide. Luego inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot no pudo iniciar su conexión local de inicio de sesión para este servidor. Reinicia OpenBot y vuelve a intentarlo.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -341,6 +347,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "La carpeta no existe o ya se eliminó.",
   "error.backend.libraryFolderOtherAgent": "Un archivo solo puede ir a una carpeta de su agente.",
   "error.backend.libraryFolderMoveInvalid": "Esta carpeta no se puede mover ahí.",
+  "error.backend.workflowFolderLimit": "Un servidor puede tener hasta {limit} carpetas de flujos de trabajo.",
+  "error.backend.workflowFolderPlacementLimit": "Hay demasiados flujos de trabajo en las carpetas.",
   "error.backend.sectionNameDuplicate": "Los nombres de las secciones deben ser únicos.",
   "error.backend.directMessageRequired": "Escribe un mensaje primero.",
   "error.backend.directMessageTooLong": "Un mensaje directo puede tener hasta {limit} caracteres.",
@@ -373,10 +381,11 @@ export const messages = {
     "Solo la app de OpenBot del teléfono puede enviar este informe, porque añade la versión y el registro de soporte del teléfono. Abre este chat en el teléfono. Si ves este mensaje allí, actualiza la app del teléfono.",
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
+  "error.backend.apiKeyListFailed": "OpenBot no pudo leer las claves de API guardadas.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
-  "error.backend.apiKeyNotAllowed":
-    "Solo el propietario del servidor o un administrador puede introducir una clave de API.",
   "error.backend.apiKeySaving": "La clave de API ya se está guardando.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot no pudo leer la clave de API. Introduce una clave de 8000 caracteres o menos y elige quién puede usarla.",
   "error.backend.authRequestInactive": "Esta solicitud de autenticación segura ya no está activa.",
   "error.backend.secureAuthUnavailable": "La autenticación segura no está disponible.",
   "error.backend.browserUrlRequired": "Se requiere una URL para el navegador.",
@@ -421,7 +430,7 @@ export const messages = {
     "No se pudo cargar la ventana emergente. Intenta iniciar sesión de nuevo desde la página original.",
   "error.backend.browserTabNotFound": "No se encontró la pestaña del navegador.",
   "error.backend.authActive": "La autenticación ya está activa.",
-  "error.backend.authHttpsRequired": "La autenticación segura requiere HTTPS.",
+  "error.backend.authWebPageRequired": "La autenticación segura requiere HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Los códigos de autenticación requieren entre 4 y 12 dígitos.",
   "error.backend.authExpired": "La solicitud de autenticación caducó.",
   "error.backend.authDigitsRequired": "Introduce el número de dígitos solicitado.",
@@ -462,6 +471,7 @@ export const messages = {
   "error.backend.taskTitleRequired": "Dale a la tarea un título corto.",
   "error.backend.taskToolInvalid":
     "Dale a la tarea un título de 120 caracteres como máximo y una descripción que diga qué hay que hacer.",
+  "error.backend.taskControlInvalid": "Indica el taskId de una tarea que iniciaste. Un mensaje también necesita texto.",
   "error.backend.taskOwnChatOnly":
     "Inicia una tarea solo desde tu propio chat. Un canal, una conversación de mensajería u otra tarea no pueden iniciarla.",
   "error.backend.taskUnfinishedLimit":
@@ -469,5 +479,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Este agente tiene {count} tareas abiertas. Cierra una tarea y después inicia o abre otra.",
   "error.backend.taskRemoteUnsupported": "Las tareas solo están disponibles para los agentes de este equipo.",
+  "error.backend.taskMessageFailed": "OpenBot no pudo enviar el mensaje a la tarea. Inténtalo de nuevo más tarde.",
   "error.backend.taskStartFailed": "OpenBot no pudo iniciar la tarea. Haz el trabajo en este turno.",
 } as const satisfies PartialTranslation<typeof source>;

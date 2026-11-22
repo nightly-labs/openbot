@@ -8,11 +8,6 @@ import { BrowserHost } from "../src/backend/browser-host";
 import type { DynamicToolCallParams } from "../src/backend/protocol";
 import { parseBrowserToolText } from "./browser-snapshot-text";
 
-// Opens each live site once in the real BrowserHost, as an agent does, and records what the bot
-// check of the site did: the `challenge` field of the snapshot, the HTTP status of the document,
-// and a page image. It follows the agent's guidance (wait while `checking`, one click on
-// `click-once`) and solves nothing.
-
 const argument = (name: string) => {
   const value = process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
   if (!value) throw new Error(`Missing ${name}.`);
@@ -23,7 +18,6 @@ const reportPath = argument("report-path");
 const pagePreload = argument("page-preload");
 const SITE_TIMEOUT_MS = 75_000;
 const EMPTY_PAGE_WAIT_MS = 8_000;
-// The GPU switches of a server host (`configureLinuxGpu` in src/main/linux-gpu-mode.ts).
 if (process.argv.includes("--server-gpu")) {
   app.commandLine.appendSwitch("disable-gpu-compositing");
   app.commandLine.appendSwitch("enable-unsafe-swiftshader");
@@ -58,22 +52,18 @@ interface SiteResult {
   elements?: number;
   textLength?: number;
   text?: string;
-  /** Each challenge status that the reads returned, in order. */
   statuses: string[];
   vendor?: string;
   clicked: boolean;
-  /** What the page reads as the browser version and brands. */
   identity?: string;
   error?: string;
 }
 
 const results: SiteResult[] = [];
 let sequence = 0;
-/** The status of the last main-frame document of each tab's contents. */
 const httpStatus = new Map<number, number>();
 let lastContents: WebContents | undefined;
 
-/** A function call keeps the type: the navigation listener assigns the variable. */
 function latestContents(): WebContents | undefined {
   return lastContents;
 }
@@ -133,7 +123,6 @@ async function main(): Promise<void> {
       let tabId: string | undefined;
       lastContents = undefined;
       const probe = async () => {
-        // A page that navigates during the read gives `{ tab, snapshotError }`; the agent then reads again.
         const opened = await call("open", { url: `https://${site.website}` });
         const unread = openedTabSchema.safeParse(opened);
         if (unread.success) tabId = unread.data.tab.id;
@@ -155,8 +144,6 @@ async function main(): Promise<void> {
             note(pageSchema.parse(await call("snapshot", { tabId, image: "never" })));
           } else break;
         }
-        // A script check can show an empty document first and then load the page. Read it again when
-        // the document has content, as an agent does after an empty snapshot.
         if (!page.challenge && (page.elements?.length ?? 0) === 0) {
           const contents = latestContents();
           const deadline = Date.now() + EMPTY_PAGE_WAIT_MS;
@@ -209,9 +196,7 @@ async function main(): Promise<void> {
           const image = await contents.capturePage();
           if (!image.isEmpty())
             await writeFile(join(dirname(reportPath), "images", `${site.id}.jpg`), image.toJPEG(60));
-        } catch {
-          // The page left or crashed; the report keeps what the reads returned.
-        }
+        } catch {}
       }
       if (tabId) await call("close_tab", { tabId }).catch(() => undefined);
       result.ms = Date.now() - started;

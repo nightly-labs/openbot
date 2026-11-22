@@ -1,6 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
 
-/** A diagram that the renderer drew: an SVG for the zoomable canvas and a PNG for the chat card. */
 export type MermaidDiagram =
   | { status: "drawing" }
   | { status: "ready"; svgUrl: string; pngUrl: string | null; width: number; height: number }
@@ -14,22 +13,16 @@ export interface MermaidJob {
 
 export interface MermaidResult {
   id: string;
-  /** The SVG as an image URL, or null when Mermaid could not parse the source. */
   svgUrl: string | null;
-  /** A raster copy for a native image, or null when the web view could not make one. */
   pngUrl: string | null;
   width: number;
   height: number;
 }
 
-// One web view draws every diagram once, and each card and screen reads the result from here, so
-// a diagram that scrolls back into view or opens on its own screen shows at once. The cap keeps a
-// long session from holding every image.
 const DIAGRAM_LIMIT = 40;
 const DRAWING: MermaidDiagram = { status: "drawing" };
 const diagrams = new Map<string, MermaidDiagram>();
 const jobKeys = new Map<string, string>();
-/** How many mounted cards and screens show each diagram. The cache never lets one of these go. */
 const consumers = new Map<string, number>();
 const listeners = new Set<() => void>();
 let jobs: readonly MermaidJob[] = [];
@@ -48,11 +41,6 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-/**
- * Lets go of the oldest unused diagrams until the cache is at its limit. A diagram that is still
- * drawing has a job that will report to it, and a diagram on screen is in use, so both stay: while
- * every diagram is in use, the cache grows past its limit, and it shrinks again when they leave.
- */
 function trim(): void {
   for (const [key, diagram] of diagrams) {
     if (diagrams.size <= DIAGRAM_LIMIT) return;
@@ -73,7 +61,6 @@ function requestMermaidDiagram(source: string, dark: boolean): void {
   emit();
 }
 
-/** Marks a diagram as on screen and draws it if needed. The returned function releases it. */
 function retainMermaidDiagram(source: string, dark: boolean): () => void {
   const key = diagramKey(source, dark);
   consumers.set(key, (consumers.get(key) ?? 0) + 1);
@@ -86,7 +73,6 @@ function retainMermaidDiagram(source: string, dark: boolean): () => void {
   };
 }
 
-/** Stores what the renderer drew and removes its job. */
 export function receiveMermaidResult(result: MermaidResult): void {
   const key = jobKeys.get(result.id);
   jobKeys.delete(result.id);
@@ -108,15 +94,10 @@ export function receiveMermaidResult(result: MermaidResult): void {
   emit();
 }
 
-/** The diagrams that wait for the renderer. */
 export function useMermaidJobs(): readonly MermaidJob[] {
   return useSyncExternalStore(subscribe, () => jobs);
 }
 
-/**
- * The diagram of a source, drawn on first use. With `enabled: false` nothing is drawn: a diagram
- * that is drawn already still shows, and any other is undefined.
- */
 export function useMermaidDiagram(source: string, dark: boolean, enabled = true): MermaidDiagram | undefined {
   const key = diagramKey(source, dark);
   const diagram = useSyncExternalStore(subscribe, () => diagrams.get(key));

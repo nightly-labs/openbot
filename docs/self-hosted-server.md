@@ -319,6 +319,11 @@ installs the packages in `packages.txt`, copies the release to `/opt/OpenBot/app
 scripts, the AppArmor profile and the units. It writes `self` to `/opt/OpenBot/hosted/mode` and
 links `/usr/local/bin/openbot`.
 
+The AppArmor profile (`/etc/apparmor.d/openbot-hosted`) needs AppArmor 4 (`abi <abi/4.0>` and the
+`userns` rule). When `/etc/apparmor.d/abi/4.0` does not exist and `apparmor_parser` cannot read the
+profile, for example on Debian 12 with AppArmor 3.0, the install does not write the profile and
+removes an old copy. These systems do not restrict user namespaces by default, so OpenBot does not need it.
+
 When Ubuntu's `bwrap-userns-restrict` profile is loaded (the default on Ubuntu 26.04), the install
 and each start of OpenBot add one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
 `priority=1 allow pix /** -> &bwrap,`. The Ubuntu profile of `/usr/bin/bwrap` removes all

@@ -78,7 +78,6 @@ export const LongContent: Story = {
 };
 export const Narrow: Story = {
   ...Permissions,
-  // The narrowest chat: a pop-out chat window at its 380px minimum width.
   decorators: [
     (Story) => (
       <div style={{ width: "340px", "max-width": "100%" }}>
@@ -87,11 +86,9 @@ export const Narrow: Story = {
     ),
   ],
 };
-/** The three-button card: the agent runs on this computer, so the standing grant is the user's to give. */
 export const AlwaysAllow: Story = {
   args: { agentName: "Chief", onAlwaysAllow: fn(async () => false) },
 };
-/** The same card without that option, which is what a remote agent and a permissions request both show. */
 export const WithoutAlwaysAllow: Story = { args: { agentName: "Chief" } };
 
 const sentFacts = {
@@ -137,24 +134,20 @@ const feedbackApproval = (text: string, reason = sourceText("status.agent.report
   cwd: null,
   reason,
 });
-/** The card text, with the host's notes in English as the host writes them. */
 const preview = (feedback: Feedback) =>
   feedbackPreview(feedback, {
     recentErrors: sourceText("status.agent.feedbackRecentErrors"),
     sameAs: (issue) => sourceText("status.agent.feedbackSameAs", { issue: String(issue) }),
   });
-/** `openbot.send_feedback` with a bug: the agent offers to send it to the OpenBot team. */
 export const ReportProblem: Story = {
   args: { agentName: "Chief", approval: feedbackApproval(preview(bugReport)) },
 };
-/** `openbot.send_feedback` with a feature idea: the same card, with what the user wants and why. */
 export const SendIdea: Story = {
   args: {
     agentName: "Chief",
     approval: feedbackApproval(preview(featureRequest), sourceText("status.agent.sendIdea")),
   },
 };
-/** A bug with the chat's recent errors, added to an open issue that has the same problem. */
 export const ReportProblemWithErrors: Story = {
   args: {
     agentName: "Chief",
@@ -167,10 +160,6 @@ export const ReportProblemWithErrors: Story = {
     ),
   },
 };
-/**
- * A bug in the phone app: only the phone has its version, system and support log, so the card has no
- * Send here and tells the user to send the report from the phone app.
- */
 export const ReportPhoneProblem: Story = {
   args: {
     agentName: "Chief",
@@ -188,7 +177,6 @@ export const ReportPhoneProblem: Story = {
     ),
   },
 };
-/** After Send: the card keeps its loader until GitHub opens the issue. */
 export const SendingFeedback: Story = {
   args: { agentName: "Chief", approval: feedbackApproval(preview(bugReport)), sending: true },
 };

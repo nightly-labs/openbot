@@ -21,10 +21,6 @@ type AttentionCandidate =
   | { mode: "question"; item: DynamicIslandPromptItem }
   | { mode: "failed"; item: DynamicIslandFailureItem };
 
-/**
- * The island text in the interface language. Each app builds it from its own catalog, so
- * `team-client` stays free of UI, catalogs, and application state.
- */
 export interface DynamicIslandText {
   taskWorking: string;
   questionHeader: string;
@@ -37,7 +33,6 @@ export interface DynamicIslandText {
   approvalCommand: string;
   approvalFileChange: string;
   approvalPermissions: string;
-  /** `userErrorMessage` in the interface language. `fallback` is already translated. */
   errorMessage: (error: unknown, fallback: string) => string;
 }
 
@@ -88,7 +83,6 @@ export function selectDynamicIslandPresentation(
   return { ...selected, remainingCount: islandCount(attentionCount - 1) };
 }
 
-/** A count that main accepts. Main rejects a presentation with more than 10,000 unread replies, so the island stopped updating. */
 function islandCount(count: number): number {
   return Math.min(DYNAMIC_ISLAND_MAX_COUNT, Math.max(0, count));
 }
@@ -296,7 +290,6 @@ function normalizeQuestions(questions: PromptEvent["questions"], text: DynamicIs
     isSecret: question.isSecret,
     options:
       question.options?.slice(0, INPUT_LIMITS.promptOptions).map((option, optionIndex) => {
-        // The technical label is the answer the agent reads, so it stays in English.
         const fallback = `Option ${optionIndex + 1}`;
         const label = normalizeTechnical(option.label, fallback, INPUT_LIMITS.promptOptionLabel);
         const displayLabel = normalizeRequired(

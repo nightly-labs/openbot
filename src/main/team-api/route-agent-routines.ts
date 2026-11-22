@@ -1,8 +1,3 @@
-// One agent's routines: the standing instructions that run on a schedule.
-//
-// The bodies are parsed by the same `parseCreateRoutine` / `parseUpdateRoutine` the IPC handlers
-// use, so a routine created over the Team API cannot differ from one created in the app.
-
 import { isReleasedRoutineSchedule } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -67,7 +62,6 @@ export async function routeAgentRoutines(
   return "unmatched";
 }
 
-/** A `once` routine stays on this computer: the released routine codecs reject its schedule. */
 function isReleasedRoutine(routine: { trigger: { schedule: unknown } }): boolean {
   return isReleasedRoutineSchedule(routine.trigger.schedule);
 }

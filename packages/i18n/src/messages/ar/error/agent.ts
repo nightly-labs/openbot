@@ -48,6 +48,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "فشل إعداد الوكيل وتعذّرت إزالة الوكيل غير المكتمل.",
   "error.agent.modelUnavailable": "نموذج الوكيل المحدد غير متاح.",
   "error.agent.modelProviderNotConnected": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير متصل.",
+  "error.agent.modelProviderSignInRequired":
+    "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تسجيل الدخول. سجّل الدخول إلى {provider} ثم حاول مرة أخرى.",
+  "error.agent.modelProviderNotInstalled": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير مثبّت.",
+  "error.agent.modelProviderOutdated": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تحديث.",
   "error.agent.modelListEmpty":
     "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج. آخر خطأ: {detail}",
   "error.agent.modelListEmptyNoError": "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج.",
@@ -114,6 +118,10 @@ export const messages = {
   "error.agent.deleteIncomplete": "تعذّرت إزالة بيانات الوكيل بالكامل. أعد محاولة حذف الوكيل.",
   "error.agent.deleteFolderInUse":
     "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. احذف هذا الوكيل مرة أخرى عند انتهاء ذلك العمل، أو بعد إعادة تشغيل OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "لا يزال برنامج آخر يستخدم مجلد هذا الوكيل، مثل برنامج بدأه الوكيل. أغلق ذلك البرنامج أو أعد تشغيل الكمبيوتر الذي يعمل عليه هذا الوكيل، ثم احذف الوكيل مرة أخرى.",
+  "error.agent.deleteWhenFolderFree":
+    "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. يحذف OpenBot هذا الوكيل عند انتهاء ذلك العمل.",
   "error.agent.duplicationBusy": "يجري تكرار هذا الوكيل بالفعل.",
   "error.agent.waitBeforeDuplicate": "انتظر انتهاء الوكيل وإفراغ قائمة انتظاره قبل تكراره.",
   "error.agent.saveOtherAgent": "عملية الحفظ هذه تخص وكيلًا آخر.",
@@ -169,6 +177,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",
   "error.agent.mcpServerKeysMove":
     "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في المتجر، التطبيقات، {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "يشغّل خادم MCP {name} أمرًا محليًا، لذا لا يقبل ترويسات. اطلب من المستخدم إدخال مفاتيحه في المتجر، التطبيقات، {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "يمكن لمستخدم OpenBot هذا فقط، في محادثة معك، أن يعطي مفاتيح خادم MCP {name}. اطلب من المستخدم إدخالها في المتجر، التطبيقات، {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} جزء من OpenBot، لذلك لا يمكن لأدوات MCP اختباره أو تشغيله أو إيقافه أو إزالته. يتحكم فيه المستخدم على الحاسوب الذي يشغّل OpenBot: اتصال GitHub في المتجر، التطبيقات، GitHub، والتحكم في الحاسوب في الإعدادات، التحكم في الحاسوب.",
   "error.agent.mcpServerUnknown": "لا يوجد خادم MCP باسم {name}. استدعِ list_mcp_servers لمعرفة الأسماء.",
@@ -180,6 +192,8 @@ export const messages = {
     "المنطقة ليست داخل شاشة واحدة. استخدم نقاط سطح المكتب داخل حدود شاشة واحدة من list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "لا يملك OpenBot إذن «تسجيل الشاشة». اطلب من المستخدم فتح System Settings > Privacy & Security > Screen & System Audio Recording، وتشغيل OpenBot، ثم إنهاء OpenBot وفتحه مرة أخرى.",
+  "error.agent.screenCaptureListPermission":
+    "لا يملك OpenBot إذن «تسجيل الشاشة» بعد، لذا لا يمكنه سرد النوافذ. لالتقاط شاشة، استدعِ capture_screen مع target screen. يوافق المستخدم على الالتقاط أولًا، ثم قد يطلب macOS من المستخدم الإذن.",
   "error.agent.screenCaptureEmptyWindows":
     "أعاد Windows صورة فارغة. اطلب من المستخدم إلغاء قفل الحاسوب وإغلاق المحتوى المحمي. يمكن أيضًا لسياسة المؤسسة إيقاف التقاط الشاشة.",
   "error.agent.screenCaptureFailed": "فشل التقاط الشاشة. أعد المحاولة.",
