@@ -66,6 +66,7 @@ import {
   nativeImage,
   net,
   powerMonitor,
+  powerSaveBlocker,
   screen,
   shell,
   systemPreferences,
@@ -206,6 +207,7 @@ import {
   createClaudeUserSetupPreferenceStore,
 } from "./claude-user-setup-preference-store";
 import { createComputerIdle } from "./computer-idle";
+import { ComputerUseDisplayAwake } from "./computer-use-display-awake";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
 import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
@@ -1864,6 +1866,13 @@ export async function createApplicationServices({
     quitting,
   });
   teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => runCauseEffect(cuaDriver.stop()));
+  const computerUseDisplayAwake = new ComputerUseDisplayAwake({
+    turnRunning: () => service.earliestRunningTurnStartedAt() !== null,
+    start: () => powerSaveBlocker.start("prevent-display-sleep"),
+    stop: (id) => powerSaveBlocker.stop(id),
+  });
+  if (process.platform === "darwin") cuaDriver.onToolCall(() => computerUseDisplayAwake.noteToolCall());
+  teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use display hold", () => computerUseDisplayAwake.release());
   const computerUseReads = new CuaDriverDaemonClient(() =>
     cuaDriver.mcpServerForProviders() ? cuaDriver.socketPath() : null,
   );
@@ -2518,6 +2527,7 @@ export async function createApplicationServices({
   );
   service.on("event", (event) => {
     if (event.type === "turn-started") startComputerUseHighlight();
+    if (event.type === "turn-completed" && !event.continues) computerUseDisplayAwake.turnEnded();
   });
   if (!setupState.completed || service.enabledMcpServers().length > 0)
     Effect.runFork(providerRuntimes.ensureToolRuntimes());
