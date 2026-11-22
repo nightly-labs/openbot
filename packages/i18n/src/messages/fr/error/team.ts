@@ -164,6 +164,8 @@ export const messages = {
     "Cette connexion ne prend pas en charge l’option de configuration Claude Code.",
   "error.team.claudeCompactWindowUnsupported":
     "Cette connexion ne prend pas en charge la taille de compactage de Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Cette connexion ne prend pas en charge le compactage avant l’expiration du cache.",
   "error.team.providerEnvironmentUnsupported": "Cette connexion ne prend pas en charge les variables de fournisseur.",
   "error.team.modelVisibilityUnsupported": "Cette connexion ne prend pas en charge la liste des modèles.",
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",

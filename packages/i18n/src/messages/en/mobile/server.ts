@@ -1391,10 +1391,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.modelsFailed": "Could not change the models. Try again.",
   "mobile.server.providers.promptCache": "Prompt cache",
   "mobile.server.providers.promptCacheHint":
-    "How long Claude keeps the context of an agent in the cache between turns. A change applies when Claude starts again.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code default",
+    "How long Claude and Pi keep the context of an agent in the cache between turns. A change applies when the provider starts again.",
+  "mobile.server.providers.promptCacheDefault": "Provider default",
   "mobile.server.providers.promptCacheHour": "1 hour",
   "mobile.server.providers.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compact before the cache expires",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "When a chat with 200K or more tokens of context is idle with a 1 hour cache, the agent compacts the context before the cache expires. Then the next message does not read the full context again with no cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Could not load the compaction setting of this server.",
   "mobile.server.providers.compactWindow": "Compact chats at",
   "mobile.server.providers.compactWindowHint":
     "Claude Code sums up the older turns of a chat when the chat reaches this size. Lower keeps turns fast and cheap. Higher keeps more detail. A model with a smaller window compacts at its own limit.",

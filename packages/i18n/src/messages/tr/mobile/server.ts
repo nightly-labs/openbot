@@ -1154,10 +1154,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Modeller değiştirilemedi. Tekrar deneyin.",
   "mobile.server.providers.promptCache": "İstem önbelleği",
   "mobile.server.providers.promptCacheHint":
-    "Claude'un turlar arasında bir ajanın bağlamını önbellekte tutma süresi. Değişiklik Claude yeniden başladığında uygulanır.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code varsayılanı",
+    "Claude ve Pi'nin bir ajanın bağlamını turlar arasında önbellekte ne kadar tuttuğu. Değişiklik sağlayıcı yeniden başladığında geçerli olur.",
+  "mobile.server.providers.promptCacheDefault": "Sağlayıcı varsayılanı",
   "mobile.server.providers.promptCacheHour": "1 saat",
   "mobile.server.providers.promptCacheLoadFailed": "Bu sunucunun istem önbelleği süresi yüklenemedi.",
+  "mobile.server.providers.cacheExpiryCompaction": "Önbelleğin süresi dolmadan sıkıştır",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "200K veya daha fazla token bağlamı olan bir sohbet 1 saatlik önbellekle boşta olduğunda, ajan önbelleğin süresi dolmadan bağlamı sıkıştırır. Böylece sonraki mesaj tüm bağlamı önbelleksiz yeniden okumaz.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Bu sunucunun sıkıştırma ayarı yüklenemedi.",
   "mobile.server.providers.compactWindow": "Sohbetleri sıkıştırma boyutu",
   "mobile.server.providers.compactWindowHint":
     "Sohbet bu boyuta ulaştığında Claude Code eski turları özetler. Düşük değer turları hızlı ve ucuz tutar. Yüksek değer daha fazla ayrıntı tutar. Daha küçük pencereli bir model kendi sınırında sıkıştırır.",

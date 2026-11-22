@@ -1419,10 +1419,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "לא ניתן לשנות את המודלים. אפשר לנסות שוב.",
   "mobile.server.providers.promptCache": "מטמון פרומפט",
   "mobile.server.providers.promptCacheHint":
-    "כמה זמן Claude שומר את ההקשר של סוכן במטמון בין תורות. שינוי נכנס לתוקף כש-Claude מתחיל שוב.",
-  "mobile.server.providers.promptCacheDefault": "ברירת המחדל של Claude Code",
+    "כמה זמן Claude ו-Pi שומרים את ההקשר של סוכן במטמון בין תורות. שינוי חל כשהספק מתחיל מחדש.",
+  "mobile.server.providers.promptCacheDefault": "ברירת המחדל של הספק",
   "mobile.server.providers.promptCacheHour": "שעה",
   "mobile.server.providers.promptCacheLoadFailed": "לא ניתן לטעון את זמן מטמון הפרומפט של השרת הזה.",
+  "mobile.server.providers.cacheExpiryCompaction": "לכווץ לפני שהמטמון פג",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "כשצ׳אט עם הקשר של 200K טוקנים או יותר לא פעיל עם מטמון של שעה, הסוכן מכווץ את ההקשר לפני שהמטמון פג. כך ההודעה הבאה לא קוראת שוב את כל ההקשר בלי מטמון.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "לא ניתן לטעון את הגדרת הכיווץ של השרת הזה.",
   "mobile.server.providers.compactWindow": "כיווץ צ׳אטים ב־",
   "mobile.server.providers.compactWindowHint":
     "Claude Code מסכם את התורות הישנים של צ׳אט כשהצ׳אט מגיע לגודל הזה. נמוך יותר שומר על תורות מהירים וזולים. גבוה יותר שומר יותר פרטים. מודל עם חלון קטן יותר מכווץ במגבלה שלו.",

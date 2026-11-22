@@ -1130,10 +1130,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "モデルを変更できませんでした。もう一度お試しください。",
   "mobile.server.providers.promptCache": "プロンプトキャッシュ",
   "mobile.server.providers.promptCacheHint":
-    "ターンの間に Claude がエージェントのコンテキストをキャッシュに保持する時間です。変更は Claude の次回起動時に適用されます。",
-  "mobile.server.providers.promptCacheDefault": "Claude Code のデフォルト",
+    "ターンの間に Claude と Pi がエージェントのコンテキストをキャッシュに保持する時間です。変更はプロバイダーの次回起動時に適用されます。",
+  "mobile.server.providers.promptCacheDefault": "プロバイダーの既定",
   "mobile.server.providers.promptCacheHour": "1 時間",
   "mobile.server.providers.promptCacheLoadFailed": "このサーバーのプロンプトキャッシュ時間を読み込めませんでした。",
+  "mobile.server.providers.cacheExpiryCompaction": "キャッシュの期限切れ前に圧縮",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "20 万トークン以上のコンテキストを持つチャットが 1 時間のキャッシュでアイドル状態のとき、エージェントはキャッシュの期限切れ前にコンテキストを圧縮します。これにより、次のメッセージはキャッシュなしでコンテキスト全体を読み直しません。",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "このサーバーの圧縮設定を読み込めませんでした。",
   "mobile.server.providers.compactWindow": "チャットを圧縮するサイズ",
   "mobile.server.providers.compactWindowHint":
     "チャットがこのサイズに達すると、Claude Code は古いターンを要約します。小さくするとターンが速く安くなります。大きくすると詳細が多く残ります。ウィンドウが小さいモデルは、その上限で圧縮します。",

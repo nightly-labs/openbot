@@ -139,6 +139,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
   "error.team.claudeUserSetupUnsupported": "この接続は Claude Code 設定のスイッチに対応していません。",
   "error.team.claudeCompactWindowUnsupported": "この接続は Claude の圧縮サイズに対応していません。",
+  "error.team.cacheExpiryCompactionUnsupported": "この接続はキャッシュの期限切れ前の圧縮に対応していません。",
   "error.team.providerEnvironmentUnsupported": "この接続はプロバイダーの変数に対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",

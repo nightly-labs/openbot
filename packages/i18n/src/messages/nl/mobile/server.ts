@@ -1127,10 +1127,15 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Kan de modellen niet wijzigen. Probeer het opnieuw.",
   "mobile.server.providers.promptCache": "Promptcache",
   "mobile.server.providers.promptCacheHint":
-    "Hoe lang Claude de context van een agent tussen beurten in de cache houdt. Een wijziging geldt wanneer Claude opnieuw start.",
-  "mobile.server.providers.promptCacheDefault": "Standaard van Claude Code",
+    "Hoe lang Claude en Pi de context van een agent tussen beurten in de cache houden. Een wijziging geldt wanneer de provider opnieuw start.",
+  "mobile.server.providers.promptCacheDefault": "Standaard van de provider",
   "mobile.server.providers.promptCacheHour": "1 uur",
   "mobile.server.providers.promptCacheLoadFailed": "Kan de promptcachetijd van deze server niet laden.",
+  "mobile.server.providers.cacheExpiryCompaction": "Comprimeren voordat de cache verloopt",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Als een chat met 200K of meer tokens context inactief is met een cache van 1 uur, comprimeert de agent de context voordat de cache verloopt. Dan leest het volgende bericht niet de hele context opnieuw zonder cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "De compressie-instelling van deze server kon niet worden geladen.",
   "mobile.server.providers.compactWindow": "Chats comprimeren bij",
   "mobile.server.providers.compactWindowHint":
     "Claude Code vat de oudere beurten van een chat samen wanneer de chat deze grootte bereikt. Lager houdt beurten snel en goedkoop. Hoger bewaart meer details. Een model met een kleiner venster comprimeert bij zijn eigen limiet.",

@@ -279,10 +279,14 @@ export const messages = {
   "provider.settings.cache": "キャッシュ",
   "provider.settings.promptCache": "プロンプトキャッシュ",
   "provider.settings.promptCacheDescription":
-    "ターンの間に Claude がエージェントのコンテキストをキャッシュに保持する時間。",
+    "ターンの間に Claude と Pi がエージェントのコンテキストをキャッシュに保持する時間。",
   "provider.settings.promptCacheHour": "1 時間",
-  "provider.settings.promptCacheDefault": "Claude Code の既定",
+  "provider.settings.promptCacheDefault": "プロバイダーの既定",
   "provider.settings.promptCacheLoadFailed": "このサーバーのプロンプトキャッシュ時間を読み込めませんでした。",
+  "provider.settings.cacheExpiryCompaction": "キャッシュの期限切れ前に圧縮",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "20 万トークン以上のコンテキストを持つチャットが 1 時間のキャッシュでアイドル状態のとき、エージェントはキャッシュの期限切れ前にコンテキストを圧縮します。これにより、次のメッセージはキャッシュなしでコンテキスト全体を読み直しません。",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "このサーバーの圧縮設定を読み込めませんでした。",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "自分の Claude Code 設定を使う",
   "provider.settings.claudeUserSetupDescription":

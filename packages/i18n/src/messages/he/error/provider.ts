@@ -137,6 +137,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "מפתח הספק מכיל רווח או תו שאסור שיופיע במפתח.",
   "error.provider.noModel": "לספק שנבחר אין מודל זמין.",
   "error.provider.noModelNamed": "ל-{provider} אין מודל זמין.",
+  "error.provider.acpModelsNotLoaded": "{provider} לא הצליח לטעון את המודלים שלו. יש לשלוח שוב את ההודעה.",
   "error.provider.acpNoModels": "ה-CLI של ACP לא פרסם אף מודל ACP. OpenBot לא ינחש מודל חלופי.",
   "error.provider.endpointRemoveBusy": "יש להמתין לסיום הפעולה הפעילה והתור לפני הסרת נקודת הקצה הזו.",
   "error.provider.codexOutdated": "Codex CLI {version} ישן מדי. OpenBot דורש גרסה 0.156.0 ומעלה.",
