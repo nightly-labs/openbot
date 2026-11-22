@@ -273,6 +273,14 @@ export function createAgentTasks(options: AgentTasksOptions) {
       });
   }
 
+  function dropArchivedPages(agentId: string): void {
+    if (!untrack(() => state.archived[agentId])) return;
+    archivedRequests.set(agentId, (archivedRequests.get(agentId) ?? 0) + 1);
+    setState((current) => {
+      delete current.archived[agentId];
+    });
+  }
+
   function updateArchivedPage(agentId: string, taskId: string, change: (tasks: AgentTask[]) => AgentTask[]): void {
     setState((current) => {
       const pages = current.archived[agentId];
@@ -520,7 +528,10 @@ export function createAgentTasks(options: AgentTasksOptions) {
     }),
     ({ agentId, shown, running }) => {
       if (!shown) return;
-      for (const id of new Set([...(agentId ? [agentId] : []), ...running])) void loadTasks(id);
+      for (const id of new Set([...(agentId ? [agentId] : []), ...running])) {
+        dropArchivedPages(id);
+        void loadTasks(id);
+      }
     },
   );
 
@@ -876,6 +887,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     for (const snapshot of Object.values(state.snapshots))
       if (snapshot.tasks.some((task) => task.state === "running")) agentIds.add(snapshot.agentId);
     for (const agentId of agentIds) {
+      dropArchivedPages(agentId);
       void loadTasks(agentId).then((loaded) => {
         if (!loaded) return;
         for (const [taskId, conversation] of Object.entries(state.conversations)) {
