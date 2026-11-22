@@ -373,6 +373,7 @@ export const messages = {
     "To zgłoszenie może wysłać tylko aplikacja OpenBot na telefon, bo dodaje wersję i dziennik pomocy telefonu. Otwórz ten czat na telefonie. Jeśli zobaczysz tam ten komunikat, zaktualizuj aplikację na telefonie.",
   "error.backend.takeoverInactive": "To przejęcie przeglądarki nie jest już aktywne.",
   "error.backend.authSubmitting": "Wysyłanie uwierzytelnienia już trwa.",
+  "error.backend.apiKeyListFailed": "OpenBot nie mógł odczytać zapisanych kluczy API.",
   "error.backend.apiKeySaveFailed": "OpenBot nie mógł zapisać klucza API. Spróbuj ponownie.",
   "error.backend.apiKeySaving": "Klucz API jest już zapisywany.",
   "error.backend.apiKeyAnswerUnreadable":

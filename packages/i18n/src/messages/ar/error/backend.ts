@@ -353,6 +353,7 @@ export const messages = {
     "يمكن لتطبيق OpenBot على الهاتف فقط إرسال هذا البلاغ، لأنه يضيف إصدار الهاتف وسجل الدعم. افتح هذه المحادثة على الهاتف. إذا ظهرت لك هذه الرسالة هناك، فحدّث تطبيق الهاتف.",
   "error.backend.takeoverInactive": "تولي التحكم في المتصفح هذا لم يعد نشطًا.",
   "error.backend.authSubmitting": "إرسال المصادقة قيد التنفيذ بالفعل.",
+  "error.backend.apiKeyListFailed": "تعذّر على OpenBot قراءة مفاتيح API المحفوظة.",
   "error.backend.apiKeySaveFailed": "تعذّر على OpenBot حفظ مفتاح API. حاول مرة أخرى.",
   "error.backend.apiKeySaving": "يتم حفظ مفتاح API بالفعل.",
   "error.backend.apiKeyAnswerUnreadable":
