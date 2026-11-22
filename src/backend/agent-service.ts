@@ -326,7 +326,7 @@ import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
-import { encodedModelId } from "./encoded-model-id";
+import { savedCustomModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
@@ -1125,13 +1125,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         savedEndpoints: () =>
           new Map(
-            credentials.customProviders().map((endpoint) => [
-              endpoint.id,
-              {
-                harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
-                models: endpoint.models.map((model) => encodedModelId(`${endpoint.id}/`, model.id)),
-              },
-            ]),
+            credentials.customProviders().map((endpoint) => {
+              const harness = endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+              return [
+                endpoint.id,
+                { harness, models: endpoint.models.map((model) => savedCustomModelId(endpoint.id, harness, model.id)) },
+              ];
+            }),
           ),
         modelsChanged: () => this.#emit({ type: "status", status: this.getStatus() }),
         stopProfileClients: () =>

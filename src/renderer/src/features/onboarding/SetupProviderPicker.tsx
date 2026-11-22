@@ -7,6 +7,7 @@ import {
   type CustomProviderHarness,
   type CustomProviderRestart,
   type CustomProviderSummary,
+  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderHarness,
@@ -280,7 +281,7 @@ export function createSetupProviders(
   function firstSavedCustomModel(): AgentModelId | null {
     for (const provider of props.customProviders ?? []) {
       const [model] = provider.models;
-      if (model) return `${provider.id}/${model.id}`;
+      if (model) return composedCustomModelId(provider.id, model.id);
     }
     return null;
   }
@@ -288,7 +289,7 @@ export function createSetupProviders(
   function selectSavedEndpoint(value: SaveCustomProviderInput): void {
     selectCustomProvider(value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
     const [firstModel] = value.models;
-    if (firstModel) setCustomModel(`${value.id}/${firstModel.id}`);
+    if (firstModel) setCustomModel(composedCustomModelId(value.id, firstModel.id));
   }
 
   const detectedApi = createMemo((): DetectedProviderApi | undefined => {

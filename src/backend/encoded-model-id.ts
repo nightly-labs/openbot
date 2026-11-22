@@ -1,4 +1,4 @@
-import { isAgentModel } from "@openbot/contracts/ipc";
+import { type CustomProviderHarness, composedCustomModelId, isAgentModel } from "@openbot/contracts/ipc";
 
 const ENCODED_MODEL = "b64:";
 
@@ -20,4 +20,8 @@ export function isEncodedModelOf(id: string, value: string): boolean {
   if (!id.startsWith(ENCODED_MODEL, start)) return false;
   const prefix = id.slice(0, start);
   return value.startsWith(prefix) && encodedModelId(prefix, value.slice(prefix.length)) === id;
+}
+
+export function savedCustomModelId(endpointId: string, harness: CustomProviderHarness, modelId: string): string {
+  return harness === "pi" ? encodedModelId(`${endpointId}/`, modelId) : composedCustomModelId(endpointId, modelId);
 }

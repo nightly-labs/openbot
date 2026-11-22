@@ -1,6 +1,6 @@
 import { AGENT_PROVIDERS, type AgentProviderId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
-import type { AgentReasoningEffort } from "./ipc-agent-identity";
+import { type AgentReasoningEffort, isAgentModel } from "./ipc-agent-identity";
 import { isBoundedString } from "./ipc-bounded-values";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
@@ -211,8 +211,21 @@ export function isCustomProviderResult(value: unknown): value is CustomProviderR
   );
 }
 
+const ESCAPED_MODEL_CHARACTERS = /[!#$%&()*+;<>?@^{|}~=]/g;
+const ESCAPABLE_MODEL_ID = /^[A-Za-z0-9._:/[\],!#$%&()*+;<>?@^{|}~=-]*$/;
+
+function escapedModelCharacter(character: string): string {
+  return `=${character.charCodeAt(0).toString(16).toUpperCase()}`;
+}
+
 export function composedCustomModelId(providerId: string, modelId: string): string {
-  return `${providerId}/${modelId}`;
+  const plain = `${providerId}/${modelId}`;
+  if (isAgentModel(plain) || !ESCAPABLE_MODEL_ID.test(modelId)) return plain;
+  return `${providerId}/${modelId.replace(ESCAPED_MODEL_CHARACTERS, escapedModelCharacter)}`;
+}
+
+export function customModelKey(providerId: string, modelId: string): string {
+  return composedCustomModelId(providerId, modelId).slice(providerId.length + 1);
 }
 
 export function isCustomProviderModelId(modelId: string, providerIds: ReadonlySet<string>): boolean {

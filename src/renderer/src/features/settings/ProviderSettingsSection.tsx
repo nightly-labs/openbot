@@ -7,6 +7,7 @@ import {
   CUSTOM_PROVIDER_HARNESSES,
   type CustomProviderRestart,
   type CustomProviderSummary,
+  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderHarness,
@@ -149,7 +150,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   const firstEndpointModel = () => {
     const endpoint = customProviders().find((item) => item.models.length > 0);
     const firstModel = endpoint?.models[0];
-    return endpoint && firstModel ? `${endpoint.id}/${firstModel.id}` : null;
+    return endpoint && firstModel ? composedCustomModelId(endpoint.id, firstModel.id) : null;
   };
 
   async function selectProvider(
@@ -189,7 +190,11 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   async function selectSavedEndpoint(value: SaveCustomProviderInput): Promise<void> {
     const firstModel = value.models[0];
     if (props.defaultProvider && firstModel) {
-      await selectProvider(value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, true, `${value.id}/${firstModel.id}`);
+      await selectProvider(
+        value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+        true,
+        composedCustomModelId(value.id, firstModel.id),
+      );
     }
   }
   const detectedApi = createMemo((): DetectedProviderApi | undefined => {
@@ -222,7 +227,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
       const provider = props.defaultProvider?.preferredProvider ?? null;
       const model = isCustomProviderHarness(provider) ? props.defaultProvider?.preferredModel : null;
       if (!provider || !model?.startsWith(`${input.id}/`)) return;
-      if (!input.models.some((item) => model === `${input.id}/${item.id}`)) {
+      if (!input.models.some((item) => model === composedCustomModelId(input.id, item.id))) {
         void selectProvider(provider, false, null);
       } else if (input.harness && input.harness !== provider) {
         void selectProvider(input.harness, true, model);
