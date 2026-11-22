@@ -220,6 +220,8 @@ export interface MemoryContext {
   memories: Pick<AgentMemory, "id" | "text" | "origin" | "site">[];
   storedCount: number;
   limit: number;
+  /** Essential memories that did not fit the prompt byte budget. They are reachable only through search. */
+  omittedEssentialCount?: number;
 }
 
 const MEMORY_LABEL =
@@ -238,6 +240,7 @@ export function memoryContext(
   options: Pick<DeveloperInstructionOptions, "memoryLimit" | "storedMemoryCount"> = {},
 ): MemoryContext {
   const promptMemories: MemoryContext["memories"] = [];
+  let omittedEssentialCount = 0;
   for (const memory of memories) {
     const safe = {
       id: memory.id,
@@ -246,16 +249,23 @@ export function memoryContext(
       ...(memory.site ? { site: memory.site } : {}),
     };
     if (essentialMemoryBytes([...promptMemories, safe]) <= AGENT_MEMORY_CONTEXT_BUDGET_BYTES) promptMemories.push(safe);
+    else omittedEssentialCount += 1;
   }
   return {
     memories: promptMemories,
+    ...(omittedEssentialCount > 0 ? { omittedEssentialCount } : {}),
     storedCount: options.storedMemoryCount ?? memories.length,
     limit: options.memoryLimit ?? DEFAULT_AGENT_MEMORY_LIMIT,
   };
 }
 
 function memoryCountLine(context: MemoryContext): string {
-  return `You have ${context.storedCount} saved memories; ${context.storedCount - context.memories.length} additional entries are available through search. The storage limit is ${context.limit}. The essential-memory prompt has a separate ${AGENT_MEMORY_CONTEXT_BUDGET_BYTES}-byte limit.`;
+  const omitted = context.omittedEssentialCount ?? 0;
+  const omittedNote =
+    omitted > 0
+      ? ` ${omitted} of them are marked essential but did not fit the prompt limit, so search for them when they could matter.`
+      : "";
+  return `You have ${context.storedCount} saved memories; ${context.storedCount - context.memories.length} additional entries are available through search.${omittedNote} The storage limit is ${context.limit}. The essential-memory prompt has a separate ${AGENT_MEMORY_CONTEXT_BUDGET_BYTES}-byte limit.`;
 }
 
 function memoryContextLines(context: MemoryContext): string[] {
