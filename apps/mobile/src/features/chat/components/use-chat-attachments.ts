@@ -187,12 +187,17 @@ export function useChatAttachments(
   async function readFile(uri: string, name: string): Promise<RemoteFileUpload & { uri: string }> {
     const file = new File(uri);
     const safeName = name.replace(/[/\\]/gu, "_");
+    const unavailable = () => new Error(t("mobile.chat.attachment.unavailable"));
     const size = file.size;
+    if (size === null) throw unavailable();
     if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw tooLarge(safeName, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
     assertSupported(safeName);
     const mimeType = attachmentMimeTypeForName(safeName);
     if (size > MOBILE_ATTACHMENT_BYTES) return { name: safeName, mimeType, base64: "", uri, file: { ref: uri, size } };
-    return { name: safeName, mimeType, base64: await readFileBase64(file), uri };
+    const base64 = await readFileBase64(file).catch(() => {
+      throw unavailable();
+    });
+    return { name: safeName, mimeType, base64, uri };
   }
   async function addFile(uri: string, name: string) {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
