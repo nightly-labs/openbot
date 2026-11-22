@@ -386,7 +386,12 @@ changed, on this computer and on a joined host.
   `list`, or labels such as `high|normal|low`; `name?` is optional. Values are strict: a number is a
   JSON number or decimal text, an integer is a safe integer, and a list is a JSON array. A model or
   agent reply with no JSON object, or with a key that is not a field (names are case-sensitive), is a
-  problem. A model step asks for one JSON object and tries once more with the problems. An agent step
+  problem. A model step asks for one JSON object and tries once more with the problems. When the
+  provider client has `structuredOutput` (Claude), the model step also gives the JSON Schema of its
+  fields (`workflowAnswerJsonSchema`): the toolless turn sends it as `outputSchema` on `thread/start`,
+  and the Claude adapter sets the SDK `outputFormat` and returns the structured output as the reply.
+  Codex is not given the schema because a custom Codex endpoint can refuse it; Pi and the ACP
+  providers have no such option. They use the prompt and the parser. An agent step
   asks the agent to call the catalog tool `workflow_answer` (`{"answer":{…}}`). The tool finds the
   running agent step from the deliveries of the turn, checks the answer at once and gives the problems
   back, so the agent corrects it in the same turn. The last answer that fits goes in the `output`

@@ -35,6 +35,7 @@ export interface AgentClient {
   readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
   readonly catalogAsMcpTools?: (model: string) => boolean;
   readonly imageInput?: (externalThreadId: string) => boolean;
+  readonly structuredOutput?: boolean;
   readonly canReleaseProcess?: () => boolean;
   readonly runsBackgroundWork?: () => boolean;
   readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;

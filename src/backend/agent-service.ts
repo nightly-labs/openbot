@@ -178,6 +178,7 @@ import {
   workflowCatalogSource,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { AGENT_THREAD_READS_LIMIT } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/context-compact-v1";
@@ -2952,7 +2953,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ).bind(this);
 
   readonly generateWorkflowText = Effect.fn("AgentService.generateWorkflowText")(
-    function* (this: AgentService, input: WorkflowModelInput & { prompt: string; images: readonly string[] }) {
+    function* (
+      this: AgentService,
+      input: WorkflowModelInput & {
+        prompt: string;
+        images: readonly string[];
+        outputSchema?: DynamicRecord;
+      },
+    ) {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
@@ -2966,6 +2974,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           input.prompt,
           workflowUsageObserver(this.#store.database.usage, provider, model.id),
           input.images,
+          input.outputSchema ?? null,
         )
         .pipe(
           Effect.tapError((failure) =>
