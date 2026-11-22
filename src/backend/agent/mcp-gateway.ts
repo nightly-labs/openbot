@@ -284,13 +284,21 @@ export class McpGateway {
             signIn: (url) => stored.signIn(url, open, options.deepLinkRedirectUrl),
           }
         : (stored ?? undefined);
-    const outcome = options.interactive
-      ? yield* inspectMcpServer(config, undefined, this.#toolRuntimes(), opened, options.signInPlace ?? null).pipe(
-          toMcpGatewayFailed,
-        )
-      : yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
-    if (!options.interactive) yield* this.#refreshForTestedTools(config, outcome);
-    return { toolCount: outcome.toolCount, error: outcome.error };
+    if (options.interactive) {
+      const outcome = yield* inspectMcpServer(
+        config,
+        undefined,
+        this.#toolRuntimes(),
+        opened,
+        options.signInPlace ?? null,
+      ).pipe(toMcpGatewayFailed);
+      return { toolCount: outcome.toolCount, error: outcome.error };
+    }
+    const outcome = yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
+    yield* this.#refreshForTestedTools(config, outcome);
+    const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
+    const error = refused ? sourceText("error.backend.mcpRegistrationUnavailable") : outcome.error;
+    return { toolCount: outcome.toolCount, error };
   });
 
   readonly #probeStoredSignIn = Effect.fnUntraced(function* (
