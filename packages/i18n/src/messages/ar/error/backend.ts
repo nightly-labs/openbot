@@ -84,6 +84,8 @@ export const messages = {
     "لا توجد لأعضاء هذه القناة محادثة لضغطها بعد. اضغطها بعد أن يرد عضو في القناة.",
   "error.backend.channelCompactNotSupported":
     "لا يمكن لأي عضو في هذه القناة الضغط عند الطلب. الأعضاء الذين يدعمونه يضغطون سياقهم تلقائيًا عندما يكاد يمتلئ.",
+  "error.backend.channelCompactProviderUnavailable":
+    "مزوّد أعضاء القناة لا يعمل الآن. حدّث المزوّدين، ثم اضغط سياق القناة مرة أخرى.",
   "error.backend.channelArchived": "استعد هذه القناة قبل إرسال الرسائل أو تغيير المهام.",
   "error.backend.channelArchiveRunning": "أوقف العمل الجاري في هذه القناة، ثم احذفها.",
   "error.backend.channelReferenceUnavailable": "رسالة القناة المشار إليها غير متاحة.",
@@ -253,6 +255,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "يطلب هذا الخادم تسجيل الدخول. سجّل الدخول إليه في OpenBot على الحاسوب المضيف.",
   "error.backend.mcpSignInNeedsHttps":
     "يطلب هذا الخادم تسجيل الدخول، ولا يسجّل OpenBot الدخول إلا عبر https. غيّر URL إلى {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "يسجّل هذا الخادم الدخول فقط على {url}. غيّر عنوان URL إلى هذا العنوان، ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInCancelled": "تم إلغاء تسجيل الدخول.",
   "error.backend.mcpSignInTimedOut": "لم يكتمل تسجيل الدخول في المتصفح.",
   "error.backend.mcpSignInRefused": "رفضت صفحة تسجيل الدخول الوصول. سجّل الدخول مرة أخرى.",

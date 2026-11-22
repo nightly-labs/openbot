@@ -493,6 +493,8 @@ export const messages = {
   "chat.compaction.running": "Bağlam sıkıştırılıyor",
   "chat.compaction.completed": "Bağlam sıkıştırıldı",
   "chat.compaction.failed": "Bağlam sıkıştırılamadı",
+  "chat.compaction.cacheExpiryRunning": "İstem önbelleğinin süresi dolmadan bağlam sıkıştırılıyor",
+  "chat.compaction.cacheExpiryCompleted": "İstem önbelleğinin süresi dolmadan bağlam sıkıştırıldı",
   "chat.compaction.tokens": "{before} → {after} token",
   "chat.compaction.continues": "Kuyruktaki mesajlar devam ediyor.",
   "chat.reference.kind.tab": "Tarayıcı sekmesi",

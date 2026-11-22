@@ -486,6 +486,8 @@ export const messages = {
   "chat.compaction.running": "Compactage du contexte",
   "chat.compaction.completed": "Contexte compacté",
   "chat.compaction.failed": "Impossible de compacter le contexte",
+  "chat.compaction.cacheExpiryRunning": "Compactage du contexte avant l’expiration du cache de prompt",
+  "chat.compaction.cacheExpiryCompleted": "Contexte compacté avant l’expiration du cache de prompt",
   "chat.compaction.tokens": "{before} → {after} jetons",
   "chat.compaction.continues": "Les messages en file d’attente continuent.",
   "chat.reference.kind.tab": "Onglet du navigateur",

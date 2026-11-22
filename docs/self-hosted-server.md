@@ -334,7 +334,9 @@ the computer. `sudo openbot uninstall` removes the rule.
 With `mode` set to `self`, `openbot-hosted-server` does not wait for a claim or for a boat desktop.
 It starts a D-Bus session with an unlocked keyring, as on a hosted server, and runs OpenBot under
 Xvfb with `OPENBOT_SERVER=1`. Main (`src/main/server-mode.ts`) then opens the control socket
-`/run/openbot/control.sock` and publishes the host after each sign-in.
+`/run/openbot/control.sock` and publishes the host after each sign-in. The
+[watchdog](hosted-servers.md#watchdog) also runs: when main stops updating its heartbeat file for 10
+minutes, the watchdog stops OpenBot and systemd starts it again.
 
 The server has two Xvfb displays, one in each of two nested `xvfb-run` commands that share one
 authority file. The outer one starts the agent display, at the [display size](#display-size), and

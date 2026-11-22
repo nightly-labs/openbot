@@ -203,6 +203,11 @@ import {
   BROWSING_MEMORY_ROUTES,
 } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import {
+  CACHE_EXPIRY_COMPACTION_CAPABILITY,
+  CACHE_EXPIRY_COMPACTION_CODECS,
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import {
   CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-folders-v1";
@@ -340,6 +345,10 @@ import {
   PENDING_PROMPTS_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY, PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import {
+  PROMPT_CACHE_TTL_CAPABILITY,
+  PROMPT_CACHE_TTL_PI_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
@@ -514,6 +523,10 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "../src/main/busy-message-mode-preference-store";
+import {
+  cacheExpiryCompactionControl,
+  createCacheExpiryCompactionPreferenceStore,
+} from "../src/main/cache-expiry-compaction-preference-store";
 import { createChannelFolders } from "../src/main/channel-folders";
 import {
   claudeCompactWindowControl,
@@ -2727,10 +2740,17 @@ try {
         createClaudeUserSetupPreferenceStore(join(root, "claude-user-setup.json")),
         () => record("claudeUserSetupChanged"),
       ),
+      cacheExpiryCompaction: cacheExpiryCompactionControl(
+        createCacheExpiryCompactionPreferenceStore(join(root, "cache-expiry-compaction.json")),
+      ),
       claudeCompactWindow: claudeCompactWindowControl(
         createClaudeCompactWindowPreferenceStore(join(root, "claude-compact-window.json")),
         () => record("claudeCompactWindowChanged"),
       ),
+      promptCacheTtl: {
+        get: () => ({ ttl: "1h" as const }),
+        set: (ttl) => Effect.succeed({ ttl }),
+      },
       providerEnvironment,
       providerDetection: {
         detection: {
@@ -6491,6 +6511,13 @@ try {
       [summary(compatibility), summary(older)],
     );
     check(
+      "the host advertises prompt-cache-ttl-pi-v1 with prompt-cache-ttl-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(PROMPT_CACHE_TTL_PI_CAPABILITY) &&
+        decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(PROMPT_CACHE_TTL_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PROMPT_CACHE_TTL_PI_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    check(
       "the host advertises vault-member-save-v1 to a protocol 10 peer only",
       decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(VAULT_MEMBER_SAVE_CAPABILITY) &&
         !list(field(older.body, "capabilities")).includes(VAULT_MEMBER_SAVE_CAPABILITY),
@@ -8772,6 +8799,57 @@ try {
         isDeepStrictEqual(off.body, { enabled: false }) &&
         callsOf("claudeUserSetupChanged").length === 2,
       [summary(member), summary(memberRead), summary(noCapability), summary(off)],
+    );
+  }
+
+  {
+    const setup = { token: adaToken, protocol: TEAM_PROTOCOL_V10, capabilities: [CACHE_EXPIRY_COMPACTION_CAPABILITY] };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const before = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const off = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, { ...setup, json: { enabled: false } });
+    const after = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const saved = parseJson(readFileSync(join(root, "cache-expiry-compaction.json"), "utf8"));
+    check(
+      "the host advertises cache-expiry-compaction-v1 to a protocol 10 peer only, the switch is on by default, and an admin turns it off, which the host saves",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(CACHE_EXPIRY_COMPACTION_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CACHE_EXPIRY_COMPACTION_CAPABILITY) &&
+        isDeepStrictEqual(before.body, { enabled: true }) &&
+        isDeepStrictEqual(off.body, { enabled: false }) &&
+        isDeepStrictEqual(after.body, { enabled: false }) &&
+        CACHE_EXPIRY_COMPACTION_CODECS.get(CACHE_EXPIRY_COMPACTION_ROUTES.update)?.response(200, off.body) !==
+          undefined &&
+        isDeepStrictEqual(saved, { version: 1, enabled: false }),
+      [summary(compatibility), summary(before), summary(off), summary(after)],
+    );
+    const member = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, {
+      ...setup,
+      token: bobToken,
+      json: { enabled: true },
+    });
+    const memberRead = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, {
+      ...setup,
+      token: bobToken,
+      json: {},
+    });
+    const noCapability = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V10,
+      json: { enabled: true },
+    });
+    const unchanged = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const on = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, { ...setup, json: { enabled: true } });
+    check(
+      "a member cannot read or set the compaction switch (403), a client without cache-expiry-compaction-v1 gets 400, and neither changes it",
+      member.status === 403 &&
+        memberRead.status === 403 &&
+        errorIs(noCapability, 400, sourceText("error.team.cacheExpiryCompactionUnsupported")) &&
+        isDeepStrictEqual(unchanged.body, { enabled: false }) &&
+        isDeepStrictEqual(on.body, { enabled: true }),
+      [summary(member), summary(memberRead), summary(noCapability), summary(on)],
     );
   }
 

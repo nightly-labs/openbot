@@ -99,6 +99,7 @@ export const messages = {
   "mcp.panel.signIn": "Oturum aç",
   "mcp.panel.signOut": "Oturumu kapat",
   "mcp.panel.cancelSignIn": "Oturum açmayı iptal et",
+  "mcp.panel.useAddress": "Bu adresi kullan",
   "mcp.panel.signInTo": "Oturum aç: {name}",
   "mcp.panel.signInWaiting": {
     one: "Oturum açmayı tarayıcınızda tamamlayın. OpenBot {count} dakika sonra beklemeyi bırakır.",

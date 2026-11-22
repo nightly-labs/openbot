@@ -152,7 +152,7 @@ import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-displa
 import { AgentDockFailed, AgentDockWindowController, toAgentDockFailed } from "./agent-dock-window";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
-import { fitImageForAgent } from "./agent-image-fit";
+import { compactScreenshot, fitImageForAgent } from "./agent-image-fit";
 import { AgentImportService } from "./agent-import-service";
 import { AgentInitializationGate } from "./agent-initialization";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
@@ -193,6 +193,11 @@ import {
 import { BrowserViewClient } from "./browser-view-client";
 import { BrowsingMemoryPreferenceStore } from "./browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
+import {
+  type CacheExpiryCompactionControl,
+  cacheExpiryCompactionControl,
+  createCacheExpiryCompactionPreferenceStore,
+} from "./cache-expiry-compaction-preference-store";
 import { type CentralAuthManager, isHostNotOnAccount } from "./central-auth-manager";
 import { type ChannelFolders, createChannelFolders } from "./channel-folders";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
@@ -221,6 +226,7 @@ import {
 import { createCreditMediaGateway } from "./credit-media-gateway";
 import { CreditsDesktopService } from "./credits-service";
 import { createCrmPreferenceStore, crmSettingsStore } from "./crm-preference-store";
+import { CuaDriverActionTap } from "./cua-driver-action-tap";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
 import {
@@ -440,6 +446,7 @@ import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-de
 import { SpeechPreferenceStore } from "./speech-preference-store";
 import { StartupTiming } from "./startup-timing";
 import { AGENT_CERTIFICATES_FILE, agentCertificateEnvironment } from "./system-certificates";
+import { mcpSignInSharedWithOthers } from "./team-api/mcp-member-access";
 import { LEGACY_TEAM_STORE_FILE, TEAM_STORE_FILE, TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -518,6 +525,7 @@ const HOST_TURN_LIMITS_PREFERENCE_FILE = "openbot-host-turn-limits-v1.json";
 const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
+const CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE = "openbot-cache-expiry-compaction-v1.json";
 const CRM_PREFERENCE_FILE = "openbot-crm-v1.json";
 const CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE = "openbot-claude-compact-window-v1.json";
 const PROVIDER_ENVIRONMENT_PREFERENCE_FILE = "openbot-provider-environment-v1.json";
@@ -713,6 +721,7 @@ export interface ApplicationServices {
   serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   claudeUserSetup: ClaudeUserSetupControl;
+  cacheExpiryCompaction: CacheExpiryCompactionControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
   providerEnvironment: ProviderEnvironmentControl;
   modelVisibility: ModelVisibility;
@@ -1461,6 +1470,9 @@ export async function createApplicationServices({
   const claudeUserSetup = createClaudeUserSetupPreferenceStore(
     join(app.getPath("userData"), CLAUDE_USER_SETUP_PREFERENCE_FILE),
   );
+  const cacheExpiryCompaction = createCacheExpiryCompactionPreferenceStore(
+    join(app.getPath("userData"), CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE),
+  );
   const crmPreference = createCrmPreferenceStore(join(app.getPath("userData"), CRM_PREFERENCE_FILE));
   const claudeCompactWindow = createClaudeCompactWindowPreferenceStore(
     join(app.getPath("userData"), CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE),
@@ -1505,6 +1517,7 @@ export async function createApplicationServices({
       serverPersonality.load(),
       promptCacheTtl.load(),
       claudeUserSetup.load(),
+      cacheExpiryCompaction.load(),
       crmPreference.load(),
       claudeCompactWindow.load(),
       providerEnvironment.load(),
@@ -1845,6 +1858,7 @@ export async function createApplicationServices({
     });
   };
   const cuaDriver = new CuaDriverRuntime({
+    actionTap: new CuaDriverActionTap(Date.now, undefined, compactScreenshot),
     executable: await Effect.runPromise(resolveCuaDriverExecutable()),
     resolveExecutable: resolveCuaDriverExecutable,
     commandAlias: cuaDriverCommandAlias({
@@ -2012,6 +2026,7 @@ export async function createApplicationServices({
     mailbox,
     browser,
     finishCheck: true,
+    cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
     visualPreview: new ChatVisualPreviewer(),
     avatarDecoder: (bytes) => !nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty(),
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
@@ -2168,6 +2183,14 @@ export async function createApplicationServices({
     crm: () => crmHandle,
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
     personCanAdminister: (personId) => host.personCanAdminister(personId),
+    mcpServerOwners: {
+      added: (mcpServerId, personId) =>
+        mcpSignInSharedWithOthers(service.listMcpServers(), mcpServerId, (id) => mcpServerOwners.addedBy(id, personId))
+          ? Effect.void
+          : mcpServerOwners.add(mcpServerId, personId),
+      removed: (mcpServerId) =>
+        mcpServerOwners.remove(mcpServerId).pipe(Effect.andThen(mcpAccessStore.remove(mcpServerId))),
+    },
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,
@@ -2213,6 +2236,7 @@ export async function createApplicationServices({
   });
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
   promptCacheTtl.onChange(() => service.notifyProviderSettingsChanged());
+  const cacheExpiryCompactionSetting = cacheExpiryCompactionControl(cacheExpiryCompaction);
   const claudeUserSetupSetting = claudeUserSetupControl(claudeUserSetup, () => service.notifyProviderSettingsChanged());
   const claudeCompactWindowSetting = claudeCompactWindowControl(claudeCompactWindow, () =>
     service.notifyProviderSettingsChanged(),
@@ -2998,6 +3022,10 @@ export async function createApplicationServices({
         get: () => claudeUserSetupSetting.get().enabled,
         set: (enabled) => claudeUserSetupSetting.set(enabled),
       },
+      cacheExpiryCompaction: {
+        get: () => cacheExpiryCompaction.get().enabled,
+        set: (enabled) => cacheExpiryCompactionSetting.set(enabled),
+      },
       claudeCompactWindow: {
         get: () => claudeCompactWindowSetting.get().tokens,
         set: (tokens) => claudeCompactWindowSetting.set(tokens),
@@ -3054,6 +3082,7 @@ export async function createApplicationServices({
     accounts: providerAccountsHost,
     receiveMcpGrant: (state, code) => mcpOAuth.receiveAuthorizationCode(state, code),
     receiveMcpRefusal: (state) => mcpOAuth.refuseAuthorization(state),
+    cancelMcpSignInPage: (state) => mcpOAuth.cancelSignInPage(state),
     printedLink: (agentId, url) =>
       agentPrintedLink(
         service.searchConversationMessages(url, agentId, undefined, 20).results.map(({ message }) => message),
@@ -3225,6 +3254,7 @@ export async function createApplicationServices({
       browsingMemory,
       promptCacheTtl,
       claudeUserSetup: claudeUserSetupSetting,
+      cacheExpiryCompaction: cacheExpiryCompactionSetting,
       claudeCompactWindow: claudeCompactWindowSetting,
       providerEnvironment: providerEnvironmentSetting,
       providerDetection: { detection: providerDetection, settings: providerDetectionSettings },
@@ -4267,6 +4297,7 @@ export async function createApplicationServices({
     serverPersonality,
     promptCacheTtl,
     claudeUserSetup: claudeUserSetupSetting,
+    cacheExpiryCompaction: cacheExpiryCompactionSetting,
     claudeCompactWindow: claudeCompactWindowSetting,
     providerEnvironment: providerEnvironmentSetting,
     modelVisibility,

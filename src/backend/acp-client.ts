@@ -574,6 +574,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
       deletesSessions: () => this.#deletesSessions,
       effortCategories: options.flavor.effortCategories,
+      stillStarting: options.flavor.stillStarting,
     });
   }
 
@@ -3148,11 +3149,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (turn.beforeWakeEcho) {
       if (update.sessionUpdate === "user_message_chunk" && update.content.type === "text") {
         if (isTurnContextBlock(update.content.text)) turn.beforeWakeEcho = null;
-      } else if (!SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+        return;
+      }
+      if (SESSION_STATE_UPDATES.has(update.sessionUpdate) || update.sessionUpdate === "tool_call_update") return;
+      if (update.sessionUpdate !== "tool_call") {
         turn.answered = true;
         turn.beforeWakeEcho.push(update);
+        return;
       }
-      return;
+      this.#releaseBeforeWakeEcho(thread, turn);
     }
     const retry = turn.stopped ? null : this.#flavor.retryUpdate?.(update);
     if (retry) {
@@ -3172,6 +3177,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#emitTurnProgress(thread, turn, recovered);
     }
     this.#applyTurnUpdate(thread, turn, update);
+  }
+
+  #releaseBeforeWakeEcho(thread: AcpThread, turn: AcpTurn): void {
+    const held = turn.beforeWakeEcho ?? [];
+    turn.beforeWakeEcho = null;
+    for (const update of held) this.#applyTurnUpdate(thread, turn, update);
   }
 
   #emitTurnProgress(thread: AcpThread, turn: AcpTurn, detail: string): void {
@@ -3947,9 +3958,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     error: unknown,
   ) {
     if (thread.activeTurn !== turn || turn.completing) return;
-    const beforeEcho = turn.beforeWakeEcho ?? [];
-    turn.beforeWakeEcho = null;
-    for (const update of beforeEcho) this.#applyTurnUpdate(thread, turn, update);
+    this.#releaseBeforeWakeEcho(thread, turn);
     turn.completing = true;
     if (this.#flavor.childSessionUpdates) yield* Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
     if (status === "failed") {
@@ -4183,13 +4192,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           ? "file-change"
           : "permissions";
     if (
-      kind === "permissions" &&
       thread &&
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      ((this.options.confine && callsBridgeTool(thread, params.toolCall.title)) ||
-        (turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
+      ((this.options.confine && callsBridgeTool(thread, params.toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
+        (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
       if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
@@ -4489,9 +4497,25 @@ function bestPermissionOption(options: PermissionOption[], accepted: boolean): P
   return kinds.flatMap((kind) => options.filter((option) => option.kind === kind))[0] ?? null;
 }
 
-function callsBridgeTool(thread: AcpThread, title: string | null | undefined): boolean {
+function callsBridgeTool(
+  thread: AcpThread,
+  toolCall: RequestPermissionRequest["toolCall"],
+  kind: "command" | "file-change" | "permissions",
+  inputNamesServer: true | undefined,
+): boolean {
+  const input = isRecord(toolCall.rawInput) ? toolCall.rawInput : null;
+  if (kind === "file-change" || (input && Object.hasOwn(input, "CommandLine"))) return false;
+  if (inputNamesServer && input && Object.hasOwn(input, "ServerName"))
+    return thread.dynamicTools.some(
+      (namespace) =>
+        namespace.name === input.ServerName && namespace.tools.some((tool) => tool.name === input.ToolName),
+    );
+  if (kind !== "permissions") return false;
+  const title = toolCall.title?.trim().replace(/\?$/u, "");
   return thread.dynamicTools.some((namespace) =>
-    namespace.tools.some((tool) => title === `${namespace.name}__${tool.name}`),
+    namespace.tools.some(
+      (tool) => title === `${namespace.name}__${tool.name}` || title === `Run mcp_${namespace.name}_${tool.name}`,
+    ),
   );
 }
 

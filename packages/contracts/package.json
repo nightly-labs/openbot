@@ -323,6 +323,7 @@
     "./team-protocol/routine-run-command-v1": "./src/team-protocol/routine-run-command-v1.ts",
     "./team-protocol/claude-user-setup-v1": "./src/team-protocol/claude-user-setup-v1.ts",
     "./team-protocol/claude-compact-window-v1": "./src/team-protocol/claude-compact-window-v1.ts",
+    "./team-protocol/cache-expiry-compaction-v1": "./src/team-protocol/cache-expiry-compaction-v1.ts",
     "./team-protocol/provider-environment-v1": "./src/team-protocol/provider-environment-v1.ts",
     "./team-protocol/agent-thread-queue-v1": "./src/team-protocol/agent-thread-queue-v1.ts",
     "./team-protocol/agent-active-queues-v1": "./src/team-protocol/agent-active-queues-v1.ts",

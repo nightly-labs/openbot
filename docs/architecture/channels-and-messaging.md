@@ -714,7 +714,11 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
 - **Updates.** Telegram posts to `https://signal.openbot.run/v1/telegram/updates/<bot ID>` with a
   secret header that Signal derives for each bot. Signal reads only the chat ID, a link code and a
   callback query ID, and sends `telegram-delivery` to the socket that holds the chat. It always
-  answers 200: Telegram would hold back the bot's other chats behind one offline host. The Telegram
+  answers 200: Telegram would hold back the bot's other chats behind one offline host. When the
+  route lookup (`/v2/remote/route-wake`) answers `hostId: null`, the chat has no link: a direct
+  message, a mention or a command there gets one `status.messaging.telegramNotLinked` notice from
+  Signal, at most once a day for each chat. A failed lookup, or a chat that this Signal saw linked,
+  revoked or named in a route ticket, gets none. The Telegram
   route ticket (`telegramRoute` in the hello, audience `openbot-telegram-route`, the Slack route key)
   and `telegram-route-revoked` work as the Slack ones do. A chat that is not in the ticket's chat list
   reports `not_linked` as a Slack workspace does, and Reconnect opens a new link for the chat. A chat

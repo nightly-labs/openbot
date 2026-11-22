@@ -169,6 +169,11 @@ export const queryKeys = {
     ...provider,
   ],
   providerPromptCache: (scope: QueryScope, serverId: string) => ["provider-prompt-cache", ...scope, serverId],
+  providerCacheExpiryCompaction: (scope: QueryScope, serverId: string) => [
+    "provider-cache-expiry-compaction",
+    ...scope,
+    serverId,
+  ],
   providerCompactWindow: (scope: QueryScope, serverId: string) => ["provider-compact-window", ...scope, serverId],
   providerEnvironment: (scope: QueryScope, serverId: string, provider: string) => [
     "provider-environment",

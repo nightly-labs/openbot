@@ -168,6 +168,7 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "timeout",
   "empty_answer",
   "model_not_found",
+  "invalid_request",
 ]);
 
 const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
@@ -190,7 +191,13 @@ function isRefusedGeminiToken(provider: string | undefined, message: string): bo
   return provider === "antigravity" && GEMINI_INVALID_CREDENTIALS.test(message);
 }
 
-const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable", "rate_limit"]);
+const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "authentication",
+  "provider_unavailable",
+  "rate_limit",
+  "network",
+  "timeout",
+]);
 const POOL_PASS_OVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "usage_limit",
   "provider_unavailable",
@@ -256,6 +263,7 @@ export interface TurnHooks {
   turnModel(agentId: string, turnId: string): string | null;
   mayFailOver(agentId: string): boolean;
   backupReadyAt(agentId: string): number | null;
+  backupsAtLimit(agentId: string): boolean;
   poolHasOtherAccount(agentId: string): boolean;
   mayContinueOnBackup(agentId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
@@ -901,7 +909,6 @@ export class TurnLifecycle {
   #holdNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
-      (source.provider !== "codex" && source.provider !== "claude") ||
       running === undefined ||
       (running.startedBackgroundWork && this.#waitingThreads.has(threadId)) ||
       running.compacted ||
@@ -936,6 +943,7 @@ export class TurnLifecycle {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
       return false;
     }
+    if (source.provider !== "codex" && source.provider !== "claude") return false;
     if (deliveries.every(({ delivery }) => this.#mailbox.answersHandledRequest(delivery.id))) {
       logger.info("A turn for another teammate result to a handled request ended quietly.", {
         agentId,
@@ -1145,7 +1153,7 @@ export class TurnLifecycle {
     const turnId = getString(params, "turnId");
     const itemId = getString(params, "itemId");
     const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
-    if (!turnId || !itemId || delta === null) return;
+    if (!turnId || !itemId || delta === null || this.#compaction.isCompactionTurn(threadId, turnId)) return;
     this.#itemTurns.set(itemId, turnId);
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
@@ -1337,7 +1345,8 @@ export class TurnLifecycle {
             item.text.trim()
           )
             running.narration = itemId;
-        } else if (running && isRepeatedWork(item)) running.narration = null;
+        } else if (running && isRepeatedWork(item) && !keepsNarration(item, notification.method === "item/completed"))
+          running.narration = null;
         if (item.type === "contextCompaction") {
           if (running) running.compacted = true;
           if (this.#conversation.openClientFor(threadId) !== source) return;
@@ -1363,6 +1372,7 @@ export class TurnLifecycle {
           }
           return;
         }
+        if (this.#compaction.isCompactionTurn(threadId, turnId)) return;
         if (notification.method === "item/completed" && itemId) {
           this.#deltas.flush(`${threadId}:${turnId}:${itemId}`);
           const loads = skillLoads(item, getArray(params, "filePaths"));
@@ -1447,6 +1457,7 @@ export class TurnLifecycle {
           this.#compaction.finish(agentId, threadId, status);
           return;
         }
+        this.#compaction.threadIdle(agentId, threadId, source);
         yield* this.#completeTurn(agentId, threadId, turnId, status).pipe(
           Effect.catchCause((cause) =>
             reportOriginalFailure(cause, (failure) =>
@@ -1502,6 +1513,7 @@ export class TurnLifecycle {
         if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
         if (status !== "running" && status !== "completed" && status !== "failed") return;
+        if (source.compactsOnDemand === true && this.#compaction.requested(threadId)) return;
         this.#compaction.observeCompaction(threadId, status, "none");
         return;
       }
@@ -1725,10 +1737,23 @@ export class TurnLifecycle {
         }
         const taskId =
           notification.method === "error" && agentId && threadId ? this.#taskForThread(agentId, threadId) : null;
+        const backupsAtLimit =
+          notification.method === "error" &&
+          context.causeCode === "usage_limit" &&
+          agentId !== undefined &&
+          this.#hooks.backupsAtLimit(agentId);
+        if (backupsAtLimit)
+          logger.warn("A usage limit stopped an agent, and no backup model can take over.", {
+            agentId,
+            provider: source.provider,
+            model: context.model,
+            message: this.#hooks.redactMcp(message),
+          });
+        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : message;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
-          this.#hooks.taskFailed(taskId, message);
-        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context, link);
+          this.#hooks.taskFailed(taskId, shown);
+        } else this.#hooks.emitError(`agent_${notification.method}`, shown, agentId, context, link);
       }
     }
   }).bind(this);
@@ -3471,6 +3496,36 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown;
   if (item.type !== "agentMessage") return true;
   if (item.failureReport === true) return false;
   return item.phase !== "commentary" && hasText(item);
+}
+
+const NARRATION_KEEPING_TOOLS = new Set([
+  "messaging_history",
+  "messaging_list_places",
+  "messaging_remember",
+  "messaging_forget_memory",
+  "remember",
+  "forget_memory",
+  "search_memories",
+  "history_read",
+  "history_search",
+  "react_to_user_message",
+]);
+
+function keepsNarration(item: DynamicRecord, completed: boolean): boolean {
+  const threadItem = toThreadItem(item);
+  if (threadItem === null) return false;
+  const tool = openBotTool(threadItem);
+  if (tool !== null) return NARRATION_KEEPING_TOOLS.has(tool);
+  if (threadItem.type !== "toolCall" || getString(threadItem, "name") !== "execute") return false;
+  if (!completed) return true;
+  const calls = getArray(getRecord(getRecord(threadItem, "result"), "metadata"), "toolCalls");
+  return calls.length > 0 && calls.every((call) => NARRATION_KEEPING_TOOLS.has(codeModeOpenBotTool(call) ?? ""));
+}
+
+function codeModeOpenBotTool(call: unknown): string | null {
+  const tool = getString(call, "tool");
+  const name = tool === "openbot.tool_call" ? getString(getRecord(call, "input"), "name") : tool;
+  return name?.startsWith("openbot.") ? name.slice("openbot.".length) : null;
 }
 
 function isUserReactionCall(item: DynamicRecord): boolean {

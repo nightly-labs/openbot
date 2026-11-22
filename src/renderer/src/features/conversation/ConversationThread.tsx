@@ -28,6 +28,7 @@ import type { ConversationThreads } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
+import { narrationRows } from "./narration-rows";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { withQuestionContext } from "./stores/scroll-store";
 import { createTurnSteps } from "./turn-steps";
@@ -100,7 +101,11 @@ export function ConversationThread() {
     [],
     { key: "id" },
   );
-  const shownMessages = createMemo(() => withQuestionContext(messages, messages, props.prompt?.turnId));
+  const shownMessages = createMemo(() =>
+    withQuestionContext(messages, messages, props.prompt?.turnId, (thinking) =>
+      narrationRows(thinking, props.agent?.provider),
+    ),
+  );
   const turnSteps = createTurnSteps({
     messages: () => messages,
     lines: () => undefined,

@@ -1248,11 +1248,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Nie udało się zmienić modeli. Spróbuj ponownie.",
   "mobile.server.providers.promptCache": "Pamięć podręczna promptów",
   "mobile.server.providers.promptCacheHint":
-    "Jak długo Claude trzyma kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu Claude.",
-  "mobile.server.providers.promptCacheDefault": "Domyślne Claude Code",
+    "Jak długo Claude i Pi trzymają kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu dostawcy.",
+  "mobile.server.providers.promptCacheDefault": "Domyślne ustawienie dostawcy",
   "mobile.server.providers.promptCacheHour": "1 godzina",
   "mobile.server.providers.promptCacheLoadFailed":
     "Nie udało się wczytać czasu pamięci podręcznej promptów tego serwera.",
+  "mobile.server.providers.cacheExpiryCompaction": "Kompaktuj przed wygaśnięciem pamięci podręcznej",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Gdy czat z kontekstem 200K lub więcej tokenów jest nieaktywny z pamięcią podręczną na 1 godzinę, agent kompaktuje kontekst przed jej wygaśnięciem. Wtedy następna wiadomość nie czyta całego kontekstu ponownie bez pamięci podręcznej.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Nie udało się wczytać ustawienia kompaktowania tego serwera.",
   "mobile.server.providers.compactWindow": "Kompaktuj czaty przy",
   "mobile.server.providers.compactWindowHint":
     "Claude Code streszcza starsze tury czatu, gdy czat osiągnie ten rozmiar. Mniej to szybsze i tańsze tury. Więcej zachowuje więcej szczegółów. Model z mniejszym oknem kompaktuje przy własnym limicie.",

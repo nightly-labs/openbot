@@ -90,6 +90,8 @@ export const messages = {
     "У участников этого канала ещё нет разговора для сжатия. Сожмите его после того, как участник ответит в канале.",
   "error.backend.channelCompactNotSupported":
     "Ни один участник этого канала не может сжимать по запросу. Участники, которые это поддерживают, сжимают контекст автоматически, когда он почти заполнен.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Провайдер участников канала сейчас не работает. Обновите провайдеров, затем снова сожмите канал.",
   "error.backend.channelArchived": "Восстановите этот канал, прежде чем отправлять сообщения или менять задачи.",
   "error.backend.channelArchiveRunning": "Остановите текущую работу в этом канале, затем удалите его.",
   "error.backend.channelReferenceUnavailable": "Сообщение канала, на которое сделана ссылка, недоступно.",
@@ -270,6 +272,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Этот сервер просит войти. Войдите в него в OpenBot на компьютере-хосте.",
   "error.backend.mcpSignInNeedsHttps":
     "Этот сервер просит войти, а OpenBot входит только по https. Измените URL на {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Этот сервер выполняет вход только по адресу {url}. Измените URL на этот адрес, затем войдите снова.",
   "error.backend.mcpSignInCancelled": "Вход отменён.",
   "error.backend.mcpSignInTimedOut": "Вход в браузере не был завершён.",
   "error.backend.mcpSignInRefused": "Страница входа отказала в доступе. Войдите снова.",

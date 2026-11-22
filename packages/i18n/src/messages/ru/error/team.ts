@@ -141,6 +141,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
   "error.team.claudeUserSetupUnsupported": "Это подключение не поддерживает переключатель настроек Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Это подключение не поддерживает размер сжатия Claude.",
+  "error.team.cacheExpiryCompactionUnsupported": "Это подключение не поддерживает сжатие до истечения кэша.",
   "error.team.providerEnvironmentUnsupported": "Это подключение не поддерживает переменные провайдера.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",

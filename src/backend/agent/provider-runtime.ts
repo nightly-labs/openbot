@@ -41,7 +41,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
-import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
+import { isOpenCodeInternalFailure, isOpenCodeStarting, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
 import { devinSignInPageRelayed, googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import {
   type AgentClient,
@@ -293,6 +293,7 @@ export interface ProviderHooks {
   onProviderHeld?(provider: AgentProvider): void;
   releasePersonWaits?(provider: AgentProvider): void;
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
+  onModelsRelisted?(provider: AgentProvider, configRevision: number): void;
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   onAccountSignedIn?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   onAccountsChanged?(): void;
@@ -549,8 +550,14 @@ export class ProviderRuntime implements ProviderPort {
             this.#refreshUsage(client, model, false).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
-          readModels: (client) =>
-            this.#modelCatalog.read(client, requireProviderDriver(client.provider).catalog).pipe(
+          readModels: (client) => {
+            const catalog = requireProviderDriver(client.provider).catalog;
+            return this.#modelCatalog.read(client, catalog).pipe(
+              Effect.catch((failure) =>
+                isProviderTimeout(failure.cause) && !catalog?.slowList
+                  ? this.#modelCatalog.read(client, catalog, this.#requestTimeoutMs)
+                  : Effect.fail(failure),
+              ),
               Effect.map(({ models }) => models),
               Effect.catch((failure) =>
                 Effect.sync(() => {
@@ -561,7 +568,8 @@ export class ProviderRuntime implements ProviderPort {
                   return null;
                 }),
               ),
-            ),
+            );
+          },
           resetCredits: (client) => this.#resetCredits.get(client),
           consumeUsageReset: (client) =>
             this.#consumeUsageReset(client).pipe(
@@ -2135,6 +2143,13 @@ export class ProviderRuntime implements ProviderPort {
     if (!this.#clients.has(harness)) {
       if (this.#released.has(harness))
         yield* this.ensureProvider(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope));
+      else if (this.#waitsForEndpoint(harness)) {
+        yield* this.#startProvider(harness, { preserveCheckErrors: true }).pipe(
+          Effect.ignore,
+          Effect.forkIn(this.#scope),
+        );
+        return "restarted";
+      }
       return "not-running";
     }
     if (this.#hooks.isProviderBusy(harness)) {
@@ -2150,6 +2165,16 @@ export class ProviderRuntime implements ProviderPort {
     }
     return "restarted";
   }, Effect.uninterruptible).bind(this);
+
+  #waitsForEndpoint(harness: CustomProviderHarness): boolean {
+    return (
+      !this.#off.has(harness) &&
+      this.signInRequired(harness) &&
+      !this.#cliLogin.has(harness) &&
+      !this.#providerConnectionCommands.has(harness) &&
+      customProvidersOn(this.#credentials.customProviders, harness)().length > 0
+    );
+  }
 
   readonly reloadAgentEnvironment = Effect.fn("ProviderRuntime.reloadAgentEnvironment")(function* (
     this: ProviderRuntime,
@@ -3417,7 +3442,12 @@ export class ProviderRuntime implements ProviderPort {
       const status = this.status().providers?.find((row) => row.id === provider);
       if (status?.message === sourceText("error.provider.codexStateBusy")) return;
       if (status?.message === sourceText("error.provider.realtimeLimitZero")) return;
-      if (status?.message === OPENCODE_INTERNAL_FAILURE && this.#restartTimers.has(provider)) return;
+      if (
+        (status?.message === OPENCODE_INTERNAL_FAILURE ||
+          status?.message === sourceText("error.provider.opencodeStillStarting")) &&
+        this.#restartTimers.has(provider)
+      )
+        return;
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         const message = status?.message;
         return yield* new ProviderOperationFailed({
@@ -3732,8 +3762,10 @@ export class ProviderRuntime implements ProviderPort {
                     ? message
                     : this.#showStartStopped(provider);
               }
-              if (provider === "opencode" && isOpenCodeInternalFailure(failed))
-                this.#retryAfterTimeout(provider, !disposed());
+              if (provider === "opencode" && isOpenCodeInternalFailure(failed)) {
+                const retryMessage = this.#retryAfterTimeout(provider, !disposed());
+                if (isOpenCodeStarting(failed)) return this.#showOpenCodeStillStarting(failure, retryMessage);
+              }
               return message;
             }),
           ),
@@ -3822,6 +3854,10 @@ export class ProviderRuntime implements ProviderPort {
     }
     yield* refreshRuntime;
   });
+
+  configRevision(client: AgentClient): number {
+    return this.#configRevisions.get(client) ?? 0;
+  }
 
   #bindClient(client: AgentClient): void {
     this.#configRevisions.set(client, this.#hooks.captureConfigRevision());
@@ -4160,6 +4196,16 @@ export class ProviderRuntime implements ProviderPort {
     recordRestartActivity();
   }, Effect.uninterruptible);
 
+  #showOpenCodeStillStarting(failure: Omit<AgentProviderStatus, "id">, retryMessage: string): string {
+    const message = this.#restartTimers.has("opencode")
+      ? sourceText("error.provider.opencodeStillStarting")
+      : retryMessage;
+    this.#setStatus({
+      providers: updateProviderStatus(this.#status.providers, "opencode", { ...failure, message }),
+    });
+    return message;
+  }
+
   #retryAfterTimeout(provider: AgentProvider, schedule: boolean): string {
     return sourceText(
       this.#scheduleStartRetry(provider, schedule) ? "error.provider.cliTimedOut" : "error.provider.cliTimedOutRefresh",
@@ -4270,6 +4316,8 @@ export class ProviderRuntime implements ProviderPort {
     const lastError = this.#lastErrors.get(provider);
     if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
+    const client = this.#clients.get(provider);
+    if (client) this.#hooks.onModelsRelisted?.(provider, this.configRevision(client));
     return true;
   });
 

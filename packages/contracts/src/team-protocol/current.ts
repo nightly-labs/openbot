@@ -70,6 +70,7 @@ import {
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "./browsing-memory-v1";
+import { CACHE_EXPIRY_COMPACTION_CAPABILITY } from "./cache-expiry-compaction-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
 import { CHANNEL_FOLDERS_CAPABILITY } from "./channel-folders-v1";
@@ -142,7 +143,7 @@ import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
 import { PENDING_PROMPTS_CAPABILITY } from "./pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
-import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
+import { PROMPT_CACHE_TTL_CAPABILITY, PROMPT_CACHE_TTL_PI_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
@@ -340,6 +341,7 @@ export {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
   BROWSING_MEMORY_CAPABILITY,
+  CACHE_EXPIRY_COMPACTION_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_FOLDERS_CAPABILITY,
@@ -399,6 +401,7 @@ export {
   PENDING_APPROVAL_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
+  PROMPT_CACHE_TTL_PI_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -802,6 +805,8 @@ const TEAM_CAPABILITY_REGISTRY = [
   [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
   [CHANNEL_FOLDERS_CAPABILITY, V10],
   [WORKFLOWS_CREDIT_MEDIA_CAPABILITY, V10],
+  [PROMPT_CACHE_TTL_PI_CAPABILITY, V10],
+  [CACHE_EXPIRY_COMPACTION_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

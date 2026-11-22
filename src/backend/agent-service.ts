@@ -254,6 +254,7 @@ import {
   type AgentFeedback,
   type AgentMessageSteer,
   type AgentServerClaims,
+  type McpServerOwnerHooks,
   OpenBotToolRouter,
 } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
@@ -329,7 +330,6 @@ import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
-import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
@@ -411,6 +411,8 @@ export interface AgentServiceOptions {
   browser: AgentBrowserHost;
   requestTimeoutMs?: number;
   contextCompactionTimeoutMs?: number;
+  cacheExpiryCompactionDelayMs?: number;
+  cacheExpiryCompaction?: () => boolean;
   memoryReviewIdleMs?: number;
   finishCheck?: boolean;
   preferredProvider?: AgentProvider;
@@ -436,6 +438,7 @@ export interface AgentServiceOptions {
   crm?: (() => CrmHandle | null) | undefined;
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   personCanAdminister?: ((personId: string) => boolean) | undefined;
+  mcpServerOwners?: McpServerOwnerHooks | undefined;
   sidebarLayout?: AgentSidebar | null;
   libraryFolders?: AgentLibraryFolders | null;
   credentials?: ProviderClientContext;
@@ -627,6 +630,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hostMemory = null,
       hostTurnLimits,
       busyMessageMode = () => DEFAULT_BUSY_MESSAGE_MODE,
+      approvalAutomation,
     } = options;
     this.#developmentDefaults = developmentDefaults;
     this.#busyMessageMode = busyMessageMode;
@@ -853,6 +857,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId) && this.#waitsForLimit(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
         waitThread: (agentId, taskId) => this.#tasks.waitThread(agentId, taskId),
+        queueHold: (agentId, taskId) =>
+          taskId === null ? this.#drain.ownChatHold(agentId) : this.#drain.taskHold(agentId, taskId),
         routineDeleted: (agentId, routineId) => {
           const keys = options.agentApiKeys;
           const removeKey = keys ? removeWebhookSecretKey(keys, agentId, routineId) : Effect.void;
@@ -1030,6 +1036,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         afterIdleCheck: () => this.#deleteReleasedFolders(),
         captureConfigRevision: () => this.#endpoints.committedRevision(),
         endpointsPending: (harness) => this.#endpoints.pending(harness),
+        onModelsRelisted: (provider, configRevision) => {
+          if (isCustomProviderHarness(provider)) this.#endpoints.clearReleased(provider, configRevision);
+        },
         onProviderActivated: (provider, configRevision) =>
           Effect.gen({ self: this }, function* () {
             if (isCustomProviderHarness(provider)) {
@@ -1135,7 +1144,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               endpoint.id,
               {
                 harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
-                models: endpoint.models.map((model) => encodedModelId(`${endpoint.id}/`, model.id)),
+                modelIds: endpoint.models.map((model) => model.id),
               },
             ]),
           ),
@@ -1154,6 +1163,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#compaction = new ContextCompaction({
       timeoutMs: options.contextCompactionTimeoutMs,
+      cacheExpiryDelayMs: options.cacheExpiryCompactionDelayMs,
+      cacheExpiryEnabled: options.cacheExpiryCompaction,
       changed: () => this.#emitRuntimeSnapshot(),
       store,
       providers: this.#providers,
@@ -1167,13 +1178,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.channels.contextCompacted(threadId);
         this.messaging.contextCompacted(threadId);
       },
+      compactBeforeCacheExpiry: (agentId, threadId) =>
+        Effect.runFork(this.#compactBeforeCacheExpiry(agentId, threadId).pipe(Effect.forkIn(this.#scope))),
     });
     this.#attention = new AttentionRegistry({
       conversation: this.#conversation,
       browser: this.#browser,
       hostedSites: this.#hostedSites,
       routines: this.#routines,
-      ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
+      ...(approvalAutomation === undefined ? {} : { approvalAutomation }),
       workspaceSandboxed: (agentId) => {
         const agent = store.get(agentId);
         return agent !== undefined && workspaceAccessEnforced(agent);
@@ -1343,6 +1356,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
       importedHistory: (threadId) => store.database.threadHasEvent(threadId, HISTORY_IMPORTED_EVENT),
       routineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
+      ...(approvalAutomation === undefined
+        ? {}
+        : { asksFirst: (agentId: string) => !approvalAutomation.autoApproves(agentId) }),
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
@@ -1734,7 +1750,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
-        servesModel: (model, provider) => this.#endpoints.serves(model, provider),
+        servesModel: (model, provider, configRevision) => this.#endpoints.servesClient(model, provider, configRevision),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
@@ -1886,6 +1902,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         backupReadyAt: (agentId) => this.#backupReadyAt(agentId),
+        backupsAtLimit: (agentId) => this.#backupsAtLimit(agentId),
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
@@ -2019,7 +2036,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(this.#localSkillTools === undefined ? {} : { localSkillTools: this.#localSkillTools }),
       ...(this.#routineFlowTools === undefined ? {} : { routineFlowTools: this.#routineFlowTools }),
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
-      ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
+      ...(approvalAutomation === undefined ? {} : { approvalAutomation }),
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
@@ -2048,6 +2065,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? {}
         : { crmAgentVisibleToMembers: options.crmAgentVisibleToMembers }),
       ...(options.personCanAdminister === undefined ? {} : { personCanAdminister: options.personCanAdminister }),
+      ...(options.mcpServerOwners === undefined ? {} : { mcpServerOwners: options.mcpServerOwners }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
@@ -4208,6 +4226,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  #backupsAtLimit(agentId: string): boolean {
+    const agent = this.#store.get(agentId);
+    if (!agent?.backupModels?.automatic || this.#mayFailOver(agentId)) return false;
+    const current = agentModelChoice(agent);
+    const backups = agent.backupModels.order.filter((choice) => !sameAgentModelChoice(choice, current));
+    return (
+      backups.length > 0 &&
+      backups.every((choice) => {
+        const limit = usageLimitOf(choice);
+        return this.#usageLimits.isLimited(limit) || this.#usageLimits.isFailed(limit);
+      })
+    );
+  }
+
   #waitsForLimit(agentId: string): boolean {
     return !this.#mayFailOver(agentId);
   }
@@ -4720,6 +4752,68 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* this.#compaction.request(input.agentId, externalThreadId);
   }, Effect.uninterruptible).bind(this);
 
+  readonly #compactBeforeCacheExpiry = Effect.fn("AgentService.compactBeforeCacheExpiry")(function* (
+    this: AgentService,
+    agentId: string,
+    externalThreadId: string,
+  ) {
+    if (yield* this.#holdsBackgroundWork(externalThreadId)) return;
+    const reserved = yield* lifecycleStep("compact before cache expiry", () =>
+      this.#reserveCacheExpiryCompaction(agentId, externalThreadId),
+    ).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("The compaction before the prompt cache expires did not start.", { error: failure.cause });
+          return false;
+        }),
+      ),
+    );
+    if (reserved) yield* this.#compaction.request(agentId, externalThreadId);
+  }, Effect.uninterruptible).bind(this);
+
+  readonly #holdsBackgroundWork = Effect.fn("AgentService.holdsBackgroundWork")(function* (
+    this: AgentService,
+    externalThreadId: string,
+  ) {
+    const client = this.#conversation.openClientFor(externalThreadId);
+    if (!client?.holdsBackgroundWork) return false;
+    const background = yield* Effect.result(client.holdsBackgroundWork(externalThreadId));
+    return Result.isFailure(background) || background.success;
+  }).bind(this);
+
+  #reserveCacheExpiryCompaction(agentId: string, externalThreadId: string): boolean {
+    const agent = this.#store.get(agentId);
+    const client = agent ? this.#providers.clientForAgent(agent) : null;
+    if (
+      !agent ||
+      !client ||
+      client.contextCompaction === "handoff" ||
+      !this.#providers.agentClientRunning(agent) ||
+      this.#conversation.openClientFor(externalThreadId) !== client
+    )
+      return false;
+    const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    if (this.#store.database.activeProviderSession(threadId, agent.provider)?.externalSessionId !== externalThreadId)
+      return false;
+    const taskId = this.#tasks.taskForThread(threadId);
+    const main = threadId === agent.threadId;
+    const task = taskId !== null && !this.#tasks.isRoutineThreadId(threadId);
+    const channel = this.channels.store.channelForThread(threadId) !== null;
+    if (!main && !task && !channel) return false;
+    if (
+      !this.#usageLimits.mayDrain(agentId) ||
+      this.#mailbox.hasUnfinishedDelivery(agentId) ||
+      this.#compaction.heldThreads(agentId).length > 0 ||
+      this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
+      this.#conversation.workingSnapshot(agentId)?.activeTurnId ||
+      this.#store.database.readActiveTurnId(agentId, threadId) ||
+      (main && this.#threads.mainContextBusy(agent)) ||
+      (task && taskId !== null && this.#mailbox.taskBusy(agentId, taskId))
+    )
+      return false;
+    return this.#compaction.reserve(agentId, externalThreadId, true, null, "cacheExpiry");
+  }
+
   readonly clearChannelContext = Effect.fn("AgentService.clearChannelContext")(function* (
     this: AgentService,
     channelId: string,
@@ -4785,7 +4879,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     const contexts = yield* this.channels.compactTargets(channelId);
     const { agents: members, candidates: found } = yield* lifecycleStep("find channel compact members", () =>
-      this.#channelCompactCandidates(contexts),
+      this.#channelCompactCandidates(channelId, contexts),
     );
     const stoppedMembers = [...new Set(found.map(({ agentId }) => members.get(agentId)))].filter(
       (agent): agent is AgentSummary =>
@@ -4808,7 +4902,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { discard: true },
     );
     const sessions = yield* lifecycleStep("compact channel context", () => {
-      const { agents, candidates } = this.#channelCompactCandidates(contexts);
+      const { agents, candidates } = this.#channelCompactCandidates(channelId, contexts);
       const reserved = candidates.filter(({ agentId, externalSessionId }) =>
         this.#compaction.reserve(agentId, externalSessionId, true),
       );
@@ -4822,7 +4916,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }, Effect.uninterruptible).bind(this);
 
-  #channelCompactCandidates(contexts: ReadonlyArray<{ agentId: string; threadId: string }>): {
+  #channelCompactCandidates(
+    channelId: string,
+    contexts: ReadonlyArray<{ agentId: string; threadId: string }>,
+  ): {
     agents: Map<string, AgentSummary>;
     candidates: Array<{ agentId: string; threadId: string; externalSessionId: string }>;
   } {
@@ -4832,7 +4929,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
       return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
     });
-    if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
+    if (
+      this.channels.compactionBlocked(channelId) ||
+      candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId))
+    )
       throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
     return { agents, candidates };
   }
@@ -4842,12 +4942,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     agents: ReadonlyMap<string, AgentSummary>,
   ): string {
     if (!candidates.length) return sourceText("error.backend.channelCompactNoSession");
-    const onRequest = candidates.some(({ agentId }) => {
-      const agent = agents.get(agentId);
-      return agent !== undefined && this.#mayCompactOnRequest(agent);
-    });
+    const onRequest = candidates
+      .map(({ agentId }) => agents.get(agentId))
+      .filter((agent): agent is AgentSummary => agent !== undefined && this.#mayCompactOnRequest(agent));
+    if (!onRequest.length) return sourceText("error.backend.channelCompactNotSupported");
     return sourceText(
-      onRequest ? "error.backend.channelCompactUnavailable" : "error.backend.channelCompactNotSupported",
+      onRequest.some((agent) => !this.#providers.agentClientRunning(agent))
+        ? "error.backend.channelCompactProviderUnavailable"
+        : "error.backend.channelCompactUnavailable",
     );
   }
 

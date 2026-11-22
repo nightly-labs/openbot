@@ -1172,10 +1172,15 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Die Modelle konnten nicht geändert werden. Versuche es erneut.",
   "mobile.server.providers.promptCache": "Prompt-Cache",
   "mobile.server.providers.promptCacheHint":
-    "Wie lange Claude den Kontext eines Agenten zwischen Antworten im Cache hält. Eine Änderung gilt, wenn Claude neu startet.",
-  "mobile.server.providers.promptCacheDefault": "Claude-Code-Standard",
+    "Wie lange Claude und Pi den Kontext eines Agenten zwischen Antworten im Cache halten. Eine Änderung gilt, wenn der Anbieter neu startet.",
+  "mobile.server.providers.promptCacheDefault": "Anbieter-Standard",
   "mobile.server.providers.promptCacheHour": "1 Stunde",
   "mobile.server.providers.promptCacheLoadFailed": "Die Prompt-Cache-Dauer dieses Servers konnte nicht geladen werden.",
+  "mobile.server.providers.cacheExpiryCompaction": "Vor Ablauf des Caches komprimieren",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Wenn ein Chat mit 200K oder mehr Tokens Kontext mit einem 1-Stunden-Cache inaktiv ist, komprimiert der Agent den Kontext, bevor der Cache abläuft. Dann liest die nächste Nachricht nicht den ganzen Kontext erneut ohne Cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Die Komprimierungseinstellung dieses Servers konnte nicht geladen werden.",
   "mobile.server.providers.compactWindow": "Chats komprimieren bei",
   "mobile.server.providers.compactWindowHint":
     "Claude Code fasst die älteren Runden eines Chats zusammen, wenn der Chat diese Größe erreicht. Weniger hält Runden schnell und günstig. Mehr behält mehr Details. Ein Modell mit kleinerem Fenster komprimiert an seiner eigenen Grenze.",

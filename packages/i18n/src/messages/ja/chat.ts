@@ -470,6 +470,8 @@ export const messages = {
   "chat.compaction.running": "コンテキストを圧縮しています",
   "chat.compaction.completed": "コンテキストを圧縮しました",
   "chat.compaction.failed": "コンテキストを圧縮できませんでした",
+  "chat.compaction.cacheExpiryRunning": "プロンプトキャッシュの期限切れ前にコンテキストを圧縮しています",
+  "chat.compaction.cacheExpiryCompleted": "プロンプトキャッシュの期限切れ前にコンテキストを圧縮しました",
   "chat.compaction.tokens": "{before} → {after} トークン",
   "chat.compaction.continues": "キュー内のメッセージは続行されます。",
   "chat.reference.kind.tab": "ブラウザーのタブ",

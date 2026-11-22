@@ -483,6 +483,8 @@ export const messages = defineMessages("chat", {
   "chat.compaction.running": "Compacting context",
   "chat.compaction.completed": "Context compacted",
   "chat.compaction.failed": "Could not compact context",
+  "chat.compaction.cacheExpiryRunning": "Compacting context before the prompt cache expires",
+  "chat.compaction.cacheExpiryCompleted": "Context compacted before the prompt cache expired",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Queued messages continue.",
   "chat.reference.kind.tab": "Browser tab",
