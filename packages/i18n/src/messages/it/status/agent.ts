@@ -2,6 +2,11 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpSignInPage": "{name} ti chiede di accedere a `{address}`. [Accedi]({url}), poi scegli Continua.",
+  "status.agent.mcpSignInPageDoneDetail": "L'agente riprova a eseguire la richiesta.",
+  "status.agent.mcpSignInPageDecline": "Non accedere",
+  "status.agent.mcpSignInPageDeclineDetail": "La richiesta si interrompe.",
+  "status.agent.elicitationMoreOptions": "Altre opzioni: {options}. Per sceglierne una, digitala come risposta.",
   "status.agent.claudeWriteOutside":
     "Scrittura di {path}, fuori dal workspace dell'agente, dalla cartella condivisa e dalle cartelle temporanee.",
   "status.agent.contextCleared": "Contesto cancellato. Da qui inizia una nuova chat.",

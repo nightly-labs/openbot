@@ -341,6 +341,8 @@ export const messages = {
   "settings.tab.updates.description": "Mantieni OpenBot aggiornato su questo computer.",
   "settings.tab.billing.title": "Fatturazione",
   "settings.tab.billing.description": "Licenza, piani dei server, metodo di pagamento e fatture.",
+  "settings.tab.referral.title": "Invita amici",
+  "settings.tab.referral.description": "Il tuo link di invito, il tuo credito e gli amici che si sono uniti.",
   "settings.tab.hostedServers.title": "Server ospitati",
   "settings.tab.hostedServers.description": "Crea server OpenBot che funzionano anche quando questo computer è spento.",
   "settings.tab.appearance.description": "Scegli tema, colori, lingua e caratteri.",

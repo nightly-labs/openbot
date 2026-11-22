@@ -39,6 +39,7 @@ export const messages = {
   "mobile.auth.email.description": "Inserisci il tuo indirizzo email. Ti invieremo un codice monouso.",
   "mobile.auth.email.label": "Email",
   "mobile.auth.email.placeholder": "tu@esempio.com",
+  "mobile.auth.email.inviteCode": "Link o codice di invito (facoltativo)",
   "mobile.auth.email.send": "Invia il codice",
   "mobile.auth.email.sending": "Invio del codice…",
   "mobile.auth.email.tryAgainIn": "Riprova tra {time}",
@@ -61,6 +62,7 @@ export const messages = {
   "mobile.auth.email.companyWaiting": "In attesa dell’accesso aziendale…",
   "mobile.auth.email.developmentCode": "Codice di sviluppo: {code}",
   "mobile.auth.email.error.invalidEmail": "Inserisci un indirizzo email valido.",
+  "mobile.auth.email.error.inviteCode": "Inserisci un link di invito o un codice di invito di 8 caratteri.",
   "mobile.auth.email.error.wait": "Aspetta prima di richiedere un altro codice.",
   "mobile.auth.email.error.deliveryUnconfirmed":
     "OpenBot non è riuscito a confermare l'invio del codice. Controlla la consegna prima di inviare un altro codice.",
