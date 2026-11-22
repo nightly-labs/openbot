@@ -880,6 +880,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hostedSites,
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+      reportFailure: (code, error, agentId) => {
+        this.#reportFailure(code, error, agentId);
+      },
       isStopping: () => this.#stopping,
       redact: (text) => this.#mcp.redact(text),
     });
@@ -7217,6 +7220,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emitError(code: string, error: unknown, agentId?: string, context?: FailureContext, link?: string): void {
+    const message = this.#reportFailure(code, error, agentId, context);
+    this.#emit({
+      type: "error",
+      ...(agentId !== undefined ? { agentId } : {}),
+      code,
+      message,
+      ...(context?.provider ? { provider: context.provider } : {}),
+      ...(context?.model ? { model: context.model } : {}),
+      ...(link ? { link } : {}),
+    });
+  }
+
+  #reportFailure(code: string, error: unknown, agentId?: string, context?: FailureContext): string {
     const causeCode = context?.causeCode ?? classifyFailure(error);
     this.emit("failure", {
       ...context,
@@ -7234,15 +7250,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       causeCode,
       message: shortenDiagnostic(message),
     });
-    this.#emit({
-      type: "error",
-      ...(agentId !== undefined ? { agentId } : {}),
-      code,
-      message,
-      ...(context?.provider ? { provider: context.provider } : {}),
-      ...(context?.model ? { model: context.model } : {}),
-      ...(link ? { link } : {}),
-    });
+    return message;
   }
 
   #emitRuntimeSnapshot(): void {
