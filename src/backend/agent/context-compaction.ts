@@ -28,7 +28,7 @@ interface ThreadContextBudget {
 
 const logger = createOpenBotLogger("context-compaction");
 
-const CONTEXT_COMPACTION_THRESHOLD = 0.8;
+export const CONTEXT_COMPACTION_THRESHOLD = 0.8;
 const INEFFECTIVE_COMPACTION_SHARE = CONTEXT_COMPACTION_THRESHOLD - 0.1;
 const INEFFECTIVE_COMPACTION_LIMIT = 2;
 const FAILED_COMPACTION_LIMIT = 2;
