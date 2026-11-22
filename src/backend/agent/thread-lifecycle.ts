@@ -1551,7 +1551,9 @@ export class ThreadLifecycle {
     if (!client?.releaseThread) return;
     yield* client.releaseThread(externalThreadId, resumes).pipe(
       Effect.catch((failure) => Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause))),
-      Effect.catchCauseIf(Cause.hasInterruptsOnly, () => Effect.void),
+      Effect.catchCauseIf(Cause.hasInterruptsOnly, (cause) =>
+        Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, Cause.squash(cause))),
+      ),
     );
   }, Effect.uninterruptible);
 
