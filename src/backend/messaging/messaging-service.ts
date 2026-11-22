@@ -1704,6 +1704,9 @@ export class MessagingService {
         return {
           posted: true as const,
           messageId: captioned.success,
+          ...(guildId
+            ? { url: `https://discord.com/channels/${guildId}/${target.platformChannelId}/${captioned.success}` }
+            : {}),
           ...directPing(`${text}\nFiles: ${single.name}`),
         };
       }
