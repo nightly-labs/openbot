@@ -51,6 +51,7 @@ async function startWithActivationFailures(
   name: string,
   activationFailures: number,
   requestTimeoutMs: number,
+  activationDelayMs: number,
   settled: (row: { state: string; message: string | null } | undefined) => boolean,
 ): Promise<StartReport> {
   const folder = join(root, name);
@@ -59,6 +60,7 @@ async function startWithActivationFailures(
   await installFakeAgent(executable, "opencode-plugin-activation", {
     FAKE_LOG: log,
     FAKE_OPENCODE_ACTIVATION_FAILURES: String(activationFailures),
+    FAKE_OPENCODE_ACTIVATION_DELAY_MS: String(activationDelayMs),
   });
   const store = new AgentStore(
     join(folder, "profile"),
@@ -126,12 +128,24 @@ try {
   assert.equal(error, sourceText("error.provider.opencodeServiceFailure"), "A failed turn names OpenCode's service.");
   report.turn = { error };
 
-  report.slowPlugins = await startWithActivationFailures("slow-plugins", 2, 10_000, (row) => row?.state !== "starting");
+  report.slowPlugins = await startWithActivationFailures(
+    "slow-plugins",
+    2,
+    10_000,
+    0,
+    (row) => row?.state !== "starting",
+  );
   assert.equal(report.slowPlugins.state, "available", "OpenCode starts once its plugins finish loading.");
   assert.equal(report.slowPlugins.starts, 1, "The first start waits for the plugins; it does not fail.");
   assert.equal(report.slowPlugins.activationFailures, 2);
 
-  report.stuckPlugins = await startWithActivationFailures("stuck-plugins", -1, 3_000, (row) => row?.state === "error");
+  report.stuckPlugins = await startWithActivationFailures(
+    "stuck-plugins",
+    -1,
+    6_000,
+    1_500,
+    (row) => row?.state === "error",
+  );
   assert.equal(
     report.stuckPlugins.message,
     sourceText("error.provider.opencodeStillStarting"),

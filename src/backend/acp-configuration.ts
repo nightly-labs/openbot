@@ -166,12 +166,23 @@ export class AcpConfiguration {
   ): Effect.Effect<SessionSetupResponse & { sessionId: string }, ProviderClientOperationError> {
     const cwd = this.options.discoveryCwd?.() ?? process.cwd();
     const stillStarting = this.options.stillStarting;
-    const opened = providerCall(() => connection.newSession({ cwd, mcpServers: [] })).pipe(
-      Effect.retry({
-        while: (failure) => stillStarting?.(failure.cause) === true && Date.now() + PROBE_START_RETRY_MS < deadline,
-        schedule: Schedule.spaced(PROBE_START_RETRY_MS),
-      }),
-    );
+    const opened = Effect.suspend(() => {
+      let attemptStartedAt = 0;
+      let longestAttemptMs = 0;
+      return Effect.suspend(() => {
+        attemptStartedAt = Date.now();
+        return providerCall(() => connection.newSession({ cwd, mcpServers: [] }));
+      }).pipe(
+        Effect.retry({
+          while: (failure) => {
+            const now = Date.now();
+            longestAttemptMs = Math.max(longestAttemptMs, now - attemptStartedAt);
+            return stillStarting?.(failure.cause) === true && now + longestAttemptMs + PROBE_START_RETRY_MS < deadline;
+          },
+          schedule: Schedule.spaced(PROBE_START_RETRY_MS),
+        }),
+      );
+    });
     const kept = this.#probe?.connection === connection ? this.#probe.sessionId : null;
     if (!kept || !this.options.keepProbeSession?.()) return opened;
     this.#probe = null;

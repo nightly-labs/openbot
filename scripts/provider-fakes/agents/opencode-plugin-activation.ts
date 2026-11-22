@@ -3,6 +3,7 @@ import { logEntry, serveFakeAcpAgent } from "../acp-agent";
 const MODEL = "opencode/big-pickle";
 const version = process.env.FAKE_OPENCODE_VERSION ?? "2.3.2";
 const activationFailures = Number(process.env.FAKE_OPENCODE_ACTIVATION_FAILURES ?? "0");
+const activationDelayMs = Number(process.env.FAKE_OPENCODE_ACTIVATION_DELAY_MS ?? "0");
 
 if (process.argv.includes("--version")) {
   process.stdout.write(`${version}\n`);
@@ -19,11 +20,15 @@ serveFakeAcpAgent({
     if (activationFailures < 0 || failed < activationFailures) {
       failed += 1;
       logEntry({ event: "plugins-activating", failed });
-      peer.fail(request, {
-        code: -32603,
-        message: "Internal error: Internal service failure",
-        data: { errorName: "ServiceUnavailableError" },
-      });
+      setTimeout(
+        () =>
+          peer.fail(request, {
+            code: -32603,
+            message: "Internal error: Internal service failure",
+            data: { errorName: "ServiceUnavailableError" },
+          }),
+        activationDelayMs,
+      );
       return;
     }
     opened += 1;
