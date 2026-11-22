@@ -979,7 +979,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const choose = providerSettings()?.accountActions?.setLiveVoiceAccount;
     const codex = providerAdmin.status().providers?.find((row) => row.id === "codex");
     if (!choose || !codex?.accounts) return undefined;
-    return { accounts: codex.accounts, accountId: codex.liveVoiceAccount ?? null, choose };
+    return {
+      accounts: codex.accounts,
+      accountId: codex.liveVoiceAccount ?? null,
+      defaultUsesKey: codex.apiKeyInUse === true,
+      choose,
+    };
   };
   const accountUsage = () => withHostAccountUsage(usageReading.accountUsage(), providerAdmin.hostAccounts.limits());
   const agentAccountChoice = createMemo(
