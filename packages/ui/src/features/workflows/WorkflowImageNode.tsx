@@ -1,24 +1,13 @@
 import { type WorkflowMediaInput, workflowCatalogSource } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import {
-  Button,
-  Download,
-  Film,
-  Image,
-  Maximize2,
-  Mic,
-  RotateCcw,
-  Square,
-  Textarea,
-  TriangleAlert,
-  Zap,
-} from "@openbot/ui";
+import { Button, Download, Film, Image, Maximize2, Mic, RotateCcw, Square, Textarea, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
 import { VideoPlayer } from "../conversation/VideoPlayer";
+import { CreditIcon } from "../credits/CreditIcon";
 import { usePictureShape } from "./picture-shape";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
 import { resultValue, useBoard, type WfnResult } from "./workflow-board";
@@ -102,7 +91,7 @@ function FailedTake(props: { id: string; result: WfnResult; step: MediaStep }) {
             <Show when={props.step.price()}>
               {(credits) => (
                 <span class="wfn-media-retry-price">
-                  <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+                  <CreditIcon class="wfn-run-credits-icon" />
                   {format.number(credits())}
                 </span>
               )}

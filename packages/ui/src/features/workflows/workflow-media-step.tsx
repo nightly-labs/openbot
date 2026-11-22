@@ -25,9 +25,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { AppTextKey } from "@openbot/i18n";
-import { Play, Zap } from "@openbot/ui";
+import { Play } from "@openbot/ui";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { CreditIcon } from "../credits/CreditIcon";
 import { resultValue, useBoard, type WfnBoard } from "./workflow-board";
 import { type InputRole, orStoredPicture, pictureUrl as storedPictureUrl } from "./workflow-input-pictures";
 import { asString, oneOf, useField, useLocked, useStepRun, useTextField } from "./workflow-node-parts";
@@ -439,7 +440,7 @@ export function RunContent(props: { credits: number | null; takes?: number }) {
           </>
         }
       >
-        <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+        <CreditIcon class="wfn-run-credits-icon" />
         {format.number(props.credits ?? 0)}
       </Show>
       <Show when={(props.takes ?? 1) > 1}>

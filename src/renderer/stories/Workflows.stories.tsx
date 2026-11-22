@@ -448,6 +448,28 @@ const TOO_FEW_CREDITS: WorkflowCatalogs = {
   creditBalance: 4,
 };
 
+const ENOUGH_CREDITS: WorkflowCatalogs = { ...TOO_FEW_CREDITS, creditBalance: 1250 };
+
+export const ImagePaidWithCredits: Story = {
+  name: "Image, paid with credits",
+  render: () => (
+    <NodeGallery
+      selected="batch"
+      catalogs={ENOUGH_CREDITS}
+      fields={{ single: { model: CREDITS_IMAGE_MODEL.id }, batch: { model: CREDITS_IMAGE_MODEL.id, batch: 4 } }}
+      results={{
+        batch: [
+          { id: "paid-result-1", at: todayAt(9, 0), value: STORY_IMAGES[0]?.name ?? "" },
+          { id: "paid-result-failed", at: todayAt(9, 4), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+    >
+      <ImageNode id="single" prompt="Hero image for the Atlas comparison page, one product window" />
+      <ImageNode id="batch" prompt="Four cover options for the Atlas launch post" />
+    </NodeGallery>
+  ),
+};
+
 export const ImageBatchTooFewCredits: Story = {
   name: "Image, batch with too few credits",
   render: () => (
