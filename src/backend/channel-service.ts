@@ -98,7 +98,6 @@ export interface ChannelHooks {
   reportsCompactions?(agentId: string): boolean;
   provisionalAnswers?(agentId: string): boolean;
   quietTurn?(turnId: string): boolean;
-  /** See `TurnLifecycle.channelNote`. */
   channelNote?(turnId: string, messageId: string): "result" | "pending" | "running" | null;
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   forgetThread?(threadId: string): Effect.Effect<void, ChannelOperationError>;
@@ -2464,10 +2463,8 @@ export class ChannelService {
 
   event(event: AgentEvent): boolean {
     if (event.type === "conversation") return this.capture(event.snapshot);
-    // A tool step that starts tells what follows the note that `capture` holds.
     if (event.type === "turn-progress" && event.running === true) {
       if (!this.store.channelForThread(event.threadId)) return false;
-      // Each tool step sends this: capture from the open snapshot only, not from the database.
       const loaded = this.hooks.loadedSnapshot?.(event.threadId);
       if (loaded?.agentId === event.agentId) this.capture(loaded, event.turnId);
       return true;
@@ -2640,15 +2637,12 @@ export class ChannelService {
       const owner = assignments.find((item) => item.turnId === message.turnId) ?? late;
       if (!owner && message.turnId !== undefined && this.#providerTurns.has(message.turnId)) continue;
       const note = channelNote(message, author?.provider, this.hooks.channelNote);
-      /* Each client shows a note as a progress update by its id, so the line before the result
-         stays in the steps under an id that is not a note's. A note shown already keeps its id. */
       const resultNoteId = `${message.id}${CHANNEL_RESULT_NOTE_SUFFIX}`;
       const entryId =
         note !== undefined && !existing(message.id) && (note === "result" || existing(resultNoteId))
           ? resultNoteId
           : message.id;
       const original = existing(entryId);
-      // Until its next step starts, a new note can still be the line before the result.
       if (!original && (note === "pending" || (note === "running" && message.status === "streaming"))) continue;
       const assignment =
         owner ??
@@ -3905,10 +3899,8 @@ const OWN_LABEL_WORDS = new Set([
   "update",
 ]);
 
-/** Ends the channel id of the note that introduced a member's result. `isNarrationItemId` rejects it. */
 const CHANNEL_RESULT_NOTE_SUFFIX = ":result";
 
-/** What `TurnLifecycle.channelNote` knows about a member's note, or undefined for any other message. */
 function channelNote(
   message: ConversationMessage,
   provider: AgentProviderRef | undefined,

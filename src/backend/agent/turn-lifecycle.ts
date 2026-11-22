@@ -390,9 +390,7 @@ export class TurnLifecycle {
       compacted: boolean;
       startedBackgroundWork: boolean;
       narration: string | null;
-      /** The step after `narration` is known. See `channelNote`. */
       narrationStepKnown: boolean;
-      /** The tools that ran when `narration` ended: their updates are not the step after it. */
       narrationOpenTools: ReadonlySet<string>;
       openTools: Set<string>;
       failureReports: Set<string>;
@@ -427,7 +425,6 @@ export class TurnLifecycle {
   readonly #quietRepeats = new Set<string>();
   readonly #reportedFailures = new Map<string, string>();
   readonly #endedTurns = new Set<string>();
-  /** The note that came directly before each `channel_result` call, by turn. See `channelNote`. */
   readonly #channelResultNotes = new Map<string, Set<string>>();
   readonly #completingTurns = new Set<string>();
   readonly #lastEventAt = new Map<string, number>();
@@ -1941,13 +1938,6 @@ export class TurnLifecycle {
     return this.#quietChannelTurns.has(turnId) && !this.#reportedFailures.has(turnId);
   }
 
-  /**
-   * What a channel knows about a note of a turn (#6931). The Natural style asks for one line before
-   * the first tool call. Before `channel_result`, that line only introduces the result, and it often
-   * holds the answer already, so a channel showed each answer two times. `result` is that line;
-   * `pending` is the newest note of a running turn while its next step is unknown; `running` is
-   * another note of a running turn; null is a note of an ended turn with no `channel_result` after it.
-   */
   channelNote(turnId: string, messageId: string): "result" | "pending" | "running" | null {
     if (this.#channelResultNotes.get(turnId)?.has(messageId)) return "result";
     const running = this.#runningTurns.get(turnId);
@@ -1955,7 +1945,6 @@ export class TurnLifecycle {
     return running.narration === messageId && !running.narrationStepKnown ? "pending" : "running";
   }
 
-  /** Kept after the turn ends: the last capture of a turn comes after its running state is gone. */
   #keepChannelResultNote(turnId: string, messageId: string): void {
     const notes = this.#channelResultNotes.get(turnId);
     if (notes) {
@@ -3568,23 +3557,10 @@ function keepsNarration(item: DynamicRecord, completed: boolean): boolean {
   return calls.length > 0 && calls.every((call) => NARRATION_KEEPING_TOOLS.has(codeModeOpenBotTool(call) ?? ""));
 }
 
-/** `channel_result` and the forms of its name that agents give, such as `openbot__channel_result`. */
 const CHANNEL_RESULT_NAME = /(?:^|[._])channel_result$/u;
-/**
- * The OpenBot tool that runs the tool its arguments name, in the forms that agents give: `tool_call`,
- * such as `mcp_openbot_tool_call`, and Grok's `use_tool`.
- */
 const BRIDGE_TOOL = /(?:^|[._])(?:tool_call|use_tool)$/u;
-/** A call of `channel_result` in the code of an OpenCode Code Mode step, not a search for it. */
 const CODE_CHANNEL_RESULT_CALL = /\bchannel_result\s*\(|["'`]openbot\.channel_result["'`]/u;
 
-/**
- * The step that follows a note: `result` for a call of the channel tool that posts a member's answer,
- * `other` for another tool, or null while the step is not known yet. ACP agents name a tool with their
- * own form, such as `channel_result`, `openbot__channel_result` or
- * `mcp__editor_openbot_<tag>__channel_result`, which `openBotTool` does not read. OpenCode Code Mode
- * calls it in the code of an `execute` step, and starts that step first with no code.
- */
 function channelNoteStep(item: DynamicRecord): "result" | "other" | null {
   const threadItem = toThreadItem(item);
   if (threadItem === null || !isToolItem(threadItem)) return null;
@@ -3597,7 +3573,6 @@ function channelNoteStep(item: DynamicRecord): "result" | "other" | null {
     return CODE_CHANNEL_RESULT_CALL.test(code) ? "result" : "other";
   }
   if (!BRIDGE_TOOL.test(name)) return CHANNEL_RESULT_NAME.test(name) ? "result" : "other";
-  // An ACP agent can start a call before it sends the arguments that name the tool.
   const args = threadItem.arguments;
   const called = getString(args, "name") ?? getString(args, "tool") ?? getString(args, "tool_name");
   if (called === null) return null;
