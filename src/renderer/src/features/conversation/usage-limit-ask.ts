@@ -6,6 +6,7 @@ import {
   sameAgentModelChoice,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { findModelOption } from "@openbot/ui/components/provider-accounts";
 import type { AgentProfile } from "@openbot/ui/data";
 import {
   type BackupModelSource,
@@ -76,16 +77,20 @@ export function usageLimitAskFrom(source: UsageLimitAskSource) {
     return {
       provider,
       // A limit can cover one model only, so the card names the model that the limit holds.
-      model: source.modelOptions().find((option) => option.provider === provider && option.id === agent.model)?.name,
+      model: findModelOption(source.modelOptions(), source.providers(), provider, agent.model)?.name,
       agentName: inChannel ? agent.name : undefined,
       resetsAt,
       options,
       rememberable: source.rememberable(),
       onSend: async (option, remember) => {
-        // The agent keeps its reasoning effort where the other model has it.
-        const model = source
-          .modelOptions()
-          .find((candidate) => candidate.provider === option.choice.provider && candidate.id === option.choice.model);
+        // The agent keeps its reasoning effort where the other model has it. A model that only an
+        // account serves is in that account's list (#12627).
+        const model = findModelOption(
+          source.modelOptions(),
+          source.providers(),
+          option.choice.provider,
+          option.choice.model,
+        );
         await source.update(agentId, {
           provider: option.choice.provider,
           model: option.choice.model,
