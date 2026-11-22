@@ -1,3 +1,4 @@
+import { chatVisualItemType } from "@openbot/contracts/chat-visual";
 import type {
   AgentApproval,
   AgentDockAction,
@@ -332,6 +333,7 @@ export function AgentDockSurface() {
           body: message.body,
           time: "",
           attachments: message.attachments,
+          ...(message.visual ? { itemType: chatVisualItemType() } : {}),
         }),
       );
       bySeat.set(agentDockSeatKey(chat.seat), {
