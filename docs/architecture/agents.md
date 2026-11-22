@@ -1079,9 +1079,12 @@ exists only after the user changes the setting, so a stored "queue" stays "queue
 reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
 "queue" default. A provider that cannot steer natively (an ACP agent with no steer request of its
 own) queues the message in both modes. OpenCode steers through its `_session/steering` ACP extension
-(`steerAcpSession` in `src/backend/acp-session-steering.ts`). An OpenCode release before the
-extension does not report `_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the steer and the message
-waits in the queue. `scripts/opencode-steer-e2e.ts` checks both. Antigravity and Devin steer with
+(`steerAcpSession` in `src/backend/acp-session-steering.ts`). Only OpenCode 2.3.0 and later have it,
+and the copy that OpenBot installs can be older (2.3.0-2.3.2 are blocked, #13640). So the `opencode`
+descriptor has `steer: "reported"`: the catalog keeps the `steersTurns` of the `model/list` answer on
+each OpenCode model, and `agentSteersTurns` reads it for the whole OpenCode process. An OpenCode
+without the extension shows the agent settings warning and "Send now", and its messages wait in the
+queue (#14488). `scripts/opencode-steer-e2e.ts` checks both. Antigravity and Devin steer with
 a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 and later,
 `steerByPromptCapability` for a Devin CLI that reports `cognition.ai/midTurnPrompts`, because Devin
 reports the version "0.0.0-dev"). While an approval or a question is open, the message waits in the

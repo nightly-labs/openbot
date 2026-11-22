@@ -176,7 +176,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "native",
     workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
-    steer: "native",
+    steer: "reported",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
@@ -526,6 +526,8 @@ export function agentSteersTurns(
 ): boolean {
   if (!isKnownAgentProvider(runtime.provider) || agentProviderDescriptor(runtime.provider).steer !== "reported")
     return providerSteersTurns(runtime.provider);
+  if (runtime.provider !== "acp")
+    return models.some((model) => model.provider === runtime.provider && model.steersTurns === true);
   const agentId = customAgentIdOfModel(runtime.model);
   return models.some(
     (model) =>
