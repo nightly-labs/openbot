@@ -518,7 +518,7 @@ step and a webhook trigger, the `check` field of a condition, and `{{name}}` in 
 and a host before it keeps them but does not use them. A client shows the editors and the problems
 only on a host that advertises it.
 
-`workflows-format-v1` says that each workflow detail has `format` and `hostFormat`. `format` is the
+Each workflow detail has `format` and `hostFormat`; no capability marks them. `format` is the
 lowest workflow format that can show the graph (`workflowGraphFormat` in
 `packages/contracts/src/ipc-workflow-format.ts`). `hostFormat` is `WORKFLOW_FORMAT` of the host. The
 format number goes up without a new capability. A client opens a graph read-only (`needsNewerApp`)

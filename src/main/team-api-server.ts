@@ -198,7 +198,6 @@ import {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
-  WORKFLOWS_FORMAT_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
@@ -2864,7 +2863,6 @@ export class TeamApiServer {
         if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_AGENT_FILES_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_ANSWERS_CAPABILITY) return this.#options.workflows !== undefined;
-        if (capability === WORKFLOWS_FORMAT_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHATS_CAPABILITY)
           return this.#options.workflows !== undefined && this.#options.admin?.routineResults !== undefined;
         if (
