@@ -105,6 +105,7 @@
     "./features/credits/CreditIcon": "./src/features/credits/CreditIcon.tsx",
     "./features/credits/CreditsSection": "./src/features/credits/CreditsSection.tsx",
     "./features/credits/CreditTargetSelect": "./src/features/credits/CreditTargetSelect.tsx",
+    "./features/credits/MakerLogo": "./src/features/credits/MakerLogo.tsx",
     "./features/credits/MoveCreditsDialog": "./src/features/credits/MoveCreditsDialog.tsx",
     "./features/credits/credits-store": "./src/features/credits/credits-store.ts",
     "./features/credits/credits.css": "./src/features/credits/credits.css",

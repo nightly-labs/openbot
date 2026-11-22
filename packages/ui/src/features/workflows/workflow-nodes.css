@@ -1028,6 +1028,13 @@ fieldset.wfn-picker-group {
   stroke: none;
 }
 
+.wfn-picker-tile > .maker-logo {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-icon-md);
+}
+
 .wfn-picker-tile > .wfn-swatch {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);

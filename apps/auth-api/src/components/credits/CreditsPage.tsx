@@ -4,10 +4,10 @@ import {
   CREDIT_MODEL_MAKERS,
   type CreditMediaKind,
   type CreditModelCost,
-  type CreditModelMaker,
   creditModelCharge,
 } from "@openbot/contracts/credits";
 import { CreditIcon } from "@openbot/ui/features/credits/CreditIcon";
+import { MakerLogo } from "@openbot/ui/features/credits/MakerLogo";
 import { Search } from "@openbot/ui/icons";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
@@ -16,72 +16,17 @@ import { matchesMarketplaceQuery } from "../../lib/marketplace-routes";
 import { LandingFooter } from "../landing/LandingFooter";
 import { SiteHeader } from "../landing/SiteHeader";
 import { CREDITS_QUERY_SLOT, type CreditsPageText } from "./credits-page-text";
-import alibabaLogo from "./logos/alibaba.svg";
-import bflLogo from "./logos/bfl.svg";
-import bytedanceLogo from "./logos/bytedance.svg";
-import googleLogo from "./logos/google.svg";
-import ideogramLogo from "./logos/ideogram.svg";
-import klingLogo from "./logos/kling.svg";
-import metaLogo from "./logos/meta.svg";
-import minimaxLogo from "./logos/minimax.svg";
-import openaiLogo from "./logos/openai.svg";
-import pixverseLogo from "./logos/pixverse.svg";
-import recraftLogo from "./logos/recraft.svg";
-import syncLogo from "./logos/sync.svg";
-import tencentLogo from "./logos/tencent.svg";
-import viduLogo from "./logos/vidu.svg";
-import xaiLogo from "./logos/xai.svg";
 import "./CreditsPage.css";
 
 type CreditsFilter = "all" | CreditMediaKind;
-
-const COLOR_LOGOS: Partial<Record<CreditModelMaker, string>> = {
-  alibaba: alibabaLogo,
-  bytedance: bytedanceLogo,
-  google: googleLogo,
-  kling: klingLogo,
-  meta: metaLogo,
-  minimax: minimaxLogo,
-  pixverse: pixverseLogo,
-  tencent: tencentLogo,
-  vidu: viduLogo,
-};
-
-const MONO_LOGOS: Partial<Record<CreditModelMaker, string>> = {
-  bfl: bflLogo,
-  ideogram: ideogramLogo,
-  openai: openaiLogo,
-  recraft: recraftLogo,
-  sync: syncLogo,
-  xai: xaiLogo,
-};
-
-function MakerLogo(props: { maker: CreditModelMaker }) {
-  const name = () => CREDIT_MODEL_MAKERS[props.maker];
-  return (
-    <span class="credits-logo" aria-hidden="true">
-      <Show
-        when={COLOR_LOGOS[props.maker]}
-        fallback={
-          <Show
-            when={MONO_LOGOS[props.maker]}
-            fallback={<span class="credits-logo-monogram">{name().slice(0, 1)}</span>}
-          >
-            {(src) => <span class="credits-logo-mono" style={{ "--credits-logo": `url("${src()}")` }} />}
-          </Show>
-        }
-      >
-        {(src) => <img class="credits-logo-image" src={src()} alt="" />}
-      </Show>
-    </span>
-  );
-}
 
 function CreditsModelRow(props: { model: CreditModelCost; text: CreditsPageText; format: (value: number) => string }) {
   const unit = () => (props.model.unit === "image" ? props.text.perImage : props.text.perClip);
   return (
     <li class="credits-row">
-      <MakerLogo maker={props.model.maker} />
+      <span class="credits-logo" aria-hidden="true">
+        <MakerLogo maker={props.model.maker} />
+      </span>
       <div class="credits-row-body">
         <span class="credits-row-name">{props.model.name}</span>
         <span class="credits-row-maker">
