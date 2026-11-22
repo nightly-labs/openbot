@@ -300,7 +300,7 @@ const TURN_STYLE_START = "<openbot_turn_style>";
 
 export const NATURAL_TURN_REMINDER = [
   TURN_STYLE_START,
-  "If you use a tool, first write one plain line: what you understood and check first, not which tool.",
+  "If you use a tool, first write one plain line: what you understood and check first, not which tool. Write it and any update in the user's reply language. The user's instruction files come first: when they ask for no status line or progress updates, write none and give only the result.",
   "</openbot_turn_style>",
 ].join("\n");
 
