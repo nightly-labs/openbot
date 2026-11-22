@@ -20,6 +20,7 @@ import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtim
 
 export const WORKFLOW_FILE_FORMAT = "openbot.workflow";
 export const WORKFLOW_FILE_VERSION = 1;
+export const WORKFLOW_FILE_EXTENSION = "openbot-workflow.json";
 export const WORKFLOW_FILE_MAX_BYTES =
   2 * INPUT_LIMITS.workflowGraphBytes + Math.ceil((ATTACHMENT_LIMITS.totalBytes * 4) / 3) + 64 * 1024;
 
@@ -28,6 +29,7 @@ export type WorkflowFileReferenceKind = (typeof REFERENCE_KINDS)[number];
 
 const NAME_LIMIT = 255;
 const VERSION_LIMIT = 32;
+const SECRET_FIELD_LIMIT = INPUT_LIMITS.workflowNodes * 32;
 
 export interface WorkflowFileReference {
   kind: WorkflowFileReferenceKind;
@@ -67,7 +69,25 @@ export interface WorkflowFileNeeds {
 export interface WorkflowFileSourceAsset {
   name: string;
   type: string;
-  bytes: Uint8Array;
+  size: number;
+}
+
+export interface WorkflowFileAssetSource {
+  key: string;
+  fileId: string;
+  node: string;
+  step: string;
+}
+
+export interface WorkflowFileHostExport {
+  text: string | null;
+  assets: WorkflowFileAssetSource[];
+  problem: WorkflowFileExportProblem | null;
+}
+
+export interface WorkflowFileSaveResult {
+  saved: boolean;
+  problem: WorkflowFileExportProblem | null;
 }
 
 export interface WorkflowFileSource {
@@ -93,7 +113,13 @@ export type WorkflowFileExportProblem =
   | { kind: "asset-too-large"; node: string; step: string }
   | { kind: "too-large" };
 
-export type WorkflowFileExport = { ok: true; file: WorkflowFile } | { ok: false; problem: WorkflowFileExportProblem };
+export type WorkflowFileExport =
+  | { ok: true; file: WorkflowFile; assets: WorkflowFileAssetSource[] }
+  | { ok: false; problem: WorkflowFileExportProblem };
+
+export type WorkflowFileFill =
+  | { ok: true; text: string; name: string }
+  | { ok: false; problem: WorkflowFileExportProblem };
 
 export type WorkflowFileImportProblem =
   | { kind: "not-file" }
@@ -134,7 +160,7 @@ function stringField(fields: WorkflowFields, name: string): string {
   return isString(value) ? value : "";
 }
 
-export function workflowFileStepName(node: Pick<WorkflowNode, "kind" | "fields">): string {
+function workflowFileStepName(node: Pick<WorkflowNode, "kind" | "fields">): string {
   return stringField(node.fields, WORKFLOW_STEP_NAME_FIELD).trim() || node.kind;
 }
 
@@ -179,6 +205,12 @@ export function workflowFileAssetBytes(asset: WorkflowFileAsset): Uint8Array {
 interface Keyed<T> {
   key: (id: string, make: () => T) => string;
   values: Record<string, T>;
+  ids: () => { key: string; id: string }[];
+}
+
+interface AssetUse {
+  node: string;
+  step: string;
 }
 
 function keyed<T>(prefix: string): Keyed<T> {
@@ -186,6 +218,7 @@ function keyed<T>(prefix: string): Keyed<T> {
   const values: Record<string, T> = {};
   return {
     values,
+    ids: () => [...keys].map(([id, key]) => ({ key, id })),
     key: (id, make) => {
       const known = keys.get(id);
       if (known) return known;
@@ -223,6 +256,7 @@ function portableField(
     channels: Keyed<WorkflowFileReference>;
     assets: Keyed<WorkflowFileAsset>;
   },
+  uses: Map<string, AssetUse>,
   node: WorkflowNode,
   field: WorkflowIdField,
   value: string,
@@ -242,10 +276,14 @@ function portableField(
   const asset = source.assets.get(value);
   const step = workflowFileStepName(node);
   if (!asset) problems.push({ kind: "asset-missing", node: node.id, step });
-  else if (asset.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)
-    problems.push({ kind: "asset-too-large", node: node.id, step });
-  if (!asset || asset.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes) return "";
-  return keys.assets.key(value, () => ({ name: asset.name, type: asset.type, data: base64(asset.bytes) }));
+  else if (asset.size > ATTACHMENT_LIMITS.fileBytes) problems.push({ kind: "asset-too-large", node: node.id, step });
+  if (!asset || asset.size > ATTACHMENT_LIMITS.fileBytes) return "";
+  if (!uses.has(value)) uses.set(value, { node: node.id, step });
+  return keys.assets.key(value, () => ({ name: asset.name, type: asset.type, data: "" }));
+}
+
+function declaredBytes(source: WorkflowFileSource, fileIds: readonly string[]): number {
+  return fileIds.reduce((sum, id) => sum + (source.assets.get(id)?.size ?? 0), 0);
 }
 
 function graphBytes(graph: WorkflowGraph): number {
@@ -259,6 +297,7 @@ export function encodeWorkflowFile(source: WorkflowFileSource): WorkflowFileExpo
     assets: keyed<WorkflowFileAsset>(ASSET_PREFIX),
   };
   const links: WorkflowFileLink[] = [];
+  const uses = new Map<string, AssetUse>();
   const problems: WorkflowFileExportProblem[] = [];
   const nodes = source.graph.nodes.map((node): WorkflowNode => {
     const fields: WorkflowFields = { ...node.fields, ...resolvedTimezone(node, source.timezone) };
@@ -267,7 +306,7 @@ export function encodeWorkflowFile(source: WorkflowFileSource): WorkflowFileExpo
       const value = stringField(node.fields, field.name);
       if (!value) continue;
       needsLink ||= LINK_FIELDS.has(field.id);
-      fields[field.name] = portableField(source, keys, node, field, value, problems);
+      fields[field.name] = portableField(source, keys, uses, node, field, value, problems);
     }
     const appField = APP_FIELD[node.kind];
     if (needsLink && appField) links.push({ node: node.id, app: stringField(node.fields, appField) });
@@ -276,8 +315,13 @@ export function encodeWorkflowFile(source: WorkflowFileSource): WorkflowFileExpo
   const [problem] = problems;
   if (problem) return { ok: false, problem };
   const assets = keys.assets.values;
+  const assetIds = keys.assets.ids();
   const graph: WorkflowGraph = { ...source.graph, nodes };
-  if (assetBytes(assets) > ATTACHMENT_LIMITS.totalBytes || graphBytes(graph) > INPUT_LIMITS.workflowGraphBytes)
+  const fileIds = assetIds.map((asset) => asset.id);
+  if (
+    declaredBytes(source, fileIds) > ATTACHMENT_LIMITS.totalBytes ||
+    graphBytes(graph) > INPUT_LIMITS.workflowGraphBytes
+  )
     return { ok: false, problem: { kind: "too-large" } };
   const secrets = secretFields(source, graph);
   if (secrets.length > 0) return { ok: false, problem: { kind: "secret", fields: secrets } };
@@ -294,7 +338,98 @@ export function encodeWorkflowFile(source: WorkflowFileSource): WorkflowFileExpo
       links,
       assets,
     },
+    assets: assetIds.map((asset) => ({
+      key: asset.key,
+      fileId: asset.id,
+      ...(uses.get(asset.id) ?? { node: "", step: "" }),
+    })),
   };
+}
+
+export function workflowFileHostExport(result: WorkflowFileExport): WorkflowFileHostExport {
+  return result.ok
+    ? { text: JSON.stringify(result.file), assets: result.assets, problem: null }
+    : { text: null, assets: [], problem: result.problem };
+}
+
+export function fillWorkflowFileText(
+  text: string,
+  sources: readonly WorkflowFileAssetSource[],
+  data: ReadonlyMap<string, Uint8Array>,
+): WorkflowFileFill {
+  const value = parseRecord(text);
+  const assets = value?.assets;
+  if (!value || value.format !== WORKFLOW_FILE_FORMAT || !isDynamicRecord(assets))
+    throw new Error("The host sent a workflow file that is not valid.");
+  let total = 0;
+  const filled: Record<string, DynamicRecord> = {};
+  for (const source of sources) {
+    const bytes = data.get(source.key);
+    const asset = assets[source.key];
+    if (!isDynamicRecord(asset)) throw new Error("The host sent a workflow file that is not valid.");
+    const where = { node: source.node, step: source.step };
+    if (!bytes) return { ok: false, problem: { kind: "asset-missing", ...where } };
+    if (bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)
+      return { ok: false, problem: { kind: "asset-too-large", ...where } };
+    total += bytes.byteLength;
+    filled[source.key] = { ...asset, data: base64(bytes) };
+  }
+  if (total > ATTACHMENT_LIMITS.totalBytes) return { ok: false, problem: { kind: "too-large" } };
+  return {
+    ok: true,
+    text: `${JSON.stringify({ ...value, assets: { ...assets, ...filled } }, null, 2)}\n`,
+    name: workflowFileName(typeof value.title === "string" ? value.title : ""),
+  };
+}
+
+function isFileField(value: unknown): value is WorkflowFileField {
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.node, NAME_LIMIT) &&
+    isBoundedString(value.step, NAME_LIMIT) &&
+    isBoundedString(value.field, NAME_LIMIT)
+  );
+}
+
+export function isWorkflowFileExportProblem(value: unknown): value is WorkflowFileExportProblem {
+  if (!isDynamicRecord(value)) return false;
+  if (value.kind === "too-large") return true;
+  if (value.kind === "secret")
+    return Array.isArray(value.fields) && value.fields.length <= SECRET_FIELD_LIMIT && value.fields.every(isFileField);
+  return (
+    (value.kind === "asset-missing" || value.kind === "asset-too-large") &&
+    isBoundedString(value.node, NAME_LIMIT) &&
+    isBoundedString(value.step, NAME_LIMIT)
+  );
+}
+
+function isAssetSource(value: unknown): value is WorkflowFileAssetSource {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.key) &&
+    isIdentifier(value.fileId) &&
+    isBoundedString(value.node, NAME_LIMIT) &&
+    isBoundedString(value.step, NAME_LIMIT)
+  );
+}
+
+export function isWorkflowFileHostExport(value: unknown): value is WorkflowFileHostExport {
+  return (
+    isDynamicRecord(value) &&
+    (value.text === null || isBoundedString(value.text, 2 * INPUT_LIMITS.workflowGraphBytes)) &&
+    Array.isArray(value.assets) &&
+    value.assets.length <= INPUT_LIMITS.workflowNodes &&
+    value.assets.every(isAssetSource) &&
+    (value.problem === null || isWorkflowFileExportProblem(value.problem))
+  );
+}
+
+export function isWorkflowFileSaveResult(value: unknown): value is WorkflowFileSaveResult {
+  return (
+    isDynamicRecord(value) &&
+    typeof value.saved === "boolean" &&
+    (value.problem === null || isWorkflowFileExportProblem(value.problem))
+  );
 }
 
 export function serializeWorkflowFile(file: WorkflowFile): string {
@@ -351,6 +486,7 @@ function isAsset(value: unknown): value is WorkflowFileAsset {
     value.name.trim().length > 0 &&
     isBoundedString(value.type, NAME_LIMIT) &&
     isString(value.data) &&
+    value.data !== "" &&
     BASE64.test(value.data) &&
     base64Length(value.data) <= ATTACHMENT_LIMITS.fileBytes
   );
@@ -475,4 +611,18 @@ export function workflowFromFile(
     return { ...node, fields };
   });
   return { title: file.title, graph: { ...file.graph, nodes } };
+}
+
+const FILE_NAME_LIMIT = 80;
+const UNSAFE_NAME_CHARACTERS = '\\/:*?"<>|';
+
+export function workflowFileName(title: string): string {
+  const safe = Array.from(title, (character) =>
+    character < " " || UNSAFE_NAME_CHARACTERS.includes(character) ? "-" : character,
+  )
+    .join("")
+    .trim()
+    .slice(0, FILE_NAME_LIMIT)
+    .trim();
+  return `${safe || "workflow"}.${WORKFLOW_FILE_EXTENSION}`;
 }

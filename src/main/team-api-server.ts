@@ -206,6 +206,7 @@ import {
   WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PORTABLE_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -2859,6 +2860,7 @@ export class TeamApiServer {
         if (capability === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_STEP_SETTINGS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_PAUSE_CAPABILITY) return this.#options.workflows !== undefined;
+        if (capability === WORKFLOWS_PORTABLE_CAPABILITY) return this.#options.workflows?.files !== undefined;
         if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_AGENT_FILES_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_ANSWERS_CAPABILITY) return this.#options.workflows !== undefined;

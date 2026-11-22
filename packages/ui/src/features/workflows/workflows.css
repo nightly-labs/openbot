@@ -1696,3 +1696,37 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-md);
 }
+
+.wfi-section {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-3);
+}
+
+.wfi-heading {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfi-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.wfi-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfi-trigger {
+  width: 100%;
+}
+
+.wfi-note {
+  margin: var(--openbot-space-3) 0 0;
+}

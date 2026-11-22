@@ -1,6 +1,12 @@
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
+  fillWorkflowFileText,
   parseWorkflowFolderAction,
+  WORKFLOW_FILE_EXTENSION,
   WORKFLOW_MEDIA_CATALOG_MAX,
+  type WorkflowFileHostExport,
+  type WorkflowFileSaveResult,
   type WorkflowMediaCatalog,
   type WorkflowMediaCredits,
   type WorkflowMediaProviders,
@@ -42,6 +48,10 @@ import {
   WORKFLOWS_PAUSE_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import {
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_PORTABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
@@ -50,6 +60,7 @@ import {
   WORKFLOWS_SUNRA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
+import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import {
   decodeRemoteCreditMediaCredits,
@@ -58,6 +69,7 @@ import {
   decodeRemoteMediaServiceAccounts,
   decodeRemoteMediaServiceCredits,
   decodeRemoteWorkflowDetail,
+  decodeRemoteWorkflowFileExport,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
@@ -80,6 +92,7 @@ import {
   workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
 import type { Effect } from "effect";
+import { app, type BrowserWindow, dialog, type SaveDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { WorkflowsHandle } from "../../backend/workflows/workflows";
 import type { WorkflowGitHubDirectory } from "../github-rest";
@@ -87,6 +100,7 @@ import type { HostEventsService } from "../host-events-service";
 import { acceptEmpty, decodeWorkflowFoldersSnapshotFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
+import type { WorkflowFileExporter } from "../workflow-file-export";
 import type { WorkflowFoldersService } from "../workflow-folders-service";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -126,6 +140,7 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY
       | typeof WORKFLOWS_STEP_SETTINGS_CAPABILITY
       | typeof WORKFLOWS_PAUSE_CAPABILITY
+      | typeof WORKFLOWS_PORTABLE_CAPABILITY
       | typeof WORKFLOW_FOLDERS_CAPABILITY,
   ): boolean;
   request<T>(
@@ -134,6 +149,7 @@ interface WorkflowRemoteServers {
     decoder: ResponseDecoder<T>,
     init?: RemoteRequestInit,
   ): Effect.Effect<T, RemoteWorkflowError>;
+  downloadAttachment(attachmentId: string, serverId: string): Effect.Effect<{ bytes: Uint8Array }, RemoteWorkflowError>;
 }
 
 interface WorkflowIpcDependencies {
@@ -142,6 +158,9 @@ interface WorkflowIpcDependencies {
   github: WorkflowGitHubDirectory;
   workflowFolders: Pick<WorkflowFoldersService, "read" | "change">;
   remoteServers: WorkflowRemoteServers;
+  workflowFiles: WorkflowFileExporter;
+  getMainWindow: () => BrowserWindow | null;
+  translate: AppTranslate;
 }
 
 export function workflowIpcHandlers({
@@ -150,6 +169,9 @@ export function workflowIpcHandlers({
   github,
   workflowFolders,
   remoteServers,
+  workflowFiles,
+  getMainWindow,
+  translate,
 }: WorkflowIpcDependencies): Pick<IpcGroupHandlers, "workflows"> {
   function remote<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: unknown): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, WORKFLOWS_CAPABILITY))
@@ -165,6 +187,35 @@ export function workflowIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, WORKFLOW_FOLDERS_CAPABILITY))
       throw new Error(sourceText("error.team.workflowFoldersUnsupported"));
     return remote(serverId, path, decodeWorkflowFoldersSnapshotFromHost, body);
+  }
+  async function chooseExportPath(name: string): Promise<string | null> {
+    const mainWindow = getMainWindow();
+    const options: SaveDialogOptions = {
+      title: translate("dialog.saveWorkflow"),
+      defaultPath: join(app.getPath("downloads"), name),
+      filters: [{ name: translate("dialog.filter.workflow"), extensions: [WORKFLOW_FILE_EXTENSION] }],
+      showsTagField: false,
+    };
+    const result = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
+    return result.canceled || !result.filePath ? null : result.filePath;
+  }
+  async function saveExport(
+    source: WorkflowFileHostExport,
+    bytes: (fileId: string) => Promise<Uint8Array | null>,
+  ): Promise<WorkflowFileSaveResult> {
+    if (source.problem || source.text === null)
+      return { saved: false, problem: source.problem ?? { kind: "too-large" } };
+    const data = new Map<string, Uint8Array>();
+    for (const asset of source.assets) {
+      const found = await bytes(asset.fileId);
+      if (found) data.set(asset.key, found);
+    }
+    const filled = fillWorkflowFileText(source.text, source.assets, data);
+    if (!filled.ok) return { saved: false, problem: filled.problem };
+    const path = await chooseExportPath(filled.name);
+    if (!path) return { saved: false, problem: null };
+    await writeFile(path, filled.text, "utf8");
+    return { saved: true, problem: null };
   }
   return {
     workflows: {
@@ -195,6 +246,27 @@ export function workflowIpcHandlers({
           if (!remoteServers.supportsCapability(serverId, WORKFLOWS_PAUSE_CAPABILITY))
             throw new Error(sourceText("error.workflow.serverTooOld"));
           return remote(serverId, WORKFLOWS_PAUSE_ROUTES.pause, decodeRemoteWorkflowSummary, input);
+        },
+      }),
+      exportFile: scopedHandler(parseWorkflowId, {
+        local: async (workflowId) => {
+          const detail = await runCauseEffect(workflows.get(workflowId));
+          return saveExport(await runCauseEffect(workflowFiles.source(detail)), (fileId) =>
+            runCauseEffect(workflowFiles.bytes(fileId)),
+          );
+        },
+        remote: async (workflowId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_PORTABLE_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          const source = await remote(serverId, WORKFLOWS_PORTABLE_ROUTES.export, decodeRemoteWorkflowFileExport, {
+            workflowId,
+          });
+          return saveExport(source, (fileId) =>
+            runCauseEffect(remoteServers.downloadAttachment(fileId, serverId)).then(
+              (file) => file.bytes,
+              () => null,
+            ),
+          );
         },
       }),
       delete: scopedHandler(parseWorkflowId, {

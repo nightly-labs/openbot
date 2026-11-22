@@ -520,6 +520,10 @@ export function mockWorkflows(
       emit(input.workflowId);
       return structuredClone(next.summary);
     },
+    exportFile: async (workflowId) => {
+      record(workflowId);
+      return { saved: false, problem: null };
+    },
     delete: async (workflowId) => {
       for (const step of steps.values()) if (step.workflowId === workflowId) stopStep(step);
       if (records.delete(workflowId)) emit(workflowId);

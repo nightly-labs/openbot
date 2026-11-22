@@ -157,6 +157,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     answersSupported: () => true,
     stepSettingsSupported: () => true,
     pauseSupported: () => true,
+    portableSupported: () => true,
     foldersSupported: () => true,
     folders: () => api.folders(),
     folderAction: (action) => api.folderAction(action),

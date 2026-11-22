@@ -1,6 +1,7 @@
 import {
   isWorkflowDetail,
   isWorkflowFields,
+  isWorkflowFileHostExport,
   isWorkflowGitHubCatalog,
   isWorkflowGitHubHistory,
   isWorkflowGitHubRepositoryOptions,
@@ -122,6 +123,7 @@ function mapped<T>(map: (value: unknown) => unknown, decode: (value: unknown) =>
 
 export const decodeRemoteWorkflowSummary = mapped(summary, guardedDecoder(isWorkflowSummary, "remote workflow"));
 export const decodeRemoteWorkflowDetail = mapped(detail, guardedDecoder(isWorkflowDetail, "remote workflow"));
+export const decodeRemoteWorkflowFileExport = guardedDecoder(isWorkflowFileHostExport, "remote workflow file");
 export function decodeRemoteWorkflowVersionGraph(value: unknown) {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow version.");
   const mappedDetail = detail({ graph: value.graph });

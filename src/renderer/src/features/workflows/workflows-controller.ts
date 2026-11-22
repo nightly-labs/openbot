@@ -810,6 +810,13 @@ export function createWorkflowsController(
         host.workflows.setPaused({ workflowId, paused }).catch(report);
       };
     },
+    get onExport() {
+      if (!host.portableSupported()) return undefined;
+      return (workflowId: string) => {
+        flush();
+        return queued(() => host.workflows.exportFile(workflowId));
+      };
+    },
     onDelete: (workflowId) => {
       flush();
       return queued(async () => {
