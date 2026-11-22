@@ -252,7 +252,7 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "השרת הזה דורש התחברות. יש להתחבר אליו ב-OpenBot במחשב המארח.",
   "error.backend.mcpSignInNeedsHttps":
     "השרת הזה דורש התחברות, ו-OpenBot מתחבר רק דרך https. יש לשנות את הכתובת ל-{url}.",
-  "error.backend.mcpSignInOtherAddress": "השרת הזה מתחבר רק בכתובת {url}. שנה את ה-URL לכתובת הזו ואז התחבר שוב.",
+  "error.backend.mcpSignInOtherAddress": "השרת הזה מתחבר רק בכתובת {url}. יש לשנות את הכתובת לכתובת הזו ולהתחבר שוב.",
   "error.backend.mcpSignInCancelled": "ההתחברות בוטלה.",
   "error.backend.mcpSignInTimedOut": "ההתחברות לא הושלמה בדפדפן.",
   "error.backend.mcpSignInRefused": "דף ההתחברות דחה את הגישה. התחבר שוב.",

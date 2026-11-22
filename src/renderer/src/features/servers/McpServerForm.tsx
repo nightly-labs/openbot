@@ -27,6 +27,7 @@ import {
   mcpConfigErrors,
   mcpConfigIsValid,
   mcpSaveConnects,
+  mcpUrlAtAddress,
   normalizeMcpConfig,
 } from "./mcp-servers";
 
@@ -134,7 +135,8 @@ export function McpServerForm(props: McpServerFormProps) {
   const testDraft = () => measure("testing", runs.runTest);
   const signInDraft = () => measure("signing-in", runs.runSignIn);
 
-  const failedAddress = (shown: McpTestState) => (shown.status === "failed" ? shown.address : undefined);
+  const failedAddress = (shown: McpTestState) =>
+    shown.status === "failed" ? mcpUrlAtAddress(state.draft.url, shown.address) : undefined;
 
   /** Puts the address the server signs in at in the URL, and signs in there. Save keeps it. */
   function switchAddress(url: string): void {

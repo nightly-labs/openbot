@@ -25,6 +25,7 @@ import {
   mcpProviderLimitNote,
   mcpStatusLabel,
   mcpStatusVariant,
+  mcpUrlAtAddress,
   normalizeMcpConfig,
 } from "./mcp-servers";
 
@@ -63,10 +64,11 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     return undefined;
   });
   const waiting = () => (test()?.status === "signing-in" ? state.test?.config : undefined);
-  /** The address the server answered that it signs in at. */
+  /** The row URL at the host the server answered that it signs in at. */
   const otherAddress = () => {
     const current = test();
-    return current?.status === "failed" ? current.address : undefined;
+    const row = config();
+    return current?.status === "failed" && row ? mcpUrlAtAddress(row.url, current.address) : undefined;
   };
 
   async function latch(key: string, action: () => Promise<void>): Promise<void> {
@@ -125,10 +127,12 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
   async function switchAddress(url: string): Promise<void> {
     const current = config();
     if (!current) return;
+    let saved = false;
     await latch("address", async () => {
       await props.tools.save({ ...current, url });
+      saved = true;
     });
-    if (config()?.url === url) void signIn();
+    if (saved) void signIn();
   }
 
   function signOut(): void {

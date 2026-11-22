@@ -85,6 +85,21 @@ export function mcpSignInAddress(sourceText: string): string | undefined {
   return sourceTextValues(sourceText, "error.backend.mcpSignInOtherAddress")?.url;
 }
 
+/**
+ * `url` at the host that a sign-in answered, with the path, query and account of `url`. `undefined`
+ * when the path differs too, or the address is not a whole https address, for example when part of it
+ * was redacted: then only the sentence shows.
+ */
+export function mcpUrlAtAddress(url: string, address: string | undefined): string | undefined {
+  if (!address || !URL.canParse(url.trim()) || !URL.canParse(address)) return undefined;
+  const next = new URL(url.trim());
+  const target = new URL(address);
+  if (target.protocol !== "https:" || target.pathname !== next.pathname) return undefined;
+  next.protocol = target.protocol;
+  next.host = target.host;
+  return next.href;
+}
+
 /** Whether a test answered that the user cancelled a sign-in, which is not a failure to show. */
 export function isMcpSignInCancelled(sourceText: string): boolean {
   return matchingSourceKeys(sourceText)[0] === "error.backend.mcpSignInCancelled";

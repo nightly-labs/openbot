@@ -1360,6 +1360,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const site = getDomain(address.hostname, { allowPrivateDomains: true });
     if (address.protocol !== "https:" || !site || site !== getDomain(requested.hostname, { allowPrivateDomains: true }))
       return null;
+    // Metadata often names only the origin, or a shorter path: the endpoint keeps the path typed.
+    const base = address.pathname.endsWith("/") ? address.pathname : `${address.pathname}/`;
+    if (`${requested.pathname}/`.startsWith(base)) address.pathname = requested.pathname;
     address.search = "";
     address.hash = "";
     return address.href;
