@@ -160,6 +160,7 @@ export function AttachmentCards(props: {
               onPlay={() => started(attachment)}
               onError={() => markUnplayable(attachment)}
               menu={videoMenu()}
+              onDownload={() => props.onAction(attachment, "download")}
             />
           );
           return (
