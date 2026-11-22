@@ -37,7 +37,7 @@ import {
   type AgentDockSeat as AgentDockUiSeat,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
-import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
+import { isDockMessage, isDockVisualReply } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
@@ -1029,6 +1029,7 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
         previewKind: attachment.previewKind,
         previewUrl: attachment.previewUrl,
       })),
+    ...(isDockVisualReply(message) ? { visual: true } : {}),
   };
 }
 
