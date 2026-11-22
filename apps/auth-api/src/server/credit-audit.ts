@@ -20,7 +20,7 @@ export type CreditAuditEvent =
 
 export type CreditAuditDetailValue = string | number | boolean | null;
 
-export interface CreditAuditWallet {
+interface CreditAuditWallet {
   userId: string | null;
   serverId: string | null;
 }
@@ -36,7 +36,7 @@ export interface CreditAuditFailure {
   detail?: Readonly<Record<string, CreditAuditDetailValue | undefined>>;
 }
 
-export interface CreditAuditUpstream {
+interface CreditAuditUpstream {
   operation: string;
   status: number;
   code: string;

@@ -105,10 +105,10 @@ const CREDIT_ACTIONS = [
   "media_charged",
   "media_released",
 ] as const;
-export type CreditAction = (typeof CREDIT_ACTIONS)[number];
+type CreditAction = (typeof CREDIT_ACTIONS)[number];
 const CREDIT_MOVE_DIRECTIONS = ["to_server", "to_personal"] as const satisfies readonly CreditTransferDirection[];
 const CREDIT_HOLD_OUTCOMES = ["completed", "failed", "canceled", "refused", "abandoned", "expired"] as const;
-export type CreditHoldAnalyticsOutcome = (typeof CREDIT_HOLD_OUTCOMES)[number];
+type CreditHoldAnalyticsOutcome = (typeof CREDIT_HOLD_OUTCOMES)[number];
 const MAX_ANALYTICS_CREDITS = 10_000_000;
 const MAX_ANALYTICS_MEDIA_SECONDS = 3_600;
 const MAX_ANALYTICS_MEDIA_COUNT = 16;
