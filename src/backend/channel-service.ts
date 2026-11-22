@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, normalize, sep } from "node:path";
 import { chatTagReferences, leadingAddress } from "@openbot/contracts/chat-tag-references";
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccessLevel,
   type AgentEvent,
+  type AgentProviderRef,
   type AgentSummary,
   type AvatarImageInput,
   CHANNEL_ASSIGNMENT_LIMIT,
@@ -22,6 +24,7 @@ import {
   type ChannelTask,
   type ChannelTaskWait,
   CONTEXT_RESET_ITEM_TYPE,
+  type ConversationMessage,
   type ConversationSnapshot,
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
@@ -95,6 +98,8 @@ export interface ChannelHooks {
   reportsCompactions?(agentId: string): boolean;
   provisionalAnswers?(agentId: string): boolean;
   quietTurn?(turnId: string): boolean;
+  /** See `TurnLifecycle.channelNote`. */
+  channelNote?(turnId: string, messageId: string): "result" | "pending" | "running" | null;
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   forgetThread?(threadId: string): Effect.Effect<void, ChannelOperationError>;
   steersWhenBusy?(agentId: string): boolean;
@@ -2459,7 +2464,8 @@ export class ChannelService {
 
   event(event: AgentEvent): boolean {
     if (event.type === "conversation") return this.capture(event.snapshot);
-    if (event.type === "conversation-delta") {
+    // A tool step that starts tells what follows the note that `capture` holds.
+    if (event.type === "conversation-delta" || (event.type === "turn-progress" && event.running === true)) {
       const channelId = this.store.channelForThread(event.threadId);
       if (!channelId) return false;
       const loaded = this.hooks.loadedSnapshot?.(event.threadId);
@@ -2586,7 +2592,8 @@ export class ChannelService {
       turnId === undefined
         ? this.store.assignments(channelId)
         : this.store.agentAssignments(channelId, snapshot.agentId);
-    const name = this.hooks.agents().find((agent) => agent.id === snapshot.agentId)?.name ?? "Former member";
+    const author = this.hooks.agents().find((agent) => agent.id === snapshot.agentId);
+    const name = author?.name ?? "Former member";
     const taskReads = new Map<string, ChannelTask | null>();
     const taskOf = (id: string): ChannelTask | undefined => {
       if (!taskReads.has(id)) taskReads.set(id, this.store.task(channelId, id));
@@ -2625,7 +2632,17 @@ export class ChannelService {
             (turnId === undefined ? undefined : (this.store.assignment(channelId, lateId) ?? undefined)));
       const owner = assignments.find((item) => item.turnId === message.turnId) ?? late;
       if (!owner && message.turnId !== undefined && this.#providerTurns.has(message.turnId)) continue;
-      const original = existing(message.id);
+      const note = channelNote(message, author?.provider, this.hooks.channelNote);
+      /* Each client shows a note as a progress update by its id, so the line before the result
+         stays in the steps under an id that is not a note's. A note shown already keeps its id. */
+      const resultNoteId = `${message.id}${CHANNEL_RESULT_NOTE_SUFFIX}`;
+      const entryId =
+        note !== undefined && !existing(message.id) && (note === "result" || existing(resultNoteId))
+          ? resultNoteId
+          : message.id;
+      const original = existing(entryId);
+      // Until its next step starts, a new note can still be the line before the result.
+      if (!original && (note === "pending" || (note === "running" && message.status === "streaming"))) continue;
       const assignment =
         owner ??
         (turnId !== undefined ||
@@ -2702,9 +2719,9 @@ export class ChannelService {
         message = { ...message, replyToMessageId: task.requestMessageId };
       const messageId =
         original?.superseded && task?.revision === assignment.taskRevision
-          ? `${message.id}-revision-${task.revision}`
-          : message.id;
-      if (messageId !== message.id && JSON.stringify(original?.message) === JSON.stringify(message)) continue;
+          ? `${entryId}-revision-${task.revision}`
+          : entryId;
+      if (messageId !== entryId && JSON.stringify(original?.message) === JSON.stringify(message)) continue;
       const value: ChannelMessage = {
         id: messageId,
         channelId,
@@ -2712,7 +2729,7 @@ export class ChannelService {
         author: { kind: "agent", id: snapshot.agentId, name },
         taskId: assignment.taskId,
         superseded:
-          task?.revision !== assignment.taskRevision || (messageId === message.id && original?.superseded === true),
+          task?.revision !== assignment.taskRevision || (messageId === entryId && original?.superseded === true),
         message,
       };
       const previous = existing(value.id);
@@ -3880,6 +3897,25 @@ const OWN_LABEL_WORDS = new Set([
   "summary",
   "update",
 ]);
+
+/** Ends the channel id of the note that introduced a member's result. `isNarrationItemId` rejects it. */
+const CHANNEL_RESULT_NOTE_SUFFIX = ":result";
+
+/** What `TurnLifecycle.channelNote` knows about a member's note, or undefined for any other message. */
+function channelNote(
+  message: ConversationMessage,
+  provider: AgentProviderRef | undefined,
+  read: ChannelHooks["channelNote"],
+): "result" | "pending" | "running" | null | undefined {
+  if (
+    message.turnId === undefined ||
+    message.author !== "assistant" ||
+    message.itemType !== "commentary" ||
+    !isNarrationItemId(message.id, provider)
+  )
+    return undefined;
+  return read?.(message.turnId, message.id) ?? null;
+}
 
 function withoutOwnNameLabel(text: string, name: string, streaming = false): string {
   const own = name.trim().toLocaleLowerCase();

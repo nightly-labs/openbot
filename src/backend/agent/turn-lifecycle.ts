@@ -390,6 +390,8 @@ export class TurnLifecycle {
       compacted: boolean;
       startedBackgroundWork: boolean;
       narration: string | null;
+      /** The step after `narration` is known. See `channelNote`. */
+      narrationStepKnown: boolean;
       openTools: Set<string>;
       failureReports: Set<string>;
       lastEventAt: number;
@@ -423,6 +425,8 @@ export class TurnLifecycle {
   readonly #quietRepeats = new Set<string>();
   readonly #reportedFailures = new Map<string, string>();
   readonly #endedTurns = new Set<string>();
+  /** The note that came directly before each `channel_result` call, by turn. See `channelNote`. */
+  readonly #channelResultNotes = new Map<string, Set<string>>();
   readonly #completingTurns = new Set<string>();
   readonly #lastEventAt = new Map<string, number>();
   readonly #codexChildren = new Map<string, CodexSubagentParent>();
@@ -1263,6 +1267,7 @@ export class TurnLifecycle {
           compacted: false,
           startedBackgroundWork: false,
           narration: null,
+          narrationStepKnown: false,
           openTools: new Set(),
           failureReports: new Set(),
           lastEventAt: Date.now(),
@@ -1336,6 +1341,11 @@ export class TurnLifecycle {
           const acted = isRepeatedWork(item);
           this.#markProduced(turnId, acted, acted, acted && isUserReactionCall(item));
         }
+        if (running?.narration && !running.narrationStepKnown) {
+          const step = channelNoteStep(item);
+          if (step === "result") this.#keepChannelResultNote(turnId, running.narration);
+          if (step !== null) running.narrationStepKnown = true;
+        }
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
           if (
             notification.method === "item/completed" &&
@@ -1343,8 +1353,10 @@ export class TurnLifecycle {
             isNarrationItemId(itemId, source.provider) &&
             isString(item.text) &&
             item.text.trim()
-          )
+          ) {
             running.narration = itemId;
+            running.narrationStepKnown = false;
+          }
         } else if (running && isRepeatedWork(item) && !keepsNarration(item, notification.method === "item/completed"))
           running.narration = null;
         if (item.type === "contextCompaction") {
@@ -1918,6 +1930,34 @@ export class TurnLifecycle {
 
   quietChannelTurn(turnId: string): boolean {
     return this.#quietChannelTurns.has(turnId) && !this.#reportedFailures.has(turnId);
+  }
+
+  /**
+   * What a channel knows about a note of a turn (#6931). The Natural style asks for one line before
+   * the first tool call. Before `channel_result`, that line only introduces the result, and it often
+   * holds the answer already, so a channel showed each answer two times. `result` is that line;
+   * `pending` is the newest note of a running turn while its next step is unknown; `running` is
+   * another note of a running turn; null is a note of an ended turn with no `channel_result` after it.
+   */
+  channelNote(turnId: string, messageId: string): "result" | "pending" | "running" | null {
+    if (this.#channelResultNotes.get(turnId)?.has(messageId)) return "result";
+    const running = this.#runningTurns.get(turnId);
+    if (!running) return null;
+    return running.narration === messageId && !running.narrationStepKnown ? "pending" : "running";
+  }
+
+  /** Kept after the turn ends: the last capture of a turn comes after its running state is gone. */
+  #keepChannelResultNote(turnId: string, messageId: string): void {
+    const notes = this.#channelResultNotes.get(turnId);
+    if (notes) {
+      notes.add(messageId);
+      return;
+    }
+    this.#channelResultNotes.set(turnId, new Set([messageId]));
+    if (this.#channelResultNotes.size > ENDED_TURN_LIMIT) {
+      const [oldest] = this.#channelResultNotes.keys();
+      if (oldest !== undefined) this.#channelResultNotes.delete(oldest);
+    }
   }
 
   keepChannelTurnAnswers(turnId: string): void {
@@ -3517,6 +3557,38 @@ function keepsNarration(item: DynamicRecord, completed: boolean): boolean {
   if (!completed) return true;
   const calls = getArray(getRecord(getRecord(threadItem, "result"), "metadata"), "toolCalls");
   return calls.length > 0 && calls.every((call) => NARRATION_KEEPING_TOOLS.has(codeModeOpenBotTool(call) ?? ""));
+}
+
+/** `channel_result` and the forms of its name that agents give, such as `openbot__channel_result`. */
+const CHANNEL_RESULT_NAME = /(?:^|[._])channel_result$/u;
+/** `tool_call`, the OpenBot tool that runs the tool its arguments name, in the forms that agents give. */
+const BRIDGE_TOOL = /(?:^|[._])tool_call$/u;
+/** A call of `channel_result` in the code of an OpenCode Code Mode step, not a search for it. */
+const CODE_CHANNEL_RESULT_CALL = /\bchannel_result\s*\(|["'`]openbot\.channel_result["'`]/u;
+
+/**
+ * The step that follows a note: `result` for a call of the channel tool that posts a member's answer,
+ * `other` for another tool, or null while the step is not known yet. ACP agents name a tool with their
+ * own form, such as `channel_result`, `openbot__channel_result` or
+ * `mcp__editor_openbot_<tag>__channel_result`, which `openBotTool` does not read. OpenCode Code Mode
+ * calls it in the code of an `execute` step, and starts that step first with no code.
+ */
+function channelNoteStep(item: DynamicRecord): "result" | "other" | null {
+  const threadItem = toThreadItem(item);
+  if (threadItem === null || !isToolItem(threadItem)) return null;
+  if (openBotTool(threadItem) === "channel_result") return "result";
+  if (threadItem.type !== "toolCall") return "other";
+  const name = getString(threadItem, "name") ?? "";
+  if (name === "execute") {
+    const code = getString(getRecord(threadItem, "arguments"), "code");
+    if (!code) return null;
+    return CODE_CHANNEL_RESULT_CALL.test(code) ? "result" : "other";
+  }
+  // ACP agents also name the bridge with their own form, such as `mcp_openbot_tool_call`.
+  const called = BRIDGE_TOOL.test(name)
+    ? (getString(threadItem.arguments, "name") ?? getString(threadItem.arguments, "tool"))
+    : name;
+  return called !== null && CHANNEL_RESULT_NAME.test(called) ? "result" : "other";
 }
 
 function codeModeOpenBotTool(call: unknown): string | null {
