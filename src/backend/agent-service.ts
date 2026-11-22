@@ -1018,6 +1018,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         afterIdleCheck: () => this.#deleteReleasedFolders(),
         captureConfigRevision: () => this.#endpoints.committedRevision(),
         endpointsPending: (harness) => this.#endpoints.pending(harness),
+        onModelsRelisted: (provider, configRevision) => {
+          if (isCustomProviderHarness(provider)) this.#endpoints.clearReleased(provider, configRevision);
+        },
         onProviderActivated: (provider, configRevision) =>
           Effect.gen({ self: this }, function* () {
             if (isCustomProviderHarness(provider)) {
@@ -1722,7 +1725,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
-        servesModel: (model, provider) => this.#endpoints.serves(model, provider),
+        servesModel: (model, provider, configRevision) => this.#endpoints.servesClient(model, provider, configRevision),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),

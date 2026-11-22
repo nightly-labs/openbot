@@ -293,6 +293,7 @@ export interface ProviderHooks {
   onProviderHeld?(provider: AgentProvider): void;
   releasePersonWaits?(provider: AgentProvider): void;
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
+  onModelsRelisted?(provider: AgentProvider, configRevision: number): void;
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   onAccountSignedIn?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   onAccountsChanged?(): void;
@@ -2135,6 +2136,13 @@ export class ProviderRuntime implements ProviderPort {
     if (!this.#clients.has(harness)) {
       if (this.#released.has(harness))
         yield* this.ensureProvider(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope));
+      else if (this.#waitsForEndpoint(harness)) {
+        yield* this.#startProvider(harness, { preserveCheckErrors: true }).pipe(
+          Effect.ignore,
+          Effect.forkIn(this.#scope),
+        );
+        return "restarted";
+      }
       return "not-running";
     }
     if (this.#hooks.isProviderBusy(harness)) {
@@ -2150,6 +2158,16 @@ export class ProviderRuntime implements ProviderPort {
     }
     return "restarted";
   }, Effect.uninterruptible).bind(this);
+
+  #waitsForEndpoint(harness: CustomProviderHarness): boolean {
+    return (
+      !this.#off.has(harness) &&
+      this.signInRequired(harness) &&
+      !this.#cliLogin.has(harness) &&
+      !this.#providerConnectionCommands.has(harness) &&
+      customProvidersOn(this.#credentials.customProviders, harness)().length > 0
+    );
+  }
 
   readonly reloadAgentEnvironment = Effect.fn("ProviderRuntime.reloadAgentEnvironment")(function* (
     this: ProviderRuntime,
@@ -3823,6 +3841,10 @@ export class ProviderRuntime implements ProviderPort {
     yield* refreshRuntime;
   });
 
+  configRevision(client: AgentClient): number {
+    return this.#configRevisions.get(client) ?? 0;
+  }
+
   #bindClient(client: AgentClient): void {
     this.#configRevisions.set(client, this.#hooks.captureConfigRevision());
     this.#hooks.bindClient(client);
@@ -4270,6 +4292,8 @@ export class ProviderRuntime implements ProviderPort {
     const lastError = this.#lastErrors.get(provider);
     if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
+    const client = this.#clients.get(provider);
+    if (client) this.#hooks.onModelsRelisted?.(provider, this.configRevision(client));
     return true;
   });
 
