@@ -20,6 +20,7 @@ interface NameQuery {
   end: number;
   typed: string;
   opened?: true;
+  single?: true;
 }
 
 interface NameOption {
@@ -42,9 +43,11 @@ interface Snapshot {
 type EditKind = "type" | "delete" | "edit";
 
 const TYPED_NAME = /\{\{\s*([A-Za-z0-9_]{0,40})$/u;
+const SINGLE_BRACE_NAME = /(?<![{$])\{([A-Za-z0-9_]{0,40})$/u;
 const OPENED_NAME = /^[A-Za-z0-9_]{0,40}$/u;
 const NAME_REST = /^[A-Za-z0-9_]*/u;
 const CLOSING = /^\s*\}\}/u;
+const SINGLE_CLOSING = /^\}{1,2}/u;
 const FIELD_NAME = /\{\{\s*([A-Za-z_][A-Za-z0-9_]{0,39})\s*\}\}/gu;
 const HAS_FIELD_NAME = new RegExp(FIELD_NAME.source, "u");
 const BLOCK = /^(DIV|P)$/u;
@@ -53,8 +56,11 @@ const CHIP = "wfn-name-chip";
 const CHIP_PROBLEMS: ReadonlySet<WorkflowAnswerProblem["code"]> = new Set(["template", "conflict", "path", "repeated"]);
 
 function nameQuery(text: string, caret: number): NameQuery | null {
-  const typed = TYPED_NAME.exec(text.slice(0, caret))?.[1];
-  return typed === undefined ? null : { start: caret - typed.length, end: caret, typed };
+  const before = text.slice(0, caret);
+  const typed = TYPED_NAME.exec(before)?.[1];
+  if (typed !== undefined) return { start: caret - typed.length, end: caret, typed };
+  const single = SINGLE_BRACE_NAME.exec(before)?.[1];
+  return single === undefined ? null : { start: caret - single.length, end: caret, typed: single, single: true };
 }
 
 const TYPE_LABEL: Readonly<Record<WorkflowAnswerType, AppTextKey>> = {
@@ -124,8 +130,10 @@ function withName(text: string, query: NameQuery, name: string): Snapshot {
   }
   const after = text.slice(query.end);
   const rest = after.slice(NAME_REST.exec(after)?.[0].length ?? 0);
-  const closing = CLOSING.exec(rest)?.[0] ?? "";
-  const head = `${text.slice(0, query.start)}${name}${closing || "}}"}`;
+  const closing = (query.single ? SINGLE_CLOSING : CLOSING).exec(rest)?.[0] ?? "";
+  const head = query.single
+    ? `${text.slice(0, query.start - 1)}{{${name}}}`
+    : `${text.slice(0, query.start)}${name}${closing || "}}"}`;
   return { text: `${head}${rest.slice(closing.length)}`, caret: head.length };
 }
 
@@ -271,6 +279,7 @@ export function NameField(props: NameFieldProps) {
   const listId = createUniqueId();
   const [query, setQuery] = createSignal<NameQuery | null>(null);
   const [active, setActive] = createSignal(0);
+  const [moved, setMoved] = createSignal(false);
   let field: HTMLDivElement | undefined;
   let fieldHadFocus = false;
   let composing = false;
@@ -292,7 +301,14 @@ export function NameField(props: NameFieldProps) {
   });
   const typed = () => query()?.typed ?? "";
   const names = createMemo(() => (query() ? matchNames(available(), typed()) : []));
-  const open = () => query() !== null && available().length > 0;
+  const open = () => {
+    const found = query();
+    return found !== null && available().length > 0 && (!found.single || names().length > 0);
+  };
+  const enterChooses = () => {
+    const found = query();
+    return !found?.single || found.typed !== "" || moved();
+  };
   const activeMatch = () => names()[Math.min(active(), names().length - 1)];
   const activeOption = () => activeMatch()?.option;
   const activeKeys = () => {
@@ -322,6 +338,7 @@ export function NameField(props: NameFieldProps) {
       found?.opened && typed !== null && OPENED_NAME.test(typed) ? { ...found, end: caret ?? 0, typed } : null;
     setQuery(opened ?? (caret === null ? null : nameQuery(text, caret)));
     setActive(0);
+    setMoved(false);
   };
   const commit = (kind: EditKind, before: Snapshot) => {
     if (!field) return;
@@ -426,9 +443,10 @@ export function NameField(props: NameFieldProps) {
       event.preventDefault();
       event.stopPropagation();
       setActive((index) => (index + (event.key === "ArrowDown" ? 1 : count - 1)) % count);
+      setMoved(true);
     } else if (event.key === "Enter" || event.key === "Tab") {
       const option = activeOption();
-      if (!option) return;
+      if (!option || (event.key === "Enter" && !enterChooses())) return;
       event.preventDefault();
       event.stopPropagation();
       choose(option.name);
