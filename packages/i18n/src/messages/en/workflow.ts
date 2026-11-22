@@ -258,6 +258,9 @@ export const messages = defineMessages("workflow", {
   "workflow.answer.problem.field": "No step before this one gives {name}.",
   "workflow.answer.problem.test": "{name} cannot be compared like this.",
   "workflow.answer.problem.conflict": "Two steps before this one give {name} with different types.",
+  "workflow.answer.problem.path":
+    "Not every path to this step gives {name}. Make it optional ({name}?) or give it on every path.",
+  "workflow.answer.problem.repeated": "Two steps before this one can give {name} in the same run. Rename one of them.",
   "workflow.check.title": "Check",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Fields: {names}",

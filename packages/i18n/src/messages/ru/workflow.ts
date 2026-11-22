@@ -286,6 +286,10 @@ export const messages = {
   "workflow.answer.problem.field": "Ни один предыдущий шаг не даёт {name}.",
   "workflow.answer.problem.test": "{name} нельзя так сравнить.",
   "workflow.answer.problem.conflict": "Два предыдущих шага дают {name} с разными типами.",
+  "workflow.answer.problem.path":
+    "Не каждый путь к этому шагу даёт {name}. Сделайте поле необязательным ({name}?) или давайте его на каждом пути.",
+  "workflow.answer.problem.repeated":
+    "Два предыдущих шага могут дать {name} в одном запуске. Переименуйте один из них.",
   "workflow.check.title": "Проверка",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Поля: {names}",

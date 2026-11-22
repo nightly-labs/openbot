@@ -102,6 +102,7 @@ export * from "./ipc-storage";
 export * from "./ipc-team-host";
 export * from "./ipc-vault";
 export * from "./ipc-voice";
+export * from "./ipc-workflow-answer-paths";
 export * from "./ipc-workflow-answers";
 export * from "./ipc-workflow-discord";
 export * from "./ipc-workflow-folders";

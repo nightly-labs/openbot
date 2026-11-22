@@ -259,6 +259,10 @@ export const messages = {
   "workflow.answer.problem.field": "Kein Schritt davor liefert {name}.",
   "workflow.answer.problem.test": "{name} kann so nicht verglichen werden.",
   "workflow.answer.problem.conflict": "Zwei Schritte davor liefern {name} mit verschiedenen Typen.",
+  "workflow.answer.problem.path":
+    "Nicht jeder Weg zu diesem Schritt liefert {name}. Mache es optional ({name}?) oder liefere es auf jedem Weg.",
+  "workflow.answer.problem.repeated":
+    "Zwei Schritte davor können {name} im selben Lauf liefern. Benenne einen davon um.",
   "workflow.check.title": "Prüfung",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Felder: {names}",
