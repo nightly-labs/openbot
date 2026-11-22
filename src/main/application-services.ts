@@ -189,6 +189,11 @@ import {
 import { BrowserViewClient } from "./browser-view-client";
 import { BrowsingMemoryPreferenceStore } from "./browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
+import {
+  type CacheExpiryCompactionControl,
+  cacheExpiryCompactionControl,
+  createCacheExpiryCompactionPreferenceStore,
+} from "./cache-expiry-compaction-preference-store";
 import { type CentralAuthManager, isHostNotOnAccount } from "./central-auth-manager";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
 import {
@@ -507,6 +512,7 @@ const HOST_TURN_LIMITS_PREFERENCE_FILE = "openbot-host-turn-limits-v1.json";
 const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
+const CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE = "openbot-cache-expiry-compaction-v1.json";
 const CRM_PREFERENCE_FILE = "openbot-crm-v1.json";
 const CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE = "openbot-claude-compact-window-v1.json";
 const PROVIDER_ENVIRONMENT_PREFERENCE_FILE = "openbot-provider-environment-v1.json";
@@ -698,6 +704,7 @@ export interface ApplicationServices {
   serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   claudeUserSetup: ClaudeUserSetupControl;
+  cacheExpiryCompaction: CacheExpiryCompactionControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
   providerEnvironment: ProviderEnvironmentControl;
   modelVisibility: ModelVisibility;
@@ -1418,6 +1425,9 @@ export async function createApplicationServices({
   const claudeUserSetup = createClaudeUserSetupPreferenceStore(
     join(app.getPath("userData"), CLAUDE_USER_SETUP_PREFERENCE_FILE),
   );
+  const cacheExpiryCompaction = createCacheExpiryCompactionPreferenceStore(
+    join(app.getPath("userData"), CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE),
+  );
   const crmPreference = createCrmPreferenceStore(join(app.getPath("userData"), CRM_PREFERENCE_FILE));
   const claudeCompactWindow = createClaudeCompactWindowPreferenceStore(
     join(app.getPath("userData"), CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE),
@@ -1462,6 +1472,7 @@ export async function createApplicationServices({
       serverPersonality.load(),
       promptCacheTtl.load(),
       claudeUserSetup.load(),
+      cacheExpiryCompaction.load(),
       crmPreference.load(),
       claudeCompactWindow.load(),
       providerEnvironment.load(),
@@ -1951,6 +1962,7 @@ export async function createApplicationServices({
     mailbox,
     browser,
     finishCheck: true,
+    cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
     visualPreview: new ChatVisualPreviewer(),
     avatarDecoder: (bytes) => !nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty(),
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
@@ -2147,6 +2159,7 @@ export async function createApplicationServices({
   });
   const agentMemoryLimitSetting = reloadingAgentMemoryLimit(agentMemoryLimit, service);
   promptCacheTtl.onChange(() => service.notifyProviderSettingsChanged());
+  const cacheExpiryCompactionSetting = cacheExpiryCompactionControl(cacheExpiryCompaction);
   const claudeUserSetupSetting = claudeUserSetupControl(claudeUserSetup, () => service.notifyProviderSettingsChanged());
   const claudeCompactWindowSetting = claudeCompactWindowControl(claudeCompactWindow, () =>
     service.notifyProviderSettingsChanged(),
@@ -2928,6 +2941,10 @@ export async function createApplicationServices({
         get: () => claudeUserSetupSetting.get().enabled,
         set: (enabled) => claudeUserSetupSetting.set(enabled),
       },
+      cacheExpiryCompaction: {
+        get: () => cacheExpiryCompaction.get().enabled,
+        set: (enabled) => cacheExpiryCompactionSetting.set(enabled),
+      },
       claudeCompactWindow: {
         get: () => claudeCompactWindowSetting.get().tokens,
         set: (tokens) => claudeCompactWindowSetting.set(tokens),
@@ -3153,6 +3170,7 @@ export async function createApplicationServices({
       browsingMemory,
       promptCacheTtl,
       claudeUserSetup: claudeUserSetupSetting,
+      cacheExpiryCompaction: cacheExpiryCompactionSetting,
       claudeCompactWindow: claudeCompactWindowSetting,
       providerEnvironment: providerEnvironmentSetting,
       providerDetection: { detection: providerDetection, settings: providerDetectionSettings },
@@ -4191,6 +4209,7 @@ export async function createApplicationServices({
     serverPersonality,
     promptCacheTtl,
     claudeUserSetup: claudeUserSetupSetting,
+    cacheExpiryCompaction: cacheExpiryCompactionSetting,
     claudeCompactWindow: claudeCompactWindowSetting,
     providerEnvironment: providerEnvironmentSetting,
     modelVisibility,

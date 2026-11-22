@@ -52,6 +52,7 @@ import type { BitwardenConnectorService } from "../bitwarden-connector-service";
 import type { BrowserProfileService } from "../browser-profile-service";
 import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { CacheExpiryCompactionControl } from "../cache-expiry-compaction-preference-store";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { CustomAgentChanges } from "../custom-agent-changes";
@@ -463,6 +464,7 @@ export interface TeamApiAdmin {
   browsingMemory?: BrowsingMemoryPreferenceStore;
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup?: ClaudeUserSetupControl;
+  cacheExpiryCompaction?: CacheExpiryCompactionControl;
   claudeCompactWindow?: ClaudeCompactWindowControl;
   providerEnvironment?: Pick<ProviderEnvironmentControl, "get" | "set">;
   providerDetection?: {

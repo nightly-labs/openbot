@@ -136,6 +136,7 @@ export const messages = {
   "error.team.browsingMemoryUnsupported": "이 연결은 브라우징 학습을 지원하지 않습니다.",
   "error.team.claudeUserSetupUnsupported": "이 연결은 Claude Code 설정 스위치를 지원하지 않아요.",
   "error.team.claudeCompactWindowUnsupported": "이 연결은 Claude 압축 크기를 지원하지 않아요.",
+  "error.team.cacheExpiryCompactionUnsupported": "이 연결은 캐시가 만료되기 전 압축을 지원하지 않아요.",
   "error.team.providerEnvironmentUnsupported": "이 연결은 공급자 변수를 지원하지 않아요.",
   "error.team.modelVisibilityUnsupported": "이 연결에서는 모델 목록을 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",

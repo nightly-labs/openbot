@@ -135,6 +135,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "مدة ذاكرة التخزين المؤقت للموجّه غير مدعومة في هذا الاتصال.",
   "error.team.claudeUserSetupUnsupported": "هذا الاتصال لا يدعم مفتاح إعداد Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "هذا الاتصال لا يدعم حجم ضغط Claude.",
+  "error.team.cacheExpiryCompactionUnsupported": "هذا الاتصال لا يدعم الضغط قبل انتهاء ذاكرة التخزين المؤقت.",
   "error.team.providerEnvironmentUnsupported": "لا يدعم هذا الاتصال متغيرات المزوّد.",
   "error.team.modelVisibilityUnsupported": "قائمة النماذج غير مدعومة في هذا الاتصال.",
   "error.team.providerDefaultUnsupported": "المزوّد الافتراضي غير مدعوم في هذا الاتصال.",

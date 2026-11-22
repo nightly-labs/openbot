@@ -1060,7 +1060,7 @@ export class TurnLifecycle {
     const turnId = getString(params, "turnId");
     const itemId = getString(params, "itemId");
     const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
-    if (!turnId || !itemId || delta === null) return;
+    if (!turnId || !itemId || delta === null || this.#compaction.isCompactionTurn(threadId, turnId)) return;
     this.#itemTurns.set(itemId, turnId);
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
@@ -1277,6 +1277,7 @@ export class TurnLifecycle {
           }
           return;
         }
+        if (this.#compaction.isCompactionTurn(threadId, turnId)) return;
         if (notification.method === "item/completed" && itemId) {
           this.#deltas.flush(`${threadId}:${turnId}:${itemId}`);
           const loads = skillLoads(item, getArray(params, "filePaths"));
@@ -1361,6 +1362,7 @@ export class TurnLifecycle {
           this.#compaction.finish(agentId, threadId, status);
           return;
         }
+        this.#compaction.threadIdle(agentId, threadId, source);
         yield* this.#completeTurn(agentId, threadId, turnId, status).pipe(
           Effect.catchCause((cause) =>
             reportOriginalFailure(cause, (failure) =>
@@ -1411,6 +1413,7 @@ export class TurnLifecycle {
         if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
         if (status !== "running" && status !== "completed" && status !== "failed") return;
+        if (source.compactsOnDemand === true && this.#compaction.requested(threadId)) return;
         this.#compaction.observeCompaction(threadId, status, "none");
         return;
       }

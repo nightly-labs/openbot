@@ -131,6 +131,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "当前连接不支持提示缓存时间。",
   "error.team.claudeUserSetupUnsupported": "当前连接不支持 Claude Code 配置开关。",
   "error.team.claudeCompactWindowUnsupported": "此连接不支持 Claude 压缩大小。",
+  "error.team.cacheExpiryCompactionUnsupported": "此连接不支持在缓存过期前压缩。",
   "error.team.providerEnvironmentUnsupported": "此连接不支持提供方变量。",
   "error.team.modelVisibilityUnsupported": "当前连接不支持模型列表。",
   "error.team.providerDefaultUnsupported": "当前连接不支持默认服务商。",

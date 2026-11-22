@@ -431,8 +431,13 @@ export function ServerProviderScreen() {
           </SettingsRow>
         </SettingsSection>
       ) : null}
-      {provider === "claude" && !off && admin.promptCache ? (
+      {(provider === "claude" || (provider === "pi" && admin.promptCache?.appliesToPi)) && !off && admin.promptCache ? (
         <PromptCacheSection serverId={serverId} setting={admin.promptCache} />
+      ) : null}
+      {(provider === "claude" || (provider === "pi" && admin.promptCache?.appliesToPi)) &&
+      !off &&
+      admin.cacheExpiryCompaction ? (
+        <CacheExpiryCompactionSection serverId={serverId} setting={admin.cacheExpiryCompaction} />
       ) : null}
       {provider === "claude" && !off && admin.compactWindow ? (
         <CompactWindowSection serverId={serverId} setting={admin.compactWindow} />
@@ -593,6 +598,42 @@ function PromptCacheSection({
         }
       >
         <Typography.Paragraph>{label}</Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+function CacheExpiryCompactionSection({
+  serverId,
+  setting,
+}: {
+  serverId: string;
+  setting: NonNullable<ProviderAdmin["cacheExpiryCompaction"]>;
+}) {
+  const { t, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const queryScope = useQueryScope();
+  const { current, saving, error, save } = useProviderSetting(
+    queryKeys.providerCacheExpiryCompaction(queryScope, serverId),
+    setting,
+  );
+  return (
+    <SettingsSection
+      footer={
+        error ??
+        (current.isError
+          ? errorMessage(current.error, t("mobile.server.providers.cacheExpiryCompactionLoadFailed"))
+          : t("mobile.server.providers.cacheExpiryCompactionHint"))
+      }
+    >
+      <SettingsRow leading={<RowIcon icon={Minimize2} />}>
+        <SettingsSwitch
+          value={current.data?.enabled === true}
+          disabled={saving || !current.isSuccess}
+          label={t("mobile.server.providers.cacheExpiryCompaction")}
+          dark={theme === "dark"}
+          onValueChange={(enabled) => save(enabled)}
+        />
       </SettingsRow>
     </SettingsSection>
   );

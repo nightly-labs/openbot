@@ -63,6 +63,7 @@ import {
   type BrowsingMemoryPreference,
   type BusyMessageModePreference,
   browserProxyAddressText,
+  type CacheExpiryCompactionSetting,
   type CentralAuthState,
   type ClaudeCompactWindowSetting,
   type ClaudeUserSetupSetting,
@@ -88,6 +89,7 @@ import {
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_BROWSING_MEMORY_PREFERENCE,
   DEFAULT_BUSY_MESSAGE_MODE,
+  DEFAULT_CACHE_EXPIRY_COMPACTION,
   DEFAULT_CLAUDE_COMPACT_WINDOW,
   DEFAULT_CLAUDE_USER_SETUP,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
@@ -499,6 +501,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
   let claudeUserSetup: ClaudeUserSetupSetting = { ...DEFAULT_CLAUDE_USER_SETUP };
+  let cacheExpiryCompaction: CacheExpiryCompactionSetting = { ...DEFAULT_CACHE_EXPIRY_COMPACTION };
   let claudeCompactWindow: ClaudeCompactWindowSetting = { ...DEFAULT_CLAUDE_COMPACT_WINDOW };
   const providerVariables = new Map<
     ProviderEnvironmentProvider,
@@ -3643,6 +3646,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isPromptCacheTtl(ttl)) throw new Error("Prompt cache time is required.");
         promptCacheTtl = { ttl };
         return clone(promptCacheTtl);
+      },
+      getCacheExpiryCompaction: async () => clone(cacheExpiryCompaction),
+      setCacheExpiryCompaction: async (enabled) => {
+        if (typeof enabled !== "boolean") throw new Error("Invalid cache expiry compaction setting.");
+        cacheExpiryCompaction = { enabled };
+        return clone(cacheExpiryCompaction);
       },
       getClaudeUserSetup: async () => clone(claudeUserSetup),
       setClaudeUserSetup: async (enabled) => {

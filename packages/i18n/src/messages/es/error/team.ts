@@ -143,6 +143,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
   "error.team.claudeUserSetupUnsupported": "Esta conexión no admite el interruptor de configuración de Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexión no admite el tamaño de compactación de Claude.",
+  "error.team.cacheExpiryCompactionUnsupported": "Esta conexión no admite compactar antes de que caduque la caché.",
   "error.team.providerEnvironmentUnsupported": "Esta conexión no admite variables de proveedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",

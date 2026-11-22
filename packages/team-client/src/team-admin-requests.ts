@@ -36,6 +36,7 @@ import {
   type BrowserProfileSummary,
   type BrowserProxyList,
   type BrowserProxySummary,
+  type CacheExpiryCompactionSetting,
   type CancelMcpSignInInput,
   type ChatColors,
   type ClaudeCompactWindowSetting,
@@ -305,6 +306,10 @@ import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bit
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import {
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+  decodeCacheExpiryCompactionResponse,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   CLAUDE_COMPACT_WINDOW_ROUTES,
@@ -991,6 +996,23 @@ export function setHostPromptCacheTtl(
   ttl: PromptCacheTtl,
 ): Effect.Effect<PromptCacheTtlSetting, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROMPT_CACHE_TTL_ROUTES.update, decodePromptCacheTtlSetting, { ttl }));
+}
+
+export function getHostCacheExpiryCompaction(
+  request: TeamApiRequest,
+): Effect.Effect<CacheExpiryCompactionSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, decodeCacheExpiryCompactionResponse, {}),
+  );
+}
+
+export function setHostCacheExpiryCompaction(
+  request: TeamApiRequest,
+  enabled: boolean,
+): Effect.Effect<CacheExpiryCompactionSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, decodeCacheExpiryCompactionResponse, { enabled }),
+  );
 }
 
 export function getHostClaudeCompactWindow(

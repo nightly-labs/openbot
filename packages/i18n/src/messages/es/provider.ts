@@ -282,10 +282,14 @@ export const messages = {
   "provider.settings.cache": "Caché",
   "provider.settings.promptCache": "Caché de prompts",
   "provider.settings.promptCacheDescription":
-    "Cuánto tiempo guarda Claude el contexto de un agente en la caché entre turnos.",
+    "Cuánto tiempo Claude y Pi guardan el contexto de un agente en la caché entre turnos.",
   "provider.settings.promptCacheHour": "1 hora",
-  "provider.settings.promptCacheDefault": "Predeterminado de Claude Code",
+  "provider.settings.promptCacheDefault": "Predeterminado del proveedor",
   "provider.settings.promptCacheLoadFailed": "No se pudo cargar la duración de la caché de prompts de este servidor.",
+  "provider.settings.cacheExpiryCompaction": "Compactar antes de que caduque la caché",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Cuando un chat con 200K o más tokens de contexto está inactivo con una caché de 1 hora, el agente compacta el contexto antes de que caduque la caché. Así el siguiente mensaje no vuelve a leer todo el contexto sin caché.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "No se pudo cargar el ajuste de compactación de este servidor.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Usar mi configuración de Claude Code",
   "provider.settings.claudeUserSetupDescription":

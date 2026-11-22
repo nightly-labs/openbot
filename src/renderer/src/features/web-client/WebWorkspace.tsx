@@ -113,6 +113,7 @@ import {
   getHostAgentMemoryLimit,
   getHostAuditLog,
   getHostBrowsingMemory,
+  getHostCacheExpiryCompaction,
   getHostClaudeCompactWindow,
   getHostMemoryReview,
   getHostModelVisibility,
@@ -130,6 +131,7 @@ import {
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostBrowsingMemory,
+  setHostCacheExpiryCompaction,
   setHostClaudeCompactWindow,
   setHostMemoryReview,
   setHostModelVisibility,
@@ -1648,6 +1650,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostPromptCacheTtl(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setPromptCacheTtl: async (ttl, serverId) =>
       runTeamEffect(setHostPromptCacheTtl(hostRequest(serverId), ttl).pipe(Effect.mapError((error) => error.cause))),
+    getCacheExpiryCompaction: async (serverId) =>
+      runTeamEffect(getHostCacheExpiryCompaction(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setCacheExpiryCompaction: async (enabled, serverId) =>
+      runTeamEffect(
+        setHostCacheExpiryCompaction(hostRequest(serverId), enabled).pipe(Effect.mapError((error) => error.cause)),
+      ),
   };
   const hostClaudeUserSetupCalls: HostClaudeUserSetupCalls = {
     getClaudeUserSetup: (serverId) =>

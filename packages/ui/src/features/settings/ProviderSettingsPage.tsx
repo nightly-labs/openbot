@@ -118,9 +118,18 @@ export type ProviderDefaultChoice = AgentProviderId | "custom";
 
 export interface ProviderPromptCache {
   value: PromptCacheTtl | null;
+  appliesToPi: boolean;
   pending: boolean;
   error: string | null;
   onChange: (ttl: PromptCacheTtl) => void;
+  compaction?: ProviderCacheExpiryCompaction | undefined;
+}
+
+export interface ProviderCacheExpiryCompaction {
+  value: boolean | null;
+  pending: boolean;
+  error: string | null;
+  onChange: (enabled: boolean) => void;
 }
 
 export interface ProviderClaudeCompactWindow {
@@ -604,7 +613,12 @@ function ProviderPage(props: PageProps) {
           <ApiKeySection {...props} row={row} />
         </Show>
         <RuntimeSection {...props} row={row} />
-        <Show when={props.option.id === "claude" && props.promptCache}>
+        <Show
+          when={
+            (props.option.id === "claude" || (props.option.id === "pi" && props.promptCache?.appliesToPi)) &&
+            props.promptCache
+          }
+        >
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
         </Show>
         <Show when={props.option.id === "claude" && props.claudeCompactWindow}>
@@ -1816,8 +1830,45 @@ function PromptCacheSection(props: {
             )}
           </Show>
         </Item>
+        <Show when={props.cache.compaction}>
+          {(compaction) => <CacheExpiryCompactionRow compaction={compaction()} disabled={props.disabled} />}
+        </Show>
       </ItemGroup>
     </SettingsSection>
+  );
+}
+
+function CacheExpiryCompactionRow(props: { compaction: ProviderCacheExpiryCompaction; disabled: boolean | undefined }) {
+  const { t } = useText();
+  return (
+    <Item class="settings-modal-row">
+      <ItemContent>
+        <ItemTitle id="provider-settings-cache-expiry-compaction-label">
+          {t("provider.settings.cacheExpiryCompaction")}
+        </ItemTitle>
+        <Show
+          when={props.compaction.error}
+          fallback={<ItemDescription>{t("provider.settings.cacheExpiryCompactionDescription")}</ItemDescription>}
+        >
+          {(message) => (
+            <ItemDescription class="provider-settings-error" role="alert">
+              {message()}
+            </ItemDescription>
+          )}
+        </Show>
+      </ItemContent>
+      <Show when={props.compaction.value !== null}>
+        <ItemActions>
+          <Switch
+            checked={props.compaction.value === true}
+            disabled={Boolean(props.disabled || props.compaction.pending)}
+            aria-busy={props.compaction.pending ? "true" : "false"}
+            aria-labelledby="provider-settings-cache-expiry-compaction-label"
+            onChange={(enabled: boolean) => props.compaction.onChange(enabled)}
+          />
+        </ItemActions>
+      </Show>
+    </Item>
   );
 }
 

@@ -37,6 +37,7 @@ export * from "./ipc-browser-dock";
 export * from "./ipc-browser-profiles";
 export * from "./ipc-browser-proxies";
 export * from "./ipc-browser-secret";
+export * from "./ipc-cache-expiry-compaction";
 export * from "./ipc-channel-memories";
 export * from "./ipc-channel-routines";
 export * from "./ipc-chat-channels";

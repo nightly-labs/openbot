@@ -407,6 +407,8 @@ export interface AgentServiceOptions {
   browser: AgentBrowserHost;
   requestTimeoutMs?: number;
   contextCompactionTimeoutMs?: number;
+  cacheExpiryCompactionDelayMs?: number;
+  cacheExpiryCompaction?: () => boolean;
   memoryReviewIdleMs?: number;
   finishCheck?: boolean;
   preferredProvider?: AgentProvider;
@@ -1139,6 +1141,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#compaction = new ContextCompaction({
       timeoutMs: options.contextCompactionTimeoutMs,
+      cacheExpiryDelayMs: options.cacheExpiryCompactionDelayMs,
+      cacheExpiryEnabled: options.cacheExpiryCompaction,
       changed: () => this.#emitRuntimeSnapshot(),
       store,
       providers: this.#providers,
@@ -1152,6 +1156,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.channels.contextCompacted(threadId);
         this.messaging.contextCompacted(threadId);
       },
+      compactBeforeCacheExpiry: (agentId, threadId) =>
+        Effect.runFork(this.#compactBeforeCacheExpiry(agentId, threadId).pipe(Effect.forkIn(this.#scope))),
     });
     this.#attention = new AttentionRegistry({
       conversation: this.#conversation,
@@ -4608,6 +4614,56 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     yield* this.#compaction.request(input.agentId, externalThreadId);
   }, Effect.uninterruptible).bind(this);
+
+  readonly #compactBeforeCacheExpiry = Effect.fn("AgentService.compactBeforeCacheExpiry")(function* (
+    this: AgentService,
+    agentId: string,
+    externalThreadId: string,
+  ) {
+    const reserved = yield* lifecycleStep("compact before cache expiry", () =>
+      this.#reserveCacheExpiryCompaction(agentId, externalThreadId),
+    ).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("The compaction before the prompt cache expires did not start.", { error: failure.cause });
+          return false;
+        }),
+      ),
+    );
+    if (reserved) yield* this.#compaction.request(agentId, externalThreadId);
+  }, Effect.uninterruptible).bind(this);
+
+  #reserveCacheExpiryCompaction(agentId: string, externalThreadId: string): boolean {
+    const agent = this.#store.get(agentId);
+    const client = agent ? this.#providers.clientForAgent(agent) : null;
+    if (
+      !agent ||
+      !client ||
+      client.contextCompaction === "handoff" ||
+      !this.#providers.agentClientRunning(agent) ||
+      this.#conversation.openClientFor(externalThreadId) !== client
+    )
+      return false;
+    const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    if (this.#store.database.activeProviderSession(threadId, agent.provider)?.externalSessionId !== externalThreadId)
+      return false;
+    const taskId = this.#tasks.taskForThread(threadId);
+    const main = threadId === agent.threadId;
+    const task = taskId !== null && !this.#tasks.isRoutineThreadId(threadId);
+    const channel = this.channels.store.channelForThread(threadId) !== null;
+    if (!main && !task && !channel) return false;
+    if (
+      this.#mailbox.hasUnfinishedDelivery(agentId) ||
+      this.#compaction.heldThreads(agentId).length > 0 ||
+      this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
+      this.#conversation.workingSnapshot(agentId)?.activeTurnId ||
+      this.#store.database.readActiveTurnId(agentId, threadId) ||
+      (main && this.#threads.mainContextBusy(agent)) ||
+      (task && taskId !== null && this.#mailbox.taskBusy(agentId, taskId))
+    )
+      return false;
+    return this.#compaction.reserve(agentId, externalThreadId, true, null, "cacheExpiry");
+  }
 
   readonly clearChannelContext = Effect.fn("AgentService.clearChannelContext")(function* (
     this: AgentService,

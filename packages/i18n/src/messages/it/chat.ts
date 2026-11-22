@@ -492,6 +492,8 @@ export const messages = {
   "chat.compaction.running": "Compattazione del contesto",
   "chat.compaction.completed": "Contesto compattato",
   "chat.compaction.failed": "Impossibile compattare il contesto",
+  "chat.compaction.cacheExpiryRunning": "Compattazione del contesto prima della scadenza della cache dei prompt",
+  "chat.compaction.cacheExpiryCompleted": "Contesto compattato prima della scadenza della cache dei prompt",
   "chat.compaction.tokens": "{before} → {after} token",
   "chat.compaction.continues": "I messaggi in coda proseguono.",
   "chat.reference.kind.tab": "Scheda del browser",

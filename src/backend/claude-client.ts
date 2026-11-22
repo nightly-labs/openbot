@@ -128,6 +128,7 @@ import {
   CLAUDE_API_KEY_ACCOUNT_TYPE,
   CLAUDE_CLI_API_KEY_ACCOUNT_TYPE,
   getArray,
+  getRecord,
   getString,
   isRecord,
   type RequestId,
@@ -412,6 +413,10 @@ const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
 
 const CLAUDE_STOP_CONFIRM_MS = 10_000;
 
+const CLAUDE_COMPACT_COMMAND = "/compact";
+
+const CLAUDE_CACHE_TTL_MS = { short: 5 * 60_000, long: 60 * 60_000 } as const;
+
 const CLAUDE_TURN_STALL_MS = 15 * 60_000;
 
 const CLAUDE_TOOL_STALL_MS = 60 * 60_000;
@@ -553,6 +558,8 @@ const CLAUDE_LISTED_MODELS = new Set<string>();
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
+  readonly compactsOnDemand = true;
+  readonly #cacheTtls = new Map<string, number>();
   readonly turnContext = true;
   readonly userInputNote = true;
   readonly imageInput = (): boolean => true;
@@ -936,12 +943,21 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         );
         return yield* providerSync(() => decoder({}));
       }
-      case "thread/compact/start":
+      case "thread/compact/start": {
+        const threadId = yield* providerSync(() => requiredString(params, "threadId"));
+        yield* this.#threads
+          .startTurn(threadId, () => this.#openCompaction(threadId))
+          .pipe(toProviderClientOperationError);
         return yield* providerSync(() => decoder({}));
+      }
       default:
         return yield* providerFailure(new Error(`Claude adapter does not implement ${method}.`));
     }
   });
+
+  promptCacheTtlMs(externalThreadId: string): number | null {
+    return this.#cacheTtls.get(externalThreadId) ?? null;
+  }
 
   notify(): void {}
 
@@ -1566,6 +1582,28 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return { turn: { id: turnId, status: "inProgress" } };
   });
 
+  readonly #openCompaction = Effect.fn("ClaudeAgentClient.openCompaction")(function* (
+    this: ClaudeAgentClient,
+    threadId: string,
+  ): Effect.fn.Return<TurnResponse, ProviderClientOperationError> {
+    yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
+    const runtime = yield* providerSync(() => this.#requireThread(threadId));
+    if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
+    runtime.contextRequest += 1;
+    const turnId = randomUUID();
+    const turn = this.#beginTurn(runtime, turnId, false);
+    takePrompt(runtime, turnId);
+    turn.messageIds.add(turnId);
+    runtime.input.push({
+      type: "user",
+      message: { role: "user", content: CLAUDE_COMPACT_COMMAND },
+      parent_tool_use_id: null,
+      uuid: turnId,
+      session_id: threadId,
+    });
+    return { turn: { id: turnId, status: "inProgress" } };
+  });
+
   #turnActiveError(turn: ActiveTurn): Error {
     return turn.unprompted
       ? new ProviderTurnActiveError("Claude")
@@ -1792,6 +1830,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const model = getString(message.message, "model");
       if (runtime.resumedUsage && id && model && isRecord(message.message))
         runtime.requestUsage.set(id, { model, usage: message.message.usage });
+      const cacheTtl = message.parent_tool_use_id ? null : claudeCacheWriteTtlMs(message.message);
+      if (cacheTtl !== null) this.#cacheTtls.set(runtime.id, cacheTtl);
     }
     if (message.type === "system" && message.subtype === "init") yield* this.#reportFailedMcpServers(runtime, message);
     if (message.type === "system" && message.subtype === "status") {
@@ -3268,6 +3308,17 @@ function normalizeClaudeEffort(effort: string): ClaudeEffort {
 function promptUuid(runtime: ThreadRuntime, requested: string | null | undefined): UUID {
   const run = requested && isUuid(requested) ? untakenRunId(requested, runtime.promptIds) : null;
   return run && isUuid(run) ? run : randomUUID();
+}
+
+function claudeCacheWriteTtlMs(message: unknown): number | null {
+  const written = getRecord(getRecord(message, "usage"), "cache_creation");
+  const tokens = (key: string) => {
+    const value = written?.[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  };
+  if (tokens("ephemeral_5m_input_tokens") > 0) return CLAUDE_CACHE_TTL_MS.short;
+  if (tokens("ephemeral_1h_input_tokens") > 0) return CLAUDE_CACHE_TTL_MS.long;
+  return null;
 }
 
 function takePrompt(runtime: ThreadRuntime, uuid: string): void {

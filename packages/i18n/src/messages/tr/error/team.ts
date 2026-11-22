@@ -138,6 +138,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Bu bağlantı istem önbelleği süresini desteklemiyor.",
   "error.team.claudeUserSetupUnsupported": "Bu bağlantı Claude Code kurulumu anahtarını desteklemiyor.",
   "error.team.claudeCompactWindowUnsupported": "Bu bağlantı Claude sıkıştırma boyutunu desteklemiyor.",
+  "error.team.cacheExpiryCompactionUnsupported": "Bu bağlantı önbelleğin süresi dolmadan sıkıştırmayı desteklemiyor.",
   "error.team.providerEnvironmentUnsupported": "Bu bağlantı sağlayıcı değişkenlerini desteklemiyor.",
   "error.team.modelVisibilityUnsupported": "Bu bağlantı model listesini desteklemiyor.",
   "error.team.providerDefaultUnsupported": "Bu bağlantı varsayılan sağlayıcıyı desteklemiyor.",

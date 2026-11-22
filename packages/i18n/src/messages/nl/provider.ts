@@ -317,10 +317,15 @@ export const messages = {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Promptcache",
   "provider.settings.promptCacheDescription":
-    "Hoelang Claude de context van een agent tussen beurten in de cache bewaart.",
+    "Hoe lang Claude en Pi de context van een agent tussen beurten in de cache houden.",
   "provider.settings.promptCacheHour": "1 uur",
-  "provider.settings.promptCacheDefault": "Standaard van Claude Code",
+  "provider.settings.promptCacheDefault": "Standaard van de provider",
   "provider.settings.promptCacheLoadFailed": "Kan de promptcachetijd van deze server niet laden.",
+  "provider.settings.cacheExpiryCompaction": "Comprimeren voordat de cache verloopt",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Als een chat met 200K of meer tokens context inactief is met een cache van 1 uur, comprimeert de agent de context voordat de cache verloopt. Dan leest het volgende bericht niet de hele context opnieuw zonder cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "De compressie-instelling van deze server kon niet worden geladen.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Mijn Claude Code-configuratie gebruiken",
   "provider.settings.claudeUserSetupDescription":

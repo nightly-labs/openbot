@@ -142,6 +142,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported":
     "Deze verbinding ondersteunt de schakelaar voor de Claude Code-instellingen niet.",
   "error.team.claudeCompactWindowUnsupported": "Deze verbinding ondersteunt de compressiegrootte van Claude niet.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Deze verbinding ondersteunt comprimeren voordat de cache verloopt niet.",
   "error.team.providerEnvironmentUnsupported": "Deze verbinding ondersteunt geen providervariabelen.",
   "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",

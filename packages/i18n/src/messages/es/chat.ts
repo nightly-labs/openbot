@@ -498,6 +498,8 @@ export const messages = {
   "chat.compaction.running": "Compactando el contexto",
   "chat.compaction.completed": "Contexto compactado",
   "chat.compaction.failed": "No se pudo compactar el contexto",
+  "chat.compaction.cacheExpiryRunning": "Compactando el contexto antes de que caduque la caché de prompts",
+  "chat.compaction.cacheExpiryCompleted": "Contexto compactado antes de que caducara la caché de prompts",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Los mensajes en cola continúan.",
   "chat.reference.kind.tab": "Pestaña del navegador",
