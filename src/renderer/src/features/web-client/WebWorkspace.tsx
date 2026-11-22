@@ -2039,7 +2039,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
         errorBanners.clearAtTurnEnd(
           key,
-          event.status === "completed" && isMainThread(event.agentId, event.threadId),
+          event.status === "completed" && !event.quiet && isMainThread(event.agentId, event.threadId),
           controller.setConversationErrors,
           controller.setConversationErrorRuns,
         );

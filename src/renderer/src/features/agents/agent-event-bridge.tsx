@@ -334,7 +334,7 @@ export function AgentEventBridge() {
         const bannerKey = composerDraftKey({ agentId: event.agentId, serverId: activeServerId() });
         errorBanners.clearAtTurnEnd(
           bannerKey,
-          event.status === "completed" && isMainThread(event.agentId, event.threadId),
+          event.status === "completed" && !event.quiet && isMainThread(event.agentId, event.threadId),
           setConversationErrors,
           setConversationErrorRuns,
         );
