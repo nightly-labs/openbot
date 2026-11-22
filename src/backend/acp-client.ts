@@ -4183,13 +4183,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           ? "file-change"
           : "permissions";
     if (
-      kind === "permissions" &&
       thread &&
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      ((this.options.confine && callsBridgeTool(thread, params.toolCall.title)) ||
-        (turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
+      ((this.options.confine && callsBridgeTool(thread, params.toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
+        (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
       if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
@@ -4489,9 +4488,25 @@ function bestPermissionOption(options: PermissionOption[], accepted: boolean): P
   return kinds.flatMap((kind) => options.filter((option) => option.kind === kind))[0] ?? null;
 }
 
-function callsBridgeTool(thread: AcpThread, title: string | null | undefined): boolean {
+function callsBridgeTool(
+  thread: AcpThread,
+  toolCall: RequestPermissionRequest["toolCall"],
+  kind: "command" | "file-change" | "permissions",
+  inputNamesServer: true | undefined,
+): boolean {
+  const input = isRecord(toolCall.rawInput) ? toolCall.rawInput : null;
+  if (kind === "file-change" || (input && Object.hasOwn(input, "CommandLine"))) return false;
+  if (inputNamesServer && input && Object.hasOwn(input, "ServerName"))
+    return thread.dynamicTools.some(
+      (namespace) =>
+        namespace.name === input.ServerName && namespace.tools.some((tool) => tool.name === input.ToolName),
+    );
+  if (kind !== "permissions") return false;
+  const title = toolCall.title?.trim().replace(/\?$/u, "");
   return thread.dynamicTools.some((namespace) =>
-    namespace.tools.some((tool) => title === `${namespace.name}__${tool.name}`),
+    namespace.tools.some(
+      (tool) => title === `${namespace.name}__${tool.name}` || title === `Run mcp_${namespace.name}_${tool.name}`,
+    ),
   );
 }
 
