@@ -231,6 +231,8 @@ export interface WfnBoard {
   resetSize?: ((id: string) => void) | undefined;
   results: (id: string) => readonly WfnResult[];
   pending: (id: string) => readonly WfnPending[];
+  creditsShort: (id: string) => boolean;
+  markCreditsShort: (id: string, short: boolean) => void;
   shown: (id: string) => WfnResult | undefined;
   newest: (id: string) => WfnResult | undefined;
   pick: (id: string, result: string) => void;
@@ -441,6 +443,16 @@ export const showsStrip = (board: WfnBoard, id: string) => board.results(id).len
 export function createBoard(options: BoardOptions) {
   const { t } = useText();
   const nameOf = (element: Element | null | undefined) => nodeName(element, t("workflow.board.stepFallback"));
+  const [creditsShort, setCreditsShort] = createSignal<ReadonlySet<string>>(new Set());
+  const markCreditsShort = (id: string, short: boolean) => {
+    setCreditsShort((current) => {
+      if (current.has(id) === short) return current;
+      const next = new Set(current);
+      if (short) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
   const [state, setState] = createStore<BoardState>({
     selection: untrack(() => (options.selected ? [options.selected] : [])),
     removed: [],
@@ -910,6 +922,8 @@ export function createBoard(options: BoardOptions) {
     resetSize: options.resetSize,
     results: (id) => resultsOf(id),
     pending: (id) => options.pendingOf?.(id) ?? NO_PENDING,
+    creditsShort: (id) => creditsShort().has(id),
+    markCreditsShort,
     shown: (id) => {
       const latest = latestOf(id);
       const picked = state.picked[id];

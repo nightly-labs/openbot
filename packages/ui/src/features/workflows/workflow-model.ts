@@ -102,6 +102,7 @@ export interface WorkflowCatalogs {
   channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
   mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
+  creditBalance?: number | null | undefined;
   mediaSize?: boolean | undefined;
   agentFiles?: boolean | undefined;
   answers?: boolean | undefined;

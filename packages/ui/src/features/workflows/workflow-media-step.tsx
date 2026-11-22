@@ -310,13 +310,30 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     const credits = price();
     return credits === null ? null : credits * batch();
   };
+  const balance = () => (model()?.provider === "openbot" ? board.catalogs().creditBalance : undefined);
+  const exceeds = (credits: number | null) => {
+    const available = balance();
+    return typeof available === "number" && credits !== null && credits > available;
+  };
+  const short = () => exceeds(total());
+  const retryShort = () => exceeds(price());
+  createEffect(short, (value) => {
+    board.markCreditsShort(id, value);
+    return () => board.markCreditsShort(id, false);
+  });
+  const priced = (label: string, isShort: boolean) =>
+    isShort ? [t("billing.credits.notEnough"), label].join(", ") : label;
   const runLabel = () => {
     const credits = total();
-    return credits === null ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
+    return credits === null
+      ? undefined
+      : priced(t("workflow.node.runPriceLabel", { credits: format.number(credits) }), short());
   };
   const retryLabel = () => {
     const credits = price();
-    return credits === null ? undefined : t("workflow.node.retryPriceLabel", { credits: format.number(credits) });
+    return credits === null
+      ? undefined
+      : priced(t("workflow.node.retryPriceLabel", { credits: format.number(credits) }), retryShort());
   };
   const chooseFrame = (frame: Frame) => {
     if (frame !== WORKFLOW_MEDIA_CUSTOM_ASPECT) {
@@ -383,6 +400,8 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     total,
     batch,
     setBatch,
+    short,
+    retryShort,
     runLabel,
     retryLabel,
     chooseFrame,

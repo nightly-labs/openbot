@@ -94,7 +94,7 @@ function FailedTake(props: { id: string; result: WfnResult; step: MediaStep }) {
             size="sm"
             class="wfn-media-retry"
             aria-label={props.step.retryLabel()}
-            disabled={props.step.locked()}
+            disabled={props.step.locked() || props.step.retryShort()}
             onClick={() => retry()(props.id, props.result.id)}
           >
             <RotateCcw aria-hidden="true" />
@@ -358,7 +358,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                     size="xs"
                     class="wfn-run-pill"
                     loading={step.busy()}
-                    disabled={!step.runnable() || step.locked() || !model()}
+                    disabled={!step.runnable() || step.locked() || step.short() || !model()}
                     aria-label={step.runLabel()}
                   >
                     <RunContent credits={step.total()} takes={step.batch()} />

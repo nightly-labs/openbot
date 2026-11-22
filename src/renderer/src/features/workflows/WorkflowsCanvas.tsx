@@ -48,7 +48,20 @@ export function WorkflowsCanvas(props: {
   const [openbot, setOpenbot] = createSignal(false);
   const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
   const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
+  const [creditBalance, setCreditBalance] = createSignal<number | null>(null);
   let disposed = false;
+  let balanceRequest = 0;
+  const readCreditBalance = () => {
+    if (!props.host.mediaSupported()) return;
+    balanceRequest += 1;
+    const sent = balanceRequest;
+    void props.host.workflows
+      .mediaCredits()
+      .then((answer) => {
+        if (!disposed && sent === balanceRequest) setCreditBalance(answer.openbot?.available ?? null);
+      })
+      .catch(() => undefined);
+  };
   const readMediaProviders = () => {
     if (!props.host.mediaSupported()) return;
     void props.host.workflows
@@ -59,6 +72,7 @@ export function WorkflowsCanvas(props: {
         setHiggsfield(providers.higgsfield);
         setOpenbot(providers.openbot === true);
         setServiceAccounts(providers.accounts);
+        if (providers.openbot === true) readCreditBalance();
       })
       .catch(() => undefined);
     void props.host.workflows
@@ -113,7 +127,9 @@ export function WorkflowsCanvas(props: {
         const model = workflow.graph.nodes.find((node) => node.id === step.nodeId)?.fields.model;
         if (typeof model === "string" && workflowCatalogSource(model)) ended = true;
       }
-      if (ended) noteMediaStepEnded();
+      if (!ended) return;
+      noteMediaStepEnded();
+      if (openbot()) readCreditBalance();
     },
   );
   window.addEventListener("focus", readMediaProviders);
@@ -184,6 +200,9 @@ export function WorkflowsCanvas(props: {
     },
     get mediaPrice() {
       return props.host.mediaSupported() ? props.host.workflows.mediaPrice : undefined;
+    },
+    get creditBalance() {
+      return openbot() ? creditBalance() : null;
     },
     get mediaSize() {
       return props.host.mediaSizeSupported();

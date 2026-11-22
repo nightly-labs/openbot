@@ -28,5 +28,6 @@
   generation, it still gets the file and does not pay a second time.
   A batch makes up to 4 results with an OpenBot model at the same time. Each result is a separate
   charge, and a failed result uses no credits.
+  When your credits do not pay for the full batch, you cannot start the step.
   This works on this computer, on a joined server and in the web client.
   A joined server must also be on the new version to show these models.
