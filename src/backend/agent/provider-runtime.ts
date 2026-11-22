@@ -550,8 +550,14 @@ export class ProviderRuntime implements ProviderPort {
             this.#refreshUsage(client, model, false).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
-          readModels: (client) =>
-            this.#modelCatalog.read(client, requireProviderDriver(client.provider).catalog).pipe(
+          readModels: (client) => {
+            const catalog = requireProviderDriver(client.provider).catalog;
+            return this.#modelCatalog.read(client, catalog).pipe(
+              Effect.catch((failure) =>
+                isProviderTimeout(failure.cause) && !catalog?.slowList
+                  ? this.#modelCatalog.read(client, catalog, this.#requestTimeoutMs)
+                  : Effect.fail(failure),
+              ),
               Effect.map(({ models }) => models),
               Effect.catch((failure) =>
                 Effect.sync(() => {
@@ -562,7 +568,8 @@ export class ProviderRuntime implements ProviderPort {
                   return null;
                 }),
               ),
-            ),
+            );
+          },
           resetCredits: (client) => this.#resetCredits.get(client),
           consumeUsageReset: (client) =>
             this.#consumeUsageReset(client).pipe(
