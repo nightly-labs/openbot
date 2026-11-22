@@ -221,7 +221,7 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     const before = storedTabs(agentId);
     const wasActive = activeId(agentId) === id;
     const index = tabOrder(agentId).indexOf(id);
-    const sideIndex = before.side.indexOf(id);
+    const sideIndex = keptSideIds(agentId).indexOf(id);
     const restore = entry.state !== "closed";
     close(agentId, id);
     setHiddenThread(id, true);
