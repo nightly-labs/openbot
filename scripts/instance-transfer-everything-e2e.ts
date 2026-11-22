@@ -722,7 +722,70 @@ try {
   const manifest: {
     agents: { name: string; preferences?: { hidden?: boolean; hiddenWorks?: boolean } }[];
     serverPreferences?: { timezone?: unknown; promptCacheTtl?: unknown; ownerNotificationLevel?: unknown };
+    settings?: { workflows?: { title: string; format?: unknown; graph: unknown }[] };
   } = JSON.parse(new TextDecoder().decode(manifestBytes));
+  const fileWorkflows = manifest.settings?.workflows ?? [];
+  const paperInFile = fileWorkflows.find((workflow) => workflow.title === "Paper pipeline");
+  pass("the file gives the graph format of each workflow", paperInFile?.format === 1, JSON.stringify(paperInFile));
+  fileWorkflows.push(
+    {
+      title: "Newer steps",
+      format: 99,
+      graph: {
+        nodes: [
+          { id: "start", kind: "trigger", at, fields: { trigger: "manual" } },
+          { id: "future", kind: "hologram", at, fields: { stepName: "Hologram", depth: 3 } },
+          { id: "after", kind: "llm", at, fields: { prompt: "Sum it up." } },
+        ],
+        edges: [
+          { id: "in", from: "start", to: "future", type: "text" },
+          { id: "out", from: "future", to: "after", type: "text" },
+          { id: "beam", from: "start", to: "after", type: "light" },
+          { id: "kept", from: "start", to: "after", type: "text" },
+        ],
+        strokes: [],
+      },
+    },
+    {
+      title: "Linked media",
+      graph: {
+        nodes: [
+          { id: "listen", kind: "trigger", at, fields: { trigger: "discord", connectionId: "", event: "mention" } },
+          { id: "pic", kind: "asset", at, fields: { fileId: "source-attachment-1", file: "cover.png" } },
+          {
+            id: "clip",
+            kind: "image",
+            at,
+            fields: { media: "video", firstFrame: "pic", lastFrame: "pic", prompt: "Move." },
+          },
+          {
+            id: "reply",
+            kind: "output",
+            at,
+            fields: { target: "discord", connectionId: "trigger", placeId: "trigger", message: "Done." },
+          },
+        ],
+        edges: [
+          { id: "frame", from: "pic", to: "clip", type: "image" },
+          { id: "say", from: "listen", to: "reply", type: "text" },
+        ],
+        strokes: [],
+      },
+    },
+    {
+      title: "Huge notes",
+      graph: {
+        nodes: Array.from({ length: 60 }, (_, index) => ({
+          id: `note-${index}`,
+          kind: "text",
+          at,
+          fields: { text: "x".repeat(20_000) },
+        })),
+        edges: [],
+        strokes: [],
+      },
+    },
+  );
   pass(
     "the file has the server preferences",
     manifest.serverPreferences?.timezone === "Europe/Warsaw" &&
@@ -1019,6 +1082,49 @@ try {
   );
   pass("the workflow's messaging connection is left empty", node("slack")?.connectionId === "");
   pass("a saved value that this OpenBot does not know moves as it is", node("slack")?.event === "message");
+  const movedWorkflows = target.workflows.listWithGraphs();
+  pass(
+    "every moved workflow is paused",
+    movedWorkflows.length > 0 && movedWorkflows.every((item) => item.summary.paused),
+    JSON.stringify(movedWorkflows.map((item) => [item.summary.title, item.summary.paused])),
+  );
+  pass(
+    "the user is told that the moved workflows are paused",
+    result.warnings.some((warning) => warning.includes("workflows are paused")),
+  );
+  const newer = movedWorkflows.find((item) => item.summary.title === "Newer steps");
+  const future = newer?.graph.nodes.find((item) => item.id === "future");
+  pass(
+    "a step from a newer OpenBot is kept as a locked note with its settings",
+    future?.kind === "note" &&
+      future.locked === true &&
+      future.fields.text === "Hologram" &&
+      future.fields.depth === 3 &&
+      JSON.stringify(newer?.graph.edges.map((edge) => edge.id)) === JSON.stringify(["kept"]),
+    JSON.stringify({ graph: newer?.graph, warnings: result.warnings }),
+  );
+  pass(
+    "the user is told which workflows need a newer OpenBot",
+    result.warnings.some((warning) => warning.startsWith("Newer steps:") && warning.includes("newer version")) &&
+      result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("newer version")),
+    JSON.stringify(result.warnings),
+  );
+  const linked = movedWorkflows.find((item) => item.summary.title === "Linked media");
+  const linkedNode = (id: string) => linked?.graph.nodes.find((item) => item.id === id)?.fields;
+  pass(
+    "a step that uses the connection of its trigger keeps it, and a file id from the file is cleared",
+    linkedNode("reply")?.connectionId === "trigger" &&
+      linkedNode("reply")?.placeId === "trigger" &&
+      linkedNode("pic")?.fileId === "" &&
+      linkedNode("clip")?.firstFrame === "pic",
+    JSON.stringify(linked?.graph.nodes.map((item) => item.fields)),
+  );
+  pass(
+    "a workflow over the size limit is not created and the user is told",
+    !movedWorkflows.some((item) => item.summary.title === "Huge notes") &&
+      result.warnings.some((warning) => warning.startsWith("Huge notes is not imported.")),
+    JSON.stringify(result.warnings),
+  );
   pass(
     "the user is told to make the webhook address and choose the connection again",
     result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("webhook")) &&

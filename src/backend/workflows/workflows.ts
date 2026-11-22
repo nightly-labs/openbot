@@ -400,7 +400,7 @@ interface WorkflowsShape {
   listWithGraphs(): Effect.Effect<{ summary: WorkflowSummary; graph: WorkflowGraph }[], WorkflowFailed>;
   get(workflowId: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   create(input: CreateWorkflowInput, agentId?: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
-  createCopy(input: { title: string; graph: WorkflowGraph }): Effect.Effect<WorkflowDetail, WorkflowFailed>;
+  createCopy(input: CreateWorkflowInput): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   rename(input: RenameWorkflowInput): Effect.Effect<WorkflowSummary, WorkflowFailed>;
   setPaused(input: SetWorkflowPausedInput): Effect.Effect<WorkflowSummary, WorkflowFailed>;
   remove(workflowId: string): Effect.Effect<void, WorkflowFailed>;
@@ -1544,12 +1544,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return announceCreated(detail, agentId);
         });
 
-        const createCopy = Effect.fn("Workflows.createCopy")(function* (input: {
-          title: string;
-          graph: WorkflowGraph;
-        }) {
+        const createCopy = Effect.fn("Workflows.createCopy")(function* (input: CreateWorkflowInput) {
           const detail = yield* attempt(() =>
-            store.create({ title: input.title, graph: prepareGraph(input.graph) }, now(), "saved"),
+            store.create(input.graph ? { ...input, graph: prepareGraph(input.graph) } : input, now(), "saved"),
           );
           return announceCreated(detail);
         });
