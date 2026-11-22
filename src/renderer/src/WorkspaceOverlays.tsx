@@ -910,6 +910,7 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostVoiceModel={{}}
           hostTurnLimits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}

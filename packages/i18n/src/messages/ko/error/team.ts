@@ -124,6 +124,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "이 연결에서는 서버 ID 변경을 지원하지 않아요.",
   "error.team.hostUpdateUnsupported": "이 연결에서는 호스트 업데이트를 지원하지 않아요.",
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
+  "error.team.hostVoiceModelUnsupported": "이 연결은 서버의 음성 인식 모델을 지원하지 않아요.",
   "error.team.hostRestartUnsupported": "이 연결에서는 서버 다시 시작을 지원하지 않아요.",
   "error.team.ownerTransferUnsupported": "이 서버는 소유권 이전을 지원하지 않아요.",
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",

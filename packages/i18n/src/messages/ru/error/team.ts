@@ -126,6 +126,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Это подключение не поддерживает изменение идентификатора сервера.",
   "error.team.hostUpdateUnsupported": "Это подключение не поддерживает обновление хоста.",
   "error.team.hostTimezoneUnsupported": "Это подключение не поддерживает часовой пояс сервера.",
+  "error.team.hostVoiceModelUnsupported": "Это подключение не поддерживает модель распознавания речи сервера.",
   "error.team.hostRestartUnsupported": "Это подключение не поддерживает перезапуск сервера.",
   "error.team.ownerTransferUnsupported": "Этот сервер не поддерживает передачу владения.",
   "error.team.hostKeyRotationUnsupported": "Это подключение не поддерживает смену ключа сервера.",

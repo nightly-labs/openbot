@@ -345,6 +345,7 @@ export const messages = {
   "mobile.server.route.timezone": "Zeitzone",
   "mobile.server.route.personality": "Agent-Persönlichkeit",
   "mobile.server.route.agents": "Agenten",
+  "mobile.server.route.voiceModel": "Spracherkennung",
   "mobile.server.settings.storage": "Speicher",
   "mobile.server.route.storage": "Speicher",
   "mobile.server.route.storageFiles": "Alle Dateien",
@@ -474,6 +475,20 @@ export const messages = {
     "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Zeitzone zu ändern.",
   "mobile.server.settings.timezoneUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seine Zeitzone hier zu ändern.",
+  "mobile.server.settings.voiceModelDescription":
+    "Agenten auf diesem Server verwenden dieses Modell, um den Ton von Videos ohne Untertitel zu transkribieren.",
+  "mobile.server.settings.voiceModelLoading": "Spracherkennung wird geladen …",
+  "mobile.server.settings.voiceModelLoadFailed": "Das Spracherkennungsmodell des Servers konnte nicht geladen werden.",
+  "mobile.server.settings.voiceModelSaveFailed":
+    "Das Spracherkennungsmodell konnte nicht geändert werden. Versuche es erneut.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um seine Spracherkennung hier zu ändern.",
+  "mobile.server.settings.voiceModelReady": "Bereit",
+  "mobile.server.settings.voiceModelDownloading": "Wird geladen: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} Download",
+  "mobile.server.settings.voiceModelDownload": "Laden",
+  "mobile.server.settings.voiceModelCancel": "Download stoppen",
+  "mobile.server.settings.voiceModelRemove": "Entfernen",
   "mobile.server.settings.keySection": "Serverschlüssel",
   "mobile.server.settings.keyChanged": "Letzte Änderung",
   "mobile.server.settings.keyChange": "Schlüssel ändern",

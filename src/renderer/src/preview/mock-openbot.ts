@@ -250,6 +250,7 @@ import { createMockHostPersonality } from "./mock-host-personality";
 import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostTurnLimits } from "./mock-host-turn-limits";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
+import { createMockHostVoiceModel } from "./mock-host-voice-model";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
 import { createMockLinkAccount } from "./mock-link-account";
@@ -3687,6 +3688,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...createMockHostVoiceModel(),
       ...hostTurnLimits,
       ...createMockHostPersonality(),
       getAgentMemoryLimit: async () => hostAgentMemoryLimit(agentMemoryLimit),

@@ -223,6 +223,7 @@ import {
   type HostRestartEvent,
   type HostRestartState,
 } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
@@ -426,6 +427,7 @@ import { routeHostRestart } from "./team-api/route-host-restart";
 import { routeHostTimezone } from "./team-api/route-host-timezone";
 import { routeHostTurnLimits } from "./team-api/route-host-turn-limits";
 import { routeHostUpdate } from "./team-api/route-host-update";
+import { routeHostVoiceModel } from "./team-api/route-host-voice-model";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
 import { routeInstanceTransferChunks } from "./team-api/route-instance-transfer-chunks";
@@ -1303,6 +1305,7 @@ export class TeamApiServer {
       if ((await routeHostAppearance(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostVoiceModel(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTurnLimits(context, this.#options.admin)) === "handled") return;
       if ((await routeHostRestart(context, this.#options.admin)) === "handled") return;
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
@@ -2787,6 +2790,7 @@ export class TeamApiServer {
         if (capability === HOST_APPEARANCE_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
         if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
+        if (capability === HOST_VOICE_MODEL_CAPABILITY) return this.#options.admin?.voiceModel !== undefined;
         if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
         if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
         if (capability === OWNER_TRANSFER_CAPABILITY) return this.#options.admin?.ownerTransfer === true;
