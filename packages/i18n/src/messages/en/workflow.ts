@@ -625,6 +625,7 @@ export const messages = defineMessages("workflow", {
   "workflow.file.import.invalid": "This workflow file is damaged.",
   "workflow.file.import.newer": "This workflow needs OpenBot {version} or later.",
   "workflow.file.import.newerUnknown": "This workflow needs a newer version of OpenBot.",
+  "workflow.file.import.newerSteps": "Steps that this version does not know: {steps}.",
   "workflow.file.import.failed": "Could not import the workflow.",
   "workflow.file.export.secret": "Remove the secrets before you export. Found in: {fields}",
   "workflow.file.export.field": "{step} ({field})",

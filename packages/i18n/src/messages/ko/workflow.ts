@@ -621,6 +621,7 @@ export const messages = {
   "workflow.file.import.invalid": "이 워크플로 파일이 손상되었습니다.",
   "workflow.file.import.newer": "이 워크플로에는 OpenBot {version} 이상이 필요합니다.",
   "workflow.file.import.newerUnknown": "이 워크플로에는 최신 버전의 OpenBot이 필요합니다.",
+  "workflow.file.import.newerSteps": "이 버전에서 알 수 없는 단계: {steps}.",
   "workflow.file.import.failed": "워크플로를 가져오지 못했습니다.",
   "workflow.file.export.secret": "내보내기 전에 비밀 값을 제거하세요. 발견 위치: {fields}",
   "workflow.file.export.field": "{step} ({field})",

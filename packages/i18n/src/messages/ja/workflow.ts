@@ -623,6 +623,7 @@ export const messages = {
   "workflow.file.import.invalid": "このワークフローファイルは壊れています。",
   "workflow.file.import.newer": "このワークフローには OpenBot {version} 以降が必要です。",
   "workflow.file.import.newerUnknown": "このワークフローには新しいバージョンの OpenBot が必要です。",
+  "workflow.file.import.newerSteps": "このバージョンが認識できないステップ: {steps}。",
   "workflow.file.import.failed": "ワークフローを読み込めませんでした。",
   "workflow.file.export.secret": "書き出す前にシークレットを削除してください。見つかった場所: {fields}",
   "workflow.file.export.field": "{step} ({field})",

@@ -626,6 +626,7 @@ export const messages = {
   "workflow.file.import.invalid": "Diese Workflow-Datei ist beschädigt.",
   "workflow.file.import.newer": "Dieser Workflow braucht OpenBot {version} oder neuer.",
   "workflow.file.import.newerUnknown": "Dieser Workflow braucht eine neuere OpenBot-Version.",
+  "workflow.file.import.newerSteps": "Schritte, die diese Version nicht kennt: {steps}.",
   "workflow.file.import.failed": "Der Workflow konnte nicht importiert werden.",
   "workflow.file.export.secret": "Entferne die Geheimnisse vor dem Export. Gefunden in: {fields}",
   "workflow.file.export.field": "{step} ({field})",

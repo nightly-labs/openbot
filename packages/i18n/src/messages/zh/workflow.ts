@@ -621,6 +621,7 @@ export const messages = {
   "workflow.file.import.invalid": "此工作流文件已损坏。",
   "workflow.file.import.newer": "此工作流需要 OpenBot {version} 或更高版本。",
   "workflow.file.import.newerUnknown": "此工作流需要更新版本的 OpenBot。",
+  "workflow.file.import.newerSteps": "此版本无法识别的步骤：{steps}。",
   "workflow.file.import.failed": "无法导入工作流。",
   "workflow.file.export.secret": "导出前请移除密钥。位置：{fields}",
   "workflow.file.export.field": "{step}（{field}）",

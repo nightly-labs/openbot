@@ -617,6 +617,7 @@ export const messages = {
   "workflow.file.import.invalid": "קובץ תהליך העבודה הזה פגום.",
   "workflow.file.import.newer": "תהליך העבודה הזה דורש OpenBot {version} ומעלה.",
   "workflow.file.import.newerUnknown": "תהליך העבודה הזה דורש גרסה חדשה יותר של OpenBot.",
+  "workflow.file.import.newerSteps": "שלבים שהגרסה הזו לא מכירה: {steps}.",
   "workflow.file.import.failed": "לא ניתן לייבא את תהליך העבודה.",
   "workflow.file.export.secret": "יש להסיר את הסודות לפני הייצוא. נמצאו ב: {fields}",
   "workflow.file.export.field": "{step} ({field})",

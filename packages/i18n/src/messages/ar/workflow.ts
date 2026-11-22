@@ -705,6 +705,7 @@ export const messages = {
   "workflow.file.import.invalid": "ملف سير العمل هذا تالف.",
   "workflow.file.import.newer": "يحتاج سير العمل هذا إلى OpenBot {version} أو أحدث.",
   "workflow.file.import.newerUnknown": "يحتاج سير العمل هذا إلى إصدار أحدث من OpenBot.",
+  "workflow.file.import.newerSteps": "خطوات لا يعرفها هذا الإصدار: {steps}.",
   "workflow.file.import.failed": "تعذر استيراد سير العمل.",
   "workflow.file.export.secret": "أزل الأسرار قبل التصدير. وُجدت في: {fields}",
   "workflow.file.export.field": "{step} ({field})",

@@ -626,6 +626,7 @@ export const messages = {
   "workflow.file.import.invalid": "Bu iş akışı dosyası bozuk.",
   "workflow.file.import.newer": "Bu iş akışı OpenBot {version} veya üstünü gerektirir.",
   "workflow.file.import.newerUnknown": "Bu iş akışı OpenBot'un daha yeni bir sürümünü gerektirir.",
+  "workflow.file.import.newerSteps": "Bu sürümün tanımadığı adımlar: {steps}.",
   "workflow.file.import.failed": "İş akışı içe aktarılamadı.",
   "workflow.file.export.secret": "Dışa aktarmadan önce gizli bilgileri kaldırın. Bulunduğu yer: {fields}",
   "workflow.file.export.field": "{step} ({field})",

@@ -79,7 +79,12 @@ export function workflowExportProblemText(
 export function workflowImportProblemText(t: AppTranslate, problem: WorkflowFileImportProblem): string {
   if (problem.kind === "not-file") return t("workflow.file.import.notFile");
   if (problem.kind === "invalid") return t("workflow.file.import.invalid");
-  return problem.minAppVersion
+  const version = problem.minAppVersion
     ? t("workflow.file.import.newer", { version: problem.minAppVersion })
     : t("workflow.file.import.newerUnknown");
+  if (problem.steps.length === 0) return version;
+  const listed = problem.steps.slice(0, LISTED_FIELDS);
+  const more = problem.steps.length - listed.length;
+  if (more > 0) listed.push(t("workflow.canvas.status.more", { count: more }));
+  return `${version} ${t("workflow.file.import.newerSteps", { steps: listed.join(", ") })}`;
 }
