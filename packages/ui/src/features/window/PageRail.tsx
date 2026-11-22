@@ -314,7 +314,9 @@ function CreditsRailButton(props: { balance: number | undefined; current: boolea
   const layout = () => (balance() === undefined ? "credit-rail-icon" : "credit-rail-icon window-rail-credits");
   return (
     <RailButton label={label()} class={layout()} current={props.current} onClick={props.onOpen}>
-      <CreditIcon />
+      <span class="credit-rail-tile">
+        <CreditIcon />
+      </span>
       <Show when={balance() !== undefined}>
         <span class="window-rail-credits-count" data-empty={(balance() ?? 0) <= 0 ? "" : undefined} aria-hidden="true">
           {amount(balance() ?? 0)}
