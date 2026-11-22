@@ -201,22 +201,31 @@ function processStreams(
       child.stdin.end();
     },
   });
+  let open = true;
+  let enqueue: (chunk: Buffer) => void = () => undefined;
+  let close: () => void = () => undefined;
   const input = new ReadableStream<Uint8Array>({
     start: (controller) => {
-      let open = true;
-      child.stdout.on("data", (chunk: Buffer) => {
+      enqueue = (chunk) => {
         if (open) controller.enqueue(new Uint8Array(chunk));
-      });
-      child.stdout.once("end", () => {
+      };
+      close = () => {
         if (!open) return;
         open = false;
         controller.close();
-      });
+      };
+      child.stdout.on("data", enqueue);
+      child.stdout.once("end", close);
       child.stdout.once("error", (error) => {
         if (!open) return;
         open = false;
         controller.error(error);
       });
+    },
+    cancel: () => {
+      open = false;
+      child.stdout.off("data", enqueue);
+      child.stdout.off("end", close);
     },
   });
   child.stdin.on("error", () => undefined);
