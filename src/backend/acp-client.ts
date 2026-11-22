@@ -155,6 +155,8 @@ const ACP_FIRST_UPDATE_MS = 3 * 60_000;
 
 const MCP_TOOL_CALL_ANSWER_MARGIN_MS = 15_000;
 
+const antigravityMcpStartup = Semaphore.makeUnsafe(1);
+
 const SILENT_PROMPT = Symbol("silent prompt");
 
 const SESSION_STATE_UPDATES: ReadonlySet<SessionUpdate["sessionUpdate"]> = new Set([
@@ -531,6 +533,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #privateSession: { connection: ClientSideConnection; sessionId: string } | null = null;
   #privateAnswer: string[] | null = null;
   readonly #privatePromptLock = Semaphore.makeUnsafe(1);
+  readonly #mcpStartupChecks = new WeakMap<AcpConnection, () => boolean>();
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #openQuestionToolCalls = new Map<string, AbortController>();
   #initialized: Deferred.Deferred<void, ProviderClientOperationError> | null = null;
@@ -577,11 +580,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  #newTransport(exit: (error: Error) => void): AcpConnection {
-    return new AcpConnection({
+  #newTransport(exit: (error: Error) => void, sessionWorker = false): AcpConnection {
+    const check = sessionWorker ? this.#flavor.mcpStartupCheck?.(this.options.argv) : undefined;
+    const transport = new AcpConnection({
       provider: this.options.provider,
       cli: this.#cli,
-      argv: this.options.argv,
+      argv: check?.argv ?? this.options.argv,
       env: this.options.env,
       extraEnv: this.options.extraEnv,
       confine: this.options.confine,
@@ -603,6 +607,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         extNotification: (method, params) => this.#extNotification(method, params),
       }),
     });
+    if (check) this.#mcpStartupChecks.set(transport, check.failed);
+    return transport;
   }
 
   readonly readHistory = Effect.fn("AcpAgentClient.readHistory")(function* (
@@ -1444,7 +1450,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const transport: AcpConnection = this.#newTransport(() => {
       const thread = owner();
       if (thread?.transport === transport) thread.needsResume = true;
-    });
+    }, true);
     this.#openingSessionProcesses.add(transport);
     const startTimeout = this.#startTimeout(
       Math.max(this.#startTimeoutMs ?? this.#requestTimeoutMs, ACP_SESSION_PROCESS_START_TIMEOUT_MS),
@@ -1570,7 +1576,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       compareReleases(version, limit.since) < 0
     )
       return true;
-    return mcp.listedWithin(sentAt, Math.max(limit.ms + ACP_MCP_LIST_MARGIN_MS, waitedMs));
+    const required =
+      this.#flavor.mcpStartupCheck && mcp.servers.some((server) => server.name === "openbot") ? "openbot" : undefined;
+    return mcp.listedWithin(sentAt, Math.max(limit.ms + ACP_MCP_LIST_MARGIN_MS, waitedMs), required);
+  }
+
+  #withMcpStartup<A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> {
+    return this.#flavor.mcpStartupCheck ? antigravityMcpStartup.withPermit(effect) : effect;
+  }
+
+  #mcpStartupFailed(transport: AcpConnection | null, servers: readonly McpServer[]): boolean {
+    return Boolean(transport && servers.length && this.#mcpStartupChecks.get(transport)?.());
+  }
+
+  #mcpStartupFailure(): Error {
+    return new Error(sourceText("error.provider.acpMcpPreloadFailed", { provider: this.#label }));
   }
 
   get #sessionProcesses(): boolean {
@@ -1676,7 +1696,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const relaysStdio =
       this.#flavor.relayStdioMcpServers === true ||
       (this.#flavor.relayStdioMcpServers === "unconfined" && !this.options.confine);
-    return yield* Effect.acquireUseRelease(
+    const opening = Effect.acquireUseRelease(
       this.#bridge
         .createSession(
           requestedThreadId ?? randomUUID(),
@@ -1785,6 +1805,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               currentModelId = currentModelFromSessionSetup(response);
             }
             const openedAt = Date.now();
+            if (this.#mcpStartupFailed(sessionTransport, mcpServers)) throw this.#mcpStartupFailure();
             const connectLimit = this.#flavor.mcpConnectLimitMs;
             if (connectLimit !== undefined && this.#supportsSessionResume && mcp.dropped(sentAt, connectLimit)) {
               this.emit("diagnostic", `${this.#label} did not load OpenBot's tools in time. The session opens again.`);
@@ -1881,6 +1902,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           if (transport) yield* transport.stop(Effect.void).pipe(Effect.ignore);
         }),
     );
+    return yield* this.#withMcpStartup(opening);
   });
 
   readonly #relayStdioMcpServers = Effect.fn("AcpAgentClient.relayStdioMcpServers")(function* (
@@ -2640,7 +2662,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (!thread.mcpListed) thread.mcpListed = this.#listedInTime(thread.mcp, sentAt);
       if (
         !thread.mcpListed &&
-        !promptedAgain &&
+        (!promptedAgain || this.#flavor.mcpStartupCheck !== undefined) &&
         !turn.wake &&
         !turn.providerError &&
         !turn.stopped &&
@@ -2880,13 +2902,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: unknown,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     const model = thread.currentModelId;
-    const resumedAt = Date.now();
-    const restored = yield* this.#restoreSessionEffect(
-      () => this.#sessionConnection(thread),
-      { sessionId: thread.id, ...restore },
-      "resume",
+    const restored = yield* this.#withMcpStartup(
+      Effect.gen({ self: this }, function* () {
+        const resumedAt = Date.now();
+        const response = yield* this.#restoreSessionEffect(
+          () => this.#sessionConnection(thread),
+          { sessionId: thread.id, ...restore },
+          "resume",
+        );
+        if (this.#mcpStartupFailed(thread.transport, restore.mcpServers)) {
+          thread.needsResume = true;
+          if (thread.transport) yield* thread.transport.stop(Effect.void).pipe(Effect.ignore);
+          return yield* providerFailure(this.#mcpStartupFailure());
+        }
+        if (!thread.mcpListed) thread.mcpListed = this.#listedInTime(thread.mcp, resumedAt, Date.now() - resumedAt);
+        return response;
+      }),
     );
-    if (!thread.mcpListed) thread.mcpListed = this.#listedInTime(thread.mcp, resumedAt, Date.now() - resumedAt);
     thread.restore = restore;
     thread.configOptions = restored.configOptions ?? thread.configOptions;
     thread.currentModelId = currentModelFromSessionSetup(restored) ?? thread.currentModelId;

@@ -440,7 +440,7 @@ try {
   assert.match(aaveDrops[0]?.detail ?? "", /get_reserve_holders/u, "The report names the tool.");
 
   const listCauses = new Map<string, string | null>();
-  const listAgent = async (name: string, env: Record<string, string>) => {
+  const listAgent = async (name: string, env: Record<string, string>, resumeId?: string) => {
     const executable = join(root, `agy-list-${name}`, "bin", "antigravity");
     const workspace = join(root, `list-${name}`);
     await mkdir(workspace, { recursive: true });
@@ -459,8 +459,8 @@ try {
     listClient.start();
     const response = await runCauseEffect(
       listClient.request(
-        "thread/start",
-        { cwd: workspace, dynamicTools: visibleDynamicTools("antigravity") },
+        resumeId ? "thread/resume" : "thread/start",
+        { cwd: workspace, threadId: resumeId, dynamicTools: visibleDynamicTools("antigravity") },
         (value) => value,
       ),
     );
@@ -509,6 +509,51 @@ try {
   const olderTurn = await runTurn(older.listClient, older.threadId, plain);
   report.turns.toolsOlderCli = olderTurn;
   assert.equal(olderTurn.status, "completed", "An older CLI's turn completes as before.");
+
+  const partial = await listAgent("partial", { FAKE_OPEN_LIST: "partial" });
+  const partialLog = await readJsonl<{ listed: number | null }>(partial.log);
+  assert.ok(
+    partialLog.some((entry) => (entry.listed ?? 0) > 0),
+    "The fake listed other tools.",
+  );
+  const partialTurn = await runTurn(partial.listClient, partial.threadId, plain);
+  report.turns.openBotMissing = partialTurn;
+  assert.equal(partialTurn.status, "failed", "Another namespace does not count as OpenBot's tools.");
+
+  await assert.rejects(
+    listAgent("preload", { FAKE_OPEN_LIST: "preload-failure" }),
+    (error) => {
+      assert.match(String(error), /stopped before running this message because its tools did not load/u);
+      return true;
+    },
+    "The native preload failure aborts startup even when the bridge was listed.",
+  );
+  const failedStartup = await readJsonl<LogEntry>(join(root, "list-preload.jsonl"));
+  assert.ok(failedStartup.some((entry) => entry.method === "session/new"));
+  assert.ok(failedStartup.every((entry) => entry.method !== "session/prompt"));
+
+  await assert.rejects(
+    listAgent("resume-preload", { FAKE_OPEN_LIST: "preload-failure" }, onTime.threadId),
+    /stopped before running this message because its tools did not load/u,
+    "A failed preload also stops a restored session before its next prompt.",
+  );
+  const failedResume = await readJsonl<LogEntry>(join(root, "list-resume-preload.jsonl"));
+  assert.ok(failedResume.some((entry) => entry.method === "session/resume"));
+  assert.ok(failedResume.every((entry) => entry.method !== "session/prompt"));
+
+  const shared = join(root, "serialized.jsonl");
+  const concurrent = await Promise.all(
+    ["a", "b"].map((name) => listAgent(name, { FAKE_OPEN_LIST: "concurrent", FAKE_LOG: shared })),
+  );
+  const events = (await readJsonl<LogEntry>(shared)).filter((entry) => entry.method.startsWith("cache/"));
+  assert.deepEqual(
+    events.map((entry) => entry.method),
+    ["cache/start", "cache/end", "cache/start", "cache/end"],
+  );
+  assert.notEqual(events[0]?.sessionId, events[2]?.sessionId);
+  for (const { listClient, threadId } of concurrent)
+    assert.equal((await runTurn(listClient, threadId, plain)).status, "completed");
+
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

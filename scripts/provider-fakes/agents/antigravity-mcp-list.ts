@@ -1,3 +1,5 @@
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { type AcpHandler, type AcpParams, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = {
@@ -32,10 +34,10 @@ async function mcpRequest(server: NonNullable<AcpParams["mcpServers"]>[number], 
   return toolCount(await response.text());
 }
 
-async function listOpenBotTools(sessionId: string): Promise<number> {
+async function listOpenBotTools(sessionId: string, partial = false): Promise<number> {
   let count = 0;
   for (const server of servers.get(sessionId) ?? []) {
-    if (server.type !== "http" || !server.name.startsWith("openbot")) continue;
+    if (server.type !== "http" || (partial && server.name === "openbot")) continue;
     await mcpRequest(server, "initialize", 1);
     count += await mcpRequest(server, "tools/list", 2);
   }
@@ -44,13 +46,27 @@ async function listOpenBotTools(sessionId: string): Promise<number> {
 
 const open = (sessionId: string, request: AcpRequest, peer: Parameters<AcpHandler>[1]) => {
   servers.set(sessionId, request.params.mcpServers ?? []);
-  const mode = process.env.FAKE_OPEN_LIST ?? "now";
+  const mode = request.params.mcpServers?.length ? (process.env.FAKE_OPEN_LIST ?? "now") : "now";
   const answer = (listed: number | null) => {
     logEntry({ method: request.method, sessionId, mode, listed });
     peer.reply(request, request.method === "session/new" ? { sessionId, models: MODELS } : { models: MODELS });
   };
   if (mode === "never") return answer(null);
-  void listOpenBotTools(sessionId).then(answer);
+  void (async () => {
+    if (mode === "concurrent") logEntry({ method: "cache/start", sessionId });
+    const listed = await listOpenBotTools(sessionId, mode === "partial");
+    if (mode === "preload-failure") {
+      const logFile = process.argv.find((arg) => arg.startsWith("--log-file="))?.slice("--log-file=".length);
+      if (!logFile) throw new Error("The session worker did not receive its own log.");
+      mkdirSync(dirname(logFile), { recursive: true });
+      appendFileSync(
+        logFile,
+        "session_handlers.go:396] Failed to preload the session's MCP servers: context deadline exceeded\n",
+      );
+    }
+    if (mode === "concurrent") logEntry({ method: "cache/end", sessionId });
+    answer(listed);
+  })();
 };
 
 serveFakeAcpAgent({

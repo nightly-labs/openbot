@@ -809,6 +809,22 @@
     "tr",
     "zh"
   ],
+  "error.provider.acpMcpPreloadFailed": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.provider.customAgentUsagePromptInvalid": ["ko"],
   "error.provider.customAgentsUnavailable": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.provider.removeDownloadsFailed": ["nl"],

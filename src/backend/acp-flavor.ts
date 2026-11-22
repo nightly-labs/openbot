@@ -134,6 +134,7 @@ export interface AcpFlavor {
   mcpServersLoadWithSession?: true;
   mcpConnectLimitMs?: number;
   mcpListLimit?: { ms: number; since: string };
+  mcpStartupCheck?: (argv: readonly string[]) => { argv: readonly string[]; failed: () => boolean } | undefined;
   relayStdioMcpServers?: true | "unconfined";
   mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
   mcpServerName?(name: string): string;
