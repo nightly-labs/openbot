@@ -16,7 +16,6 @@ export class ComputerUseDisplayAwake {
   }
 
   noteToolCall(): void {
-    if (!this.#options.turnRunning()) return;
     if (this.#blocker === null) this.#blocker = this.#options.start();
     if (this.#idleRelease) clearTimeout(this.#idleRelease);
     this.#idleRelease = setTimeout(() => this.release(), IDLE_RELEASE_MS);
