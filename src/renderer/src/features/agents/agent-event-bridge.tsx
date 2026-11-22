@@ -459,7 +459,8 @@ export function AgentEventBridge() {
         );
         return;
       case "error": {
-        const shownError = activeServer()?.kind === "local" ? event.message : remoteAgentError(event.message);
+        const server = activeServer();
+        const shownError = !server || server.kind === "local" ? event.message : remoteAgentError(event.message);
         const authFailure = classifyUserError(event.message) === "auth";
         if (authFailure) void refreshAgentProviders({ automatic: true }).catch(() => undefined);
         const agentId = event.agentId;
