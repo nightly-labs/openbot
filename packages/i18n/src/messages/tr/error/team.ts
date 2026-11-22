@@ -125,6 +125,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Sunucu kimliği değişiklikleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostUpdateUnsupported": "Ana makine güncellemeleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
+  "error.team.hostVoiceModelUnsupported": "Bu bağlantı sunucunun konuşma tanıma modelini desteklemiyor.",
   "error.team.hostRestartUnsupported": "Bu bağlantı sunucuyu yeniden başlatmayı desteklemiyor.",
   "error.team.ownerTransferUnsupported": "Bu sunucu sahiplik devrini desteklemiyor.",
   "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",

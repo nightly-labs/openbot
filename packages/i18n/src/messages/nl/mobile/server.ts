@@ -336,6 +336,7 @@ export const messages = {
   "mobile.server.route.timezone": "Tijdzone",
   "mobile.server.route.personality": "Agentpersoonlijkheid",
   "mobile.server.route.agents": "Agents",
+  "mobile.server.route.voiceModel": "Spraakherkenning",
   "mobile.server.settings.storage": "Opslag",
   "mobile.server.route.storage": "Opslag",
   "mobile.server.route.storageFiles": "Alle bestanden",
@@ -464,6 +465,19 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de tijdzone te wijzigen.",
   "mobile.server.settings.timezoneUnsupported": "Werk OpenBot bij op deze server om de tijdzone hier te wijzigen.",
+  "mobile.server.settings.voiceModelDescription":
+    "Agents op deze server gebruiken dit model om het geluid van video’s zonder ondertiteling uit te schrijven.",
+  "mobile.server.settings.voiceModelLoading": "Spraakherkenning laden…",
+  "mobile.server.settings.voiceModelLoadFailed": "Kan het spraakherkenningsmodel van de server niet laden.",
+  "mobile.server.settings.voiceModelSaveFailed": "Kan het spraakherkenningsmodel niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Werk OpenBot bij op deze server om de spraakherkenning hier te wijzigen.",
+  "mobile.server.settings.voiceModelReady": "Klaar",
+  "mobile.server.settings.voiceModelDownloading": "Downloaden: {percent}",
+  "mobile.server.settings.voiceModelSize": "Download van {size}",
+  "mobile.server.settings.voiceModelDownload": "Downloaden",
+  "mobile.server.settings.voiceModelCancel": "Download stoppen",
+  "mobile.server.settings.voiceModelRemove": "Verwijderen",
   "mobile.server.settings.keySection": "Serversleutel",
   "mobile.server.settings.keyChanged": "Laatste wijziging",
   "mobile.server.settings.keyChange": "Sleutel wijzigen",

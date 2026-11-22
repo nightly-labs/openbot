@@ -101,6 +101,7 @@ import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
 import type { ServerTurnLimitsOptions } from "./ServerTurnLimitsSetting";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
+import type { ServerVoiceModelOptions } from "./ServerVoiceModelSetting";
 import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -141,6 +142,7 @@ export interface ServerSettingsModalProps {
   instanceTransfer?: ServerTransferOptions | undefined;
   hostUpdate?: ServerUpdateOptions | undefined;
   hostTimezone?: ServerTimezoneOptions | undefined;
+  hostVoiceModel?: ServerVoiceModelOptions | undefined;
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
   hostPersonality?: ServerPersonalityOptions | undefined;
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
@@ -233,6 +235,7 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
   agents: [
     "server.settings.timezone",
     "server.settings.turnLimit",
+    "server.settings.voiceModel.section",
     "server.settings.agentTaskLimit",
     "agentSettings.automation.title",
     "agentSettings.agentNewChat.title",

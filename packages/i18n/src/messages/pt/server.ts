@@ -391,6 +391,10 @@ export const messages = {
     "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente. Em um servidor, o navegador também o usa após a próxima reinicialização.",
   "server.settings.timezoneAutomatic": "Automático ({zone})",
   "server.settings.timezoneLoadFailed": "Não foi possível carregar o fuso horário do servidor.",
+  "server.settings.voiceModel.section": "Reconhecimento de fala",
+  "server.settings.voiceModel.description":
+    "Os agentes deste servidor usam este modelo para transcrever o som de vídeos que não têm legendas.",
+  "server.settings.voiceModel.loadFailed": "Não foi possível carregar o modelo de reconhecimento de fala do servidor.",
   "server.settings.turnLimit": "Tópicos ao mesmo tempo",
   "server.settings.turnLimitDescription":
     "Quantos tópicos de agentes podem ser executados ao mesmo tempo neste servidor. Mais tópicos usam mais memória.",

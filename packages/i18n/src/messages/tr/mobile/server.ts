@@ -343,6 +343,7 @@ export const messages = {
   "mobile.server.route.timezone": "Saat dilimi",
   "mobile.server.route.personality": "Ajan kişiliği",
   "mobile.server.route.agents": "Ajanlar",
+  "mobile.server.route.voiceModel": "Konuşma tanıma",
   "mobile.server.settings.storage": "Depolama",
   "mobile.server.route.storage": "Depolama",
   "mobile.server.route.storageFiles": "Tüm dosyalar",
@@ -468,6 +469,19 @@ export const messages = {
     "Saat dilimini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.settings.timezoneUnsupported":
     "Saat dilimini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.voiceModelDescription":
+    "Bu sunucudaki ajanlar, altyazısı olmayan videoların sesini yazıya dökmek için bu modeli kullanır.",
+  "mobile.server.settings.voiceModelLoading": "Konuşma tanıma yükleniyor…",
+  "mobile.server.settings.voiceModelLoadFailed": "Sunucunun konuşma tanıma modeli yüklenemedi.",
+  "mobile.server.settings.voiceModelSaveFailed": "Konuşma tanıma modeli değiştirilemedi. Tekrar deneyin.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Konuşma tanımayı buradan değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.voiceModelReady": "Hazır",
+  "mobile.server.settings.voiceModelDownloading": "İndiriliyor: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} indirme",
+  "mobile.server.settings.voiceModelDownload": "İndir",
+  "mobile.server.settings.voiceModelCancel": "İndirmeyi durdur",
+  "mobile.server.settings.voiceModelRemove": "Kaldır",
   "mobile.server.settings.keySection": "Sunucu anahtarı",
   "mobile.server.settings.keyChanged": "Son değişiklik",
   "mobile.server.settings.keyChange": "Anahtarı değiştir",

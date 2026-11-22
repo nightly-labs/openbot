@@ -394,6 +394,10 @@ export const messages = {
     "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
+  "server.settings.voiceModel.section": "Reconnaissance vocale",
+  "server.settings.voiceModel.description":
+    "Les agents de ce serveur utilisent ce modèle pour transcrire le son des vidéos sans sous-titres.",
+  "server.settings.voiceModel.loadFailed": "Impossible de charger le modèle de reconnaissance vocale du serveur.",
   "server.settings.turnLimit": "Fils en même temps",
   "server.settings.turnLimitDescription":
     "Le nombre de fils d’agents qui peuvent s’exécuter en même temps sur ce serveur. Plus de fils utilisent plus de mémoire.",

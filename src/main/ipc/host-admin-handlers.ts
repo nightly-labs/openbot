@@ -11,6 +11,7 @@ import {
   decodeHostTimezoneSettings,
   decodeHostTurnLimits,
   decodeHostUpdateStatus,
+  decodeHostVoiceModel,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
   decodeProviderModelVisibility,
@@ -19,6 +20,7 @@ import {
   type HostTurnLimitsInput,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
+  type HostVoiceModelChange,
   hostAgentMemoryLimit,
   hostBrowsingMemory,
   hostMemoryReview,
@@ -38,6 +40,7 @@ import {
   type ProviderModelVisibilityChange,
   parseAgentAccessChange,
   parseHostTurnLimitsInput,
+  parseHostVoiceModelChange,
   parseProviderModelVisibilityChange,
   parseProviderModelVisibilityProvider,
   type ServerAuditLog,
@@ -95,6 +98,10 @@ import {
 } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
+  HOST_VOICE_MODEL_CAPABILITY,
+  HOST_VOICE_MODEL_ROUTES,
+} from "@openbot/contracts/team-protocol/host-voice-model-v1";
+import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
@@ -124,6 +131,7 @@ import type { ClaudeCompactWindowControl } from "../claude-compact-window-prefer
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
 import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
+import type { HostVoiceModelService } from "../host-voice-model";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
@@ -163,6 +171,7 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity" | "rotateIdentityKey">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  voiceModel: Pick<HostVoiceModelService, "snapshot" | "change">;
   hostTurnLimits: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
@@ -190,6 +199,7 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  voiceModel,
   hostTurnLimits,
   serverPersonality,
   agentMemoryLimit,
@@ -224,6 +234,11 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, HOST_TIMEZONE_CAPABILITY))
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
+  }
+  function remoteVoiceModel(serverId: string, route: string, body: Record<string, never> | HostVoiceModelChange) {
+    if (!remoteServers.supportsCapability(serverId, HOST_VOICE_MODEL_CAPABILITY))
+      throw new Error(sourceText("error.team.hostVoiceModelUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostVoiceModel, { method: "POST", body }));
   }
   function remoteTurnLimits(serverId: string, route: string, body: Record<string, never> | HostTurnLimitsInput) {
     if (!remoteServers.supportsCapability(serverId, HOST_TURN_LIMITS_CAPABILITY))
@@ -436,6 +451,14 @@ export function hostAdminIpcHandlers({
       setTimezone: scopedHandler(parseServerTimezone, {
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
+      }),
+      getVoiceModel: scopedQueryHandler({
+        local: () => runCauseEffect(voiceModel.snapshot()),
+        remote: (serverId) => remoteVoiceModel(serverId, HOST_VOICE_MODEL_ROUTES.settings, {}),
+      }),
+      changeVoiceModel: scopedHandler(parseHostVoiceModelChange, {
+        local: (change) => runCauseEffect(voiceModel.change(change)),
+        remote: (change, serverId) => remoteVoiceModel(serverId, HOST_VOICE_MODEL_ROUTES.change, change),
       }),
       getTurnLimits: scopedQueryHandler({
         local: () => hostTurnLimits.get(),

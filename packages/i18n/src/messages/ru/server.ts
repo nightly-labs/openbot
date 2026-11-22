@@ -399,6 +399,10 @@ export const messages = {
     "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя. На сервере браузер тоже использует его после следующего перезапуска.",
   "server.settings.timezoneAutomatic": "Автоматически ({zone})",
   "server.settings.timezoneLoadFailed": "Не удалось загрузить часовой пояс сервера.",
+  "server.settings.voiceModel.section": "Распознавание речи",
+  "server.settings.voiceModel.description":
+    "Агенты на этом сервере используют эту модель, чтобы расшифровывать звук видео без субтитров.",
+  "server.settings.voiceModel.loadFailed": "Не удалось загрузить модель распознавания речи сервера.",
   "server.settings.turnLimit": "Ветки одновременно",
   "server.settings.turnLimitDescription":
     "Сколько веток агентов может выполняться одновременно на этом сервере. Больше веток — больше памяти.",

@@ -339,6 +339,7 @@ export const messages = {
   "mobile.server.route.timezone": "Fuseau horaire",
   "mobile.server.route.personality": "Personnalité de l’agent",
   "mobile.server.route.agents": "Agents",
+  "mobile.server.route.voiceModel": "Reconnaissance vocale",
   "mobile.server.settings.storage": "Stockage",
   "mobile.server.route.storage": "Stockage",
   "mobile.server.route.storageFiles": "Tous les fichiers",
@@ -469,6 +470,19 @@ export const messages = {
     "Connectez-vous à ce serveur en tant que propriétaire ou admin pour changer son fuseau horaire.",
   "mobile.server.settings.timezoneUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer son fuseau horaire ici.",
+  "mobile.server.settings.voiceModelDescription":
+    "Les agents de ce serveur utilisent ce modèle pour transcrire le son des vidéos sans sous-titres.",
+  "mobile.server.settings.voiceModelLoading": "Chargement de la reconnaissance vocale…",
+  "mobile.server.settings.voiceModelLoadFailed": "Impossible de charger le modèle de reconnaissance vocale du serveur.",
+  "mobile.server.settings.voiceModelSaveFailed": "Impossible de changer le modèle de reconnaissance vocale. Réessayez.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour changer ici sa reconnaissance vocale.",
+  "mobile.server.settings.voiceModelReady": "Prêt",
+  "mobile.server.settings.voiceModelDownloading": "Téléchargement : {percent}",
+  "mobile.server.settings.voiceModelSize": "Téléchargement de {size}",
+  "mobile.server.settings.voiceModelDownload": "Télécharger",
+  "mobile.server.settings.voiceModelCancel": "Arrêter",
+  "mobile.server.settings.voiceModelRemove": "Supprimer",
   "mobile.server.settings.keySection": "Clé du serveur",
   "mobile.server.settings.keyChanged": "Dernier changement",
   "mobile.server.settings.keyChange": "Changer la clé",

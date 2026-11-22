@@ -442,6 +442,10 @@ export const messages = defineMessages("server", {
     "New routines use this timezone when the message does not give the sender's timezone. On a server, the browser also uses it after the next restart.",
   "server.settings.timezoneAutomatic": "Automatic ({zone})",
   "server.settings.timezoneLoadFailed": "Could not load the server timezone.",
+  "server.settings.voiceModel.section": "Speech recognition",
+  "server.settings.voiceModel.description":
+    "Agents on this server use this model to transcribe the sound of videos that have no captions.",
+  "server.settings.voiceModel.loadFailed": "Could not load the speech recognition model of the server.",
   "server.settings.turnLimit": "Threads at the same time",
   "server.settings.turnLimitDescription":
     "How many agent threads can run at the same time on this server. More threads use more memory.",

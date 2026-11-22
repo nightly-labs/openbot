@@ -11,6 +11,9 @@ export const messages = {
   "error.voice.transcriptionTimedOut": "语音转写超时。",
   "error.voice.prepareRequired": "本地语音转写不可用。请运行 `bun run voice:prepare` 并重启 OpenBot。",
   "error.voice.transcriptionFailed": "OpenBot 无法转写这段录音。",
+  "error.voice.videoModelMissing": "尚未在“设置 → 语音”中设置用于录音的语音识别模型。",
+  "error.voice.videoModelMissingServer":
+    "此服务器上尚未设置语音识别模型。所有者或管理员可以在服务器设置的“语音识别”中设置模型。",
   "error.voice.cloud.keyRequired": "请在“设置 → 语音”中添加 {provider} API 密钥。",
   "error.voice.cloud.keyRejected": "{provider} 未接受该 API 密钥，请在“设置 → 语音”中检查。",
   "error.voice.cloud.quotaExceeded": "你的 {provider} 配额已用完。",

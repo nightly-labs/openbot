@@ -392,6 +392,10 @@ export const messages = {
     "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente. En un servidor, el navegador también la usa después del próximo reinicio.",
   "server.settings.timezoneAutomatic": "Automática ({zone})",
   "server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
+  "server.settings.voiceModel.section": "Reconocimiento de voz",
+  "server.settings.voiceModel.description":
+    "Los agentes de este servidor usan este modelo para transcribir el sonido de los vídeos que no tienen subtítulos.",
+  "server.settings.voiceModel.loadFailed": "No se pudo cargar el modelo de reconocimiento de voz del servidor.",
   "server.settings.turnLimit": "Hilos a la vez",
   "server.settings.turnLimitDescription":
     "Cuántos hilos de agentes pueden ejecutarse a la vez en este servidor. Más hilos usan más memoria.",

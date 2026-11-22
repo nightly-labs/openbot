@@ -271,6 +271,7 @@ import { HostReleaseService, readInstallationMode } from "./host-release-service
 import { HostService } from "./host-service";
 import { HostTurnLimitsPreferenceStore } from "./host-turn-limits-preference-store";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
+import { HostVoiceModelService } from "./host-voice-model";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
 import {
   applyHostedServerAccount,
@@ -753,6 +754,7 @@ export interface ApplicationServices {
   hermesImport: HermesImportService;
   instanceTransfer: InstanceTransferService;
   voice: VoiceTranscriptionService;
+  hostVoiceModel: HostVoiceModelService;
   speech: VoiceSpeechService;
   voiceServer: VoiceServerService;
   dynamicIsland: DynamicIslandWindowController;
@@ -2034,7 +2036,13 @@ export async function createApplicationServices({
               ? voice.transcribe(audio)
               : Effect.fail(
                   new VoiceOperationError({
-                    cause: new Error("No speech recognition model for recordings is set up in Settings → Voice."),
+                    cause: new Error(
+                      sourceText(
+                        hostedServer || serverModeEnvironment || localServerChild
+                          ? "error.voice.videoModelMissingServer"
+                          : "error.voice.videoModelMissing",
+                      ),
+                    ),
                   }),
                 ),
           ),
@@ -3208,6 +3216,10 @@ export async function createApplicationServices({
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
       timezone: serverTimezone,
+      voiceModel: {
+        snapshot: () => hostVoiceModel.snapshot(),
+        change: (change) => hostVoiceModel.change(change),
+      },
       turnLimits: hostTurnLimits,
       ...(serverModeEnvironment
         ? {
@@ -3856,6 +3868,7 @@ export async function createApplicationServices({
     openStreamSocket: openScribeSocket,
     modelFetch: voiceModelFetch,
   });
+  const hostVoiceModel = new HostVoiceModelService(voice);
   if (app.isPackaged) {
     void Effect.runPromise(removeLegacyWhisperCache(join(app.getPath("userData"), "runtimes", "whisper"))).catch(
       (error) => logger.warn("Could not remove the old Whisper model cache.", toLogValue(error)),
@@ -4314,6 +4327,7 @@ export async function createApplicationServices({
     hermesImport,
     instanceTransfer,
     voice,
+    hostVoiceModel,
     speech,
     voiceServer,
     dynamicIsland,

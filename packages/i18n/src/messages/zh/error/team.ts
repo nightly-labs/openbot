@@ -118,6 +118,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "当前连接不支持更改服务器身份。",
   "error.team.hostUpdateUnsupported": "当前连接不支持主机更新。",
   "error.team.hostTimezoneUnsupported": "当前连接不支持服务器时区。",
+  "error.team.hostVoiceModelUnsupported": "此连接不支持服务器的语音识别模型。",
   "error.team.hostRestartUnsupported": "当前连接不支持重启服务器。",
   "error.team.ownerTransferUnsupported": "该服务器不支持转移所有权。",
   "error.team.hostKeyRotationUnsupported": "当前连接不支持更改服务器密钥。",

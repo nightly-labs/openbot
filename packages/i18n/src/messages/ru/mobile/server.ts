@@ -383,6 +383,7 @@ export const messages = {
   "mobile.server.route.timezone": "Часовой пояс",
   "mobile.server.route.personality": "Личность агента",
   "mobile.server.route.agents": "Агенты",
+  "mobile.server.route.voiceModel": "Распознавание речи",
   "mobile.server.settings.storage": "Хранилище",
   "mobile.server.route.storage": "Хранилище",
   "mobile.server.route.storageFiles": "Все файлы",
@@ -517,6 +518,19 @@ export const messages = {
     "Подключитесь к этому серверу как владелец или администратор, чтобы изменить его часовой пояс.",
   "mobile.server.settings.timezoneUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его часовой пояс.",
+  "mobile.server.settings.voiceModelDescription":
+    "Агенты на этом сервере используют эту модель, чтобы расшифровывать звук видео без субтитров.",
+  "mobile.server.settings.voiceModelLoading": "Загрузка распознавания речи…",
+  "mobile.server.settings.voiceModelLoadFailed": "Не удалось загрузить модель распознавания речи сервера.",
+  "mobile.server.settings.voiceModelSaveFailed": "Не удалось изменить модель распознавания речи. Попробуйте ещё раз.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь распознавание речи.",
+  "mobile.server.settings.voiceModelReady": "Готово",
+  "mobile.server.settings.voiceModelDownloading": "Загрузка: {percent}",
+  "mobile.server.settings.voiceModelSize": "Загрузка {size}",
+  "mobile.server.settings.voiceModelDownload": "Скачать",
+  "mobile.server.settings.voiceModelCancel": "Остановить",
+  "mobile.server.settings.voiceModelRemove": "Удалить",
   "mobile.server.settings.keySection": "Ключ сервера",
   "mobile.server.settings.keyChanged": "Последнее изменение",
   "mobile.server.settings.keyChange": "Сменить ключ",

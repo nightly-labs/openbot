@@ -464,6 +464,10 @@ export const messages = {
     "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل. على الخادم، يستخدمها المتصفح أيضًا بعد إعادة التشغيل التالية.",
   "server.settings.timezoneAutomatic": "تلقائي ({zone})",
   "server.settings.timezoneLoadFailed": "تعذّر تحميل المنطقة الزمنية للخادم.",
+  "server.settings.voiceModel.section": "التعرّف على الكلام",
+  "server.settings.voiceModel.description":
+    "يستخدم الوكلاء على هذا الخادم هذا النموذج لتفريغ صوت مقاطع الفيديو التي لا تحتوي على ترجمة نصية.",
+  "server.settings.voiceModel.loadFailed": "تعذّر تحميل نموذج التعرّف على الكلام الخاص بالخادم.",
   "server.settings.turnLimit": "السلاسل في الوقت نفسه",
   "server.settings.turnLimitDescription":
     "عدد سلاسل الوكلاء التي يمكن تشغيلها في الوقت نفسه على هذا الخادم. السلاسل الأكثر تستخدم ذاكرة أكثر.",

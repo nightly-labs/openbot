@@ -383,6 +383,10 @@ export const messages = {
     "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "server.settings.timezoneAutomatic": "自動 ({zone})",
   "server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
+  "server.settings.voiceModel.section": "音声認識",
+  "server.settings.voiceModel.description":
+    "このサーバーのエージェントは、字幕のない動画の音声をこのモデルで文字起こしします。",
+  "server.settings.voiceModel.loadFailed": "サーバーの音声認識モデルを読み込めませんでした。",
   "server.settings.turnLimit": "同時に実行するスレッド",
   "server.settings.turnLimitDescription":
     "このサーバーで同時に実行できるエージェントのスレッド数です。スレッドが多いほどメモリーを多く使います。",

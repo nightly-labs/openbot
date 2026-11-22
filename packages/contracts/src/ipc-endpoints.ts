@@ -608,6 +608,8 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
+  HostVoiceModel,
+  HostVoiceModelChange,
   SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
@@ -1215,6 +1217,10 @@ export const IPC_ENDPOINTS = {
     ),
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getVoiceModel: scopedQuery<HostVoiceModel, "required">()("host-admin:get-voice-model"),
+    changeVoiceModel: scopedRequest<HostVoiceModelChange, HostVoiceModel, "required">()(
+      "host-admin:change-voice-model",
+    ),
     getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
     setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),

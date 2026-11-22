@@ -388,6 +388,10 @@ export const messages = {
     "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır. Bir sunucuda tarayıcı da bir sonraki yeniden başlatmadan sonra bunu kullanır.",
   "server.settings.timezoneAutomatic": "Otomatik ({zone})",
   "server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
+  "server.settings.voiceModel.section": "Konuşma tanıma",
+  "server.settings.voiceModel.description":
+    "Bu sunucudaki ajanlar, altyazısı olmayan videoların sesini yazıya dökmek için bu modeli kullanır.",
+  "server.settings.voiceModel.loadFailed": "Sunucunun konuşma tanıma modeli yüklenemedi.",
   "server.settings.turnLimit": "Aynı anda mesaj dizileri",
   "server.settings.turnLimitDescription":
     "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",

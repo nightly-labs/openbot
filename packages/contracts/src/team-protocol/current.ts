@@ -112,6 +112,7 @@ import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
+import { HOST_VOICE_MODEL_CAPABILITY } from "./host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
@@ -799,6 +800,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [STORAGE_WORKFLOW_FILES_CAPABILITY, V10],
   [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
   [CHANNEL_FOLDERS_CAPABILITY, V10],
+  [HOST_VOICE_MODEL_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

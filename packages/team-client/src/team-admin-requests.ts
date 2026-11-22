@@ -101,6 +101,7 @@ import {
   decodeHostVaultCodes,
   decodeHostVaultImport,
   decodeHostVaultState,
+  decodeHostVoiceModel,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
   decodeInstalledSkills,
@@ -150,6 +151,8 @@ import {
   type HostTimezoneSettings,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
+  type HostVoiceModel,
+  type HostVoiceModelChange,
   type InstallAgentTemplateInput,
   type InstalledSkill,
   type InstallMarketplaceAgentInput,
@@ -334,6 +337,7 @@ import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-relea
 import { HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import {
   decodeLiveVoiceAccount,
@@ -809,6 +813,17 @@ export function setHostTimezone(
   timezone: string | null,
 ): Effect.Effect<HostTimezoneSettings, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
+}
+
+export function getHostVoiceModel(request: TeamApiRequest): Effect.Effect<HostVoiceModel, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_VOICE_MODEL_ROUTES.settings, decodeHostVoiceModel, {}));
+}
+
+export function changeHostVoiceModel(
+  request: TeamApiRequest,
+  { action, modelId }: HostVoiceModelChange,
+): Effect.Effect<HostVoiceModel, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_VOICE_MODEL_ROUTES.change, decodeHostVoiceModel, { action, modelId }));
 }
 
 export function requestHostRestart(request: TeamApiRequest): Effect.Effect<void, TeamAdminRequestError> {
