@@ -128,7 +128,10 @@ answer after a person's request, the tool returns `shown`, not a refusal: after 
 did not call the tool on the later wakes. The CLI wakes the model with its own prompt, which does not
 name the tool, so a Claude agent always loads the tool (not behind the tool search) and its developer
 instructions say when a wake needs no answer. The model decides: in tests, Sonnet called the tool on
-a wake with nothing new, and Haiku often wrote a status line instead. The lifecycle
+a wake with nothing new, and Haiku often wrote a status line instead. The client starts the CLI with
+`CLAUDE_CODE_SILENT_TURN_REMINDER=0`: that CLI reminder tells the model, after some turns with no
+text, to say what it is doing, so the model wrote a status line on wakes that had nothing new, and
+each line notified the user (#14730). The lifecycle
 keeps the newest quiet turns and the newest such turns in memory only, so after a restart such a turn
 shows.
 
