@@ -34,6 +34,7 @@ import {
   ServerPersonalityRow,
   ServerSkillLearningRow,
 } from "@/features/servers/components/server-learning-rows";
+import { ServerVoiceModelRow } from "@/features/servers/components/server-voice-model-row";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import { canRestartServer, useOwnerHostedServerIds } from "@/features/servers/model/server-settings-access";
@@ -319,7 +320,8 @@ function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
     checks.canManageAgentMemoryLimit(serverId) ||
     checks.canManageMemoryReview(serverId) ||
     checks.canManageSkillLearning(serverId) ||
-    checks.canManageBrowsingMemory(serverId)
+    checks.canManageBrowsingMemory(serverId) ||
+    checks.canManageServerVoiceModel(serverId)
   );
 }
 
@@ -386,6 +388,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
     canManageMemoryReview,
     canManageSkillLearning,
     canManageBrowsingMemory,
+    canManageServerVoiceModel,
   } = useMobileWorkspace();
   return (
     <>
@@ -394,6 +397,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
       {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
       {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
       {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+      {canManageServerVoiceModel(serverId) ? <ServerVoiceModelRow serverId={serverId} /> : null}
     </>
   );
 }

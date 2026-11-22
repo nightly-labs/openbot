@@ -332,6 +332,7 @@ export const messages = {
   "mobile.server.route.timezone": "タイムゾーン",
   "mobile.server.route.personality": "エージェントの性格",
   "mobile.server.route.agents": "エージェント",
+  "mobile.server.route.voiceModel": "音声認識",
   "mobile.server.settings.storage": "ストレージ",
   "mobile.server.route.storage": "ストレージ",
   "mobile.server.route.storageFiles": "すべてのファイル",
@@ -457,6 +458,19 @@ export const messages = {
     "タイムゾーンを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.settings.timezoneUnsupported":
     "ここでタイムゾーンを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.voiceModelDescription":
+    "このサーバーのエージェントは、字幕のない動画の音声をこのモデルで文字起こしします。",
+  "mobile.server.settings.voiceModelLoading": "音声認識を読み込み中…",
+  "mobile.server.settings.voiceModelLoadFailed": "サーバーの音声認識モデルを読み込めませんでした。",
+  "mobile.server.settings.voiceModelSaveFailed": "音声認識モデルを変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.voiceModelUnsupported":
+    "ここで音声認識を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.voiceModelReady": "準備完了",
+  "mobile.server.settings.voiceModelDownloading": "ダウンロード中: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} のダウンロード",
+  "mobile.server.settings.voiceModelDownload": "ダウンロード",
+  "mobile.server.settings.voiceModelCancel": "ダウンロードを停止",
+  "mobile.server.settings.voiceModelRemove": "削除",
   "mobile.server.settings.keySection": "サーバーキー",
   "mobile.server.settings.keyChanged": "最終変更",
   "mobile.server.settings.keyChange": "キーを変更",

@@ -14,6 +14,13 @@ a script that loops cannot spend the user's quota. The value is an account defau
 (`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Server Settings ›
 Agents › Local scripts.
 
+A script answers as a person who is not the owner (`respondToLocalAttention`): it cannot press a
+privileged UI block action or accept an owner-only approval, so a frozen block with a privileged
+answer always comes from the owner or an admin. A click in the desktop app or the Dynamic Island
+answers as the owner and saves `HostService.conversationSender()` as `respondedBy`, the same as a
+Team API click saves the member. Signed out, there is no sender to save. `history_read` and
+`channel_history` give it to agents as `answeredBy` on the answered card message.
+
 A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
 kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
 crash. The flag is in `agent_json` and needs no migration; a profile without it is off. Only the user

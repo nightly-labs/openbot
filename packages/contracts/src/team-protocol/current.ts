@@ -114,6 +114,7 @@ import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
+import { HOST_VOICE_MODEL_CAPABILITY } from "./host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
@@ -808,6 +809,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [PROMPT_CACHE_TTL_PI_CAPABILITY, V10],
   [CACHE_EXPIRY_COMPACTION_CAPABILITY, V10],
   [AGENT_ARCHIVED_THREADS_CAPABILITY, V10],
+  [HOST_VOICE_MODEL_CAPABILITY, V10],
   [TEAM_USAGE_READ_FAILED_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 

@@ -339,6 +339,7 @@ export const messages = {
   "mobile.server.route.timezone": "Zona horaria",
   "mobile.server.route.personality": "Personalidad del agente",
   "mobile.server.route.agents": "Agentes",
+  "mobile.server.route.voiceModel": "Reconocimiento de voz",
   "mobile.server.settings.storage": "Almacenamiento",
   "mobile.server.route.storage": "Almacenamiento",
   "mobile.server.route.storageFiles": "Todos los archivos",
@@ -466,6 +467,20 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Conéctate a este servidor como propietario o administrador para cambiar su zona horaria.",
   "mobile.server.settings.timezoneUnsupported": "Actualiza OpenBot en este servidor para cambiar aquí su zona horaria.",
+  "mobile.server.settings.voiceModelDescription":
+    "Los agentes de este servidor usan este modelo para transcribir el sonido de los vídeos que no tienen subtítulos.",
+  "mobile.server.settings.voiceModelLoading": "Cargando el reconocimiento de voz…",
+  "mobile.server.settings.voiceModelLoadFailed": "No se pudo cargar el modelo de reconocimiento de voz del servidor.",
+  "mobile.server.settings.voiceModelSaveFailed":
+    "No se pudo cambiar el modelo de reconocimiento de voz. Inténtalo de nuevo.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Actualiza OpenBot en este servidor para cambiar aquí su reconocimiento de voz.",
+  "mobile.server.settings.voiceModelReady": "Listo",
+  "mobile.server.settings.voiceModelDownloading": "Descargando: {percent}",
+  "mobile.server.settings.voiceModelSize": "Descarga de {size}",
+  "mobile.server.settings.voiceModelDownload": "Descargar",
+  "mobile.server.settings.voiceModelCancel": "Detener descarga",
+  "mobile.server.settings.voiceModelRemove": "Quitar",
   "mobile.server.settings.keySection": "Clave del servidor",
   "mobile.server.settings.keyChanged": "Último cambio",
   "mobile.server.settings.keyChange": "Cambiar clave",
