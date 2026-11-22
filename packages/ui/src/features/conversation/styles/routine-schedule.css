@@ -1,4 +1,3 @@
-/* Routine schedule row: the frequency and its values as one sentence of chips. */
 .routine-trigger-row,
 .routine-weekday-strip,
 .routine-calendar-days {
@@ -8,11 +7,8 @@
   padding: 0;
 }
 
-/* Keyboard focus uses the shared focus ring, as the other controls do. The ring is a box shadow, so
-   the native outline goes. This rule has the same weight as the accent outline rule in auth.css,
-   which loads earlier. */
 :is(.routine-schedule-picker, .routine-popover, .routine-chip-select-content)
-:is(button, input, textarea):focus-visible {
+  :is(button, input, textarea):focus-visible {
   outline: 0;
 }
 
@@ -26,8 +22,6 @@
   gap: var(--openbot-space-1-5);
 }
 
-/* One line at every width. A narrow row shrinks its flexible chip, not the line count. */
-/* In a panel the row is a form field, so it has the box of the settings inputs around it. */
 .routine-trigger-row {
   display: flex;
   min-width: 0;
@@ -83,7 +77,6 @@
   flex: 1;
   align-items: center;
   gap: var(--openbot-space-2);
-  /* Clips a row that is narrower than its fixed chips, and keeps the focus ring visible. */
   overflow: clip;
   overflow-clip-margin: var(--openbot-space-1);
 }
@@ -148,7 +141,6 @@
   text-overflow: ellipsis;
 }
 
-/* The chips sit one padding inside the box, so the row is as tall as an input at every width. */
 .routine-schedule-picker[data-density="panel"] .routine-chip {
   height: var(--openbot-control-sm);
   border-radius: var(--openbot-radius-xs);
@@ -212,7 +204,6 @@
   padding-inline-start: 0;
 }
 
-/* Popovers */
 .routine-popover {
   z-index: var(--openbot-layer-popover);
   border-radius: var(--openbot-radius-lg);
@@ -247,7 +238,6 @@
   box-shadow: var(--openbot-focus-ring);
 }
 
-/* The strip is short, so an unselected day can look like a button. A month grid stays plain. */
 .routine-weekday-strip .routine-day {
   background: var(--openbot-bg-control-active);
 }
@@ -269,7 +259,6 @@
   box-shadow: var(--openbot-focus-ring);
 }
 
-/* Time */
 .routine-clock-input {
   display: flex;
   align-items: center;
@@ -325,7 +314,6 @@
   box-shadow: var(--openbot-focus-ring);
 }
 
-/* Hours window: a two-option list and, for "Between hours", the times beside it. */
 .routine-window-menu {
   display: grid;
   width: 240px;
@@ -416,7 +404,6 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* Calendar */
 .routine-calendar {
   display: grid;
   width: calc(7 * var(--openbot-control-md) + 6 * var(--openbot-space-0-5));
@@ -463,17 +450,6 @@
   opacity: 0.32;
 }
 
-/* Chat card */
-/*
- * As wide as its content, as a message is: the row sets the width, and a narrow chat shrinks it.
- * The minimum keeps the card still while most edits change the chips. It needs the second class
- * because interaction-cards.css loads later and resets `min-width`.
- */
-/*
- * The row takes the most space that still shows every label whole. RoutineSchedulePicker sets
- * `data-fit` from the labels and the width, so a short row keeps its room in a narrow panel.
- * Each step keeps the rules of the steps before it.
- */
 .routine-schedule-picker:not([data-fit="roomy"]) .routine-trigger-chips {
   gap: var(--openbot-space-1-5);
 }
@@ -521,7 +497,6 @@
   padding: 0 var(--openbot-space-1-5);
 }
 
-/* The value chips then cut their labels short, and the frequency and time chips stay whole. */
 .routine-schedule-picker[data-fit="minimal"] :is(.routine-trigger-icon, .routine-connector) {
   display: none;
 }
@@ -530,11 +505,6 @@
   gap: var(--openbot-space-1);
 }
 
-/*
- * The end of a trigger row: the menu that changes the trigger. It sits one padding from the end,
- * as the icon does at the start. The menu button has the size of a chip, so the row stays as tall
- * as an input.
- */
 .routine-trigger-action {
   display: inline-flex;
   flex: 0 0 auto;
@@ -552,10 +522,6 @@
   border-radius: var(--openbot-radius-xs);
 }
 
-/*
- * The webhook trigger: a header, then one full-width row for each value. The header icon starts
- * where the row text starts, and the row actions share one column with the menu button.
- */
 .routine-trigger-card {
   display: grid;
   min-width: 0;
@@ -584,13 +550,11 @@
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
-  /* Mostly lowercase text looks low when its line box is centered. Center the x-height on the icon. */
   text-box: trim-both ex alphabetic;
 }
 
 .routine-webhook-field {
   display: grid;
-  /* An action, the row padding and the top border, so a row without an action has the same height. */
   min-height: calc(var(--openbot-control-sm) + var(--openbot-space-2) + 1px);
   grid-template-columns: minmax(84px, auto) minmax(0, 1fr) var(--openbot-control-sm);
   align-items: center;
@@ -627,7 +591,6 @@ code.routine-webhook-value {
   font-family: inherit;
 }
 
-/* A new secret wraps in a fixed-width font, so the user can read each character before copying it. */
 code.routine-webhook-secret {
   padding-block: var(--openbot-space-1-5);
   font-family: var(--openbot-font-mono);
@@ -645,7 +608,6 @@ code.routine-webhook-secret {
   height: var(--openbot-control-sm);
 }
 
-/* The secret row can have two actions. They share the last column, which grows to fit them. */
 .routine-webhook-field:has(> .routine-webhook-actions) {
   grid-template-columns: minmax(84px, auto) minmax(0, 1fr) minmax(var(--openbot-control-sm), auto);
 }
@@ -655,7 +617,6 @@ code.routine-webhook-secret {
   align-items: center;
 }
 
-/* The Events row is a ghost Button; two classes keep the row layout over the button styles. */
 .routine-webhook-field.routine-webhook-events-toggle {
   width: auto;
   min-width: 0;
@@ -688,7 +649,6 @@ code.routine-webhook-secret {
   color: var(--openbot-text-muted);
 }
 
-/* A status sentence wraps; a URL or a secret stays on one line. */
 .ui-text.routine-webhook-value {
   white-space: normal;
 }
@@ -709,8 +669,6 @@ code.routine-webhook-secret {
   gap: var(--openbot-space-2);
 }
 
-/* In a chat card the rows are one block, so the card gap does not split them, and they line up
- * with the card title. */
 .routine-webhook-card-endpoint {
   display: grid;
   border-bottom: 1px solid var(--openbot-border);
@@ -721,7 +679,6 @@ code.routine-webhook-secret {
   padding-inline-start: 0;
 }
 
-/* The setup steps: a number, or a check when done, beside each step. */
 .routine-webhook-steps {
   display: grid;
   margin: 0;
@@ -775,7 +732,6 @@ code.routine-webhook-secret {
   height: var(--openbot-icon-sm);
 }
 
-/* A value row inside a step has its own border. */
 .routine-webhook-inset {
   min-width: 0;
   border: 1px solid var(--openbot-border);
@@ -827,7 +783,6 @@ code.routine-webhook-secret {
   margin: 0;
 }
 
-/* Hints are captions, not field labels. */
 .routine-webhook-events .settings-field > .ui-text {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
@@ -843,7 +798,6 @@ code.routine-webhook-secret {
   font-weight: inherit;
 }
 
-/* A quiet link under the rows. Its text starts under the row labels. */
 .routine-webhook-filter-link {
   justify-self: start;
   margin-block: 0 var(--openbot-space-1);
@@ -861,8 +815,6 @@ code.routine-webhook-secret {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* The trigger menu: a name and one line that tells when the routine runs. It is taller than a short
- * window, so it fits the space left and scrolls; the webhook row stays reachable. */
 .routine-trigger-menu {
   width: 300px;
   max-height: min(560px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 560px));
@@ -892,7 +844,6 @@ code.routine-webhook-secret {
   color: var(--openbot-text-primary);
 }
 
-/* The previous and next months, and the closed disclosures, point the other way in RTL. */
 :dir(rtl) .routine-calendar-header :is(svg[class~="lucide-chevron-left"], svg[class~="lucide-chevron-right"]),
 :dir(rtl) .routine-webhook-events-toggle > svg[class~="lucide-chevron-right"],
 :dir(rtl) svg[class~="lucide-chevron-right"].routine-webhook-disclosure-icon {

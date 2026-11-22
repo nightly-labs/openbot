@@ -23,7 +23,6 @@ import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/worksp
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, type MobileText, useText } from "@/shared/lib/text";
 
-/** The restart blockers that the host reports, as the user reads them. */
 const RESTART_REASON_KEYS: Record<string, MobileTextKey> = {
   "agent-turn": "mobile.server.update.reason.agentTurn",
   "queued-delivery": "mobile.server.update.reason.queuedDelivery",
@@ -48,11 +47,6 @@ const RELEASE_PATH_KEYS = {
   unavailable: "mobile.server.update.path.unavailable",
 } as const satisfies Record<string, MobileTextKey>;
 
-/**
- * Server settings > Updates: the OpenBot update of the server's host, as the Updates section of the
- * desktop Server Settings shows it. Owners and admins also choose the restart, cancel it and change
- * the automatic updates. A member can only ask for an update that waits for idle agents.
- */
 export function ServerUpdatesScreen() {
   const text = useText();
   const { t, errorMessage } = text;
@@ -67,7 +61,6 @@ export function ServerUpdatesScreen() {
   const [error, setError] = useState<string | null>(null);
   const name = servers.find((server) => server.id === serverId)?.name ?? "";
   const snapshot = query.data;
-  // A host that restarts into the update goes offline. The page keeps its last status until it is back.
   if (!snapshot)
     return (
       <SettingsContent>
@@ -85,7 +78,6 @@ export function ServerUpdatesScreen() {
   const blocked = updateBlocked(status);
   const admin = access === "admin";
   const loadFailed = query.isError;
-  // A host that restarts into the update cannot answer. The footer keeps the restart text.
   const showLoadFailure = loadFailed && !updateRunning(status);
   const disabled = !access || busy !== null || loadFailed || blocked;
   const checkDisabled = !access || busy !== null || loadFailed || (release ? release.phase === "unavailable" : blocked);
@@ -111,7 +103,6 @@ export function ServerUpdatesScreen() {
   function check() {
     if (!access) return;
     void act("check", async () => {
-      // The release check leaves the update status as it is. The page reads it again while the check runs.
       return release
         ? { release: await checkServerRelease(serverId) }
         : { status: await checkServerUpdate(serverId, access) };
@@ -185,7 +176,6 @@ export function ServerUpdatesScreen() {
         {actionsShown && !blocked ? (
           <SettingsRow
             disclosure={false}
-            // Only a relaunch of the host recovers from a failed install.
             disabled={disabled || !status.availableVersion || status.errorCode === "install_failed"}
             onPress={offerUpdate}
           >
@@ -263,7 +253,6 @@ export function ServerUpdatesScreen() {
   );
 }
 
-/** Why no action can run here, and what the host administrator can do instead. */
 function blockedNotice(
   { t }: MobileText,
   snapshot: ServerUpdateSnapshot,
@@ -337,7 +326,6 @@ function statusMessage({ t, format }: MobileText, snapshot: ServerUpdateSnapshot
   }
 }
 
-/** Who asked for the restart, and the work that it waits for. */
 function restartMessage({ t, format }: MobileText, status: HostUpdateStatus, name: string): string {
   const restart = status.restart;
   if (!restart) return "";

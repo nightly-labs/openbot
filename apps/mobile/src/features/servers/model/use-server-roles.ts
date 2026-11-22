@@ -15,7 +15,6 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 
-/** Everyone gives `manage` for an agent that it does not list; another role gives `none`. */
 export function everyoneLevel(everyone: AgentAccessLevels, agentId: string): AgentAccessLevel {
   return everyone[agentId] ?? "manage";
 }
@@ -24,11 +23,6 @@ export function roleLevel(role: AgentAccessRole, agentId: string): AgentAccessLe
   return role.agents[agentId] ?? "none";
 }
 
-/**
- * The roles of one server (`agent-access-v1`), as the Roles, Role and Member pages of the server
- * sheet show them. Each change saves the whole set with the revision that it read; the host refuses
- * a stale one, and the pages read the roles again.
- */
 export function useServerRoles(serverId: string) {
   const available = useMobileWorkspaceSelector((workspace) => workspace.canManageServerRoles(serverId));
   const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
@@ -54,7 +48,6 @@ export function useServerRoles(serverId: string) {
     },
     onError: () => {
       void haptics.notification("error");
-      // Another admin saved first, or the host refused the change: show what it holds now.
       void roles.refetch();
     },
     onSettled: () => {
@@ -69,7 +62,6 @@ export function useServerRoles(serverId: string) {
     everyone: snapshot?.everyone,
     list: snapshot?.roles,
     agents: agents.filter((agent) => agent.serverId === serverId),
-    /** Runs one change at a time on a copy of the roles. Resolves true when it succeeds. */
     save(edit: (change: AgentAccessChange) => void): Promise<boolean> {
       if (locked.current || !snapshot?.everyone || !snapshot.roles) return Promise.resolve(false);
       locked.current = true;
@@ -87,33 +79,19 @@ export function useServerRoles(serverId: string) {
   };
 }
 
-/**
- * True when the roles let this person only view `agentId`. The host sends each change of the roles as
- * `agents-changed` too, and that event reads the levels again. Unknown levels do not limit: the host
- * checks each write.
- */
 export function useAgentViewOnly(serverId: string, agentId: string): boolean {
   return useAgentAccessLevel(serverId, agentId) === "view";
 }
 
-/**
- * The level that the roles give this person on `agentId`: `manage` for an owner or admin. Null while
- * the levels are unknown, and on a host without `agent-access-v1`.
- */
 export function useAgentAccessLevel(serverId: string, agentId: string): AgentAccessLevel | null {
   return useAgentAccessLevels(serverId).level(agentId);
 }
 
-/**
- * The levels of this person on each agent of a server. `limited` is false on a host without
- * `agent-access-v1`: each member then uses each agent, and `level` gives null.
- */
 export function useAgentAccessLevels(serverId: string): {
   limited: boolean;
   level: (agentId: string) => AgentAccessLevel | null;
 } {
   const limited = useMobileWorkspaceSelector((workspace) => workspace.hasAgentAccessLimits(serverId));
-  // An owner or admin can use all agents, also with levels read before a promotion.
   const role = useMobileWorkspaceSelector(
     (workspace) => workspace.servers.find((server) => server.id === serverId)?.role,
   );
@@ -122,8 +100,6 @@ export function useAgentAccessLevels(serverId: string): {
   const access = useQuery({
     queryKey: queryKeys.serverRoles(queryScope, serverId),
     enabled: limited,
-    // Kept while the app runs: offline, the last levels that the host sent still apply. After a
-    // restart offline, the levels are unknown until the host answers.
     gcTime: Number.POSITIVE_INFINITY,
     queryFn: () => loadServerRoles(serverId),
   });
@@ -134,7 +110,6 @@ export function useAgentAccessLevels(serverId: string): {
   };
 }
 
-/** Adds `memberId` to the role or takes it out. */
 export function setRoleMember(change: AgentAccessChange, roleId: string, memberId: string, on: boolean): void {
   const role = change.roles.find((item) => item.id === roleId);
   if (!role) return;
@@ -142,7 +117,6 @@ export function setRoleMember(change: AgentAccessChange, roleId: string, memberI
   role.memberIds = on ? [...others, memberId] : others;
 }
 
-/** The names of the roles that `memberId` has, in the order of the server. */
 export function memberRoleNames(roles: readonly AgentAccessRole[] | undefined, memberId: string): string[] {
   return (roles ?? []).filter((role) => role.memberIds.includes(memberId)).map((role) => role.name);
 }

@@ -100,7 +100,6 @@ const meta = {
     onSubmit: fn(async () => false),
     onOpenLink: fn(),
   },
-  // The bubble alone on a canvas. "In chat" sets `stage: false`, because the real chat fills the window.
   decorators: [
     (Story, context) =>
       context.parameters.stage === false ? (
@@ -117,7 +116,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The real chat with a pending prompt: the timeline, the header and the composer of the app. */
 export const InChat: Story = {
   name: "In chat",
   args: { questions: multipleQuestions, onSubmit: fn(async () => true) },
@@ -159,7 +157,6 @@ export const MultipleQuestions: Story = {
   args: { questions: multipleQuestions },
 };
 
-/** The send succeeds, so the last answer opens the summary. */
 export const AnswersSent: Story = {
   args: { questions: multipleQuestions, onSubmit: fn(async () => true) },
 };

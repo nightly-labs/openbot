@@ -68,11 +68,9 @@ export interface AgentRuntimePromptQuestion {
   id: string;
   header: string;
   question: string;
-  /** See `AgentPromptQuestion.detail`. */
   detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
-  /** See `AgentPromptQuestion.multiSelect`. */
   multiSelect?: boolean;
 }
 
@@ -118,9 +116,6 @@ function isRuntimeApproval(value: unknown): value is AgentRuntimeApproval {
   );
 }
 
-// The twin of `isAgentApprovalPermissions` in `ipc-approvals.ts`, bounded by the snapshot's tighter
-// limits instead of the IPC ones. Kept apart on purpose: merging them onto either bound would either
-// let a snapshot exceed its byte cap or reject a legitimate full approval.
 function isRuntimeApprovalPermissions(value: unknown): value is AgentApprovalPermissions {
   return (
     isDynamicRecord(value) &&
@@ -139,7 +134,6 @@ function isRuntimePathList(value: unknown): value is string[] {
   );
 }
 
-/** What fills a part of the context window, in the order the popover lists it. */
 export const AGENT_CONTEXT_CATEGORIES = [
   "systemPrompt",
   "memoryFiles",
@@ -157,11 +151,6 @@ export interface AgentContextCategoryUsage {
   tokens: number;
 }
 
-/**
- * How full the context window of one chat is. The Team API carries it only under context-usage-v1, with
- * the keys and values that `team-protocol/context-usage-v1.ts` freezes: a new key or value goes only to a
- * later capability.
- */
 export interface AgentContextState {
   agentId: string;
   threadId: string;
@@ -171,7 +160,6 @@ export interface AgentContextState {
     autoCompactAt: number | null;
     nativeManaged: boolean;
     estimated?: boolean;
-    /** The provider's estimate of what fills `usedTokens`. Absent when the provider gives only a total. */
     categories?: AgentContextCategoryUsage[];
   } | null;
   compaction: {
@@ -188,7 +176,6 @@ function isContextCount(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
-/** One row per category at most, each a token count. */
 export function isAgentContextCategories(value: unknown): value is AgentContextCategoryUsage[] {
   return (
     Array.isArray(value) &&
@@ -227,7 +214,6 @@ function isAgentContextState(value: unknown): value is AgentContextState {
 
 export interface AgentRuntimeSnapshot {
   contextStates?: AgentContextState[];
-  /** The context of each side thread that reported one, by its `threadId`. Team API: as `contextStates`. */
   threadContextStates?: AgentContextState[];
   agents: AgentRuntimeRosterEntry[];
   activeTurns: Array<{ agentId: string; threadId: string; turnId: string }>;
@@ -240,39 +226,15 @@ export interface AgentRuntimeSnapshot {
     threadId: string;
     turnId: string;
     questions: AgentRuntimePromptQuestion[];
-    /** As on the `prompt` event: no turn waits for it. Absent from a released Team API snapshot. */
     detached?: true;
   }>;
   pendingApprovals: AgentRuntimeApproval[];
   pendingBrowserTakeovers: BrowserTakeoverRequest[];
   failedTurns: Array<{ agentId: string; turnId: string }>;
-  /**
-   * The agents whose queue waits for a provider plan limit to reset, in epoch seconds. Absent from
-   * a released Team API snapshot: its adapters project a fixed key list.
-   */
   usageLimits?: Array<{ agentId: string; resetsAt: number | null }>;
-  /**
-   * Each provider account and model that a usage limit holds, also when no agent is on it now. Absent
-   * from a released Team API snapshot, as `usageLimits` is.
-   */
   usageLimitedModels?: AgentModelChoice[];
-  /**
-   * Each provider account and model that a provider error holds for a while, so that a switch to a
-   * backup model passes over it. Absent from a released Team API snapshot, as `usageLimits` is.
-   */
   failedModels?: AgentModelChoice[];
-  /**
-   * The agents whose subagents still run, with the turn that started them. A background subagent
-   * runs on after its turn, so its agent is still at work. Absent from a released Team API
-   * snapshot, as `usageLimits` is.
-   */
   subagentTurns?: Array<{ agentId: string; turnId: string }>;
-  /**
-   * The chats whose background work, such as a shell command, still runs after their turn ended. The
-   * provider starts a turn by itself when the work ends. `taskId` is null for the agent's own chat, and
-   * `since` is when the work started, from `Date.now()` on the host. Absent from a released Team API
-   * snapshot, as `usageLimits` is.
-   */
   backgroundWork?: Array<{ agentId: string; taskId: string | null; since: number }>;
 }
 
@@ -363,7 +325,9 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
   );
 }
 
-function isRuntimePrompt(value: unknown): value is AgentRuntimeSnapshot["pendingPrompts"][number] {
+export type AgentRuntimePrompt = AgentRuntimeSnapshot["pendingPrompts"][number];
+
+export function isRuntimePrompt(value: unknown): value is AgentRuntimePrompt {
   return (
     isDynamicRecord(value) &&
     isRequestId(value.requestId) &&

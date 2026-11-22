@@ -1,23 +1,10 @@
-// The Antigravity agent of `antigravity-steer-e2e.ts`. It steers as `agy acp` 1.5.8 did in a live
-// probe: a prompt that arrives while another prompt of the session is open answers the open one with
-// `end_turn` at once, echoes the new message as `user_message_chunk`, and the work goes on under the
-// new prompt. A `work` prompt opens one tool call and stays open. A steer that starts with `more`
-// also stays open; another steer ends the tool call and answers with its text. Each other prompt
-// answers at once. An `ask` prompt asks for a permission and answers with the outcome. A `daemon`
-// prompt starts a daemon command and answers while it runs, as `agy acp` 1.5.x does for a dev server.
-// A `hold` prompt shows a tool call and waits for its approval at once, but sends the permission request
-// only after `FAKE_HOLD_MS`. A prompt during that wait is refused with the error of `agy acp` 1.5.10.
-// `FAKE_VERSION` sets the version in `agentInfo`. A session id holds the process id.
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" };
-/** The prompt that is open, by session. */
 const open = new Map<string, AcpRequest>();
-/** The sessions whose open prompt waits for a permission answer. */
 const waiting = new Set<string>();
 let sessions = 0;
 let replies = 0;
-/** The peer of the last request, for `session/cancel`, which is a notification. */
 let lastPeer: AcpPeer | undefined;
 
 function promptText(request: AcpRequest): string {

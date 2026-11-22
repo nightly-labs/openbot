@@ -29,12 +29,6 @@ import { actionToast } from "../../action-toast";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
-/**
- * The identity form: the name and logo as the server last confirmed them, the draft the user is
- * editing, and the validation feedback that belongs to that draft. `logo` is `undefined` while the
- * saved image stands, `null` once the user removes it, and an image once one is chosen, so it
- * carries the difference between "unchanged" and "cleared" that a save has to send.
- */
 interface ServerIdentityDraft {
   editing: boolean;
   logo: AvatarImageInput | null | undefined;
@@ -47,19 +41,10 @@ interface ServerIdentityDraft {
   savedName: string;
 }
 
-/**
- * The General section's state. Each group's fields are written together - a reset rewrites the
- * whole identity draft at once - so they are one store rather than a signal each, and replacing one
- * field re-renders only what read that field.
- */
 interface GeneralPanels {
   confirmLeave: boolean;
   confirmRotateKey: boolean;
   identity: ServerIdentityDraft;
-  /**
-   * The plush look that the user chose and the server has not confirmed. `undefined` shows the
-   * server's own look, so the picker and the logo change at the click.
-   */
   appearance: ServerAppearance | null | undefined;
   appearancePickerOpen: boolean;
 }
@@ -68,23 +53,15 @@ interface ServerGeneralSection {
   Panel: () => JSX.Element;
   LeaveDialog: () => JSX.Element;
   RotateKeyDialog: () => JSX.Element;
-  /** True while the user edits the identity, so the server's own name and logo do not replace the draft. */
   editing: Accessor<boolean>;
   identityDirty: Accessor<boolean>;
   resetIdentity(): void;
   saveIdentity(): Promise<void>;
-  /**
-   * Saves a valid name or logo that the user did not save, and says whether nothing failed. Members
-   * calls it before it publishes an unnamed server, so that the server does not get a generated name.
-   */
   saveIdentityDraft(): Promise<boolean>;
-  /** Shows the name and logo the server holds now, while the user does not edit them. */
   syncFromServer(name: string, logoUrl: string | null): void;
-  /** Forgets the draft state of the previous server when the dialog shows another one. */
   resetForServer(): void;
 }
 
-/** The General section: server identity, agent settings, and leaving a joined server. */
 export function createServerGeneralSection(host: ServerSettingsSectionHost): ServerGeneralSection {
   const { t, errorMessage, format } = useText();
   const { props, local, configured, published, actionsAvailable, busy, run } = host;
@@ -108,12 +85,7 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
   let logoInput: HTMLInputElement | undefined;
   let nameInput: HTMLInputElement | undefined;
 
-  /** The host changes its own name and logo; an admin elsewhere asks it to while it is online. */
   const canEditIdentity = () => serverCanAdminister(props.server, "host-admin-v1") && actionsAvailable();
-  /**
-   * An owner or admin chooses the plush look. A joined server needs `host-appearance-v1`; this
-   * computer's server needs an identity first, which the first save of the name gives.
-   */
   const canEditAppearance = () =>
     Boolean(props.onSaveAppearance) &&
     serverCanAdminister(props.server, "host-appearance-v1") &&
@@ -121,7 +93,6 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
     (!local() || configured());
   const appearance = (): ServerAppearance | null =>
     panels.appearance === undefined ? (props.server.appearance ?? null) : panels.appearance;
-  /** A choice made while a save runs; it is sent when that save ends, so the last click wins. */
   let queuedAppearance: ServerAppearance | null | undefined;
   let savingAppearance = false;
   const trimmedName = () => panels.identity.name.trim();
@@ -134,16 +105,9 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
     return null;
   };
   const visibleNameError = () => (panels.identity.nameTouched ? nameError() : null);
-  /** The owner cannot leave the host they own, and the local server is this computer. */
   const canLeave = () => Boolean(props.onLeaveServer) && !local() && props.server.role !== "owner";
-  /** The owner removes the server from the account instead. The host does not need to be online. */
   const canRemove = () => Boolean(props.onRemoveServer) && !local() && props.server.role === "owner";
-  /**
-   * The key handover goes through the account service, so this computer's server must be published.
-   * A joined server's owner asks the host while it is online.
-   */
   const canRotateKey = () => Boolean(props.onRotateHostKey) && (local() ? published() : actionsAvailable());
-  /** The last key change that the previous and the new key both signed. Every member sees it. */
   const keyChangedAt = () => props.server.keyChangedAt;
   const identityDirty = () =>
     canEditIdentity() &&
@@ -186,8 +150,6 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
   function updateDraftName(value: string): void {
     const namePristine = value.trim() === panels.identity.savedName;
     const logoPristine = panels.identity.logo === undefined && panels.identity.logoUrl === panels.identity.savedLogoUrl;
-    // Decided before the write, so `nameError()` still sees the pre-write draft name - the same
-    // value it saw when this was a signal, whose write was equally deferred.
     const stopShaking = namePristine || !nameError();
     setPanels((state) => {
       state.identity.name = value;
@@ -225,8 +187,6 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
     const saved = await run("identity", () =>
       props.onSaveIdentity({
         serverName,
-        // The image crosses to IPC, which structured-clones it, so it goes as a snapshot rather
-        // than as whatever the store hands back.
         ...(logo === undefined ? {} : { logo: snapshot(logo) }),
       }),
     );
@@ -264,7 +224,6 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
     } finally {
       savingAppearance = false;
       queuedAppearance = undefined;
-      // The server's own look shows again: the saved one, or the previous one after a failure.
       setPanels((state) => {
         state.appearance = undefined;
       });
@@ -398,7 +357,6 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                 </ItemDescription>
               </ItemContent>
               <ItemActions class="settings-identity-image-control">
-                {/* The plush shows only while the server has no logo, so its picker does too. */}
                 <Show when={canEditAppearance() && !panels.identity.logoUrl}>
                   <Popover.Root
                     open={panels.appearancePickerOpen}
@@ -417,7 +375,6 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                         class: "settings-identity-image-trigger server-appearance-trigger",
                       })}
                       aria-label={t("server.settings.appearance")}
-                      // Another action holds `run`, which would refuse the save with no message.
                       disabled={Boolean(busy()) && busy() !== "appearance"}
                     >
                       <ServerPlushLogo class="server-settings-plush" seed={props.server.id} appearance={appearance()} />

@@ -12,13 +12,11 @@ function isTranslatedLocale(value: unknown): value is TranslatedLocale {
 }
 
 const preview: Preview = {
-  // The toolbar switches every story's text, so a translation can be read in its real layout.
   globalTypes: {
     locale: {
       description: "Interface language",
       toolbar: { icon: "globe", items: [...TRANSLATED_LOCALES], dynamicTitle: true },
     },
-    // The palette of tokens-light.css or the dark base, as the app's root attribute selects it.
     colorScheme: {
       description: "Color scheme",
       toolbar: { icon: "contrast", items: ["dark", "light"], dynamicTitle: true },

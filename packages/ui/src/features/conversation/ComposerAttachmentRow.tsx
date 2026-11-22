@@ -6,32 +6,21 @@ import { fileBadge } from "./AttachmentCards";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
 
-/** A pasted image that is still importing, with its local preview. */
 export interface ComposerPendingImage {
   id: string;
   name: string;
   url: string;
 }
 
-/** A picked or dropped file that has not reached the server yet, or that failed on the way. */
 export interface ComposerUploadFile {
-  /** Unique in the row. */
   key: string;
-  /** The import that carries the file. Retry and remove act on it. */
   uploadId: string;
   name: string;
   size: number;
-  /** The bytes the server confirmed. Null when the transport does not report them. */
   sent: number | null;
-  /** Why the upload failed. Null while it runs. */
   error: string | null;
 }
 
-/**
- * The files of a message box that its text does not name, the pasted images that still import, and
- * the files that still upload. Without `onRetryUpload`, a failed upload can only be removed.
- * A click on an image opens it in the image viewer, with the other images of the box.
- */
 export function ComposerAttachmentRow(props: {
   attachments: readonly DraftAttachment[];
   pending?: readonly ComposerPendingImage[] | undefined;
@@ -40,7 +29,6 @@ export function ComposerAttachmentRow(props: {
   onRemove: (attachment: DraftAttachment) => void;
   onRemoveUpload?: ((uploadId: string) => void) | undefined;
   onRetryUpload?: ((uploadId: string) => void) | undefined;
-  /** The window draws the macOS window controls over the image viewer's top start corner. */
   macWindowControls?: boolean | undefined;
 }) {
   const { t, format } = useText();
@@ -57,7 +45,6 @@ export function ComposerAttachmentRow(props: {
       <div ref={row} class="composer-attachments">
         <For each={props.attachments}>
           {(attachment) => {
-            // An image with no preview (the web client) shows as a file, with its name.
             const chip = () => (attachment.kind === "image" && attachment.previewUrl ? "image" : "file");
             return (
               <div class="composer-attachment ui-removable-image" data-kind={chip()}>
@@ -101,7 +88,6 @@ export function ComposerAttachmentRow(props: {
             );
           }}
         </For>
-        {/* Keyed by file, so a progress report updates the chip rather than drawing a new one. */}
         <For each={props.uploads ?? []} keyed={(upload) => upload.key}>
           {(upload) => (
             <ComposerUploadChip upload={upload()} onRemove={props.onRemoveUpload} onRetry={props.onRetryUpload} />
@@ -132,12 +118,10 @@ export function ComposerAttachmentRow(props: {
   );
 }
 
-/** An image chip with a preview. An SVG has an image preview but is a file chip, so it does not open. */
 function opensInViewer(attachment: DraftAttachment): boolean {
   return attachment.kind === "image" && isLightboxImage(attachment);
 }
 
-/** A file on its way to the server: a ring with the bytes, or the failure with Retry. */
 function ComposerUploadChip(props: {
   upload: ComposerUploadFile;
   onRemove: ((uploadId: string) => void) | undefined;
@@ -194,7 +178,6 @@ function ComposerUploadChip(props: {
       <Show when={props.onRemove}>
         {(remove) => (
           <ImageRemoveButton
-            // An upload goes on in the background; the file lands nowhere.
             label={t("composer.attachment.remove", { name: props.upload.name })}
             onClick={() => remove()(props.upload.uploadId)}
           />

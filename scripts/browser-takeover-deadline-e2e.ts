@@ -1,11 +1,3 @@
-// Runs a takeover card past the provider's tool-call deadline (#9689) on the real `AttentionRegistry`.
-// Antigravity 1.5.9 stops each MCP tool call after 180 s, also with progress. The call must get an
-// answer before then, the card must stay open, and the next call for the same tab must wait on the
-// same card. Cursor asks for no progress and stops each call after 60 s (#10577), so a Vault request
-// card must also answer its call first, stay open, and send only the saved item's name as the late
-// answer. A secure fill that fails gives the page to the user and tells the agent only a fixed reason
-// (#10536). The browser host is a stub: no page, provider or account is used; the Vault is a temporary file.
-// `bun scripts/browser-takeover-deadline-e2e.ts`. Writes .openbot-build/browser-takeover-deadline-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,22 +21,19 @@ const THREAD = "thread-1";
 const TAB = "tab-1";
 const SECRET = "e2e-password-7c41";
 const VAULT_SECRET = "e2e-vault-password-93be";
-/** Short, so the script waits for the real timer and not for 165 s. */
 const DEADLINE_MS = 50;
+const USER_ANSWER_LIMIT_MS = 200;
 
-/** The JSON of a takeover tool result. */
 interface AgentAnswer {
   status?: string;
   next?: string;
   secureInput?: string;
 }
 
-/** Records what OpenBot answers to the agent. The process never starts. */
 class RecordingClient extends CodexAppServerClient {
   readonly answers = new Map<RequestId, unknown>();
   readonly #waiters = new Map<RequestId, () => void>();
 
-  /** Resolves when OpenBot answers the request, so that a host timer is awaited, not slept on. */
   answered(id: RequestId): Promise<unknown> {
     if (this.answers.has(id)) return Promise.resolve(this.answers.get(id));
     return new Promise((done) => this.#waiters.set(id, () => done(this.answers.get(id))));
@@ -62,6 +51,10 @@ class RecordingClient extends CodexAppServerClient {
 }
 
 const client = new RecordingClient("/nonexistent/codex");
+
+class NoteClient extends RecordingClient {
+  readonly userInputNote = true;
+}
 const snapshot: ConversationSnapshot = {
   agentId: AGENT,
   threadId: THREAD,
@@ -82,7 +75,6 @@ const tabs: BrowserTab[] = [
 const events: AgentEvent[] = [];
 const browserLog: string[] = [];
 const submitted: string[] = [];
-/** When set, the fill fails with this error, as a page that the fill cannot complete. */
 let fillFailure: Error | undefined;
 
 function preparedSecret(): PreparedBrowserSecret {
@@ -115,6 +107,13 @@ const registry = new AttentionRegistry({
   },
   browser: {
     listTabs: () => tabs,
+    toolCanUseTab: (params, tabId) =>
+      tabs.some(
+        (candidate) =>
+          candidate.id === tabId &&
+          candidate.ownerAgentId === params.ownerAgentId &&
+          candidate.ownerThreadId === params.threadId,
+      ),
     prepareSecret: () => Effect.sync(preparedSecret),
     beginTakeover: (tabId) =>
       Effect.sync(() => {
@@ -134,11 +133,19 @@ const registry = new AttentionRegistry({
 
 let nextRequest = 1;
 
-/** One provider call of a takeover tool, as the tool router passes it. */
 function call(tool: "submit_secret" | "request_takeover", turnId: string, answerBeforeMs?: number) {
+  return callOn(registry, tool, turnId, answerBeforeMs);
+}
+
+function callOn(
+  target: AttentionRegistry,
+  tool: "submit_secret" | "request_takeover",
+  turnId: string,
+  answerBeforeMs?: number,
+) {
   const id = nextRequest++;
   return runCauseEffect(
-    registry.surfaceBrowserTakeover(client, {
+    target.surfaceBrowserTakeover(client, {
       id,
       method: "item/tool/call",
       params: {
@@ -169,7 +176,6 @@ function answerOf(result: unknown): AgentAnswer & { success: boolean } {
 const count = (type: AgentEvent["type"]) => events.filter((event) => event.type === type).length;
 const openCards = () => registry.runtimeAttention().pendingBrowserTakeovers;
 
-/** Waits for the card's event, not for a time. */
 async function cardShown(before: number): Promise<void> {
   while (count("browser-takeover-requested") === before) await new Promise((done) => setImmediate(done));
 }
@@ -206,7 +212,6 @@ try {
     const shown = count("browser-takeover-requested");
     const requestId = openCards()[0]?.requestId;
     assert(requestId !== undefined);
-    // It waits on the card: its own deadline answers it, and no second card shows.
     const second = answerOf(await call("submit_secret", "turn-1", DEADLINE_MS));
     assert.equal(second.status, "waiting");
     assert.equal(openCards()[0]?.requestId, requestId);
@@ -334,7 +339,18 @@ try {
             snapshot.revision += 1;
           },
         },
-        browser: { listTabs: () => tabs, beginTakeover: () => Effect.void, endTakeover: () => {} },
+        browser: {
+          listTabs: () => tabs,
+          toolCanUseTab: (params, tabId) =>
+            tabs.some(
+              (candidate) =>
+                candidate.id === tabId &&
+                candidate.ownerAgentId === params.ownerAgentId &&
+                candidate.ownerThreadId === params.threadId,
+            ),
+          beginTakeover: () => Effect.void,
+          endTakeover: () => {},
+        },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
         routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
         emit: (event) => events.push(event),
@@ -358,7 +374,6 @@ try {
           tool: "request_vault_item",
           arguments: args,
         },
-        // Cursor's call: no progress token, so the bridge sets only this deadline.
         detachAfterMs: DEADLINE_MS,
       };
       const shown = await runCauseEffect(
@@ -370,7 +385,6 @@ try {
       const pending = vaultRegistry.runtimeAttention().pendingPrompts;
       assert.equal(pending.length, 1, "the card closed with its call");
       assert.equal(pending[0]?.detached, true);
-      // The turn ends, as the agent ends it after the waiting answer. The card stays.
       vaultRegistry.clearForTurn(THREAD, "turn-8", true);
       assert.equal(vaultRegistry.runtimeAttention().pendingPrompts.length, 1, "the end of the turn closed the card");
       const spec = vaultRequestFormSpec(args);
@@ -398,7 +412,259 @@ try {
     }
   });
 
-  /** Submits the card while the fill fails, then the user selects Done; returns the agent's answer. */
+  const releasedAnswers: string[] = [];
+  const limitedEvents: AgentEvent[] = [];
+  const limitedLog: string[] = [];
+  const limitedRegistry = (lateAnswerTarget: () => { taskId?: string } | null) =>
+    new AttentionRegistry({
+      conversation: {
+        agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
+        publicThreadId: (_agentId, threadId) => threadId,
+        ensureSnapshot: () => snapshot,
+        emitConversation: () => {
+          snapshot.revision += 1;
+        },
+      },
+      browser: {
+        listTabs: () => tabs,
+        toolCanUseTab: (params, tabId) =>
+          tabs.some(
+            (candidate) =>
+              candidate.id === tabId &&
+              candidate.ownerAgentId === params.ownerAgentId &&
+              candidate.ownerThreadId === params.threadId,
+          ),
+        prepareSecret: () => Effect.sync(preparedSecret),
+        beginTakeover: (tabId) =>
+          Effect.sync(() => {
+            limitedLog.push(`begin:${tabId}`);
+          }),
+        endTakeover: (tabId) => {
+          limitedLog.push(`end:${tabId}`);
+        },
+      },
+      hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
+      routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+      emit: (event) => limitedEvents.push(event),
+      emitError: () => {},
+      emitRuntimeSnapshot: () => {},
+      lateAnswerTarget,
+      sendLateAnswer: (_agentId, _target, text) => releasedAnswers.push(text),
+      userAnswerLimitMs: USER_ANSWER_LIMIT_MS,
+    });
+  const limited = limitedRegistry(() => ({}));
+  const limitedCards = () => limited.runtimeAttention().pendingBrowserTakeovers;
+  const limitedCount = (type: AgentEvent["type"]) => limitedEvents.filter((event) => event.type === type).length;
+
+  await step("with no provider deadline, a takeover ends its call at the limit and the card stays", async () => {
+    const answer = answerOf(await callOn(limited, "request_takeover", "turn-limit-1"));
+    assert.equal(answer.success, true);
+    assert.equal(answer.status, "waiting");
+    assert.match(answer.next ?? "", /arrives as the user's next message/);
+    assert.match(answer.next ?? "", /end your turn/);
+    assert.equal(limitedCount("browser-takeover-requested"), 1, "the card was not shown once");
+    assert.equal(limitedCount("browser-takeover-resolved"), 0, "the limit closed the card");
+    assert.equal(limitedCards().length, 1);
+    assert.equal(limited.hasAttentionForTurn(THREAD, "turn-limit-1"), false, "the turn still waits for the card");
+    limited.clearForTurn(THREAD, "turn-limit-1", true);
+    assert.equal(limitedCards().length, 1, "the end of the turn closed the released card");
+    assert.deepEqual(limitedLog, [`begin:${TAB}`], "the tab went back to the agent");
+    return answer;
+  });
+
+  await step("a second call in the same turn does not wait and shows no new card", async () => {
+    const answer = answerOf(await callOn(limited, "request_takeover", "turn-limit-1"));
+    assert.equal(answer.status, "waiting");
+    assert.equal(limitedCount("browser-takeover-requested"), 1, "the call showed a second card");
+    assert.equal(limitedCards().length, 1);
+    return answer;
+  });
+
+  await step("a late answer reaches the agent as a new message, once", async () => {
+    const requestId = limitedCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    await runCauseEffect(limited.respondToBrowserTakeover({ requestId, decision: "complete" }));
+    assert.equal(limitedCards().length, 0);
+    assert.equal(limitedCount("browser-takeover-resolved"), 1);
+    assert.deepEqual(releasedAnswers, [
+      `I finished the browser takeover in tab ${TAB}. Take a fresh snapshot and continue.`,
+    ]);
+    assert.deepEqual(limitedLog, [`begin:${TAB}`, `end:${TAB}`]);
+    const again = await runCauseEffect(limited.respondToBrowserTakeover({ requestId, decision: "complete" })).then(
+      () => "accepted",
+      () => "refused",
+    );
+    assert.equal(again, "refused", "the takeover ran twice");
+    assert.equal(releasedAnswers.length, 1, "the agent got a second late answer");
+    return { lateAnswer: releasedAnswers[0], again };
+  });
+
+  await step("a cancel by the user also reaches the agent as a new message", async () => {
+    await callOn(limited, "request_takeover", "turn-limit-2");
+    limited.clearForTurn(THREAD, "turn-limit-2", true);
+    const requestId = limitedCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    await runCauseEffect(limited.respondToBrowserTakeover({ requestId, decision: "cancel" }));
+    assert.equal(
+      releasedAnswers.at(-1),
+      `I cancelled the browser takeover in tab ${TAB}. Do not try it again until I ask.`,
+    );
+    return releasedAnswers.at(-1);
+  });
+
+  await step("a late password answer tells the agent that the Vault did not save it", async () => {
+    await callOn(limited, "submit_secret", "turn-limit-11");
+    limited.clearForTurn(THREAD, "turn-limit-11", true);
+    const requestId = limitedCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    const late = releasedAnswers.length;
+    await runCauseEffect(
+      limited.respondToBrowserSecret({
+        requestId,
+        agentId: AGENT,
+        decision: "submit",
+        secret: SECRET,
+        saveToVault: true,
+      }),
+    );
+    assert.equal(releasedAnswers.length, late + 1, "the late answer did not reach the agent once");
+    const answer = releasedAnswers.at(-1) ?? "";
+    assert.match(answer, /^I finished the browser takeover/);
+    assert.match(answer, /The password was not saved: no Vault is available\./);
+    assert.doesNotMatch(answer, new RegExp(SECRET), "the late answer has the secret");
+    return answer;
+  });
+
+  await step("a call in a later turn waits on the released card and gets its result", async () => {
+    await callOn(limited, "request_takeover", "turn-limit-3");
+    limited.clearForTurn(THREAD, "turn-limit-3", true);
+    const shown = limitedCount("browser-takeover-requested");
+    const requestId = limitedCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    const late = releasedAnswers.length;
+    const next = callOn(limited, "request_takeover", "turn-limit-4");
+    await runCauseEffect(limited.respondToBrowserTakeover({ requestId, decision: "complete" }));
+    const answer = answerOf(await next);
+    assert.equal(answer.status, "completed");
+    assert.equal(limitedCount("browser-takeover-requested"), shown, "the later turn showed a new card");
+    assert.equal(releasedAnswers.length, late, "the agent got the result twice");
+    assert.equal(limitedCards().length, 0);
+    return answer;
+  });
+
+  await step("a message of the user in the chat closes a released card with no late answer", async () => {
+    await callOn(limited, "request_takeover", "turn-limit-5");
+    limited.clearForTurn(THREAD, "turn-limit-5", true);
+    assert.equal(limitedCards().length, 1);
+    const late = releasedAnswers.length;
+    limited.closeDetachedForUserMessage(AGENT, THREAD);
+    assert.equal(limitedCards().length, 0, "the message did not close the card");
+    assert.equal(releasedAnswers.length, late, "the agent got a late answer for the user's own message");
+    return "closed";
+  });
+
+  await step("a chat with no late answer target closes the card at the limit", async () => {
+    const routine = limitedRegistry(() => null);
+    const answer = answerOf(await callOn(routine, "request_takeover", "turn-limit-6"));
+    assert.equal(answer.status, "expired");
+    assert.equal(routine.runtimeAttention().pendingBrowserTakeovers.length, 0, "the card stayed open");
+    return answer;
+  });
+
+  await step("a question with no provider deadline detaches at the limit", async () => {
+    const id = nextRequest++;
+    limited.surfaceDynamicPrompt(client, {
+      id,
+      method: "item/tool/call",
+      params: {
+        threadId: THREAD,
+        turnId: "turn-limit-7",
+        callId: `call-${id}`,
+        namespace: "openbot",
+        tool: "ask_user",
+        arguments: { questions: [{ id: "q1", header: "Plan", question: "Which plan?" }] },
+      },
+    });
+    const answer = answerOf(await client.answered(id));
+    assert.equal(answer.status, "waiting");
+    assert.equal(limited.runtimeAttention().pendingPrompts[0]?.detached, true);
+    limited.clearForTurn(THREAD, "turn-limit-7", false);
+    return answer;
+  });
+
+  const askQuestion = (target: AttentionRegistry, turnId: string, isSecret: boolean) => {
+    const id = nextRequest++;
+    target.surfaceDynamicPrompt(client, {
+      id,
+      method: "item/tool/call",
+      params: {
+        threadId: THREAD,
+        turnId,
+        callId: `call-${id}`,
+        namespace: "openbot",
+        tool: "ask_user",
+        arguments: { questions: [{ id: "q1", header: "Plan", question: "Which plan?", isSecret }] },
+      },
+    });
+    return client.answered(id);
+  };
+
+  await step("a question in a chat with no late answer target expires at the limit", async () => {
+    const routine = limitedRegistry(() => null);
+    const answer = answerOf(await askQuestion(routine, "turn-limit-8", false));
+    assert.equal(answer.success, false);
+    assert.match(answer.next ?? "", /expired/);
+    assert.equal(routine.runtimeAttention().pendingPrompts.length, 0, "the question card stayed open");
+    assert.equal(routine.hasAttentionForTurn(THREAD, "turn-limit-8"), false, "the turn still waits");
+    return answer;
+  });
+
+  await step("a question of a client with answer notes detaches at the limit and gets the answer late", async () => {
+    const noteClient = new NoteClient("/nonexistent/claude");
+    const id = nextRequest++;
+    limited.surfacePrompt(noteClient, {
+      id,
+      method: "item/tool/requestUserInput",
+      params: {
+        threadId: THREAD,
+        turnId: "turn-limit-10",
+        questions: [
+          {
+            id: "color",
+            header: "Color",
+            question: "Which color?",
+            options: [
+              { label: "Red", description: "Choose red" },
+              { label: "Blue", description: "Choose blue" },
+            ],
+          },
+        ],
+      },
+    });
+    const result: { answers?: Record<string, string[]>; note?: string } = JSON.parse(
+      JSON.stringify(await noteClient.answered(id)),
+    );
+    assert.deepEqual(result.answers, {});
+    assert.match(result.note ?? "", /answer arrives as the user's next message/);
+    assert.equal(limited.runtimeAttention().pendingPrompts[0]?.detached, true, "the card closed at the limit");
+    assert.equal(limited.hasAttentionForTurn(THREAD, "turn-limit-10"), false, "the turn still waits");
+    limited.clearForTurn(THREAD, "turn-limit-10", true);
+    const late = releasedAnswers.length;
+    await runCauseEffect(limited.respondToPrompt({ requestId: id, answers: { color: ["Blue"] } }));
+    assert.equal(releasedAnswers.length, late + 1, "the late answer did not reach the agent once");
+    assert.match(releasedAnswers.at(-1) ?? "", /Blue/);
+    assert.equal(noteClient.answers.size, 1, "the provider got a second answer");
+    return { note: result.note, lateAnswer: releasedAnswers.at(-1) };
+  });
+
+  await step("a secret question expires at the limit", async () => {
+    const answer = answerOf(await askQuestion(limited, "turn-limit-9", true));
+    assert.equal(answer.success, false);
+    assert.match(answer.next ?? "", /expired/);
+    assert.equal(limited.runtimeAttention().pendingPrompts.length, 0, "the secret question card stayed open");
+    return answer;
+  });
+
   const failedFill = async (turnId: string, failure: Error) => {
     fillFailure = failure;
     const shown = count("browser-takeover-requested");
@@ -456,6 +722,13 @@ try {
         },
         browser: {
           listTabs: () => tabs,
+          toolCanUseTab: (params, tabId) =>
+            tabs.some(
+              (candidate) =>
+                candidate.id === tabId &&
+                candidate.ownerAgentId === params.ownerAgentId &&
+                candidate.ownerThreadId === params.threadId,
+            ),
           prepareSecret: () =>
             Effect.sync(() => ({
               ...preparedSecret(),
@@ -509,7 +782,6 @@ try {
           }),
         );
       };
-      // Account B: the card opens, and the password of account A does not go in.
       const shown = cards();
       const other = signIn("b@example.test");
       let answered = false;
@@ -532,14 +804,12 @@ try {
       const typed = answerOf(await other);
       assert.equal(typed.status, "completed");
       assert.deepEqual(vaultFills, [SECRET], "the card did not fill what the user typed");
-      // The same account, written in another case, and a call with no username: the saved login goes in.
       const same = answerOf(await signIn(" A@Example.test"));
       const unnamed = answerOf(await signIn());
       assert.equal(same.status, "completed");
       assert.equal(unnamed.status, "completed");
       assert.deepEqual(vaultFills, [SECRET, VAULT_SECRET, VAULT_SECRET], "the saved login was not filled");
       assert.equal(cards(), shown + 1, "a card opened for the saved account");
-      // A login saved with no username names no account, so it is filled as before.
       savedUsername = null;
       const noSavedUsername = answerOf(await signIn("b@example.test"));
       assert.equal(noSavedUsername.status, "completed");
@@ -549,7 +819,135 @@ try {
     },
   );
 
-  await writeFile(resolve(OUT, "report.json"), `${JSON.stringify({ ok: true, steps, browserLog }, null, 2)}\n`);
+  await step(
+    "a saved login that an agent script blocks goes back to the agent at once, with no card (#14181)",
+    async () => {
+      const vaultFills: string[] = [];
+      const vaultEvents: AgentEvent[] = [];
+      const attention: string[] = [];
+      const vaultRegistry = new AttentionRegistry({
+        conversation: {
+          agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
+          publicThreadId: (_agentId, threadId) => threadId,
+          ensureSnapshot: () => snapshot,
+          emitConversation: () => {
+            snapshot.revision += 1;
+          },
+        },
+        browser: {
+          listTabs: () => tabs,
+          toolCanUseTab: (params, tabId) =>
+            tabs.some(
+              (candidate) =>
+                candidate.id === tabId &&
+                candidate.ownerAgentId === params.ownerAgentId &&
+                candidate.ownerThreadId === params.threadId,
+            ),
+          prepareSecret: () =>
+            Effect.sync(() => ({
+              ...preparedSecret(),
+              agentScriptedOrigin: true,
+              vaultFillable: true,
+              submit: (secret: string) =>
+                Effect.sync(() => {
+                  vaultFills.push(secret);
+                  return "submitted" as const;
+                }),
+            })),
+          beginTakeover: () => Effect.void,
+          endTakeover: () => {},
+        },
+        hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
+        routines: {
+          markNeedsAttention: (turnId) => attention.push(`needs:${turnId}`),
+          markRunningForTurn: (turnId) => attention.push(`running:${turnId}`),
+        },
+        emit: (event) => vaultEvents.push(event),
+        emitError: () => {},
+        emitRuntimeSnapshot: () => {},
+        lateAnswerTarget: () => ({}),
+        passwordVault: {
+          connected: () => true,
+          loginsFor: () =>
+            Effect.succeed([
+              { id: "openbot:a", title: "Account A", username: "a@example.test", hasOneTimePassword: false },
+            ]),
+          secretFor: (loginId) => Effect.succeed(loginId === "openbot:a" ? VAULT_SECRET : null),
+        },
+      });
+      const cards = () => vaultEvents.filter((event) => event.type === "browser-takeover-requested").length;
+      const signIn = (loginId?: string) => {
+        const id = nextRequest++;
+        return runCauseEffect(
+          vaultRegistry.surfaceBrowserTakeover(client, {
+            id,
+            method: "item/tool/call",
+            params: {
+              threadId: THREAD,
+              turnId: `turn-scripted-${id}`,
+              callId: `call-${id}`,
+              namespace: "openbot_browser",
+              tool: "submit_secret",
+              arguments: {
+                tabId: TAB,
+                method: "password",
+                targets: [{ kind: "css", selector: "#password" }],
+                submission: "click",
+                submitTarget: { kind: "css", selector: "#submit" },
+                ...(loginId === undefined ? {} : { loginId }),
+              },
+            },
+          }),
+        );
+      };
+      const cancelledBefore = browserLog.filter((entry) => entry === "secret-cancelled").length;
+      const scripted = signIn("openbot:a");
+      let answered = false;
+      void scripted.finally(() => {
+        answered = true;
+      });
+      while (cards() === 0 && !answered) await new Promise((done) => setImmediate(done));
+      assert.equal(cards(), 0, "a password card opened for a skip that the agent can fix");
+      const skipped = answerOf(await scripted);
+      assert.equal(skipped.success, false, "the skipped saved login was reported as a success");
+      assert.match(skipped.next ?? "", /evaluate/u, "the agent did not get the reason for the skip");
+      assert.match(skipped.next ?? "", /navigate direction=reload/u, "the agent did not get the reload step");
+      assert.match(skipped.next ?? "", /request_takeover/u, "the agent did not get the takeover fallback");
+      assert.equal(cards(), 0, "a password card opened for a skip that the agent can fix");
+      assert.deepEqual(vaultFills, [], "a saved password was filled while an agent script can run");
+      assert.equal(vaultRegistry.runtimeAttention().pendingBrowserTakeovers.length, 0, "the takeover stayed open");
+      assert.equal(
+        browserLog.filter((entry) => entry === "secret-cancelled").length,
+        cancelledBefore + 1,
+        "the secure input lock of the tab was not released",
+      );
+      assert(!attention.some((entry) => entry.startsWith("needs:")), "the routine was marked as waiting for the user");
+      const unnamed = signIn();
+      let unnamedAnswered = false;
+      void unnamed.finally(() => {
+        unnamedAnswered = true;
+      });
+      while (cards() === 0 && !unnamedAnswered) await new Promise((done) => setImmediate(done));
+      const card = vaultRegistry.runtimeAttention().pendingBrowserTakeovers[0];
+      assert(card?.secret, "no password card for a sign-in without loginId");
+      await runCauseEffect(
+        vaultRegistry.respondToBrowserSecret({
+          requestId: card.requestId,
+          agentId: AGENT,
+          decision: "submit",
+          secret: SECRET,
+        }),
+      );
+      assert.equal(answerOf(await unnamed).status, "completed");
+      assert.deepEqual(vaultFills, [SECRET], "the card did not fill what the user typed");
+      return { skipped, cards: cards() };
+    },
+  );
+
+  await writeFile(
+    resolve(OUT, "report.json"),
+    `${JSON.stringify({ ok: true, steps, browserLog, limitedLog, releasedAnswers }, null, 2)}\n`,
+  );
   process.stdout.write(`browser-takeover-deadline-e2e: ${steps.length} steps passed\n`);
 } catch (error) {
   await writeFile(

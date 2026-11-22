@@ -15,7 +15,6 @@ export function canCheckRendererPermission(
   return permission === "media" && details.mediaType === "audio";
 }
 
-/** A permission request names the frame that asks, which can be a frame inside a trusted window. */
 interface RendererPermissionRequest {
   requestingUrl: string;
   isMainFrame: boolean;

@@ -1,13 +1,10 @@
-/** The zoom bar of the canvas: zoom out, the zoom menu, zoom in, zoom to fit, and the minimap. */
-
 import type { AppTextKey } from "@openbot/i18n";
-import { buttonVariants, DropdownMenu, Kbd, MapIcon, Minus, Plus, Scan } from "@openbot/ui";
-import { For } from "solid-js";
+import { buttonVariants, DropdownMenu, Kbd, MapIcon, Minus, Network, Plus, Scan } from "@openbot/ui";
+import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { HudButton, hudBarRect } from "./WorkflowCanvasHud";
 import { MOD_KEY } from "./workflow-board";
 
-/** The zoom levels in the grid of the zoom menu, as on the Higgsfield canvas. */
 const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2];
 
 type ZoomAction = "in" | "out" | "reset" | "fit";
@@ -19,7 +16,6 @@ const ZOOM_LABEL = {
   fit: "workflow.canvas.zoom.fit",
 } satisfies Record<ZoomAction, AppTextKey>;
 
-/** The shortcut of each zoom action. */
 export const ZOOM_KEYS: Record<ZoomAction, readonly string[]> = {
   in: [MOD_KEY, "+"],
   out: [MOD_KEY, "−"],
@@ -27,11 +23,15 @@ export const ZOOM_KEYS: Record<ZoomAction, readonly string[]> = {
   fit: ["⇧", "1"],
 };
 
+export const TIDY_KEYS: readonly string[] = ["⇧", "T"];
+
 export function WorkflowZoomMenu(props: {
   scale: number;
   minScale: number;
   maxScale: number;
   minimap: boolean;
+  canTidy: boolean;
+  onTidy: () => void;
   onZoom: (action: ZoomAction) => void;
   onZoomTo: (scale: number) => void;
   onToggleMinimap: () => void;
@@ -101,6 +101,11 @@ export function WorkflowZoomMenu(props: {
       <HudButton label={t(ZOOM_LABEL.fit)} keys={ZOOM_KEYS.fit} onClick={() => props.onZoom("fit")}>
         <Scan />
       </HudButton>
+      <Show when={props.canTidy}>
+        <HudButton label={t("workflow.canvas.action.tidy")} keys={TIDY_KEYS} onClick={props.onTidy}>
+          <Network />
+        </HudButton>
+      </Show>
       <HudButton
         label={props.minimap ? t("workflow.canvas.minimap.close") : t("workflow.canvas.minimap.open")}
         pressed={props.minimap}

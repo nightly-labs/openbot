@@ -1,10 +1,3 @@
-// Which agent chat messages make the chat unread, on every surface that counts them or moves the
-// read mark.
-//
-// The host counts unread messages after the member's read mark. The desktop and mobile apps move
-// that mark to the newest message that the host counts. When a client used its own rule, the host
-// kept counting a message after the mark and the chat stayed unread (#5089), so there is one.
-
 import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "./chat-visual";
 import { AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE } from "./ipc-agent-instructions";
 import {
@@ -25,7 +18,6 @@ import { MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX } from "./marketplace-suggestio
 import { SETTING_LINK_ITEM_TYPE_PREFIX } from "./setting-links";
 import { SKILL_EVENT_ITEM_TYPE_PREFIX } from "./skill-conversation-events";
 
-/** Item types that never make a chat unread: the agent's own work, and messages between agents. */
 export const READ_EXCLUDED_ITEM_TYPES = [
   "commentary",
   CONVERSATION_PLAN_ITEM_TYPE,
@@ -39,7 +31,6 @@ export const READ_EXCLUDED_ITEM_TYPES = [
   CONTEXT_RESET_ITEM_TYPE,
 ] as const;
 
-/** Item type prefixes that never make a chat unread: visual pages and the markers an agent writes about itself. */
 export const READ_EXCLUDED_ITEM_TYPE_PREFIXES = [
   CHAT_VISUAL_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
@@ -54,10 +45,6 @@ export const READ_EXCLUDED_ITEM_TYPE_PREFIXES = [
 
 const excludedItemTypes: ReadonlySet<string> = new Set(READ_EXCLUDED_ITEM_TYPES);
 
-/**
- * Whether a message of this item type, not sent by the user, makes the chat unread. Each surface
- * checks the author itself, because the IPC messages and the renderer rows spell the user differently.
- */
 export function itemTypeCountsAsUnread(itemType: string | undefined): boolean {
   if (itemType === undefined) return true;
   if (excludedItemTypes.has(itemType)) return false;

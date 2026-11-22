@@ -15,8 +15,9 @@ import { Fragment } from "react";
 import { Alert } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
-import { ConnectorError, ConnectorHeader } from "@/features/servers/components/connector-header";
+import { ConnectorError, ConnectorHeader, ConnectorLoading } from "@/features/servers/components/connector-header";
 import {
+  CONNECTION_KIND_KEYS,
   CONNECTOR_STATUS_KEYS,
   connectionKind,
   maskedWhatsAppNumber,
@@ -27,38 +28,23 @@ import {
   whatsappStatus,
 } from "@/features/servers/model/connectors";
 import { useConnectorAction } from "@/features/servers/model/use-server-connectors";
-import {
-  SettingsContent,
-  SettingsNote,
-  SettingsRow,
-  SettingsSection,
-} from "@/features/settings/components/settings-content";
+import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import { type MobileText, useText } from "@/shared/lib/text";
 
-const KIND_KEYS = {
-  live: "mobile.server.connectors.statusConnected",
-  paused: "mobile.server.connectors.statusPaused",
-  setup: "mobile.server.connectors.statusConnecting",
-  attention: "mobile.server.connectors.statusAttention",
-} as const;
-
 const AVATAR_SIZE = 32;
 const ICON_SIZE = 20;
 
-/** What to do about a stopped number, or the note of its kind. */
 function numberNote({ t, format }: MobileText, connection: MessagingConnection, account: WhatsAppAccount | undefined) {
   if (connection.retryAt)
     return t("mobile.server.connectors.whatsapp.retryAt", {
       time: format.date(new Date(connection.retryAt), { hour: "numeric", minute: "2-digit" }),
     });
   switch (connection.state) {
-    // WhatsApp removed the linked device: only a new link brings the number back.
     case "invalid_token":
       return t("mobile.server.connectors.whatsapp.helpLoggedOut");
-    // The saved keys of the number cannot be read: a reconnect has nothing to connect with.
     case "secret_storage_unavailable":
       return t("mobile.server.connectors.whatsapp.helpKeysUnreadable");
     case "error":
@@ -70,12 +56,6 @@ function numberNote({ t, format }: MobileText, connection: MessagingConnection, 
   }
 }
 
-/**
- * Marketplace › Apps › WhatsApp of a joined server (`whatsapp-connector-v1`). Each number
- * links the host as a device from WhatsApp on a phone, and one WhatsApp Orchestrator answers all
- * numbers. Only the allowed contacts and groups reach it. On a number only for OpenBot, an unknown
- * person gets a code that the owner approves here. The host keeps the WhatsApp session and its keys.
- */
 export function WhatsAppConnectorPage({
   server,
   query,
@@ -102,23 +82,13 @@ export function WhatsAppConnectorPage({
   } = useMobileWorkspaceActions();
   const action = useConnectorAction(query.refetch);
   const overview = query.data;
-  if (!overview)
-    return (
-      <SettingsContent>
-        <SettingsNote>
-          {query.isError
-            ? errorMessage(query.error, t("mobile.server.connectors.readFailed"))
-            : t("mobile.server.connectors.loading")}
-        </SettingsNote>
-      </SettingsContent>
-    );
+  if (!overview) return <ConnectorLoading query={query} />;
   const { connections, accounts } = overview;
   const serverId = server.id;
   const status = whatsappStatus(connections, agents);
   const attention = whatsappAttentionCount(connections, agents);
   const orchestrator = telegramOrchestrator(connections, agents);
   const account = (workspaceId: string) => accounts.find((entry) => entry.workspaceId === workspaceId);
-  /** The numbers whose settings are known, in the order of the number list. */
   const linked = connections.flatMap((connection) => {
     const settings = account(connection.workspaceId);
     return settings ? [{ connection, account: settings }] : [];
@@ -132,7 +102,6 @@ export function WhatsAppConnectorPage({
 
   const disconnect = (connection: MessagingConnection) => {
     const number = whatsappNumberName(connection);
-    // The last linked number: its disconnect deletes the WhatsApp Orchestrator.
     const deletes = connections.length === 1 && orchestrator !== null;
     const body = [
       t("mobile.server.connectors.whatsapp.disconnectBody", { number }),
@@ -216,7 +185,7 @@ export function WhatsAppConnectorPage({
                   type="body-xs"
                   className={kind === "attention" ? "text-warning-text" : "text-grouped-secondary"}
                 >
-                  {t(KIND_KEYS[kind])}
+                  {t(CONNECTION_KIND_KEYS[kind])}
                 </Typography.Paragraph>
               }
             >
@@ -248,7 +217,6 @@ export function WhatsAppConnectorPage({
                 />
               </SettingsRow>
             ) : null}
-            {/* An older host cannot set it: its numbers carry no `workingMessage`. */}
             {settings && settings.workingMessage !== undefined ? (
               <SettingsRow supportingText={t("mobile.server.connectors.whatsapp.workingMessageDescription")}>
                 <SettingsSwitch
@@ -264,7 +232,6 @@ export function WhatsAppConnectorPage({
                 />
               </SettingsRow>
             ) : null}
-            {/* An older host cannot set it: its numbers carry no `statusReactions`. */}
             {settings && settings.statusReactions !== undefined ? (
               <SettingsRow supportingText={t("mobile.server.connectors.whatsapp.statusReactionsDescription")}>
                 <SettingsSwitch
@@ -280,7 +247,6 @@ export function WhatsAppConnectorPage({
                 />
               </SettingsRow>
             ) : null}
-            {/* The device was removed, or its keys cannot be read: only a new link brings the number back. */}
             {connection.state === "invalid_token" || connection.state === "secret_storage_unavailable" ? (
               <SettingsRow
                 disclosure={false}
@@ -359,7 +325,6 @@ export function WhatsAppConnectorPage({
             <SettingsRow
               disclosure={false}
               disabled={action.busy}
-              // The host starts it on its default provider and model, as the Telegram page does.
               onPress={() => run(() => addWhatsAppOrchestrator(serverId))}
             >
               <Typography.Paragraph className="text-accent">
@@ -438,7 +403,6 @@ export function WhatsAppConnectorPage({
                 </Typography.Paragraph>
               </SettingsRow>
             </SettingsSection>
-            {/* A personal number answers no stranger, so it shows requests only when some still wait. */}
             {!settings.ownNumber || settings.pendingRequests.length > 0 ? (
               <SettingsSection
                 title={t("mobile.server.connectors.whatsapp.requestsTitle", { number })}

@@ -55,7 +55,6 @@ const Catalog = Schema.Struct({ agents: Schema.Array(Schema.Unknown).check(Schem
 const decodeCatalog = Schema.decodeUnknownEffect(Catalog);
 const decodeAgent = Schema.decodeUnknownOption(RegistryAgent);
 
-/** One malformed upstream entry cannot conceal every other agent. No executable comes from the renderer. */
 export const readAcpRegistry = Effect.fn("AcpRegistry.catalog")(function* () {
   const bytes = yield* registryDownload(ACP_REGISTRY_URL, 8 * 1024 * 1024);
   const raw = yield* runtimeIO(() => Promise.resolve(JSON.parse(bytes.toString("utf8"))));
@@ -75,7 +74,6 @@ export const readAcpRegistry = Effect.fn("AcpRegistry.catalog")(function* () {
   return entries;
 });
 
-/** Bounds both network time and bytes. Redirects must still end on credential-free HTTPS. */
 export const registryDownload = Effect.fn("AcpRegistry.download")(function* (url: string, maximum: number) {
   return yield* runtimeIO(async (signal) => {
     const response = await fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]) });

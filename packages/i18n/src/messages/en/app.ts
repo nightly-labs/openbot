@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("app", {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Loading OpenBot",
   "app.leftPanel.resize": "Resize left sidebar",
   "app.host.thisMac": "This Mac",
@@ -32,7 +31,7 @@ export const messages = defineMessages("app", {
   "app.provider.restartFailed": "Could not restart {name}",
   "app.provider.included": "{name} is included with OpenBot.",
   "app.clipboard.copyFailed": "Could not copy the text.",
-  "app.voice.tooLong": "Voice recordings are limited to two minutes.",
+  "app.voice.tooLong": "Voice recordings are limited to 10 minutes.",
   "app.avatar.type": "Choose a PNG, JPEG, GIF, or WebP image.",
   "app.avatar.size": "Choose an image smaller than 10 MB.",
   "app.avatar.processingUnavailable": "Image processing is unavailable.",
@@ -47,7 +46,6 @@ export const messages = defineMessages("app", {
   "app.questionnaire.empty": "No questions",
   "app.standingApproval.title": "Always allow {name}?",
   "app.standingApproval.titleUnnamed": "Always allow this agent?",
-  // The page rail and the settings page of the desktop window.
   "app.rail.label": "Pages",
   "app.rail.website": "OpenBot website",
   "app.rail.agents": "Agents",

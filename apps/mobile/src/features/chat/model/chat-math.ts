@@ -1,8 +1,3 @@
-/**
- * A MathML element from KaTeX. React Native has no DOM, so the app draws this tree with native
- * views instead of the KaTeX HTML that desktop shows. KaTeX still parses the LaTeX, expands its
- * macros and picks each symbol, so both apps accept the same formulas.
- */
 export interface MathElement {
   tag: string;
   attributes: Readonly<Record<string, string>>;
@@ -11,7 +6,6 @@ export interface MathElement {
 
 export type MathNode = MathElement | string;
 
-/** The MathML elements the native renderer draws. A formula with another element shows its source. */
 const SUPPORTED_ELEMENTS = new Set([
   "math",
   "semantics",
@@ -43,8 +37,6 @@ const SUPPORTED_ELEMENTS = new Set([
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 
-// Settled messages render again as the list scrolls, so each formula is parsed once. Cap the size so
-// a long session cannot grow this without bound.
 const MATH_CACHE_LIMIT = 300;
 const mathCache = new Map<string, MathElement | null>();
 
@@ -56,11 +48,6 @@ function katex(): typeof import("katex") {
   return loaded;
 }
 
-/**
- * The MathML tree of `tex`, without the `math` and `semantics` wrappers and the source annotation.
- * Null when KaTeX cannot parse the formula, or when it needs an element the app cannot draw.
- * `trust: false` keeps `\href`, `\includegraphics` and the `\html*` commands inert.
- */
 export function mathTree(tex: string, display: boolean): MathElement | null {
   const key = `${display ? "d" : "i"}${tex}`;
   const cached = mathCache.get(key);
@@ -111,10 +98,6 @@ function supported(node: MathNode): boolean {
   return typeof node === "string" || (SUPPORTED_ELEMENTS.has(node.tag) && node.children.every(supported));
 }
 
-/**
- * Reads the markup that KaTeX writes: elements, double-quoted attributes, self-closing elements and
- * escaped text. It is not a general XML parser.
- */
 function parseMathMl(markup: string): MathElement {
   const root: MathElement & { children: MathNode[] } = { tag: "#root", attributes: {}, children: [] };
   const stack: (MathElement & { children: MathNode[] })[] = [root];
@@ -150,18 +133,15 @@ function decodeEntities(value: string): string {
   });
 }
 
-/** The text of a leaf element such as `mi` or `mo`. */
 export function mathText(node: MathElement): string {
   return node.children.map((child) => (typeof child === "string" ? child : mathText(child))).join("");
 }
 
-/** A MathML length in em, such as `0.2778em` or `+0.6em`. Other units are not used by KaTeX. */
 export function mathLength(value: string | undefined): number {
   const match = /^([+-]?\d*\.?\d+)em$/u.exec(value?.trim() ?? "");
   return match?.[1] ? Number(match[1]) : 0;
 }
 
-/** TeX spacing around an operator, in em, as KaTeX's HTML output uses it. */
 export function operatorSpacing(operator: string): { before: number; after: number } {
   if (RELATIONS.has(operator)) return { before: 0.2778, after: 0.2778 };
   if (BINARY_OPERATORS.has(operator)) return { before: 0.2222, after: 0.2222 };
@@ -173,5 +153,4 @@ const RELATIONS = new Set([..."=<>≤≥≠≈≡≅∼≃∝∈∉∋⊂⊃⊆�
 
 const BINARY_OPERATORS = new Set([..."+−-±∓×÷⋅·∘∙∗∪∩∧∨⊕⊖⊗⊘⊙∖⋆⋄◃▹△▽†‡⊎⊓⊔"]);
 
-/** Operators that KaTeX draws in a larger font: sums, products, integrals and big set operations. */
 export const LARGE_OPERATORS = new Set([..."∑∏∐∫∬∭∮∯∰⋃⋂⋁⋀⨁⨂⨀⨄⨆"]);

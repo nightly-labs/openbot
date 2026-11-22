@@ -25,6 +25,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Téléchargez le modèle de synthèse vocale dans Réglages → Voix.",
   "error.voice.speech.timedOut": "La lecture à voix haute de la réponse a expiré.",
   "error.voice.speech.failed": "OpenBot n’a pas pu lire la réponse à voix haute.",
+  "error.voice.speech.providerRefused": "{provider} a refusé de créer l’audio : {reason}",
   "error.voice.recordingNotKept": "OpenBot n’a pas pu conserver l’enregistrement vocal.",
   "error.voice.live.timedOut": "La voix en direct Codex n’a pas démarré à temps. Réessayez.",
   "error.voice.live.failed": "La voix en direct s’est arrêtée : {reason}",
@@ -32,6 +33,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex sur le serveur n’a pas pu démarrer la voix en direct. Demandez à son propriétaire de mettre à jour Codex sur cet ordinateur et de se connecter avec ChatGPT, puis réessayez.",
   "error.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "error.voice.live.chooseAccount":
+    "Ce compte ChatGPT ne peut pas utiliser la voix en direct. Dans Réglages → Voix, choisissez un compte dont l'abonnement inclut la voix.",
   "error.voice.live.unavailable":
     "OpenAI n'a pas pu démarrer la voix en direct. Le problème vient d'OpenAI. Réessayez plus tard.",
   "error.voice.live.refused":

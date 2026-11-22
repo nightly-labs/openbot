@@ -97,6 +97,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Esta conexión no puede detener una ejecución de rutina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.libraryFoldersUnsupported": "Esta conexión no permite carpetas de la Biblioteca.",
+  "error.team.workflowFoldersUnsupported": "Esta conexión no admite carpetas de flujos de trabajo.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
   "error.team.sidebarPinsUnsupported":
@@ -130,11 +131,13 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Esta conexión no admite actualizaciones del host.",
   "error.team.hostTimezoneUnsupported": "Esta conexión no admite la zona horaria del servidor.",
   "error.team.hostRestartUnsupported": "Esta conexión no admite reiniciar el servidor.",
+  "error.team.ownerTransferUnsupported": "Este servidor no admite transferir la propiedad.",
   "error.team.hostKeyRotationUnsupported": "Esta conexión no admite cambiar la clave del servidor.",
   "error.team.localServersUnsupported": "Esta conexión no admite servidores en este ordenador.",
   "error.team.routineResultsUnsupported": "Esta conexión no admite destinos de rutinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexión no admite el límite de recuerdos de los agentes.",
   "error.team.agentFoldersUnsupported": "Esta conexión no admite las carpetas de los agentes.",
+  "error.team.channelFoldersUnsupported": "Esta conexión no admite las carpetas de los canales.",
   "error.team.folderUnavailable": "Esta carpeta no está disponible en el ordenador anfitrión.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
   "error.team.skillLearningUnsupported": "Esta conexión no admite el aprendizaje de habilidades.",
@@ -154,6 +157,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Esta conexión no admite servidores MCP.",
   "error.team.mcpServerListNeedsUpdate":
     "Actualiza OpenBot en este dispositivo para usar más de {limit} servidores MCP en este servidor.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Actualiza OpenBot en este dispositivo para usar más de {limit} cuentas de un proveedor en este servidor.",
   "error.team.storageUnsupported": "Esta conexión no admite almacenamiento.",
   "error.team.machineResourcesUnsupported": "Esta conexión no admite el uso de la máquina.",
   "error.team.machineAlertMemberInvalid":
@@ -196,6 +201,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexión no admite esperas abiertas.",
   "error.team.pendingApprovalUnsupported": "Esta conexión no permite leer una aprobación completa.",
+  "error.team.pendingPromptsUnsupported": "Esta conexión no permite leer las preguntas abiertas.",
   "error.team.phoneFeedbackUnsupported": "Esta conexión no permite enviar un informe desde la app del teléfono.",
   "error.team.messagePinsUnsupported": "Esta conexión no admite los mensajes fijados.",
   "error.team.queuedMessageThreadUnsupported":

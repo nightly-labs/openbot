@@ -6,7 +6,6 @@ export const messages = {
     "OpenBot, MCP sunucularını Codex yapılandırmasına kaydedemedi. Codex config.toml dosyanızın geçerli ve yazılabilir olduğunu denetleyin, ardından OpenBot'u yeniden başlatın.",
   "error.provider.computerUseConfig":
     "OpenBot, Bilgisayar Kullanımını Codex yapılandırmasına kaydedemedi. Codex config.toml dosyanızın geçerli ve yazılabilir olduğunu denetleyin, ardından OpenBot'u yeniden başlatın. Onsuz devam etmek için ekip arkadaşı ayarlarından Bilgisayar Kullanımını kapatabilirsiniz.",
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.codexUnresponsive": "Codex yanıt vermeyi bıraktı, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpUnresponsive": "{provider} zamanında yanıt vermedi, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpSignInLost":
@@ -20,6 +19,8 @@ export const messages = {
     "{provider}, planınızın kullanım hakkının bittiğini bildiriyor. Başka bir model seçin veya {provider} planınızı yükseltin.",
   "error.provider.acpMcpNotLoaded":
     "{provider}, OpenBot araçlarını yüklemedi; bu yüzden bu ajan onları kullanamıyor ve takım arkadaşlarına ulaşamıyor. Bir {provider} ekip politikası yerel MCP sunucularını engelleyebilir. Ekip yöneticinizden bunlara izin vermesini isteyin, ardından yeniden deneyin.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} bu mesajı OpenBot araçları olmadan çalıştırdı; bu yüzden ajan takım arkadaşlarına ulaşamadı, tarayıcıyı kullanamadı ve dosya ekleyemedi. Yeniden deneyin.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider}, {name} MCP sunucusunu başlatamadı, bu yüzden yanıt durdu. Bu sunucu OpenBot'ta değil, kendi {provider} ayarlarınızda. Sunucuyu orada kaldırın veya onarın, ardından yeni bir sohbet başlatın.",
   "error.provider.endpointsReadOnly":
@@ -237,6 +238,8 @@ export const messages = {
     '"{provider}" uç noktası isteği reddetti. API anahtarı veya başlıkları yanlış olabilir ya da hesabı bu modeli kullanamıyor olabilir. Bunları Sunucu ayarları → Sağlayıcılar bölümünde kontrol edin veya başka bir model seçin. Ardından tekrar deneyin.',
   "error.provider.customEndpointKeyMissing":
     '"{provider}" uç noktası bir API anahtarı gerektiriyor. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde ekleyin, ardından tekrar deneyin.',
+  "error.provider.customEndpointEffortRefused":
+    '"{provider}" uç noktası bu modelin akıl yürütme eforunu reddetti. Sunucu ayarları → Sağlayıcılar bölümünde "{provider}" öğesini düzenleyin. Efor altında yalnızca bu modelin kabul ettiği düzeyleri bırakın veya Akıl yürütme yok seçeneğini seçin. Ardından tekrar deneyin.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeKeyRefused":
@@ -245,6 +248,7 @@ export const messages = {
     "OpenCode Go isteği reddetti. Yeni bir API anahtarı bunu düzeltmez. OpenCode Go planınız etkin olmayabilir veya OpenCode Go ağınızı engelliyor olabilir: bazı hizmetler VPN'leri, proxy'leri veya bazı ülkeleri engeller. Planınızın OpenCode Console'da etkin olduğundan emin olun ya da VPN'i kapatın, sonra yeniden deneyin. Başka bir model de seçebilirsiniz.",
   "error.provider.opencodeServiceFailure":
     "Yerel hizmeti başarısız olduğu için OpenCode bu turu tamamlayamadı. Tekrar deneyin. Hata devam ederse Ayarlar'dan OpenCode'a yeniden bağlanın.",
+  "error.provider.opencodeStillStarting": "OpenCode zamanında yüklenmeyi bitiremedi. OpenBot yeniden deneyecek.",
   "error.provider.opencodeRateLimited":
     "Model sağlayıcısı hız sınırı nedeniyle isteği reddetti. Birkaç dakika bekleyin veya başka bir model seçip tekrar deneyin.\n{detail}",
   "error.provider.opencodeBilling":
@@ -265,6 +269,10 @@ export const messages = {
     "Bu model sizin için kullanılamıyor. Bu ajan için başka bir model seçin.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Modelin yanıtı yarıda kesildi veya geçerli değildi. Mesajınızı tekrar gönderin veya başka bir model seçin.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Modelin yanıtı üç kez çıktı sınırını aştı, bu yüzden tur durdu. Daha düşük bir efor veya başka bir model seçin, sonra mesajınızı yeniden gönderin.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Modelin yanıtı üç kez çıktı sınırını aştı, bu yüzden tur durdu. Ayarlar'da Özel sağlayıcı'yı açın, bu uç noktada Düzenle'ye tıklayın ve bu model için daha büyük bir En fazla çıktı değeri girin. Ya da daha düşük bir efor veya başka bir model seçin.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode bu efor düzeyinde bu modelin akıl yürütmesini okuyamadı. Daha düşük bir efor ya da başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.opencodeModelNotServed":
@@ -281,6 +289,8 @@ export const messages = {
     "Bu bilgisayarın işlemcisi bu sağlayıcıyı çalıştıramıyor. Başka bir sağlayıcı kullanın.",
   "error.provider.opencodeDatabaseNewer":
     "Daha yeni bir OpenCode sürümü veritabanını değiştirdiği için OpenCode veritabanını açamadı. OpenCode'u 2 veya daha yeni bir sürüme güncelleyin, sonra yeniden deneyin.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok başlamadı, çünkü yapılandırmasındaki allowed_models ayarı varsayılan modelini içermiyor. Varsayılan modeli allowed_models listesine ekleyin veya allowed_models ayarını kaldırın, sonra yeniden deneyin.",
   "error.provider.opencodeNoAnswer":
     "OpenCode modeli turu yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -290,6 +300,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} bazı adımları uyguladı, sonra turu yanıt vermeden bitirdi. Aynı isteği yeniden göndermeden önce ajana ne yaptığını sorun.",
   "error.provider.acpRefusedNoReason": "{provider} yanıt vermeden durdu. Mesajı yeniden gönderin.",
+  "error.provider.channelNoAnswer":
+    "{provider} turu yanıt vermeden bitirdi. Kanalda görevi yeniden çalıştırmak için Devam et'e, başka bir üyeye vermek için Yeniden ata'ya tıklayın.",
   "error.provider.chatgptPageFailed": "OpenBot ChatGPT bağlantı sayfasını açamadı.",
   "error.provider.noneReady": "Hiçbir ajan sağlayıcısı hazır değil.",
   "error.provider.claudeTurnActive": "Bağlamını yenilemeden önce etkin Claude turunun bitmesini bekleyin.",
@@ -326,6 +338,8 @@ export const messages = {
     "Gemini bu isteği reddetti ve nedenini belirtmedi. Buna sohbet geçmişindeki bir öğe, örneğin ajanın açtığı bir görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model seçin.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini bu sohbetin kayıtlı geçmişini okuyamadı. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Mesajınızı yeniden gönderin.",
+  "error.provider.acpTurnStuck":
+    "{provider} önceki turunu bitirmediği için bu mesajı kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Mesajınızı yeniden gönderin.",
   "error.provider.antigravityLocationUnsupported":
     "Google, bu ajanı çalıştıran bilgisayarın ağ konumundan Gemini'nin çalışmasına izin vermiyor. Gemini'yi başka bir bilgisayarda kullanın veya bu ajan için başka bir sağlayıcı seçin.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -398,6 +412,10 @@ export const messages = {
     "Kayıtlı geçmişindeki bir öğe eksik olduğu için Codex bu sohbete devam edemedi. OpenBot sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexRequestRefused":
     "{provider}, bu sohbetin isteğini reddetti ve nedenini belirtmedi. Bu, çok sayıda görsel içeren uzun bir sohbette olabilir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.codexSafetyBlocked":
+    "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi: {reason} Ajan artık bu mesajı görmüyor, bu yüzden mesaj sonraki mesajlarınızı durdurmaz. İsteğinizi farklı kelimelerle yeniden gönderin.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi: {reason} {provider} sonraki mesajlarınızı da engellerse yeni bir sohbet başlatın.",
   "error.provider.codexAudioRefused":
     "Bu model ses dinleyemez, bu yüzden bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Devam etmek için isteğinizi yeniden gönderin ve ajandan ses olmadan çalışmasını isteyin. Sesi kontrol etmek için ajanın model menüsünde ses dinleyebilen bir model seçin.",
   "error.provider.imageTooSmall":
@@ -412,6 +430,8 @@ export const messages = {
     "Bu sohbet, modele gönderilemeyecek kadar büyüdü. Bunun nedeni çoğu zaman sohbetteki görsellerdir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.opencodeSessionRejected":
     "OpenCode isteği reddetti ve nedenini belirtmedi. Bu, uzun bir sohbette veya model değişikliğinden sonra olabilir. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model veya daha düşük bir efor seçin.",
+  "error.provider.opencodeInputRefused":
+    "Model bu sohbetin içeriğini reddetti ve nedenini belirtmedi. Buna sohbetteki bir dosya, örneğin bir PDF veya görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Mesajınızı dosya olmadan yeniden gönderin veya başka bir model seçin.",
   "error.provider.opencodeCompactionFailed":
     "Model, bağlam penceresinde yer açmak için bu uzun sohbeti özetleyemedi. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse daha güçlü bir model seçin.",
   "error.provider.museMcpStartupFault":
@@ -526,6 +546,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
   "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",
+  "error.provider.acpSessionStale": "{provider} bu sohbetin en son sürümünü yükleyemedi. Mesajınızı yeniden gönderin.",
   "error.provider.acpModelNotOffered":
     "{provider} şu anda {model} modelini sunmuyor. Bu ajan için başka bir model seçip yeniden deneyin.",
   "error.provider.piStopped": "Pi çalışmıyor. Pi'yi bağlayıp tekrar deneyin.",

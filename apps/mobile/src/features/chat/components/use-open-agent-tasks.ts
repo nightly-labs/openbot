@@ -11,11 +11,6 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 
 const NO_TASKS: AgentTask[] = [];
 
-/**
- * The open threads of one agent, as the desktop thread list shows them: a thread stays after its
- * turn ends, with its result, until the person archives it. The task events keep the list current.
- * Empty on a host without `agent-tasks-v1`.
- */
 export function useOpenAgentTasks(serverId: string, agentId: string): AgentTask[] {
   const queryScope = useQueryScope();
   const workspace = useMobileWorkspaceReader();
@@ -31,6 +26,5 @@ export function useOpenAgentTasks(serverId: string, agentId: string): AgentTask[
     queryFn: () => workspace().loadAgentTasks(agentId, serverId),
   });
   const tasks = list.data?.tasks;
-  // One array while the list stays, so the chat and its thread menu do not draw again.
   return useMemo(() => (tasks?.some(isAgentTaskOpen) ? tasks.filter(isAgentTaskOpen) : NO_TASKS), [tasks]);
 }

@@ -11,11 +11,6 @@ function showOutcome(outcome: Outcome) {
   };
 }
 
-/**
- * A toast that tells the result of an action that the user started. It plays the cue for that result,
- * soft. A toast that comes without a user action, such as an update offer or an error that a host
- * sends, uses `toast` and stays silent.
- */
 export const actionToast = {
   success: showOutcome("success"),
   warning: showOutcome("warning"),

@@ -1,9 +1,3 @@
-// Runs the real `acp` provider driver over one fake agent, installed as `omp` and as `other-agent`, to
-// check the missing-session rules of the custom agent flavors (`src/backend/acp-flavor.ts`). After a
-// restart, `session/load` fails. The exact omp error for this session and the protocol's `-32002`
-// error, with the session in `data.uri` or `data.sessionId`, must replace the session for both
-// commands. An internal error, and an error for another session, must keep it.
-// `bun run test:acp-flavors`. Writes .openbot-build/acp-flavor-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -18,7 +12,8 @@ import { installFakeAgent, readJsonl, startThread, stopClients, xorCipher } from
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-flavor-e2e");
 
 const COMMANDS = ["omp", "other-agent"] as const;
-/** Each `session/load` error, and whether it names a missing session. */
+type Command = (typeof COMMANDS)[number];
+const CUSTOM_AGENT_ONLY: Readonly<Record<Command, boolean>> = { omp: false, "other-agent": true };
 const LOAD_ERRORS = [
   ["unsupported", true],
   ["unsupported-other", false],
@@ -26,6 +21,10 @@ const LOAD_ERRORS = [
   ["session-not-found", true],
   ["session-not-found-other", false],
   ["internal", false],
+  ["invalid-id", CUSTOM_AGENT_ONLY],
+  ["invalid-id-other", false],
+  ["unknown-id", CUSTOM_AGENT_ONLY],
+  ["unknown-id-other", false],
 ] as const;
 type LoadError = (typeof LOAD_ERRORS)[number][0];
 
@@ -48,8 +47,7 @@ const clients: AgentClient[] = [];
 try {
   const workspace = join(root, "workspace");
   await mkdir(workspace);
-  const store = new CustomAgentStore({ path: join(root, "custom-agents.json"), cipher: xorCipher });
-  await runCauseEffect(store.load());
+  const stores: CustomAgentStore[] = [];
   const agents: {
     id: string;
     command: (typeof COMMANDS)[number];
@@ -60,12 +58,15 @@ try {
   for (const command of COMMANDS) {
     const executable = join(root, "bin", command);
     await installFakeAgent(executable, "session-errors");
-    for (const [loadError, missingSession] of LOAD_ERRORS) {
+    const store = new CustomAgentStore({ path: join(root, `${command}-agents.json`), cipher: xorCipher });
+    await runCauseEffect(store.load());
+    stores.push(store);
+    for (const [loadError, expected] of LOAD_ERRORS) {
       const agent = {
         id: `${command}-${loadError}`,
         command,
         loadError,
-        missingSession,
+        missingSession: typeof expected === "boolean" ? expected : expected[command],
         log: join(root, `${command}-${loadError}.jsonl`),
       };
       agents.push(agent);
@@ -90,7 +91,7 @@ try {
     apiKey: () => null,
     customProviders: () => [],
     mcpServers: () => [],
-    customAgents: () => store.configs(),
+    customAgents: () => stores.flatMap((store) => store.configs()),
   };
   const cli = await runCauseEffect(driver.resolveCli());
   const open = () => {
@@ -100,7 +101,6 @@ try {
     return client;
   };
 
-  // One session for each agent, then a new process for each agent that must load its session again.
   let client = open();
   const threads = new Map<string, string>();
   for (const agent of agents) {

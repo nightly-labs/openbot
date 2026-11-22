@@ -5,6 +5,7 @@ export const messages = {
   "notification.needsInput": "Heeft je input nodig.",
   "notification.needsApproval": "Heeft je goedkeuring nodig.",
   "notification.needsBrowserStep": "Je moet een stap in de browser afronden.",
+  "notification.waitsForSignIn": "Wacht op aanmelding bij {provider}.",
   "notification.needsApprovalFor": "Heeft je goedkeuring nodig: {action}",
   "notification.finished": "Klaar met werken.",
   "notification.workflowApproval": "Een stap wacht op je goedkeuring.",

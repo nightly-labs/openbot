@@ -40,12 +40,8 @@ import {
   stringField,
   WEBRTC_FRAME_BODY_BUDGET,
 } from "./request-helpers";
+import { agentTaskWire } from "./route-agent-tasks";
 
-/**
- * `agent-threads-v1`: rename and delete a side thread, by its `agent-tasks-v1` task id. The same member
- * who can send to the agent can use them, with the agent level of a task change. An agent that this
- * peer cannot see (`hiddenAgentIds`) answers as a missing agent does.
- */
 export async function routeAgentThreads(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,
@@ -72,11 +68,6 @@ export async function routeAgentThreads(
   return json(200, {});
 }
 
-/**
- * `agent-thread-reads-v1`: the member's own read mark of each open side thread, and a move of one.
- * The same member who can send to the agent can use them. An agent that this peer cannot see
- * (`hiddenAgentIds`) answers as a missing agent does.
- */
 export async function routeAgentThreadReads(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,
@@ -103,12 +94,6 @@ export async function routeAgentThreadReads(
   return json(200, tasks.markTaskRead(input, member.id, exclusions));
 }
 
-/**
- * `agent-thread-files-v1`: start a side thread, or send to one, with attachment drafts that the member
- * uploaded. The same member who can send to the agent can use them, with the agent level of a task
- * start, and is the sender. An agent that this peer cannot see (`hiddenAgentIds`) answers as a missing
- * agent does. The frozen codec has already checked the ids, the bounds, and that text or a file is there.
- */
 export async function routeAgentThreadFiles(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,
@@ -131,19 +116,13 @@ export async function routeAgentThreadFiles(
     ...(isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {}),
   };
   if (url.pathname === AGENT_THREAD_FILES_ROUTES.start)
-    return json(200, await runCauseEffect(tasks.startTask(message, memberSender(member))));
+    return json(200, agentTaskWire(await runCauseEffect(tasks.startTask(message, memberSender(member))), capabilities));
   return json(
     202,
     await runCauseEffect(tasks.sendMessage({ ...message, taskId: stringField(body, "taskId") }, memberSender(member))),
   );
 }
 
-/**
- * `agent-thread-replies-v1`: send a reply to a message of a side thread, with text, attachment drafts that
- * the member uploaded, or both. The same member who can send to the agent can use it, with the agent level
- * of a task message, and is the sender. An agent that this peer cannot see (`hiddenAgentIds`) answers as a
- * missing agent does. The frozen codec has already checked the ids, the bounds, and that text or a file is there.
- */
 export async function routeAgentThreadReplies(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,
@@ -169,13 +148,6 @@ export async function routeAgentThreadReplies(
   return json(202, await runCauseEffect(tasks.sendMessage(message, memberSender(member))));
 }
 
-/**
- * `agent-thread-branches-v1`: branch a conversation of the agent into a new side thread, and the links
- * of the branches among the listed tasks. A branch needs the agent level of a task start; the list
- * needs what the `agent-tasks-v1` list needs. The member who branches has read the copy. An agent that
- * this peer cannot see (`hiddenAgentIds`) answers as a missing agent does. The frozen codec has already
- * checked the ids.
- */
 export async function routeAgentThreadBranches(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,
@@ -225,13 +197,6 @@ export async function routeAgentThreadBranches(
   throw failure.cause;
 }
 
-/**
- * `agent-thread-pages-v1`: the older messages of a side thread, before a message that the client holds.
- * A member who can read the thread with `agent-tasks-v1` can read them. An agent that this peer cannot
- * see (`hiddenAgentIds`) answers as a missing agent does. The frozen codec has already checked the ids
- * and the limit. Long messages make a page of fewer messages, so it fits one WebRTC frame; the client
- * reads the rest as the next page.
- */
 export async function routeAgentThreadPages(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,

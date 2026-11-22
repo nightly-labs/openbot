@@ -40,9 +40,6 @@ import { TRELLO_PLUGIN_GUIDE } from "./trello";
 import { TRYPOST_PLUGIN_GUIDE } from "./trypost";
 import { VERCEL_PLUGIN_GUIDE } from "./vercel";
 
-// The written part of each plugin page, by catalog slug. A listing with no entry here
-// still has its page, without the uses, the questions and the sources.
-
 const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   aave: AAVE_PLUGIN_GUIDE,
   airtable: AIRTABLE_PLUGIN_GUIDE,

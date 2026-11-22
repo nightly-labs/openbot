@@ -32,22 +32,16 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { MessageFileActions } from "../components/message-file-actions";
-import { useCopyMessage } from "../components/use-copy-message";
+import { copyToClipboard } from "../components/use-copy-message";
 import { MOBILE_LARGE_FILE_BYTES } from "../model/large-files";
 import { releaseMessageActions, useMessageActionsRequest } from "../model/message-actions-sheet";
 
 const ICON_SIZE = 22;
 const PRESSED = { transform: [{ scale: 0.92 }] };
-/** The cell of the button that shows the other emoji. */
 const MORE = "more";
-/** The accessibility action of the Read aloud row that changes the speed. */
 const SPEED_ACTION = "speed";
 const NO_FILES: readonly AttachmentSummary[] = [];
 
-/**
- * Always two rows with the same columns: six reactions, the first five of the others and the More
- * button, or, after More, all fourteen in rows of seven.
- */
 function emojiRows(all: boolean): string[][] {
   const cells = all
     ? [...MESSAGE_REACTIONS, ...MORE_MESSAGE_REACTIONS]
@@ -56,11 +50,6 @@ function emojiRows(all: boolean): string[][] {
   return [cells.slice(0, columns), cells.slice(columns)];
 }
 
-/**
- * The sheet that a touch and hold on a message opens: the reactions on top, then the actions on the
- * files of the message, then Reply, Branch, Mark unread and Send to channel, then the actions on the
- * text, and Delete last. Each action closes the sheet.
- */
 export function MessageActionsScreen() {
   const { t, format } = useText();
   const request = useMessageActionsRequest();
@@ -70,13 +59,9 @@ export function MessageActionsScreen() {
   const reading = useReadingAloud(request?.readAloudId ?? "");
   const speed = useVoiceSettings((state) => state.speed);
   const speedReady = useVoiceSettings((state) => state.ready);
-  const { copy } = useCopyMessage(request?.copyText ?? "");
-  // A file above the download limit cannot come to the phone, so it has no file actions.
   const attachments = (request?.files?.attachments ?? NO_FILES).filter(
     (attachment) => attachment.size <= MOBILE_LARGE_FILE_BYTES,
   );
-  // Runs when the sheet has closed. A selection that starts while the sheet is on screen ends when
-  // the sheet takes the focus with it.
   const afterClose = useRef<(() => void) | undefined>(undefined);
   useEffect(
     () => () => {
@@ -94,7 +79,6 @@ export function MessageActionsScreen() {
   };
   const icon = String(foreground);
   const readAloudId = request.copyText ? request.readAloudId : undefined;
-  /** A build without the native speed, such as Expo Go, shows the speed button disabled. */
   const canChangeSpeed = canChangeReplySpeed && speedReady;
   const speedLabel = t("mobile.chat.message.readAloudSpeed", { speed: format.number(speed) });
   const changeSpeed = () => {
@@ -102,7 +86,6 @@ export function MessageActionsScreen() {
     void saveVoiceSettings({ speed: nextSpeechSpeed(speed) }).catch(() => Alert.alert(t("mobile.settings.saveFailed")));
   };
   const sendToChannel = request.sendToChannel?.channels.length ? request.sendToChannel : undefined;
-  /** Runs a file action when the sheet has closed, so a share sheet or a picker shows over the chat. */
   const afterSheet = (action: () => void) => {
     afterClose.current = action;
     router.back();
@@ -218,7 +201,6 @@ export function MessageActionsScreen() {
               onPressAction={({ nativeEvent }) => {
                 const channelId = nativeEvent.event;
                 if (!sendToChannel.channels.some((channel) => channel.id === channelId)) return;
-                // The channel opens when the sheet has closed.
                 afterClose.current = () => sendToChannel.onSend(channelId);
                 router.back();
               }}
@@ -237,7 +219,7 @@ export function MessageActionsScreen() {
             <SettingsRow
               leading={<Copy size={ICON_SIZE} color={icon} />}
               disclosure={false}
-              onPress={() => run(() => void copy())}
+              onPress={() => run(() => void copyToClipboard(request.copyText, "mobile.chat.message.copyFailed", t))}
             >
               <Typography>{t("mobile.chat.message.copy")}</Typography>
             </SettingsRow>
@@ -250,7 +232,6 @@ export function MessageActionsScreen() {
               onPress={() => run(() => toggleReadAloud(readAloudId, request.copyText))}
               trailing={
                 speedReady ? (
-                  // Changes the speed and keeps the sheet open, so the user can press again.
                   <Button
                     size="sm"
                     variant="secondary"
@@ -300,7 +281,6 @@ export function MessageActionsScreen() {
             leading={<Trash2 size={ICON_SIZE} color={danger} />}
             disclosure={false}
             onPress={() => {
-              // The alert that asks shows when the sheet has closed.
               afterClose.current = request.onDelete;
               router.back();
             }}

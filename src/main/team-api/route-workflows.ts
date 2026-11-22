@@ -1,10 +1,10 @@
 import {
-  type AgentAccessLevel,
-  canAdministerServer,
-  graphAgentIds,
   WORKFLOW_GROUP_FIELDS,
+  WORKFLOW_MEDIA_CATALOG_V1_ASPECTS,
+  WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
   type WorkflowGraph,
+  type WorkflowMediaCatalog,
   type WorkflowRunDetail,
   type WorkflowRunPage,
   type WorkflowStep,
@@ -22,6 +22,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
@@ -29,6 +33,10 @@ import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import {
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_SUNRA_ROUTES,
@@ -40,10 +48,6 @@ import {
   WORKFLOWS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { RoutineInputError } from "@openbot/team-client/routine-schedule";
-import type { Effect } from "effect";
-import { runCauseEffect } from "../../backend/effect-boundary";
-import { WorkflowStoreError } from "../../backend/workflows/workflow-store";
 import {
   parseCreateWorkflow,
   parseDecideWorkflowStep,
@@ -61,10 +65,10 @@ import {
 } from "../ipc/workflow-inputs";
 import type { TeamApiAgents, TeamApiWorkflows } from "./dependencies";
 import { HttpError } from "./http-error";
-import { isPeerHiddenProvider } from "./provider-visibility";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireAgentLevel, stringField, WEBRTC_FRAME_BODY_BUDGET } from "./request-helpers";
 import { runEventsEffect } from "./route-events";
+import { runWorkflowEffect as run, workflowMissing, workflowVisibility } from "./workflow-visibility";
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
 const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
@@ -72,13 +76,19 @@ const WORKFLOW_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_ROUTE
 const WORKFLOW_SUNRA_PATHS = new Set<string>(Object.values(WORKFLOWS_SUNRA_ROUTES));
 const WORKFLOW_HIGGSFIELD_PATHS = new Set<string>(Object.values(WORKFLOWS_HIGGSFIELD_ROUTES));
 const WORKFLOW_MEDIA_CATALOG_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_CATALOG_ROUTES));
+const WORKFLOW_MEDIA_CATALOG_V2_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES));
 const WORKFLOW_MEDIA_ACCOUNT_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES));
+const WORKFLOW_STEP_SETTINGS_PATHS = new Set<string>(Object.values(WORKFLOWS_STEP_SETTINGS_ROUTES));
 
-function workflowMissing(): never {
-  throw new HttpError(404, sourceText("error.workflow.missing"));
+function catalogV1(catalog: WorkflowMediaCatalog): WorkflowMediaCatalog {
+  return {
+    models: catalog.models.flatMap(({ options: _options, inputs: _inputs, modes: _modes, ...model }) => {
+      const aspects = model.aspects.filter((aspect) => WORKFLOW_MEDIA_CATALOG_V1_ASPECTS.includes(aspect));
+      return aspects.length > 0 ? [{ ...model, aspects }] : [];
+    }),
+  };
 }
 
-/** The wire codec has already checked the body, so only a malformed payload fails here, in English. */
 function parse<A>(decode: (value: unknown) => A, body: unknown): A {
   try {
     return decode(body);
@@ -87,21 +97,6 @@ function parse<A>(decode: (value: unknown) => A, body: unknown): A {
   }
 }
 
-/**
- * A workflow refused by the store, such as a cycle, or a schedule that cannot run, is the member's
- * sentence. Anything else is a host fault.
- */
-async function run<A>(operation: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> {
-  try {
-    return await runCauseEffect(operation);
-  } catch (error) {
-    if (error instanceof WorkflowStoreError) throw new HttpError(error.code === "missing" ? 404 : 400, error.message);
-    if (error instanceof RoutineInputError) throw new HttpError(400, error.message);
-    throw error;
-  }
-}
-
-/** The messaging place of each output node that posts to one, by node. */
 function placeOutputs(graph: WorkflowGraph): Map<string, string> {
   const places = new Map<string, string>();
   for (const node of graph.nodes) {
@@ -111,16 +106,11 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
   return places;
 }
 
-/** The fields that put a node in a group of the canvas. Any member that can change the workflow sets them. */
-const GROUP_FIELD_KEYS: ReadonlySet<string> = new Set(Object.values(WORKFLOW_GROUP_FIELDS));
+const DISPLAY_FIELD_KEYS: ReadonlySet<string> = new Set([
+  ...Object.values(WORKFLOW_GROUP_FIELDS),
+  WORKFLOW_STEP_NAME_FIELD,
+]);
 
-/**
- * The settings of each GitHub, Discord, Telegram or Slack trigger and output, and of each output into an
- * OpenBot channel, by node. Their changes act as the host's GitHub App bot, speak in the host's Discord
- * servers, Telegram chats or Slack workspaces, or post in the host's channels, so only an owner or admin
- * can add or change one (`workflows-github-v1`, `workflows-chats-v1`, `workflows-channels-v1`). The group
- * fields are not settings.
- */
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
   for (const node of graph.nodes) {
@@ -128,7 +118,7 @@ function adminNodes(graph: WorkflowGraph): Map<string, string> {
     if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack" && kind !== "chat-channel")
       continue;
     const fields = Object.keys(node.fields)
-      .filter((key) => !GROUP_FIELD_KEYS.has(key))
+      .filter((key) => !DISPLAY_FIELD_KEYS.has(key))
       .sort()
       .map((key) => [key, node.fields[key] ?? null]);
     nodes.set(node.id, JSON.stringify([node.kind, fields]));
@@ -149,10 +139,6 @@ function fitted<A>(value: A): A {
   return value;
 }
 
-/**
- * `whole`, with the step texts of `lists` emptied in order while it would not fit one frame. Each list
- * belongs to `whole`, and it changes in place.
- */
 function trimmed<A>(whole: A, lists: readonly WorkflowStep[][]): A {
   let bytes = bytesOf(whole);
   for (const steps of lists)
@@ -165,36 +151,35 @@ function trimmed<A>(whole: A, lists: readonly WorkflowStep[][]): A {
   return fitted(whole);
 }
 
-/**
- * The workflows of a server, their versions and their runs, for a member. A member reads and uses a
- * workflow only when every agent of its agent steps, and every provider of its model steps, is visible
- * to them; otherwise it answers as missing. The answer filter in `provider-visibility.ts` would drop
- * the settings of such a node, and the member's save would then lose them. An owner or admin also
- * sees a workflow whose agent was deleted, so that they can fix or delete it. A run or a decision
- * needs the chat level for each of those agents; a change, a delete or a restore needs the manage
- * level, before and after the change. A graph that names no agent needs no level, by product decision.
- * A change to an output that posts to a messaging place needs an owner or admin, as routine results
- * do. Frozen by `workflows-v1`. A GitHub trigger or a GitHub output, and the GitHub catalog and
- * options, need an owner or admin; the GitHub event history needs a member who reads the workflow, and
- * a run with the last event needs the chat level, as a start does. Frozen by `workflows-github-v1`.
- */
 export async function routeWorkflows(
   context: TeamApiRequestContext,
   workflows: TeamApiWorkflows | undefined,
   agents: Pick<TeamApiAgents, "listAgents">,
   hiddenAgentIds: ReadonlySet<string>,
 ): Promise<RouteOutcome> {
-  const { method, url, capabilities, member, request, json, protocol } = context;
+  const { method, url, capabilities, member, request, json } = context;
   const path = url.pathname;
   const githubPath = WORKFLOW_GITHUB_PATHS.has(path);
   const mediaPath = WORKFLOW_MEDIA_PATHS.has(path);
   const sunraPath = WORKFLOW_SUNRA_PATHS.has(path);
   const higgsfieldPath = WORKFLOW_HIGGSFIELD_PATHS.has(path);
   const catalogPath = WORKFLOW_MEDIA_CATALOG_PATHS.has(path);
+  const catalogV2Path = WORKFLOW_MEDIA_CATALOG_V2_PATHS.has(path);
   const accountPath = WORKFLOW_MEDIA_ACCOUNT_PATHS.has(path);
+  const settingsPath = WORKFLOW_STEP_SETTINGS_PATHS.has(path);
   if (
     method !== "POST" ||
-    !(githubPath || mediaPath || sunraPath || higgsfieldPath || catalogPath || accountPath || WORKFLOW_PATHS.has(path))
+    !(
+      githubPath ||
+      mediaPath ||
+      sunraPath ||
+      higgsfieldPath ||
+      catalogPath ||
+      catalogV2Path ||
+      accountPath ||
+      settingsPath ||
+      WORKFLOW_PATHS.has(path)
+    )
   )
     return "unmatched";
   if (!workflows || !capabilities.has(WORKFLOWS_CAPABILITY))
@@ -210,23 +195,19 @@ export async function routeWorkflows(
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (catalogPath && !capabilities.has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (catalogV2Path && !capabilities.has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (accountPath && !capabilities.has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
-  // `readJson` has already run the body through the workflows wire codec.
+  if (settingsPath && !capabilities.has(WORKFLOWS_STEP_SETTINGS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const body = await readJson(request);
-  const admin = canAdministerServer(member.role);
-  const listed = () => new Set(agents.listAgents().map((agent) => agent.id));
-
-  const visibleAgents = (agentIds: readonly string[], known: ReadonlySet<string>) =>
-    agentIds.every((agentId) => !hiddenAgentIds.has(agentId) && (admin || known.has(agentId)));
-  const visibleGraph = (graph: WorkflowGraph, known: ReadonlySet<string>) =>
-    visibleAgents(graphAgentIds(graph), known) &&
-    graph.nodes.every((node) => !isPeerHiddenProvider(node.fields.provider, protocol));
-  /** A graph that the member can read and use at `level`, or a 404 as for a missing workflow. */
-  const requireUsable = (graph: WorkflowGraph, level: Exclude<AgentAccessLevel, "none">) => {
-    if (!visibleGraph(graph, listed())) workflowMissing();
-    for (const agentId of graphAgentIds(graph)) requireAgentLevel(context, agentId, level);
-  };
+  const { admin, listed, visibleAgents, visibleGraph, requireUsable, visibleDetail, usableDetail } = workflowVisibility(
+    context,
+    workflows,
+    agents,
+    hiddenAgentIds,
+  );
   const requireChange = (before: WorkflowGraph, after: WorkflowGraph) => {
     requireUsable(before, "manage");
     requireUsable(after, "manage");
@@ -235,20 +216,6 @@ export async function routeWorkflows(
     const oldAdmin = adminNodes(before);
     for (const [nodeId, settings] of adminNodes(after)) if (oldAdmin.get(nodeId) !== settings) requireAdmin(member);
   };
-  const visibleDetail = async (workflowId: string) => {
-    const detail = await run(workflows.get(workflowId));
-    if (!visibleGraph(detail.graph, listed())) workflowMissing();
-    return detail;
-  };
-  const usableDetail = async (workflowId: string, level: Exclude<AgentAccessLevel, "none">) => {
-    const detail = await visibleDetail(workflowId);
-    requireUsable(detail.graph, level);
-    return detail;
-  };
-  /**
-   * The workflow of a run or a step that the member can run: its current graph, and the
-   * agents of the run graph that a retry or a decision moves on. Otherwise a 404 as for a missing run.
-   */
   const usableRunOf = async (ref: { runId: string } | { stepId: string }) => {
     const missing = () =>
       new HttpError(404, sourceText("runId" in ref ? "error.workflow.runMissing" : "error.workflow.stepMissing"));
@@ -267,7 +234,6 @@ export async function routeWorkflows(
       throw new HttpError(413, sourceText("error.workflow.tooLargeToSend"));
     return result;
   };
-  /** A step's texts, clipped. The answer filter drops a step of an agent hidden from the member. */
   const memberStep = (step: WorkflowStep): WorkflowStep => ({
     ...step,
     output: clip(step.output),
@@ -277,25 +243,18 @@ export async function routeWorkflows(
     run: { ...detail.run, error: clip(detail.run.error) },
     steps: detail.steps.slice(-WORKFLOW_RUN_STEP_LIMIT).map(memberStep),
   });
-  /** The run, with the texts of its oldest steps emptied first while it would not fit one frame. */
   const fittedRun = (detail: WorkflowRunDetail): WorkflowRunDetail => {
     const result = memberRun(detail);
     return trimmed(result, [result.steps]);
   };
-  /** The page, with the step texts of the oldest runs emptied first while it would not fit one frame. */
   const memberPage = (page: WorkflowRunPage): WorkflowRunPage => {
     const result: WorkflowRunPage = {
       runs: page.runs.map(memberRun),
       soloSteps: page.soloSteps.map(memberStep),
       nextBefore: page.nextBefore,
     };
-    // The page lists the newest run first.
     return trimmed(result, [...result.runs.map((detail) => detail.steps).reverse(), result.soloSteps]);
   };
-  /**
-   * One step for the member. The answer filter would empty the whole answer for a step of an agent
-   * hidden from them, so that step answers as missing.
-   */
   const soleStep = (step: WorkflowStep): WorkflowStep => {
     if (step.agentId !== null && hiddenAgentIds.has(step.agentId))
       throw new HttpError(404, sourceText("error.workflow.stepMissing"));
@@ -334,7 +293,6 @@ export async function routeWorkflows(
       requireChange(current.graph, input.graph);
       const result = await run(workflows.saveGraph(input));
       if (result.ok) return json(200, result);
-      // Another device saved first. Its graph can name an agent that this member cannot see.
       if (!visibleGraph(result.conflict.graph, listed())) workflowMissing();
       return json(200, { ok: false, conflict: memberDetail(result.conflict) });
     }
@@ -398,7 +356,6 @@ export async function routeWorkflows(
       const runId = stringField(body, "runId");
       const workflowId = (await run(workflows.workflowOf({ runId })))?.workflowId;
       if (!workflowId) throw new HttpError(404, sourceText("error.workflow.runMissing"));
-      // The answer filter drops the steps of agents hidden from the member.
       await visibleDetail(workflowId);
       return json(200, fittedRun(await run(workflows.run(runId))));
     }
@@ -409,32 +366,31 @@ export async function routeWorkflows(
       return json(200, await runEventsEffect(workflows.rotateWorkflowSecret(input)));
     }
   }
-  // Each member can keep a picture, as each member can send a draft. The draft id is known only to
-  // its sender.
   if (path === WORKFLOWS_MEDIA_ROUTES.keepPicture) {
     return json(200, { fileId: await run(workflows.keepPicture(stringField(body, "draftId"))) });
   }
-  // Each member who can use workflows can read it: it says only whether the host has a Sunra sign-in.
-  // Each route answers the field of its own frozen capability only.
   if (path === WORKFLOWS_SUNRA_ROUTES.providers) return json(200, { sunra: workflows.mediaProviders().sunra });
-  // The same members can read the credits: they spend them when they run a Sunra step.
   if (path === WORKFLOWS_SUNRA_ROUTES.credits)
     return json(200, { sunra: (await run(workflows.mediaCredits("sunra"))).sunra });
-  // The same for Higgsfield.
   if (path === WORKFLOWS_HIGGSFIELD_ROUTES.providers)
     return json(200, { higgsfield: workflows.mediaProviders().higgsfield });
   if (path === WORKFLOWS_HIGGSFIELD_ROUTES.credits)
     return json(200, { higgsfield: (await run(workflows.mediaCredits("higgsfield"))).higgsfield });
-  // The same members can read the accounts and their credits: they choose the account that pays for a
-  // step. The answer has the name and the row id only, never a token or an address.
   if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts)
     return json(200, { accounts: workflows.mediaProviders().accounts ?? [] });
   if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits)
     return json(200, { accounts: (await run(workflows.mediaCredits())).accounts ?? [] });
-  // The same members can read the live models and a price: they choose a model and run its steps. Both
-  // are reads that never give a token or an account, and never start a job.
-  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog()));
-  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price)
+  if (path === WORKFLOWS_STEP_SETTINGS_ROUTES.read) {
+    const stepId = stringField(body, "stepId");
+    const scope = await run(workflows.workflowOf({ stepId }));
+    if (scope === null) throw new HttpError(404, sourceText("error.workflow.stepMissing"));
+    await visibleDetail(scope.workflowId);
+    if (!visibleAgents(scope.agentIds, listed())) throw new HttpError(404, sourceText("error.workflow.stepMissing"));
+    return json(200, fitted(await run(workflows.stepSettings(stepId))));
+  }
+  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, catalogV1(await run(workflows.mediaCatalog())));
+  if (path === WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog()));
+  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price || path === WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price)
     return json(200, await run(workflows.mediaPrice(parse(parseWorkflowMediaPrice, body))));
   if (!github) return "unmatched";
   switch (path) {

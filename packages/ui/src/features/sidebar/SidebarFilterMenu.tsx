@@ -1,9 +1,3 @@
-/**
- * The filter button beside New, and its menu: the kind of chat, its state, the folders and the chat
- * order. A dot on the button shows that a filter is set. The counts come from the data store and are
- * read only while the menu is open.
- */
-
 import { ArrowDownWideNarrow, Badge, Check, ChevronRight, DropdownMenu, Filter, Folder, Minus, X } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -32,7 +26,6 @@ function MenuMark(props: { on: boolean; mixed?: boolean }) {
   );
 }
 
-/** A checkbox for a folder and the folders in it. It stays open, so more folders can be picked. */
 function FolderCheck(props: { node: SidebarFolderNode }) {
   const { filterFolders, listFilter, listFilterCount, setListFilter } = useSidebarScope();
   const { t } = useText();
@@ -56,10 +49,6 @@ function FolderCheck(props: { node: SidebarFolderNode }) {
   );
 }
 
-/**
- * A folder with folders in it opens its own menu. The menu starts with the folder itself, which
- * selects it with all the folders in it, then lists each folder in it.
- */
 function FolderSub(props: { node: SidebarFolderNode }) {
   const { listFilter, listFilterCount } = useSidebarScope();
   const mark = () => sidebarFolderMark(props.node, listFilter().folders);

@@ -10,7 +10,6 @@ import {
 import { mockSkillPage } from "./mock-skills";
 import { matchesQuery } from "./mock-support";
 
-/** One page of `items`, with the search, filter and cursor of the account service's list routes. */
 function page<
   T extends { category?: string | undefined; featured?: boolean | undefined; verified?: boolean | undefined },
 >(items: readonly T[], params: URLSearchParams, text: (item: T) => string) {
@@ -26,7 +25,6 @@ function page<
   return { items: matches.slice(start, end), nextCursor: end < matches.length ? String(end) : null };
 }
 
-/** The skill list query that `marketplaceQueryParams` sent. A value the route does not know is left out. */
 function skillQuery(params: URLSearchParams): MarketplaceSkillQuery {
   const category = params.get("category");
   const verified = params.get("verified");
@@ -43,7 +41,6 @@ function skillQuery(params: URLSearchParams): MarketplaceSkillQuery {
   };
 }
 
-/** The answer of a catalog route, or a 404 for a listing that the fixtures do not have. */
 function catalogResponse(path: string, params: URLSearchParams): Response {
   if (path === "/v1/skills/") return Response.json(mockSkillPage(STORY_MARKETPLACE_SKILLS, skillQuery(params)));
   if (path === "/v1/marketplace/agents/") {
@@ -70,10 +67,6 @@ function catalogResponse(path: string, params: URLSearchParams): Response {
   return body ? Response.json(body) : Response.json({ error: "not_found" }, { status: 404 });
 }
 
-/**
- * The read a shared Marketplace link makes: an agent by id at `/listing`, or a skill by slug. Null for
- * another path; undefined for a listing that the fixtures do not have.
- */
 function linkedListing(path: string) {
   const agentId = /^\/v1\/marketplace\/agents\/([^/]+)\/listing$/.exec(path)?.[1];
   if (agentId) return STORY_MARKETPLACE_AGENT_DETAILS[decodeURIComponent(agentId)];
@@ -83,10 +76,6 @@ function linkedListing(path: string) {
   return null;
 }
 
-/**
- * The account service's public marketplace routes, for the web client in Storybook: the skill and
- * agent catalogs, their pages, and shared agent templates. Other requests go to `fallback`.
- */
 export function mockAccountCatalogFetch(fallback: typeof fetch = fetch): typeof fetch {
   return async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), window.location.origin);

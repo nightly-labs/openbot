@@ -10,33 +10,18 @@ import {
 import { isQueueDelivery, type QueueDelivery } from "./ipc-queue";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
-/**
- * The most tasks of one agent that run a turn at the same time by the agent's own limit, next to its
- * own chat. Frozen by `agent-task-limit-v1`, `agent-tasks-v1` and the instance archive.
- */
 export const AGENT_TASK_LIMIT_MAX = 4;
-/**
- * The most that an owner or admin can set as the host default for agents with no limit of their own
- * (`HostTurnLimits.agentTaskLimit`, `host-turn-limits-v1`).
- */
 export const HOST_AGENT_TASK_LIMIT_MAX = 64;
-/** The built-in task limit of an agent that has no limit of its own, when the host sets no default. */
 export const AGENT_TASK_LIMIT_DEFAULT = 4;
 
 export function isAgentTaskLimit(value: unknown): value is number {
   return integerInRange(value, 1, AGENT_TASK_LIMIT_MAX);
 }
 
-/** A host default task limit, or a limit that follows it. */
 export function isHostAgentTaskLimit(value: unknown): value is number {
   return integerInRange(value, 1, HOST_AGENT_TASK_LIMIT_MAX);
 }
 
-/**
- * How many tasks of the agent run a turn at the same time. A provider that runs one turn at a time
- * runs one task, and the agent's own chat waits for it. `hostDefault` is the limit of an agent that
- * has no limit of its own.
- */
 export function agentTaskLimit(
   agent: { provider: AgentProviderId; taskLimit?: number },
   hostDefault: number = AGENT_TASK_LIMIT_DEFAULT,
@@ -48,15 +33,6 @@ export function agentTaskLimit(
 export const AGENT_TASK_STATES = ["running", "queued", "idle", "closed"] as const;
 export type AgentTaskState = (typeof AGENT_TASK_STATES)[number];
 
-/**
- * Why the next message of a task waits:
- * - `task-limit`: the agent already runs as many tasks as its limit allows.
- * - `agent-restarting`: the agent's provider process restarts after another turn ends.
- * - `usage-limit`: the provider plan refused a turn, and the agent waits for the reset.
- * - `server-busy`: the computer runs as many turns as its memory allows.
- * - `agent-busy`: other agent work holds the agent, for example a profile save or a routine.
- * - `one-turn`: the provider runs one turn at a time, and another turn of the agent runs.
- */
 export const AGENT_TASK_HOLDS = [
   "task-limit",
   "agent-restarting",
@@ -64,19 +40,17 @@ export const AGENT_TASK_HOLDS = [
   "server-busy",
   "agent-busy",
   "one-turn",
+  "sign-in",
 ] as const;
 export type AgentTaskHold = (typeof AGENT_TASK_HOLDS)[number];
 
 export const AGENT_TASK_OUTCOMES = ["completed", "failed", "interrupted"] as const;
 export type AgentTaskOutcome = (typeof AGENT_TASK_OUTCOMES)[number];
 
-/** The most characters of a queued message that a task row shows. */
 export const AGENT_TASK_QUEUED_PREVIEW = 500;
 
-/** The states of a request whose answer has not come back yet. */
 export const AGENT_TASK_AWAITED_STATES = ["queued", "starting", "running"] as const;
 
-/** A request that the agent sent from a task to another agent, whose answer has not come back yet. */
 export interface AgentTaskAwaitedReply {
   messageId: string;
   recipientAgentId: string;
@@ -92,83 +66,44 @@ export function isAgentTaskAwaitedReply(value: unknown): value is AgentTaskAwait
   );
 }
 
-/** A message that waits to start in a task. */
 export interface AgentTaskQueuedMessage {
   deliveryId: string;
-  /** The start of the message, at most `AGENT_TASK_QUEUED_PREVIEW` characters. */
   text: string;
   createdAt: string;
 }
 
-/**
- * A second conversation of one agent. The agent keeps its identity, workspace and memories; the task
- * has its own thread, provider session, progress and stop. A joined server sends its tasks through the
- * optional `agent-tasks-v1` capability, in the frozen bounds of `team-protocol/agent-tasks-v1.ts`.
- */
 export interface AgentTask {
   id: string;
   agentId: string;
   threadId: string;
-  /** `agent`: the agent started it with its `start_task` tool. */
   origin: "user" | "agent";
   title: string;
   state: AgentTaskState;
-  /** The end of the last turn. Null before the first turn ends. */
   outcome: AgentTaskOutcome | null;
-  /** Set only when `state` is `queued`. */
   hold: AgentTaskHold | null;
   activeTurnId: string | null;
-  /** What the running turn does now, as the agent's own chat shows it. Null when no turn runs. */
   progress: string | null;
-  /** What the provider reported, redacted, when the last turn failed. Null when it reported nothing. */
   error: string | null;
-  /** The messages that wait to start in this task, oldest first. */
   queuedMessages: AgentTaskQueuedMessage[];
-  /**
-   * The same messages in full, with their files and state, for the queue of the thread. Only this
-   * computer sends it: the frozen `agent-tasks-v1` routes carry `queuedMessages` alone.
-   */
   queue?: QueueDelivery[];
-  /**
-   * The requests that the agent sent from this task and that wait for their answer. A joined server
-   * sends them through `agent-thread-requests-v1`; the frozen `agent-tasks-v1` routes do not.
-   */
   awaitedReplies?: AgentTaskAwaitedReply[];
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
-  /**
-   * Set when the thread is a branch: a copy of another conversation of the agent up to one turn.
-   * Absent from a server that cannot branch, and never sent on the frozen `agent-tasks-v1` routes.
-   */
   branch?: AgentTaskBranch | null;
-  /**
-   * Set when the thread takes the runs of one routine of the agent. Absent from an older server, and
-   * never sent on the frozen `agent-tasks-v1` routes.
-   */
   routineId?: string | null;
 }
 
-/** Where a branch was copied from. */
 export interface AgentTaskBranch {
-  /** The source side thread, or null for the agent's own chat. The id stays when the source is deleted. */
   sourceTaskId: string | null;
-  /**
-   * The title of the source side thread when the host read the link. Null for the agent's own chat and
-   * for a deleted source. The task list can leave out an archived source, so its title comes from here.
-   */
   sourceTitle: string | null;
-  /** The message in the source that the person branched from. */
   sourceMessageId: string;
-  /** The last copied message in the branch. The copied history ends after it. */
   throughMessageId: string;
 }
 
 export interface AgentTasksSnapshot {
   agentId: string;
-  /** The open tasks first, then the newest closed ones. */
   tasks: AgentTask[];
-  /** How many tasks can run a turn at the same time. */
   limit: number;
 }
 
@@ -179,7 +114,6 @@ export interface StartAgentTaskInput {
   clientMessageId?: string;
 }
 
-/** Moves a queued message of the agent's own chat into a new task. */
 export interface RunQueuedMessageAsTaskInput {
   agentId: string;
   deliveryId: string;
@@ -190,20 +124,13 @@ export interface AgentTaskInput {
   taskId: string;
 }
 
-/** The older messages of a side thread: the page before a message that its view holds. */
 export interface ReadAgentTaskPageInput extends AgentTaskInput {
   beforeMessageId: string;
-  /**
-   * 0 to 100: a target. The page has whole turns, so it can have more or fewer messages, and never more
-   * than 100; a turn of more than 100 messages is split over pages. With 0, the page has no messages and tells only whether the thread has older ones.
-   */
   limit: number;
 }
 
-/** A page of the older messages of a side thread, oldest first. */
 export interface AgentTaskPage {
   conversation: ConversationSnapshot;
-  /** The thread has messages before this page. */
   hasOlder: boolean;
 }
 
@@ -211,16 +138,12 @@ export function isAgentTaskPage(value: unknown): value is AgentTaskPage {
   return isDynamicRecord(value) && isConversationSnapshot(value.conversation) && typeof value.hasOlder === "boolean";
 }
 
-/** The messages of a side thread around one of its messages: the thread opens at that message. */
 export interface ReadAgentTaskAroundInput extends AgentTaskInput {
   messageId: string;
-  /** 1 to 100: a target, as for a page. About half of the messages come before the message. */
   limit: number;
 }
 
-/** A part of a side thread around one message, oldest first. It has no messages when the thread does not hold the message. */
 export interface AgentTaskWindow extends AgentTaskPage {
-  /** The thread has messages after this part: it does not reach the latest message. */
   hasNewer: boolean;
 }
 
@@ -228,30 +151,21 @@ export function isAgentTaskWindow(value: unknown): value is AgentTaskWindow {
   return isAgentTaskPage(value) && isDynamicRecord(value) && typeof value.hasNewer === "boolean";
 }
 
-/**
- * Makes a side thread with a copy of a conversation of the agent through the turn of `messageId`, the
- * last agent message of a finished turn. The source must have no running turn.
- */
 export interface BranchAgentTaskInput {
   agentId: string;
-  /** The source side thread, or null for the agent's own chat. */
   taskId: string | null;
   messageId: string;
-  /** A new id for each branch action. A retry with the same id returns the same branch. */
   requestId: string;
 }
 
-/** A person's new title for a side thread. */
 export interface RenameAgentTaskInput extends AgentTaskInput {
   title: string;
 }
 
-/** Moves the person's read mark of a side thread to a message of that thread. */
 export interface MarkAgentTaskReadInput extends AgentTaskInput {
   throughMessageId: string;
 }
 
-/** The person's read mark of one side thread, by its task id. */
 export interface AgentTaskReadState extends ConversationReadState {
   taskId: string;
 }
@@ -260,14 +174,15 @@ export function isAgentTaskReadState(value: unknown): value is AgentTaskReadStat
   return isDynamicRecord(value) && isIdentifier(value.taskId) && isConversationReadState(value);
 }
 
-/**
- * A thread title that a person writes, trimmed: one line with no control, line or paragraph separator
- * characters. Null when the value is not a valid title. IPC and the Team API use this one rule.
- */
 export function agentThreadTitle(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const title = value.trim();
   return title && title.length <= INPUT_LIMITS.agentTaskTitle && !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(title) ? title : null;
+}
+
+export function fitAgentTaskTitle(title: string): string {
+  const limit = INPUT_LIMITS.agentTaskTitle;
+  return title.length > limit ? `${title.slice(0, limit - 1)}…` : title;
 }
 
 function isAgentTaskQueuedMessage(value: unknown): value is AgentTaskQueuedMessage {

@@ -1,21 +1,3 @@
-// Runs the real `opencode` provider driver and the real OpenCode binary against a fake
-// OpenAI-compatible server with two models, as a llama-swap user has them: the user's own OpenCode
-// config names one as `model` and `small_model`, and the agent runs on the other. A local server like llama-swap loads
-// the model that each request names, so every request must name the agent's model.
-// A second endpoint needs an API key: a turn must send the saved key, and a refused or missing key
-// must name the endpoint, not an OpenCode sign-in.
-// Three more models carry #4234's shapes: a saved output cap must reach the request verbatim, a
-// blank cap on a 128K window (the corrected repro) must get the 16,384 guess rather than OpenCode's
-// 32,000, and a small window must get half the window.
-// One more model saves its efforts (#4154): OpenCode must list exactly those efforts, and a turn at
-// `max` must send `reasoning_effort: "max"`. A model with no saved efforts keeps OpenCode's own set.
-// A model that the server reports as not able to reason (#8381): the real probe must find it through
-// `/api/show`, OpenBot must offer no effort choice for it, and a turn at `high` must send no effort.
-// Input kinds (#5332): a model with none saved keeps OpenCode's default and gets an attached image;
-// a model saved as text-only does not. The read tool gives a PDF to a model saved with PDF input,
-// and refuses it for the others.
-// `OPENCODE_CLI=<opencode> bun run test:opencode-custom-model`.
-// Writes .openbot-build/opencode-custom-model/report.json.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -42,29 +24,20 @@ const AGENT_MODEL = "agent-model";
 const KEYED_ENDPOINT = "vault";
 const KEYED_PATH = "/keyed/v1";
 const KEY = "e2e-endpoint-key";
-/** #4234's corrected repro with the cap saved: a 128K window whose real output cap is 16K. */
 const CAPPED_MODEL = "capped-model";
-/** The same 128K window with the cap left blank: the guess must not exceed 16,384. */
 const WIDE_MODEL = "wide-model";
-/** #4234 as first filed: a 16K window, where half the window is the only budget that fits. */
 const GUESSED_MODEL = "guessed-model";
-/** #4154: an endpoint that accepts Low, High and Max for this model, and no other effort. */
 const EFFORT_MODEL = "effort-model";
 const SAVED_EFFORTS = ["low", "high", "max"] as const;
-/** #8381: a model that the server reports as not able to reason, such as Ollama's `mistral:latest`. */
+const NO_EFFORT_MODEL = "no-effort-model";
 const PLAIN_MODEL = "plain-model";
-/** #5332: a vision model behind the endpoint, saved with image and PDF input. */
 const VISION_MODEL = "vision-model";
-/** An endpoint that refuses images for this model, saved as text-only. */
 const TEXT_MODEL = "text-model";
-/** The prompt that makes the fake endpoint call the read tool on `report.pdf`. */
 const READ_PDF = "Read report.pdf.";
-/** A one-page PDF. */
 const PDF = Buffer.from(
   "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
     "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 10 10]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
 );
-/** A 1×1 PNG. */
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
   "base64",
@@ -74,19 +47,12 @@ interface Request {
   path: string;
   model: string | null;
   stream: boolean;
-  /** For the keyed endpoint: whether the request carried its key. */
   auth?: "key" | "other" | "none";
-  /** The output budget OpenCode asked for; absent when the endpoint protocol has no such field. */
   maxCompletionTokens: number | null;
-  /** The `reasoning_effort` that the request sent, or null. */
   reasoningEffort: string | null;
-  /** The `image_url` content parts of the request's messages. */
   images: number;
-  /** The request carries PDF data. */
   pdf: boolean;
-  /** The request carries OpenCode's refusal of a PDF. */
   pdfRefused: boolean;
-  /** The text of the last message, when a user sent it. */
   userText: string | null;
 }
 
@@ -94,10 +60,8 @@ interface Report {
   passed: boolean;
   openCodeVersion?: string;
   models?: string[];
-  /** The efforts that OpenBot listed for each model. */
   efforts?: Record<string, string[]>;
   requests: Request[];
-  /** The paths of Ollama's own API that the reasoning probe asked. */
   ollamaRequests: string[];
   turns: { reply: string; error: string | null; status: string | null }[];
   error?: string;
@@ -107,10 +71,8 @@ const report: Report = { passed: false, requests: [], ollamaRequests: [], turns:
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-model-e2e-"));
 const clients: AgentClient[] = [];
 const run = promisify(execFile);
-/** The PDF that the fake endpoint asks the read tool for, in the agent's workspace. */
 const pdfPath = join(root, "workspace", "report.pdf");
 
-/** The model and the stream flag of one chat request. */
 async function readRequest(request: IncomingMessage): Promise<Omit<Request, "path" | "auth">> {
   const chunks: Buffer[] = [];
   for await (const part of request) chunks.push(Buffer.from(part));
@@ -131,7 +93,6 @@ async function readRequest(request: IncomingMessage): Promise<Omit<Request, "pat
   };
 }
 
-/** The text of a user message, whether its content is a string or a list of parts. */
 function userText(message: unknown): string | null {
   if (getString(message, "role") !== "user") return null;
   const content = isRecord(message) ? message.content : null;
@@ -141,7 +102,6 @@ function userText(message: unknown): string | null {
     .join("");
 }
 
-/** A streamed call of OpenCode's read tool, as a model that wants to read a file sends it. */
 function readCall(model: string, path: string): string {
   const call = {
     index: 0,
@@ -172,7 +132,6 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
     const read = await readRequest(request);
     const { model, stream } = read;
     const path = request.url ?? "";
-    // Ollama's own API, which the main process asks for the models that cannot reason (#8381).
     if (path.startsWith("/api/")) {
       report.ollamaRequests.push(path);
       response.writeHead(200, { "content-type": "application/json" });
@@ -191,7 +150,6 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
       const auth = header === `Bearer ${KEY}` ? "key" : header ? "other" : "none";
       report.requests.push({ path, ...read, auth });
       if (auth !== "key") {
-        // TokenMe's answer to a missing or refused key, which OpenCode 2.2.5 reports as `-32000`.
         response.writeHead(401, { "content-type": "application/json" });
         response.end(JSON.stringify({ error: { message: "The API key is invalid", type: "authentication_error" } }));
         return;
@@ -227,7 +185,6 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
   });
 });
 
-/** A free TCP port for OpenCode's managed service, so the test does not meet a running OpenBot's. */
 async function freePort(): Promise<number> {
   const probe = createTcpServer();
   await new Promise<void>((listening) => probe.listen(0, "127.0.0.1", listening));
@@ -245,7 +202,6 @@ try {
   const origin = `http://127.0.0.1:${address.port}`;
   const baseUrl = `${origin}/v1`;
 
-  // OpenCode must not read the developer's own config, keys or sessions.
   for (const [name, folder] of [
     ["HOME", "home"],
     ["XDG_CONFIG_HOME", "config"],
@@ -256,8 +212,6 @@ try {
     process.env[name] = join(root, folder);
     await mkdir(join(root, folder), { recursive: true });
   }
-  // The user's own OpenCode config names a default and a small model of the same server, as a
-  // llama-swap user's can. OpenCode asks the small model for a title unless OpenBot turns titles off.
   await mkdir(join(root, "config", "opencode"), { recursive: true });
   await writeFile(
     join(root, "config", "opencode", "opencode.json"),
@@ -287,13 +241,12 @@ try {
       { id: WIDE_MODEL, name: "Wide model", contextWindow: 131_072 },
       { id: GUESSED_MODEL, name: "Guessed model", contextWindow: 16_384 },
       { id: EFFORT_MODEL, name: "Effort model", reasoningEfforts: [...SAVED_EFFORTS] },
+      { id: NO_EFFORT_MODEL, name: "No effort model", reasoningEfforts: [] },
       { id: VISION_MODEL, name: "Vision model", inputs: ["image", "pdf"] },
       { id: TEXT_MODEL, name: "Text model", inputs: [] },
       { id: PLAIN_MODEL, name: "Plain model" },
     ],
   };
-  // The real probe, against the fake server's `/api/show`. It must name the plain model only, and
-  // must not ask about the model with saved efforts.
   const reasoning = createModelReasoningSupport(() => [endpoint]);
   assert.deepEqual(
     await Effect.runPromise(reasoning.refresh()),
@@ -306,7 +259,6 @@ try {
     { changed: false, unreachable: false },
     "The same answer must not count as a change.",
   );
-  // A server that is not up yet: the start asks it again, and the models keep their efforts.
   const down = createModelReasoningSupport(() => [{ ...endpoint, baseUrl: "http://127.0.0.1:9/v1" }]);
   assert.deepEqual(await Effect.runPromise(down.refresh()), { changed: false, unreachable: true });
   assert.equal(down.configs()[0]?.withoutReasoning, undefined);
@@ -350,7 +302,6 @@ try {
     "A model with no saved efforts must keep OpenCode's own efforts.",
   );
 
-  // OpenBot lists a model with no effort as one fixed effort that the user cannot change.
   const plain = getArray(listed, "data").find((model) => getString(model, "model") === `${ENDPOINT}/${PLAIN_MODEL}`);
   assert.equal(
     isRecord(plain) && plain.reasoningEffortConfigurable,
@@ -365,9 +316,6 @@ try {
     assert.equal(turn.error, null, `The turn failed: ${turn.error}`);
   }
 
-  // #4234's shapes: the saved cap verbatim, and the half-window guess for a small window. An
-  // explicit limit is served as written on both the pinned 2.1.1 runtime and 2.2.5; only an
-  // unset one falls back to OpenCode's own pick (#4234's `max_completion_tokens: 32000`).
   const budgets: ReadonlyArray<readonly [string, number]> = [
     [CAPPED_MODEL, 16_384],
     [WIDE_MODEL, 16_384],
@@ -384,7 +332,6 @@ try {
   const effortTurn = await runTurn(client, effortThread, { effort: "max", text: "Say one word.", timeoutMs: 120_000 });
   report.turns.push(effortTurn);
   assert.equal(effortTurn.error, null, `The turn on ${EFFORT_MODEL} failed: ${effortTurn.error}`);
-  // #8381: the agent's saved effort must not reach a model that cannot reason.
   const plainThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${PLAIN_MODEL}` });
   const plainTurn = await runTurn(client, plainThread, { effort: "high", text: "Say one word.", timeoutMs: 120_000 });
   report.turns.push(plainTurn);
@@ -400,7 +347,27 @@ try {
     assert.equal(request.reasoningEffort, "max", `${EFFORT_MODEL} must send the effort of the turn.`);
   }
 
-  // #5332: an attached image reaches a model saved with image input, and not a text-only model.
+  const noEffortModel = getArray(listed, "data").find(
+    (model) => getString(model, "model") === `${ENDPOINT}/${NO_EFFORT_MODEL}`,
+  );
+  assert.ok(
+    isRecord(noEffortModel) && noEffortModel.reasoningEffortConfigurable === false,
+    "A model saved with no efforts must offer no effort.",
+  );
+  const noEffortThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${NO_EFFORT_MODEL}` });
+  const noEffortTurn = await runTurn(client, noEffortThread, {
+    effort: "high",
+    text: "Say one word.",
+    timeoutMs: 120_000,
+  });
+  report.turns.push(noEffortTurn);
+  assert.equal(noEffortTurn.error, null, `The turn on ${NO_EFFORT_MODEL} failed: ${noEffortTurn.error}`);
+  const noEffortRequests = report.requests.filter((request) => request.model === NO_EFFORT_MODEL);
+  assert.ok(noEffortRequests.length > 0, `The endpoint got no request for ${NO_EFFORT_MODEL}.`);
+  for (const request of noEffortRequests) {
+    assert.equal(request.reasoningEffort, null, `${NO_EFFORT_MODEL} must send no effort.`);
+  }
+
   const image = join(workspace, "pixel.png");
   await writeFile(image, PNG);
   const visionThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${VISION_MODEL}` });
@@ -416,7 +383,6 @@ try {
     visionRequests.some((request) => request.images === 1),
     "OpenCode must send the image to a model saved with image input.",
   );
-  /** The requests of one turn on `model`, with an image and the given text. */
   const turnRequests = async (model: string, text: string) => {
     const start = report.requests.length;
     const modelThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${model}` });
@@ -435,7 +401,6 @@ try {
     assert.equal(request.images, 0, "OpenCode must not send an image to a model saved as text-only.");
   }
 
-  // The read tool: a PDF reaches the model saved with PDF input, and OpenCode refuses it for the other.
   await writeFile(pdfPath, PDF);
   const visionPdf = await turnRequests(VISION_MODEL, READ_PDF);
   assert.ok(visionPdf.length > 1, `${VISION_MODEL} did not get the result of the read tool.`);
@@ -456,6 +421,7 @@ try {
   const known = new Set([
     AGENT_MODEL,
     EFFORT_MODEL,
+    NO_EFFORT_MODEL,
     PLAIN_MODEL,
     VISION_MODEL,
     TEXT_MODEL,

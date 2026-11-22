@@ -1,10 +1,3 @@
-// Runs the real `deepseek` provider driver, which is the Pi client, over a fake Pi
-// (`provider-fakes/agents/pi-idle.ts`) to check the idle limit of Pi threads. Each Pi thread has its
-// own `pi` process. Only one thread with no turn keeps it: when a second thread's turn ends, the
-// longest idle thread closes its process. Its next turn starts a new process on the same session
-// file. Before this check, every Pi thread kept its process until the whole provider was idle for
-// 10 minutes. The 5-minute timer itself is not driven here.
-// `bun run test:pi-idle-release`. Writes .openbot-build/pi-idle-release-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -24,7 +17,6 @@ interface LogEntry {
 
 interface Report {
   passed: boolean;
-  /** The process of each thread, by step. */
   steps: { name: string; alive: Record<string, number | null> }[];
   resumed?: { pid: number; sessionFile: string };
   failure?: string;
@@ -35,7 +27,6 @@ const log = join(root, "agent.jsonl");
 const report: Report = { passed: false, steps: [] };
 const clients: AgentClient[] = [];
 
-/** The live process that has this session file open, or null. */
 async function processOf(session: string): Promise<number | null> {
   const entries = await readJsonl<LogEntry>(log);
   const exited = new Set(entries.filter((entry) => entry.event === "exit").map((entry) => entry.pid));
@@ -46,7 +37,6 @@ async function processOf(session: string): Promise<number | null> {
   return live[0] ?? null;
 }
 
-/** Waits until the fake has logged the state that `ready` accepts, or fails after 10 seconds. */
 async function waitFor<T>(what: string, ready: () => Promise<T | null>): Promise<T> {
   const deadline = Date.now() + 10_000;
   for (;;) {
@@ -84,7 +74,6 @@ try {
   const second = await startThread(client, { cwd: root });
   const secondTurn = await runTurn(client, second, { timeoutMs: 20_000 });
   assert.equal(secondTurn.status, "completed");
-  // The limit is one idle thread: the first thread is the longest idle, so its process ends.
   await waitFor("the first thread's process to exit", async () => ((await processOf(first)) === null ? true : null));
   assert.ok(await processOf(second), "The second thread keeps its process.");
   await step("second thread idle", { first, second });
@@ -94,12 +83,15 @@ try {
   const resumedPid = await processOf(first);
   assert.ok(resumedPid && resumedPid !== firstPid, "The next turn starts a new process.");
   const entries = await readJsonl<LogEntry>(log);
-  const switched = entries.find((entry) => entry.pid === resumedPid && entry.event === "switch_session");
-  assert.equal(switched?.sessionFile, first, "The new process opens the same session file.");
+  const started = entries.find((entry) => entry.pid === resumedPid && entry.event === "start");
+  assert.equal(started?.sessionFile, first, "The new process starts on the same session file.");
+  assert.ok(
+    !entries.some((entry) => entry.pid === resumedPid && entry.event === "switch_session"),
+    "The new process does not replace its session, so Pi extensions start only once.",
+  );
   const prompted = entries.find((entry) => entry.pid === resumedPid && entry.event === "prompt");
   assert.equal(prompted?.sessionFile, first, "The prompt goes to the resumed session.");
   report.resumed = { pid: resumedPid, sessionFile: first };
-  // Now the second thread is the longest idle one.
   await waitFor("the second thread's process to exit", async () => ((await processOf(second)) === null ? true : null));
   await step("first thread resumed", { first, second });
 

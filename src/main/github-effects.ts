@@ -1,7 +1,6 @@
 import { Context, type Effect, Layer, Schema } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
 
-/** Adapter failure retains the original error for the native boundary. */
 export class GitHubOperationError extends Schema.TaggedError<GitHubOperationError>()("GitHubOperationError", {
   cause: Schema.Defect(),
 }) {}
@@ -12,7 +11,6 @@ export const {
   rewrap: toGitHubOperationError,
 } = causeHelpers(GitHubOperationError);
 
-/** Actual injected network and desktop navigation capabilities. */
 export class GitHubPlatform extends Context.Service<
   GitHubPlatform,
   {

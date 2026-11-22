@@ -1,9 +1,3 @@
-// Runs the real `grok` provider driver over a fake Grok agent (`provider-fakes/agents/grok-steer.ts`)
-// to check that a steered message goes into the running turn through `x.ai/interject` (#2512).
-// Cases: a steer with text and an image, a steer for a turn that is not the running one, a steer
-// after the turn ended, and a Grok without the method. Each refused steer must send nothing to the
-// agent and must not stop the running turn, so the message can wait in the queue.
-// `bun run test:grok-steer`. Writes .openbot-build/grok-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,7 +10,6 @@ import { installFakeAgent, readJsonl, startThread, stopClients } from "./provide
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/grok-steer-e2e");
 const TURN_TIMEOUT_MS = 20_000;
-/** A 1x1 transparent PNG. */
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
   "base64",
@@ -61,7 +54,6 @@ async function open(
   return { client, log };
 }
 
-/** Waits until the fake logs an entry that matches, or fails after `timeoutMs`. */
 async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!(await readJsonl<LogEntry>(log)).some(match)) {
@@ -72,11 +64,9 @@ async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, ti
 
 interface RunningTurn {
   id: string;
-  /** The reply text and the `turn/completed` status. */
   done: Promise<{ reply: string; status: string | null }>;
 }
 
-/** Starts a `work` turn, which stays open with one tool call until the agent gets an interjection. */
 async function startWork(client: AgentClient, thread: string, log: string): Promise<RunningTurn> {
   let reply = "";
   let listener: ((notification: AppServerNotification) => void) | undefined;
@@ -108,7 +98,6 @@ async function startWork(client: AgentClient, thread: string, log: string): Prom
   return { id, done };
 }
 
-/** Steers the turn with this input. Answers the turn id that the client reports. */
 function steer(
   client: AgentClient,
   thread: string,
@@ -143,7 +132,6 @@ try {
   const { client, log } = await open("native", {});
   const thread = await startThread(client, { cwd: root });
 
-  // A steer goes into the running turn and does not start or stop a turn.
   const turn = await startWork(client, thread, log);
   const answer = await steer(client, thread, turn.id, [
     { type: "text", text: "use the other branch", text_elements: [] },
@@ -165,7 +153,6 @@ try {
   assert.ok(!entries.some((entry) => entry.event === "cancel"), "The steer must not cancel the turn.");
   report.steered = { turnId: turn.id, reply: finished.reply, status: finished.status, interject };
 
-  // A steer for a turn that is not the running one is refused before it reaches the agent.
   const second = await startWork(client, thread, log);
   const before = await interjects(log);
   const wrongTurn = await refusal(steer(client, thread, "another-turn", [{ type: "text", text: "late" }]));
@@ -174,13 +161,11 @@ try {
   await steer(client, thread, second.id, [{ type: "text", text: "end" }]);
   await second.done;
 
-  // After the turn ended, Grok would start the message as a turn of its own.
   const ended = await interjects(log);
   const afterTurn = await refusal(steer(client, thread, second.id, [{ type: "text", text: "too late" }]));
   assert.equal(await interjects(log), ended);
   report.afterTurn = { refused: afterTurn, interjects: (await interjects(log)) - ended };
 
-  // A Grok without the method refuses it. The turn goes on, and nothing cancels it.
   const old = await open("without-method", { FAKE_NO_INTERJECT: "1" });
   const oldThread = await startThread(old.client, { cwd: root });
   const oldTurn = await startWork(old.client, oldThread, old.log);

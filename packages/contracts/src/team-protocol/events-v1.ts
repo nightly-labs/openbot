@@ -1,9 +1,3 @@
-// Frozen optional events-v1 wire contract.
-//
-// Webhook routine management is an additive admin surface. The host makes and keeps the signing
-// secret and shows it once, in the save or rotate response. Widening one of these records needs a
-// new capability instead of changing this codec.
-
 import { EVENT_DELIVERY_ID_MAX_LENGTH } from "../ipc-events";
 import { isString } from "../runtime-values";
 import {
@@ -50,7 +44,6 @@ const integerInRange =
     }
     return value;
   };
-/** A time of day as "HH:MM". `workflows-v1` reads it too. */
 export const routineTime: AdminDecoder = (value) => {
   if (typeof value !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/u.test(value)) {
     throw new Error("Invalid routine schedule.");
@@ -77,7 +70,6 @@ const nonEmptyString =
     if (!isString(decoded) || decoded.length === 0) throw new Error("Invalid routine schedule.");
     return decoded;
   };
-/** A released routine schedule. `workflows-v1` reads it too. */
 export const routineSchedule = variant({
   hourly: fields({ kind: oneOf("hourly"), minute: integerInRange(0, 59) }),
   daily: fields({ kind: oneOf("daily"), time: routineTime }),
@@ -125,7 +117,6 @@ const triggerInput = variant({
   schedule: scheduleTrigger,
   webhook: fields({ kind: oneOf("webhook"), eventType: nullable(eventType), filters }),
 });
-/** A routine trigger as a read answers it. `routine-flows-v1` reads it too. */
 export const routineTrigger = variant({
   schedule: scheduleTrigger,
   webhook: fields({ kind: oneOf("webhook"), url: nullable(string(2_048)), eventType: nullable(eventType), filters }),
@@ -190,5 +181,4 @@ export const EVENTS_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ],
 ]);
 
-/** `routine-recovery-v1` reads routines with the same owner and trigger decoders. */
 export { owner as routineOwner, triggerInput as routineTriggerInput };

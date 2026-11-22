@@ -1,7 +1,3 @@
-// The WebRTC framing of every Team protocol (1-10): the three data channels, the frame shapes, the
-// size limits and the file chunks. Protocol 2 introduced it, so the names keep the `V2` spelling,
-// but it is current code: deleting an old protocol must not delete this file.
-
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
 
 export const TEAM_PROTOCOL_V2 = 2 as const;

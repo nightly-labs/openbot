@@ -1,18 +1,11 @@
-/**
- * Holds routines while the computer sleeps, and starts them again only when the network is back.
- * A routine that fires in the first seconds after a wake runs before Wi-Fi joins and fails.
- */
 export interface RoutineWakeOptions {
   routines: { suspendRoutines(): void; resumeRoutines(): void };
   isOnline: () => boolean;
   pollMs?: number;
-  /** Consecutive online reads before routines resume. One read can be true before the link is up. */
   onlineReads?: number;
-  /** Routines resume after this even when the computer stays offline, so they never stay held. */
   maxWaitMs?: number;
 }
 
-/** Awake time after a suspend with no resume event, before routines resume without one. */
 const LOST_RESUME_MS = 10 * 60_000;
 
 export class RoutineWake {
@@ -35,8 +28,6 @@ export class RoutineWake {
   suspend(): void {
     this.dispose();
     this.#routines.suspendRoutines();
-    // The timer does not advance while the computer sleeps, so it ends only after a wake that macOS
-    // or Electron did not report. Without it, every routine would stay held until a restart.
     this.#lostResume = setTimeout(() => this.resume(), LOST_RESUME_MS);
     this.#lostResume.unref?.();
   }

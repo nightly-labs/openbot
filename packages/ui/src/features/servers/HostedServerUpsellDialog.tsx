@@ -7,10 +7,6 @@ export interface HostedServerUpsellDialogProps {
   onClose: () => void;
 }
 
-/**
- * The offer of a hosted server after a new routine. A short loop shows it: the laptop lid closes and the
- * routine stops, while the server keeps running.
- */
 export function HostedServerUpsellDialog(props: HostedServerUpsellDialogProps) {
   const { t } = useText();
   let seePlans: HTMLButtonElement | undefined;

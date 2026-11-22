@@ -30,7 +30,6 @@ function storyReleaseNotesSkill(): MarketplaceSkillDetail {
   if (!skill) throw new Error("The release notes skill fixture is missing.");
   return skill;
 }
-/** Newest first. Equal times keep the catalog order. */
 function byUpdate(a: MarketplaceSkillSummary, b: MarketplaceSkillSummary): number {
   return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
 }
@@ -41,10 +40,6 @@ const SKILL_ORDERS: Record<NonNullable<MarketplaceSkillQuery["sort"]>, typeof by
   name: (a, b) => a.name.localeCompare(b.name),
 };
 
-/**
- * One catalog page as the account service answers it: the search and filters, then the order, then
- * the cursor. No order is featured first, then the latest update.
- */
 export function mockSkillPage(
   skills: readonly MarketplaceSkillSummary[],
   query: MarketplaceSkillQuery = {},
@@ -74,7 +69,6 @@ const GITHUB_SKILLS: readonly (readonly [string, string])[] = [
   ["xlsx", "Creates and edits spreadsheets with formulas, formatting and charts."],
 ];
 
-/** The public anthropics/skills repository as the host reads it. */
 function mockGithubSource(): GithubSkillSource {
   return {
     owner: "anthropics",
@@ -97,7 +91,6 @@ function mockGithubSource(): GithubSkillSource {
   };
 }
 
-/** Reads a link to anthropics/skills, or to one of its folders. Other links fail as a private one does. */
 function readMockGithub(link: string): GithubSkillSource {
   const match = /^(?:https?:\/\/)?(?:www\.)?github\.com\/anthropics\/skills(?:\/(?:tree|blob)\/[^/]+\/?(.*))?$/iu.exec(
     link.trim(),
@@ -118,7 +111,6 @@ function mockGithubDetail(skillId: string): MarketplaceSkillDetail | undefined {
   return skill && githubSkillDetail(source, skill);
 }
 
-/** The skills marketplace, local skills, and the skills installed on each agent. */
 export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId: string) => void = () => {}) {
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
   const localSkills = clone(
@@ -142,7 +134,6 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
     return installedSkills.get(agentId) ?? [];
   }
 
-  /** Saves the skills of one agent and reports the change, as the desktop host does. */
   function writeInstalled(agentId: string, next: InstalledSkill[]): void {
     installedSkills.set(agentId, next);
     onChanged(agentId);

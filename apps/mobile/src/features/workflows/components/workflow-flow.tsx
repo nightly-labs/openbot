@@ -16,15 +16,10 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** A place between two steps of the outline: a tap adds a step there. */
 function AddHere({ list, index }: { list: FlowList; index: number }) {
   return <FlowAddButton onPress={() => openAddStep(list, index)} />;
 }
 
-/**
- * A step of the outline flow: a tap opens its page, a long press opens the same menu as the list. The
- * card is the card of every flow; the trigger has no menu.
- */
 function FlowStep({
   node,
   draft,
@@ -54,12 +49,6 @@ function FlowStep({
   );
 }
 
-/**
- * The flow view of the editor, on the canvas of the workflow page: the trigger, the steps before the
- * condition, its two paths one under the other and the steps after they join, from left to right. A "+" between two steps adds a
- * step at that place. The steps that the trigger does not reach are not part of the flow; the editor
- * lists them below it.
- */
 export function WorkflowFlow({
   draft,
   outline,
@@ -77,7 +66,6 @@ export function WorkflowFlow({
     const node = byId.get(id);
     return node ? <FlowStep node={node} draft={draft} agents={agents} problem={problems.get(id)} /> : null;
   };
-  /** The steps of a list with a place to add before, between and after them. */
   const list = (name: FlowList) => (
     <>
       {outline[name].map((id, index) => (

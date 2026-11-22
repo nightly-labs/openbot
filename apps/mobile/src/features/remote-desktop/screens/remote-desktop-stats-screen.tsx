@@ -22,13 +22,11 @@ import {
 
 const COPIED_MS = 1_500;
 
-/** The live connection stats of the open remote desktop, beside the stream. */
 export function RemoteDesktopStatsScreen() {
   const { t, format } = useText();
   const stats = useRemoteDesktopStats();
   const [copied, setCopied] = useState(false);
 
-  // The screen under the sheet asks the page for samples while the sheet is open.
   useEffect(() => {
     setRemoteDesktopStatsOpen(true);
     return () => setRemoteDesktopStatsOpen(false);

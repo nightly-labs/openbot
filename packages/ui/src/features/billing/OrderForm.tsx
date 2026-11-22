@@ -30,45 +30,27 @@ import { cx } from "../../utils";
 import { formatMinorMoney } from "./money";
 import "./order-form.css";
 
-/** What the order form buys. A null server or license is not bought. */
 export type OrderFormOrder = PricingOrder;
 
 type LicenseChoice = LicenseTier | "none";
 type ServerChoice = BillingPlanId | "none";
 
 export interface OrderFormProps {
-  /** The server plans with their prices. With none, the form sells only the license. */
   plans: readonly HostedServerCatalogPlan[];
-  /** The first currency. A currency that the plans do not have, such as BRL on some catalogs, gives EUR. */
   currency?: BillingCurrency | undefined;
-  /** A Stripe customer pays in one currency, so an account with open subscriptions cannot change it. */
   currencyLocked?: boolean | undefined;
-  /** The account pays for a server already, so a license gets the bundle price without a new server. */
   ownedServer?: boolean | undefined;
-  /** The people who use the account's servers now. A license must be for at least this many users. */
   used?: number | undefined;
-  /** A visitor in the EU sees "excl. VAT" beside the total. */
   inEu?: boolean | undefined;
-  /** A license bought now is free until this time, in milliseconds since the epoch. */
   licenseTrialEnd?: number | undefined;
   initialServer?: BillingPlanId | null | undefined;
   initialLicense?: LicenseTier | null | undefined;
-  /** The first billing interval. Without it, the form starts with yearly billing. */
   initialInterval?: BillingInterval | undefined;
-  /** The first number of Team license users. It is never less than the users that the license needs. */
   initialUsers?: number | undefined;
-  /** The title of the choice without a server. The app runs on the user's computer, so it says so. */
   noServerTitle?: string | undefined;
-  /** Shows left of the switches, such as the heading of the page. */
   heading?: (() => JSX.Element) | undefined;
-  /** Puts the switches in this element, such as the header of an app page, and not above the form. */
   controlsMount?: HTMLElement | undefined;
-  /** The buttons beside the total. They read the order when the user acts. */
   action: (order: Accessor<OrderFormOrder>) => JSX.Element;
-  /**
-   * Replaces the action when the Team license passes `LICENSE_MAX_USERS` users. Without it, the members stepper
-   * stops at the maximum.
-   */
   contact?: (() => JSX.Element) | undefined;
   onOrderChange?: ((order: OrderFormOrder) => void) | undefined;
   class?: string | undefined;
@@ -86,15 +68,10 @@ const PLAN_NAME = {
   pro: "settings.hostedServers.plan.pro.name",
 } as const satisfies Record<BillingPlanId, AppTextKey>;
 
-/** Keeps "50 GB storage" and "2× speed" on one line on a phone. */
 function noBreak(text: string): string {
   return text.replaceAll(" ", " ");
 }
 
-/**
- * The price for one month of a plan, in minor units. On yearly billing it is the yearly price divided by 12.
- * It is 0 in a currency that the plan does not have; the form offers only the currencies of the catalog.
- */
 export function planMonthlyPrice(
   plan: HostedServerCatalogPlan,
   interval: BillingInterval,
@@ -105,10 +82,6 @@ export function planMonthlyPrice(
   return interval === "month" ? prices.month : Math.round(prices.year / 12);
 }
 
-/**
- * How much less yearly billing costs than twelve monthly payments, in whole percent. It is the smallest
- * discount of the plans, so the text is true for each plan.
- */
 export function yearlyDiscountPercent(plans: readonly HostedServerCatalogPlan[], currency: BillingCurrency): number {
   const discounts = plans.map((plan) => {
     const prices = plan.prices[currency];
@@ -136,7 +109,6 @@ function Price(props: { value: number; currency: BillingCurrency; unit?: string 
   );
 }
 
-/** A pill switch. The pill slides to the chosen option; every column has the same width. */
 function Segment<T extends string>(props: {
   label: string;
   options: readonly { id: T; label: string }[];
@@ -173,10 +145,6 @@ function Segment<T extends string>(props: {
   );
 }
 
-/**
- * The currency as a menu, for a page header with little space. The options change only with the catalog:
- * the menu must not get a new options array on each change.
- */
 function CurrencySelect(props: {
   label: string;
   options: BillingCurrency[];
@@ -216,24 +184,17 @@ interface MemberStepperProps {
   onChange: (value: number) => void;
 }
 
-/**
- * One row of a radio group. The members stepper goes under the label. The row takes the stepper as data, not as
- * JSX children: children here render on the server but are lost when the client hydrates.
- */
 function ChoiceRow(props: {
   value: string;
   title: string;
   badge?: string | undefined;
-  /** A green pill by the title, such as the bundle discount. */
   saving?: string | undefined;
   detail: string;
   disabled?: boolean | undefined;
   price: number;
-  /** The price without the discounts. When it is higher, it shows struck through. */
   fullPrice?: number | undefined;
   currency: BillingCurrency;
   unit?: string | undefined;
-  /** Shows in place of the price, for an order with a price that we agree with the buyer. */
   custom?: string | undefined;
   stepper?: MemberStepperProps | undefined;
 }) {
@@ -300,10 +261,6 @@ function ChoiceRow(props: {
   );
 }
 
-/**
- * The steps are text, not icons: the pricing page renders this form on the server, and an element child of
- * `Button` does not hydrate there.
- */
 function MemberStepper(props: MemberStepperProps) {
   const { t } = useText();
   return (
@@ -334,7 +291,6 @@ function MemberStepper(props: MemberStepperProps) {
   );
 }
 
-/** A summary line that opens and closes. While it closes, it keeps the text that it had when it was open. */
 function SummaryLine(props: {
   open: boolean;
   label: string;
@@ -372,10 +328,6 @@ function SummaryLine(props: {
   );
 }
 
-/**
- * One order: a hosted server on the left, the license on the right, one summary under both, and the
- * consumer's buttons beside the total. The pricing page and Billing show it.
- */
 export function OrderForm(props: OrderFormProps) {
   const { t, format } = useText();
   const id = createUniqueId();
@@ -384,9 +336,7 @@ export function OrderForm(props: OrderFormProps) {
   const [interval, setInterval] = createSignal<BillingInterval>(untrack(() => props.initialInterval) ?? "year");
   const [chosenCurrency, setCurrency] = createSignal<BillingCurrency>(untrack(() => props.currency) ?? "eur");
   const plans = () => props.plans;
-  /** BRL is in the catalog only when each Stripe Price has it. A form without plans sells in the base currencies. */
   const currencies = createMemo(() => catalogCurrencies(plans()));
-  // A locked currency is the currency of the Stripe customer: a change to EUR only gets a refusal.
   const currency = (): BillingCurrency => {
     const chosen = chosenCurrency();
     return props.currencyLocked || currencies().includes(chosen) ? chosen : "eur";
@@ -397,7 +347,6 @@ export function OrderForm(props: OrderFormProps) {
   const starterFits = () => (props.used ?? 0) <= 1;
   const [serverId, setServerId] = createSignal<ServerChoice>(untrack(() => props.initialServer) ?? "none");
   const [license, setLicense] = createSignal<LicenseChoice>(untrack(() => props.initialLicense) ?? "none");
-  // The Team license starts with its included users, or with the people who use the servers now when they are more.
   const [members, setMembers] = createSignal(
     untrack(() => clamp(props.initialUsers ?? 0, minTeam(), LICENSE_MAX_USERS)),
   );
@@ -409,15 +358,12 @@ export function OrderForm(props: OrderFormProps) {
     const plan = server();
     return plan ? planMonthlyPrice(plan, interval(), currency()) : 0;
   };
-  /** The monthly price of the chosen server. In yearly billing the summary takes the discount off as its own line. */
   const serverFull = () => {
     const plan = server();
     return plan ? planMonthlyPrice(plan, "month", currency()) : 0;
   };
-  /** The monthly list price of a license. In yearly billing the summary takes the discount off as its own line. */
   const licenseList = (choice: LicenseTier) =>
     licenseListMonthly(choice, choice === "team" ? members() : 1, currency());
-  /** The Team license has more users than the app sells, so the buyer contacts us for the price. */
   const contact = () => props.contact !== undefined && license() === "team" && members() > LICENSE_MAX_USERS;
   const priced = () => licensed() && !contact();
   const licenseFull = () => {
@@ -425,10 +371,8 @@ export function OrderForm(props: OrderFormProps) {
     return choice === "none" || contact() ? 0 : licenseList(choice);
   };
   const licenseCost = () => licenseMonthlyPrice(licenseFull(), interval());
-  /** A license costs less with any server: one in this order, or one that the account pays for. */
   const bundled = () => server() !== undefined || props.ownedServer === true;
   const licensePlan = (tier: LicenseTier): LicensePlan => ({ tier, interval: interval(), bundle: bundled() });
-  /** The monthly price of a license after the yearly and bundle discounts: the amount that Stripe charges. */
   const licensePrice = (choice: LicenseTier) =>
     licenseOrderMonthly(licensePlan(choice), choice === "team" ? members() : 1, currency());
   const bundleSaving = () =>
@@ -440,10 +384,8 @@ export function OrderForm(props: OrderFormProps) {
   const total = () => serverCost() + licenseCost() - discount();
   const buying = () => server() !== undefined || licensed();
   const unit = () => (isYearly() ? t("billing.order.unit.monthBilledYearly") : t("billing.order.unit.month"));
-  /** A license cannot pay for more members than the server holds, so the Team license does not fit a small server. */
   const teamMax = () => Math.min(LICENSE_MAX_USERS, server()?.memberLimit ?? LICENSE_MAX_USERS);
   const teamFits = () => teamMax() >= minTeam();
-  /** With a contact action, one step after `LICENSE_MAX_USERS` means "more than the maximum". */
   const teamStepMax = () => (props.contact && teamMax() === LICENSE_MAX_USERS ? LICENSE_MAX_USERS + 1 : teamMax());
   const memberLabel = () =>
     members() > LICENSE_MAX_USERS
@@ -452,8 +394,6 @@ export function OrderForm(props: OrderFormProps) {
   const teamCustom = () => (contact() ? t("billing.license.change.custom") : undefined);
   const teamSaving = () => (contact() ? undefined : bundleSaving());
   const yearlyPercent = () => yearlyDiscountPercent(plans(), currency());
-  // A conditional in a component prop or in children compiles to a memo on the client but not on the server. That
-  // moves the hydration keys of everything after it, so each such conditional is a named function here.
   const teamDetail = () => {
     if (contact()) return t("billing.license.change.customDescription", { count: LICENSE_MAX_USERS });
     return teamFits()
@@ -486,13 +426,11 @@ export function OrderForm(props: OrderFormProps) {
     const plan = server();
     return plan ? t("billing.order.summary.server", { plan: serverName(plan), count: plan.memberLimit }) : "";
   };
-  /** The total is the price a visitor pays, so in the EU its unit says that VAT is not included. */
   const totalUnit = () => {
     if (!buying()) return t("billing.order.unit.free");
     if (!props.inEu) return unit();
     return isYearly() ? t("billing.order.unit.monthBilledYearlyExclVat") : t("billing.order.unit.monthExclVat");
   };
-  /** A sold-out plan says so and cannot be chosen, as in Add server. */
   const planBadge = (plan: HostedServerCatalogPlan) => {
     if (plan.soldOut) return t("settings.hostedServers.plan.soldOut");
     return plan.id === "standard" ? t("billing.order.server.bestValue") : undefined;
@@ -556,7 +494,6 @@ export function OrderForm(props: OrderFormProps) {
           : { tier: choice, users: choice === "team" ? Math.min(members(), LICENSE_MAX_USERS) : 1 },
     };
   });
-  // A block body: a signal setter as `onOrderChange` returns its value, and an effect must not return one.
   createEffect(order, (next) => {
     props.onOrderChange?.(next);
   });
@@ -689,7 +626,6 @@ export function OrderForm(props: OrderFormProps) {
 
         <section class="order-form-summary">
           <h2 class="sr-only">{t("billing.order.summary.title")}</h2>
-          {/* Each part sits under its own half: the server on the left, the license on the right. */}
           <ul class="order-form-summary-lines order-form-summary-server">
             <SummaryLine
               open={server() !== undefined}

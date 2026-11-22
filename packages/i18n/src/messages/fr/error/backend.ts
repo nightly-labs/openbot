@@ -241,7 +241,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Cette attente n’est pas ouverte. L’agent l’a fermée, ou quelqu’un l’a annulée.",
   "error.backend.agentWaitNoRequest": "Une attente a besoin d’un message pour continuer. Ce tour n’a pas de message.",
   "error.backend.agentWaitOwnChatOnly":
-    "Ouvrez une attente uniquement dans votre propre discussion. Une tâche de canal ou de messagerie ne peut pas attendre.",
+    "Ouvrez une attente dans votre propre discussion ou dans un fil secondaire. Une conversation de canal ou de messagerie ne peut pas attendre.",
   "error.backend.agentWaitNoteRequired": "Indiquez une courte note qui précise l’objet de l’attente.",
   "error.backend.agentWaitRoutineGone": "Cet agent n’a pas de routine avec cet identifiant.",
   "error.backend.agentWaitNoRoutine":
@@ -310,6 +310,12 @@ export const messages = {
     "{provider} n’a pas pu démarrer le serveur MCP {name}. Ses outils ne sont pas disponibles pour {provider}. {provider} démarre le serveur lui-même, donc le test de connexion dans OpenBot peut réussir. Commencez une nouvelle discussion pour réessayer.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’a pas répondu à temps. Commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’est pas disponible pour le moment. Attendez quelques minutes, puis commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} n’a pas pu joindre le serveur MCP {name}. Ouvrez {name} dans Marketplace, Apps, et vérifiez que son adresse est correcte et que le serveur fonctionne. Commencez ensuite une nouvelle discussion pour réessayer.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} n’a pas pu obtenir les outils GitHub, car GitHub n’a pas répondu. Ouvrez GitHub dans Marketplace, Apps, et reconnectez-le s’il vous le demande. Commencez ensuite une nouvelle discussion pour réessayer.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot n’a pas pu démarrer sa connexion locale de connexion pour ce serveur. Redémarrez OpenBot, puis réessayez.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -348,6 +354,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Le dossier n’existe pas ou a déjà été supprimé.",
   "error.backend.libraryFolderOtherAgent": "Un fichier ne peut aller que dans un dossier de son agent.",
   "error.backend.libraryFolderMoveInvalid": "Ce dossier ne peut pas être déplacé ici.",
+  "error.backend.workflowFolderLimit": "Un serveur peut avoir jusqu’à {limit} dossiers de workflows.",
+  "error.backend.workflowFolderPlacementLimit": "Il y a trop de workflows dans les dossiers.",
   "error.backend.sectionNameDuplicate": "Les noms de section doivent être uniques.",
   "error.backend.directMessageRequired": "Écrivez d’abord un message.",
   "error.backend.directMessageTooLong": "Un message direct peut contenir jusqu’à {limit} caractères.",
@@ -383,9 +391,11 @@ export const messages = {
     "Seule l'app OpenBot du téléphone peut envoyer ce rapport, car elle ajoute la version et le journal d'assistance du téléphone. Ouvre cette discussion sur le téléphone. Si tu y vois ce message, mets à jour l'app du téléphone.",
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
+  "error.backend.apiKeyListFailed": "OpenBot n’a pas pu lire les clés d’API enregistrées.",
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
-  "error.backend.apiKeyNotAllowed": "Seul le propriétaire du serveur ou un administrateur peut saisir une clé d’API.",
   "error.backend.apiKeySaving": "La clé d’API est déjà en cours d’enregistrement.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot n’a pas pu lire la clé d’API. Saisissez une clé de 8 000 caractères au plus, puis choisissez qui peut l’utiliser.",
   "error.backend.authRequestInactive": "Cette demande d’authentification sécurisée n’est plus active.",
   "error.backend.secureAuthUnavailable": "L’authentification sécurisée est indisponible.",
   "error.backend.browserUrlRequired": "Une URL de navigateur est requise.",
@@ -429,7 +439,7 @@ export const messages = {
     "La fenêtre contextuelle n’a pas pu se charger. Réessayez la connexion depuis la page d’origine.",
   "error.backend.browserTabNotFound": "Onglet de navigateur introuvable.",
   "error.backend.authActive": "L’authentification est déjà active.",
-  "error.backend.authHttpsRequired": "L’authentification sécurisée nécessite HTTPS.",
+  "error.backend.authWebPageRequired": "L’authentification sécurisée nécessite HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Les codes d’authentification doivent comporter de 4 à 12 chiffres.",
   "error.backend.authExpired": "La demande d’authentification a expiré.",
   "error.backend.authDigitsRequired": "Saisissez le nombre de chiffres demandé.",
@@ -471,6 +481,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Donnez un titre court à la tâche.",
   "error.backend.taskToolInvalid":
     "Donnez à la tâche un titre de 120 caractères au plus et des consignes qui disent quoi faire.",
+  "error.backend.taskControlInvalid":
+    "Indiquez le taskId d’une tâche que vous avez lancée. Un message doit aussi contenir du texte.",
   "error.backend.taskOwnChatOnly":
     "Lancez une tâche uniquement depuis votre propre discussion. Un canal, une conversation de messagerie ou une autre tâche ne peut pas en lancer.",
   "error.backend.taskUnfinishedLimit":
@@ -478,5 +490,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Cet agent a {count} tâches ouvertes. Fermez une tâche, puis lancez-en ou ouvrez-en une autre.",
   "error.backend.taskRemoteUnsupported": "Les tâches sont disponibles uniquement pour les agents de cet ordinateur.",
+  "error.backend.taskMessageFailed": "OpenBot n’a pas pu envoyer le message à la tâche. Réessayez plus tard.",
   "error.backend.taskStartFailed": "OpenBot n’a pas pu lancer la tâche. Faites plutôt le travail dans ce tour.",
 } as const satisfies PartialTranslation<typeof source>;

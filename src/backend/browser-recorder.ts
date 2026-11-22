@@ -25,10 +25,8 @@ const recorderStartErrorSchema = Schema.Struct({
   message: Schema.String,
 });
 
-/** The encoded video size in physical pixels, or null to keep the size that the capture gives. */
 export type RecordingFrameSize = { width: number; height: number } | null;
 
-/** A tab with a custom viewport records at that viewport times its scale, not at the display's size. */
 export function recordingFrameSize(environment: BrowserEnvironment): RecordingFrameSize {
   const { mode, width, height, deviceScaleFactor } = environment.viewport;
   if (mode !== "custom") return null;
@@ -55,7 +53,6 @@ export class BrowserRecorder {
   readonly #artifacts = new Map<string, BrowserRecordingArtifact>();
   readonly #errors = new Map<string, Error>();
   readonly #starting = new Set<string>();
-  /** The tabs whose capture the recorder starts now, by `WebContents` id. */
   readonly #capturing = new Set<number>();
   readonly #onStateChanged: (tabId: string, recording: boolean) => void;
   readonly #maxRecordingMs: number;
@@ -82,7 +79,6 @@ export class BrowserRecorder {
     return this.#sessions.get(tabId)?.stoppedReason === null;
   }
 
-  /** Allows one tab-capture request of the recorder for a tab whose capture starts now. */
   allowsTabCapture(
     contents: WebContents,
     permission: string,
@@ -422,9 +418,6 @@ export class BrowserRecorder {
 }
 
 function startScript(sourceId: string, maxRecordingMs: number, frameSize: RecordingFrameSize): string {
-  // A custom page size records through tab capture at exactly that size. Without a size, capture
-  // follows the display's scale: 1920x1080 at scale 1 recorded at 4480x2520 on a Retina screen.
-  // A tab that fills its panel keeps the display capture of the panel, as before.
   const tabVideo = frameSize
     ? {
         mandatory: {
