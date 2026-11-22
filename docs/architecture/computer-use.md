@@ -86,6 +86,14 @@ window only by `app` or `window` title removes the cursor, because only the driv
 The driver skips the reads between the steps of a batch and does one read at the end. The tap keeps
 the `screenshot_width` of that end read (`observation.state` in the answer) as of a direct read.
 
+On macOS, driver 0.52.9 keeps no screenshot frame after a read that ends in
+`ax_window_unresolved`: the window exists, but no accessibility window claims it, as with Premiere
+Pro. Every pixel action on that window is then refused as `window_never_read`, also in the
+foreground, and a new full read does the same again (#14480, upstream trycua/cua#6755). A
+screenshot-only read (`include_accessibility_tree: false`, `include_screenshot: true`) has no
+accessibility result to fail, so the driver keeps its frame. The agent instructions name that read
+on macOS. When a driver release with trycua/cua#8117 is pinned, the rule can go.
+
 ### Agent display on a server
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in
