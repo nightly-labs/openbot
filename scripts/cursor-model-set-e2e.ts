@@ -38,8 +38,7 @@ try {
   const log = join(root, "sets.jsonl");
   const failFlag = join(root, "fail-next-set");
   const reorderFlag = join(root, "reorder-sets");
-  const executable = join(root, "cursor", "cursor-agent");
-  await installFakeAgent(executable, "cursor-model-set", {
+  const executable = await installFakeAgent(join(root, "cursor", "cursor-agent"), "cursor-model-set", {
     FAKE_LOG: log,
     FAKE_FAIL_NEXT_SET: failFlag,
     FAKE_REORDER_SETS: reorderFlag,

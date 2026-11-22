@@ -10,14 +10,21 @@ export async function installFakeAgent(
   executable: string,
   agent: string,
   env: Readonly<Record<string, string>> = {},
-): Promise<void> {
+): Promise<string> {
   const file = resolve(import.meta.dirname, "agents", `${agent}.ts`);
   const exports = Object.entries(env)
     .map(([name, value]) => `export ${name}=${JSON.stringify(value)}\n`)
     .join("");
   await mkdir(dirname(executable), { recursive: true });
+  if (process.platform === "win32") {
+    const cmdPath = `${executable}.cmd`;
+    const envLines = Object.entries(env).map(([name, value]) => `set "${name}=${value.replaceAll('"', '""')}"`);
+    await writeFile(cmdPath, `@echo off\r\n${envLines.join("\r\n")}\r\n"${process.execPath}" "${file}" %*\r\n`);
+    return cmdPath;
+  }
   await writeFile(executable, `#!/bin/sh\n${exports}exec "${process.execPath}" "${file}" "$@"\n`);
   await chmod(executable, 0o755);
+  return executable;
 }
 
 export async function readJsonl<T>(path: string): Promise<T[]> {
