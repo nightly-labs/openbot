@@ -29,7 +29,7 @@ import {
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { checkResourceAllowed, resourceUrlFromServerUrl } from "@modelcontextprotocol/sdk/shared/auth-utils.js";
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { MCP_SIGN_IN_TIMEOUT_MS } from "@openbot/contracts/ipc";
+import { MCP_SIGN_IN_TIMEOUT_MS, relayCallbackQuery } from "@openbot/contracts/ipc";
 import { mcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
@@ -176,6 +176,8 @@ export interface McpSignIn {
 
 export type McpSignInOpener = (url: string) => Promise<void>;
 
+export type McpSignInAddressOutcome = "received" | "ended" | "invalid";
+
 export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   refreshAccessToken: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
@@ -183,6 +185,7 @@ export interface McpOAuthAuthority {
   signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   cancelSignIn: (url: string) => boolean;
   signInLink: (url: string) => string | null;
+  receiveSignInAddress: (url: string, address: string) => McpSignInAddressOutcome;
   signedIn: (url: string) => boolean;
   needsSignIn: (url: string) => boolean;
   hasSignIn: (url: string) => boolean;
@@ -494,6 +497,18 @@ export class McpOAuth implements McpOAuthAuthority {
     const key = mcpOAuthAccountKey(url);
     const attempts = key === null ? [] : [...(this.#attempts.get(key) ?? [])];
     return attempts.map((attempt) => attempt.openedUrl()).findLast((page) => page !== null) ?? null;
+  }
+
+  receiveSignInAddress(url: string, address: string): McpSignInAddressOutcome {
+    const page = this.signInLink(url);
+    const state = page ? URL.parse(page)?.searchParams.get("state") : null;
+    if (!state || !this.#exchanges.has(state)) return "ended";
+    const query = relayCallbackQuery(address, state);
+    if (query === null) return "invalid";
+    if (!this.#waiting.has(state)) return "received";
+    const code = new URLSearchParams(query).get("code");
+    const received = code ? this.receiveAuthorizationCode(state, code) : this.refuseAuthorization(state);
+    return received ? "received" : "ended";
   }
 
   signedIn(url: string): boolean {

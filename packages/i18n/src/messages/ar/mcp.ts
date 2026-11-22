@@ -28,6 +28,7 @@ export const messages = {
   "mcp.signIn.pageDescription": "هذه الصفحة مفتوحة في المتصفح على {host}. سجّل الدخول هنا.",
   "mcp.signIn.copyHint": "إذا لم تُحمَّل الصفحة، انسخ الرابط وافتحه في متصفح آخر.",
   "mcp.signIn.copyLink": "نسخ الرابط",
+  "mcp.signIn.pasteHint": "إذا سجّلت الدخول على جهاز آخر، فانسخ العنوان الذي يعرضه متصفحه في النهاية والصقه هنا.",
   "mcp.test.connected": {
     zero: "متصل · لا أدوات",
     one: "متصل · أداة واحدة",
