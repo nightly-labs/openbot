@@ -168,6 +168,30 @@ function numberIn(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+export type CompactScreenshot = (png: Buffer) => Buffer | null;
+
+const MIN_COMPACTED_BASE64_CHARS = 262_144;
+
+function withCompactImages(answer: DynamicRecord, compact: CompactScreenshot): DynamicRecord | null {
+  const result = answer.ok === true && isDynamicRecord(answer.result) ? answer.result : null;
+  if (!result || !Array.isArray(result.content)) return null;
+  let changed = false;
+  const content = result.content.map((item: unknown) => {
+    const jpeg = compactedImageData(item, compact);
+    if (jpeg === null || !isDynamicRecord(item)) return item;
+    changed = true;
+    return { ...item, data: jpeg, mimeType: "image/jpeg" };
+  });
+  return changed ? { ...answer, result: { ...result, content } } : null;
+}
+
+function compactedImageData(item: unknown, compact: CompactScreenshot): string | null {
+  if (!isDynamicRecord(item) || item.type !== "image" || item.mimeType !== "image/png") return null;
+  const { data } = item;
+  if (typeof data !== "string" || data.length < MIN_COMPACTED_BASE64_CHARS) return null;
+  return compact(Buffer.from(data, "base64"))?.toString("base64") ?? null;
+}
+
 export interface ActionTapAddresses {
   upstream: string;
   tap: string;
@@ -190,18 +214,21 @@ class CallAnswerLines extends Transform {
   readonly #captured: (windowId: number, width: number) => void;
   readonly #refused: () => void;
   readonly #now: () => number;
+  readonly #compact: CompactScreenshot | null;
 
   constructor(
     answered: (tool: string, ms: number) => void,
     captured: (windowId: number, width: number) => void,
     refused: () => void,
     now: () => number,
+    compact: CompactScreenshot | null,
   ) {
     super();
     this.#answered = answered;
     this.#captured = captured;
     this.#refused = refused;
     this.#now = now;
+    this.#compact = compact;
   }
 
   expect(request: ExpectedAnswer | null): void {
@@ -262,7 +289,8 @@ class CallAnswerLines extends Transform {
     if (!whole) this.push(line);
     else if (this.#answering === "list") this.push(withoutDriverCursorTools(line));
     else {
-      this.push(withCopy(line, SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "") ? this.#readScreenshot : undefined));
+      const screenshots = SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "");
+      this.push(screenshots ? withCopy(line, this.#readScreenshot, this.#compact) : withCopy(line));
       if (isAccessibilityRefusal(line)) this.#refused();
     }
   }
@@ -290,14 +318,26 @@ function withoutDriverCursorTools(line: Buffer): Buffer {
   return Buffer.from(`${JSON.stringify({ ...parsed, result: { ...result, tools } })}\n`, "utf8");
 }
 
-function withCopy(line: Buffer, read?: (answer: DynamicRecord) => void): Buffer {
-  if (!line.includes('"structuredContent"') && !line.includes('"ok":false') && !line.includes('"isError":true'))
+function withCopy(
+  line: Buffer,
+  read?: (answer: DynamicRecord) => void,
+  compact: CompactScreenshot | null = null,
+): Buffer {
+  const pngCompact = compact && line.includes('"image/png"') ? compact : null;
+  if (
+    !pngCompact &&
+    !line.includes('"structuredContent"') &&
+    !line.includes('"ok":false') &&
+    !line.includes('"isError":true')
+  )
     return line;
   const parsed = parseAnswerLine(line.toString("utf8", 0, line.length - 1));
   if (!parsed) return line;
   read?.(parsed);
-  const rewritten = rewriteCallAnswer(parsed);
-  return rewritten === null ? line : Buffer.from(`${rewritten}\n`, "utf8");
+  const compacted = pngCompact ? withCompactImages(parsed, pngCompact) : null;
+  const rewritten = rewriteCallAnswer(compacted ?? parsed);
+  if (rewritten !== null) return Buffer.from(`${rewritten}\n`, "utf8");
+  return compacted ? Buffer.from(`${JSON.stringify(compacted)}\n`, "utf8") : line;
 }
 
 export class CuaDriverActionTap {
@@ -311,10 +351,12 @@ export class CuaDriverActionTap {
   #logger: Logger;
   #onAccessibilityRefused: (() => void) | null = null;
   #onToolCall: (() => void) | null = null;
+  readonly #compact: CompactScreenshot | null;
 
-  constructor(now: () => number = Date.now, logger: Logger = defaultLogger) {
+  constructor(now: () => number = Date.now, logger: Logger = defaultLogger, compact: CompactScreenshot | null = null) {
     this.#now = now;
     this.#logger = logger;
+    this.#compact = compact;
   }
 
   onAccessibilityRefused(listener: () => void): void {
@@ -400,6 +442,7 @@ export class CuaDriverActionTap {
       (windowId, width) => this.#keepScreenshotWidth(windowId, width),
       () => this.#onAccessibilityRefused?.(),
       this.#now,
+      this.#compact,
     );
     const end = () => {
       for (const call of answers.takeUnanswered()) this.#logUnanswered(call.tool, this.#now() - call.at);
