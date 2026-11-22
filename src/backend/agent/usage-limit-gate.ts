@@ -49,8 +49,11 @@ interface ProviderFailure extends UsageLimitKey {
   spent: boolean;
   refused: boolean;
   notOffered: boolean;
+  rateLimited: boolean;
   timer: ReturnType<typeof setTimeout>;
 }
+
+export type ProviderFailureNote = { kind: "not-offered" } | { kind: "rate-limit" | "error"; endsAt: number };
 
 interface Refusal {
   count: number;
@@ -159,6 +162,15 @@ export class UsageLimitGate {
     return this.#failures.get(limitKey(limit.provider, limit.accountId, limit.model))?.spent === true;
   }
 
+  failureNote(limit: UsageLimitKey): ProviderFailureNote | null {
+    const failure = this.#failures.get(limitKey(limit.provider, limit.accountId, limit.model));
+    if (!failure || failure.spent || failure.refused) return null;
+    if (failure.notOffered) return { kind: "not-offered" };
+    return Number.isFinite(failure.endsAt)
+      ? { kind: failure.rateLimited ? "rate-limit" : "error", endsAt: failure.endsAt }
+      : null;
+  }
+
   backupWaitEnd(backups: readonly UsageLimitKey[]): number | null {
     const now = Date.now();
     const ends = backups.flatMap((limit) => {
@@ -182,6 +194,7 @@ export class UsageLimitGate {
     spent = false,
     refused = false,
     notOffered = false,
+    rateLimited = false,
   ): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
@@ -208,6 +221,7 @@ export class UsageLimitGate {
       spent: spent || previous?.spent === true,
       refused: refused || previous?.refused === true,
       notOffered: notOffered || previous?.notOffered === true,
+      rateLimited,
       timer: this.#armFailure(key, endsAt),
     });
     if (dropped) this.#wakeReturning(key);

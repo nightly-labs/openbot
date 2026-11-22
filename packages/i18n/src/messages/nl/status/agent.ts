@@ -11,6 +11,18 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Overgeslagen: de vorige uitvoering was nog niet klaar",
   "status.agent.routineSkippedUsageLimit": "Overgeslagen: gebruikslimiet bereikt",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
+  "status.agent.modelSwitchedForRateLimit": {
+    one: "{previous} bereikte een korte snelheidslimiet. Overgeschakeld naar {model}. Schakelt over ongeveer {count} minuut terug.",
+    other:
+      "{previous} bereikte een korte snelheidslimiet. Overgeschakeld naar {model}. Schakelt over ongeveer {count} minuten terug.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    one: "{previous} stopte door een fout. Overgeschakeld naar {model}. Schakelt over ongeveer {count} minuut terug.",
+    other:
+      "{previous} stopte door een fout. Overgeschakeld naar {model}. Schakelt over ongeveer {count} minuten terug.",
+  },
+  "status.agent.modelSwitchedForNotOffered":
+    "{previous} is nu niet beschikbaar voor dit account. Overgeschakeld naar {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",

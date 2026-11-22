@@ -11,6 +11,16 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Saltata: l'ultima esecuzione non era finita",
   "status.agent.routineSkippedUsageLimit": "Saltata: limite di utilizzo raggiunto",
   "status.agent.modelSwitchedForError": "Errore del provider. Passato a {model}.",
+  "status.agent.modelSwitchedForRateLimit": {
+    one: "{previous} ha raggiunto un breve limite di frequenza. Passato a {model}. Torna indietro tra circa {count} minuto.",
+    other:
+      "{previous} ha raggiunto un breve limite di frequenza. Passato a {model}. Torna indietro tra circa {count} minuti.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    one: "{previous} si è fermato per un errore. Passato a {model}. Torna indietro tra circa {count} minuto.",
+    other: "{previous} si è fermato per un errore. Passato a {model}. Torna indietro tra circa {count} minuti.",
+  },
+  "status.agent.modelSwitchedForNotOffered": "{previous} non è disponibile per questo account ora. Passato a {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} non ha più crediti. Passaggio a {model}. Per usarlo di nuovo, aggiungi crediti e poi selezionalo.",
   "status.agent.modelReturnedAfterError": "Tornato a {model} dopo l’errore del provider.",

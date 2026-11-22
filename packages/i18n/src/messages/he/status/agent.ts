@@ -10,6 +10,17 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "דולגה ריצה: הריצה הקודמת עוד לא הסתיימה",
   "status.agent.routineSkippedUsageLimit": "דולגה ריצה: הגעת למכסת השימוש",
   "status.agent.modelSwitchedForError": "שגיאת ספק. עבר אל {model}.",
+  "status.agent.modelSwitchedForRateLimit": {
+    one: "{previous} הגיע למגבלת קצב קצרה. עבר אל {model}. יחזור בעוד כ-{count} דקה.",
+    two: "{previous} הגיע למגבלת קצב קצרה. עבר אל {model}. יחזור בעוד כ-{count} דקות.",
+    other: "{previous} הגיע למגבלת קצב קצרה. עבר אל {model}. יחזור בעוד כ-{count} דקות.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    one: "{previous} נעצר בגלל שגיאה. עבר אל {model}. יחזור בעוד כ-{count} דקה.",
+    two: "{previous} נעצר בגלל שגיאה. עבר אל {model}. יחזור בעוד כ-{count} דקות.",
+    other: "{previous} נעצר בגלל שגיאה. עבר אל {model}. יחזור בעוד כ-{count} דקות.",
+  },
+  "status.agent.modelSwitchedForNotOffered": "{previous} לא זמין כרגע בחשבון הזה. עבר אל {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",

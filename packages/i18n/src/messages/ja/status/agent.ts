@@ -11,6 +11,13 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "スキップ: 前回の実行がまだ終わっていませんでした",
   "status.agent.routineSkippedUsageLimit": "スキップ: 使用量の上限に達しました",
   "status.agent.modelSwitchedForError": "プロバイダーのエラーが発生しました。{model} に切り替えました。",
+  "status.agent.modelSwitchedForRateLimit": {
+    other: "{previous} が短時間のレート制限に達しました。{model} に切り替えました。約 {count} 分後に戻ります。",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    other: "{previous} がエラーで停止しました。{model} に切り替えました。約 {count} 分後に戻ります。",
+  },
+  "status.agent.modelSwitchedForNotOffered": "{previous} は現在このアカウントで使えません。{model} に切り替えました。",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
   "status.agent.modelReturnedAfterError": "プロバイダーのエラーの後、{model} に戻しました。",

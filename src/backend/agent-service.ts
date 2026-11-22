@@ -1468,6 +1468,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                     resetDelayMs,
                     spent,
                     failed.causeCode === "authentication",
+                    false,
+                    failed.causeCode === "rate_limit",
                   );
                 }
                 return Effect.void;
@@ -4457,7 +4459,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             previous: name(left, email),
             model: name(joined, email),
           })
-        : sourceText(MODEL_SWITCH_TEXT[reason], { model: name(joined, email) });
+        : ((reason === "provider-error" && left
+            ? this.#providerErrorNote(agent, left, name(left, email), name(joined, email))
+            : null) ?? sourceText(MODEL_SWITCH_TEXT[reason], { model: name(joined, email) }));
     const text = note(true);
     try {
       this.channels.noteModelSwitch(agent.id, note(false), MODEL_SWITCH_ITEM_TYPES[reason]);
@@ -4484,6 +4488,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     } catch (error) {
       this.#emitError("model_switch_marker_failed", error, agent.id);
     }
+  }
+
+  #providerErrorNote(agent: AgentSummary, left: AgentModelChoice, previous: string, model: string): string | null {
+    const failure = this.#usageLimits.failureNote(usageLimitOf(left));
+    if (failure?.kind === "not-offered")
+      return sourceText("status.agent.modelSwitchedForNotOffered", { previous, model });
+    const returnTo = agent.usageLimitReturn;
+    if (!failure || !returnTo || !sameAgentModelChoice(returnTo, left)) return null;
+    const count = Math.ceil((failure.endsAt - Date.now()) / 60_000);
+    if (count < 1 || count > PROVIDER_ERROR_NOTE_MAX_MINUTES) return null;
+    return sourceText(
+      failure.kind === "rate-limit"
+        ? "status.agent.modelSwitchedForRateLimit"
+        : "status.agent.modelSwitchedForErrorUntilReturn",
+      { previous, model, count },
+    );
   }
 
   readonly setAvatar = Effect.fn("AgentService.setAvatar")(function* (
@@ -7133,6 +7153,8 @@ export class AgentLifecycleFailed extends Schema.TaggedError<AgentLifecycleFaile
 }) {}
 
 const POOL_READ_INTERVAL_MS = 4 * 60_000;
+
+const PROVIDER_ERROR_NOTE_MAX_MINUTES = 60;
 
 type ModelMove = "return" | "provider-error" | "next-turn" | "pool";
 

@@ -11,6 +11,16 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Atlandı: son çalıştırma henüz bitmemişti",
   "status.agent.routineSkippedUsageLimit": "Atlandı: kullanım sınırına ulaşıldı",
   "status.agent.modelSwitchedForError": "Sağlayıcı hatası. {model} modeline geçildi.",
+  "status.agent.modelSwitchedForRateLimit": {
+    one: "{previous} kısa bir istek sınırına ulaştı. {model} modeline geçildi. Yaklaşık {count} dakika sonra geri döner.",
+    other:
+      "{previous} kısa bir istek sınırına ulaştı. {model} modeline geçildi. Yaklaşık {count} dakika sonra geri döner.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    one: "{previous} bir hata nedeniyle durdu. {model} modeline geçildi. Yaklaşık {count} dakika sonra geri döner.",
+    other: "{previous} bir hata nedeniyle durdu. {model} modeline geçildi. Yaklaşık {count} dakika sonra geri döner.",
+  },
+  "status.agent.modelSwitchedForNotOffered": "{previous} şu anda bu hesapta kullanılamıyor. {model} modeline geçildi.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} için kredi kalmadı. {model} modeline geçildi. Yeniden kullanmak için kredi ekleyin ve sonra seçin.",
   "status.agent.modelReturnedAfterError": "Sağlayıcı hatasından sonra {model} modeline geri dönüldü.",

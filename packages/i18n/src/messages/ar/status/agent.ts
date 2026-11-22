@@ -10,6 +10,23 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "تشغيل متخطى: لم يكن التشغيل السابق قد انتهى",
   "status.agent.routineSkippedUsageLimit": "تشغيل متخطى: تم بلوغ حد الاستخدام",
   "status.agent.modelSwitchedForError": "خطأ في المزوّد. تم التبديل إلى {model}.",
+  "status.agent.modelSwitchedForRateLimit": {
+    zero: "بلغ {previous} حدًا قصيرًا لمعدل الطلبات. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+    one: "بلغ {previous} حدًا قصيرًا لمعدل الطلبات. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+    two: "بلغ {previous} حدًا قصيرًا لمعدل الطلبات. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+    few: "بلغ {previous} حدًا قصيرًا لمعدل الطلبات. تم التبديل إلى {model}. يعود بعد نحو {count} دقائق.",
+    many: "بلغ {previous} حدًا قصيرًا لمعدل الطلبات. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+    other: "بلغ {previous} حدًا قصيرًا لمعدل الطلبات. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    zero: "توقف {previous} بسبب خطأ. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+    one: "توقف {previous} بسبب خطأ. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+    two: "توقف {previous} بسبب خطأ. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+    few: "توقف {previous} بسبب خطأ. تم التبديل إلى {model}. يعود بعد نحو {count} دقائق.",
+    many: "توقف {previous} بسبب خطأ. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+    other: "توقف {previous} بسبب خطأ. تم التبديل إلى {model}. يعود بعد نحو {count} دقيقة.",
+  },
+  "status.agent.modelSwitchedForNotOffered": "{previous} غير متاح لهذا الحساب الآن. تم التبديل إلى {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
   "status.agent.modelReturnedAfterError": "تمت العودة إلى {model} بعد خطأ المزوّد.",

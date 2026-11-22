@@ -11,6 +11,18 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Übersprungen: Die letzte Ausführung war noch nicht fertig",
   "status.agent.routineSkippedUsageLimit": "Übersprungen: Nutzungslimit erreicht",
   "status.agent.modelSwitchedForError": "Anbieterfehler. Zu {model} gewechselt.",
+  "status.agent.modelSwitchedForRateLimit": {
+    one: "{previous} hat ein kurzes Ratenlimit erreicht. Zu {model} gewechselt. Wechselt in etwa {count} Minute zurück.",
+    other:
+      "{previous} hat ein kurzes Ratenlimit erreicht. Zu {model} gewechselt. Wechselt in etwa {count} Minuten zurück.",
+  },
+  "status.agent.modelSwitchedForErrorUntilReturn": {
+    one: "{previous} wurde durch einen Fehler gestoppt. Zu {model} gewechselt. Wechselt in etwa {count} Minute zurück.",
+    other:
+      "{previous} wurde durch einen Fehler gestoppt. Zu {model} gewechselt. Wechselt in etwa {count} Minuten zurück.",
+  },
+  "status.agent.modelSwitchedForNotOffered":
+    "{previous} ist für dieses Konto gerade nicht verfügbar. Zu {model} gewechselt.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} hat kein Guthaben mehr. Zu {model} gewechselt. Um es wieder zu nutzen, lade Guthaben auf und wähle es dann aus.",
   "status.agent.modelReturnedAfterError": "Nach dem Anbieterfehler zurück zu {model} gewechselt.",

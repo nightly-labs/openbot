@@ -366,7 +366,7 @@ export const messages = {
   "mobile.agent.backupModels.intro":
     "Als {model} de gebruikslimiet bereikt voordat {name} begint te schrijven, vraagt {name} je welk model het moet gebruiken.",
   "mobile.agent.backupModels.introAutomatic":
-    "Als {model} de gebruikslimiet bereikt, schakelt {name} over op het eerste beschikbare model in de volgorde. {name} schakelt ook over als {model} een fout van de aanbieder geeft voordat {name} begint te schrijven.",
+    "Als {model} de gebruikslimiet bereikt, schakelt {name} over op het eerste beschikbare model in de volgorde. {name} schakelt ook over als {model} een fout van de aanbieder geeft.",
   "mobile.agent.backupModels.ask": "Vragen voor overschakelen",
   "mobile.agent.backupModels.order": "Volgorde",
   "mobile.agent.backupModels.empty": "Geen volgorde ingesteld. {name} biedt elk beschikbaar model aan.",

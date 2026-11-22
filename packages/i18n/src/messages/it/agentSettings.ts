@@ -82,7 +82,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Quando {model} raggiunge il limite di utilizzo prima che {name} inizi a scrivere, {name} ti chiede quale modello usare.",
   "agentSettings.backupModels.introAutomatic":
-    "Quando {model} raggiunge il limite di utilizzo, {name} passa al primo modello disponibile nell'ordine. {name} cambia modello anche quando {model} fallisce per un errore del provider prima che {name} inizi a scrivere.",
+    "Quando {model} raggiunge il limite di utilizzo, {name} passa al primo modello disponibile nell'ordine. {name} cambia modello anche quando {model} fallisce per un errore del provider.",
   "agentSettings.backupModels.ask": "Chiedi prima di cambiare",
   "agentSettings.backupModels.order": "Ordine",
   "agentSettings.backupModels.listLabel": "Modelli di riserva, in ordine",

@@ -576,6 +576,14 @@ function modelName(model: string): string {
   return service.listModels().find((option) => option.provider === "claude" && option.id === model)?.name ?? model;
 }
 
+function providerErrorNote(): string {
+  return sourceText("status.agent.modelSwitchedForErrorUntilReturn", {
+    previous: modelName(PRIMARY),
+    model: modelName(BACKUP),
+    count: 10,
+  });
+}
+
 async function markers(agentId: string, itemType: string) {
   const snapshot = await runCauseEffect(service.readConversation(agentId));
   return snapshot.messages.filter((message) => message.itemType === itemType).map((message) => message.text);
@@ -737,7 +745,7 @@ try {
     assert.equal(agent.usageLimitReturn?.cause, "provider-error", "The return names the provider error.");
     assert.deepEqual(errorsFor(mover.id, since), [], "No error shows for the moved turn.");
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
-    assert.deepEqual(notes, [sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) })]);
+    assert.deepEqual(notes, [providerErrorNote()]);
     await verifyHistoryKeepsRequests(mover.id);
     return { ran, notes };
   });
@@ -811,12 +819,7 @@ try {
       .map((message) => message.text);
     assert.deepEqual(
       shown,
-      [
-        "act-then-fail",
-        "Partial answer.",
-        sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) }),
-        "Done.",
-      ],
+      ["act-then-fail", "Partial answer.", providerErrorNote(), "Done."],
       "The chat shows the stopped text, the switch and then the backup's answer.",
     );
     failing([]);
