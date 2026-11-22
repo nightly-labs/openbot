@@ -238,8 +238,15 @@ export class RoutineScheduler implements RoutineDueSource {
     return run?.agentId === delivery.recipientAgentId && run.deliveryId !== null && run.deliveryId !== deliveryId;
   }
 
+  linkedRunForDelivery(deliveryId: string): RoutineRun | null {
+    const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (delivery?.sender.kind !== "routine") return null;
+    const run = this.#routines.run(delivery.sender.runId);
+    return run && run.agentId !== delivery.recipientAgentId ? run : null;
+  }
+
   quietRunForDelivery(deliveryId: string): boolean {
-    const run = this.#routines.runForDelivery(deliveryId);
+    const run = this.#routines.runForDelivery(deliveryId) ?? this.linkedRunForDelivery(deliveryId);
     return run === null ? this.workflowRunSource(deliveryId) !== null : quietRoutineRun(run);
   }
 
