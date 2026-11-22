@@ -303,7 +303,7 @@ and only a loopback `http:` origin is accepted.
     `product`. `ready` (generation 17 and later) is not on the dashboard yet. The Worker sends one snapshot each 5 minutes. Each report is a bar with the `max`
     metric, the minute interval and a 30-minute range: a longer interval adds up more than one
     snapshot (`docs/hosted-servers.md#reuse-a-pool-machine`).
-14. Credits: `credit_action` (`account_api` generation 18 and later). Sum of `credits` with
+14. Ops, "Credits": `credit_action` (`account_api` generation 18 and later). Sum of `credits` with
     `action` `media_charged` by profile, by `model_id` and by `kind` answers who uses the most
     credits and on what; `media_released` by `outcome` shows failed and refused generations. Sum of
     `credits` with `action` `purchased` by profile and by `currency` shows the buyers; `granted`
