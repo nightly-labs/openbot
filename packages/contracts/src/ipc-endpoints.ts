@@ -5,6 +5,7 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
+import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -46,6 +47,7 @@ import type {
   AgentDockAction,
   AgentDockDisplayInfo,
   AgentDockDragPhase,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockOffset,
   AgentDockPresentation,
@@ -232,6 +234,9 @@ import type {
   BrowserTeachStep,
   BrowserTeachStopInput,
   BrowserVisibilityInput,
+  BrowserWindowAction,
+  BrowserWindowEvent,
+  BrowserWindowModel,
 } from "./ipc-browser";
 import type { BrowserDockAction, BrowserDockFrame, BrowserDockPresentation } from "./ipc-browser-dock";
 import type {
@@ -252,6 +257,12 @@ import type {
   SetBrowserProfileProxyInput,
 } from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
+import type {
+  BrowseChannelFoldersInput,
+  ChannelFolderChange,
+  ChannelFolderInput,
+  ChannelFolderList,
+} from "./ipc-channel-folders";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -920,6 +931,7 @@ export const IPC_ENDPOINTS = {
     action: event<AgentDockAction>()("agent-dock:action"),
     setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
     setInputRegion: request<AgentDockInputRect[], void>()("agent-dock:set-input-region"),
+    setExtent: request<AgentDockExtent | null, void>()("agent-dock:set-extent"),
     setXWayland: request<SetAgentDockXWaylandInput, void>()("agent-dock:set-xwayland"),
     closeChat: event<undefined>()("agent-dock:close-chat"),
     listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
@@ -1370,6 +1382,9 @@ export const IPC_ENDPOINTS = {
     plans: request<undefined, HostedServerCatalog>()("hosted-servers:plans"),
     create: request<CreateHostedServerInput, HostedServerSummary>()("hosted-servers:create"),
     openCheckout: request<string, HostedServerSummary>()("hosted-servers:open-checkout"),
+    openCustomCheckout: request<CustomServerCheckoutRequest, CustomServerCheckoutResult>()(
+      "hosted-servers:open-custom-checkout",
+    ),
     delete: request<DeleteHostedServerInput, void>()("hosted-servers:delete"),
     lifecycle: request<HostedServerLifecycleInput, void>()("hosted-servers:lifecycle"),
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),
@@ -1597,6 +1612,13 @@ export const IPC_ENDPOINTS = {
     deleteChannelMemory: scopedRequest<DeleteChannelMemoryInput, void>()("agent:channel-memories:delete"),
     clearChannelMemories: scopedRequest<string, void>()("agent:channel-memories:clear"),
   },
+  channelFolders: {
+    listChannelFolders: scopedRequest<string, ChannelFolderList>()("agent:channel-folders:list"),
+    chooseChannelFolder: request<string, ChannelFolderChange>()("agent:channel-folders:choose"),
+    addChannelFolder: scopedRequest<ChannelFolderInput, ChannelFolderChange>()("agent:channel-folders:add"),
+    removeChannelFolder: scopedRequest<ChannelFolderInput, ChannelFolderChange>()("agent:channel-folders:remove"),
+    browseChannelFolders: scopedRequest<BrowseChannelFoldersInput, AgentFolderBrowse>()("agent:channel-folders:browse"),
+  },
   channelRoutines: {
     listChannelRoutines: scopedRequest<string, ChannelRoutine[]>()("agent:channel-routines:list"),
     createChannelRoutine: scopedRequest<CreateChannelRoutineInput, ChannelRoutine>()("agent:channel-routines:create"),
@@ -1732,6 +1754,15 @@ export const IPC_ENDPOINTS = {
     dockPictureInPicture: request<undefined, void>()("browser:picture-in-picture-dock"),
     hidePictureInPicture: request<undefined, void>()("browser:picture-in-picture-hide"),
     pictureInPictureEvent: event<BrowserPictureInPictureEvent>()("browser:picture-in-picture-event"),
+    openWindow: request<BrowserBounds | undefined, BrowserBounds>()("browser:window-open"),
+    closeWindow: request<undefined, void>()("browser:window-close"),
+    focusWindow: request<undefined, void>()("browser:window-focus"),
+    dockWindow: request<undefined, void>()("browser:window-dock"),
+    publishWindowModel: request<BrowserWindowModel, void>()("browser:window-model-publish"),
+    getWindowModel: request<undefined, BrowserWindowModel | null>()("browser:window-model-get"),
+    sendWindowAction: request<BrowserWindowAction, void>()("browser:window-action"),
+    windowModel: event<BrowserWindowModel>()("browser:window-model-event"),
+    windowEvent: event<BrowserWindowEvent>()("browser:window-event"),
     openLocalSignIn: request<BrowserLocalSignInInput, BrowserLocalSignInEnd>()("browser:local-sign-in-open"),
     finishLocalSignIn: request<BrowserLocalSignInFinish, BrowserLocalSignInResult | null>()(
       "browser:local-sign-in-finish",
@@ -2026,6 +2057,7 @@ export const IPC_GROUP_PATHS = {
   agentRoutines: "agent",
   channelMemories: "agent",
   channelRoutines: "agent",
+  channelFolders: "agent",
   agentAttachments: "agent",
   agentFolders: "agent",
   agentInstructions: "agent",

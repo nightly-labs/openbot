@@ -222,7 +222,8 @@ export const messages = defineMessages("error.backend", {
     "This agent already has {count} open waits. Close a wait with openbot.close_wait before you open another one.",
   "error.backend.agentWaitGone": "This wait is not open. The agent closed it, or someone cancelled it.",
   "error.backend.agentWaitNoRequest": "A wait needs a message to continue. This turn has no message.",
-  "error.backend.agentWaitOwnChatOnly": "Open a wait only in your own chat. A channel or messaging task cannot wait.",
+  "error.backend.agentWaitOwnChatOnly":
+    "Open a wait in your own chat or in a side thread. A channel or messaging conversation cannot wait.",
   "error.backend.agentWaitNoteRequired": "Give a short note that says what the wait is for.",
   "error.backend.agentWaitRoutineGone": "This agent has no routine with this id.",
   "error.backend.agentWaitNoRoutine":
@@ -263,6 +264,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInOnHost": "This server asks for a sign-in. Sign in to it in OpenBot on the host computer.",
   "error.backend.mcpSignInNeedsHttps":
     "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "This server signs in only at {url}. Change the URL to this address, then sign in again.",
   "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
   "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
   "error.backend.mcpSignInRefused": "The sign-in page refused access. Sign in again.",
@@ -377,6 +380,7 @@ export const messages = defineMessages("error.backend", {
     "Only the OpenBot phone app can send this report, because it adds the phone's version and support log. Open this chat on the phone. If you see this message there, update the phone app.",
   "error.backend.takeoverInactive": "This browser takeover is no longer active.",
   "error.backend.authSubmitting": "Authentication submission is already in progress.",
+  "error.backend.apiKeyListFailed": "OpenBot could not read the saved API keys.",
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
   "error.backend.apiKeySaving": "The API key is already being saved.",
   "error.backend.apiKeyAnswerUnreadable":

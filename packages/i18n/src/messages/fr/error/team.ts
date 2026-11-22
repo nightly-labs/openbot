@@ -150,6 +150,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Cette connexion ne prend pas en charge les destinations des routines.",
   "error.team.agentMemoryLimitUnsupported": "Cette connexion ne prend pas en charge la limite de souvenirs des agents.",
   "error.team.agentFoldersUnsupported": "Cette connexion ne prend pas en charge les dossiers des agents.",
+  "error.team.channelFoldersUnsupported": "Cette connexion ne prend pas en charge les dossiers des canaux.",
   "error.team.folderUnavailable": "Ce dossier n’est pas disponible sur l’ordinateur hôte.",
   "error.team.memoryReviewUnsupported": "Cette connexion ne prend pas en charge la revue des souvenirs.",
   "error.team.skillLearningUnsupported":
@@ -173,6 +174,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Les serveurs MCP ne sont pas pris en charge par cette connexion.",
   "error.team.mcpServerListNeedsUpdate":
     "Mettez à jour OpenBot sur cet appareil pour utiliser plus de {limit} serveurs MCP sur ce serveur.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Mettez à jour OpenBot sur cet appareil pour utiliser plus de {limit} comptes d’un fournisseur sur ce serveur.",
   "error.team.storageUnsupported": "Le stockage n’est pas pris en charge par cette connexion.",
   "error.team.machineResourcesUnsupported":
     "L’utilisation de la machine n’est pas prise en charge par cette connexion.",

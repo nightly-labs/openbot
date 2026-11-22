@@ -102,6 +102,7 @@ export const messages = {
   "mcp.panel.signIn": "Anmelden",
   "mcp.panel.signOut": "Abmelden",
   "mcp.panel.cancelSignIn": "Anmeldung abbrechen",
+  "mcp.panel.useAddress": "Diese Adresse nutzen",
   "mcp.panel.signInTo": "Bei {name} anmelden",
   "mcp.panel.signInWaiting": {
     one: "Schließe die Anmeldung im Browser ab. OpenBot wartet höchstens {count} Minute.",

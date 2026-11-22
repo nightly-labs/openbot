@@ -51,6 +51,11 @@ const asSeconds = (value: unknown): number | undefined =>
 const asText = (value: unknown): string | undefined => (typeof value === "string" && value ? value : undefined);
 const asSide = (value: unknown): number | undefined => (isWorkflowMediaSide(value) ? value : undefined);
 
+export const MEDIA_BATCH_SIZES = [1, 2, 3, 4] as const;
+const asBatch = (value: unknown): number | undefined =>
+  typeof value === "number" && MEDIA_BATCH_SIZES.some((size) => size === value) ? value : undefined;
+export const mediaTakes = (value: unknown) => asBatch(value) ?? 1;
+
 const CUSTOM_START = {
   "1:1": { width: 1024, height: 1024 },
   "4:3": { width: 1024, height: 768 },
@@ -187,21 +192,6 @@ export function typedSide(text: string, current: number): number {
   return Math.min(WORKFLOW_MEDIA_SIZE_MAX, Math.max(WORKFLOW_MEDIA_SIZE_MIN, value));
 }
 
-export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-
-export function useElapsed(running: () => boolean) {
-  const [now, setNow] = createSignal(0);
-  let start = 0;
-  createEffect(running, (on) => {
-    if (!on) return;
-    start = performance.now();
-    setNow(start);
-    const timer = setInterval(() => setNow(performance.now()), 250);
-    return () => clearInterval(timer);
-  });
-  return () => Math.max(0, Math.floor((now() - start) / 1000));
-}
-
 const openQuotes = new WeakMap<WfnBoard, Map<string, Promise<WorkflowMediaPrice>>>();
 
 function sharedQuote(
@@ -313,9 +303,18 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
       ...(options.length > 0 ? { options } : {}),
     };
   });
-  const runLabel = () => {
+  const [batch, setBatch] = useField<number>(key, "batch", 1, asBatch);
+  const total = () => {
     const credits = price();
+    return credits === null ? null : credits * batch();
+  };
+  const runLabel = () => {
+    const credits = total();
     return credits === null ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
+  };
+  const retryLabel = () => {
+    const credits = price();
+    return credits === null ? undefined : t("workflow.node.retryPriceLabel", { credits: format.number(credits) });
   };
   const chooseFrame = (frame: Frame) => {
     if (frame !== WORKFLOW_MEDIA_CUSTOM_ASPECT) {
@@ -346,6 +345,7 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   const voiceText = () => voiceName() ?? t("workflow.video.voiceAuto");
   const [locked, setLocked] = useLocked(key);
   const run = useStepRun(id);
+  const busy = () => run.running() || board.pending(id).length > 0;
   const orFile = (made: string | null | undefined, value: string) => orStoredPicture(board, made, value);
   const pictureUrl = (value: string) => storedPictureUrl(board, value);
   const inputUrl = (source: string) => {
@@ -378,7 +378,11 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     setMode,
     mediaInputs,
     price,
+    total,
+    batch,
+    setBatch,
     runLabel,
+    retryLabel,
     chooseFrame,
     voice,
     setVoice,
@@ -389,7 +393,8 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     locked,
     setLocked,
     run,
-    specsDisabled: () => locked() || run.running(),
+    busy,
+    specsDisabled: () => locked() || busy(),
     orFile,
     pictureUrl,
     inputUrl,
@@ -400,20 +405,25 @@ export type MediaStep = ReturnType<typeof useMediaStep>;
 
 export const resolutionName = (value: string) => value.replace(/k$/u, "K");
 
-export function RunContent(props: { credits: number | null }) {
+export function RunContent(props: { credits: number | null; takes?: number }) {
   const { t, format } = useText();
   return (
-    <Show
-      when={props.credits !== null}
-      fallback={
-        <>
-          <Play aria-hidden="true" />
-          {t("workflow.node.run")}
-        </>
-      }
-    >
-      <Zap class="wfn-run-credits-icon" aria-hidden="true" />
-      {format.number(props.credits ?? 0)}
-    </Show>
+    <>
+      <Show
+        when={props.credits !== null}
+        fallback={
+          <>
+            <Play aria-hidden="true" />
+            {t("workflow.node.run")}
+          </>
+        }
+      >
+        <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+        {format.number(props.credits ?? 0)}
+      </Show>
+      <Show when={(props.takes ?? 1) > 1}>
+        <span class="wfn-run-takes">{t("workflow.media.batchCount", { value: String(props.takes) })}</span>
+      </Show>
+    </>
   );
 }

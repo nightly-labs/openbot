@@ -101,6 +101,10 @@ OpenBot quits, OpenBot stops listening and deletes the files.
 
 Each request needs `Authorization: Bearer <token>`.
 
+Responses remove secrets from text. These ID fields always have their real values: `id`, `agentId`,
+`recipientAgentId`, `threadId`, `turnId`, `requestId`, `messageId`, `deliveryId`, `runId` and
+`providerAccountId`.
+
 ### `GET /v1/agents`
 
 The agents that allow local scripts, with their routines:
@@ -122,6 +126,13 @@ gives the user its wait ID. A run without `waitId` wakes every open wait of the 
 routine or has this routine. A run with `waitId` wakes only that wait. When no such wait is open,
 the run starts without a wait. The run's input repeats the request and the agent's note, so the
 agent can continue the request.
+
+A side thread that the user opened can open a wait too. The wait continues in the side thread where it
+opened. A run with the `waitId` of a side-thread wait runs in that side thread. Any other run that
+wakes a side-thread wait stays in its usual place, and the side thread gets its own message with
+the run's instruction and the wait. That message continues the wait; it does not do the routine task again. An archived side thread opens again. When the side thread is
+gone, or no more side threads can be open, the wait continues in the run's place. A channel or
+messaging conversation cannot open a wait.
 
 Answer: `202 { "runId": string, "deliveryId": string | null }`.
 

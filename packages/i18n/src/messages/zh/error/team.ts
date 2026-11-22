@@ -125,6 +125,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "当前连接不支持自动化任务的结果去向。",
   "error.team.agentMemoryLimitUnsupported": "当前连接不支持助手记忆上限。",
   "error.team.agentFoldersUnsupported": "当前连接不支持助手的文件夹。",
+  "error.team.channelFoldersUnsupported": "当前连接不支持频道的文件夹。",
   "error.team.folderUnavailable": "此文件夹在主机电脑上不可用。",
   "error.team.memoryReviewUnsupported": "当前连接不支持记忆整理。",
   "error.team.skillLearningUnsupported": "此连接不支持技能学习。",
@@ -148,6 +149,8 @@ export const messages = {
   "error.team.browserSessionNotFound": "未找到浏览器视图会话。",
   "error.team.mcpUnsupported": "当前连接不支持 MCP 服务器。",
   "error.team.mcpServerListNeedsUpdate": "请在此设备上更新 OpenBot，才能在此服务器上使用超过 {limit} 个 MCP 服务器。",
+  "error.team.providerAccountListNeedsUpdate":
+    "请在此设备上更新 OpenBot，才能在此服务器上为一个提供商使用超过 {limit} 个账号。",
   "error.team.storageUnsupported": "当前连接不支持存储。",
   "error.team.machineResourcesUnsupported": "当前连接不支持机器使用情况。",
   "error.team.machineAlertMemberInvalid": "只有该服务器的所有者或管理员可以接收机器警报。",

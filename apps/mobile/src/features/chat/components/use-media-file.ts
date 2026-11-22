@@ -108,10 +108,10 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
                 },
               }
             : undefined;
-        const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment), progress);
-        const handedOver = Date.now();
         file.parentDirectory.create({ intermediates: true, idempotent: true });
-        await writeMediaFile(file, data.base64);
+        const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment, file.uri), progress);
+        const handedOver = Date.now();
+        if (!data.file) await writeMediaFile(file, data.base64);
         const bytesMs = (arrived ?? handedOver) - started;
         supportLog.add(
           "info",

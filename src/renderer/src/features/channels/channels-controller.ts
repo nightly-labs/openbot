@@ -15,6 +15,7 @@ function takeOlderWindow(target: ChannelPage, source: ChannelPage): void {
   else target.oldestAt = source.oldestAt;
 }
 
+import type { ChannelFoldersMode } from "./channel-folders-port";
 import type { ChannelsPort } from "./channels-port";
 
 interface ChannelsState {
@@ -46,6 +47,7 @@ export interface ChannelsEnvironment {
   browserSupported: () => boolean;
   pictureSupported: () => boolean;
   contextActionsSupported: () => boolean;
+  foldersMode: () => ChannelFoldersMode | null;
   beforeOpen: () => void;
   canMarkRead: () => boolean;
   onList?: (channels: ChannelSummary[], scope: string) => void;
@@ -466,6 +468,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     deletesAnyMessage: env.deletesAnyMessage,
     deleteMessage,
     pictureSupported: () => supported() && env.pictureSupported() && env.port().agent.setChannelImage !== undefined,
+    foldersMode: () => (supported() && env.port().agent.listChannelFolders !== undefined ? env.foldersMode() : null),
     setImage: (channelId: string, image: AvatarImageInput | null) =>
       perform(async () => {
         const setChannelImage = env.port().agent.setChannelImage;

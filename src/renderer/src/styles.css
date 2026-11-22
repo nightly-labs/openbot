@@ -42,6 +42,7 @@
 @import "@openbot/ui/features/servers/server-audit-log.css";
 @import "@openbot/ui/features/servers/server-update-dialog.css";
 @import "@openbot/ui/features/servers/server-plan-end.css";
+@import "@openbot/ui/features/servers/server-paywall.css";
 @import "@openbot/ui/styles/settings-panel.css";
 @import "@openbot/ui/styles/provider-code-login.css";
 @import "@openbot/ui/styles/scroll-edges.css";
@@ -88,6 +89,7 @@
 @import "@openbot/ui/features/settings/logo-color-picker.css";
 @import "@openbot/ui/features/settings/sound-choice-select.css";
 @import "@openbot/ui/features/settings/talk-key-recorder.css";
+@import "@openbot/ui/features/settings/keyboard-shortcuts.css";
 @import "@openbot/ui/features/settings/notification-matrix.css";
 @import "@openbot/ui/features/settings/plan-start.css";
 @import "@openbot/ui/features/settings/mcp-connect-dialog.css";

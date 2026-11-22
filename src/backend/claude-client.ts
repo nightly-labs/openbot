@@ -372,10 +372,13 @@ interface ActiveTurn {
   unprompted: boolean;
   prompt: { requestedId: string | null; message: SDKUserMessage; retries: number } | null;
   messageIds: Set<string>;
+  untakenSteerIds: Set<string>;
+  hostToolCalls: Set<AbortController>;
   promptStarted: boolean;
   lastActivityAt: number;
   stalled: boolean;
   hostRequests: number;
+  personRequests: number;
   stopRequested: boolean;
 }
 
@@ -402,7 +405,7 @@ interface ThreadRuntime {
   subagents: SubagentState;
   backgroundTasks: number;
   awaitsResultTurn: boolean;
-  taskTurns: Map<string, string>;
+  taskTurns: Map<string, string | typeof SUBAGENT_OWNED_TASK>;
   endedTaskTurns: (string | null)[];
   subagentLimit: { resetsAt: number | null; text: string } | null;
   lastOutputAt: number;
@@ -439,6 +442,18 @@ const SKIPPED_PROMPT_RETRIES = MAX_RUNS + 1;
 
 const CLAUDE_STOP_HOOK_FEEDBACK = "Stop hook feedback:\n";
 
+const SUBAGENT_OWNED_TASK = Symbol("subagent-owned task");
+
+function startedTaskOrigin(
+  taskTurns: ReadonlyMap<string, string | typeof SUBAGENT_OWNED_TASK>,
+  message: ClaudeStreamMessage,
+  turn: ActiveTurn | null,
+): string | typeof SUBAGENT_OWNED_TASK | undefined {
+  if (message.owned_by_subagent === true) return SUBAGENT_OWNED_TASK;
+  const parentOrigin = isString(message.parent_task_id) ? taskTurns.get(message.parent_task_id) : undefined;
+  return parentOrigin ?? turn?.id;
+}
+
 interface ClaudeStreamMessage {
   type: string;
   parent_tool_use_id?: string | null;
@@ -465,6 +480,8 @@ interface ClaudeStreamMessage {
   rate_limit_info?: unknown;
   tasks?: unknown;
   task_id?: unknown;
+  parent_task_id?: unknown;
+  owned_by_subagent?: unknown;
   run_id?: unknown;
   command_uuid?: unknown;
   state?: unknown;
@@ -710,7 +727,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
 
   canReleaseProcess(): boolean {
-    return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
+    return !this.runsBackgroundWork();
+  }
+
+  runsBackgroundWork(): boolean {
+    return [...this.#threads.ids()].some((id) => Boolean(this.#threads.get(id)?.backgroundTasks));
   }
 
   holdsBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
@@ -748,10 +769,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     );
   });
 
-  #emitBackgroundWork(runtime: ThreadRuntime): void {
+  #emitBackgroundWork(runtime: ThreadRuntime, closed = false): void {
     this.emit("notification", {
       method: "openbot/background-work",
-      params: { threadId: runtime.id, running: runtime.backgroundTasks > 0 },
+      params: { threadId: runtime.id, running: runtime.backgroundTasks > 0, ...(closed ? { closed } : {}) },
     });
   }
 
@@ -785,9 +806,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     yield* removeClaudeQueryFile(runtime.settingsFile);
     for (const change of stopSubagents(runtime.subagents, new Date().toISOString()))
       this.#emitSubagents(runtime, change);
-    if (runtime.backgroundTasks > 0) {
+    if (runtime.backgroundTasks > 0 || runtime.awaitsResultTurn) {
       runtime.backgroundTasks = 0;
-      this.#emitBackgroundWork(runtime);
+      runtime.awaitsResultTurn = false;
+      this.#emitBackgroundWork(runtime, true);
     }
     if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
     if (turn && runtime.activeTurn === turn) {
@@ -844,6 +866,21 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           if (!turn) return;
           turn.hostRequests -= 1;
           turn.lastActivityAt = Date.now();
+        }),
+    );
+  }
+
+  #awaitPerson<A, E, R>(threadId: string, request: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> {
+    return Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const turn = this.#threads.get(threadId)?.activeTurn ?? null;
+        if (turn) turn.personRequests += 1;
+        return turn;
+      }),
+      () => this.#awaitHost(threadId, request),
+      (turn) =>
+        Effect.sync(() => {
+          if (turn) turn.personRequests -= 1;
         }),
     );
   }
@@ -934,22 +971,25 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       case "turn/interrupt": {
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
-        if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
+        const turnId = getString(params, "turnId");
+        const notRunning = turnId === null ? {} : { turnActive: false };
+        if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder(notRunning));
         const runtime = yield* providerSync(() => this.#requireThread(threadId));
         const turn = runtime.activeTurn;
-        const stopped = turn && turn.id === getString(params, "turnId") ? turn : null;
+        const stopped = turn && turn.id === turnId ? turn : null;
         if (stopped) {
           stopped.stopRequested = true;
           yield* this.#closeIfStopIgnored(runtime, stopped);
         }
         yield* providerCall(() => runtime.query.interrupt()).pipe(
           Effect.catch((failure) =>
-            stopped && (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn !== stopped)
+            (stopped && (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn !== stopped)) ||
+            (!stopped && turnId !== null)
               ? Effect.void
               : Effect.fail(failure),
           ),
         );
-        return yield* providerSync(() => decoder({}));
+        return yield* providerSync(() => decoder(stopped ? {} : notRunning));
       }
       case "thread/compact/start":
         return yield* providerSync(() => decoder({}));
@@ -1624,10 +1664,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       unprompted,
       prompt: null,
       messageIds: new Set<string>(),
+      untakenSteerIds: new Set<string>(),
+      hostToolCalls: new Set<AbortController>(),
       promptStarted: false,
       lastActivityAt: Date.now(),
       stalled: false,
       hostRequests: 0,
+      personRequests: 0,
       stopRequested: false,
     };
     const continues =
@@ -1649,6 +1692,23 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       },
     });
     return turn;
+  }
+
+  #noteEndedTask(runtime: ThreadRuntime, message: ClaudeStreamMessage, taskId: string, origin: string | null): void {
+    const turn = runtime.activeTurn;
+    if (!turn) {
+      runtime.endedTaskTurns.push(origin);
+      if (isString(message.run_id))
+        runtime.nextTurnId = claudeTaskTurnId(
+          isString(message.session_id) ? message.session_id : runtime.id,
+          taskId,
+          message.run_id,
+        );
+    } else if (turn.unprompted && origin !== turn.id)
+      this.emit("notification", {
+        method: "openbot/turn-continues",
+        params: { threadId: runtime.id, turnId: turn.id, continues: origin },
+      });
   }
 
   #holdSubagentLimit(runtime: ThreadRuntime, message: ClaudeStreamMessage): void {
@@ -1680,12 +1740,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const messageId = promptUuid(runtime, clientId);
     takePrompt(runtime, messageId);
     runtime.activeTurn.messageIds.add(messageId);
+    const stopsRunningTools = runtime.activeTurn.toolCalls.size > 0 && runtime.activeTurn.personRequests === 0;
+    if (stopsRunningTools) runtime.activeTurn.untakenSteerIds.add(messageId);
     runtime.input.push({
       type: "user",
       message: { role: "user", content: readInputText(params) },
       parent_tool_use_id: null,
       uuid: messageId,
       session_id: threadId,
+      ...(stopsRunningTools ? { priority: "now" as const } : {}),
     });
     return { turnId: runtime.activeTurn.id };
   });
@@ -1881,23 +1944,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     if (message.type === "system" && message.subtype?.startsWith("task_") && isString(message.task_id)) {
       const turn = runtime.activeTurn;
-      if (message.subtype === "task_started" && turn) runtime.taskTurns.set(message.task_id, turn.id);
-      else if (message.subtype === "task_notification") {
-        const origin = runtime.taskTurns.get(message.task_id) ?? null;
+      if (message.subtype === "task_started") {
+        const origin = startedTaskOrigin(runtime.taskTurns, message, turn);
+        if (origin !== undefined) runtime.taskTurns.set(message.task_id, origin);
+      } else if (message.subtype === "task_notification") {
+        const owner = runtime.taskTurns.get(message.task_id);
         runtime.taskTurns.delete(message.task_id);
-        if (!turn) {
-          runtime.endedTaskTurns.push(origin);
-          if (isString(message.run_id))
-            runtime.nextTurnId = claudeTaskTurnId(
-              isString(message.session_id) ? message.session_id : runtime.id,
-              message.task_id,
-              message.run_id,
-            );
-        } else if (turn.unprompted && origin !== turn.id)
-          this.emit("notification", {
-            method: "openbot/turn-continues",
-            params: { threadId: runtime.id, turnId: turn.id, continues: origin },
-          });
+        if (owner !== SUBAGENT_OWNED_TASK) this.#noteEndedTask(runtime, message, message.task_id, owner ?? null);
       }
     }
     if (message.type === "system" && message.subtype?.startsWith("task_")) {
@@ -2143,6 +2196,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const turn = runtime.activeTurn;
     if (turn?.prompt && !interrupted && isOtherTurnResult(message, turn.messageIds)) {
       queryLogger.info("Claude ended a turn of its own before the message's turn.", { threadId: runtime.id });
+      return;
+    }
+    if (turn) for (const uuid of takenMessageIds(message)) turn.untakenSteerIds.delete(uuid);
+    if (turn && interrupted && !turn.stopRequested && turn.untakenSteerIds.size > 0) {
+      for (const [toolCallId, { name }] of turn.toolCalls) {
+        this.#emitToolCall(runtime, toolCallId, name, true);
+      }
+      turn.toolCalls.clear();
+      for (const hostToolCall of turn.hostToolCalls) hostToolCall.abort();
+      turn.hostToolCalls.clear();
+      queryLogger.info("Claude stopped its running tools to take a steered message.", { threadId: runtime.id });
       return;
     }
     const apiError = message.subtype === "success" && message.is_error === true;
@@ -2670,17 +2734,27 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     args: unknown,
   ): Effect.fn.Return<CallToolResult, ProviderClientOperationError> {
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
+    const turn = runtime.activeTurn;
+    const hostToolCall = new AbortController();
+    turn?.hostToolCalls.add(hostToolCall);
     const result = yield* this.#awaitHost(
       threadId,
-      this.#serverRequests.call("item/tool/call", {
-        threadId,
-        turnId: runtime.activeTurn?.id ?? randomUUID(),
-        callId: randomUUID(),
-        namespace,
-        tool: name,
-        arguments: args,
-      }),
-    ).pipe(toProviderClientOperationError);
+      this.#serverRequests.call(
+        "item/tool/call",
+        {
+          threadId,
+          turnId: turn?.id ?? randomUUID(),
+          callId: randomUUID(),
+          namespace,
+          tool: name,
+          arguments: args,
+        },
+        hostToolCall.signal,
+      ),
+    ).pipe(
+      Effect.ensuring(Effect.sync(() => turn?.hostToolCalls.delete(hostToolCall))),
+      toProviderClientOperationError,
+    );
     if (!isRecord(result)) return { content: [{ type: "text" as const, text: String(result) }] };
     const content: CallToolResult["content"] = [];
     if (Array.isArray(result.contentItems)) {
@@ -2704,7 +2778,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       options: Array.isArray(question.options) ? question.options : undefined,
       ...(question.multiSelect === true ? { multiSelect: true } : {}),
     }));
-    const result = yield* this.#awaitHost(
+    const result = yield* this.#awaitPerson(
       threadId,
       this.#serverRequests.call("item/tool/requestUserInput", {
         threadId,
@@ -2731,7 +2805,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     request: Parameters<OnElicitation>[0],
     signal: AbortSignal,
   ): Effect.fn.Return<ElicitationResult> {
-    const result = yield* this.#awaitHost(
+    const result = yield* this.#awaitPerson(
       threadId,
       this.#serverRequests.call(
         "mcpServer/elicitation/request",
@@ -2766,7 +2840,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     toolInput: DynamicRecord,
     toolUseId: string,
   ): Effect.fn.Return<PermissionResult, ProviderClientOperationError> {
-    const result = yield* this.#awaitHost(
+    const result = yield* this.#awaitPerson(
       threadId,
       this.#serverRequests.call("item/fileChange/requestApproval", {
         threadId,
@@ -3320,9 +3394,13 @@ function takePrompt(runtime: ThreadRuntime, uuid: string): void {
   }
 }
 
-function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet<string>): boolean {
+function takenMessageIds(message: ClaudeStreamMessage): string[] {
   const listed = Array.isArray(message.user_message_uuids) ? message.user_message_uuids.filter(isString) : [];
-  const taken = listed.length > 0 ? listed : message.user_message_uuid ? [message.user_message_uuid] : [];
+  return listed.length > 0 ? listed : message.user_message_uuid ? [message.user_message_uuid] : [];
+}
+
+function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet<string>): boolean {
+  const taken = takenMessageIds(message);
   if (taken.length > 0) return !taken.some((uuid) => messageIds.has(uuid));
   return (
     isRecord(message.origin) &&

@@ -137,6 +137,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Esta conexão não oferece suporte a destinos de rotinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexão não oferece suporte ao limite de memórias dos agentes.",
   "error.team.agentFoldersUnsupported": "Esta conexão não oferece suporte às pastas dos agentes.",
+  "error.team.channelFoldersUnsupported": "Esta conexão não oferece suporte às pastas dos canais.",
   "error.team.folderUnavailable": "Esta pasta não está disponível no computador host.",
   "error.team.memoryReviewUnsupported": "Esta conexão não oferece suporte à revisão de memórias.",
   "error.team.skillLearningUnsupported": "Esta conexão não oferece suporte ao aprendizado de habilidades.",
@@ -156,6 +157,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Esta conexão não oferece suporte a servidores MCP.",
   "error.team.mcpServerListNeedsUpdate":
     "Atualize o OpenBot neste dispositivo para usar mais de {limit} servidores MCP neste servidor.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Atualize o OpenBot neste dispositivo para usar mais de {limit} contas de um provedor neste servidor.",
   "error.team.storageUnsupported": "Esta conexão não oferece suporte a armazenamento.",
   "error.team.machineResourcesUnsupported": "Esta conexão não oferece suporte ao uso da máquina.",
   "error.team.machineAlertMemberInvalid":

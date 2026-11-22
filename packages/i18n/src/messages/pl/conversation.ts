@@ -150,6 +150,8 @@ export const messages = {
   "conversation.voice.key.metaWin": "Win",
   "conversation.voice.key.metaLinux": "Super",
   "conversation.voice.key.enter": "Enter",
+  "conversation.voice.key.tab": "Tab",
+  "conversation.voice.key.escape": "Esc",
   "conversation.voice.interrupt": "Przerwij",
   "conversation.voice.start": "Rozpocznij rozmowę głosową",
   "conversation.voice.end": "Zakończ rozmowę głosową",

@@ -954,6 +954,13 @@ export function loadDynamicIslandRenderer(window: BrowserWindow, display: Displa
   return window.loadURL(url.toString());
 }
 
+function closeFocusedDevTools(): void {
+  webContents
+    .getAllWebContents()
+    .find((contents) => !contents.isDestroyed() && contents.isDevToolsFocused())
+    ?.closeDevTools();
+}
+
 function zoomFocusedContents(interfaceSize: InterfaceSizeService, step: InterfaceSizeStep): void {
   const focused = webContents.getFocusedWebContents();
   if (!focused || focused.session === session.defaultSession) {
@@ -1072,6 +1079,12 @@ export function configureApplicationMenu(
           { role: "reload" },
           { role: "forceReload" },
           { role: "toggleDevTools" },
+          {
+            label: translate("menu.closeDeveloperTools"),
+            accelerator: "F12",
+            visible: false,
+            click: closeFocusedDevTools,
+          },
           { type: "separator" },
           {
             label: translate("menu.actualSize"),

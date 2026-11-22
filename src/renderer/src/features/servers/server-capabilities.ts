@@ -165,7 +165,8 @@ export function serverSupportsCapability(
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
       capability === "owner-transfer-v1" ||
-      capability === "provider-detection-v1") &&
+      capability === "provider-detection-v1" ||
+      capability === "workspace-directory-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, le attività eseguite in parallelo, l’account della voce dal vivo, l’interruttore della memoria di OpenBot, le cartelle dei flussi di lavoro, le risposte tipizzate dei flussi di lavoro e più di 10 account dello stesso provider funzionano solo se il server ha questa versione.",
+      "Dopo questo aggiornamento, una versione precedente di OpenBot non può aprire i tuoi dati."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Un agente può dividere il lavoro non correlato in attività che vengono eseguite in parallelo. Ogni risultato torna alla chat principale, e l’agente combina i risultati per te.",
+          "Vedi tutti i thread aperti di un agente nella nuova scheda Thread del pannello laterale. La scheda mostra il numero di thread che ti aspettano.",
+          "Cambia le scorciatoie da tastiera nella nuova scheda Tastiera delle Impostazioni. Le nuove scorciatoie avviano un thread e passano al thread successivo e a quello precedente.",
+          "I flussi di lavoro si aprono in schede, e i passaggi possono dare risposte tipizzate. Scrivi {{name}} per inserire una risposta in un passaggio successivo.",
+          "Carica un video MP4 o WebM come sfondo della finestra in Impostazioni > Aspetto.",
+          "Scegli l’account ChatGPT che usa la voce dal vivo di GPT in Impostazioni > Voce."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un provider mantiene fino a 20 account. Prima il limite era 10.",
+          "La dettatura registra fino a 10 minuti. Prima si fermava dopo 2 minuti.",
+          "Un thread carica i messaggi più vecchi quando scorri vicino alla parte alta. Non devi cliccare un pulsante."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Una routine pianificata non si spegne più in silenzio quando un’esecuzione non ha nulla da segnalare.",
+          "Una chat lunga conserva tutti i suoi messaggi, nell’ordine corretto, mentre arriva una risposta.",
+          "Un numero WhatsApp collegato non smette più di ricevere messaggi mentre mostra ancora «Connesso».",
+          "Su Windows, gli agenti OpenCode eseguono di nuovo i comandi. Prima spesso fallivano con «opencode-pty request timed out».",
+          "Un agente che hai silenziato non ti invia più notifiche quando risponde in un canale."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

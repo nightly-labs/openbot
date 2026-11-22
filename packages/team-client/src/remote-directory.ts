@@ -1,3 +1,4 @@
+import { type CustomServerPlan, optionalCustomServerPayment } from "@openbot/contracts/custom-server-plans";
 import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import {
   createInviteUrl,
@@ -49,6 +50,8 @@ export interface RemoteTeamHost {
   restartAvailable?: boolean;
   storageGb?: number;
   keyChangedAt?: number;
+  paymentRequired?: true;
+  customPlan?: CustomServerPlan;
 }
 
 export interface RemoteTeamMember {
@@ -226,6 +229,7 @@ export class RemoteTeamDirectoryClient {
                 ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
                 ...(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1 ? { storageGb } : {}),
                 ...(keyChangedAt === null ? {} : { keyChangedAt }),
+                ...optionalCustomServerPayment(candidate),
               },
             ];
           }),

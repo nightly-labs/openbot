@@ -44,7 +44,26 @@ const FAILURES: readonly VoiceTranscriptionFailure[] = ["runtime-unavailable", "
 
 const logger = createOpenBotLogger("voice-transcription-smoke");
 
-const SAMPLES: readonly { name: string; text: string; voice: string; language: VoiceLanguage }[] = [
+const BRIEFING_SENTENCES = [
+  "Please open the settings and turn on dark mode.",
+  "Read the latest reply from the team and summarize it for me.",
+  "Yes, send the report to everyone on the project.",
+  "Can you check why the build failed on the main branch this morning? I think the new test for the login page is flaky, so please run it again and tell me what you find.",
+];
+const BRIEFING = Array.from({ length: 27 }, () => BRIEFING_SENTENCES).flat();
+const BRIEFING_MINIMUM_SECONDS = 500;
+const WAV_BYTES_PER_SECOND = 32_000;
+
+interface Sample {
+  name: string;
+  text: string;
+  spoken?: string;
+  minimumSeconds?: number;
+  voice: string;
+  language: VoiceLanguage;
+}
+
+const SAMPLES: readonly Sample[] = [
   {
     name: "settings",
     text: "Please open the settings and turn on dark mode.",
@@ -80,6 +99,14 @@ const SAMPLES: readonly { name: string; text: string; voice: string; language: V
     text: "Proszę otworzyć ustawienia i włączyć tryb ciemny.",
     voice: "Ewa",
     language: "pl",
+  },
+  {
+    name: "briefing",
+    text: BRIEFING.join(" "),
+    spoken: BRIEFING.join(" [[slnc 700]] "),
+    minimumSeconds: BRIEFING_MINIMUM_SECONDS,
+    voice: "Samantha",
+    language: AUTOMATIC_VOICE_LANGUAGE,
   },
 ];
 
@@ -215,7 +242,8 @@ async function main(): Promise<void> {
       if (status.phase !== "ready") throw new Error(`${modelId} is not ready: ${status.phase} ${status.message ?? ""}`);
       const downloadMs = Date.now() - downloadStartedAt;
       for (const sample of samples) {
-        const wavBytes = audio.get(sample.name) ?? (await spokenWav(sample.text, sample.voice, temporary));
+        const wavBytes =
+          audio.get(sample.name) ?? (await spokenWav(sample.spoken ?? sample.text, sample.voice, temporary));
         audio.set(sample.name, wavBytes);
         await Effect.runPromise(voice.setSettings({ modelId, language: sample.language }));
         const startedAt = Date.now();
@@ -223,7 +251,9 @@ async function main(): Promise<void> {
         const transcriptionMs = Date.now() - startedAt;
         const wer = wordErrorRate(sample.text, text);
         const firstWord = words(text)[0] === words(sample.text)[0];
-        const ok = wer <= MAXIMUM_WORD_ERROR_RATE && firstWord;
+        const audioSeconds = (wavBytes.byteLength - 44) / WAV_BYTES_PER_SECOND;
+        const longEnough = audioSeconds >= (sample.minimumSeconds ?? 0);
+        const ok = wer <= MAXIMUM_WORD_ERROR_RATE && firstWord && longEnough;
         failed ||= !ok;
         results.push({
           modelId,
@@ -233,11 +263,15 @@ async function main(): Promise<void> {
           text,
           wer,
           firstWord,
+          audioSeconds,
+          longEnough,
           ok,
           transcriptionMs,
           downloadMs,
         });
-        logger.info(`${modelId} ${sample.name}: "${text}" (WER ${(wer * 100).toFixed(1)} %, ${transcriptionMs} ms)`);
+        logger.info(
+          `${modelId} ${sample.name} ${audioSeconds.toFixed(1)} s: "${text}" (WER ${(wer * 100).toFixed(1)} %, ${transcriptionMs} ms)`,
+        );
       }
     }
     await writeFile(
@@ -249,7 +283,8 @@ async function main(): Promise<void> {
     await Effect.runPromise(voice.shutdown());
     await rm(temporary, { recursive: true, force: true });
   }
-  if (failed) throw new Error("A transcription missed its first word or had too many word errors.");
+  if (failed)
+    throw new Error("A transcription missed its first word, had too many word errors, or had too little audio.");
 }
 
 await main();

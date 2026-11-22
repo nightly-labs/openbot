@@ -5,6 +5,7 @@ import FilePreviewPanel from "../src/features/conversation/FilePreviewPanel";
 import { INLINE_SVG_CHART, publishChatVisualPage } from "./chat-visual-fixtures";
 import {
   AUDIO_PREVIEW,
+  DOCX_PREVIEW,
   IMAGE_PREVIEW,
   MARKDOWN_PREVIEW,
   MARKDOWN_SHORT_PREVIEW,
@@ -94,6 +95,10 @@ export const Spreadsheet: Story = {
 
 export const SpreadsheetLiteralPrefixes: Story = {
   args: { preview: XLSX_LITERAL_PREFIXES_PREVIEW },
+};
+
+export const WordDocument: Story = {
+  args: { preview: DOCX_PREVIEW },
 };
 
 const HTML_BYTES = new TextEncoder().encode(INLINE_SVG_CHART);

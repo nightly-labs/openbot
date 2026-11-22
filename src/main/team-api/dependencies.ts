@@ -52,6 +52,7 @@ import type { BitwardenConnectorService } from "../bitwarden-connector-service";
 import type { BrowserProfileService } from "../browser-profile-service";
 import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { ChannelFolders } from "../channel-folders";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { CustomAgentChanges } from "../custom-agent-changes";
@@ -288,7 +289,10 @@ export type TeamApiProviderUsageResets = Pick<AgentService, "providerUsageResets
 export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
 
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk" | "diskUse">;
-export type TeamApiLibraryFolders = Pick<LibraryFoldersService, "snapshot" | "change" | "removeAgent" | "removeFiles">;
+export type TeamApiLibraryFolders = Pick<
+  LibraryFoldersService,
+  "snapshot" | "change" | "removeAgent" | "removeFiles" | "workflowFiles"
+>;
 export type TeamApiWorkflowFolders = Pick<WorkflowFoldersService, "read" | "change">;
 export type TeamApiMachine = Pick<
   MachineAlertMonitor,
@@ -436,6 +440,7 @@ export interface TeamApiAdmin {
   agentHost?: AgentHostSettingsService;
   agentDefaults?: AgentDefaultsSettingsService;
   folders?: Omit<AgentFolders, "requireAgent">;
+  channelFolders?: Pick<ChannelFolders, "hasChannel" | "list" | "add" | "remove" | "browse">;
   instructions?: Pick<AgentInstructionsFiles, "listAgents" | "read" | "save">;
   sessionSettings?: Pick<
     AgentService,

@@ -80,7 +80,7 @@ import { mcpFallbackRunsServer } from "./mcp-tools";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
-import { visibleDynamicTools } from "./tool-catalog";
+import { toolCatalogNames, visibleDynamicTools } from "./tool-catalog";
 import {
   AGENT_INSTRUCTIONS_FILE_BYTES,
   missingInstructionFileNames,
@@ -88,7 +88,9 @@ import {
   promptInstructionsFile,
 } from "./workspace-instructions";
 import {
+  type CodexApprovalPolicy,
   checkAgentFolders,
+  codexApprovalPolicy,
   codexSandboxConfig,
   codexSandboxMode,
   existingAgentFolders,
@@ -164,6 +166,7 @@ export interface ThreadLifecycleOptions {
   branchThread?: (threadId: string) => boolean;
   importedHistory?: (threadId: string) => boolean;
   routineThread?: (threadId: string) => boolean;
+  asksFirst?: (agentId: string) => boolean;
 }
 
 export class ThreadLifecycle {
@@ -197,6 +200,7 @@ export class ThreadLifecycle {
   readonly #branchThread: (threadId: string) => boolean;
   readonly #importedHistory: (threadId: string) => boolean;
   readonly #routineThread: (threadId: string) => boolean;
+  readonly #asksFirst: (agentId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
   readonly #givenTurnContext = new Map<string, string>();
   readonly #handoffWrites = Semaphore.makeUnsafe(1);
@@ -239,6 +243,11 @@ export class ThreadLifecycle {
     this.#branchThread = options.branchThread ?? (() => false);
     this.#importedHistory = options.importedHistory ?? (() => false);
     this.#routineThread = options.routineThread ?? (() => false);
+    this.#asksFirst = options.asksFirst ?? (() => false);
+  }
+
+  approvalPolicy(agent: Pick<AgentSummary, "id" | "access">): CodexApprovalPolicy {
+    return codexApprovalPolicy(agent, this.#asksFirst(agent.id));
   }
 
   #toolRuntimes(): McpToolRuntimes {
@@ -621,7 +630,7 @@ export class ThreadLifecycle {
       effort: agent.reasoningEffort,
       cwd: agent.workspacePath,
       runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
-      approvalPolicy: "on-request",
+      approvalPolicy: this.approvalPolicy(agent),
       approvalsReviewer: "user",
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),
@@ -1176,6 +1185,7 @@ export class ThreadLifecycle {
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
+      ...(client.provider === "antigravity" ? { toolCatalog: toolCatalogNames(client.provider) } : {}),
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };
@@ -1268,7 +1278,7 @@ export class ThreadLifecycle {
       effort: agent.reasoningEffort,
       cwd: agent.workspacePath,
       runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
-      approvalPolicy: "on-request",
+      approvalPolicy: this.approvalPolicy(agent),
       approvalsReviewer: "user",
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),

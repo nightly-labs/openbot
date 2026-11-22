@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "{name} yeniden başlatılamadı",
   "app.provider.included": "{name}, OpenBot ile birlikte gelir.",
   "app.clipboard.copyFailed": "Metin kopyalanamadı.",
-  "app.voice.tooLong": "Ses kayıtları iki dakika ile sınırlıdır.",
+  "app.voice.tooLong": "Ses kayıtları 10 dakika ile sınırlıdır.",
   "app.avatar.type": "Bir PNG, JPEG, GIF veya WebP görseli seçin.",
   "app.avatar.size": "10 MB'tan küçük bir görsel seçin.",
   "app.avatar.processingUnavailable": "Görsel işleme kullanılamıyor.",

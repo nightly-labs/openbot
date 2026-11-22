@@ -1,4 +1,4 @@
-import { isXlsxMimeType, playableMediaKind } from "./attachment-files";
+import { isDocxMimeType, isXlsxMimeType, playableMediaKind } from "./attachment-files";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { guardedDecoder } from "./ipc-decoding";
@@ -35,7 +35,8 @@ export function canPreviewAttachment(attachment: AttachmentSummary): boolean {
   return (
     attachment.previewKind !== "none" ||
     playableMediaKind(attachment.mimeType) !== null ||
-    isXlsxMimeType(attachment.mimeType)
+    isXlsxMimeType(attachment.mimeType) ||
+    isDocxMimeType(attachment.mimeType)
   );
 }
 
@@ -170,6 +171,7 @@ export const FILE_PREVIEW_KINDS = [
   "audio",
   "video",
   "spreadsheet",
+  "document",
   "none",
 ] as const;
 
@@ -200,6 +202,7 @@ export function filePreviewKindForFile(name: string, mimeType: string): FilePrev
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType === "application/pdf") return "pdf";
   if (isXlsxMimeType(mimeType)) return "spreadsheet";
+  if (isDocxMimeType(mimeType)) return "document";
   const media = playableMediaKind(mimeType);
   if (media) return media;
   if (mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "message/rfc822") return "text";

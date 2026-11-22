@@ -57,6 +57,8 @@ export const messages = {
   "browser.pip.close": "ブラウザーのポップアップを閉じる",
   "browser.pip.reattachFailed": "OpenBot はブラウザーをサイドバーに戻せませんでした。",
   "browser.pip.closeFailed": "OpenBot はブラウザーのポップアップを閉じられませんでした。",
+  "browser.window.open": "ブラウザーを新しいウィンドウで開く",
+  "browser.window.openFailed": "OpenBot はブラウザーのウィンドウを開けませんでした。",
   "browser.popupBlocked.title": "ポップアップがブロックされました",
   "browser.popupBlocked.dismiss": "ポップアップのメッセージを閉じる",
   "browser.liveView.label": "サーバー上のページのライブビュー",

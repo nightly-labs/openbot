@@ -39,6 +39,7 @@ const PRIMARY: AgentModelId = defaultProviderModel("claude");
 const BACKUP: AgentModelId = PRIMARY === "claude-sonnet-5-5" ? "claude-opus-5-5" : "claude-sonnet-5-5";
 const PROVIDER_ERROR =
   'API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"},"request_id":"req_e2e"}';
+const CONNECTION_ERROR = "API Error: Connection error.";
 
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
@@ -101,7 +102,8 @@ const turn = (message) => {
   const failing = JSON.parse(fs.readFileSync(${JSON.stringify(failingFile)}, "utf8"));
   const fails = failing.includes(model);
   const input = JSON.stringify(message);
-  const acts = input.includes("act-then-fail");
+  const drops = input.includes("drop-then-fail");
+  const acts = drops || input.includes("act-then-fail");
   fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid }) + "\\n");
   if (input.includes("usage-relay") && model === ${JSON.stringify(PRIMARY)}) {
     const startHelper = (description) => {
@@ -181,9 +183,17 @@ const turn = (message) => {
     result({ is_error: true, result: "You've hit your limit. Try again later." });
     return;
   }
+  if (input.includes("refused-key") && model === ${JSON.stringify(PRIMARY)}) {
+    const refused = "Invalid API key · Please run /login";
+    write({ type: "assistant", error: "authentication_failed", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "text", text: refused }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+      parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    result({ is_error: true, result: refused });
+    return;
+  }
   if (fails) {
     if (acts) assistant("Partial answer.");
-    result({ is_error: true, result: ${JSON.stringify(PROVIDER_ERROR)} });
+    result({ is_error: true, result: drops ? ${JSON.stringify(CONNECTION_ERROR)} : ${JSON.stringify(PROVIDER_ERROR)} });
     return;
   }
   const caseId = /case:([a-z-]+)/.exec(input)?.[1];
@@ -814,6 +824,27 @@ try {
     failing([]);
     await restart();
     return { ran: ran.map((turn) => turn.model), shown };
+  });
+
+  await check("a turn that wrote text before a dropped connection continues on the backup model", async () => {
+    const dropper = await withBackup("Dropper");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(dropper.id, "drop-then-fail");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The backup continues the work.");
+    assert.equal(agentOf(dropper.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(dropper.id, since), [], "No error shows for the moved turn.");
+    failing([]);
+    await restart();
+    return { ran: ran.map((turn) => turn.model) };
   });
 
   await check("a thread turn moves to the backup model", async () => {
@@ -1551,6 +1582,33 @@ try {
     assert.equal(agent.model, PRIMARY, "The agent stays on the chosen model.");
     assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
     return { failedModels, workedModels };
+  });
+
+  await check("a refused sign-in moves to the backup and tells the user", async () => {
+    await restart();
+    const agent = await withBackup("Refused");
+    failing([]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "refused-key work");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const models = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(models, [PRIMARY, BACKUP], "The refused model fails once, then the backup answers.");
+    assert.equal(agentOf(agent.id).model, BACKUP, "The refused sign-in moved the agent to its backup.");
+    const shown = errorsFor(agent.id, since).map((event) => (event.type === "error" ? event.message : ""));
+    assert.equal(shown.length, 1, "The user sees why the agent left its model.");
+    assert.ok(shown[0], "The shown reason has text.");
+
+    const next = turns().length;
+    const again = await send(agent.id, "refused-key again");
+    assert.equal(again.status, "completed", `The next message completes: ${again.error}`);
+    const nextModels = turns()
+      .slice(next)
+      .map((turn) => turn.model);
+    assert.deepEqual(nextModels, [BACKUP], "The next message does not try the refused sign-in again.");
+    return { models, shown, nextModels };
   });
 
   report.passed = true;

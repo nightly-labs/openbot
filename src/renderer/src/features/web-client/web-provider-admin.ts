@@ -44,6 +44,11 @@ import {
   PROVIDER_DETECTION_CAPABILITY,
   PROVIDER_DETECTION_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-detection-v1";
+import {
+  PROVIDER_FROZEN_ACCOUNTS_LIMIT,
+  PROVIDER_MANY_ACCOUNTS_CAPABILITY,
+  PROVIDER_MANY_ACCOUNTS_LIMIT,
+} from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { providerSignInRelay } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
@@ -603,6 +608,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       },
       rename: (provider, accountId, label) => changed(admin.renameAccount({ provider, accountId, label }, id)),
       remove: (provider, accountId) => changed(admin.removeAccount({ provider, accountId }, id)),
+      maxAccounts: serverSupportsCapability(options.server(), PROVIDER_MANY_ACCOUNTS_CAPABILITY)
+        ? PROVIDER_MANY_ACCOUNTS_LIMIT
+        : PROVIDER_FROZEN_ACCOUNTS_LIMIT,
       ...(remoteAdminServer(options.server(), PROVIDER_USAGE_RESET_CAPABILITY)?.id === id
         ? {
             usageResets: (provider: AgentProviderId) => admin.usageResets(provider, id),

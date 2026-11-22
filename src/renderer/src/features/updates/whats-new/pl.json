@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze zadania uruchamiane równocześnie, konto głosu na żywo, przełącznik pamięci OpenBot, foldery przepływów pracy, typowane odpowiedzi w przepływach pracy i więcej niż 10 kont jednego dostawcy działają tylko wtedy, gdy serwer ma tę wersję.",
+      "Po tej aktualizacji starsza wersja OpenBot nie może otworzyć twoich danych."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agent może podzielić niezwiązaną pracę na zadania uruchamiane równocześnie. Każdy wynik wraca do głównego czatu, a agent łączy wyniki dla ciebie.",
+          "Zobacz wszystkie otwarte wątki agenta na nowej karcie Wątki w panelu bocznym. Karta pokazuje liczbę wątków, które czekają na ciebie.",
+          "Zmień skróty klawiszowe na nowej karcie Klawiatura w Ustawienia. Nowe skróty rozpoczynają wątek i przechodzą do następnego oraz poprzedniego wątku.",
+          "Przepływy pracy otwierają się w kartach, a kroki przepływów pracy mogą przyjmować typowane odpowiedzi. Wpisz {{name}}, aby użyć odpowiedzi w późniejszym kroku.",
+          "Prześlij wideo MP4 lub WebM jako tło okna w Ustawienia > Wygląd.",
+          "Wybierz konto ChatGPT, którego używa głos na żywo GPT, w Ustawienia > Głos."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Dostawca może mieć do 20 kont. Wcześniej limit wynosił 10.",
+          "Dyktowanie nagrywa do 10 minut. Wcześniej zatrzymywało się po 2 minutach.",
+          "Wątek wczytuje starsze wiadomości, gdy przewiniesz blisko góry. Nie musisz klikać przycisku."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Zaplanowana rutyna nie wyłącza się już po cichu, gdy przebieg nie ma nic do zgłoszenia.",
+          "Długi czat zachowuje wszystkie wiadomości, we właściwej kolejności, podczas gdy odpowiedź napływa.",
+          "Połączony numer WhatsApp nie przestaje już odbierać wiadomości, choć nadal pokazuje „Połączono”.",
+          "W systemie Windows agenci OpenCode znów uruchamiają polecenia. Wcześniej często kończyli się błędem „opencode-pty request timed out”.",
+          "Agent, którego wyciszyłeś, nie wysyła już powiadomienia, gdy odpowiada w kanale."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

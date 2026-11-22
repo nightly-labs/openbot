@@ -251,6 +251,7 @@ export const messages = {
     "OpenCode Go ha rifiutato la richiesta. Una nuova chiave API non risolve il problema. Il tuo piano OpenCode Go potrebbe non essere attivo, oppure OpenCode Go potrebbe bloccare la tua rete: alcuni servizi bloccano VPN, proxy o alcuni paesi. Verifica che il piano sia attivo in OpenCode Console o disattiva la VPN, poi riprova. Puoi anche scegliere un altro modello.",
   "error.provider.opencodeServiceFailure":
     "OpenCode non ha potuto completare questo turno perché il suo servizio locale è andato in errore. Riprova. Se l'errore continua, riconnetti OpenCode in Impostazioni.",
+  "error.provider.opencodeStillStarting": "OpenCode non ha finito di caricarsi in tempo. OpenBot riproverà.",
   "error.provider.opencodeRateLimited":
     "Il provider del modello ha rifiutato la richiesta per via del limite di richieste. Attendi qualche minuto o scegli un altro modello, poi riprova.\n{detail}",
   "error.provider.opencodeBilling":
@@ -291,6 +292,8 @@ export const messages = {
     "Il processore di questo computer non può eseguire questo provider. Usa un altro provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode non è riuscito ad aprire il suo database perché una versione più recente di OpenCode lo ha modificato. Aggiorna OpenCode alla versione 2 o successiva, poi riprova.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok non si è avviato perché l'impostazione allowed_models nella sua configurazione non include il suo modello predefinito. Aggiungi il modello predefinito ad allowed_models, oppure rimuovi allowed_models, poi riprova.",
   "error.provider.opencodeNoAnswer":
     "Il modello OpenCode ha terminato il turno senza risposta. Riprova o scegli un altro modello.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -428,6 +431,8 @@ export const messages = {
     "Questa chat è diventata troppo grande da inviare al modello. Spesso la causa sono le immagini nella chat. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.opencodeSessionRejected":
     "OpenCode ha rifiutato la richiesta senza indicarne la causa. Può succedere in una chat lunga o dopo un cambio di modello. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello o un impegno minore.",
+  "error.provider.opencodeInputRefused":
+    "Il modello ha rifiutato il contenuto di questa chat senza indicarne la causa. Può dipendere da un file nella chat, come un PDF o un’immagine. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Invia di nuovo il messaggio senza il file, oppure scegli un altro modello.",
   "error.provider.opencodeCompactionFailed":
     "Il modello non è riuscito a riassumere questa chat lunga per liberare spazio nella finestra di contesto. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Riprova. Se l’errore continua, scegli un modello più potente.",
   "error.provider.museMcpStartupFault":

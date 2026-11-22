@@ -215,6 +215,7 @@ export const messages = {
     "OpenCode Go 拒绝了该请求。新的 API 密钥无法解决此问题。你的 OpenCode Go 套餐可能未激活，或者 OpenCode Go 可能屏蔽了你的网络：某些服务会屏蔽 VPN、代理或某些国家/地区。请在 OpenCode Console 中确认套餐已激活，或关闭 VPN，然后重试。你也可以选择其他模型。",
   "error.provider.opencodeServiceFailure":
     "由于本地服务故障，OpenCode 无法完成本轮对话。请重试；若错误持续，请在设置中重新连接 OpenCode。",
+  "error.provider.opencodeStillStarting": "OpenCode 未能及时完成加载。OpenBot 会再试一次。",
   "error.provider.opencodeRateLimited":
     "由于触发速率限制，模型服务商拒绝了该请求。请等待几分钟或改用其他模型后重试。\n{detail}",
   "error.provider.opencodeBilling":
@@ -250,6 +251,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "这台电脑的处理器无法运行此服务商。请使用其他服务商。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok 未能启动，因为其配置中的 allowed_models 设置不包含它的默认模型。请将默认模型添加到 allowed_models，或删除 allowed_models，然后重试。",
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 模型给出推理过程后结束本轮对话，但没有回答。请重试或改用其他模型。",
@@ -376,6 +379,8 @@ export const messages = {
     "此聊天太大，无法发送给模型。这通常是聊天中的图片导致的。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
+  "error.provider.opencodeInputRefused":
+    "模型拒绝了这个聊天的内容，但没有给出原因。聊天中的文件（例如 PDF 或图片）可能导致这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话。请去掉该文件后重新发送消息，或换一个模型。",
   "error.provider.opencodeCompactionFailed":
     "模型无法总结这段长对话，因此无法在上下文窗口中腾出空间。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请选择更强的模型。",
   "error.provider.museMcpStartupFault":

@@ -1,3 +1,4 @@
+import { parseCustomServerPlan } from "@openbot/contracts/custom-server-plans";
 import {
   type DirectConversationPage,
   type DirectConversationReadState,
@@ -282,6 +283,8 @@ function server(summary: DynamicRecord): ServerSummary {
     hosted,
     restartAvailable,
     storageGb,
+    paymentRequired,
+    customPlan,
     keyChangedAt,
     thisComputer,
     appearance,
@@ -305,6 +308,9 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid keyChangedAt.");
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
+  if (paymentRequired !== undefined && paymentRequired !== true) throw new Error("Invalid paymentRequired.");
+  const plan = customPlan === undefined ? undefined : parseCustomServerPlan(customPlan);
+  if (plan === null) throw new Error("Invalid customPlan.");
   if (capabilitiesPending !== undefined && capabilitiesPending !== true) {
     throw new Error("Invalid capabilitiesPending.");
   }
@@ -338,6 +344,8 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hosted === undefined ? {} : { hosted }),
     ...(restartAvailable === undefined ? {} : { restartAvailable }),
     ...(storageGb === undefined ? {} : { storageGb }),
+    ...(paymentRequired === undefined ? {} : { paymentRequired }),
+    ...(plan === undefined ? {} : { customPlan: plan }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
   };
