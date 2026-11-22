@@ -125,7 +125,9 @@ import {
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
 import type { VaultItems } from "../vault-items";
+import { WORKFLOW_ANSWER_TOOL } from "../workflows/workflow-answers";
 import {
+  handleWorkflowAnswerTool,
   handleWorkflowTool,
   WORKFLOW_CHANGE_TOOL_NAMES,
   WORKFLOW_TOOL_NAMES,
@@ -2273,6 +2275,13 @@ export class OpenBotToolRouter {
       );
       if (crmResult) return crmResult;
     }
+
+    if (params.tool === WORKFLOW_ANSWER_TOOL)
+      return yield* handleWorkflowAnswerTool(
+        params.arguments,
+        this.#workflowTools?.() ?? null,
+        this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId).map(({ delivery }) => delivery.id),
+      );
 
     if (
       WORKFLOW_CHANGE_TOOL_NAMES.has(params.tool) &&

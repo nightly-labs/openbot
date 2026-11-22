@@ -376,8 +376,13 @@ changed, on this computer and on a joined host.
   `list`, or labels such as `high|normal|low`; `name?` is optional. Values are strict: a number is a
   JSON number or decimal text, an integer is a safe integer, and a list is a JSON array. A model or
   agent reply with no JSON object, or with a key that is not a field (names are case-sensitive), is a
-  problem. A model step asks for one JSON object and tries once more with the problems; an agent step gets one more handoff (key `workflow-step:<id>:answer`) and then
-  fails with `answerInvalid`. The step keeps the checked JSON as its output. A webhook trigger checks
+  problem. A model step asks for one JSON object and tries once more with the problems. An agent step
+  asks the agent to call the catalog tool `workflow_answer` (`{"answer":{…}}`). The tool finds the
+  running agent step from the deliveries of the turn, checks the answer at once and gives the problems
+  back, so the agent corrects it in the same turn. The last answer that fits goes in the `output`
+  column of the running step and is the result when the turn ends. When the agent does not call the
+  tool, the step reads the last JSON object of the reply, gets one more handoff (key
+  `workflow-step:<id>:answer`) and then fails with `answerInvalid`. The step keeps the checked JSON as its output. A webhook trigger checks
   the request body when it arrives and answers 400 when a field is missing or wrong, or when a key
   differs from a field only in case; other extra keys are dropped. `check` on a
   condition (`priority = high and count > 2`, `urgent`, `not done`, `title contains "refund"`, joined

@@ -138,8 +138,17 @@ export function modelAnswerAsk(fields: readonly WorkflowAnswerField[]): string {
   return `Answer with only one JSON object, with no other text, with these fields:\n${workflowAnswerInstruction(fields)}`;
 }
 
+export const WORKFLOW_ANSWER_TOOL = "workflow_answer";
+
 export function agentAnswerAsk(fields: readonly WorkflowAnswerField[]): string {
-  return `End your reply with one JSON object with these fields:\n${workflowAnswerInstruction(fields)}`;
+  return `Give your answer with the openbot.${WORKFLOW_ANSWER_TOOL} tool, as {"answer":{…}}, with these fields:\n${workflowAnswerInstruction(fields)}\nWhen it is not in your tool list, run it with openbot.tool_call. It checks the fields at once; when it tells you a problem, correct the answer and call it again. When you cannot call it, end your reply with the same JSON object.`;
+}
+
+export function toolAnswerFixAsk(
+  fields: readonly WorkflowAnswerField[],
+  problems: readonly WorkflowAnswerValueProblem[],
+): string {
+  return `The answer did not fit: ${workflowAnswerFixText(problems)}. Call ${WORKFLOW_ANSWER_TOOL} again with the corrected answer, with these fields:\n${workflowAnswerInstruction(fields)}`;
 }
 
 export function answerFixAsk(
@@ -154,7 +163,11 @@ export type ReadAnswer = { output: string } | { problems: WorkflowAnswerValuePro
 export function readAnswer(fields: readonly WorkflowAnswerField[], text: string): ReadAnswer {
   const record = lastJsonObject(text);
   if (!record) return { problems: [{ name: fields.map((field) => field.name).join(", "), problem: "json" }] };
-  const { answer, problems } = checkWorkflowAnswer(fields, record, "refuse");
+  return readGivenAnswer(fields, record);
+}
+
+export function readGivenAnswer(fields: readonly WorkflowAnswerField[], value: unknown): ReadAnswer {
+  const { answer, problems } = checkWorkflowAnswer(fields, value, "refuse");
   return problems.length > 0 ? { problems } : { output: JSON.stringify(answer) };
 }
 
