@@ -237,6 +237,7 @@ export interface AccountUsageLimit {
   groups?: AccountUsageGroup[];
   sharedQuotaWith?: AgentProviderId;
   creditsAvailable?: boolean;
+  readFailed?: true;
 }
 
 export interface AccountUsage {
@@ -260,7 +261,8 @@ export function isAccountUsage(value: unknown): value is AccountUsage {
             limit.groups.length <= MAX_USAGE_GROUPS &&
             limit.groups.every(isAccountUsageGroup))) &&
         (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)) &&
-        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean"),
+        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean") &&
+        (limit.readFailed === undefined || limit.readFailed === true),
     )
   );
 }
