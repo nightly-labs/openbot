@@ -257,6 +257,9 @@ export const messages = {
   "workflow.answer.problem.field": "前面没有步骤提供 {name}。",
   "workflow.answer.problem.test": "无法这样比较 {name}。",
   "workflow.answer.problem.conflict": "前面的两个步骤以不同类型提供 {name}。",
+  "workflow.answer.problem.path":
+    "并非每条通往此步骤的路径都提供 {name}。请将其设为可选（{name}?），或在每条路径上提供它。",
+  "workflow.answer.problem.repeated": "前面的两个步骤可能在同一次运行中提供 {name}。请重命名其中一个。",
   "workflow.check.title": "检查",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "字段：{names}",

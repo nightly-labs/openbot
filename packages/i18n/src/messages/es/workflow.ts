@@ -259,6 +259,10 @@ export const messages = {
   "workflow.answer.problem.field": "Ningún paso anterior da {name}.",
   "workflow.answer.problem.test": "{name} no se puede comparar así.",
   "workflow.answer.problem.conflict": "Dos pasos anteriores dan {name} con tipos distintos.",
+  "workflow.answer.problem.path":
+    "No todos los caminos a este paso dan {name}. Hazlo opcional ({name}?) o dalo en cada camino.",
+  "workflow.answer.problem.repeated":
+    "Dos pasos anteriores pueden dar {name} en la misma ejecución. Cambia el nombre de uno.",
   "workflow.check.title": "Comprobación",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Campos: {names}",

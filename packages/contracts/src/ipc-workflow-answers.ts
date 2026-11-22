@@ -1,4 +1,5 @@
-import type { WorkflowGraph, WorkflowNode, WorkflowNodeKind } from "./ipc-workflows";
+import { workflowForwardEdges, workflowNamePathProblems } from "./ipc-workflow-answer-paths";
+import type { WorkflowEdge, WorkflowGraph, WorkflowNode, WorkflowNodeKind } from "./ipc-workflows";
 import { type DynamicRecord, isDynamicRecord } from "./runtime-values";
 
 export const WORKFLOW_ANSWER_FIELD = "answer";
@@ -466,12 +467,16 @@ export interface WorkflowAnswerSource {
   fields: WorkflowAnswerField[];
 }
 
-export function workflowAnswerSources(graph: WorkflowGraph, nodeId: string): WorkflowAnswerSource[] {
+export function workflowAnswerSources(
+  graph: WorkflowGraph,
+  nodeId: string,
+  edges: readonly WorkflowEdge[] = graph.edges,
+): WorkflowAnswerSource[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const sources: WorkflowAnswerSource[] = [];
   const seen = new Set<string>([nodeId]);
   const visit = (id: string) => {
-    for (const edge of graph.edges) {
+    for (const edge of edges) {
       if (edge.to !== id || edge.type !== "text" || seen.has(edge.from)) continue;
       seen.add(edge.from);
       const node = nodes.get(edge.from);
@@ -498,13 +503,24 @@ export type WorkflowAnswerProblem =
   | { nodeId: string; code: "field"; name: string }
   | { nodeId: string; code: "test"; name: string }
   | { nodeId: string; code: "template"; name: string; field: string }
-  | { nodeId: string; code: "conflict"; name: string };
+  | { nodeId: string; code: "conflict"; name: string }
+  | { nodeId: string; code: "path"; name: string }
+  | { nodeId: string; code: "repeated"; name: string };
 
 export function workflowAnswerProblems(graph: WorkflowGraph): WorkflowAnswerProblem[] {
-  return graph.nodes.flatMap((node) => nodeAnswerProblems(graph, node));
+  const forward = workflowForwardEdges(graph);
+  return graph.nodes.flatMap((node) => answerProblemsOf(graph, node, forward));
 }
 
-export function nodeAnswerProblems(graph: WorkflowGraph, node: WorkflowNode): WorkflowAnswerProblem[] {
+export function nodeAnswerProblemsWithoutPaths(graph: WorkflowGraph, node: WorkflowNode): WorkflowAnswerProblem[] {
+  return answerProblemsOf(graph, node, null);
+}
+
+function answerProblemsOf(
+  graph: WorkflowGraph,
+  node: WorkflowNode,
+  forward: readonly WorkflowEdge[] | null,
+): WorkflowAnswerProblem[] {
   const problems: WorkflowAnswerProblem[] = [];
   const spec = fieldString(node, WORKFLOW_ANSWER_FIELD);
   if (spec.trim() && canGiveWorkflowAnswer(node))
@@ -535,13 +551,10 @@ export function nodeAnswerProblems(graph: WorkflowGraph, node: WorkflowNode): Wo
   for (const { field, name } of names)
     if (!available.has(name)) problems.push({ nodeId: node.id, code: "template", name, field });
     else known(name);
-  if (!check) return problems;
-  const parsed = parseWorkflowCheck(check);
-  if (!parsed) {
-    problems.push({ nodeId: node.id, code: "check" });
-    return problems;
-  }
-  for (const test of parsed.flat()) {
+  const parsed = check ? parseWorkflowCheck(check) : null;
+  if (check && !parsed) problems.push({ nodeId: node.id, code: "check" });
+  const tests = parsed?.flat() ?? [];
+  for (const test of tests) {
     if (!available.has(test.name)) {
       problems.push({ nodeId: node.id, code: "field", name: test.name });
       continue;
@@ -549,6 +562,14 @@ export function nodeAnswerProblems(graph: WorkflowGraph, node: WorkflowNode): Wo
     const field = known(test.name);
     if (field && !testFits(test, field)) problems.push({ nodeId: node.id, code: "test", name: test.name });
   }
+  const reached = [...new Set([...names.map(({ name }) => name), ...tests.map(({ name }) => name)])].filter(
+    (name) => available.has(name) && !conflicts.has(name),
+  );
+  if (!forward) return problems;
+  const sources = workflowAnswerSources(graph, node.id, forward);
+  const required = new Set(reached.filter((name) => available.get(name)?.some((field) => !field.optional)));
+  for (const { name, code } of workflowNamePathProblems(graph, node.id, forward, sources, reached, required))
+    problems.push({ nodeId: node.id, code, name });
   return problems;
 }
 
@@ -619,6 +640,10 @@ export function workflowAnswerProblemText(problem: WorkflowAnswerProblem): strin
       return `${problem.field} uses {{${problem.name}}}, but no connected step before it gives that field in its answer, so the step fails when it runs.`;
     case "conflict":
       return `two steps before it give the field ${problem.name} with different types. Rename one of them.`;
+    case "path":
+      return `uses field ${problem.name}, but on some paths into this step no step gives it: another condition branch, another trigger, or the first pass of a loop. Give it on every path, or mark it optional (${problem.name}?) in the answer of the steps that give it.`;
+    case "repeated":
+      return `two steps before it can both give the field ${problem.name} in the same run, so it is not clear which value it uses. Rename one of them.`;
   }
 }
 

@@ -256,6 +256,10 @@ export const messages = {
   "workflow.answer.problem.field": "이 단계 앞에 {name}을(를) 주는 단계가 없습니다.",
   "workflow.answer.problem.test": "{name}은(는) 이렇게 비교할 수 없습니다.",
   "workflow.answer.problem.conflict": "앞의 두 단계가 서로 다른 유형의 {name}을(를) 줍니다.",
+  "workflow.answer.problem.path":
+    "이 단계로 오는 모든 경로가 {name}을(를) 주지는 않습니다. 선택 항목({name}?)으로 하거나 모든 경로에서 주세요.",
+  "workflow.answer.problem.repeated":
+    "앞의 두 단계가 같은 실행에서 {name}을(를) 줄 수 있습니다. 하나의 이름을 바꾸세요.",
   "workflow.check.title": "검사",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "필드: {names}",

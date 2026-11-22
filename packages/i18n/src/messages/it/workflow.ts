@@ -259,6 +259,10 @@ export const messages = {
   "workflow.answer.problem.field": "Nessun passaggio precedente fornisce {name}.",
   "workflow.answer.problem.test": "{name} non si può confrontare così.",
   "workflow.answer.problem.conflict": "Due passaggi precedenti forniscono {name} con tipi diversi.",
+  "workflow.answer.problem.path":
+    "Non tutti i percorsi verso questo passaggio forniscono {name}. Rendilo facoltativo ({name}?) o fornisci il valore su ogni percorso.",
+  "workflow.answer.problem.repeated":
+    "Due passaggi precedenti possono fornire {name} nella stessa esecuzione. Rinominane uno.",
   "workflow.check.title": "Controllo",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Campi: {names}",

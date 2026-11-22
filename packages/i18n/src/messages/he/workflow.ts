@@ -257,6 +257,9 @@ export const messages = {
   "workflow.answer.problem.field": "אף שלב לפני זה לא נותן את {name}.",
   "workflow.answer.problem.test": "אי אפשר להשוות את {name} כך.",
   "workflow.answer.problem.conflict": "שני שלבים לפני זה נותנים את {name} בסוגים שונים.",
+  "workflow.answer.problem.path":
+    "לא כל נתיב לשלב הזה נותן את {name}. הפוך אותו לאופציונלי ({name}?) או תן אותו בכל נתיב.",
+  "workflow.answer.problem.repeated": "שני שלבים לפני זה יכולים לתת את {name} באותה הרצה. שנה את השם של אחד מהם.",
   "workflow.check.title": "בדיקה",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "שדות: {names}",

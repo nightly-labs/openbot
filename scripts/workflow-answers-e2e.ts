@@ -331,6 +331,111 @@ try {
   });
   check("edit_workflow refuses an unknown answer type", !badSpec.ok && badSpec.text.includes("priority"), badSpec.text);
 
+  const branchSteps = (yesAnswer: string, noAnswer: string) => [
+    { op: "add", ref: "rate", kind: "llm", fields: { prompt: "Rate it.", answer: TRIAGE } },
+    { op: "add", ref: "gate", kind: "condition", from: "rate", fields: { check: "priority = high" } },
+    {
+      op: "add",
+      ref: "fast",
+      kind: "llm",
+      from: "gate",
+      branch: "yes",
+      fields: { prompt: "Note it.", answer: yesAnswer },
+    },
+    {
+      op: "add",
+      ref: "slow",
+      kind: "llm",
+      from: "gate",
+      branch: "no",
+      fields: { prompt: "Note it.", answer: noAnswer },
+    },
+    { op: "add", ref: "join", kind: "llm", from: "fast", fields: { prompt: "Use {{note}}." } },
+    { op: "connect", from: "slow", to: "join" },
+  ];
+  const onePath = await tool("edit_workflow", { title: "One branch", ops: branchSteps("note: text", "other: text") });
+  check(
+    "edit_workflow refuses a {{name}} that only one condition branch gives",
+    !onePath.ok && onePath.text.includes("field note, but on some paths"),
+    onePath.text,
+  );
+  const optionalPath = await tool("edit_workflow", {
+    title: "Optional branch",
+    ops: branchSteps("note?: text", "other: text"),
+  });
+  check("edit_workflow saves the same graph when the field is optional", optionalPath.ok, optionalPath.text);
+  const bothPaths = await tool("edit_workflow", {
+    title: "Both branches",
+    ops: branchSteps("note: text", "note: text"),
+  });
+  check("edit_workflow saves a {{name}} that each branch gives", bothPaths.ok, bothPaths.text);
+  const parallel = await tool("edit_workflow", {
+    title: "Parallel",
+    ops: [
+      { op: "add", ref: "rate", kind: "llm", fields: { prompt: "Rate it." } },
+      { op: "add", ref: "left", kind: "llm", from: "rate", fields: { prompt: "Note it.", answer: "note: text" } },
+      { op: "add", ref: "right", kind: "llm", from: "rate", fields: { prompt: "Note it.", answer: "note: text" } },
+      { op: "add", ref: "join", kind: "llm", from: "left", fields: { prompt: "Use {{note}}." } },
+      { op: "connect", from: "right", to: "join" },
+    ],
+  });
+  check(
+    "edit_workflow refuses a {{name}} that two steps can give in the same run",
+    !parallel.ok && parallel.text.includes("both give the field note"),
+    parallel.text,
+  );
+  const twoTriggers = await tool("edit_workflow", {
+    title: "Two triggers",
+    ops: [
+      { op: "add", ref: "hook", kind: "trigger", fields: { trigger: "webhook", answer: "title: text" } },
+      { op: "add", ref: "work", kind: "llm", from: "hook", fields: { prompt: "Fix {{title}}." } },
+      { op: "add", ref: "other", kind: "trigger", fields: { trigger: "webhook" } },
+      { op: "connect", from: "other", to: "work" },
+    ],
+  });
+  check(
+    "edit_workflow refuses a {{name}} that only one of two triggers gives",
+    !twoTriggers.ok && twoTriggers.text.includes("field title, but on some paths"),
+    twoTriggers.text,
+  );
+  const loop = await tool("edit_workflow", {
+    title: "Loop",
+    ops: [
+      { op: "add", ref: "rate", kind: "llm", fields: { prompt: "Rate it." } },
+      { op: "add", ref: "work", kind: "llm", from: "rate", fields: { prompt: "Improve {{note}}." } },
+      { op: "add", ref: "review", kind: "llm", from: "work", fields: { prompt: "Review it.", answer: "note: text" } },
+      { op: "connect", from: "review", to: "work" },
+    ],
+  });
+  check(
+    "edit_workflow refuses a {{name}} that only the loop back gives, because the first pass has no value",
+    !loop.ok && loop.text.includes("field note, but on some paths"),
+    loop.text,
+  );
+
+  modelReplies = ['{"note":"one"}', '{"note":"two"}', "Done."];
+  const repeated = await startRun(workflows, "Repeated at run time", {
+    nodes: [
+      node("start", "prompt", 0, { text: "Ticket." }),
+      node("left", "llm", 300, { prompt: "Note it.", answer: "note: text" }),
+      node("right", "llm", 300, { prompt: "Note it.", answer: "note: text" }),
+      node("join", "llm", 600, { prompt: "Use {{note}}." }),
+    ],
+    edges: [
+      { id: "start-left", from: "start", to: "left", type: "text" },
+      { id: "start-right", from: "start", to: "right", type: "text" },
+      { id: "left-join", from: "left", to: "join", type: "text" },
+      { id: "right-join", from: "right", to: "join", type: "text" },
+    ],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, repeated, ended);
+  check(
+    "a saved graph with a repeated field still runs as before",
+    detail.run.status === "done" && stepOf(detail, "join")?.status === "done",
+    detail.steps,
+  );
+
   modelReplies = ['{"priority":"high","count":5}'];
   const braces = await startRun(workflows, "Code in the answer", triageGraph("priority = high", REPORT));
   await runUntil(workflows, braces, (run) => stepOf(run, "agent")?.status === "running");

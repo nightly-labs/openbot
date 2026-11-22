@@ -414,7 +414,14 @@ changed, on this computer and on a joined host.
   done, failed or stopped attempt of a step before it failed or stopped (`latestSettled`); it does not
   use an older answer in its place.
   `edit_workflow` refuses an edit that adds an answer problem (`workflowAnswerProblems`) and tells
-  the agent how to correct it; an unknown `{{name}}` only adds a note to the result. The canvas edits
+  the agent how to correct it; an unknown `{{name}}` only adds a note to the result. Two of these
+  problems come from the paths into a step (`workflowNamePathProblems`). The check tries each
+  trigger before the step and each yes/no outcome of the conditions before it, on the edges without
+  the loop backs. `path`: on some paths no step before it gives a required field that it uses, for
+  example another branch, another trigger, or the first pass of a loop; a field marked optional
+  (`name?`) does not count. `repeated`: two steps that give the same field can both run in the same
+  pass. The check stops when the triggers times the condition outcomes before the step are more than 256. Both problems only refuse new edits and
+  show on the canvas; a run does not fail a step for them, so saved workflows run as before. The canvas edits
   these fields from the node toolbar and shows the same problems on the node, only on a host with
   `workflows-answers-v1`.
 - A restart keeps approvals and agent steps, because their state is in the database and the

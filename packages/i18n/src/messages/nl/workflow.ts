@@ -249,6 +249,10 @@ export const messages = {
   "workflow.answer.problem.field": "Geen eerdere stap geeft {name}.",
   "workflow.answer.problem.test": "{name} kan zo niet worden vergeleken.",
   "workflow.answer.problem.conflict": "Twee eerdere stappen geven {name} met verschillende typen.",
+  "workflow.answer.problem.path":
+    "Niet elk pad naar deze stap geeft {name}. Maak het optioneel ({name}?) of geef het op elk pad.",
+  "workflow.answer.problem.repeated":
+    "Twee eerdere stappen kunnen {name} in dezelfde run geven. Geef een van beide een andere naam.",
   "workflow.check.title": "Controle",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Velden: {names}",

@@ -259,6 +259,10 @@ export const messages = {
   "workflow.answer.problem.field": "Bundan önceki hiçbir adım {name} vermiyor.",
   "workflow.answer.problem.test": "{name} bu şekilde karşılaştırılamaz.",
   "workflow.answer.problem.conflict": "Önceki iki adım {name} alanını farklı türlerle veriyor.",
+  "workflow.answer.problem.path":
+    "Bu adıma giden her yol {name} alanını vermiyor. Alanı isteğe bağlı yapın ({name}?) ya da her yolda verin.",
+  "workflow.answer.problem.repeated":
+    "Önceki iki adım aynı çalıştırmada {name} alanını verebilir. Birini yeniden adlandırın.",
   "workflow.check.title": "Kontrol",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Alanlar: {names}",

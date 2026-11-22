@@ -38,6 +38,10 @@ function answerProblemText(t: AppTranslate, problem: WorkflowAnswerProblem): str
       return t("workflow.answer.problem.test", { name: problem.name });
     case "conflict":
       return t("workflow.answer.problem.conflict", { name: problem.name });
+    case "path":
+      return t("workflow.answer.problem.path", { name: problem.name });
+    case "repeated":
+      return t("workflow.answer.problem.repeated", { name: problem.name });
   }
 }
 
