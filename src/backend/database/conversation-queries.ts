@@ -425,7 +425,12 @@ export class ConversationQueries {
       terms.length > 1
         ? `${textMatch} AND LOWER(${COLLAPSE_WHITESPACE_FUNCTION}(${storedText})) LIKE ? ESCAPE '\\'`
         : textMatch;
-    const textParameters = terms.length > 1 ? [`%${escapeLike(longestTerm)}%`, pattern] : [pattern];
+    const exactTextParameters = terms.length > 1 ? [`%${escapeLike(longestTerm)}%`, pattern] : [pattern];
+    // Cheap pre-check on the stored JSON: it skips most rows before json_extract parses them.
+    const rawJsonFilter = rawJsonCanContain(longestTerm) ? `message.message_json LIKE ? ESCAPE '\\' AND ` : "";
+    const textParameters = rawJsonFilter
+      ? [`%${escapeLike(longestTerm)}%`, ...exactTextParameters]
+      : exactTextParameters;
     const filter = agentId ? "AND thread.agent_id = ?" : "";
     const parameters = agentId ? [...textParameters, agentId] : textParameters;
     const rows = databaseRows(
@@ -435,7 +440,7 @@ export class ConversationQueries {
              SELECT message.rowid AS message_rowid, thread.agent_id, message.created_at, message.ordinal, message.message_id
              FROM projection_thread_messages message
              JOIN projection_threads thread ON thread.thread_id = message.thread_id
-             WHERE ${textFilter}
+             WHERE ${rawJsonFilter}${textFilter}
                AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
                AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}', '${AGENT_WELCOME_ITEM_TYPE}', '${CHANNEL_RESUME_ITEM_TYPE}')
                AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
@@ -829,6 +834,12 @@ function decodeSearchCursor(value: string): number {
   } catch {
     throw new Error("The conversation search cursor is invalid.");
   }
+}
+
+// JSON.stringify writes printable ASCII other than `"` and `\` unchanged, and SQLite LIKE folds
+// ASCII case. So for such a term, a text match implies a match on the raw stored JSON.
+function rawJsonCanContain(term: string): boolean {
+  return /^[\x20-\x7e]+$/u.test(term) && !/["\\]/u.test(term);
 }
 
 function escapeLike(value: string): string {
