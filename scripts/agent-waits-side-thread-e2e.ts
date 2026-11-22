@@ -124,6 +124,7 @@ const scheduler = new RoutineScheduler({
     usageLimited: () => false,
     routineThread: () => null,
     waitThread: (agentId, taskId) => tasks.waitThread(agentId, taskId),
+    queueHold: () => null,
     routineDeleted: () => Effect.void,
   },
 });
