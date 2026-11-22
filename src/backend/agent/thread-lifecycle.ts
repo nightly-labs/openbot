@@ -2,9 +2,12 @@ import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  AGENT_INSTRUCTION_FILE_NAMES,
+  type AgentInstructionFileName,
   type AgentSummary,
   agentAutomationAllowed,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentProviderDescriptor,
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
@@ -77,9 +80,10 @@ import { mcpFallbackRunsServer } from "./mcp-tools";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
-import { visibleDynamicTools } from "./tool-catalog";
+import { toolCatalogNames, visibleDynamicTools } from "./tool-catalog";
 import {
   AGENT_INSTRUCTIONS_FILE_BYTES,
+  missingInstructionFileNames,
   type PromptInstructionsFile,
   promptInstructionsFile,
 } from "./workspace-instructions";
@@ -107,6 +111,7 @@ interface InstructionsFileInPrompt {
   fileName: PromptInstructionsFile["fileName"];
   found: PromptInstructionsFile | null;
   file: PromptInstructionsFile | null;
+  hiddenFromCli: AgentInstructionFileName[];
 }
 
 const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
@@ -623,6 +628,7 @@ export class ThreadLifecycle {
       ...this.#computerUseParam(agent, client),
       ...this.#mcpAgentParam(agent, client),
       ...this.#channelToolsParam(client, publicThreadId),
+      ...this.#excludedInstructionFilesParam(instructionsFile),
       ...this.#instructions(
         agent,
         client,
@@ -926,6 +932,7 @@ export class ThreadLifecycle {
           ...(instructionsFile.found?.text ? [["instructions", instructionsFile.found.text]] : []),
           ...(catalogCommands.length > 0 ? [["catalog-commands", ...catalogCommands]] : []),
           ...(agentComputerUseEnabled(agent) ? [] : ["codex-computer-use-off"]),
+          ...(agentMemoryEnabled(agent) ? [] : ["memory-off"]),
         ]),
       )
       .digest("hex");
@@ -986,7 +993,7 @@ export class ThreadLifecycle {
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
     return (
-      this.#runsBesideOwnChat(agent, publicThreadId) &&
+      this.#conversation.isTaskThread(publicThreadId) &&
       !this.#routineThread(publicThreadId) &&
       agentComputerUseEnabled(agent)
     );
@@ -1023,7 +1030,8 @@ export class ThreadLifecycle {
   }
 
   #channelToolsParam(client: AgentClient, publicThreadId: string): { channelTools?: true } {
-    return client.provider === "claude" && this.#conversation.channelForThread(publicThreadId) !== null
+    return (client.provider === "claude" || client.provider === "grok") &&
+      this.#conversation.channelForThread(publicThreadId) !== null
       ? { channelTools: true }
       : {};
   }
@@ -1128,7 +1136,8 @@ export class ThreadLifecycle {
     instructionsFile: InstructionsFileInPrompt,
     workspaceSkills: readonly string[] = [],
   ): DynamicRecord {
-    const memories = this.#memories.essentialFor(agent.id);
+    const memoryEnabled = agentMemoryEnabled(agent);
+    const memories = memoryEnabled ? this.#memories.essentialFor(agent.id) : [];
     const options = {
       computerUseInOwnChat,
       computerUseNotReady:
@@ -1146,7 +1155,7 @@ export class ThreadLifecycle {
       skillRevision: this.#skillRevision(),
       memoryLimit: this.#memories.limit(),
       storedMemoryCount: this.#memories.listFor(agent.id).length,
-      memoriesInTurns: client.turnContext === true,
+      memoriesInTurns: memoryEnabled && client.turnContext === true,
       teammatesInTurns: client.turnContext === true,
       savedLoginsInTurns: client.turnContext === true,
       instructionsFileInTurns: this.#instructionsFileInTurns(client),
@@ -1163,10 +1172,11 @@ export class ThreadLifecycle {
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
               client.provider === "antigravity"
               ? mcpServers
-                  .filter((config) => mcpFallbackRunsServer(config, agent) && config.id !== COMPUTER_USE_MCP_SERVER_ID)
+                  .filter((config) => mcpFallbackRunsServer(config, agent))
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
+      ...(client.provider === "antigravity" ? { toolCatalog: toolCatalogNames(client.provider) } : {}),
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };
@@ -1178,10 +1188,10 @@ export class ThreadLifecycle {
       this.#store.agentDefaults(),
       options,
     );
-    return options.memoriesInTurns
+    return client.turnContext === true
       ? {
           developerInstructions: instructions,
-          memoryContext: memoryContext(memories, options),
+          ...(options.memoriesInTurns ? { memoryContext: memoryContext(memories, options) } : {}),
           sectionTeammates: section,
           savedLogins: options.passwordVault,
           ...(options.instructionsFileInTurns ? { instructionsFile: options.instructionsFile } : {}),
@@ -1211,17 +1221,34 @@ export class ThreadLifecycle {
     agent: AgentSummary,
     client: AgentClient,
   ) {
+    const enforced = workspaceAccessEnforced(agent);
     const read =
-      client.provider === "claude" && workspaceAccessEnforced(agent)
+      client.provider === "claude" && enforced
         ? []
         : agentProviderDescriptor(client.provider).workspaceInstructionFiles;
     const file = yield* promptInstructionsFile(agent.workspacePath, read);
+    const sent = file && !file.readByCli ? file : null;
+    const cliReadsProjectFiles = client.provider === "claude" && !enforced;
+    const missing = cliReadsProjectFiles ? yield* missingInstructionFileNames(agent.workspacePath) : [];
     return {
       fileName: file?.fileName ?? "AGENTS.md",
       found: file,
-      file: file && !file.readByCli ? file : null,
+      file: sent,
+      hiddenFromCli: cliReadsProjectFiles
+        ? AGENT_INSTRUCTION_FILE_NAMES.filter(
+            (fileName) => !read.includes(fileName) && (sent?.fileName === fileName || missing.includes(fileName)),
+          )
+        : [],
     } satisfies InstructionsFileInPrompt;
   });
+
+  #excludedInstructionFilesParam(instructionsFile: InstructionsFileInPrompt): {
+    excludedInstructionFiles?: AgentInstructionFileName[];
+  } {
+    return instructionsFile.hiddenFromCli.length > 0
+      ? { excludedInstructionFiles: instructionsFile.hiddenFromCli }
+      : {};
+  }
 
   readonly threadParams = Effect.fn("ThreadLifecycle.threadParams")(function* (
     this: ThreadLifecycle,
@@ -1235,6 +1262,7 @@ export class ThreadLifecycle {
     yield* checkAgentFolders(agent);
     const configs = this.#agentMcpServers(agent);
     const toolRuntimes = this.#toolRuntimes();
+    const instructionsFile = yield* this.#instructionsFile(agent, client);
     return {
       threadId: externalThreadId,
       model: agent.model,
@@ -1248,6 +1276,7 @@ export class ThreadLifecycle {
       ...this.#computerUseParam(agent, client),
       ...this.#mcpAgentParam(agent, client),
       ...this.#channelToolsParam(client, publicThreadId),
+      ...this.#excludedInstructionFilesParam(instructionsFile),
       ...this.#instructions(
         agent,
         client,
@@ -1256,7 +1285,7 @@ export class ThreadLifecycle {
         yield* this.#homeSkills(agent, client),
         this.#runsBesideOwnChat(agent, publicThreadId),
         configs,
-        yield* this.#instructionsFile(agent, client),
+        instructionsFile,
         yield* this.#workspaceSkills(agent, client),
       ),
       ...(client.provider === "codex" ? {} : { dynamicTools: visibleDynamicTools(client.provider) }),

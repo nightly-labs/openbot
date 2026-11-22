@@ -114,17 +114,20 @@ export function Terms() {
         Licenses. The applicable discounts and final charges are presented before completing the purchase.
       </p>
       <p>
-        A user may share an invite link. An account that is created with that link gets 10% off each payment for a
-        Hosted Server or a Commercial License. For each paid invoice of that account, the user who shared the link gets
-        10% of the amount without tax as credit on the user's Stripe account, which is taken off the user's next
-        invoices. The credit starts when that account pays a second time, at the first renewal of its plan. Credit from
-        the payments before that renewal is given at the renewal, and no credit is given if the plan stops before it.
-        Credit collects until it reaches US$20 (€17, 67 zł or R$100), and then goes to the user's Stripe account. Credit
-        has no cash value and is not paid out. When a payment is refunded or a dispute is lost, the credit from that
-        payment is taken back, up to the credit that remains. A user cannot use the user's own link. A person who signs
-        in can also enter an invite link or code at sign-in; it counts only when that sign-in creates the account. When
-        an invited account pays with a card that the user who shared the link also used, the invite ends: the account
-        loses the discount, and the credit from that account that was not yet given is not given.
+        A user may share an invite link. An account that is created with that link gets 10% off the first payment of its
+        first purchase of a Hosted Server or a Commercial License. Accounts that got the invite discount before 20
+        November 2026 keep 10% off each payment of the plans that they bought before that date. For each paid invoice of
+        that account, the user who shared the link gets 10% of the amount without tax as credit on the user's Stripe
+        account, which is taken off the user's next invoices. For a yearly invoice, the credit is given in 12 equal
+        parts, one part every 30 days after the payment. For other invoices, the credit starts when that account pays a
+        second time, at the first renewal of its plan. Credit from the payments before that renewal is given at the
+        renewal, and no credit is given if the plan stops before it. Credit collects until it reaches US$20 (€17, 67 zł
+        or R$100), and then goes to the user's Stripe account. Credit has no cash value and is not paid out. When a
+        payment is refunded or a dispute is lost, the credit from that payment is taken back, up to the credit that
+        remains. A user cannot use the user's own link. A person who signs in can also enter an invite link or code at
+        sign-in; it counts only when that sign-in creates the account. When an invited account pays with a card that the
+        user who shared the link also used, the invite ends: the account loses the discount, and the credit from that
+        account that was not yet given is not given.
       </p>
       <p>All payments for Commercial Licenses and Hosted Server subscriptions are processed through Stripe.</p>
       <p>
@@ -640,6 +643,12 @@ export function Terms() {
         environment and all stored content, will be deleted immediately upon approval of the refund request by us,
         without the 14-day data retention period otherwise applicable following subscription expiry. Such deletion is
         permanent, and the associated data cannot be recovered.
+      </p>
+      <p>
+        In the case of a payment dispute or chargeback for a Hosted Server subscription within 30 days of the start of
+        that subscription, the associated Hosted Server, including its environment and all stored content, will be
+        deleted immediately, without the 14-day data retention period. Such deletion is permanent, and the associated
+        data cannot be recovered.
       </p>
       <p>
         Users are responsible for saving or exporting any content they wish to retain before deleting a Hosted Server.

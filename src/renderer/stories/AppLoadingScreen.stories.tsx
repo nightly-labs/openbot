@@ -36,6 +36,16 @@ export const Loading: Story = {
   render: () => <AppLoadingScreen />,
 };
 
+export const QuietLoading: Story = {
+  render: () => <AppLoadingScreen scene="quiet" title="Loading OpenBot" />,
+};
+
+export const QuietStartingServer: Story = {
+  render: () => (
+    <ServerConnectionNotice name="My server" phase="waking" initial loadingScene="quiet" onRetry={() => {}} />
+  ),
+};
+
 export const Seeded: StoryObj<{ seed: number }> = {
   args: { seed: 7 },
   argTypes: { seed: { control: { type: "number", min: 0, step: 1 } } },

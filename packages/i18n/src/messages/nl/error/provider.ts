@@ -20,6 +20,8 @@ export const messages = {
     "{provider} meldt dat je abonnement op is. Kies een ander model of upgrade je {provider}-abonnement.",
   "error.provider.acpMcpNotLoaded":
     "{provider} heeft de tools van OpenBot niet geladen, dus deze agent kan ze niet gebruiken en zijn teamgenoten niet bereiken. Een teambeleid van {provider} kan lokale MCP-servers blokkeren. Vraag je teambeheerder om ze toe te staan en probeer het opnieuw.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} heeft dit bericht zonder de tools van OpenBot uitgevoerd, dus de agent kon zijn teamgenoten niet bereiken, de browser niet gebruiken en geen bestanden bijvoegen. Probeer het opnieuw.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} kon de MCP-server {name} niet starten, dus het antwoord is gestopt. Deze server staat in je eigen {provider}-instellingen, niet in OpenBot. Verwijder of herstel de server daar en start dan een nieuwe chat.",
   "error.provider.endpointsReadOnly":
@@ -287,6 +289,8 @@ export const messages = {
     "De processor van deze computer kan deze aanbieder niet uitvoeren. Gebruik een andere aanbieder.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode kon de database niet openen, omdat een nieuwere versie van OpenCode deze heeft gewijzigd. Werk OpenCode bij naar versie 2 of nieuwer en probeer het opnieuw.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok is niet gestart, omdat de instelling allowed_models in de configuratie het standaardmodel niet bevat. Voeg het standaardmodel toe aan allowed_models, of verwijder allowed_models, en probeer het daarna opnieuw.",
   "error.provider.opencodeNoAnswer":
     "Het OpenCode-model beëindigde de beurt zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -334,6 +338,8 @@ export const messages = {
     "Gemini heeft dit verzoek geweigerd zonder de oorzaak te geven. Een item in de chatgeschiedenis kan de oorzaak zijn, zoals een afbeelding die de agent heeft geopend. OpenBot heeft een nieuwe Gemini-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini kon de opgeslagen geschiedenis van deze chat niet lezen. OpenBot heeft een nieuwe Gemini-sessie met de chatgeschiedenis gestart. Stuur je bericht opnieuw.",
+  "error.provider.acpTurnStuck":
+    "{provider} heeft de vorige beurt niet afgerond en heeft dit bericht daarom niet aangenomen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw.",
   "error.provider.antigravityLocationUnsupported":
     "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -421,6 +427,8 @@ export const messages = {
     "Deze chat is te groot geworden om naar het model te sturen. Afbeeldingen in de chat zijn vaak de oorzaak. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
+  "error.provider.opencodeInputRefused":
+    "Het model heeft de inhoud van deze chat geweigerd zonder de oorzaak te geven. Een bestand in de chat, zoals een pdf of een afbeelding, kan de oorzaak zijn. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw zonder het bestand, of kies een ander model.",
   "error.provider.opencodeCompactionFailed":
     "Het model kon deze lange chat niet samenvatten om ruimte te maken in het contextvenster. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een sterker model.",
   "error.provider.museMcpStartupFault":
@@ -539,6 +547,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "De versie van de {provider} CLI kon niet worden gelezen.",
   "error.provider.piSessionBusy": "Wacht tot de huidige Pi-beurt klaar is.",
   "error.provider.acpSessionBusy": "{provider} rondt nog een gestopte beurt af. Probeer het zo opnieuw.",
+  "error.provider.acpSessionStale":
+    "{provider} kon de nieuwste versie van deze chat niet laden. Stuur je bericht opnieuw.",
   "error.provider.acpModelNotOffered":
     "{provider} biedt {model} nu niet aan. Kies een ander model voor deze agent en probeer het opnieuw.",
   "error.provider.piStopped": "Pi draait niet. Verbind Pi en probeer het opnieuw.",

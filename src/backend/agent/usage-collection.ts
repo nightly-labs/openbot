@@ -142,7 +142,23 @@ export function collectProviderUsage(
     });
     return;
   }
-  const sessionCost = session.provider === "pi" || session.provider === "acp" || isKeyOnlyProvider(session.provider);
+  if (session.provider === "acp") {
+    usage.record({
+      agentId: agent.id,
+      sessionId: session.id,
+      turnId,
+      provider: session.provider,
+      model,
+      counterId: `${session.id}:acp:${getString(params, "promptId") ?? turnId}`,
+      costCounterId: `${session.id}:grok`,
+      baseline: false,
+      tokens: acpTokens(value),
+      reportedCost: isDynamicRecord(params) ? cost(params.cost) : null,
+      zeroCostUnpriced: true,
+    });
+    return;
+  }
+  const sessionCost = session.provider === "pi" || isKeyOnlyProvider(session.provider);
   const reportedCost = sessionCost && isDynamicRecord(params) ? cost(params.cost) : null;
   usage.record({
     agentId: agent.id,

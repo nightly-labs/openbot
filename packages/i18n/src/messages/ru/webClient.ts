@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Некорректный ответ при входе.",
   "webClient.pane.navigation": "Навигация по рабочему пространству",
   "webClient.pane.chat": "Чат",
-  "webClient.pane.routines": "Автозадачи",
   "webClient.pane.workspace": "Рабочее пространство",
   "webClient.phoneApp.title": "Используйте приложение OpenBot",
   "webClient.phoneApp.description": "На телефоне OpenBot лучше всего работает в приложении. Войдите с той же почтой.",

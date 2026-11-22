@@ -297,6 +297,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "في الانتظار. يشغّل المضيف أكبر عدد من الأدوار تسمح به ذاكرته.",
   "mobile.server.threads.hold.agentBusy": "في انتظار انتهاء عمل آخر لهذا الوكيل.",
   "mobile.server.threads.hold.oneTurn": "في الانتظار. يشغّل مزوّد هذا الوكيل دورًا واحدًا في كل مرة.",
+  "mobile.server.threads.hold.signIn": "في الانتظار. يحتاج مزوّد هذا الوكيل إلى تسجيل الدخول.",
   "mobile.server.threads.offline": "اتصل بهذا الخادم لرؤية سلاسله.",
   "mobile.server.threads.loading": "جارٍ تحميل السلاسل…",
   "mobile.server.threads.loadFailed": "تعذّر تحميل سلاسل بعض الوكلاء.",
@@ -638,6 +639,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "إضافة وكلاء",
   "mobile.server.browserProfiles.agentsHint":
     "تمنح النقرة الوكيلَ ملف التعريف هذا، أو تعيده إلى الملف المشترك. يُغلق التغيير علامات التبويب المفتوحة للوكيل.",
+  "mobile.server.browserProfiles.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل المنقول الدخول إلى هذه المواقع مرة أخرى.",
   "mobile.server.browserProfiles.clear": "مسح البيانات",
   "mobile.server.browserProfiles.clearTitle": "هل تريد مسح بيانات {name}؟",
   "mobile.server.browserProfiles.clearBody":
@@ -1743,6 +1746,8 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "يطلب منك خادم MCP هذا تسجيل الدخول. سجّل الدخول من OpenBot على حاسوب، ثم اختبر مجددًا.",
+  "mobile.server.mcp.signIn": "تسجيل الدخول",
+  "mobile.server.mcp.signInHere": "يطلب خادم MCP هذا تسجيل الدخول. اضغط تسجيل الدخول، ثم اختبر مرة أخرى.",
   "mobile.server.mcp.signedInDescription": "{server} مسجّل الدخول إلى خادم MCP هذا.",
   "mobile.server.mcp.signOut": "تسجيل الخروج",
   "mobile.server.mcp.saveFailed": "تعذّر حفظ التغيير. أعد المحاولة.",
@@ -1804,6 +1809,7 @@ export const messages = {
     other: "{count} ساعة",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} دقيقة",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "التحديثات",
   "mobile.server.settings.updateAvailable": "يتوفر تحديث",
   "mobile.server.route.updates": "التحديثات",
@@ -2225,4 +2231,41 @@ export const messages = {
   "mobile.server.transfer.copyAgents": "الوكلاء المطلوب نسخهم",
   "mobile.server.transfer.copyNext": "يستخدم الوكلاء المنسوخون قواعد الموافقة لـ {server}.",
   "mobile.server.transfer.copyNoServer": "اتصل بخادم آخر بصفتك مالكًا أو مسؤولًا لنسخ الوكلاء إليه.",
+  "mobile.server.route.ownerTransfer": "نقل الملكية",
+  "mobile.server.ownerTransfer.unavailable": "اتصل بهذا الخادم بصفتك المالك لنقل الملكية.",
+  "mobile.server.ownerTransfer.hosted": "يستضيف OpenBot هذا الخادم، لذا لا يمكن تغيير مالكه.",
+  "mobile.server.ownerTransfer.lede":
+    "يتلقى المالك الجديد بريدًا إلكترونيًا، ويجب أن يقبل وهو مسجّل الدخول بهذا البريد. بعد ذلك تُزال من هذا الخادم.",
+  "mobile.server.ownerTransfer.email": "بريد المالك الجديد",
+  "mobile.server.ownerTransfer.send": "إرسال",
+  "mobile.server.ownerTransfer.sending": "جارٍ الإرسال…",
+  "mobile.server.ownerTransfer.stays":
+    "تبقى الوكلاء والدردشات والمهام الدورية وتسجيلات الدخول إلى المزوّدين والمفاتيح المحفوظة وبيانات دخول الخزنة وتسجيلات دخول المتصفح والتطبيقات المتصلة على الخادم. ويمكن للمالك الجديد استخدامها.",
+  "mobile.server.ownerTransfer.expiry": "ينتهي الطلب بعد 7 أيام.",
+  "mobile.server.ownerTransfer.confirmTitle": "هل تجعل {email} المالك؟",
+  "mobile.server.ownerTransfer.confirmBody":
+    "عندما يقبل {email} يصبح مالك {server} وتفقد الوصول إليه. تبقى البيانات على الخادم. ينتهي الطلب بعد 7 أيام.",
+  "mobile.server.ownerTransfer.confirm": "نقل",
+  "mobile.server.ownerTransfer.sendFailed": "لم يُرسَل الطلب.",
+  "mobile.server.ownerTransfer.loadFailed": "تعذّرت قراءة النقل المعلّق.",
+  "mobile.server.ownerTransfer.pending": "بانتظار المالك الجديد",
+  "mobile.server.ownerTransfer.expires": "ينتهي في {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "يجب أن يقبل {email} وهو مسجّل الدخول بهذا البريد. حتى ذلك الحين تبقى أنت المالك.",
+  "mobile.server.ownerTransfer.cancel": "إلغاء النقل",
+  "mobile.server.ownerTransfer.cancelTitle": "هل تلغي النقل؟",
+  "mobile.server.ownerTransfer.cancelBody": "لن يتمكن {email} من قبوله بعد ذلك.",
+  "mobile.server.ownerTransfer.keep": "إبقاء",
+  "mobile.server.ownerTransfer.cancelFailed": "لم يُلغَ النقل.",
+  "mobile.server.ownerTransfer.incomingTitle": "هل تصبح مالك {server}؟",
+  "mobile.server.ownerTransfer.incomingBody":
+    "يريد {name} أن يجعلك مالك {server}. ستتحكم في الخادم بالكامل، وتبقى عليه وكلاؤه ودردشاته ومهامه الدورية وتسجيلات الدخول المحفوظة. ويفقد {name} الوصول. يمكن لأي شخص لا يزال يستطيع تسجيل الدخول إلى الكمبيوتر الذي يشغّل الخادم أن يستخدم حسابك في OpenBot. غيّر كلمات المرور ومفاتيح SSH على ذلك الكمبيوتر.",
+  "mobile.server.ownerTransfer.accept": "قبول",
+  "mobile.server.ownerTransfer.decline": "رفض",
+  "mobile.server.ownerTransfer.accepted": "أنت الآن مالك {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "تعذّر قبول النقل",
+  "mobile.server.ownerTransfer.declineFailed": "تعذّر رفض النقل",
+  "mobile.server.ownerTransfer.tryAgain": "حاول مرة أخرى لاحقًا.",
+  "mobile.server.providers.updateAll": "تحديث الكل",
+  "mobile.server.providers.updateAllFailed": "لم تبدأ بعض التحديثات. حاول مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

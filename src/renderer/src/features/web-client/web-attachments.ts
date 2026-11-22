@@ -69,8 +69,8 @@ export function createWebAttachmentFiles(
       const file = await remote.sharedFile(path);
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
     },
-    async previewWorkspace(agentId: string, path: string): Promise<FilePreview> {
-      const file = await remote.workspaceFile(agentId, path);
+    async previewWorkspace(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<FilePreview> {
+      const file = await remote.workspaceFile(agentId, path, options);
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
     },
   };

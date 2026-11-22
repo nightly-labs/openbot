@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { MANAGED_SKILL_FOLDERS } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentSummary,
@@ -40,7 +41,7 @@ import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { GithubSkillSourceReader } from "./github-skill-source";
 import { type LocalSkillLibrary, quotedSkillMarkdown } from "./local-skill-library";
-import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
+import { listManagedSkillsForChat, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import { listFolderSkills, listHomeFolderSkills } from "./skill-folder-discovery";
 import {
   archiveDirectory,

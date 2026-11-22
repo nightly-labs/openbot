@@ -9,6 +9,7 @@ import {
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import { providerSignInRelayProviders } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v4";
@@ -41,6 +42,7 @@ export function serverSupportsCapability(
       capability === "mcp-access-v1" ||
       capability === "live-voice-v1" ||
       capability === "sign-in-relay-v1" ||
+      capability === "provider-sign-in-relay-v2" ||
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
       capability === "bitwarden-connector-v1" ||
@@ -64,6 +66,7 @@ export function serverSupportsCapability(
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
       capability === "agent-plan-card-v1" ||
+      capability === "agent-builtin-memory-v1" ||
       capability === "agent-defaults-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||
@@ -109,8 +112,6 @@ export function serverSupportsCapability(
       capability === "whatsapp-status-reactions-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
-      capability === "routine-flows-v1" ||
-      capability === "routine-flow-stop-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||
@@ -129,6 +130,7 @@ export function serverSupportsCapability(
       capability === "agent-thread-replies-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
+      capability === "side-question-threads-v1" ||
       capability === "workflows-github-v1" ||
       capability === "agent-notification-levels-v1" ||
       capability === "sidebar-pins-v1" ||
@@ -150,6 +152,7 @@ export function serverSupportsCapability(
       capability === "workflows-channels-v1" ||
       capability === "workflows-media-v1" ||
       capability === "workflows-agent-files-v1" ||
+      capability === "workflow-folders-v1" ||
       capability === "vault-import-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||
@@ -161,7 +164,9 @@ export function serverSupportsCapability(
       capability === "provider-environment-v1" ||
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
-      capability === "provider-detection-v1") &&
+      capability === "owner-transfer-v1" ||
+      capability === "provider-detection-v1" ||
+      capability === "workspace-directory-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;
@@ -201,8 +206,8 @@ export function hostSignInProviders(server: ServerSummary | undefined): readonly
 }
 
 export function relaySignInProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
-  return server?.kind === "remote" && serverSupportsCapability(server, "sign-in-relay-v1")
-    ? SIGN_IN_RELAY_PROVIDERS
+  return server?.kind === "remote"
+    ? providerSignInRelayProviders((capability) => serverSupportsCapability(server, capability))
     : [];
 }
 

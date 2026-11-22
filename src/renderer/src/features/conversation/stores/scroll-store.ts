@@ -53,6 +53,7 @@ interface ScrollStickyState {
   setStickToLatest: (value: boolean) => void;
   getCurrentUnreadCount: () => number;
   followLatest: (element: HTMLDivElement) => void;
+  followReaderScroll: (element: HTMLDivElement) => void;
 }
 
 export interface ScrollStoreDeps {
@@ -64,6 +65,7 @@ export interface ScrollStoreDeps {
   handedOverRowKeys: () => ReadonlyMap<string, string>;
   elements: ScrollElements;
   sticky: ScrollStickyState;
+  drawLatestFirst: () => boolean;
 }
 
 export function createScrollStore(deps: ScrollStoreDeps) {
@@ -363,6 +365,8 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     scrollMargin: virtualScrollMargin,
     stickToLatest: deps.sticky.getStickToLatest,
     followLatest: deps.sticky.followLatest,
+    drawLatestFirst: deps.drawLatestFirst,
+    onRowsDrawn: deps.sticky.followReaderScroll,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
       if (!first) return;
@@ -373,9 +377,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   function updateHistoryBoundary(element = deps.elements.scrollElement()): boolean {
     const followsLatest = deps.sticky.getStickToLatest();
+    const firstRow = Math.max(firstRenderedIndex, messageVirtualizer.firstDrawnIndex());
     const reached =
-      chatHistoryBoundaryReached(element, firstRenderedIndex, followsLatest) &&
-      (!followsLatest || currentRowsRendered(element));
+      chatHistoryBoundaryReached(element, firstRow, followsLatest) && (!followsLatest || currentRowsRendered(element));
     setAtHistoryBoundary(reached);
     return reached;
   }

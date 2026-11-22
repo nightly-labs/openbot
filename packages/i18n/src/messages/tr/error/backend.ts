@@ -221,7 +221,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Bu bekleme açık değil. Ajan onu kapattı veya biri iptal etti.",
   "error.backend.agentWaitNoRequest": "Beklemenin devam etmesi için bir mesaj gerekir. Bu turda mesaj yok.",
   "error.backend.agentWaitOwnChatOnly":
-    "Beklemeyi yalnızca kendi sohbetinizde açın. Bir kanal veya mesajlaşma görevi bekleyemez.",
+    "Beklemeyi kendi sohbetinizde veya bir yan ileti dizisinde açın. Bir kanal veya mesajlaşma konuşması bekleyemez.",
   "error.backend.agentWaitNoteRequired": "Beklemenin ne için olduğunu belirten kısa bir not yazın.",
   "error.backend.agentWaitRoutineGone": "Bu ajanın bu kimliğe sahip bir rutini yok.",
   "error.backend.agentWaitNoRoutine":
@@ -331,6 +331,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Klasör yok veya zaten silinmiş.",
   "error.backend.libraryFolderOtherAgent": "Bir dosya yalnızca kendi ajanının klasörüne konabilir.",
   "error.backend.libraryFolderMoveInvalid": "Bu klasör oraya taşınamaz.",
+  "error.backend.workflowFolderLimit": "Bir sunucuda en fazla {limit} iş akışı klasörü olabilir.",
+  "error.backend.workflowFolderPlacementLimit": "Klasörlerde çok fazla iş akışı var.",
   "error.backend.sectionNameDuplicate": "Bölüm adları benzersiz olmalıdır.",
   "error.backend.directMessageRequired": "Önce bir mesaj yazın.",
   "error.backend.directMessageTooLong": "Doğrudan mesaj en fazla {limit} karakter içerebilir.",
@@ -361,6 +363,7 @@ export const messages = {
     "Bu raporu yalnızca OpenBot telefon uygulaması gönderebilir, çünkü telefonun sürümünü ve destek günlüğünü ekler. Bu sohbeti telefonda açın. Bu mesajı orada görürseniz telefon uygulamasını güncelleyin.",
   "error.backend.takeoverInactive": "Bu tarayıcı devralması artık etkin değil.",
   "error.backend.authSubmitting": "Kimlik doğrulama gönderimi zaten devam ediyor.",
+  "error.backend.apiKeyListFailed": "OpenBot kayıtlı API anahtarlarını okuyamadı.",
   "error.backend.apiKeySaveFailed": "OpenBot API anahtarını kaydedemedi. Yeniden deneyin.",
   "error.backend.apiKeySaving": "API anahtarı zaten kaydediliyor.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -447,6 +450,7 @@ export const messages = {
   "error.backend.taskTitleRequired": "Göreve kısa bir başlık verin.",
   "error.backend.taskToolInvalid":
     "Göreve en fazla 120 karakterlik bir başlık ve ne yapılacağını anlatan kısa bir talimat verin.",
+  "error.backend.taskControlInvalid": "Başlattığınız bir görevin taskId değerini verin. Bir mesajın metni de olmalı.",
   "error.backend.taskOwnChatOnly":
     "Görevi yalnızca kendi sohbetinizden başlatın. Bir kanal, bir mesajlaşma konuşması veya başka bir görev yeni bir görev başlatamaz.",
   "error.backend.taskUnfinishedLimit":
@@ -454,5 +458,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Bu ajanın {count} açık görevi var. Bir görevi kapatın, ardından başka bir görev başlatın veya açın.",
   "error.backend.taskRemoteUnsupported": "Görevler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.taskMessageFailed": "OpenBot mesajı göreve gönderemedi. Daha sonra yeniden deneyin.",
   "error.backend.taskStartFailed": "OpenBot görevi başlatamadı. Bunun yerine işi bu turda yapın.",
 } as const satisfies PartialTranslation<typeof source>;

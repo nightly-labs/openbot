@@ -16,6 +16,9 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.agentStepEnded": "The agent's message for this step was removed before it answered.",
   "error.workflow.agentStepStopped": "The agent stopped before it answered this step. Run the step again.",
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
+  "error.workflow.answerInvalid":
+    "The answer did not have the fields that this step asks for: {fields}. Run the step again.",
+  "error.workflow.checkInvalid": "The check of this step is not valid. Correct it, then run the step again.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
   "error.workflow.modelTimedOut":
     "The model did not answer in time. Choose a lower effort or a faster model for this step, then run it again.",
@@ -31,6 +34,7 @@ export const messages = defineMessages("error.workflow", {
     "OpenBot could not reach the provider. Check the internet connection, then run the step again.",
   "error.workflow.modelBusy": "Another model request is running. Run the step again soon.",
   "error.workflow.mediaFailed": "The model could not make the image or video. Run the step again.",
+  "error.workflow.mediaNotMade": "The model did not make the image or video. It said: {answer}",
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
   "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
   "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",

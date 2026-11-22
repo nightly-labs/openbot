@@ -33,6 +33,7 @@ const REPLY_SPEECH_START_MS = 400;
 const HOLD_WORDS_MS = 2_000;
 const WORD = /[\p{L}\p{N}]/u;
 const SILENT_RECORDING_MS = 4_000;
+const TURN_MAXIMUM_SECONDS = 120;
 const RESTART_QUIET_MS = 600;
 const PUSH_TO_TALK_MIN_MS = 300;
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_200;
@@ -395,8 +396,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       );
     current.timers.push(
       setInterval(() => {
-        if (turn !== current || performance.now() - current.startedAt < (VOICE_AUDIO_LIMITS.maximumSeconds - 2) * 1_000)
-          return;
+        if (turn !== current || performance.now() - current.startedAt < (TURN_MAXIMUM_SECONDS - 2) * 1_000) return;
         if (current.spoke || (pushToTalk && talking)) endTurn(current);
         else restartRecording(current);
       }, 1_000),

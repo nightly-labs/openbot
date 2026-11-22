@@ -62,6 +62,8 @@ export const messages = {
   "browser.pip.close": "إغلاق نافذة المتصفح المنبثقة",
   "browser.pip.reattachFailed": "تعذّر على OpenBot إعادة إرفاق المتصفح.",
   "browser.pip.closeFailed": "تعذّر على OpenBot إغلاق نافذة المتصفح المنبثقة.",
+  "browser.window.open": "فتح المتصفح في نافذة جديدة",
+  "browser.window.openFailed": "تعذّر على OpenBot فتح نافذة المتصفح.",
   "browser.popupBlocked.title": "حُظرت نافذة منبثقة",
   "browser.popupBlocked.dismiss": "تجاهل رسالة النافذة المنبثقة",
   "browser.liveView.label": "عرض مباشر للصفحة على الخادم",

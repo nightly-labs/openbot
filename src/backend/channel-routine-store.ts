@@ -92,6 +92,16 @@ export class ChannelRoutineStore extends RoutineStore {
     return result.kind === "started" ? { kind: "started", run: toChannelRun(result.run) } : result;
   }
 
+  skipOccurrences(
+    { channelId, ...fields }: ChannelRoutine,
+    due: Date,
+    scheduledFor: Date,
+    nextRunAt: Date,
+    reason: string,
+  ): void {
+    this.skipOccurrenceRow({ ...fields, ownerId: channelId }, due, scheduledFor, nextRunAt, reason);
+  }
+
   attachRequest(runId: string, requestMessageId: string): ChannelRoutineRun {
     return toChannelRun(this.attachHandleRow(runId, requestMessageId));
   }

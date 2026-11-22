@@ -55,7 +55,19 @@ import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-app
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Context, Deferred, Effect, Fiber, Layer, ManagedRuntime, Option, Result, Semaphore } from "effect";
+import {
+  Cause,
+  Context,
+  Deferred,
+  Effect,
+  Fiber,
+  Layer,
+  ManagedRuntime,
+  Option,
+  Result,
+  Schema,
+  Semaphore,
+} from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
@@ -143,6 +155,7 @@ interface HostServiceOptions {
   instanceTransfer?: ForwardedApiOptions["instanceTransfer"];
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
+  workflowFolders?: ForwardedApiOptions["workflowFolders"];
   crm?: ForwardedApiOptions["crm"];
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
   routineRunPlaces?: ForwardedApiOptions["routineRunPlaces"];
@@ -213,6 +226,13 @@ interface HostServiceOptions {
     hostId: string,
     home?: RemoteHostTicketHome,
   ) => Effect.Effect<{ ticket: string; signalUrl: string; expiresAt: number }, RemoteWorkflowError>;
+  requestTransferredOwnerSession?: (
+    hostId: string,
+  ) => Effect.Effect<{ sessionToken: string; user: CentralAuthUser } | null, RemoteWorkflowError>;
+  applyTransferredOwnerSession?: (
+    hostId: string,
+    session: { sessionToken: string; user: CentralAuthUser },
+  ) => Effect.Effect<unknown, RemoteWorkflowError>;
   sendLiveActivityPush?: (
     hostId: string,
     push: LiveActivityRelayPush,
@@ -222,7 +242,8 @@ interface HostServiceOptions {
     request: NotificationRelayRequest,
   ) => Effect.Effect<"sent" | "gone", RemoteWorkflowError>;
   pushNotificationStore?: PushNotificationStore;
-  hostComputerInUse?: (event: AgentEvent) => boolean;
+  hostComputerInUse?: (event: AgentEvent | null) => boolean;
+  signInWaits?: ConstructorParameters<typeof PushNotificationService>[0]["signInWaits"];
   awayAfterMs?: number;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
@@ -292,11 +313,13 @@ export class HostService extends EventEmitter<HostEvents> {
   #startOperation: Fiber.Fiber<HostStatus, RemoteWorkflowError> | null = null;
   readonly #hostKeyLock = Semaphore.makeUnsafe(1);
   readonly #memberWrites = Semaphore.makeUnsafe(1);
+  readonly #ownerAdoption = Semaphore.makeUnsafe(1);
   readonly #localPublish = Semaphore.makeUnsafe(1);
   #webRtcOnline = false;
   #unreachedSignalUrl: string | null = null;
   #boundAccountId: string | null | undefined = undefined;
   #legacyCredentialRemoved = false;
+  #adoptedReaderKey: string | null = null;
   readonly #remoteControlStreams = new Map<string, string>();
 
   constructor(options: HostServiceOptions) {
@@ -396,6 +419,7 @@ export class HostService extends EventEmitter<HostEvents> {
       sendPushNotification && pushNotificationStore
         ? new PushNotificationService({
             agents: options.agents,
+            ...(options.signInWaits === undefined ? {} : { signInWaits: options.signInWaits }),
             store: pushNotificationStore,
             send: (request) => {
               const hostId = options.store.getIdentity()?.serverId;
@@ -468,6 +492,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.instanceTransfer === undefined ? {} : { instanceTransfer: options.instanceTransfer }),
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
+      ...(options.workflowFolders === undefined ? {} : { workflowFolders: options.workflowFolders }),
       ...(options.crm === undefined ? {} : { crm: options.crm }),
       ...(options.hiddenAgents === undefined ? {} : { hiddenAgents: options.hiddenAgents }),
       ...(options.routineRunPlaces === undefined ? {} : { routineRunPlaces: options.routineRunPlaces }),
@@ -529,7 +554,7 @@ export class HostService extends EventEmitter<HostEvents> {
                   cause: new Error(sourceText("error.host.webRtcNotConfigured")),
                 });
               return yield* issueTicket(hostId, failedSignalUrl === undefined ? {} : { failedSignalUrl });
-            }),
+            }).pipe(Effect.tap((bootstrap) => Effect.sync(() => this.#noticeOwnerChange(bootstrap.ticket)))),
           renewalRefused: isFinalClientError,
           onSignalRecoveryFailure: (error, reason) => {
             logger.warn(`Host phase ${this.#status.phase} -> error: Signal ${reason}.`);
@@ -1083,6 +1108,7 @@ export class HostService extends EventEmitter<HostEvents> {
         return this.getStatus();
       }
       yield* this.#stopRuntime();
+      if (isOwnerChangedRefusal(error) && (yield* this.#adoptTransferredOwnership(null))) return this.getStatus();
       if (automatic && isHostRemovedRefusal(error)) {
         if (generation !== this.#runtimeGeneration) return this.getStatus();
         const serverId = this.#options.store.getIdentity()?.serverId;
@@ -1850,6 +1876,39 @@ export class HostService extends EventEmitter<HostEvents> {
     });
   }
 
+  #noticeOwnerChange(ticket: string): void {
+    const owner = ticketUserId(ticket);
+    if (!owner || owner === this.#signedInAccountId() || !this.#options.requestTransferredOwnerSession) return;
+    this.#dispatch(this.#adoptTransferredOwnership(owner).pipe(Effect.asVoid));
+  }
+
+  readonly #adoptTransferredOwnership = Effect.fn("HostService.adoptTransferredOwnership")(
+    function* (this: HostService, expectedOwner: string | null): Effect.fn.Return<boolean> {
+      if (expectedOwner !== null && expectedOwner === this.#signedInAccountId()) return false;
+      const request = this.#options.requestTransferredOwnerSession;
+      const apply = this.#options.applyTransferredOwnerSession;
+      const identity = this.#options.store.getIdentity();
+      if (!request || !apply || !identity) return false;
+      return yield* Effect.gen({ self: this }, function* () {
+        const session = yield* request(identity.serverId);
+        if (!session) return false;
+        const closed = yield* this.#options.store.transferOwnership(identity.serverId, session.user);
+        for (const sessionId of closed) yield* this.#closeLocalSession(sessionId);
+        yield* apply(identity.serverId, session);
+        logger.info("The server now belongs to its new owner.");
+        return true;
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            logger.warn("The server could not apply its ownership change:", toLogValue(error.cause));
+            return false;
+          }),
+        ),
+      );
+    },
+    (operation) => this.#ownerAdoption.withPermit(operation),
+  );
+
   #dispatch(operation: Effect.Effect<void, RemoteWorkflowError>): void {
     this.#runtime.runFork(this.#provide(operation));
   }
@@ -1924,6 +1983,7 @@ export class HostService extends EventEmitter<HostEvents> {
     try {
       user = this.#options.getSignedInUser();
     } catch {
+      this.#adoptedReaderKey = null;
       return { id: SIGNED_OUT_CHANNEL_MEMBER_ID, name: "You" };
     }
     return { id: this.#currentAgentReaderId(), name: user.name ?? "You" };
@@ -1984,14 +2044,22 @@ export class HostService extends EventEmitter<HostEvents> {
   #currentAgentReaderId(): string {
     const accountReaderId = `local-user:${this.#options.getSignedInUser().id}`;
     const memberId = this.#findCurrentMemberId();
+    this.#adoptReadsOnce(accountReaderId, memberId);
+    return memberId ?? accountReaderId;
+  }
+
+  #adoptReadsOnce(accountReaderId: string, memberId: string | null): void {
+    const readerKey = `${accountReaderId}\n${memberId ?? ""}`;
+    if (this.#adoptedReaderKey === readerKey) return;
+    this.#adoptedReaderKey = null;
     if (!memberId) {
       this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, accountReaderId);
-      return accountReaderId;
+    } else {
+      this.#options.agents.adoptConversationReads(accountReaderId, memberId);
+      this.#options.channels?.store.adoptReads(accountReaderId, memberId);
+      this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, memberId);
     }
-    this.#options.agents.adoptConversationReads(accountReaderId, memberId);
-    this.#options.channels?.store.adoptReads(accountReaderId, memberId);
-    this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, memberId);
-    return memberId;
+    this.#adoptedReaderKey = readerKey;
   }
 
   #findCurrentMemberId(): string | null {
@@ -2048,6 +2116,18 @@ function normalizeRemoteDesktopPlatform(platform: NodeJS.Platform): "darwin" | "
 function memberChatColorsChanged(before: readonly TeamMemberSummary[], after: readonly TeamMemberSummary[]): boolean {
   const previous = new Map(before.map((member) => [member.id, member.chatColor ?? null]));
   return after.some((member) => (previous.get(member.id) ?? null) !== (member.chatColor ?? null));
+}
+
+function isOwnerChangedRefusal(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "host_owner_mismatch";
+}
+
+const decodeTicketClaims = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ userId: Schema.String })));
+
+function ticketUserId(ticket: string): string | null {
+  const payload = ticket.split(".")[1];
+  if (!payload) return null;
+  return Option.getOrNull(decodeTicketClaims(Buffer.from(payload, "base64url").toString("utf8")))?.userId ?? null;
 }
 
 function isHostRemovedRefusal(error: unknown): boolean {

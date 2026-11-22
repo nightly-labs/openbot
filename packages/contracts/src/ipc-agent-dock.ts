@@ -183,9 +183,26 @@ export interface AgentDockDisplayInfo {
 
 export type AgentDockEdge = "left" | "right";
 
+export interface AgentDockDisplayBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface AgentDockOffset {
   displayId: number;
   offset: number;
+  bounds?: AgentDockDisplayBounds | undefined;
+}
+
+export function sameAgentDockDisplayBounds(
+  a: AgentDockDisplayBounds | undefined,
+  b: AgentDockDisplayBounds | undefined,
+): boolean {
+  return (
+    a !== undefined && b !== undefined && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+  );
 }
 
 export const AGENT_DOCK_SIZE_LIMITS = { min: 70, max: 140, step: 1, default: 100 } as const;
@@ -262,6 +279,12 @@ export interface AgentDockInputRect {
   y: number;
   width: number;
   height: number;
+}
+
+export interface AgentDockExtent {
+  inward: number;
+  above: number;
+  below: number;
 }
 
 export function isAgentDockPresentation(value: unknown): value is AgentDockPresentation {
@@ -354,6 +377,16 @@ export function isAgentDockXWayland(value: unknown): value is SetAgentDockXWayla
   return isDynamicRecord(value) && isBoolean(value.enabled);
 }
 
+export function isAgentDockExtent(value: unknown): value is AgentDockExtent | null {
+  return (
+    value === null ||
+    (isDynamicRecord(value) &&
+      integerInRange(value.inward, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(value.above, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(value.below, 0, AGENT_DOCK_LIMITS.inputExtent))
+  );
+}
+
 export function isAgentDockInputRegion(value: unknown): value is AgentDockInputRect[] {
   return isList(
     value,
@@ -373,7 +406,19 @@ export function isAgentDockOffset(value: unknown): value is AgentDockOffset {
     isDisplayId(value.displayId) &&
     isFiniteNumber(value.offset) &&
     value.offset >= 0 &&
-    value.offset <= 1
+    value.offset <= 1 &&
+    (value.bounds === undefined || isAgentDockDisplayBounds(value.bounds))
+  );
+}
+
+function isAgentDockDisplayBounds(value: unknown): value is AgentDockDisplayBounds {
+  const extent = AGENT_DOCK_LIMITS.inputExtent;
+  return (
+    isDynamicRecord(value) &&
+    integerInRange(value.x, -extent, extent) &&
+    integerInRange(value.y, -extent, extent) &&
+    integerInRange(value.width, 1, extent) &&
+    integerInRange(value.height, 1, extent)
   );
 }
 

@@ -228,7 +228,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Это ожидание не открыто. Агент закрыл его, или кто-то его отменил.",
   "error.backend.agentWaitNoRequest": "Для продолжения ожиданию нужно сообщение. В этом ходе нет сообщения.",
   "error.backend.agentWaitOwnChatOnly":
-    "Открывайте ожидание только в своём чате. Задача канала или мессенджера не может ждать.",
+    "Открывайте ожидание в своём чате или в боковой ветке. Разговор канала или мессенджера не может ждать.",
   "error.backend.agentWaitNoteRequired": "Кратко укажите, для чего это ожидание.",
   "error.backend.agentWaitRoutineGone": "У этого агента нет регулярной задачи с таким id.",
   "error.backend.agentWaitNoRoutine":
@@ -336,6 +336,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Папка не существует или уже удалена.",
   "error.backend.libraryFolderOtherAgent": "Файл можно поместить только в папку его агента.",
   "error.backend.libraryFolderMoveInvalid": "Эту папку нельзя туда переместить.",
+  "error.backend.workflowFolderLimit": "На сервере может быть не более {limit} папок рабочих процессов.",
+  "error.backend.workflowFolderPlacementLimit": "В папках слишком много рабочих процессов.",
   "error.backend.sectionNameDuplicate": "Названия разделов должны быть уникальными.",
   "error.backend.directMessageRequired": "Сначала напишите сообщение.",
   "error.backend.directMessageTooLong": "Личное сообщение может содержать не более {limit} символов.",
@@ -371,6 +373,7 @@ export const messages = {
     "Этот отчёт может отправить только приложение OpenBot на телефоне: оно добавляет версию и журнал поддержки телефона. Откройте этот чат на телефоне. Если вы видите это сообщение там, обновите приложение на телефоне.",
   "error.backend.takeoverInactive": "Этот перехват браузера больше не активен.",
   "error.backend.authSubmitting": "Отправка аутентификации уже выполняется.",
+  "error.backend.apiKeyListFailed": "OpenBot не удалось прочитать сохранённые ключи API.",
   "error.backend.apiKeySaveFailed": "OpenBot не удалось сохранить ключ API. Повторите попытку.",
   "error.backend.apiKeySaving": "Ключ API уже сохраняется.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -455,6 +458,7 @@ export const messages = {
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",
   "error.backend.taskToolInvalid": "Дайте задаче название не длиннее 120 символов и описание того, что нужно сделать.",
+  "error.backend.taskControlInvalid": "Укажите taskId задачи, которую вы запустили. Сообщению также нужен текст.",
   "error.backend.taskOwnChatOnly":
     "Задачу можно начать только из своего чата. Канал, диалог в мессенджере или другая задача не может её начать.",
   "error.backend.taskUnfinishedLimit":
@@ -462,5 +466,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "У этого агента открыто задач: {count}. Закройте задачу, затем начните или откройте другую.",
   "error.backend.taskRemoteUnsupported": "Задачи доступны только для агентов на этом компьютере.",
+  "error.backend.taskMessageFailed": "OpenBot не удалось отправить сообщение задаче. Повторите попытку позже.",
   "error.backend.taskStartFailed": "OpenBot не удалось запустить задачу. Выполните работу в этом ходе.",
 } as const satisfies PartialTranslation<typeof source>;

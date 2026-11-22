@@ -23,6 +23,8 @@ export const messages = {
     "Хост не разрешил OpenBot записывать экран. Разрешите запись экрана на хосте и повторите попытку.",
   "error.remote.windowsSessionDisconnected":
     "Сеанс Windows на хосте отключён, поэтому нет экрана для показа. Войдите в Windows на экране хоста и повторите попытку.",
+  "error.remote.windowsCaptureDenied":
+    "Windows на хосте не разрешает OpenBot записывать экран. Разблокируйте Windows на экране хоста, закройте все запросы администратора и повторите попытку. Если проблема не исчезнет, перезапустите хост.",
   "error.remote.macScreenLocked":
     "Mac заблокирован, поэтому не может показать свой экран. Разблокируйте Mac на его экране и повторите попытку.",
   "error.remote.streamTooSlowLowerQuality":
@@ -212,6 +214,10 @@ export const messages = {
   "error.remote.formUnavailable": "Эта форма больше недоступна.",
   "error.remote.hostedServerRemoval": "Чтобы удалить размещённый сервер, используйте раздел «Оплата».",
   "error.remote.hostRemoved": "Владелец удалил этот сервер из аккаунта.",
+  "error.remote.ownerTransferSelf": "Этот сервер уже принадлежит вам. Введите email нового владельца.",
+  "error.remote.ownerTransferHosted": "Сервер, который размещает OpenBot, не может сменить владельца.",
+  "error.remote.ownerTransferInvalid":
+    "Эта передача владения больше недоступна. Попросите владельца отправить её снова.",
   "error.remote.channelsUnsupported": "Обновите этот сервер на компьютере, чтобы использовать каналы.",
   "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
   "error.remote.historyRefreshFailed": "Сообщение отправлено, но историю чата обновить не удалось.",

@@ -85,6 +85,7 @@ export interface AcpFlavor {
   lostServerUntilRestart?(error: unknown): boolean;
   serverLost?(error: unknown): boolean;
   sessionBusy?(error: unknown): boolean;
+  staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
@@ -133,7 +134,8 @@ export interface AcpFlavor {
   mcpServersPerDirectory?: true;
   mcpServersLoadWithSession?: true;
   mcpConnectLimitMs?: number;
-  relayStdioMcpServers?: true;
+  mcpListLimit?: { ms: number; since: string };
+  relayStdioMcpServers?: true | "unconfined";
   mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
   mcpServerName?(name: string): string;
   ownMcpServerNames?(cwd: string, argv: readonly string[]): readonly string[];
@@ -149,7 +151,9 @@ export interface AcpFlavor {
   signInLostChunk?: RegExp;
   signInUnusable?(error: RequestError): string | null;
   planUsedUpChunk?: RegExp;
+  connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
+  mcpCallInputNamesServer?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
@@ -220,6 +224,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpServerFailure: grokMcpServerFailure,
   mcpServerName: grokMcpServerName,
+  relayStdioMcpServers: "unconfined",
   restoreFailure: (error) =>
     error instanceof RequestError && error.code === -32603 && isRecord(error.data) && error.data.code === "FS_NOT_FOUND"
       ? "confirm-missing"
@@ -299,6 +304,15 @@ function hermesRefusal(error: unknown): boolean {
   );
 }
 
+function kimiStaleSession(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32600 &&
+    isRecord(error.data) &&
+    error.data.code === "session.stale"
+  );
+}
+
 function hermesSessionBusy(error: unknown): boolean {
   return (
     error instanceof RequestError &&
@@ -357,6 +371,14 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   catalogAsMcpTools: true,
 };
 
+const CURSOR_STREAM_FAILURE = /\bRetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] /u;
+
+function cursorTurnFailure(error: unknown, detail: string): string {
+  return CURSOR_STREAM_FAILURE.test(errorText(error))
+    ? sourceText("error.provider.acpServerLost", { provider: agentProviderName("cursor") })
+    : detail;
+}
+
 export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error, sessionId) =>
     error.code === -32602 ? isRecord(error.data) && error.data.message === `Session "${sessionId}" not found` : null,
@@ -368,6 +390,9 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
       ? sourceText("error.provider.cursorSignInUnusable")
       : null,
   planUsedUpChunk: /^(?:\n\nUpgrade your plan to continue|\s*Add a payment method to continue\.?\s*)$/u,
+  connectionLostChunk: /^\s*Error: RetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] [^\n]*\s*$/u,
+  turnFailure: cursorTurnFailure,
+  failureCause: (error) => (CURSOR_STREAM_FAILURE.test(errorText(error)) ? "network" : null),
   processWideModel: true,
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,
@@ -385,6 +410,8 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   authRequiredSignsOut: true,
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpToolsFixedAtStart: true,
+  turnStallMs: 12 * 60_000,
+  staleSession: kimiStaleSession,
 };
 
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
@@ -411,6 +438,16 @@ function ompSessionNotFound(error: RequestError, sessionId: string): boolean | n
   return error.code === -32603
     ? isRecord(error.data) && error.data.details === `Unsupported ACP session: ${sessionId}`
     : null;
+}
+
+function geminiCliSessionNotFound(error: RequestError, sessionId: string): true | null {
+  if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
+  const details = error.code === -32603 && isRecord(error.data) ? error.data.details : undefined;
+  return typeof details === "string" && details.startsWith(`Invalid session identifier "${sessionId}"`) ? true : null;
+}
+
+function customSessionNotFound(error: RequestError, sessionId: string): boolean | null {
+  return geminiCliSessionNotFound(error, sessionId) ?? ompSessionNotFound(error, sessionId);
 }
 
 function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
@@ -445,7 +482,7 @@ const OMP_ACP_FLAVOR: AcpFlavor = {
 };
 
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
-  sessionNotFound: ompSessionNotFound,
+  sessionNotFound: customSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,
   failureCause: customFailureCause,
@@ -470,7 +507,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },
-  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true },
+  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true, staleSession: kimiStaleSession },
   "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
 };
 

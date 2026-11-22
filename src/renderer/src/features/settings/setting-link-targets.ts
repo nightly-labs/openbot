@@ -34,6 +34,8 @@ const TARGETS: Record<Exclude<AppSettingLinkId, "island.show">, AppSettingLinkTa
   "voice.read-replies": { tab: "voice", row: "settings.voice.speech.readReplies.title" },
   "voice.speech-voice": { tab: "voice", row: "settings.voice.speech.voice.title" },
   "voice.speech-speed": { tab: "voice", row: "settings.voice.speech.speed.title" },
+  "voice.codex-live": { tab: "voice", row: "settings.voice.speech.codexLive.title" },
+  "voice.server": { tab: "voice", row: "settings.voice.server.section" },
   "phones.devices": { tab: "mobile-connect", row: "settings.mobileConnect.phones.title" },
   "app.launch-at-login": { tab: "app-behavior", row: "settings.launchAtLogin.title" },
   "app.restore-workspace": { tab: "app-behavior", row: "settings.restoreWorkspace.title" },

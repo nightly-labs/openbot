@@ -186,9 +186,11 @@ counted, task requests from before task metering, and requests from before migra
 count. The last request counts, also in a session from before migration 15. An update with no
 `last` or no turn ID establishes a baseline.
 Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
-is optional. Missing fields remain unknown. ACP usage is a session total, with one counter for each
-session, except from Antigravity: from 1.4.3 it sends the tokens of one prompt, so each prompt result has its
-own counter, and its `thoughtTokens` count as output. Completed assistant messages exclude commentary and tool
+is optional. Missing fields remain unknown. Built-in ACP agents without their own rule book usage as a session
+total, with one counter for each session. Antigravity (from 1.4.3), OpenCode, Grok and custom agents send the
+tokens of one prompt, so each prompt result has its own counter. Antigravity's `thoughtTokens` count as output.
+The session cost of a custom agent stays cumulative in a separate counter, which keeps the ID of the old session
+counter, so a session that started before the per-prompt counters keeps its cost history. Completed assistant messages exclude commentary and tool
 output. Only post-install messages enter activity counts.
 
 `agent:get-analytics` and the capability-gated `GET /v1/agents/:agentId/analytics` return aggregates.

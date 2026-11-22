@@ -17,6 +17,7 @@ import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-agent-step-e2e");
 const WAIT_MS = 5_000;
+const STEP_NAME = "Research competitors";
 
 interface Report {
   checks: string[];
@@ -36,7 +37,12 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 const graphOf = (agentId: string): WorkflowGraph => ({
   nodes: [
     { id: "prompt", kind: "prompt", at: { x: 0, y: 0 }, fields: { text: "Check the competitor sites." } },
-    { id: "agent", kind: "agent", at: { x: 300, y: 0 }, fields: { agentId, task: "Write a short note." } },
+    {
+      id: "agent",
+      kind: "agent",
+      at: { x: 300, y: 0 },
+      fields: { agentId, task: "Write a short note.", stepName: STEP_NAME },
+    },
   ],
   edges: [{ id: "edge", from: "prompt", to: "agent", type: "text" }],
   strokes: [],
@@ -194,6 +200,17 @@ try {
     report.handoffs.some((handoff) => handoff.agentId === "agent-research"),
     report.handoffs,
   );
+  const named = await runCauseEffect(workflows.get(research.workflowId));
+  check(
+    "the saved graph keeps the step name",
+    named.graph.nodes.some((node) => node.id === "agent" && node.fields.stepName === STEP_NAME),
+    named.graph.nodes,
+  );
+  check(
+    "the step name is not sent to the agent",
+    report.handoffs.every((handoff) => !handoff.text.includes(STEP_NAME)),
+    report.handoffs,
+  );
   database.hardDeleteAgent(`agents:hard-delete:${crypto.randomUUID()}`, "agent-research", null, []);
   await Effect.runPromise(workflows.sweep());
   const failed = await runUntil(workflows, research.runId, (detail) => detail.run.status !== "running");
@@ -205,9 +222,11 @@ try {
   check("the run fails", failed.run.status === "failed", failed.run);
   const afterDelete = await runCauseEffect(workflows.get(research.workflowId));
   check(
-    "the graph keeps the node without the agent, on a new revision",
+    "the graph keeps the node and its name without the agent, on a new revision",
     afterDelete.revision > research.revision &&
-      afterDelete.graph.nodes.some((node) => node.id === "agent" && node.fields.agentId === undefined),
+      afterDelete.graph.nodes.some(
+        (node) => node.id === "agent" && node.fields.agentId === undefined && node.fields.stepName === STEP_NAME,
+      ),
     { revision: afterDelete.revision, nodes: afterDelete.graph.nodes },
   );
 

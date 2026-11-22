@@ -102,7 +102,7 @@ export const messages = {
   "composer.voice.progress": "Загрузка голосовой модели: {progress}%",
   "composer.voice.recording": "Запись голоса",
   "composer.voice.limitSoon": "Запись остановится через {seconds} секунд.",
-  "composer.voice.limitReached": "Запись остановлена: достигнут лимит в 2 минуты. Сказанное уже в сообщении.",
+  "composer.voice.limitReached": "Запись остановлена: достигнут лимит в 10 минут. Сказанное уже в сообщении.",
   "composer.send.saveQueued": "Сохранить сообщение в очереди",
   "composer.send.voice": "Отправить голосовое сообщение",
   "composer.send.message": "Отправить сообщение",

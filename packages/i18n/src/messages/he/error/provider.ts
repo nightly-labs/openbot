@@ -19,6 +19,8 @@ export const messages = {
     "{provider} מדווח שהתוכנית שלך נוצלה במלואה. יש לבחור מודל אחר או לשדרג את התוכנית של {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} לא טען את הכלים של OpenBot, ולכן הסוכן הזה לא יכול להשתמש בהם או להגיע לחברי הצוות שלו. מדיניות צוות של {provider} יכולה לחסום שרתי MCP מקומיים. יש לבקש ממנהל הצוות לאפשר אותם, ואז לנסות שוב.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} הריץ את ההודעה הזו בלי הכלים של OpenBot, ולכן הסוכן לא יכול היה להגיע לחברי הצוות שלו, להשתמש בדפדפן או לצרף קבצים. יש לנסות שוב.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, ולכן התשובה נעצרה. השרת הזה נמצא בהגדרות {provider} שלך, ולא ב-OpenBot. הסר את השרת משם או תקן אותו, ואז התחל צ׳אט חדש.",
   "error.provider.endpointsReadOnly":
@@ -266,6 +268,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "המעבד של המחשב הזה לא יכול להריץ את הספק הזה. השתמש בספק אחר.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode לא הצליח לפתוח את מסד הנתונים שלו כי גרסה חדשה יותר של OpenCode שינתה אותו. יש לעדכן את OpenCode לגרסה 2 ומעלה ואז לנסות שוב.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok לא הופעל כי ההגדרה allowed_models בקובץ התצורה שלו לא כוללת את מודל ברירת המחדל שלו. הוסיפו את מודל ברירת המחדל ל-allowed_models, או הסירו את allowed_models, ואז נסו שוב.",
   "error.provider.opencodeNoAnswer": "מודל OpenCode סיים את הפעולה בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
@@ -309,6 +313,8 @@ export const messages = {
     "Gemini דחה את הבקשה הזו ולא מסר את הסיבה. פריט בהיסטוריית הצ'אט יכול לגרום לכך, למשל תמונה שהסוכן פתח. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini לא הצליח לקרוא את ההיסטוריה השמורה של הצ'אט הזה. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
+  "error.provider.acpTurnStuck":
+    "{provider} לא סיים את התור הקודם שלו, ולכן לא קיבל את ההודעה הזו. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
   "error.provider.antigravityLocationUnsupported":
     "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
@@ -394,6 +400,8 @@ export const messages = {
     "הצ'אט הזה נעשה גדול מדי לשליחה למודל. תמונות בצ'אט גורמות לכך לעיתים קרובות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
+  "error.provider.opencodeInputRefused":
+    "המודל דחה את התוכן של הצ'אט הזה ולא מסר את הסיבה. קובץ בצ'אט, כמו PDF או תמונה, יכול לגרום לזה. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב בלי הקובץ, או לבחור מודל אחר.",
   "error.provider.opencodeCompactionFailed":
     "המודל לא הצליח לסכם את הצ'אט הארוך הזה כדי לפנות מקום בחלון ההקשר. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל חזק יותר.",
   "error.provider.museMcpStartupFault":
@@ -500,6 +508,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",
+  "error.provider.acpSessionStale": "{provider} לא הצליח לטעון את הגרסה האחרונה של הצ'אט הזה. יש לשלוח את ההודעה שוב.",
   "error.provider.acpModelNotOffered": "{provider} לא מציע כעת את {model}. בחרו מודל אחר לסוכן הזה ונסו שוב.",
   "error.provider.piStopped": "Pi אינו פועל. יש לחבר את Pi ולנסות שוב.",
   "error.provider.piSessionMissing": "קובץ הסשן של Pi אינו זמין במחשב הזה.",

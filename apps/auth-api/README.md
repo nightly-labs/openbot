@@ -90,6 +90,12 @@ fit the order or does not exist gives the code field. A copy of the Brazil partn
 gives a discount on a BRL server page and the code field on a EUR server page and a license page. It deletes the
 coupons and turns off the codes at the end.
 
+The `invite` scenario checks the invite rewards: a referred friend gets the first-payment coupon only on the
+first purchase, the coupon goes after the first paid invoice, a yearly payment gives 12 credit parts 30 days
+apart, the cron (`/cdn-cgi/handler/scheduled`) sends the due parts, and a refund takes the newest unsent parts
+first and then the sent credit. The scenario moves `ready_at` in D1, because the parts use the Worker clock,
+not the Stripe test clock.
+
 The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
 that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
 

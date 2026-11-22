@@ -1,6 +1,7 @@
 import { agentProviderName, decodeHostProviderAccounts, isAccountUsage } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import {
+  type PlanLimitListedWindow,
   type PlanLimitRow,
   type PlanLimits,
   type PlanLimitWindow,
@@ -144,6 +145,13 @@ export function planLimitResetDate(window: Pick<PlanLimitWindow, "resetsAt">): D
 
 export function planLimitWindowKey(window: PlanLimitWindow, index: number): string {
   return `${index}-${window.durationMins ?? "limit"}`;
+}
+
+export function planLimitListedWindowLabel(window: PlanLimitListedWindow, t: Translate): string {
+  const label = planLimitWindowLabel(window.durationMins, t);
+  if (window.group === null) return label;
+  if (window.group.windowCount === 1) return window.group.name;
+  return t("mobile.server.planLimits.window.group", { group: window.group.name, window: label });
 }
 
 export function planLimitWindowLabel(durationMins: number | null, t: Translate): string {

@@ -23,6 +23,8 @@ export const messages = {
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",
   "error.remote.windowsSessionDisconnected":
     "Ana makinedeki Windows oturumunun bağlantısı kesik, bu yüzden paylaşılacak ekran yok. Ana makinenin ekranında Windows'ta oturum açın, ardından tekrar deneyin.",
+  "error.remote.windowsCaptureDenied":
+    "Ana makinedeki Windows, OpenBot'un ekranı kaydetmesine izin vermiyor. Ana makinenin ekranında Windows'un kilidini açın, yönetici onay pencerelerini kapatın, ardından tekrar deneyin. Sorun devam ederse ana makineyi yeniden başlatın.",
   "error.remote.macScreenLocked":
     "Mac kilitli, bu yüzden ekranını paylaşamıyor. Mac'in kilidini kendi ekranında açın, ardından tekrar deneyin.",
   "error.remote.streamTooSlowLowerQuality":
@@ -210,6 +212,10 @@ export const messages = {
   "error.remote.formUnavailable": "Bu form artık kullanılamıyor.",
   "error.remote.hostedServerRemoval": "Barındırılan bir sunucuyu silmek için Faturalandırma'yı kullanın.",
   "error.remote.hostRemoved": "Sahibi bu sunucuyu hesaptan kaldırdı.",
+  "error.remote.ownerTransferSelf": "Bu sunucunun sahibi zaten sizsiniz. Yeni sahibin e-posta adresini girin.",
+  "error.remote.ownerTransferHosted": "OpenBot'un barındırdığı bir sunucunun sahibi değiştirilemez.",
+  "error.remote.ownerTransferInvalid":
+    "Bu sahiplik devri artık geçerli değil. Sahibinden yeniden göndermesini isteyin.",
   "error.remote.channelsUnsupported": "Kanalları kullanmak için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",

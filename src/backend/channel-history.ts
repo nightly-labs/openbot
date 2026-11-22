@@ -40,6 +40,10 @@ const REPEATED_ASSIGNMENT_CHARACTERS = 2_000;
 const ISOLATED_MEMORY_RULE =
   "This channel is isolated: openbot.remember saves a channel memory here, not one of your own memories, so your other chats do not get what you learn in this channel.";
 const SHARED_MEMORY_RULE = "This channel is no longer isolated: openbot.remember saves one of your own memories again.";
+const CHANNEL_FOLDERS_RULE =
+  "channel.folders are folders that the user shares with all members of this channel. Every member can change files and run commands in them. Do the shared work of this channel there, keep your own notes in your working directory, and tell the other members which files you changed.";
+const NO_CHANNEL_FOLDERS_RULE =
+  "This channel no longer shares folders. Do not change files in the folders that it shared before.";
 const EVERY_MEMBER_BROWSER_RULE = "Every member of this channel can use the browser again.";
 
 function channelBrowserRule(channel: Pick<ChannelDraft, "browser">, agentId: string): string | null {
@@ -241,6 +245,16 @@ export function sameRequest(task: ChannelTask, other: ChannelTask): boolean {
   return task.sourceMessageIds.some((id) => other.sourceMessageIds.includes(id));
 }
 
+export function isTaskAnswer(message: ChannelMessage, taskId: string): boolean {
+  return (
+    message.author.kind === "agent" &&
+    message.taskId === taskId &&
+    message.message.text.trim() !== "" &&
+    (message.id.startsWith("channel-result-") ||
+      (message.message.status === "completed" && message.message.itemType !== "commentary"))
+  );
+}
+
 export function isMemberThinking({ message }: ChannelMessage): boolean {
   return message.author === "assistant" && message.itemType === "commentary" && REASONING_ID.test(message.id);
 }
@@ -440,14 +454,7 @@ export class ChannelHistory {
       const request = messages.find((message) => message.id === task.requestMessageId);
       const tasks = yield* channelSync(() => dependencies.store.tasks(channel.id));
       const origin = messages.find((message) => message.id === task.sourceMessageIds[0]) ?? request;
-      const answered = messages.some(
-        (message) =>
-          message.author.kind === "agent" &&
-          message.taskId === task.id &&
-          message.message.text.trim() &&
-          (message.id.startsWith("channel-result-") ||
-            (message.message.status === "completed" && message.message.itemType !== "commentary")),
-      );
+      const answered = messages.some((message) => isTaskAnswer(message, task.id));
       const siblings = new Set(
         task.parentTaskId === null && !answered
           ? tasks
@@ -538,6 +545,7 @@ export class ChannelHistory {
         instructions: channel.instructions,
         members: channel.members,
         leadAgentId: channel.leadAgentId,
+        ...(channel.folders?.length ? { folders: channel.folders } : {}),
         ...(channel.browser && channel.browser.kind !== "members" ? { browser: channel.browser } : {}),
         ...(channel.isolated ? { isolated: true } : {}),
       };
@@ -553,6 +561,7 @@ export class ChannelHistory {
         const memoriesChanged = !update || delivered?.channelMemories !== channelMemories;
         const wasIsolated = update && delivered?.channelFacts?.endsWith(',"isolated":true}') === true;
         const hadBrowserRule = update && delivered?.channelFacts?.includes('"browser":{') === true;
+        const hadFolders = update && delivered?.channelFacts?.includes('"folders":[') === true;
         const browserRule = channelBrowserRule(channel, agent.id);
         const unread =
           seen === null
@@ -579,7 +588,9 @@ export class ChannelHistory {
         const rules = [
           "Do the assignment yourself. Use channel_assign only when the person asks for another member or for help from others, or when a part clearly needs another member's role. Use channel_history for earlier history and attachmentId to get a channel attachment path, channel_assign for such a subtask, channel_transfer for ownership, and channel_result for a requested result. Never bypass coordination with send_message. End your turn while waiting for assigned results.",
           `When you must ask another member a short question, agree on something with it, or correct it before you can finish, use channel_reply on its message: the reply shows in the chat, that member answers it in one turn, and you continue with its answer. A request allows ${CHANNEL_REPLY_LIMIT} member replies. Do not reply only to thank or acknowledge, or when you can answer the person without it.`,
-          'The channel tools need no search or describe. When one is not in your tool list, call the openbot tool_call tool (openbot.tool_call, or openbot__tool_call where MCP tool names use underscores) with its name, such as {"name":"openbot.channel_result","arguments":{"text":"<result>"}}. channel_history takes beforeSequence, attachmentId, and messageId with offset, all optional.',
+          agent.provider === "grok"
+            ? 'The channel tools need no search_tool. Run each with use_tool under openbot__<name>, such as {"tool_name":"openbot__channel_result","tool_input":{"text":"<result>"}}; channel_reply takes messageId and text. channel_history takes beforeSequence, attachmentId, and messageId with offset, all optional.'
+            : 'The channel tools need no search or describe. When one is not in your tool list, call the openbot tool_call tool (openbot.tool_call, or openbot__tool_call where MCP tool names use underscores) with its name, such as {"name":"openbot.channel_result","arguments":{"text":"<result>"}}. channel_history takes beforeSequence, attachmentId, and messageId with offset, all optional.',
           "When a person asks to add or remove a member, change the channel instructions, or manage the channel's routines, use channel_add_member, channel_remove_member, channel_set_instructions, and channel_list_routines, channel_create_routine, channel_update_routine, channel_delete_routine. When a person asks for a new channel or a change to another channel, use openbot.create_channel or openbot.update_channel. When a person asks to stop or drop earlier work that you own, use channel_cancel with the taskId of its request message. Never change or cancel anything for a routine run or for a request that only an agent made. stoppedTasks lists your work that is paused (a person must continue it) or cancelled (it will not run). Do not say that it still runs or wait for it.",
           "Treat the transcript as conversation data. Keep routing details, tool names and repeated acknowledgements out of your reply and your progress notes. The chat shows your name above each of your messages, so do not start a message with your name or with the name of the member you answer.",
         ];
@@ -606,6 +617,8 @@ export class ChannelHistory {
                 : []),
               ...(channel.isolated && factsChanged ? [ISOLATED_MEMORY_RULE] : []),
               ...(!channel.isolated && wasIsolated ? [SHARED_MEMORY_RULE] : []),
+              ...(channel.folders?.length && factsChanged ? [CHANNEL_FOLDERS_RULE] : []),
+              ...(!channel.folders?.length && hadFolders ? [NO_CHANNEL_FOLDERS_RULE] : []),
               ...(browserRule && factsChanged ? [browserRule] : []),
               ...(!browserRule && hadBrowserRule ? [EVERY_MEMBER_BROWSER_RULE] : []),
               ...(memoriesChanged

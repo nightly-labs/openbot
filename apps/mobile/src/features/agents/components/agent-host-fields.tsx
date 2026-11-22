@@ -1,6 +1,7 @@
 import {
   AGENT_TASK_LIMIT_DEFAULT,
   AGENT_TASK_LIMIT_MAX,
+  type AgentBuiltinMemorySettings,
   type AgentHostSettings,
   type AgentModelOption,
   type AgentNewChatSettings,
@@ -61,7 +62,7 @@ export interface AgentHostFieldsProps {
 
 export function useAgentHostRecord<Settings extends object, Input extends Partial<Settings>>(
   { agent, server, available }: AgentHostFieldsProps,
-  part: "host" | "task-limit" | "new-chat" | "plan-card" | "backup-models" | "fast-mode",
+  part: "host" | "task-limit" | "new-chat" | "plan-card" | "builtin-memory" | "backup-models" | "fast-mode",
   load: (agentId: string, serverId: string) => Promise<Settings | null>,
   update: (input: Input & { agentId: string }, serverId: string) => Promise<Settings>,
   members = false,
@@ -306,6 +307,33 @@ export function AgentPlanCardField(props: AgentHostFieldsProps) {
           label={t("mobile.agent.planCard.label")}
           dark={theme === "dark"}
           onValueChange={(quickAcknowledgement) => void save(current, { quickAcknowledgement })}
+        />
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
+  );
+}
+
+export function AgentBuiltinMemoryField(props: AgentHostFieldsProps) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const workspace = useMobileWorkspaceActions();
+  const { current, enabled, error, save } = useAgentHostRecord<AgentBuiltinMemorySettings, AgentBuiltinMemorySettings>(
+    props,
+    "builtin-memory",
+    workspace.loadAgentBuiltinMemory,
+    workspace.updateAgentBuiltinMemory,
+  );
+  if (!current) return null;
+  return (
+    <SettingsGroupRow>
+      <SettingsRow description={t("mobile.agent.builtinMemory.footer")}>
+        <SettingsSwitch
+          value={current.memory}
+          disabled={!enabled}
+          label={t("mobile.agent.builtinMemory.label")}
+          dark={theme === "dark"}
+          onValueChange={(memory) => void save(current, { memory })}
         />
       </SettingsRow>
       <RowSaveError error={error} />

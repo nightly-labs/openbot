@@ -32,11 +32,15 @@ import {
   type BitwardenConnectorStatus,
   type BitwardenHostConnectInput,
   type BrowseAgentFoldersInput,
+  type BrowseChannelFoldersInput,
   type BrowserProfileList,
   type BrowserProfileSummary,
   type BrowserProxyList,
   type BrowserProxySummary,
   type CancelMcpSignInInput,
+  type ChannelFolderChange,
+  type ChannelFolderInput,
+  type ChannelFolderList,
   type ChatColors,
   type ClaudeCompactWindowSetting,
   type ClearBrowserDataInput,
@@ -64,6 +68,8 @@ import {
   decodeBrowserProfileSummary,
   decodeBrowserProxyList,
   decodeBrowserProxySummary,
+  decodeChannelFolderChangeFromMain,
+  decodeChannelFolderListFromMain,
   decodeChannelStorageUsage,
   decodeCustomAgentResult,
   decodeCustomAgentSummaries,
@@ -215,6 +221,7 @@ import {
   type SetAgentSessionSettingInput,
   type SetBrowserProfileProxyInput,
   type SetEnabledSkillInput,
+  type SetLiveVoiceAccountInput,
   type SetMcpAccessInput,
   type SetMcpServerEnabledInput,
   type SetMessagingEnabledInput,
@@ -304,6 +311,7 @@ import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bit
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CHANNEL_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   CLAUDE_COMPACT_WINDOW_ROUTES,
@@ -327,6 +335,10 @@ import { HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-resta
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import {
+  decodeLiveVoiceAccount,
+  LIVE_VOICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
@@ -352,6 +364,10 @@ import {
   PROVIDER_ENVIRONMENT_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import type {
+  ProviderSignInRelay,
+  ProviderSignInRelayProvider,
+} from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDER_SIGN_OUT_ROUTES } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_ROUTES } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { decodeProviderUseResponse, PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
@@ -371,7 +387,7 @@ import {
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
-import { type SIGN_IN_RELAY_PROVIDERS, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/storage-channel-v1";
@@ -1152,9 +1168,10 @@ export function startMcpSignInRelay(
 
 export function startProviderSignInRelay(
   request: TeamApiRequest,
-  provider: (typeof SIGN_IN_RELAY_PROVIDERS)[number],
+  relay: ProviderSignInRelay,
+  provider: ProviderSignInRelayProvider,
 ): Effect.Effect<{ flowId: string }, TeamAdminRequestError> {
-  return adminCall(() => request("POST", SIGN_IN_RELAY_ROUTES.providerStart, decodeSignInRelayFlow, { provider }));
+  return adminCall(() => request("POST", relay.start, decodeSignInRelayFlow, { provider }));
 }
 
 export function startProviderAccountSignInRelay(
@@ -1369,8 +1386,9 @@ export function listProviderAccountsWithModels(
   request: TeamApiRequest,
   withModels: boolean,
   withPools: boolean,
+  withLiveVoice = false,
 ): Effect.Effect<HostProviderAccounts, TeamAdminRequestError> {
-  if (!withModels && !withPools) return listProviderAccounts(request);
+  if (!withModels && !withPools && !withLiveVoice) return listProviderAccounts(request);
   return Effect.all(
     [
       listProviderAccounts(request),
@@ -1384,12 +1402,19 @@ export function listProviderAccountsWithModels(
             Effect.orElseSucceed(() => null),
           )
         : Effect.succeed(null),
+      withLiveVoice
+        ? adminCall(() => request("POST", LIVE_VOICE_ACCOUNT_ROUTES.settings, decodeLiveVoiceAccount, {})).pipe(
+            Effect.map((accountId) => ({ accountId })),
+            Effect.orElseSucceed(() => null),
+          )
+        : Effect.succeed(null),
     ],
     { concurrency: "unbounded" },
   ).pipe(
-    Effect.map(([accounts, models, pools]) => {
+    Effect.map(([accounts, models, pools, liveVoice]) => {
       const withAccountModels = models ? withHostProviderAccountModels(accounts, models) : accounts;
-      return pools ? { ...withAccountModels, pools } : withAccountModels;
+      const withPools = pools ? { ...withAccountModels, pools } : withAccountModels;
+      return liveVoice ? { ...withPools, liveVoiceAccount: liveVoice.accountId } : withPools;
     }),
   );
 }
@@ -1438,6 +1463,13 @@ export function setProviderAccountPool(
   input: SetProviderAccountPoolInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROVIDER_ACCOUNT_POOL_ROUTES.update, ignoreResponse, { ...input }));
+}
+
+export function setLiveVoiceAccount(
+  request: TeamApiRequest,
+  input: SetLiveVoiceAccountInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", LIVE_VOICE_ACCOUNT_ROUTES.update, ignoreResponse, { ...input }));
 }
 
 export function providerAccountUsage(request: TeamApiRequest): Effect.Effect<AccountUsage, TeamAdminRequestError> {
@@ -1764,6 +1796,33 @@ export function browseAgentFolders(
   input: BrowseAgentFoldersInput,
 ): Effect.Effect<AgentFolderBrowse, TeamAdminRequestError> {
   return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, { ...input }));
+}
+
+export function readChannelFolders(
+  request: TeamApiRequest,
+  channelId: string,
+): Effect.Effect<ChannelFolderList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.read, decodeChannelFolderListFromMain, { channelId }));
+}
+export function addChannelFolder(
+  request: TeamApiRequest,
+  input: ChannelFolderInput,
+): Effect.Effect<ChannelFolderChange, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.add, decodeChannelFolderChangeFromMain, { ...input }));
+}
+export function removeChannelFolder(
+  request: TeamApiRequest,
+  input: ChannelFolderInput,
+): Effect.Effect<ChannelFolderChange, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CHANNEL_FOLDERS_ROUTES.remove, decodeChannelFolderChangeFromMain, { ...input }),
+  );
+}
+export function browseChannelFolders(
+  request: TeamApiRequest,
+  input: BrowseChannelFoldersInput,
+): Effect.Effect<AgentFolderBrowse, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, { ...input }));
 }
 
 function decodeHiddenAgents(value: unknown): HiddenAgentsSnapshot {

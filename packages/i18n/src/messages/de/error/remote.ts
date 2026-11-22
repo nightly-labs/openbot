@@ -24,6 +24,8 @@ export const messages = {
     "Der Host hat OpenBot keine Bildschirmaufnahme erlaubt. Erlaube die Bildschirmaufnahme auf dem Host und versuche es erneut.",
   "error.remote.windowsSessionDisconnected":
     "Die Windows-Sitzung auf dem Host ist getrennt und hat keinen Bildschirm zum Teilen. Melde dich am Bildschirm des Hosts bei Windows an und versuche es erneut.",
+  "error.remote.windowsCaptureDenied":
+    "Windows auf dem Host lässt OpenBot den Bildschirm nicht aufzeichnen. Entsperre Windows am Bildschirm des Hosts, schließe alle Administrator-Abfragen und versuche es erneut. Wenn das Problem bleibt, starte den Host neu.",
   "error.remote.macScreenLocked":
     "Der Mac ist gesperrt und kann seinen Bildschirm nicht teilen. Entsperre den Mac an seinem Bildschirm und versuche es erneut.",
   "error.remote.streamTooSlowLowerQuality":
@@ -217,6 +219,11 @@ export const messages = {
   "error.remote.formUnavailable": "Dieses Formular ist nicht mehr verfügbar.",
   "error.remote.hostedServerRemoval": "Lösche einen gehosteten Server unter „Abrechnung“.",
   "error.remote.hostRemoved": "Der Eigentümer hat diesen Server aus dem Konto entfernt.",
+  "error.remote.ownerTransferSelf":
+    "Dieser Server gehört bereits dir. Gib die E-Mail-Adresse des neuen Eigentümers ein.",
+  "error.remote.ownerTransferHosted": "Ein Server, den OpenBot hostet, kann den Eigentümer nicht wechseln.",
+  "error.remote.ownerTransferInvalid":
+    "Diese Eigentumsübertragung ist nicht mehr verfügbar. Bitte den Eigentümer, sie erneut zu senden.",
   "error.remote.channelsUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu verwenden.",
   "error.remote.channelDeleteUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu löschen.",
   "error.remote.historyRefreshFailed":

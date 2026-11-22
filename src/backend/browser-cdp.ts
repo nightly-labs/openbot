@@ -108,6 +108,8 @@ export const SNAPSHOT_NAVIGATED_MESSAGE = "Page navigated during the browser sna
 
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
+const PAGE_ANSWER_WAIT_MS = 2_000;
+const PAGE_ANSWER_RETRY_MS = 100;
 const MAX_RESULT_BYTES = 64 * 1024;
 const DOCUMENT_ID_PROPERTY = "__openbot_browser_document_id__";
 const MAX_SNAPSHOT_FRAMES = 12;
@@ -922,6 +924,7 @@ export class BrowserCdpEngine {
   #ownsDebugger = false;
   #idleDetach: NodeJS.Immediate | undefined;
   #idleFocusOff = false;
+  #frozen = false;
   #closing = false;
   #disposed = false;
   readonly #scope = Scope.makeUnsafe();
@@ -2277,6 +2280,37 @@ export class BrowserCdpEngine {
     return true;
   }
 
+  readonly pageAnswers = Effect.fn("BrowserCdp.pageAnswers")(function* (
+    this: BrowserCdpEngine,
+  ): Effect.fn.Return<boolean, BrowserOperationError> {
+    if (this.#disposed || this.#closing || this.#frozen || this.#dialog) return true;
+    if (this.#contents.isDestroyed() || this.#contents.isCrashed()) return true;
+    const pageDebugger = this.#contents.debugger;
+    this.#activeLeases += 1;
+    return yield* Effect.gen({ self: this }, function* () {
+      while (!this.#contents.isDestroyed()) {
+        if (!pageDebugger.isAttached()) {
+          yield* browserSync(() => pageDebugger.attach("1.3"));
+          this.#ownsDebugger = true;
+        }
+        const reply = yield* Effect.exit(
+          browserCall(() => pageDebugger.sendCommand("Runtime.evaluate", { expression: "0" })),
+        );
+        if (Exit.isSuccess(reply)) return;
+        yield* Effect.sleep(PAGE_ANSWER_RETRY_MS);
+      }
+    }).pipe(
+      Effect.timeoutOption(PAGE_ANSWER_WAIT_MS),
+      Effect.map(Option.isSome),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#activeLeases -= 1;
+          this.#releaseIdleDebugger();
+        }),
+      ),
+    );
+  });
+
   readonly setIdleFocus = Effect.fn("BrowserCdp.setIdleFocus")(function* (
     this: BrowserCdpEngine,
     enabled: boolean,
@@ -2284,6 +2318,25 @@ export class BrowserCdpEngine {
     this.#idleFocusOff = !enabled;
     if (!this.#mayEmulateIdleFocus()) return;
     yield* browserCall(() => this.#contents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled }));
+  });
+
+  get frozen(): boolean {
+    return this.#frozen;
+  }
+
+  readonly setFrozen = Effect.fn("BrowserCdp.setFrozen")(function* (
+    this: BrowserCdpEngine,
+    frozen: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    if ((!frozen && !this.#frozen) || this.#disposed || this.#closing || this.#contents.isDestroyed()) return;
+    this.#frozen = frozen;
+    if (!this.#contents.debugger.isAttached()) {
+      yield* browserSync(() => this.#contents.debugger.attach("1.3"));
+      this.#ownsDebugger = true;
+    }
+    yield* browserCall(() =>
+      this.#contents.debugger.sendCommand("Page.setWebLifecycleState", { state: frozen ? "frozen" : "active" }),
+    ).pipe(Effect.ensuring(Effect.sync(() => this.#releaseIdleDebugger())));
   });
 
   readonly setEnvironment = Effect.fn("BrowserCdp.setEnvironment")(function* (
@@ -3670,6 +3723,8 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<T, BrowserOperationError> {
     if (this.#disposed || this.#closing || this.#contents.isDestroyed())
       return yield* browserFailure(new Error("Browser tab was closed."));
+    if (this.#contents.isCrashed())
+      return yield* browserFailure(new Error("The page of this browser tab stopped. Load it again with navigate."));
     if (!this.#contents.debugger.isAttached()) {
       yield* browserSync(() => this.#contents.debugger.attach("1.3"));
       this.#ownsDebugger = true;

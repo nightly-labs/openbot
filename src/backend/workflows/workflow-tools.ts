@@ -12,7 +12,9 @@ import {
   WORKFLOW_PORT_TYPES,
   WORKFLOW_PORTS,
   WORKFLOW_SLACK_EVENTS,
+  WORKFLOW_STEP_NAME_FIELD,
   WORKFLOW_TELEGRAM_EVENTS,
+  type WorkflowAnswerProblem,
   type WorkflowEdge,
   type WorkflowGraph,
   type WorkflowNode,
@@ -21,6 +23,8 @@ import {
   type WorkflowRunDetail,
   type WorkflowStep,
   type WorkflowStepSettings,
+  workflowAnswerProblems,
+  workflowAnswerProblemText,
   workflowCatalogProvider,
   workflowGitHubTriggerRepositoryFields,
   workflowGraphProblemAt,
@@ -185,8 +189,14 @@ function refuse(message: string): never {
   throw new WorkflowEditRefused(message);
 }
 
+function stepNameOf(node: WorkflowNode): string {
+  const name = node.fields[WORKFLOW_STEP_NAME_FIELD];
+  return typeof name === "string" ? name.trim() : "";
+}
+
 function readFields(node: WorkflowNode) {
-  const fields = runtimeFields(node);
+  const name = stepNameOf(node);
+  const fields = name ? { ...runtimeFields(node), [WORKFLOW_STEP_NAME_FIELD]: name } : runtimeFields(node);
   if (node.kind !== "trigger" || node.fields.trigger !== "github") return fields;
   const repositories = githubTriggerRepositories(node).join("\n");
   delete fields.repositories;
@@ -598,11 +608,28 @@ function graphProblem(graph: WorkflowGraph): string | null {
   return `Edge ${found.edge.from} -> ${found.edge.to}: ${PROBLEM_TEXT[found.problem] ?? found.problem}.`;
 }
 
+function newAnswerProblems(
+  before: WorkflowGraph,
+  applied: { graph: WorkflowGraph; ids: Record<string, string> },
+): { refusal: string | null; notes: string[] } {
+  const known = new Set(workflowAnswerProblems(before).map((problem) => JSON.stringify(problem)));
+  const found = workflowAnswerProblems(applied.graph).filter((problem) => !known.has(JSON.stringify(problem)));
+  const named = (problem: WorkflowAnswerProblem) => {
+    const ref = Object.entries(applied.ids).find(([, id]) => id === problem.nodeId)?.[0];
+    return `Node ${ref ?? problem.nodeId}: ${workflowAnswerProblemText(problem)}`;
+  };
+  const refused = found.find((problem) => problem.code !== "template");
+  return {
+    refusal: refused ? named(refused) : null,
+    notes: found.filter((problem) => problem.code === "template").map(named),
+  };
+}
+
 function stepLabel(node: WorkflowNode | undefined) {
   if (!node) return {};
   const field = LABEL_FIELD[node.kind];
   const value = field === undefined ? undefined : node.fields[field];
-  const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+  const text = (stepNameOf(node) || (typeof value === "string" ? value : "")).replace(/\s+/g, " ").trim();
   return text
     ? { kind: node.kind, label: text.length > LABEL_CHARS ? `${text.slice(0, LABEL_CHARS)}…` : text }
     : { kind: node.kind };
@@ -669,13 +696,14 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
     let detail = yield* workflows.get(workflowId);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const applied = yield* toolStep(() => applyWorkflowOps(detail.graph, ops, agentIds, tidy));
-      const problem = graphProblem(applied.graph);
+      const answers = newAnswerProblems(detail.graph, applied);
+      const problem = graphProblem(applied.graph) ?? answers.refusal;
       if (problem) return yield* toolStep(() => refuse(problem));
       const result = yield* workflows.saveGraph(
         { workflowId, baseRevision: detail.revision, graph: applied.graph },
         callerId,
       );
-      if (result.ok) return { revision: result.revision, ids: applied.ids };
+      if (result.ok) return { revision: result.revision, ids: applied.ids, notes: answers.notes };
       detail = result.conflict;
     }
     return yield* toolStep(() => refuse("The workflow changed during the edit. Read it and try again."));
@@ -716,16 +744,17 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
       const workflowId = input.workflowId;
       if (workflowId === undefined) {
         if (input.title === undefined) return openBotToolFailure("A new workflow needs a title.");
-        const applied = yield* toolStep(() =>
-          applyWorkflowOps({ nodes: [], edges: [], strokes: [] }, ops, agentIds, tidy),
-        );
-        const problem = graphProblem(applied.graph);
+        const empty: WorkflowGraph = { nodes: [], edges: [], strokes: [] };
+        const applied = yield* toolStep(() => applyWorkflowOps(empty, ops, agentIds, tidy));
+        const answers = newAnswerProblems(empty, applied);
+        const problem = graphProblem(applied.graph) ?? answers.refusal;
         if (problem) return openBotToolFailure(problem);
         const created = yield* workflows.create({ title: input.title, graph: applied.graph }, callerId);
         return openBotToolResult({
           workflowId: created.summary.id,
           revision: created.revision,
           ...(Object.keys(applied.ids).length > 0 ? { ids: applied.ids } : {}),
+          ...(answers.notes.length > 0 ? { notes: answers.notes } : {}),
         });
       }
       const saved = ops.length > 0 || tidy ? yield* save(workflowId, ops, tidy) : null;
@@ -735,6 +764,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
         workflowId,
         revision: saved.revision,
         ...(Object.keys(saved.ids).length > 0 ? { ids: saved.ids } : {}),
+        ...(saved.notes.length > 0 ? { notes: saved.notes } : {}),
       });
     }
     if (tool === "delete_workflow") {

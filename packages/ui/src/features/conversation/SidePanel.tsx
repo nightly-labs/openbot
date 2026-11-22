@@ -1,5 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Badge,
   Button,
   buttonVariants,
   ChevronDown,
@@ -9,6 +10,7 @@ import {
   Maximize2,
   MessageCircleQuestionMark,
   MessageSquare,
+  MessagesSquare,
   Minimize2,
   PanelRight,
   Plus,
@@ -26,7 +28,7 @@ import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, For, flush, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, flush, onSettled, Show, untrack } from "solid-js";
 import { createTabRow } from "../../components/createTabRow";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
 import { ThreadTabGhost } from "./threads/ThreadTabGhost";
@@ -43,6 +45,7 @@ function fileValue(key: string): string {
 const SIDE_PANEL_PANES = {
   browser: { label: "conversation.sidePanel.pane.browser", icon: () => <ComputerIcon /> },
   files: { label: "conversation.sidePanel.pane.files", icon: () => <Folder aria-hidden="true" /> },
+  threads: { label: "conversation.sidePanel.pane.threads", icon: () => <MessagesSquare aria-hidden="true" /> },
   settings: { label: "conversation.sidePanel.pane.settings", icon: () => <Settings aria-hidden="true" /> },
   question: {
     label: "conversation.sidePanel.pane.question",
@@ -65,6 +68,21 @@ function inPaneOrder(available: readonly SidePanelPane[]): SidePanelPane[] {
 
 function PaneIcon(props: { pane: SidePanelPane }): JSX.Element {
   return SIDE_PANEL_PANES[props.pane].icon();
+}
+
+function PaneBadge(props: { badge: SidePanelPaneBadge | undefined }) {
+  return (
+    <Show when={props.badge}>
+      {(badge) => (
+        <>
+          <Badge variant="warning-light" class="side-panel-tab-count" aria-hidden="true">
+            {badge().count}
+          </Badge>
+          <span class="sr-only">{badge().label}</span>
+        </>
+      )}
+    </Show>
+  );
 }
 
 function FileTabIcon(props: { file: SidePanelFileTab }): JSX.Element {
@@ -121,10 +139,16 @@ export function SidePanelToggle(props: SidePanelToggleProps) {
   );
 }
 
+export interface SidePanelPaneBadge {
+  count: number;
+  label: string;
+}
+
 export interface SidePanelHeaderProps {
   panes: readonly SidePanelPane[];
   selected: SidePanelPane | null;
   available: readonly SidePanelPane[];
+  badges?: Partial<Record<SidePanelPane, SidePanelPaneBadge>> | undefined;
   maximized: boolean;
   settingsLabel?: string | undefined;
   onSelect: (pane: SidePanelPane) => void;
@@ -186,6 +210,7 @@ interface TabEntry {
   value: string;
   label: string;
   icon: () => JSX.Element;
+  badge?: SidePanelPaneBadge | undefined;
   select: () => void;
 }
 
@@ -318,6 +343,10 @@ function SidePanelTabRow(
   const row = tabRow.row;
   createEffect(createMemo(selectedValue), (value) => tabRow.reveal(value));
   createEffect(
+    createMemo(() => row.hidden.length > 0),
+    () => tabRow.reveal(untrack(selectedValue)),
+  );
+  createEffect(
     () => tabValues().join(),
     () => tabRow.measure(),
   );
@@ -331,6 +360,7 @@ function SidePanelTabRow(
       value: pane,
       label: labelOf(pane),
       icon: () => <PaneIcon pane={pane} />,
+      badge: props.badges?.[pane],
       select: () => props.onSelect(pane),
     })),
     ...threads().map((thread) => ({
@@ -558,10 +588,8 @@ function SidePanelTabRow(
                     onFocus={(event) => keyboardFocus(event) && !selected() && props.onSelect(pane)}
                     onKeyDown={(event) => onTabKeyDown(event, pane, close)}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <PaneIcon pane={pane} />
-                    </span>
                     <span class="side-panel-tab-label">{label()}</span>
+                    <PaneBadge badge={props.badges?.[pane]} />
                   </Tabs.Trigger>
                   <Button
                     variant="ghost"
@@ -573,6 +601,9 @@ function SidePanelTabRow(
                     title={t("conversation.sidePanel.closePane", { name: label() })}
                     onClick={() => closeWithPointer(pane, close)}
                   >
+                    <span class="side-panel-tab-icon">
+                      <PaneIcon pane={pane} />
+                    </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
                 </div>
@@ -608,9 +639,6 @@ function SidePanelTabRow(
                     onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
-                    </span>
                     <span class="side-panel-tab-label">{thread().title}</span>
                     <ThreadStatusText status={thread().status} unread={thread().unread} />
                   </Tabs.Trigger>
@@ -624,6 +652,9 @@ function SidePanelTabRow(
                     title={t("conversation.threads.closeTab")}
                     onClick={() => closeWithPointer(value(), close)}
                   >
+                    <span class="side-panel-tab-icon">
+                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
+                    </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
                 </div>
@@ -659,9 +690,6 @@ function SidePanelTabRow(
                     onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <FileTabIcon file={file()} />
-                    </span>
                     <span class="side-panel-tab-label">{file().name}</span>
                   </Tabs.Trigger>
                   <Button
@@ -674,6 +702,9 @@ function SidePanelTabRow(
                     title={t("conversation.sidePanel.closePane", { name: file().name })}
                     onClick={() => closeWithPointer(value(), close)}
                   >
+                    <span class="side-panel-tab-icon">
+                      <FileTabIcon file={file()} />
+                    </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
                 </div>
@@ -704,7 +735,8 @@ function SidePanelTabRow(
                         }}
                       >
                         <span class="side-panel-hidden-tab-icon">{entry().icon()}</span>
-                        <span>{entry().label}</span>
+                        <span class="side-panel-hidden-tab-label">{entry().label}</span>
+                        <PaneBadge badge={entry().badge} />
                       </DropdownMenu.Item>
                     )}
                   </For>
@@ -737,6 +769,7 @@ function SidePanelTabRow(
                       <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => props.onSelect(pane)}>
                         <PaneIcon pane={pane} />
                         {labelOf(pane)}
+                        <PaneBadge badge={props.badges?.[pane]} />
                       </DropdownMenu.Item>
                     )}
                   </For>
@@ -790,6 +823,7 @@ function SidePanelTabRow(
 
 export function SidePanelLauncher(props: {
   available: readonly SidePanelPane[];
+  badges?: Partial<Record<SidePanelPane, SidePanelPaneBadge>> | undefined;
   settingsLabel?: string | undefined;
   onOpen: (pane: SidePanelPane) => void;
 }) {
@@ -806,6 +840,7 @@ export function SidePanelLauncher(props: {
           <Button variant="secondary" class="side-panel-launch" onClick={() => props.onOpen(pane)}>
             <PaneIcon pane={pane} />
             {t("conversation.sidePanel.openPane", { name: paneLabel(t, pane, props.settingsLabel) })}
+            <PaneBadge badge={props.badges?.[pane]} />
           </Button>
         )}
       </For>

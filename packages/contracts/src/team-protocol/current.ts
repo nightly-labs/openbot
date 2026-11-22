@@ -8,6 +8,7 @@ import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKGROUND_WORK_CAPABILITY } from "./agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "./agent-builtin-memory-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "./agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
@@ -71,6 +72,7 @@ import {
 import { BROWSING_MEMORY_CAPABILITY } from "./browsing-memory-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "./channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
@@ -117,6 +119,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "./library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "./live-voice-account-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
 import { MAC_APPS_LIMIT_CAPABILITY } from "./mac-apps-limit-v1";
@@ -134,8 +137,10 @@ import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "./mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
+import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
+import { PENDING_PROMPTS_CAPABILITY } from "./pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
@@ -150,7 +155,9 @@ import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "./provider-many-accounts-v1";
 import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "./provider-model-source-v1";
+import { PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY } from "./provider-sign-in-relay-v2";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "./provider-use-v1";
@@ -164,7 +171,7 @@ import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "./push-notification-thread
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
-import { QUEUE_HOLD_CAPABILITY } from "./queue-hold-v1";
+import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "./queue-hold-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
@@ -181,7 +188,7 @@ import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SERVER_SAFE_MODE_CAPABILITY } from "./server-safe-mode-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "./setting-link-markers-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
-import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
+import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_THREADS_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_DEEP_LINK_CAPABILITY } from "./sign-in-relay-deep-link-v1";
@@ -193,6 +200,7 @@ import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
 import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
+import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "./storage-workflow-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
@@ -200,6 +208,7 @@ import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "./ui-block-preview-edit-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
+import { TEAM_USAGE_GROUPS_CAPABILITY } from "./usage-groups-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import {
   highestCommonTeamProtocol,
@@ -236,7 +245,9 @@ import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
+import { WORKFLOW_FOLDERS_CAPABILITY } from "./workflow-folders-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "./workflows-agent-files-v1";
+import { WORKFLOWS_ANSWERS_CAPABILITY } from "./workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
@@ -277,6 +288,7 @@ export {
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKGROUND_WORK_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
@@ -329,6 +341,7 @@ export {
   BROWSING_MEMORY_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
@@ -391,6 +404,7 @@ export {
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USE_CAPABILITY,
@@ -416,6 +430,7 @@ export {
   SETTING_LINK_MARKERS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_THREADS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
@@ -447,6 +462,7 @@ export {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
@@ -464,7 +480,9 @@ export {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  WORKFLOW_FOLDERS_CAPABILITY,
   WORKFLOWS_AGENT_FILES_CAPABILITY,
+  WORKFLOWS_ANSWERS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -764,10 +782,23 @@ const TEAM_CAPABILITY_REGISTRY = [
   [SKILL_PROBLEMS_CAPABILITY, V10],
   [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
   [QUEUE_HOLD_CAPABILITY, V10],
+  [OWNER_TRANSFER_CAPABILITY, V10],
   [VAULT_MEMBER_SAVE_CAPABILITY, V10],
   [WORKFLOWS_AGENT_FILES_CAPABILITY, V10],
   [WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY, V10],
   [WORKFLOWS_STEP_SETTINGS_CAPABILITY, V10],
+  [TEAM_USAGE_GROUPS_CAPABILITY, V10],
+  [QUEUE_HOLD_SIGN_IN_CAPABILITY, V10],
+  [PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY, V10],
+  [PENDING_PROMPTS_CAPABILITY, V10],
+  [LIVE_VOICE_ACCOUNT_CAPABILITY, V10],
+  [SIDE_QUESTION_THREADS_CAPABILITY, V10],
+  [WORKFLOW_FOLDERS_CAPABILITY, V10],
+  [AGENT_BUILTIN_MEMORY_CAPABILITY, V10],
+  [WORKFLOWS_ANSWERS_CAPABILITY, V10],
+  [STORAGE_WORKFLOW_FILES_CAPABILITY, V10],
+  [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
+  [CHANNEL_FOLDERS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

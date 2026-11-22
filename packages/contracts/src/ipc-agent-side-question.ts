@@ -11,6 +11,7 @@ export interface AskSideQuestionInput {
   agentId: string;
   question: string;
   earlier: SideQuestionTurn[];
+  taskId?: string;
 }
 
 function isSideQuestionTurn(value: unknown): value is SideQuestionTurn {
@@ -29,7 +30,8 @@ export function parseAskSideQuestion(value: unknown): AskSideQuestionInput {
     !value.question.trim() ||
     !Array.isArray(value.earlier) ||
     value.earlier.length > INPUT_LIMITS.sideQuestionTurns ||
-    !value.earlier.every(isSideQuestionTurn)
+    !value.earlier.every(isSideQuestionTurn) ||
+    (value.taskId !== undefined && !isIdentifier(value.taskId))
   ) {
     throw new Error("Provide a valid side question.");
   }
@@ -37,5 +39,6 @@ export function parseAskSideQuestion(value: unknown): AskSideQuestionInput {
     agentId: value.agentId,
     question: value.question.trim(),
     earlier: value.earlier.map((turn) => ({ question: turn.question, answer: turn.answer })),
+    ...(value.taskId === undefined ? {} : { taskId: value.taskId }),
   };
 }

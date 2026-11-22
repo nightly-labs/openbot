@@ -1,4 +1,12 @@
-import type { RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
+import {
+  type AgentStepActivity,
+  type RoutineSchedule,
+  type StoredFileRow,
+  type WorkflowAnswerProblem,
+  type WorkflowGraph,
+  workflowAnswerProblems,
+  workflowInputAnswerFields,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -16,7 +24,6 @@ import {
 } from "solid-js";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
-import { diagramEdgeMidpoint, diagramEdgePath } from "../diagrams/diagram-graph";
 import type { WorkflowGitHubCanvas } from "./workflow-github";
 import type { Box } from "./workflow-ink";
 import type { WorkflowLoop } from "./workflow-loops";
@@ -25,6 +32,19 @@ import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
 export type WfnPortType = "text" | "image" | "file";
 export type WfnPortSide = "in" | "out";
 export type WfnRunStatus = "waiting" | "running" | "done" | "failed" | "approval";
+
+export interface WorkflowAgentProgress {
+  agentId: string;
+  detail: string;
+  previous: string | undefined;
+  activity: AgentStepActivity | null;
+  done: number;
+}
+
+export function customStepName(value: WfnFieldValue | undefined): string | undefined {
+  const name = typeof value === "string" ? value.trim() : "";
+  return name || undefined;
+}
 export type WfnEdgeTone = "idle" | "run" | "done";
 export type WfnFieldValue = string | number | boolean;
 export type WfnFields = Record<string, WfnFieldValue>;
@@ -32,6 +52,15 @@ export type WfnFields = Record<string, WfnFieldValue>;
 export interface WfnPoint {
   x: number;
   y: number;
+}
+
+function edgePath(from: WfnPoint, to: WfnPoint): string {
+  const bend = Math.max(48, Math.abs(to.x - from.x) / 2);
+  return `M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`;
+}
+
+function edgeMidpoint(from: WfnPoint, to: WfnPoint): WfnPoint {
+  return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
 }
 
 export interface WfnSize {
@@ -61,6 +90,12 @@ export interface WfnResult {
   at: string;
   value: string;
   failed?: boolean;
+  branch?: string;
+}
+
+export interface WfnPending {
+  id: string;
+  at: string;
 }
 
 export const resultValue = (result: WfnResult | undefined) => (result?.failed ? undefined : result?.value);
@@ -164,11 +199,15 @@ export interface WfnBoard {
   setField: (id: string, key: string, value: WfnFieldValue, typing?: boolean) => void;
   setFields: (id: string, values: WfnFields) => void;
   githubTriggers: (id: string) => string[];
+  answerNames: (id: string) => readonly string[];
+  answerProblems: (id: string) => readonly WorkflowAnswerProblem[];
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
+  progress: (id: string) => WorkflowAgentProgress | undefined;
   error: (id: string) => string | undefined;
   retry?: ((id: string) => void) | undefined;
+  retryResult?: ((id: string, result: string) => void) | undefined;
   catalogs: () => WorkflowCatalogs;
   features: () => WorkflowFeatures | undefined;
   github: () => WorkflowGitHubCanvas | undefined;
@@ -191,7 +230,9 @@ export interface WfnBoard {
   stretch: (id: string) => WfnStretch;
   resetSize?: ((id: string) => void) | undefined;
   results: (id: string) => readonly WfnResult[];
+  pending: (id: string) => readonly WfnPending[];
   shown: (id: string) => WfnResult | undefined;
+  newest: (id: string) => WfnResult | undefined;
   pick: (id: string, result: string) => void;
   record: (id: string, value: string, run?: number) => void;
   recordFailure: (id: string, message: string, run?: number) => void;
@@ -222,6 +263,7 @@ export function BoardProvider(props: { board: WfnBoard; children: JSX.Element })
 
 export interface BoardOptions {
   catalogs: () => WorkflowCatalogs;
+  graph?: () => WorkflowGraph;
   buildState?: (edgeId: string) => "unbuilt" | "arrived" | undefined;
   selected?: string | undefined;
   edges?: readonly WfnEdge[] | undefined;
@@ -233,8 +275,10 @@ export interface BoardOptions {
   hides?: (edge: WfnEdge) => boolean;
   dropFiles?: (id: string, files: readonly File[]) => void;
   status?: (id: string) => WfnRunStatus | undefined;
+  progress?: (id: string) => WorkflowAgentProgress | undefined;
   error?: (id: string) => string | undefined;
   retry?: (id: string) => void;
+  retryResult?: (result: string) => void;
   runFrom?: (id: string) => void;
   schedule?: (id: string) => RoutineSchedule | undefined;
   setSchedule?: (id: string, schedule: RoutineSchedule) => void;
@@ -254,6 +298,7 @@ export interface BoardOptions {
   focus?: () => string | null;
   results?: Record<string, readonly WfnResult[]> | undefined;
   resultsOf?: (id: string) => readonly WfnResult[];
+  pendingOf?: (id: string) => readonly WfnPending[];
   fields?: Record<string, WfnFields> | undefined;
   features?: () => WorkflowFeatures | undefined;
   github?: () => WorkflowGitHubCanvas | undefined;
@@ -386,6 +431,12 @@ export function inCanvas(root: Element | undefined, element: Element | null): bo
     element.closest("[data-wfn-portal]") !== null
   );
 }
+
+const NO_ANSWER_PROBLEMS: readonly WorkflowAnswerProblem[] = [];
+
+const NO_PENDING: readonly WfnPending[] = [];
+
+export const showsStrip = (board: WfnBoard, id: string) => board.results(id).length + board.pending(id).length > 1;
 
 export function createBoard(options: BoardOptions) {
   const { t } = useText();
@@ -589,6 +640,16 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  const answerProblemsByNode = createMemo(
+    () => {
+      const graph = options.graph?.();
+      const byNode = new Map<string, WorkflowAnswerProblem[]>();
+      for (const problem of graph ? workflowAnswerProblems(graph) : [])
+        byNode.set(problem.nodeId, [...(byNode.get(problem.nodeId) ?? []), problem]);
+      return byNode;
+    },
+    { lazy: true },
+  );
   const pendingCompanions = createMemo(() => (state.pending ? companions(state.pending) : []));
 
   const isArmed = (port: PortRef) => {
@@ -706,6 +767,15 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  const unpick = (id: string) =>
+    setState((draft) => {
+      delete draft.picked[id];
+    });
+  const retryResultOf = (retry: (result: string) => void) => (id: string, result: string) => {
+    unpick(id);
+    retry(result);
+  };
+
   const add = (id: string, value: string, run: number | undefined, failed: boolean) => {
     const result: WfnResult = { id: crypto.randomUUID(), at: new Date().toISOString(), value };
     if (run !== undefined) result.run = run;
@@ -781,6 +851,11 @@ export function createBoard(options: BoardOptions) {
       }
       return found;
     },
+    answerNames: (id) => {
+      const graph = options.graph?.();
+      return graph ? [...workflowInputAnswerFields(graph, id).keys()] : [];
+    },
+    answerProblems: (id) => answerProblemsByNode().get(id) ?? NO_ANSWER_PROBLEMS,
     inputs: (id, type) =>
       state.edges.flatMap((edge) =>
         edge.to === id && edge.type === type && !state.removed.includes(edge.from) ? [edge.from] : [],
@@ -808,14 +883,19 @@ export function createBoard(options: BoardOptions) {
     features: () => options.features?.(),
     github: () => options.github?.(),
     status: (id) => options.status?.(id),
+    progress: (id) => options.progress?.(id),
     error: (id) => options.error?.(id),
     retry: options.retry,
+    retryResult: options.retryResult && retryResultOf(options.retryResult),
     runFrom: options.runFrom,
     schedule: (id) => options.schedule?.(id),
     setSchedule: (id, schedule) => options.setSchedule?.(id, schedule),
     endScheduleEdit: () => options.endScheduleEdit?.(),
     rotateWebhookSecret: options.rotateWebhookSecret,
-    runStep: (id) => options.runStep?.(id),
+    runStep: (id) => {
+      unpick(id);
+      options.runStep?.(id);
+    },
     stopStep: options.stopStep,
     running: () => options.running?.() ?? false,
     toolbarBelow: (id, bar) => options.toolbarBelow?.(id, bar) ?? false,
@@ -829,6 +909,7 @@ export function createBoard(options: BoardOptions) {
     stretch: (id) => options.stretch?.(id) ?? "x",
     resetSize: options.resetSize,
     results: (id) => resultsOf(id),
+    pending: (id) => options.pendingOf?.(id) ?? NO_PENDING,
     shown: (id) => {
       const latest = latestOf(id);
       const picked = state.picked[id];
@@ -836,6 +917,7 @@ export function createBoard(options: BoardOptions) {
       if (!stillNewest) return latest;
       return resultsOf(id).find((result) => result.id === picked.result) ?? latest;
     },
+    newest: latestOf,
     pick: (id, result) => {
       const newest = latestOf(id)?.id;
       setState((draft) => {
@@ -1141,7 +1223,7 @@ export function createBoard(options: BoardOptions) {
 
   const shapeOf = (edge: WfnEdge, from: WfnPoint, to: WfnPoint) => {
     const loop = options.loops?.().get(edge.id);
-    if (!loop) return { path: diagramEdgePath(from, to), middle: diagramEdgeMidpoint(from, to), turn: undefined };
+    if (!loop) return { path: edgePath(from, to), middle: edgeMidpoint(from, to), turn: undefined };
     const bottoms = loop.body.flatMap((id) => {
       const box = options.box?.(id);
       return box ? [box.y + box.height] : [];
@@ -1220,7 +1302,7 @@ export function createBoard(options: BoardOptions) {
       const anchor = options.anchor?.(from, undefined)?.at() ?? point(from.node, from.side, from.type, from.branch);
       const end = draftEnd();
       if (!anchor || !end) return null;
-      return from.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+      return from.side === "out" ? edgePath(anchor, end) : edgePath(end, anchor);
     };
     const draftPath = () => (state.pending ? draftLine(state.pending) : null);
     const companionPaths = () => {

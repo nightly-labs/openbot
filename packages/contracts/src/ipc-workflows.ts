@@ -60,6 +60,7 @@ export type WorkflowFieldValue = string | number | boolean;
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
 
 export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
+export const WORKFLOW_STEP_NAME_FIELD = "stepName";
 
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
@@ -384,12 +385,10 @@ export function workflowMediaSpecs(
     durations[0] ?? WORKFLOW_VIDEO_DURATIONS[0],
   );
   const resolutions = workflowMediaResolutions(model, kind);
-  const preferred = typeof fields.resolution === "string" ? fields.resolution : "720p";
+  const preferred = (typeof fields.resolution === "string" ? fields.resolution : "720p").toLowerCase();
   const resolution = size
     ? resolutionForSize(resolutions, size)
-    : resolutions.includes(preferred)
-      ? preferred
-      : (resolutions[0] ?? null);
+    : (resolutions.find((value) => value.toLowerCase() === preferred) ?? resolutions[0] ?? null);
   const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
   return { aspect, duration, resolution, transparent, size, options: workflowMediaOptions(fields, model) };
 }
@@ -710,10 +709,11 @@ export const WORKFLOW_RUNTIME_FIELDS: Readonly<Record<WorkflowNodeKind, readonly
     "placeId",
     "roles",
     "text",
+    "answer",
   ],
-  agent: ["agentId", "task"],
-  llm: ["provider", "model", "effort", "prompt", "system"],
-  condition: ["rule", "provider", "model", "effort"],
+  agent: ["agentId", "task", "answer"],
+  llm: ["provider", "model", "effort", "prompt", "system", "answer"],
+  condition: ["rule", "provider", "model", "effort", "check"],
   approval: ["question"],
   output: [
     "target",

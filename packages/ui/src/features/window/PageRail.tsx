@@ -20,7 +20,6 @@ import {
   Sparkles,
   Store,
   Waypoints,
-  Workflow,
 } from "@openbot/ui";
 import { AccountUsageDetails, AccountUsageWindowList } from "@openbot/ui/features/account/AccountUsageDetails";
 import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/features/account/account-usage-view";
@@ -249,7 +248,7 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
   );
 }
 
-const MAX_RING_PLACES = 5;
+const START_RING_PLACES = 5;
 const RAIL_MIN_FREE = 12;
 
 export interface CustomAgentUsageRailRow {
@@ -366,7 +365,6 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
 
 export type PageRailPage =
   | "agents"
-  | "routines"
   | "workflows"
   | "tasks"
   | "schedule"
@@ -378,7 +376,6 @@ export type PageRailPage =
   | "settings";
 
 export const PAGE_RAIL_PINNABLE_PAGES = [
-  "routines",
   "workflows",
   "tasks",
   "schedule",
@@ -399,7 +396,6 @@ export interface PageRailProps {
   mediaCredits?: readonly MediaCreditsRailRow[] | undefined;
   onMediaCredits?: ((provider: MediaCreditsRailRow["provider"]) => void) | undefined;
   onAgents: () => void;
-  onRoutines?: (() => void) | undefined;
   onWorkflows?: (() => void) | undefined;
   onPreloadWorkflows?: (() => void) | undefined;
   onTasks?: ((button: HTMLElement) => void) | undefined;
@@ -525,7 +521,7 @@ export function PageRail(props: PageRailProps) {
       .filter((row) => !owner(row))
       .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
   });
-  const [ringSlots, setRingSlots] = createSignal(MAX_RING_PLACES);
+  const [ringSlots, setRingSlots] = createSignal(START_RING_PLACES);
   const ringLayout = createMemo(() => {
     const all = rings();
     if (all.length <= ringSlots()) return { shown: all, more: [] };
@@ -551,7 +547,7 @@ export function PageRail(props: PageRailProps) {
         pagesBox.getBoundingClientRect().bottom -
         endWithoutRings -
         RAIL_MIN_FREE;
-      setRingSlots(Math.max(1, Math.min(MAX_RING_PLACES, Math.floor(free / slot))));
+      setRingSlots(Math.max(1, Math.floor(free / slot)));
     };
     let frame = 0;
     const observer = new ResizeObserver(() => {
@@ -566,15 +562,7 @@ export function PageRail(props: PageRailProps) {
   });
   const pages = createMemo((): RailPage[] => {
     const list: RailPage[] = [];
-    const { onRoutines, onWorkflows, onTasks, onSchedule } = props;
-    if (onRoutines) {
-      list.push({
-        id: "routines",
-        label: t("sidebar.view.routines"),
-        icon: Workflow,
-        open: () => onRoutines(),
-      });
-    }
+    const { onWorkflows, onTasks, onSchedule } = props;
     if (onWorkflows) {
       list.push({
         id: "workflows",

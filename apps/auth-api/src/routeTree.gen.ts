@@ -214,6 +214,7 @@ import { Route as V2RemoteHostsRegisterRouteImport } from './routes/v2/remote/ho
 import { Route as V2RemoteInvitesInviteIdRouteImport } from './routes/v2/remote/invites/$inviteId'
 import { Route as V2RemoteInvitesAcceptRouteImport } from './routes/v2/remote/invites/accept'
 import { Route as V2RemoteInvitesPreviewRouteImport } from './routes/v2/remote/invites/preview'
+import { Route as V2RemoteOwnerTransfersIndexRouteImport } from './routes/v2/remote/owner-transfers/index'
 import { Route as V2RemoteResumeValidateRouteImport } from './routes/v2/remote/resume/validate'
 import { Route as V2RemoteSessionsIndexRouteImport } from './routes/v2/remote/sessions/index'
 import { Route as V2RemoteSlackRouteValidateRouteImport } from './routes/v2/remote/slack-route/validate'
@@ -243,6 +244,7 @@ import { Route as V2HostingServersServerIdWakeRouteImport } from './routes/v2/ho
 import { Route as V2RemoteHostsHostIdIndexRouteImport } from './routes/v2/remote/hosts/$hostId/index'
 import { Route as V2RemoteHostsHostIdAndroidNotificationRouteImport } from './routes/v2/remote/hosts/$hostId/android-notification'
 import { Route as V2RemoteHostsHostIdAppearanceRouteImport } from './routes/v2/remote/hosts/$hostId/appearance'
+import { Route as V2RemoteHostsHostIdCheckoutRouteImport } from './routes/v2/remote/hosts/$hostId/checkout'
 import { Route as V2RemoteHostsHostIdDiscordDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/discord-disconnect'
 import { Route as V2RemoteHostsHostIdDiscordRouteRouteImport } from './routes/v2/remote/hosts/$hostId/discord-route'
 import { Route as V2RemoteHostsHostIdGithubRouteRouteImport } from './routes/v2/remote/hosts/$hostId/github-route'
@@ -251,6 +253,8 @@ import { Route as V2RemoteHostsHostIdKeyHandoverRouteImport } from './routes/v2/
 import { Route as V2RemoteHostsHostIdLiveActivityRouteImport } from './routes/v2/remote/hosts/$hostId/live-activity'
 import { Route as V2RemoteHostsHostIdLogoRouteImport } from './routes/v2/remote/hosts/$hostId/logo'
 import { Route as V2RemoteHostsHostIdNotificationRouteImport } from './routes/v2/remote/hosts/$hostId/notification'
+import { Route as V2RemoteHostsHostIdOwnerSessionRouteImport } from './routes/v2/remote/hosts/$hostId/owner-session'
+import { Route as V2RemoteHostsHostIdOwnerTransferRouteImport } from './routes/v2/remote/hosts/$hostId/owner-transfer'
 import { Route as V2RemoteHostsHostIdSlackDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/slack-disconnect'
 import { Route as V2RemoteHostsHostIdSlackRouteRouteImport } from './routes/v2/remote/hosts/$hostId/slack-route'
 import { Route as V2RemoteHostsHostIdTelegramDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/telegram-disconnect'
@@ -259,6 +263,8 @@ import { Route as V2RemoteHostsHostIdTelegramRouteRouteImport } from './routes/v
 import { Route as V2RemoteHostsHostIdTicketRouteImport } from './routes/v2/remote/hosts/$hostId/ticket'
 import { Route as V2RemoteHostsHostIdWebhookRouteRouteImport } from './routes/v2/remote/hosts/$hostId/webhook-route'
 import { Route as V2RemoteHostsHostIdWebhookRoutesRouteImport } from './routes/v2/remote/hosts/$hostId/webhook-routes'
+import { Route as V2RemoteOwnerTransfersTransferIdAcceptRouteImport } from './routes/v2/remote/owner-transfers/$transferId/accept'
+import { Route as V2RemoteOwnerTransfersTransferIdDeclineRouteImport } from './routes/v2/remote/owner-transfers/$transferId/decline'
 import { Route as V2RemoteSessionsSessionIdEndRouteImport } from './routes/v2/remote/sessions/$sessionId/end'
 import { Route as V2RemoteSessionsSessionIdTicketRouteImport } from './routes/v2/remote/sessions/$sessionId/ticket'
 import { Route as V1MarketplaceAgentsAdminCardsVersionIdRouteImport } from './routes/v1/marketplace/agents/admin/cards/$versionId'
@@ -1308,6 +1314,12 @@ const V2RemoteInvitesPreviewRoute = V2RemoteInvitesPreviewRouteImport.update({
   path: '/v2/remote/invites/preview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V2RemoteOwnerTransfersIndexRoute =
+  V2RemoteOwnerTransfersIndexRouteImport.update({
+    id: '/v2/remote/owner-transfers/',
+    path: '/v2/remote/owner-transfers/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteResumeValidateRoute = V2RemoteResumeValidateRouteImport.update({
   id: '/v2/remote/resume/validate',
   path: '/v2/remote/resume/validate',
@@ -1479,6 +1491,12 @@ const V2RemoteHostsHostIdAppearanceRoute =
     path: '/v2/remote/hosts/$hostId/appearance',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdCheckoutRoute =
+  V2RemoteHostsHostIdCheckoutRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/checkout',
+    path: '/v2/remote/hosts/$hostId/checkout',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdDiscordDisconnectRoute =
   V2RemoteHostsHostIdDiscordDisconnectRouteImport.update({
     id: '/v2/remote/hosts/$hostId/discord-disconnect',
@@ -1524,6 +1542,18 @@ const V2RemoteHostsHostIdNotificationRoute =
   V2RemoteHostsHostIdNotificationRouteImport.update({
     id: '/v2/remote/hosts/$hostId/notification',
     path: '/v2/remote/hosts/$hostId/notification',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteHostsHostIdOwnerSessionRoute =
+  V2RemoteHostsHostIdOwnerSessionRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/owner-session',
+    path: '/v2/remote/hosts/$hostId/owner-session',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteHostsHostIdOwnerTransferRoute =
+  V2RemoteHostsHostIdOwnerTransferRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/owner-transfer',
+    path: '/v2/remote/hosts/$hostId/owner-transfer',
     getParentRoute: () => rootRouteImport,
   } as any)
 const V2RemoteHostsHostIdSlackDisconnectRoute =
@@ -1572,6 +1602,18 @@ const V2RemoteHostsHostIdWebhookRoutesRoute =
   V2RemoteHostsHostIdWebhookRoutesRouteImport.update({
     id: '/v2/remote/hosts/$hostId/webhook-routes',
     path: '/v2/remote/hosts/$hostId/webhook-routes',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteOwnerTransfersTransferIdAcceptRoute =
+  V2RemoteOwnerTransfersTransferIdAcceptRouteImport.update({
+    id: '/v2/remote/owner-transfers/$transferId/accept',
+    path: '/v2/remote/owner-transfers/$transferId/accept',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteOwnerTransfersTransferIdDeclineRoute =
+  V2RemoteOwnerTransfersTransferIdDeclineRouteImport.update({
+    id: '/v2/remote/owner-transfers/$transferId/decline',
+    path: '/v2/remote/owner-transfers/$transferId/decline',
     getParentRoute: () => rootRouteImport,
   } as any)
 const V2RemoteSessionsSessionIdEndRoute =
@@ -1854,6 +1896,7 @@ export interface FileRoutesByFullPath {
   '/v1/me/license/': typeof V1MeLicenseIndexRoute
   '/v2/hosting/servers/': typeof V2HostingServersIndexRoute
   '/v2/remote/hosts/': typeof V2RemoteHostsIndexRoute
+  '/v2/remote/owner-transfers/': typeof V2RemoteOwnerTransfersIndexRoute
   '/v2/remote/sessions/': typeof V2RemoteSessionsIndexRoute
   '/v1/marketplace/agents/$agentId/avatar': typeof V1MarketplaceAgentsAgentIdAvatarRoute
   '/v1/marketplace/agents/$agentId/card': typeof V1MarketplaceAgentsAgentIdCardRoute
@@ -1876,6 +1919,7 @@ export interface FileRoutesByFullPath {
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/android-notification': typeof V2RemoteHostsHostIdAndroidNotificationRoute
   '/v2/remote/hosts/$hostId/appearance': typeof V2RemoteHostsHostIdAppearanceRoute
+  '/v2/remote/hosts/$hostId/checkout': typeof V2RemoteHostsHostIdCheckoutRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
@@ -1884,6 +1928,8 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
   '/v2/remote/hosts/$hostId/notification': typeof V2RemoteHostsHostIdNotificationRoute
+  '/v2/remote/hosts/$hostId/owner-session': typeof V2RemoteHostsHostIdOwnerSessionRoute
+  '/v2/remote/hosts/$hostId/owner-transfer': typeof V2RemoteHostsHostIdOwnerTransferRoute
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/telegram-disconnect': typeof V2RemoteHostsHostIdTelegramDisconnectRoute
@@ -1892,6 +1938,8 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
+  '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
   '/v2/hosting/servers/$serverId/': typeof V2HostingServersServerIdIndexRoute
@@ -2114,6 +2162,7 @@ export interface FileRoutesByTo {
   '/v1/me/license': typeof V1MeLicenseIndexRoute
   '/v2/hosting/servers': typeof V2HostingServersIndexRoute
   '/v2/remote/hosts': typeof V2RemoteHostsIndexRoute
+  '/v2/remote/owner-transfers': typeof V2RemoteOwnerTransfersIndexRoute
   '/v2/remote/sessions': typeof V2RemoteSessionsIndexRoute
   '/v1/marketplace/agents/$agentId/avatar': typeof V1MarketplaceAgentsAgentIdAvatarRoute
   '/v1/marketplace/agents/$agentId/card': typeof V1MarketplaceAgentsAgentIdCardRoute
@@ -2136,6 +2185,7 @@ export interface FileRoutesByTo {
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/android-notification': typeof V2RemoteHostsHostIdAndroidNotificationRoute
   '/v2/remote/hosts/$hostId/appearance': typeof V2RemoteHostsHostIdAppearanceRoute
+  '/v2/remote/hosts/$hostId/checkout': typeof V2RemoteHostsHostIdCheckoutRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
@@ -2144,6 +2194,8 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
   '/v2/remote/hosts/$hostId/notification': typeof V2RemoteHostsHostIdNotificationRoute
+  '/v2/remote/hosts/$hostId/owner-session': typeof V2RemoteHostsHostIdOwnerSessionRoute
+  '/v2/remote/hosts/$hostId/owner-transfer': typeof V2RemoteHostsHostIdOwnerTransferRoute
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/telegram-disconnect': typeof V2RemoteHostsHostIdTelegramDisconnectRoute
@@ -2152,6 +2204,8 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
+  '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
   '/v2/hosting/servers/$serverId': typeof V2HostingServersServerIdIndexRoute
@@ -2379,6 +2433,7 @@ export interface FileRoutesById {
   '/v1/me/license/': typeof V1MeLicenseIndexRoute
   '/v2/hosting/servers/': typeof V2HostingServersIndexRoute
   '/v2/remote/hosts/': typeof V2RemoteHostsIndexRoute
+  '/v2/remote/owner-transfers/': typeof V2RemoteOwnerTransfersIndexRoute
   '/v2/remote/sessions/': typeof V2RemoteSessionsIndexRoute
   '/v1/marketplace/agents/$agentId/avatar': typeof V1MarketplaceAgentsAgentIdAvatarRoute
   '/v1/marketplace/agents/$agentId/card': typeof V1MarketplaceAgentsAgentIdCardRoute
@@ -2401,6 +2456,7 @@ export interface FileRoutesById {
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/android-notification': typeof V2RemoteHostsHostIdAndroidNotificationRoute
   '/v2/remote/hosts/$hostId/appearance': typeof V2RemoteHostsHostIdAppearanceRoute
+  '/v2/remote/hosts/$hostId/checkout': typeof V2RemoteHostsHostIdCheckoutRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
@@ -2409,6 +2465,8 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
   '/v2/remote/hosts/$hostId/notification': typeof V2RemoteHostsHostIdNotificationRoute
+  '/v2/remote/hosts/$hostId/owner-session': typeof V2RemoteHostsHostIdOwnerSessionRoute
+  '/v2/remote/hosts/$hostId/owner-transfer': typeof V2RemoteHostsHostIdOwnerTransferRoute
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/telegram-disconnect': typeof V2RemoteHostsHostIdTelegramDisconnectRoute
@@ -2417,6 +2475,8 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
   '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  '/v2/remote/owner-transfers/$transferId/accept': typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
+  '/v2/remote/owner-transfers/$transferId/decline': typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
   '/v2/hosting/servers/$serverId/': typeof V2HostingServersServerIdIndexRoute
@@ -2641,6 +2701,7 @@ export interface FileRouteTypes {
     | '/v1/me/license/'
     | '/v2/hosting/servers/'
     | '/v2/remote/hosts/'
+    | '/v2/remote/owner-transfers/'
     | '/v2/remote/sessions/'
     | '/v1/marketplace/agents/$agentId/avatar'
     | '/v1/marketplace/agents/$agentId/card'
@@ -2663,6 +2724,7 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/android-notification'
     | '/v2/remote/hosts/$hostId/appearance'
+    | '/v2/remote/hosts/$hostId/checkout'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
@@ -2671,6 +2733,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
     | '/v2/remote/hosts/$hostId/notification'
+    | '/v2/remote/hosts/$hostId/owner-session'
+    | '/v2/remote/hosts/$hostId/owner-transfer'
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/telegram-disconnect'
@@ -2679,6 +2743,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/owner-transfers/$transferId/accept'
+    | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
     | '/v2/hosting/servers/$serverId/'
@@ -2901,6 +2967,7 @@ export interface FileRouteTypes {
     | '/v1/me/license'
     | '/v2/hosting/servers'
     | '/v2/remote/hosts'
+    | '/v2/remote/owner-transfers'
     | '/v2/remote/sessions'
     | '/v1/marketplace/agents/$agentId/avatar'
     | '/v1/marketplace/agents/$agentId/card'
@@ -2923,6 +2990,7 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/android-notification'
     | '/v2/remote/hosts/$hostId/appearance'
+    | '/v2/remote/hosts/$hostId/checkout'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
@@ -2931,6 +2999,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
     | '/v2/remote/hosts/$hostId/notification'
+    | '/v2/remote/hosts/$hostId/owner-session'
+    | '/v2/remote/hosts/$hostId/owner-transfer'
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/telegram-disconnect'
@@ -2939,6 +3009,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/owner-transfers/$transferId/accept'
+    | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
     | '/v2/hosting/servers/$serverId'
@@ -3165,6 +3237,7 @@ export interface FileRouteTypes {
     | '/v1/me/license/'
     | '/v2/hosting/servers/'
     | '/v2/remote/hosts/'
+    | '/v2/remote/owner-transfers/'
     | '/v2/remote/sessions/'
     | '/v1/marketplace/agents/$agentId/avatar'
     | '/v1/marketplace/agents/$agentId/card'
@@ -3187,6 +3260,7 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/android-notification'
     | '/v2/remote/hosts/$hostId/appearance'
+    | '/v2/remote/hosts/$hostId/checkout'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
@@ -3195,6 +3269,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
     | '/v2/remote/hosts/$hostId/notification'
+    | '/v2/remote/hosts/$hostId/owner-session'
+    | '/v2/remote/hosts/$hostId/owner-transfer'
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/telegram-disconnect'
@@ -3203,6 +3279,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/hosts/$hostId/webhook-route'
     | '/v2/remote/hosts/$hostId/webhook-routes'
+    | '/v2/remote/owner-transfers/$transferId/accept'
+    | '/v2/remote/owner-transfers/$transferId/decline'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
     | '/v2/hosting/servers/$serverId/'
@@ -3347,6 +3425,7 @@ export interface RootRouteChildren {
   V1MarketplaceAgentsIndexRoute: typeof V1MarketplaceAgentsIndexRoute
   V2HostingServersIndexRoute: typeof V2HostingServersIndexRoute
   V2RemoteHostsIndexRoute: typeof V2RemoteHostsIndexRoute
+  V2RemoteOwnerTransfersIndexRoute: typeof V2RemoteOwnerTransfersIndexRoute
   V2RemoteSessionsIndexRoute: typeof V2RemoteSessionsIndexRoute
   V1MarketplaceAgentsAdminSubmissionsRoute: typeof V1MarketplaceAgentsAdminSubmissionsRouteWithChildren
   V1SitesAdminSiteIdBlockRoute: typeof V1SitesAdminSiteIdBlockRoute
@@ -3363,6 +3442,7 @@ export interface RootRouteChildren {
   V2HostingServersServerIdWakeRoute: typeof V2HostingServersServerIdWakeRoute
   V2RemoteHostsHostIdAndroidNotificationRoute: typeof V2RemoteHostsHostIdAndroidNotificationRoute
   V2RemoteHostsHostIdAppearanceRoute: typeof V2RemoteHostsHostIdAppearanceRoute
+  V2RemoteHostsHostIdCheckoutRoute: typeof V2RemoteHostsHostIdCheckoutRoute
   V2RemoteHostsHostIdDiscordDisconnectRoute: typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   V2RemoteHostsHostIdDiscordRouteRoute: typeof V2RemoteHostsHostIdDiscordRouteRoute
   V2RemoteHostsHostIdGithubRouteRoute: typeof V2RemoteHostsHostIdGithubRouteRoute
@@ -3371,6 +3451,8 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdLiveActivityRoute: typeof V2RemoteHostsHostIdLiveActivityRoute
   V2RemoteHostsHostIdLogoRoute: typeof V2RemoteHostsHostIdLogoRoute
   V2RemoteHostsHostIdNotificationRoute: typeof V2RemoteHostsHostIdNotificationRoute
+  V2RemoteHostsHostIdOwnerSessionRoute: typeof V2RemoteHostsHostIdOwnerSessionRoute
+  V2RemoteHostsHostIdOwnerTransferRoute: typeof V2RemoteHostsHostIdOwnerTransferRoute
   V2RemoteHostsHostIdSlackDisconnectRoute: typeof V2RemoteHostsHostIdSlackDisconnectRoute
   V2RemoteHostsHostIdSlackRouteRoute: typeof V2RemoteHostsHostIdSlackRouteRoute
   V2RemoteHostsHostIdTelegramDisconnectRoute: typeof V2RemoteHostsHostIdTelegramDisconnectRoute
@@ -3379,6 +3461,8 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdTicketRoute: typeof V2RemoteHostsHostIdTicketRoute
   V2RemoteHostsHostIdWebhookRouteRoute: typeof V2RemoteHostsHostIdWebhookRouteRoute
   V2RemoteHostsHostIdWebhookRoutesRoute: typeof V2RemoteHostsHostIdWebhookRoutesRoute
+  V2RemoteOwnerTransfersTransferIdAcceptRoute: typeof V2RemoteOwnerTransfersTransferIdAcceptRoute
+  V2RemoteOwnerTransfersTransferIdDeclineRoute: typeof V2RemoteOwnerTransfersTransferIdDeclineRoute
   V2RemoteSessionsSessionIdEndRoute: typeof V2RemoteSessionsSessionIdEndRoute
   V2RemoteSessionsSessionIdTicketRoute: typeof V2RemoteSessionsSessionIdTicketRoute
   V2HostingServersServerIdIndexRoute: typeof V2HostingServersServerIdIndexRoute
@@ -4830,6 +4914,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteInvitesPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/owner-transfers/': {
+      id: '/v2/remote/owner-transfers/'
+      path: '/v2/remote/owner-transfers'
+      fullPath: '/v2/remote/owner-transfers/'
+      preLoaderRoute: typeof V2RemoteOwnerTransfersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/resume/validate': {
       id: '/v2/remote/resume/validate'
       path: '/v2/remote/resume/validate'
@@ -5033,6 +5124,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdAppearanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/checkout': {
+      id: '/v2/remote/hosts/$hostId/checkout'
+      path: '/v2/remote/hosts/$hostId/checkout'
+      fullPath: '/v2/remote/hosts/$hostId/checkout'
+      preLoaderRoute: typeof V2RemoteHostsHostIdCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/hosts/$hostId/discord-disconnect': {
       id: '/v2/remote/hosts/$hostId/discord-disconnect'
       path: '/v2/remote/hosts/$hostId/discord-disconnect'
@@ -5089,6 +5187,20 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdNotificationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/owner-session': {
+      id: '/v2/remote/hosts/$hostId/owner-session'
+      path: '/v2/remote/hosts/$hostId/owner-session'
+      fullPath: '/v2/remote/hosts/$hostId/owner-session'
+      preLoaderRoute: typeof V2RemoteHostsHostIdOwnerSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/hosts/$hostId/owner-transfer': {
+      id: '/v2/remote/hosts/$hostId/owner-transfer'
+      path: '/v2/remote/hosts/$hostId/owner-transfer'
+      fullPath: '/v2/remote/hosts/$hostId/owner-transfer'
+      preLoaderRoute: typeof V2RemoteHostsHostIdOwnerTransferRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/hosts/$hostId/slack-disconnect': {
       id: '/v2/remote/hosts/$hostId/slack-disconnect'
       path: '/v2/remote/hosts/$hostId/slack-disconnect'
@@ -5143,6 +5255,20 @@ declare module '@tanstack/solid-router' {
       path: '/v2/remote/hosts/$hostId/webhook-routes'
       fullPath: '/v2/remote/hosts/$hostId/webhook-routes'
       preLoaderRoute: typeof V2RemoteHostsHostIdWebhookRoutesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/owner-transfers/$transferId/accept': {
+      id: '/v2/remote/owner-transfers/$transferId/accept'
+      path: '/v2/remote/owner-transfers/$transferId/accept'
+      fullPath: '/v2/remote/owner-transfers/$transferId/accept'
+      preLoaderRoute: typeof V2RemoteOwnerTransfersTransferIdAcceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/owner-transfers/$transferId/decline': {
+      id: '/v2/remote/owner-transfers/$transferId/decline'
+      path: '/v2/remote/owner-transfers/$transferId/decline'
+      fullPath: '/v2/remote/owner-transfers/$transferId/decline'
+      preLoaderRoute: typeof V2RemoteOwnerTransfersTransferIdDeclineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v2/remote/sessions/$sessionId/end': {
@@ -5682,6 +5808,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MarketplaceAgentsIndexRoute: V1MarketplaceAgentsIndexRoute,
   V2HostingServersIndexRoute: V2HostingServersIndexRoute,
   V2RemoteHostsIndexRoute: V2RemoteHostsIndexRoute,
+  V2RemoteOwnerTransfersIndexRoute: V2RemoteOwnerTransfersIndexRoute,
   V2RemoteSessionsIndexRoute: V2RemoteSessionsIndexRoute,
   V1MarketplaceAgentsAdminSubmissionsRoute:
     V1MarketplaceAgentsAdminSubmissionsRouteWithChildren,
@@ -5701,6 +5828,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteHostsHostIdAndroidNotificationRoute:
     V2RemoteHostsHostIdAndroidNotificationRoute,
   V2RemoteHostsHostIdAppearanceRoute: V2RemoteHostsHostIdAppearanceRoute,
+  V2RemoteHostsHostIdCheckoutRoute: V2RemoteHostsHostIdCheckoutRoute,
   V2RemoteHostsHostIdDiscordDisconnectRoute:
     V2RemoteHostsHostIdDiscordDisconnectRoute,
   V2RemoteHostsHostIdDiscordRouteRoute: V2RemoteHostsHostIdDiscordRouteRoute,
@@ -5710,6 +5838,8 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteHostsHostIdLiveActivityRoute: V2RemoteHostsHostIdLiveActivityRoute,
   V2RemoteHostsHostIdLogoRoute: V2RemoteHostsHostIdLogoRoute,
   V2RemoteHostsHostIdNotificationRoute: V2RemoteHostsHostIdNotificationRoute,
+  V2RemoteHostsHostIdOwnerSessionRoute: V2RemoteHostsHostIdOwnerSessionRoute,
+  V2RemoteHostsHostIdOwnerTransferRoute: V2RemoteHostsHostIdOwnerTransferRoute,
   V2RemoteHostsHostIdSlackDisconnectRoute:
     V2RemoteHostsHostIdSlackDisconnectRoute,
   V2RemoteHostsHostIdSlackRouteRoute: V2RemoteHostsHostIdSlackRouteRoute,
@@ -5720,6 +5850,10 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteHostsHostIdTicketRoute: V2RemoteHostsHostIdTicketRoute,
   V2RemoteHostsHostIdWebhookRouteRoute: V2RemoteHostsHostIdWebhookRouteRoute,
   V2RemoteHostsHostIdWebhookRoutesRoute: V2RemoteHostsHostIdWebhookRoutesRoute,
+  V2RemoteOwnerTransfersTransferIdAcceptRoute:
+    V2RemoteOwnerTransfersTransferIdAcceptRoute,
+  V2RemoteOwnerTransfersTransferIdDeclineRoute:
+    V2RemoteOwnerTransfersTransferIdDeclineRoute,
   V2RemoteSessionsSessionIdEndRoute: V2RemoteSessionsSessionIdEndRoute,
   V2RemoteSessionsSessionIdTicketRoute: V2RemoteSessionsSessionIdTicketRoute,
   V2HostingServersServerIdIndexRoute: V2HostingServersServerIdIndexRoute,

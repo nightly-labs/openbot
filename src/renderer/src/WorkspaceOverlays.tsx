@@ -7,6 +7,7 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
@@ -22,7 +23,7 @@ import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerD
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, Loading, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "./action-toast";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
@@ -52,6 +53,8 @@ import {
 } from "./features/servers/hosted-server-upsell-controller";
 import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import { OwnerTransferPrompt } from "./features/servers/OwnerTransferPrompt";
+import { ServerPlanReminder } from "./features/servers/ServerPlanReminder";
 import type { ServerCopyOptions } from "./features/servers/ServerTransferPanel";
 import { useServerActions } from "./features/servers/server-actions";
 import {
@@ -110,6 +113,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <CreateLocalServer />
       <InstallServer />
       <HostedUpsell account={props.account} />
+      <PlanReminder />
       <LeaveServer />
       <RestartServer />
       <ServerSettings />
@@ -117,7 +121,43 @@ export function WorkspaceOverlays(props: AccountProps) {
       <GlobalMessageSearch />
       <RemoteDesktop />
       <ChannelCreateOverlay />
+      <OwnerTransfers />
     </>
+  );
+}
+
+const OWNER_TRANSFER_FOCUS_RELOAD_MS = 60_000;
+
+function OwnerTransfers() {
+  const platform = usePlatform();
+  const { refreshServers } = useServers();
+  const [reloadRequest, setReloadRequest] = createSignal(0);
+  let reloadedAt = Date.now();
+  const reload = () => {
+    reloadedAt = Date.now();
+    setReloadRequest((request) => request + 1);
+  };
+  const unsubscribe = appPort().auth.onOwnerTransfersChanged(reload);
+  const focus = () => {
+    if (Date.now() - reloadedAt >= OWNER_TRANSFER_FOCUS_RELOAD_MS) reload();
+  };
+  window.addEventListener("focus", focus);
+  onCleanup(() => {
+    unsubscribe();
+    window.removeEventListener("focus", focus);
+  });
+  return (
+    <Show when={platform.chatWindow === null}>
+      <OwnerTransferPrompt
+        calls={{
+          list: () => appPort().auth.listOwnerTransfers(),
+          accept: (transferId) => appPort().auth.acceptOwnerTransfer(transferId),
+          decline: (transferId) => appPort().auth.declineOwnerTransfer(transferId),
+        }}
+        reloadKey={reloadRequest()}
+        onAccepted={() => void refreshServers()}
+      />
+    </Show>
   );
 }
 
@@ -180,6 +220,20 @@ export function SkillsMarketplace() {
       onMcpSignInRequestHandled={() => setPendingMcpSignIn(null)}
       onMcpSignIns={(serverId, states) => setMcpSignIns({ serverId, states })}
     />
+  );
+}
+
+function PlanReminder() {
+  const platform = usePlatform();
+  const { orderedServers, callbacks } = useServerActions();
+  return (
+    <Show when={platform.chatWindow === null}>
+      <ServerPlanReminder
+        servers={orderedServers()}
+        planDeletesAt={callbacks.planDeletesAt}
+        onRenew={callbacks.onRenewPlan}
+      />
+    </Show>
   );
 }
 
@@ -820,6 +874,15 @@ function ServerSettings() {
           onCreateInvite={createServerInvite}
           license={appPort().license}
           companySignIn={appPort().auth}
+          ownerTransfer={
+            server().kind === "remote" &&
+            server().hosted !== true &&
+            hostedServersLoaded() &&
+            !hostedServerIds().has(server().id) &&
+            serverSupportsCapability(server(), OWNER_TRANSFER_CAPABILITY)
+              ? appPort().servers
+              : undefined
+          }
           onContactUs={() => void appPort().openExternal("hosted-server-contact")}
           onUpdateMember={updateServerMember}
           onRemoveMember={removeServerMember}
@@ -945,12 +1008,21 @@ function AppSettings(props: AccountProps) {
   });
   const codexLiveAccess = () =>
     activeServer()?.kind === "local" ? codexLiveAccessOf(agentStatus().providers) : undefined;
+  const { providerAccounts } = useProviders();
+  const liveVoiceAccount = () => {
+    const choose = providerAccounts()?.setLiveVoiceAccount;
+    const codex = agentStatus().providers?.find((row) => row.id === "codex");
+    if (!choose || !codex?.accounts) return undefined;
+    return { accounts: codex.accounts, accountId: codex.liveVoiceAccount ?? null, choose };
+  };
   const {
     appSettingsOpen,
     notificationFocusRequest,
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
+    mobileInstallRequest,
+    clearMobileInstallRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -987,6 +1059,7 @@ function AppSettings(props: AccountProps) {
         onCancelScheduledRestart={updates.cancelScheduledRestart}
         onRestartWhenIdle={updates.restartWhenIdle}
         onCancelIdleRestart={updates.cancelIdleRestart}
+        onRestartNow={updates.restartNow}
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}
@@ -1013,6 +1086,7 @@ function AppSettings(props: AccountProps) {
           setAddServerOpen(true, "settings_billing");
         }}
         codexLiveAccess={codexLiveAccess()}
+        liveVoiceAccount={liveVoiceAccount()}
         onConnectCodex={() => {
           setAppSettingsOpen(false);
           openServerSettings(LOCAL_SERVER_ID, null, "providers");
@@ -1025,6 +1099,8 @@ function AppSettings(props: AccountProps) {
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
+        mobileInstallRequest={mobileInstallRequest()}
+        onMobileInstallRequestHandled={clearMobileInstallRequest}
       />
     </Loading>
   );

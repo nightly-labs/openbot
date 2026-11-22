@@ -29,6 +29,8 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelHistoryArriving",
   "error.backend.channelHistoryLeadRequired",
   "error.backend.channelRoutingUnreadable",
+  "error.backend.channelLeadTimedOut",
+  "error.backend.channelRequestMemberRequired",
   "error.backend.recipientHidden",
   "error.provider.customEndpointKeyRefused",
   "error.connector.protonPassPlan",

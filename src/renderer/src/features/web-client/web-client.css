@@ -87,6 +87,15 @@
   inset-inline-end: 0;
 }
 
+.web-app-window[data-loading-waited-long] > .app-loading {
+  z-index: var(--openbot-layer-dropdown);
+}
+
+.web-app-window[data-loading-waited-long] > .window-rail {
+  z-index: calc(var(--openbot-layer-dropdown) + 1);
+  background: var(--window-frame);
+}
+
 @media (max-width: 720px) {
   .web-app-window {
     --web-mobile-navigation-height: 64px;
@@ -122,7 +131,6 @@
   }
 
   .web-app-frame[data-web-mobile-pane="conversation"] .conversation-panel,
-  .web-app-frame[data-web-mobile-pane="conversation"] .diagram-view,
   .web-app-frame[data-web-mobile-pane="conversation"] .remote-compatibility-screen {
     grid-column: 1;
     min-width: 0;
@@ -133,7 +141,6 @@
   }
 
   .web-app-frame[data-web-mobile-pane="workspace"] .conversation-panel,
-  .web-app-frame[data-web-mobile-pane="workspace"] .diagram-view,
   .web-app-frame[data-web-mobile-pane="workspace"] .remote-compatibility-screen,
   .web-app-frame[data-web-mobile-pane="workspace"] > .server-connection-workspace {
     display: none;

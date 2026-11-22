@@ -22,6 +22,8 @@ export const messages = defineMessages("error.remote", {
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
   "error.remote.windowsSessionDisconnected":
     "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
+  "error.remote.windowsCaptureDenied":
+    "Windows on the host does not let OpenBot record its screen. Unlock Windows at the screen of the host and close any administrator prompt, then try again. If this continues, restart the host.",
   "error.remote.macScreenLocked":
     "The Mac is locked, so it cannot share its screen. Unlock the Mac at its screen, then try again.",
   "error.remote.streamTooSlowLowerQuality":
@@ -206,6 +208,10 @@ export const messages = defineMessages("error.remote", {
   "error.remote.formUnavailable": "This form is no longer available.",
   "error.remote.hostedServerRemoval": "Use Billing to delete a hosted server.",
   "error.remote.hostRemoved": "The owner removed this server from the account.",
+  "error.remote.ownerTransferSelf": "You already own this server. Enter the email of the new owner.",
+  "error.remote.ownerTransferHosted": "A server that OpenBot hosts cannot change its owner.",
+  "error.remote.ownerTransferInvalid":
+    "This ownership transfer is no longer available. Ask the owner to send it again.",
   "error.remote.channelsUnsupported": "Update this desktop server to use channels.",
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",

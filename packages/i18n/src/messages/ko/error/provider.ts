@@ -19,6 +19,8 @@ export const messages = {
     "{provider} 요금제 사용량을 모두 사용했습니다. 다른 모델을 선택하거나 {provider} 요금제를 업그레이드하세요.",
   "error.provider.acpMcpNotLoaded":
     "{provider}가 OpenBot 도구를 불러오지 않아 이 에이전트는 도구를 사용하거나 팀원에게 연락할 수 없습니다. {provider} 팀 정책이 로컬 MCP 서버를 차단할 수 있습니다. 팀 관리자에게 허용을 요청한 다음 다시 시도하세요.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider}가 OpenBot 도구 없이 이 메시지를 실행해서 에이전트가 팀원에게 연락하거나 브라우저를 사용하거나 파일을 첨부할 수 없었습니다. 다시 시도하세요.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider}가 MCP 서버 {name}을(를) 시작하지 못해 응답이 중단되었습니다. 이 서버는 OpenBot이 아니라 사용자의 {provider} 설정에 있습니다. 그곳에서 서버를 제거하거나 고친 다음 새 채팅을 시작하세요.",
   "error.provider.endpointsReadOnly":
@@ -285,6 +287,8 @@ export const messages = {
     "이 컴퓨터의 프로세서에서는 이 제공자를 실행할 수 없어요. 다른 제공자를 사용해 주세요.",
   "error.provider.opencodeDatabaseNewer":
     "더 새로운 OpenCode 버전이 데이터베이스를 변경해서 OpenCode가 데이터베이스를 열 수 없었어요. OpenCode를 버전 2 이상으로 업데이트한 후 다시 시도해 주세요.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok 설정의 allowed_models에 기본 모델이 없어서 Grok이 시작되지 않았습니다. 기본 모델을 allowed_models에 추가하거나 allowed_models를 삭제한 다음 다시 시도하세요.",
   "error.provider.opencodeNoAnswer": "OpenCode 모델이 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 모델이 추론만 하고 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
@@ -329,6 +333,8 @@ export const messages = {
     "Gemini가 원인을 알리지 않고 이 요청을 거부했어요. 에이전트가 연 이미지처럼 채팅 기록의 항목 때문일 수 있어요. OpenBot이 채팅 기록으로 새 Gemini 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델을 선택하세요.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini가 이 채팅의 저장된 기록을 읽지 못했습니다. OpenBot이 채팅 기록으로 새 Gemini 세션을 시작했습니다. 메시지를 다시 보내세요.",
+  "error.provider.acpTurnStuck":
+    "{provider}이(가) 이전 턴을 끝내지 않아 이 메시지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 메시지를 다시 보내세요.",
   "error.provider.antigravityLocationUnsupported":
     "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -417,6 +423,8 @@ export const messages = {
     "이 채팅이 너무 커져서 모델에 보낼 수 없습니다. 채팅의 이미지가 원인인 경우가 많습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.opencodeSessionRejected":
     "OpenCode가 원인을 알리지 않고 요청을 거부했어요. 긴 채팅이나 모델 변경 후에 발생할 수 있어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델이나 낮은 강도를 선택하세요.",
+  "error.provider.opencodeInputRefused":
+    "모델이 원인을 알리지 않고 이 채팅의 내용을 거부했어요. PDF나 이미지 같은 채팅 속 파일 때문일 수 있어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 파일 없이 메시지를 다시 보내거나 다른 모델을 선택하세요.",
   "error.provider.opencodeCompactionFailed":
     "모델이 이 긴 채팅을 요약하지 못해 컨텍스트 창에 공간을 만들지 못했어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 더 강력한 모델을 선택하세요.",
   "error.provider.museMcpStartupFault":
@@ -530,6 +538,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "{provider} CLI 버전을 읽을 수 없었어요.",
   "error.provider.piSessionBusy": "현재 Pi 턴이 끝날 때까지 기다려 주세요.",
   "error.provider.acpSessionBusy": "{provider}이(가) 중지된 턴을 아직 마무리하고 있습니다. 잠시 후 다시 시도해 주세요.",
+  "error.provider.acpSessionStale":
+    "{provider}이(가) 이 채팅의 최신 버전을 불러오지 못했어요. 메시지를 다시 보내 주세요.",
   "error.provider.acpModelNotOffered":
     "{provider}에서 지금 {model}을(를) 제공하지 않아요. 이 에이전트에 다른 모델을 선택한 후 다시 시도해 주세요.",
   "error.provider.piStopped": "Pi가 실행 중이 아니에요. Pi를 연결한 후 다시 시도해 주세요.",

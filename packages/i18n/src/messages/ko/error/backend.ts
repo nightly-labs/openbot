@@ -219,7 +219,7 @@ export const messages = {
   "error.backend.agentWaitGone": "이 대기는 열려 있지 않아요. 에이전트가 닫았거나 누군가 취소했어요.",
   "error.backend.agentWaitNoRequest": "대기를 이어가려면 메시지가 필요한데, 이 턴에는 메시지가 없어요.",
   "error.backend.agentWaitOwnChatOnly":
-    "대기는 자신의 채팅에서만 열 수 있어요. 채널이나 메시징 작업에서는 대기할 수 없어요.",
+    "대기는 자신의 채팅이나 사이드 스레드에서 열 수 있어요. 채널이나 메시징 대화에서는 대기할 수 없어요.",
   "error.backend.agentWaitNoteRequired": "대기 목적을 알려 주는 짧은 메모를 입력하세요.",
   "error.backend.agentWaitRoutineGone": "이 에이전트에는 이 ID의 루틴이 없어요.",
   "error.backend.agentWaitNoRoutine":
@@ -326,6 +326,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "폴더가 없거나 이미 삭제되었어요.",
   "error.backend.libraryFolderOtherAgent": "파일은 해당 에이전트의 폴더에만 넣을 수 있어요.",
   "error.backend.libraryFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없어요.",
+  "error.backend.workflowFolderLimit": "서버 하나에는 워크플로 폴더를 최대 {limit}개까지 둘 수 있어요.",
+  "error.backend.workflowFolderPlacementLimit": "폴더에 있는 워크플로가 너무 많아요.",
   "error.backend.sectionNameDuplicate": "섹션 이름은 고유해야 해요.",
   "error.backend.directMessageRequired": "먼저 메시지를 작성하세요.",
   "error.backend.directMessageTooLong": "다이렉트 메시지는 최대 {limit}자까지 쓸 수 있어요.",
@@ -359,6 +361,7 @@ export const messages = {
     "이 신고는 OpenBot 휴대폰 앱에서만 보낼 수 있어요. 휴대폰의 버전과 지원 로그를 추가하기 때문이에요. 휴대폰에서 이 채팅을 열어 주세요. 거기서도 이 메시지가 보이면 휴대폰 앱을 업데이트해 주세요.",
   "error.backend.takeoverInactive": "이 브라우저 제어권 가져오기는 더 이상 활성 상태가 아니에요.",
   "error.backend.authSubmitting": "인증을 이미 제출하는 중이에요.",
+  "error.backend.apiKeyListFailed": "OpenBot이 저장된 API 키를 읽을 수 없었어요.",
   "error.backend.apiKeySaveFailed": "OpenBot이 API 키를 저장할 수 없었어요. 다시 시도해 주세요.",
   "error.backend.apiKeySaving": "API 키를 이미 저장하는 중이에요.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -438,6 +441,7 @@ export const messages = {
   "error.backend.threadMoveRefused": "이 에이전트에게만 보낸 메시지만 새 스레드에서 실행할 수 있어요.",
   "error.backend.taskTitleRequired": "작업에 짧은 제목을 지정하세요.",
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",
+  "error.backend.taskControlInvalid": "시작한 작업의 taskId를 지정하세요. 메시지에는 텍스트도 필요해요.",
   "error.backend.taskOwnChatOnly":
     "작업은 자신의 채팅에서만 시작할 수 있어요. 채널, 메시징 대화, 다른 작업에서는 시작할 수 없어요.",
   "error.backend.taskUnfinishedLimit":
@@ -445,5 +449,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "이 에이전트에는 열린 작업이 {count}개 있어요. 작업 하나를 닫은 후 다른 작업을 시작하거나 여세요.",
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.taskMessageFailed": "OpenBot이 작업에 메시지를 보낼 수 없었어요. 나중에 다시 시도하세요.",
   "error.backend.taskStartFailed": "OpenBot이 작업을 시작할 수 없었어요. 대신 이 턴에서 작업을 처리하세요.",
 } as const satisfies PartialTranslation<typeof source>;

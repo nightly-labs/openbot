@@ -2,6 +2,10 @@ import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
 import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
 import {
+  type CustomServerCheckoutResult,
+  parseCustomServerCheckoutResult,
+} from "@openbot/contracts/custom-server-plans";
+import {
   type HostedServerCatalog,
   type HostedServerList,
   type HostedServerSummary,
@@ -152,6 +156,7 @@ import {
   isMarketplaceSkillSlug,
   type MarketplaceListingLink,
 } from "@openbot/contracts/marketplace-links";
+import { decodeOwnerTransfer, type OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { parseReferralState, type ReferralState } from "@openbot/contracts/referral";
 import {
@@ -165,8 +170,16 @@ import {
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
-  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering, hourCycle, aboveAppsSupport } =
-    info;
+  const {
+    platform,
+    variant,
+    analyticsCaptureUrl,
+    analyticsInstallId,
+    softwareRendering,
+    hourCycle,
+    aboveAppsSupport,
+    dynamicIslandUnavailable,
+  } = info;
   if (!isOneOf(["darwin", "win32", "linux"] as const, platform)) throw new Error("Invalid platform.");
   if (!isOneOf(["production", "dev", "preview"] as const, variant)) throw new Error("Invalid variant.");
   if (analyticsCaptureUrl !== undefined && !isString(analyticsCaptureUrl))
@@ -178,6 +191,8 @@ export function decodeAppInfo(value: unknown): AppInfo {
   if (hourCycle !== undefined && !isOneOf(["h12", "h23"] as const, hourCycle)) throw new Error("Invalid hour cycle.");
   if (aboveAppsSupport !== undefined && !isOneOf(["restart", "unsupported"] as const, aboveAppsSupport))
     throw new Error("Invalid agent dock screen support.");
+  if (dynamicIslandUnavailable !== undefined && !isBoolean(dynamicIslandUnavailable))
+    throw new Error("Invalid Dynamic Island availability.");
   return {
     name: requiredString(info, "name"),
     version: requiredString(info, "version"),
@@ -188,6 +203,7 @@ export function decodeAppInfo(value: unknown): AppInfo {
     ...(softwareRendering === undefined ? {} : { softwareRendering }),
     ...(hourCycle === undefined ? {} : { hourCycle }),
     ...(aboveAppsSupport === undefined ? {} : { aboveAppsSupport }),
+    ...(dynamicIslandUnavailable === undefined ? {} : { dynamicIslandUnavailable }),
   };
 }
 
@@ -392,6 +408,15 @@ export function decodeMobileConnectTicket(value: unknown): MobileConnectTicket {
 export function decodeMobileConnectLink(value: unknown): MobileConnectLink {
   const link = decodeRecord(value, "Mobile Connect link");
   return { url: requiredString(link, "url"), createdAt: requiredNumber(link, "createdAt") };
+}
+
+export function decodeOwnerTransferOrNull(value: unknown): OwnerTransfer | null {
+  return value === null ? null : decodeOwnerTransfer(value);
+}
+
+export function decodeOwnerTransferList(value: unknown): OwnerTransfer[] {
+  if (!Array.isArray(value)) throw new Error("Invalid ownership transfers.");
+  return value.map(decodeOwnerTransfer);
 }
 
 export function decodeMobileConnectedDevices(value: unknown): MobileConnectedDevice[] {
@@ -754,6 +779,12 @@ export function decodeHostedServer(value: unknown): HostedServerSummary {
   const server = parseHostedServerSummary(value);
   if (!server) throw new Error("Invalid hosted server response.");
   return server;
+}
+
+export function decodeCustomServerCheckoutResult(value: unknown): CustomServerCheckoutResult {
+  const result = parseCustomServerCheckoutResult(value);
+  if (!result) throw new Error("Invalid custom server checkout response.");
+  return result;
 }
 
 export function decodeServerClaim(value: unknown): ServerClaim {

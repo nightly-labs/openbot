@@ -25,6 +25,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Konuşma modelini Ayarlar → Ses bölümünden indirin.",
   "error.voice.speech.timedOut": "Yanıtı sesli okuma zaman aşımına uğradı.",
   "error.voice.speech.failed": "OpenBot yanıtı sesli okuyamadı.",
+  "error.voice.speech.providerRefused": "{provider} sesi oluşturmayı reddetti: {reason}",
   "error.voice.recordingNotKept": "OpenBot ses kaydını saklayamadı.",
   "error.voice.live.timedOut": "Codex canlı ses zamanında başlamadı. Tekrar dene.",
   "error.voice.live.failed": "Canlı ses durdu: {reason}",
@@ -32,6 +33,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Sunucudaki Codex canlı sesi başlatamadı. Sahibinden o bilgisayardaki Codex'i güncellemesini ve ChatGPT ile oturum açmasını isteyin, sonra yeniden deneyin.",
   "error.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
+  "error.voice.live.chooseAccount":
+    "Bu ChatGPT hesabı canlı sesi kullanamaz. Ayarlar → Ses bölümünde planı sesi içeren bir hesap seçin.",
   "error.voice.live.unavailable": "OpenAI canlı sesi başlatamadı. Sorun OpenAI tarafında. Daha sonra yeniden deneyin.",
   "error.voice.live.refused":
     "OpenAI canlı sesi başlatmayı reddetti. Daha sonra yeniden deneyin veya sesle konuşmak için Ayarlar'dan canlı sesi kapatın.",

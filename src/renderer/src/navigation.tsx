@@ -204,8 +204,8 @@ const Navigation = createSimpleContext({
     });
     let historyTarget: number | null = null;
 
-    const openChat = (): ChatHistoryEntry | null => {
-      if (windowPage.page() !== "agents" || agentSetupOpen()) return null;
+    const currentChat = (): ChatHistoryEntry | null => {
+      if (agentSetupOpen()) return null;
       const channelId = channels.state.selectedId;
       if (channelId) return { kind: "channel", id: channelId };
       const member = activeDirectMember();
@@ -213,6 +213,8 @@ const Navigation = createSimpleContext({
       const agent = activeAgent();
       return agent ? { kind: "agent", id: agent.id } : null;
     };
+    const openChat = (): ChatHistoryEntry | null => (windowPage.page() === "agents" ? currentChat() : null);
+    const chatUnderPage = (): ChatHistoryEntry | null => (windowPage.page() === "agents" ? null : currentChat());
     createEffect(
       () => {
         const entry = openChat();
@@ -239,6 +241,7 @@ const Navigation = createSimpleContext({
     const goBack = () => {
       const pageBack = windowPage.pageBack();
       if (pageBack) pageBack.back();
+      else if (chatUnderPage()) windowPage.showAgents();
       else goInHistory(-1);
     };
     const goForward = () => goInHistory(1);
@@ -251,7 +254,7 @@ const Navigation = createSimpleContext({
     onSettled(() => {
       const onKeyDown = (event: KeyboardEvent) => {
         if (handledElsewhere(event)) return;
-        const command = chatHistoryShortcut(event, platform.appInfo()?.platform === "darwin");
+        const command = chatHistoryShortcut(event);
         if (!command) return;
         event.preventDefault();
         if (command === "back") goBack();
@@ -281,7 +284,14 @@ const Navigation = createSimpleContext({
       globalSearchOpener: () => globalSearchOpener,
       searchGlobalMessages,
       selectGlobalSearchMessage,
-      chatHistory: { previous: history.previous, next: history.next, pageBack: windowPage.pageBack, goBack, goForward },
+      chatHistory: {
+        previous: history.previous,
+        next: history.next,
+        pageBack: windowPage.pageBack,
+        chatUnderPage,
+        goBack,
+        goForward,
+      },
     };
   },
 });

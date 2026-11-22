@@ -17,6 +17,8 @@ export const messages = {
   "error.workflow.agentStepEnded": "ההודעה של הסוכן לשלב הזה הוסרה לפני שהוא ענה.",
   "error.workflow.agentStepStopped": "הסוכן נעצר לפני שענה על השלב הזה. יש להריץ את השלב שוב.",
   "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
+  "error.workflow.answerInvalid": "התשובה לא כללה את השדות שהשלב הזה מבקש: {fields}. יש להריץ את השלב שוב.",
+  "error.workflow.checkInvalid": "הבדיקה של השלב הזה לא תקינה. יש לתקן אותה ולהריץ את השלב שוב.",
   "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
   "error.workflow.modelTimedOut":
     "המודל לא ענה בזמן. יש לבחור רמת מאמץ נמוכה יותר או מודל מהיר יותר לשלב הזה, ואז להריץ אותו שוב.",
@@ -30,6 +32,7 @@ export const messages = {
   "error.workflow.providerOffline": "ל-OpenBot אין גישה לספק. יש לבדוק את החיבור לאינטרנט ואז להריץ את השלב שוב.",
   "error.workflow.modelBusy": "בקשה אחרת למודל רצה כעת. יש להריץ את השלב שוב בעוד רגע.",
   "error.workflow.mediaFailed": "המודל לא הצליח ליצור את התמונה או את הווידאו. יש להריץ את השלב שוב.",
+  "error.workflow.mediaNotMade": "המודל לא יצר את התמונה או את הווידאו. תשובתו: {answer}",
   "error.workflow.pictureMissing": "התמונה כבר לא בשרת. יש לשלוח אותה שוב.",
   "error.workflow.pictureType": "יש להשתמש בתמונה בפורמט PNG,‏ JPEG או WebP.",
   "error.workflow.mediaInputMissing": "תמונה משלב קודם אינה זמינה. יש להריץ את השלב הזה שוב.",

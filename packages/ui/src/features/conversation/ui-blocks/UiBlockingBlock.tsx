@@ -10,6 +10,7 @@ export interface UiBlockingBlockProps extends Omit<UiBlockProps<UiBlockSpec>, "o
   onRespond: (response: UiBlockResponse, preview?: string) => void;
   renderPreview?: ((markdown: string) => JSX.Element) | undefined;
   canEditPreview?: boolean | undefined;
+  onPreviewDraftChange?: ((draft: string | undefined) => void) | undefined;
 }
 
 export function UiBlockingBlock(props: UiBlockingBlockProps) {
@@ -48,6 +49,7 @@ export function UiBlockingBlock(props: UiBlockingBlockProps) {
             spec={spec()}
             renderPreview={props.renderPreview}
             canEditPreview={props.canEditPreview}
+            onDraftChange={props.onPreviewDraftChange}
           />
         )}
       </Match>

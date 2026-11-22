@@ -23,6 +23,7 @@ import { recordRestartActivity } from "../backend/restart-activity";
 import { readBodyWithin } from "./http-body";
 import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
+import { remoteDesktopKeyboardScript } from "./remote-desktop-keyboard";
 import { remoteDesktopPasteScript } from "./remote-desktop-paste";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { remoteDesktopStreamWatchScript } from "./remote-desktop-stream-watch";
@@ -94,6 +95,7 @@ export interface RemoteScreenRuntime {
   selectDisplay: SunshineMoonlightRuntime["selectDisplay"];
   stop: SunshineMoonlightRuntime["stop"];
   screenCaptureDenied?(): boolean;
+  windowsCaptureDenied?(): boolean;
   checkSetup?: SunshineMoonlightRuntime["checkSetup"];
   test?: SunshineMoonlightRuntime["test"];
 }
@@ -1102,6 +1104,8 @@ export class RemoteScreenGateway {
       stage === "sunshine" ? "sunshine" : "moonlight",
       `OpenBot: the remote desktop runtime did not start (${stage ?? "runtime"}): ${describeCause(cause)}\n`,
     );
+    if (stage === "sunshine" && this.#runtime?.windowsCaptureDenied?.())
+      return new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsCaptureDenied"));
     return new RemoteScreenError(
       503,
       "host_unavailable",
@@ -1158,7 +1162,8 @@ export class RemoteScreenGateway {
       response.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
       response.end(
         remoteDesktopStreamWatchScript(session.snapshot.serverId) +
-          (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : ""),
+          (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : "") +
+          remoteDesktopKeyboardScript(),
       );
       return;
     }

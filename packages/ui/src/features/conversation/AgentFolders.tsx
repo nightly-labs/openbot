@@ -356,7 +356,7 @@ export function AgentFoldersRow(props: {
   );
 }
 
-function FolderRow(props: {
+export function FolderRow(props: {
   name?: string;
   path: string;
   fresh?: boolean;

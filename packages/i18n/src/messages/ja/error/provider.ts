@@ -20,6 +20,8 @@ export const messages = {
     "{provider} のプランの利用上限に達しました。別のモデルを選ぶか、{provider} のプランをアップグレードしてください。",
   "error.provider.acpMcpNotLoaded":
     "{provider} が OpenBot のツールを読み込まなかったため、このエージェントはツールを使えず、チームメイトにも連絡できません。{provider} のチームポリシーがローカル MCP サーバーをブロックしている可能性があります。チーム管理者に許可を依頼してから、もう一度お試しください。",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} が OpenBot のツールなしでこのメッセージを実行したため、エージェントはチームメイトへの連絡、ブラウザの使用、ファイルの添付ができませんでした。もう一度お試しください。",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} が MCP サーバー {name} を起動できなかったため、応答が止まりました。このサーバーは OpenBot ではなく、ご自身の {provider} の設定にあります。そこでサーバーを削除するか修復してから、新しいチャットを始めてください。",
   "error.provider.endpointsReadOnly":
@@ -295,6 +297,8 @@ export const messages = {
     "このコンピューターのプロセッサーでは、このプロバイダーを実行できません。別のプロバイダーを使用してください。",
   "error.provider.opencodeDatabaseNewer":
     "新しいバージョンの OpenCode がデータベースを変更したため、OpenCode はデータベースを開けませんでした。OpenCode をバージョン 2 以降に更新してから、もう一度お試しください。",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok の設定の allowed_models に既定のモデルが含まれていないため、Grok は起動しませんでした。既定のモデルを allowed_models に追加するか、allowed_models を削除してから、もう一度お試しください。",
   "error.provider.opencodeNoAnswer":
     "OpenCode のモデルが、回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -343,6 +347,8 @@ export const messages = {
     "Gemini がこのリクエストを拒否しましたが、原因は示されていません。エージェントが開いた画像など、チャット履歴内の項目が原因の場合があります。OpenBot はチャット履歴を引き継いだ新しい Gemini セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選んでください。",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini はこのチャットの保存済みの履歴を読み取れませんでした。OpenBot はチャット履歴を引き継いで新しい Gemini セッションを開始しました。メッセージをもう一度送信してください。",
+  "error.provider.acpTurnStuck":
+    "{provider} は前のターンを終了しなかったため、このメッセージを受け付けませんでした。OpenBot はチャット履歴を引き継いで新しい {provider} セッションを開始しました。メッセージをもう一度送信してください。",
   "error.provider.antigravityLocationUnsupported":
     "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -435,6 +441,8 @@ export const messages = {
     "このチャットは大きくなりすぎて、モデルに送信できません。多くの場合、チャット内の画像が原因です。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
+  "error.provider.opencodeInputRefused":
+    "モデルがこのチャットの内容を拒否しましたが、原因は示されていません。PDF や画像など、チャット内のファイルが原因のことがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。ファイルを外してもう一度メッセージを送るか、別のモデルを選んでください。",
   "error.provider.opencodeCompactionFailed":
     "モデルがこの長いチャットを要約できず、コンテキストウィンドウに空きを作れませんでした。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、より高性能なモデルを選んでください。",
   "error.provider.museMcpStartupFault":
@@ -558,6 +566,8 @@ export const messages = {
   "error.provider.piSessionBusy": "現在の Pi のターンが終わるまでお待ちください。",
   "error.provider.acpSessionBusy":
     "{provider} は停止したターンをまだ終了しています。少し待ってからもう一度お試しください。",
+  "error.provider.acpSessionStale":
+    "{provider} はこのチャットの最新の状態を読み込めませんでした。もう一度メッセージを送信してください。",
   "error.provider.acpModelNotOffered":
     "{provider} は現在 {model} を提供していません。このエージェントに別のモデルを選んでから、もう一度お試しください。",
   "error.provider.piStopped": "Pi が実行されていません。Pi を接続してもう一度お試しください。",

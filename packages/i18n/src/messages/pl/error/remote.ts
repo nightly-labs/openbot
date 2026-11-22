@@ -23,6 +23,8 @@ export const messages = {
     "Host nie zezwolił OpenBot na nagrywanie ekranu. Przyznaj na hoście uprawnienie do nagrywania ekranu, a następnie spróbuj ponownie.",
   "error.remote.windowsSessionDisconnected":
     "Sesja Windows na hoście jest rozłączona, więc nie ma ekranu do udostępnienia. Zaloguj się do Windows na ekranie hosta, a następnie spróbuj ponownie.",
+  "error.remote.windowsCaptureDenied":
+    "Windows na hoście nie pozwala OpenBot nagrywać ekranu. Odblokuj Windows na ekranie hosta, zamknij wszystkie monity administratora, a następnie spróbuj ponownie. Jeśli problem nie ustąpi, uruchom ponownie host.",
   "error.remote.macScreenLocked":
     "Mac jest zablokowany, więc nie może udostępnić ekranu. Odblokuj Maca na jego ekranie, a następnie spróbuj ponownie.",
   "error.remote.streamTooSlowLowerQuality":
@@ -211,6 +213,10 @@ export const messages = {
   "error.remote.formUnavailable": "Ten formularz nie jest już dostępny.",
   "error.remote.hostedServerRemoval": "Użyj sekcji Rozliczenia, aby usunąć hostowany serwer.",
   "error.remote.hostRemoved": "Właściciel usunął ten serwer z konta.",
+  "error.remote.ownerTransferSelf": "Ten serwer już należy do Ciebie. Wpisz e-mail nowego właściciela.",
+  "error.remote.ownerTransferHosted": "Serwer hostowany przez OpenBot nie może zmienić właściciela.",
+  "error.remote.ownerTransferInvalid":
+    "To przekazanie własności nie jest już dostępne. Poproś właściciela, aby wysłał je ponownie.",
   "error.remote.channelsUnsupported": "Zaktualizuj ten serwer desktopowy, aby używać kanałów.",
   "error.remote.channelDeleteUnsupported": "Zaktualizuj ten serwer desktopowy, aby usuwać kanały.",
   "error.remote.historyRefreshFailed": "Wiadomość została wysłana, ale nie udało się odświeżyć historii czatu.",

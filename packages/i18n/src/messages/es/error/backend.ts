@@ -236,7 +236,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Una espera necesita un mensaje para continuar. Este turno no tiene ningún mensaje.",
   "error.backend.agentWaitOwnChatOnly":
-    "Abre una espera solo en tu propio chat. Una tarea de canal o de mensajería no puede esperar.",
+    "Abre una espera en tu propio chat o en un hilo lateral. Una conversación de canal o de mensajería no puede esperar.",
   "error.backend.agentWaitNoteRequired": "Escribe una nota breve que diga para qué es la espera.",
   "error.backend.agentWaitRoutineGone": "Este agente no tiene ninguna rutina con este id.",
   "error.backend.agentWaitNoRoutine":
@@ -347,6 +347,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "La carpeta no existe o ya se eliminó.",
   "error.backend.libraryFolderOtherAgent": "Un archivo solo puede ir a una carpeta de su agente.",
   "error.backend.libraryFolderMoveInvalid": "Esta carpeta no se puede mover ahí.",
+  "error.backend.workflowFolderLimit": "Un servidor puede tener hasta {limit} carpetas de flujos de trabajo.",
+  "error.backend.workflowFolderPlacementLimit": "Hay demasiados flujos de trabajo en las carpetas.",
   "error.backend.sectionNameDuplicate": "Los nombres de las secciones deben ser únicos.",
   "error.backend.directMessageRequired": "Escribe un mensaje primero.",
   "error.backend.directMessageTooLong": "Un mensaje directo puede tener hasta {limit} caracteres.",
@@ -379,6 +381,7 @@ export const messages = {
     "Solo la app de OpenBot del teléfono puede enviar este informe, porque añade la versión y el registro de soporte del teléfono. Abre este chat en el teléfono. Si ves este mensaje allí, actualiza la app del teléfono.",
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
+  "error.backend.apiKeyListFailed": "OpenBot no pudo leer las claves de API guardadas.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
   "error.backend.apiKeySaving": "La clave de API ya se está guardando.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -468,6 +471,7 @@ export const messages = {
   "error.backend.taskTitleRequired": "Dale a la tarea un título corto.",
   "error.backend.taskToolInvalid":
     "Dale a la tarea un título de 120 caracteres como máximo y una descripción que diga qué hay que hacer.",
+  "error.backend.taskControlInvalid": "Indica el taskId de una tarea que iniciaste. Un mensaje también necesita texto.",
   "error.backend.taskOwnChatOnly":
     "Inicia una tarea solo desde tu propio chat. Un canal, una conversación de mensajería u otra tarea no pueden iniciarla.",
   "error.backend.taskUnfinishedLimit":
@@ -475,5 +479,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Este agente tiene {count} tareas abiertas. Cierra una tarea y después inicia o abre otra.",
   "error.backend.taskRemoteUnsupported": "Las tareas solo están disponibles para los agentes de este equipo.",
+  "error.backend.taskMessageFailed": "OpenBot no pudo enviar el mensaje a la tarea. Inténtalo de nuevo más tarde.",
   "error.backend.taskStartFailed": "OpenBot no pudo iniciar la tarea. Haz el trabajo en este turno.",
 } as const satisfies PartialTranslation<typeof source>;

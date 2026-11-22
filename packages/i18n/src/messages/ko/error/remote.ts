@@ -23,6 +23,8 @@ export const messages = {
     "호스트에서 OpenBot의 화면 녹화를 허용하지 않았어요. 호스트에서 화면 녹화 권한을 허용한 다음 다시 시도해 주세요.",
   "error.remote.windowsSessionDisconnected":
     "호스트의 Windows 세션 연결이 끊겨 공유할 화면이 없어요. 호스트 화면에서 Windows에 로그인한 다음 다시 시도해 주세요.",
+  "error.remote.windowsCaptureDenied":
+    "호스트의 Windows가 OpenBot의 화면 녹화를 허용하지 않아요. 호스트 화면에서 Windows 잠금을 해제하고 관리자 확인 창을 모두 닫은 다음 다시 시도해 주세요. 계속 문제가 생기면 호스트를 다시 시작해 주세요.",
   "error.remote.macScreenLocked":
     "Mac이 잠겨 있어 화면을 공유할 수 없어요. Mac 화면에서 잠금을 해제한 다음 다시 시도해 주세요.",
   "error.remote.streamTooSlowLowerQuality":
@@ -209,6 +211,10 @@ export const messages = {
   "error.remote.formUnavailable": "이 양식은 더 이상 사용할 수 없어요.",
   "error.remote.hostedServerRemoval": "호스팅 서버를 삭제하려면 결제에서 삭제해 주세요.",
   "error.remote.hostRemoved": "소유자가 이 서버를 계정에서 삭제했어요.",
+  "error.remote.ownerTransferSelf": "이미 이 서버의 소유자예요. 새 소유자의 이메일을 입력하세요.",
+  "error.remote.ownerTransferHosted": "OpenBot이 호스팅하는 서버는 소유자를 바꿀 수 없어요.",
+  "error.remote.ownerTransferInvalid":
+    "이 소유권 이전은 더 이상 사용할 수 없어요. 소유자에게 다시 보내 달라고 요청하세요.",
   "error.remote.channelsUnsupported": "채널을 사용하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.channelDeleteUnsupported": "채널을 삭제하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.historyRefreshFailed": "메시지를 보냈지만 채팅 기록을 새로 고칠 수 없었어요.",

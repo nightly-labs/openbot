@@ -107,6 +107,7 @@ export function StoryChannelConversation(props: ChannelStoryProps) {
     ownMessage: (message) => message.author === "you",
     workers: () => props.workers ?? [],
     memberThreadIds: () => new Set(),
+    memberAgentIds: () => new Set(),
     browserOwner: () => null,
     workingTurns: () => [],
     interactionAgentName: () => undefined,

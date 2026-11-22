@@ -20,6 +20,8 @@ export const messages = {
     "{provider} segnala che il tuo piano è esaurito. Scegli un altro modello o passa a un piano {provider} superiore.",
   "error.provider.acpMcpNotLoaded":
     "{provider} non ha caricato gli strumenti di OpenBot, quindi questo agente non può usarli né contattare i suoi compagni. Una policy del team {provider} può bloccare i server MCP locali. Chiedi all’amministratore del team di consentirli, poi riprova.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} ha eseguito questo messaggio senza gli strumenti di OpenBot, quindi l’agente non ha potuto contattare i compagni, usare il browser né allegare file. Riprova.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} non è riuscito ad avviare il server MCP {name}, quindi la risposta si è fermata. Questo server è nelle tue impostazioni di {provider}, non in OpenBot. Rimuovilo o riparalo lì, poi avvia una nuova chat.",
   "error.provider.endpointsReadOnly":
@@ -290,6 +292,8 @@ export const messages = {
     "Il processore di questo computer non può eseguire questo provider. Usa un altro provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode non è riuscito ad aprire il suo database perché una versione più recente di OpenCode lo ha modificato. Aggiorna OpenCode alla versione 2 o successiva, poi riprova.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok non si è avviato perché l'impostazione allowed_models nella sua configurazione non include il suo modello predefinito. Aggiungi il modello predefinito ad allowed_models, oppure rimuovi allowed_models, poi riprova.",
   "error.provider.opencodeNoAnswer":
     "Il modello OpenCode ha terminato il turno senza risposta. Riprova o scegli un altro modello.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -337,6 +341,8 @@ export const messages = {
     "Gemini ha rifiutato questa richiesta senza indicarne la causa. Può dipendere da un elemento della cronologia della chat, come un’immagine aperta dall’agente. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini non è riuscito a leggere la cronologia salvata di questa chat. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Invia di nuovo il messaggio.",
+  "error.provider.acpTurnStuck":
+    "{provider} non ha terminato il turno precedente, quindi non ha accettato questo messaggio. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Invia di nuovo il messaggio.",
   "error.provider.antigravityLocationUnsupported":
     "Google non consente a Gemini di funzionare dalla posizione di rete del computer che esegue questo agente. Usa Gemini su un altro computer oppure scegli un altro provider per questo agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -425,6 +431,8 @@ export const messages = {
     "Questa chat è diventata troppo grande da inviare al modello. Spesso la causa sono le immagini nella chat. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.opencodeSessionRejected":
     "OpenCode ha rifiutato la richiesta senza indicarne la causa. Può succedere in una chat lunga o dopo un cambio di modello. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello o un impegno minore.",
+  "error.provider.opencodeInputRefused":
+    "Il modello ha rifiutato il contenuto di questa chat senza indicarne la causa. Può dipendere da un file nella chat, come un PDF o un’immagine. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Invia di nuovo il messaggio senza il file, oppure scegli un altro modello.",
   "error.provider.opencodeCompactionFailed":
     "Il modello non è riuscito a riassumere questa chat lunga per liberare spazio nella finestra di contesto. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Riprova. Se l’errore continua, scegli un modello più potente.",
   "error.provider.museMcpStartupFault":
@@ -541,6 +549,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Impossibile leggere la versione della CLI di {provider}.",
   "error.provider.piSessionBusy": "Attendi che il turno attuale di Pi finisca.",
   "error.provider.acpSessionBusy": "{provider} sta ancora finendo un turno interrotto. Riprova tra un attimo.",
+  "error.provider.acpSessionStale":
+    "{provider} non è riuscito a caricare la versione più recente di questa chat. Invia di nuovo il messaggio.",
   "error.provider.acpModelNotOffered":
     "{provider} non offre {model} al momento. Scegli un altro modello per questo agente, poi riprova.",
   "error.provider.piStopped": "Pi non è in esecuzione. Connetti Pi e riprova.",

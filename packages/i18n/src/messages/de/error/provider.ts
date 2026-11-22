@@ -20,6 +20,8 @@ export const messages = {
     "{provider} meldet, dass dein Tarif aufgebraucht ist. Wähle ein anderes Modell oder wechsle zu einem höheren {provider}-Tarif.",
   "error.provider.acpMcpNotLoaded":
     "{provider} hat die OpenBot-Tools nicht geladen, daher kann dieser Agent sie nicht nutzen und seine Teammitglieder nicht erreichen. Eine Team-Richtlinie von {provider} kann lokale MCP-Server blockieren. Bitte deinen Team-Admin, sie zu erlauben, und versuche es dann erneut.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} hat diese Nachricht ohne die OpenBot-Tools ausgeführt. Der Agent konnte daher seine Teammitglieder nicht erreichen, den Browser nicht nutzen und keine Dateien anhängen. Versuche es erneut.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} konnte den MCP-Server {name} nicht starten, daher wurde die Antwort beendet. Dieser Server ist in deinen eigenen {provider}-Einstellungen, nicht in OpenBot. Entferne oder repariere ihn dort und starte dann einen neuen Chat.",
   "error.provider.endpointsReadOnly":
@@ -297,6 +299,8 @@ export const messages = {
     "Der Prozessor dieses Computers kann diesen Anbieter nicht ausführen. Verwende einen anderen Anbieter.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode konnte seine Datenbank nicht öffnen, weil eine neuere OpenCode-Version sie geändert hat. Aktualisiere OpenCode auf Version 2 oder neuer und versuche es dann erneut.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok ist nicht gestartet, weil die Einstellung allowed_models in seiner Konfiguration sein Standardmodell nicht enthält. Füge das Standardmodell zu allowed_models hinzu oder entferne allowed_models und versuche es dann erneut.",
   "error.provider.opencodeNoAnswer":
     "Das OpenCode-Modell hat den Durchlauf ohne Antwort beendet. Versuche es erneut oder wähle ein anderes Modell.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -348,6 +352,8 @@ export const messages = {
     "Gemini hat diese Anfrage abgelehnt und keinen Grund genannt. Ein Element im Chatverlauf kann die Ursache sein, zum Beispiel ein Bild, das der Agent geöffnet hat. OpenBot hat eine neue Gemini-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini konnte den gespeicherten Verlauf dieses Chats nicht lesen. OpenBot hat eine neue Gemini-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
+  "error.provider.acpTurnStuck":
+    "{provider} hat seinen vorherigen Durchgang nicht beendet und diese Nachricht deshalb nicht angenommen. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
   "error.provider.antigravityLocationUnsupported":
     "Google lässt Gemini am Netzwerkstandort des Computers, auf dem dieser Agent läuft, nicht arbeiten. Nutze Gemini auf einem anderen Computer oder wähle einen anderen Anbieter für diesen Agenten.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -437,6 +443,8 @@ export const messages = {
     "Dieser Chat ist zu groß geworden, um ihn an das Modell zu senden. Oft sind Bilder im Chat die Ursache. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
+  "error.provider.opencodeInputRefused":
+    "Das Modell hat den Inhalt dieses Chats abgelehnt und keinen Grund genannt. Eine Datei im Chat, etwa ein PDF oder ein Bild, kann die Ursache sein. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht ohne die Datei erneut oder wähle ein anderes Modell.",
   "error.provider.opencodeCompactionFailed":
     "Das Modell konnte diesen langen Chat nicht zusammenfassen, um Platz im Kontextfenster zu schaffen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein stärkeres Modell.",
   "error.provider.museMcpStartupFault":
@@ -561,6 +569,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Warte, bis der aktuelle Pi-Durchlauf endet.",
   "error.provider.acpSessionBusy":
     "{provider} beendet noch einen gestoppten Durchlauf. Versuche es gleich noch einmal.",
+  "error.provider.acpSessionStale":
+    "{provider} konnte die neueste Version dieses Chats nicht laden. Sende deine Nachricht noch einmal.",
   "error.provider.acpModelNotOffered":
     "{provider} bietet {model} gerade nicht an. Wähle ein anderes Modell für diesen Agenten und versuche es erneut.",
   "error.provider.piStopped": "Pi läuft nicht. Verbinde Pi und versuche es erneut.",

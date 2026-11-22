@@ -23,6 +23,8 @@ export const messages = {
     "لم يسمح المضيف لـ OpenBot بتسجيل شاشته. امنح إذن تسجيل الشاشة على المضيف، ثم أعد المحاولة.",
   "error.remote.windowsSessionDisconnected":
     "جلسة Windows على المضيف غير متصلة، لذلك لا توجد شاشة لمشاركتها. سجّل الدخول إلى Windows على شاشة المضيف، ثم أعد المحاولة.",
+  "error.remote.windowsCaptureDenied":
+    "لا يسمح Windows على المضيف لـ OpenBot بتسجيل شاشته. افتح قفل Windows على شاشة المضيف وأغلق أي طلب إذن من المسؤول، ثم أعد المحاولة. إذا استمرت المشكلة، فأعد تشغيل المضيف.",
   "error.remote.macScreenLocked":
     "جهاز Mac مقفل، لذلك لا يمكنه مشاركة شاشته. افتح قفل جهاز Mac من شاشته، ثم أعد المحاولة.",
   "error.remote.streamTooSlowLowerQuality":
@@ -202,6 +204,9 @@ export const messages = {
   "error.remote.formUnavailable": "هذا النموذج لم يعد متاحًا.",
   "error.remote.hostedServerRemoval": "استخدم «الفوترة» لحذف خادم مستضاف.",
   "error.remote.hostRemoved": "أزال المالك هذا الخادم من الحساب.",
+  "error.remote.ownerTransferSelf": "أنت بالفعل مالك هذا الخادم. أدخل البريد الإلكتروني للمالك الجديد.",
+  "error.remote.ownerTransferHosted": "لا يمكن تغيير مالك خادم تستضيفه OpenBot.",
+  "error.remote.ownerTransferInvalid": "طلب نقل الملكية هذا لم يعد متاحًا. اطلب من المالك إرساله مرة أخرى.",
   "error.remote.channelsUnsupported": "حدّث خادم الحاسوب المكتبي هذا لاستخدام القنوات.",
   "error.remote.channelDeleteUnsupported": "حدّث خادم الحاسوب المكتبي هذا لحذف القنوات.",
   "error.remote.historyRefreshFailed": "أُرسلت الرسالة، لكن تعذّر تحديث سجل الدردشة.",

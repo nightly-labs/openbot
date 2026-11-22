@@ -479,6 +479,8 @@ const server = createServer((request, response) => {
     </script>`);
 });
 
+const HANG_LIMIT_MS = 10 * 60_000;
+
 const SCENARIOS = [
   "identity",
   "background",
@@ -523,7 +525,7 @@ async function main(): Promise<void> {
   const hardTimeout = setTimeout(() => {
     process.stderr.write("BrowserHost smoke test timed out.\n");
     app.exit(1);
-  }, 180_000);
+  }, HANG_LIMIT_MS);
 
   try {
     if (persistencePhase) {

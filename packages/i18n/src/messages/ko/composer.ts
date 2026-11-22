@@ -99,7 +99,7 @@ export const messages = {
   "composer.voice.progress": "음성 모델 다운로드 중 {progress}%",
   "composer.voice.recording": "음성 녹음",
   "composer.voice.limitSoon": "{seconds}초 후 녹음이 중지돼요.",
-  "composer.voice.limitReached": "2분 제한에 도달해 녹음이 중지되었어요. 말한 내용은 메시지에 들어 있어요.",
+  "composer.voice.limitReached": "10분 제한에 도달해 녹음이 중지되었어요. 말한 내용은 메시지에 들어 있어요.",
   "composer.send.saveQueued": "대기열 메시지 저장",
   "composer.send.voice": "음성 메시지 보내기",
   "composer.send.message": "메시지 보내기",

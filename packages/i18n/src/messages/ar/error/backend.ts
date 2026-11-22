@@ -212,7 +212,8 @@ export const messages = {
     "لدى هذا الوكيل بالفعل {count} انتظارات مفتوحة. أغلق انتظارًا باستخدام openbot.close_wait قبل فتح انتظار آخر.",
   "error.backend.agentWaitGone": "هذا الانتظار غير مفتوح. أغلقه الوكيل، أو ألغاه شخص ما.",
   "error.backend.agentWaitNoRequest": "يحتاج الانتظار إلى رسالة للمتابعة. لا توجد رسالة في هذا الدور.",
-  "error.backend.agentWaitOwnChatOnly": "افتح انتظارًا في دردشتك فقط. لا يمكن لمهمة قناة أو مراسلة أن تنتظر.",
+  "error.backend.agentWaitOwnChatOnly":
+    "افتح انتظارًا في دردشتك أو في سلسلة جانبية. لا يمكن لمحادثة قناة أو مراسلة أن تنتظر.",
   "error.backend.agentWaitNoteRequired": "اكتب ملاحظة قصيرة توضح سبب الانتظار.",
   "error.backend.agentWaitRoutineGone": "ليس لدى هذا الوكيل مهمة دورية بهذا المعرّف.",
   "error.backend.agentWaitNoRoutine":
@@ -317,6 +318,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "المجلد غير موجود أو حُذف بالفعل.",
   "error.backend.libraryFolderOtherAgent": "يمكن وضع الملف في مجلد تابع لوكيله فقط.",
   "error.backend.libraryFolderMoveInvalid": "لا يمكن نقل هذا المجلد إلى هناك.",
+  "error.backend.workflowFolderLimit": "يمكن أن يحتوي الخادم على {limit} من مجلدات مسارات العمل كحد أقصى.",
+  "error.backend.workflowFolderPlacementLimit": "توجد مسارات عمل كثيرة جدًا في المجلدات.",
   "error.backend.sectionNameDuplicate": "يجب أن تكون أسماء الأقسام فريدة.",
   "error.backend.directMessageRequired": "اكتب رسالة أولًا.",
   "error.backend.directMessageTooLong": "يمكن أن تحتوي الرسالة المباشرة على {limit} حرف كحد أقصى.",
@@ -350,6 +353,7 @@ export const messages = {
     "يمكن لتطبيق OpenBot على الهاتف فقط إرسال هذا البلاغ، لأنه يضيف إصدار الهاتف وسجل الدعم. افتح هذه المحادثة على الهاتف. إذا ظهرت لك هذه الرسالة هناك، فحدّث تطبيق الهاتف.",
   "error.backend.takeoverInactive": "تولي التحكم في المتصفح هذا لم يعد نشطًا.",
   "error.backend.authSubmitting": "إرسال المصادقة قيد التنفيذ بالفعل.",
+  "error.backend.apiKeyListFailed": "تعذّر على OpenBot قراءة مفاتيح API المحفوظة.",
   "error.backend.apiKeySaveFailed": "تعذّر على OpenBot حفظ مفتاح API. حاول مرة أخرى.",
   "error.backend.apiKeySaving": "يتم حفظ مفتاح API بالفعل.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -436,10 +440,12 @@ export const messages = {
   "error.backend.threadMoveRefused": "يمكن تشغيل الرسالة التي أرسلتها إلى هذا الوكيل وحده فقط في سلسلة جديدة.",
   "error.backend.taskTitleRequired": "امنح المهمة عنوانًا قصيرًا.",
   "error.backend.taskToolInvalid": "امنح المهمة عنوانًا من 120 حرفًا كحد أقصى ووصفًا موجزًا يوضح ما يجب فعله.",
+  "error.backend.taskControlInvalid": "أدخل taskId لمهمة بدأتها. تحتاج الرسالة أيضًا إلى نص.",
   "error.backend.taskOwnChatOnly": "ابدأ مهمة من دردشتك فقط. لا يمكن لقناة أو محادثة مراسلة أو مهمة أخرى بدء مهمة.",
   "error.backend.taskUnfinishedLimit":
     "لدى هذا الوكيل بالفعل {count} مهام غير مكتملة. ابدأ مهمة أخرى عند انتهاء إحداها.",
   "error.backend.taskOpenLimitReached": "لدى هذا الوكيل {count} مهام مفتوحة. أغلق مهمة، ثم ابدأ مهمة أخرى أو افتحها.",
   "error.backend.taskRemoteUnsupported": "المهام متاحة فقط للوكلاء على هذا الحاسوب.",
+  "error.backend.taskMessageFailed": "تعذّر على OpenBot إرسال الرسالة إلى المهمة. حاول مرة أخرى لاحقًا.",
   "error.backend.taskStartFailed": "تعذّر على OpenBot بدء المهمة. أنجز العمل في هذا الدور بدلًا من ذلك.",
 } as const satisfies PartialTranslation<typeof source>;

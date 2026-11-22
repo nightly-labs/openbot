@@ -15,13 +15,24 @@ const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could n
 const GEMINI_VERIFICATION_ANSWER =
   /(?:^|\n)[^\n]*:\s+(https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
 const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
+const GEMINI_VERIFICATION_LINK = /https:\/\/accounts\.google\.com\/signin\/continue\?[^\s<>"'`)\]}\\]*/u;
 const GEMINI_LOG_ACCOUNT_LINK =
   /https:\/\/accounts\.google\.com\/signin\/(?:continue\?|[^\s<>"'`)\]}\\]*auth_success_gemini)[^\s<>"'`)\]}\\]*/gu;
+const GEMINI_VERIFICATION_PROMPT =
+  /Verification required\. Please complete verification in your browser\b|Please verify your account in your browser to continue\b|Verify your account to continue\./u;
 const GEMINI_VERIFICATION_REQUIRED_ANSWER = /^\s*(?:\u26A0\uFE0F?\s*)?Verification Required\b/u;
+const GEMINI_VERIFICATION_PROMPT_ANSWER = new RegExp(
+  `^\\s*(?:\\u26A0\\uFE0F?\\s*)?(?:${GEMINI_VERIFICATION_PROMPT.source})`,
+  "u",
+);
+const GEMINI_VERIFICATION_REQUIRED = new RegExp(
+  `${GEMINI_VERIFICATION_REQUIRED_ANSWER.source}|${GEMINI_VERIFICATION_PROMPT.source}|\\bVALIDATION_REQUIRED\\b`,
+  "u",
+);
 const GEMINI_WARNING_ANSWER = /^\n\u26A0 /u;
 const GEMINI_RETRY_NOTICE = /^\n?⚠ API error \(attempt (\d+)\): /u;
 const GEMINI_FAILURE_ANSWER = new RegExp(
-  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_CONNECTION_LOST_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}|${GEMINI_WARNING_ANSWER.source}`,
+  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_CONNECTION_LOST_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}|${GEMINI_WARNING_ANSWER.source}|${GEMINI_VERIFICATION_PROMPT_ANSWER.source}`,
   "u",
 );
 
@@ -99,7 +110,7 @@ function geminiRequestFailureText(key: GeminiRequestFailureKey, text: string): s
 
 function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequestFailureKey | null } {
   const text = answer.replace(GEMINI_WARNING_ANSWER, "");
-  if (geminiAccountLink(text) !== null || GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text))
+  if (geminiAccountLink(text) !== null || GEMINI_VERIFICATION_REQUIRED.test(text))
     return { message: sourceText("error.provider.geminiVerificationRequired"), key: null };
   if (/\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text))
     return { message: sourceText("error.provider.geminiKeyRefused"), key: null };
@@ -133,6 +144,7 @@ export function geminiSavedKeyLimitFailure(text: string, error?: unknown): strin
 function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
   const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
+  if (GEMINI_VERIFICATION_REQUIRED.test(reason)) return sourceText("error.provider.geminiVerificationRequired");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   return key ? geminiRequestFailureText(key, reason) : detail;
 }
@@ -238,7 +250,9 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
 
 function antigravityAccountLink(text: string, argv: readonly string[]): string | null {
   const link = geminiAccountLink(text);
-  if (link !== null || !GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text)) return link;
+  if (link !== null || !GEMINI_VERIFICATION_REQUIRED.test(text)) return link;
+  const answered = GEMINI_VERIFICATION_LINK.exec(text)?.[0].replace(/[.,;:]+$/u, "");
+  if (answered) return answered;
   for (const log of antigravityRecentLogs(argv)) {
     if (!log.includes("VALIDATION_REQUIRED")) continue;
     const links = log
@@ -317,9 +331,12 @@ function googleRefusedMcpTools(log: string, folder: string): string[] {
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   ownMcpServerNames: antigravityOwnMcpServerNames,
+  relayStdioMcpServers: "unconfined",
   mcpToolCallLimitMs: 180_000,
+  mcpListLimit: { ms: 5_000, since: "1.5.11" },
   sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
   approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,
+  mcpCallInputNamesServer: true,
   sessionNotFound: (error, sessionId) => {
     if (error.code === -32603 && error.message.startsWith(`Failed to read session ${sessionId};`)) return true;
     if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
@@ -342,7 +359,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     turnFailure: (answer) => geminiAnswerFailure(answer).message,
     fallbackCause: geminiTurnFailureCause,
     accountLink: antigravityAccountLink,
-    accountVerification: GEMINI_VERIFICATION_REQUIRED_ANSWER,
+    accountVerification: GEMINI_VERIFICATION_REQUIRED,
     quota: (text) => {
       const quota = GEMINI_QUOTA_CHUNK.exec(text);
       return quota

@@ -44,6 +44,7 @@ interface ProviderModels {
   models: ToolModel[];
   omittedModels?: number;
   accounts?: (Pick<ProviderAccountStatus, "id" | "label" | "state"> & { models?: ToolModel[] })[];
+  noMatchReason?: string;
 }
 
 type ToolModel = Pick<AgentModelOption, "id" | "name"> &
@@ -76,8 +77,26 @@ export function requireRunnableProvider(
 ): void {
   if (providerCanRun(model.provider, statuses)) return;
   throw new AgentSettingsRefused(
-    sourceText("error.agent.modelProviderNotConnected", { model: model.id, provider: providerLabel(model.provider) }),
+    providerNotReadyText(
+      model.id,
+      providerLabel(model.provider),
+      statuses.find((row) => row.id === model.provider),
+    ),
   );
+}
+
+export function providerNotReadyText(model: string, provider: string, row: ProviderStatusRow | undefined): string {
+  if (row?.off) return sourceText("error.agent.modelProviderNotConnected", { model, provider });
+  switch (row?.state) {
+    case "sign-in-required":
+      return sourceText("error.agent.modelProviderSignInRequired", { model, provider });
+    case "not-installed":
+      return sourceText("error.agent.modelProviderNotInstalled", { model, provider });
+    case "outdated":
+      return sourceText("error.agent.modelProviderOutdated", { model, provider });
+    default:
+      return sourceText("error.agent.modelProviderNotConnected", { model, provider });
+  }
 }
 
 export function requireRunnableChange(
@@ -102,6 +121,8 @@ function emptyCatalogMessage(provider: AgentProvider): string {
 
 const SHORT_LIST_LENGTH = 8;
 const QUERY_RESULT_LIMIT = 20;
+const OPENROUTER_NO_MATCH_REASON =
+  "OpenRouter lists only the models that the privacy, provider and guardrail settings of the key's account on openrouter.ai allow. The user changes them on openrouter.ai.";
 
 export interface ListModelsRequest {
   provider?: AgentProvider | undefined;
@@ -216,6 +237,9 @@ export function listModelsPayload(
           defaultModel: fallback.id,
           models: listed.map(toolModel),
           ...(omitted > 0 ? { omittedModels: omitted } : {}),
+          ...(id === "openrouter" && words.length > 0 && candidates.length === 0
+            ? { noMatchReason: OPENROUTER_NO_MATCH_REASON }
+            : {}),
           ...(rows
             ? {
                 accounts: rows.map((account) => {

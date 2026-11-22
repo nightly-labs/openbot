@@ -26,6 +26,8 @@ export const messages = {
     "O computador anfitrião não permitiu que o OpenBot grave a tela. Conceda a permissão de gravação de tela no computador anfitrião e tente novamente.",
   "error.remote.windowsSessionDisconnected":
     "A sessão do Windows no computador anfitrião está desconectada, então não há tela para compartilhar. Entre no Windows na tela do computador anfitrião e tente novamente.",
+  "error.remote.windowsCaptureDenied":
+    "O Windows no computador anfitrião não permite que o OpenBot grave a tela. Desbloqueie o Windows na tela do computador anfitrião, feche qualquer aviso de administrador e tente novamente. Se o problema continuar, reinicie o computador anfitrião.",
   "error.remote.macScreenLocked":
     "O Mac está bloqueado, então não pode compartilhar a tela. Desbloqueie o Mac na tela dele e tente novamente.",
   "error.remote.streamTooSlowLowerQuality":
@@ -221,6 +223,10 @@ export const messages = {
   "error.remote.formUnavailable": "Este formulário não está mais disponível.",
   "error.remote.hostedServerRemoval": "Use a seção Cobrança para excluir um servidor hospedado.",
   "error.remote.hostRemoved": "O proprietário removeu este servidor da conta.",
+  "error.remote.ownerTransferSelf": "Você já é o proprietário deste servidor. Digite o e-mail do novo proprietário.",
+  "error.remote.ownerTransferHosted": "Um servidor hospedado pela OpenBot não pode mudar de proprietário.",
+  "error.remote.ownerTransferInvalid":
+    "Esta transferência de propriedade não está mais disponível. Peça ao proprietário para enviá-la de novo.",
   "error.remote.channelsUnsupported": "Atualize este servidor no computador para usar canais.",
   "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
   "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",

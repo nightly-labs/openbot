@@ -231,6 +231,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "En attente. L’hôte exécute autant de tours que sa mémoire le permet.",
   "mobile.server.threads.hold.agentBusy": "En attente de la fin d’un autre travail de cet agent.",
   "mobile.server.threads.hold.oneTurn": "En attente. Le fournisseur de cet agent exécute un seul tour à la fois.",
+  "mobile.server.threads.hold.signIn": "En attente. Le fournisseur de cet agent doit être connecté.",
   "mobile.server.threads.offline": "Connectez-vous à ce serveur pour voir ses fils.",
   "mobile.server.threads.loading": "Chargement des fils…",
   "mobile.server.threads.loadFailed": "Impossible de charger les fils de certains agents.",
@@ -550,6 +551,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Ajouter des agents",
   "mobile.server.browserProfiles.agentsHint":
     "Un appui donne ce profil à l’agent ou le remet dans le profil partagé. Un changement ferme les onglets ouverts de l’agent.",
+  "mobile.server.browserProfiles.movedNote":
+    "Les connexions aux sites restent dans l’ancien profil. Un agent déplacé doit se reconnecter à ces sites.",
   "mobile.server.browserProfiles.clear": "Effacer les données",
   "mobile.server.browserProfiles.clearTitle": "Effacer les données de {name} ?",
   "mobile.server.browserProfiles.clearBody":
@@ -1276,6 +1279,8 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Connecté · {count} outil", other: "Connecté · {count} outils" },
   "mobile.server.mcp.signInOnComputer":
     "Ce serveur MCP demande une connexion. Connectez-vous depuis OpenBot sur un ordinateur, puis testez à nouveau.",
+  "mobile.server.mcp.signIn": "Se connecter",
+  "mobile.server.mcp.signInHere": "Ce serveur MCP demande une connexion. Touchez Se connecter, puis testez à nouveau.",
   "mobile.server.mcp.signedInDescription": "{server} est connecté à ce serveur MCP.",
   "mobile.server.mcp.signOut": "Se déconnecter",
   "mobile.server.mcp.saveFailed": "Impossible d’enregistrer la modification. Réessayez.",
@@ -1328,6 +1333,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 heures",
   "mobile.server.planLimits.window.hours": { one: "{count} heure", other: "{count} heures" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Mises à jour",
   "mobile.server.settings.updateAvailable": "Mise à jour disponible",
   "mobile.server.route.updates": "Mises à jour",
@@ -1665,4 +1671,42 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Les agents copiés suivent les règles d’approbation de {server}.",
   "mobile.server.transfer.copyNoServer":
     "Connectez-vous à un autre serveur en tant que propriétaire ou administrateur pour y copier des agents.",
+  "mobile.server.route.ownerTransfer": "Transférer la propriété",
+  "mobile.server.ownerTransfer.unavailable":
+    "Connectez-vous à ce serveur en tant que propriétaire pour transférer la propriété.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot héberge ce serveur, son propriétaire ne peut donc pas changer.",
+  "mobile.server.ownerTransfer.lede":
+    "Le nouveau propriétaire reçoit un e-mail et doit accepter en étant connecté avec cet e-mail. Vous êtes ensuite retiré de ce serveur.",
+  "mobile.server.ownerTransfer.email": "E-mail du nouveau propriétaire",
+  "mobile.server.ownerTransfer.send": "Envoyer",
+  "mobile.server.ownerTransfer.sending": "Envoi…",
+  "mobile.server.ownerTransfer.stays":
+    "Les agents, discussions, routines, connexions aux fournisseurs, clés enregistrées, identifiants du Vault, connexions du navigateur et apps connectées restent sur le serveur. Le nouveau propriétaire peut les utiliser.",
+  "mobile.server.ownerTransfer.expiry": "La demande expire après 7 jours.",
+  "mobile.server.ownerTransfer.confirmTitle": "Faire de {email} le propriétaire ?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Quand {email} accepte, cette personne devient propriétaire de {server} et vous perdez l’accès. Les données restent sur le serveur. La demande expire après 7 jours.",
+  "mobile.server.ownerTransfer.confirm": "Transférer",
+  "mobile.server.ownerTransfer.sendFailed": "La demande n’a pas été envoyée.",
+  "mobile.server.ownerTransfer.loadFailed": "Impossible de lire le transfert en attente.",
+  "mobile.server.ownerTransfer.pending": "En attente du nouveau propriétaire",
+  "mobile.server.ownerTransfer.expires": "Expire le {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} doit accepter en étant connecté avec cet e-mail. D’ici là, vous restez propriétaire.",
+  "mobile.server.ownerTransfer.cancel": "Annuler",
+  "mobile.server.ownerTransfer.cancelTitle": "Annuler le transfert ?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} ne pourra plus l’accepter.",
+  "mobile.server.ownerTransfer.keep": "Garder",
+  "mobile.server.ownerTransfer.cancelFailed": "Le transfert n’a pas été annulé.",
+  "mobile.server.ownerTransfer.incomingTitle": "Devenir propriétaire de {server} ?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} veut faire de vous le propriétaire de {server}. Vous obtenez le contrôle total du serveur, et ses agents, discussions, routines et connexions enregistrées y restent. {name} perd l’accès. Toute personne qui peut encore se connecter à l’ordinateur qui exécute le serveur peut utiliser votre compte OpenBot. Changez ses mots de passe et ses clés SSH.",
+  "mobile.server.ownerTransfer.accept": "Accepter",
+  "mobile.server.ownerTransfer.decline": "Refuser",
+  "mobile.server.ownerTransfer.accepted": "Vous êtes maintenant propriétaire de {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Impossible d’accepter le transfert",
+  "mobile.server.ownerTransfer.declineFailed": "Impossible de refuser le transfert",
+  "mobile.server.ownerTransfer.tryAgain": "Réessayez plus tard.",
+  "mobile.server.providers.updateAll": "Tout mettre à jour",
+  "mobile.server.providers.updateAllFailed": "Certaines mises à jour n’ont pas démarré. Réessayez.",
 } as const satisfies PartialTranslation<typeof source>;

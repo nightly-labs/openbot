@@ -1104,7 +1104,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                     when={!search().trim() && endpointModelsElsewhere()}
                                     fallback={
                                       search().trim()
-                                        ? t("provider.picker.noMatches")
+                                        ? provider === "openrouter"
+                                          ? t("provider.picker.openrouterNoMatches")
+                                          : t("provider.picker.noMatches")
                                         : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
                                           provider === "muse"
                                           ? t("provider.picker.museNoModels")

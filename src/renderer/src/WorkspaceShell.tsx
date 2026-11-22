@@ -7,8 +7,11 @@ import {
   ServerPanelLoadNotice,
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { createServerPaywall } from "@openbot/ui/features/servers/ServerPaywall";
+import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { appPort } from "./app-port";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
 import { AgentDockHost, useAgentDockPlacement } from "./features/agent-dock/AgentDockHost";
 import { useAgents } from "./features/agents/agents-context";
@@ -24,15 +27,16 @@ import { useCustomAgentUsagePolling } from "./features/custom-agents/custom-agen
 import { serverHasStorage } from "./features/files/storage-usage";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
-import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
 import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
+import { renewServerPlan } from "./features/servers/server-actions";
 import { serverCanAdminister } from "./features/servers/server-capabilities";
 import { createServerConnectionToast } from "./features/servers/server-connection-toast";
 import { useServerScope } from "./features/servers/server-scope";
 import { followsServerUpdate, ServerUpdateDialogHost } from "./features/servers/server-update-flow";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
@@ -44,8 +48,10 @@ import { WindowBackdrop } from "./features/window/WindowBackdrop";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
 import { useWindowPage } from "./features/window/window-page-context";
+import { useWorkspaceShortcuts } from "./features/window/workspace-shortcuts";
 import { useLayout } from "./layout";
 import { usePlatform } from "./platform";
+import { startupLoadingScene } from "./startup-animation-preference";
 import { WorkspaceFrame } from "./WorkspaceFrame";
 import { WorkspaceOverlays } from "./WorkspaceOverlays";
 
@@ -56,7 +62,7 @@ export function WorkspaceShell(props: {
 }) {
   const platform = usePlatform();
   const chatWindow = platform.chatWindow !== null;
-  const { sourceText, t } = useText();
+  const { sourceText, t, errorMessage } = useText();
   const scope = useServerScope();
   const settings = useSettings();
   const channels = useChannels();
@@ -74,11 +80,14 @@ export function WorkspaceShell(props: {
     serversLoaded,
     serversLoadFailed,
     refreshServers,
+    refreshHostedServersAvailable,
+    planDeletesAt,
   } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const agentDockPlacement = useAgentDockPlacement();
   const windowAgentDock = () => agentDockPlacement() === "window" && activeServer() !== undefined;
-  const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled } = useAgents();
+  const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled, openAgentSetup } =
+    useAgents();
   const { conversations, retryConversation } = useConversation();
   const activeConversation = () => conversations[activeAgent()?.id ?? ""];
   const { activeDirectMember } = useDirectMessages();
@@ -88,7 +97,7 @@ export function WorkspaceShell(props: {
     if (agentSetupOpen()) return "agent-setup";
     if (channelOpen()) return "channel";
     if (activeDirectMember()) return "direct";
-    return layout.sidebarView() === "routines" ? "routines" : "agent";
+    return "agent";
   });
   const agentChatOpen = () => middlePane() === "agent";
   if (chatWindow) {
@@ -136,13 +145,29 @@ export function WorkspaceShell(props: {
       if (unsupported) usage.closeUsage();
     },
   );
+  const paywall = createServerPaywall({
+    server: activeServer,
+    subscribe: (request) => serversPort().hostedServers.openCustomCheckout(request),
+    billingDetails: appPort().billing,
+    errorMessage: (error) => errorMessage(error, t("server.paywall.checkoutFailed")),
+  });
+  const fullScreenServer = () => planScreenShown() || paywall.server() !== null;
   const blockedRemoteServer = createMemo(() => {
+    const paywallServer = paywall.server();
+    if (paywallServer) return paywallServer;
     const server = activeServer();
     if (server?.kind !== "remote" || server.hostedSleep) return null;
-    return server.state === "incompatible" || (server.issue && server.issue.code !== "network_unavailable")
+    return server.state === "incompatible" ||
+      serverPlanBlocks(server, planDeletesAt(server.id)) ||
+      (server.issue && server.issue.code !== "network_unavailable")
       ? server
       : null;
   });
+  const planScreenShown = () => serverPlanScreenShown(blockedRemoteServer(), planDeletesAt);
+  const retryBlockedServer = (serverId: string) => {
+    void refreshHostedServersAvailable();
+    return retryServerConnection(serverId);
+  };
   const activePeopleEnabled = createMemo(
     () => platform.peopleEnabled && activeServerSupportsCapability("direct-messages"),
   );
@@ -242,6 +267,7 @@ export function WorkspaceShell(props: {
   const connectionNotice = (cover = false, screen = true) => (
     <ServerConnectionNotice
       screen={screen}
+      loadingScene={startupLoadingScene()}
       name={activeServer()?.name ?? ""}
       initial={cover || !scope.connection.synced}
       ready={cover ? !fullWindowLoading() : undefined}
@@ -299,6 +325,23 @@ export function WorkspaceShell(props: {
         : [],
     );
   if (!chatWindow) {
+    useWorkspaceShortcuts({
+      newAgent: () => {
+        if (!activeServer() || platform.landingPreview) return false;
+        channels.close();
+        openAgentSetup();
+        return true;
+      },
+      toggleSidebar: () => {
+        if (layout.sidebarClosed()) layout.expandSidebar();
+        else layout.setSidebarClosed(true);
+        return true;
+      },
+      showShortcuts: () => {
+        settings.openAppSettings(undefined, "keyboard");
+        return true;
+      },
+    });
     createHostRestartToasts(() => remoteHosts().filter((host) => !followsServerUpdate(host.id)));
     createRoutineTimezonePrompt(() => desktopRoutineZoneTargets(servers()));
   }
@@ -336,12 +379,17 @@ export function WorkspaceShell(props: {
           }
           hidden={remoteDesktopWorkspaceVisible()}
           blockedServer={blockedRemoteServer()}
-          onRetryServer={retryServerConnection}
+          paywall={paywall}
+          onRetryServer={retryBlockedServer}
+          planDeletesAt={planDeletesAt}
+          onRenewPlan={renewServerPlan}
           windowPage={windowPage.page()}
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
-              <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
+              <Show when={!fullScreenServer()}>
+                <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
+              </Show>
             </Show>
           }
           page={<WindowPageView />}
@@ -375,9 +423,6 @@ export function WorkspaceShell(props: {
           </Show>
           <Show when={agentChatOpen() && !chatHeld()}>
             <WorkspaceConversation account={props.account} />
-          </Show>
-          <Show when={middlePane() === "routines"}>
-            <WorkspaceRoutineFlows />
           </Show>
           <Show when={middlePane() === "channel"}>
             <WorkspaceChannelConversation account={props.account} />

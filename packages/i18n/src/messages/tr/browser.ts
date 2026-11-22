@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Tarayıcı açılır penceresini kapat",
   "browser.pip.reattachFailed": "OpenBot tarayıcıyı kenar çubuğuna geri ekleyemedi.",
   "browser.pip.closeFailed": "OpenBot tarayıcı açılır penceresini kapatamadı.",
+  "browser.window.open": "Tarayıcıyı yeni pencerede aç",
+  "browser.window.openFailed": "OpenBot tarayıcı penceresini açamadı.",
   "browser.popupBlocked.title": "Açılır pencere engellendi",
   "browser.popupBlocked.dismiss": "Açılır pencere mesajını kapat",
   "browser.liveView.label": "Sunucudaki sayfanın canlı görünümü",

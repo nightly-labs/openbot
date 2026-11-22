@@ -270,6 +270,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Ожидание. Хост выполняет столько ходов, сколько позволяет его память.",
   "mobile.server.threads.hold.agentBusy": "Ожидание завершения другой работы этого агента.",
   "mobile.server.threads.hold.oneTurn": "Ожидание. Провайдер этого агента выполняет один ход за раз.",
+  "mobile.server.threads.hold.signIn": "Ожидание. Нужно войти в провайдер этого агента.",
   "mobile.server.threads.offline": "Подключитесь к этому серверу, чтобы увидеть его ветки.",
   "mobile.server.threads.loading": "Загрузка веток…",
   "mobile.server.threads.loadFailed": "Не удалось загрузить ветки некоторых агентов.",
@@ -613,6 +614,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Добавить агентов",
   "mobile.server.browserProfiles.agentsHint":
     "Нажатие назначает агенту этот профиль или возвращает его в общий профиль. Изменение закрывает открытые вкладки агента.",
+  "mobile.server.browserProfiles.movedNote":
+    "Входы на сайты остаются в старом профиле. Перемещённому агенту нужно снова войти на эти сайты.",
   "mobile.server.browserProfiles.clear": "Очистить данные",
   "mobile.server.browserProfiles.clearTitle": "Очистить данные профиля {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1376,6 +1379,8 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "Этот сервер MCP просит войти. Войдите через OpenBot на компьютере и проверьте снова.",
+  "mobile.server.mcp.signIn": "Войти",
+  "mobile.server.mcp.signInHere": "Этот сервер MCP просит войти. Нажмите «Войти», затем проверьте снова.",
   "mobile.server.mcp.signedInDescription": "{server} выполнил вход на этот сервер MCP.",
   "mobile.server.mcp.signOut": "Выйти",
   "mobile.server.mcp.saveFailed": "Не удалось сохранить изменение. Повторите попытку.",
@@ -1436,6 +1441,7 @@ export const messages = {
     other: "{count} ч",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} мин",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Обновления",
   "mobile.server.settings.updateAvailable": "Доступно обновление",
   "mobile.server.route.updates": "Обновления",
@@ -1838,4 +1844,41 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Скопированные агенты используют правила подтверждения сервера {server}.",
   "mobile.server.transfer.copyNoServer":
     "Подключитесь к другому серверу как владелец или администратор, чтобы скопировать на него агентов.",
+  "mobile.server.route.ownerTransfer": "Передать владение",
+  "mobile.server.ownerTransfer.unavailable": "Подключитесь к этому серверу как владелец, чтобы передать владение.",
+  "mobile.server.ownerTransfer.hosted": "Этот сервер размещает OpenBot, поэтому его владелец не может смениться.",
+  "mobile.server.ownerTransfer.lede":
+    "Новый владелец получит письмо и должен принять запрос, войдя с этим адресом. После этого вы будете удалены с сервера.",
+  "mobile.server.ownerTransfer.email": "Email нового владельца",
+  "mobile.server.ownerTransfer.send": "Отправить",
+  "mobile.server.ownerTransfer.sending": "Отправка…",
+  "mobile.server.ownerTransfer.stays":
+    "Агенты, чаты, регулярные задачи, входы в провайдеров, сохранённые ключи, логины из Vault, входы в браузере и подключённые приложения остаются на сервере. Новый владелец сможет ими пользоваться.",
+  "mobile.server.ownerTransfer.expiry": "Запрос истекает через 7 дней.",
+  "mobile.server.ownerTransfer.confirmTitle": "Сделать {email} владельцем?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Когда {email} примет запрос, этот человек станет владельцем {server}, а вы потеряете доступ. Данные остаются на сервере. Запрос истекает через 7 дней.",
+  "mobile.server.ownerTransfer.confirm": "Передать",
+  "mobile.server.ownerTransfer.sendFailed": "Запрос не отправлен.",
+  "mobile.server.ownerTransfer.loadFailed": "Не удалось прочитать ожидающую передачу.",
+  "mobile.server.ownerTransfer.pending": "Ожидание нового владельца",
+  "mobile.server.ownerTransfer.expires": "Истекает {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} должен принять запрос, войдя с этим адресом. До этого вы остаётесь владельцем.",
+  "mobile.server.ownerTransfer.cancel": "Отменить",
+  "mobile.server.ownerTransfer.cancelTitle": "Отменить передачу?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} больше не сможет её принять.",
+  "mobile.server.ownerTransfer.keep": "Оставить",
+  "mobile.server.ownerTransfer.cancelFailed": "Передача не отменена.",
+  "mobile.server.ownerTransfer.incomingTitle": "Стать владельцем {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} хочет сделать вас владельцем {server}. Вы получите полный контроль над сервером, а его агенты, чаты, регулярные задачи и сохранённые входы останутся на нём. {name} теряет доступ. Любой, кто ещё может войти на компьютер, где работает сервер, может пользоваться вашим аккаунтом OpenBot. Смените на нём пароли и SSH-ключи.",
+  "mobile.server.ownerTransfer.accept": "Принять",
+  "mobile.server.ownerTransfer.decline": "Отклонить",
+  "mobile.server.ownerTransfer.accepted": "Теперь вы владелец {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Не удалось принять передачу",
+  "mobile.server.ownerTransfer.declineFailed": "Не удалось отклонить передачу",
+  "mobile.server.ownerTransfer.tryAgain": "Попробуйте позже.",
+  "mobile.server.providers.updateAll": "Обновить все",
+  "mobile.server.providers.updateAllFailed": "Некоторые обновления не запустились. Попробуйте ещё раз.",
 } as const satisfies PartialTranslation<typeof source>;

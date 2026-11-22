@@ -19,6 +19,10 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "L’agente si è fermato prima di rispondere a questo passaggio. Esegui di nuovo il passaggio.",
   "error.workflow.conditionUnclear": "Il modello non ha risposto sì o no.",
+  "error.workflow.answerInvalid":
+    "La risposta non conteneva i campi richiesti da questo passaggio: {fields}. Esegui di nuovo il passaggio.",
+  "error.workflow.checkInvalid":
+    "Il controllo di questo passaggio non è valido. Correggilo, poi esegui di nuovo il passaggio.",
   "error.workflow.modelFailed": "Il modello non ha potuto rispondere. Esegui di nuovo il passaggio.",
   "error.workflow.modelTimedOut":
     "Il modello non ha risposto in tempo. Scegli un impegno più basso o un modello più veloce per questo passaggio, poi eseguilo di nuovo.",
@@ -35,6 +39,7 @@ export const messages = {
     "OpenBot non è riuscito a raggiungere il provider. Controlla la connessione a internet, poi esegui di nuovo il passaggio.",
   "error.workflow.modelBusy": "È in corso un’altra richiesta al modello. Esegui di nuovo il passaggio tra poco.",
   "error.workflow.mediaFailed": "Il modello non ha potuto creare l’immagine o il video. Esegui di nuovo il passaggio.",
+  "error.workflow.mediaNotMade": "Il modello non ha creato l’immagine o il video. Ha risposto: {answer}",
   "error.workflow.pictureMissing": "L’immagine non è più sul server. Inviala di nuovo.",
   "error.workflow.pictureType": "Usa un’immagine PNG, JPEG o WebP.",
   "error.workflow.mediaInputMissing":

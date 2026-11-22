@@ -4,15 +4,21 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/sdk/shared/stdio.js";
 import {
+  CallToolResultSchema,
   ErrorCode,
   isJSONRPCErrorResponse,
+  isJSONRPCNotification,
   isJSONRPCRequest,
   isJSONRPCResultResponse,
+  type JSONRPCErrorResponse,
+  type JSONRPCRequest,
+  type JSONRPCResultResponse,
   type RequestId,
 } from "@modelcontextprotocol/sdk/types.js";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { cliSpawnTarget } from "./cli";
+import { boundedError, MCP_TOOL_CALL_TIMEOUT_MS, type McpToolArguments, type McpToolCallResult } from "./mcp-probe";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 
@@ -24,10 +30,37 @@ export interface StdioMcpLaunch {
   onStartAbandoned?: () => void;
 }
 
+export type RelayedMcpToolOutcome = { result: McpToolCallResult } | { error: string };
+
 export interface StdioMcpRelay {
   url: string;
   token: string;
   close: () => Effect.Effect<void, ProviderClientOperationError>;
+  callTool: (name: string, args: McpToolArguments) => Effect.Effect<RelayedMcpToolOutcome | null>;
+}
+
+type OwnAnswer = (answer: JSONRPCResultResponse | JSONRPCErrorResponse | null) => void;
+
+type ServerAnswer = JSONRPCResultResponse | JSONRPCErrorResponse;
+
+interface Handshake {
+  request: RequestId;
+  reply: RequestId;
+  client: string;
+  answer: ServerAnswer | null;
+}
+
+interface ServerOutput {
+  transport: StreamableHTTPServerTransport | null;
+  pending: Set<RequestId>;
+  own: Map<RequestId, OwnAnswer>;
+  handshake: Handshake | null;
+}
+
+interface RunningServer {
+  child: ChildProcess;
+  initialized: boolean;
+  output: ServerOutput;
 }
 
 const STOP_GRACE_MS = 2_000;
@@ -40,6 +73,9 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
   const transports = new Set<StreamableHTTPServerTransport>();
   const sessions = new Map<string, StreamableHTTPServerTransport>();
   const children = new Set<ChildProcess>();
+  const running: RunningServer[] = [];
+  const abandoned = new WeakSet<StreamableHTTPServerTransport>();
+  let starting: RunningServer | null = null;
   let closing = false;
 
   const authorized = (request: IncomingMessage) => {
@@ -47,9 +83,49 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     return header.length === expected.length && timingSafeEqual(header, expected);
   };
 
+  const launchServer = (transport: StreamableHTTPServerTransport) => {
+    const output: ServerOutput = { transport, pending: new Set(), own: new Map(), handshake: null };
+    const child = startServer(launch, output);
+    const entry: RunningServer = { child, initialized: false, output };
+    const forget = () => {
+      children.delete(child);
+      if (starting === entry) starting = null;
+      const index = running.indexOf(entry);
+      if (index >= 0) running.splice(index, 1);
+    };
+    children.add(child);
+    running.push(entry);
+    child.once("exit", forget);
+    child.once("error", forget);
+    return entry;
+  };
+
+  const adoptStartingServer = (transport: StreamableHTTPServerTransport, request: JSONRPCRequest) => {
+    const entry = starting;
+    const handshake = entry?.output.handshake;
+    if (!entry || !handshake || handshake.client !== handshakeClient(request)) return null;
+    starting = null;
+    if (handshake.answer && isJSONRPCErrorResponse(handshake.answer)) {
+      void stopServer(entry.child);
+      return null;
+    }
+    entry.output.transport = transport;
+    handshake.reply = request.id;
+    if (handshake.answer) void transport.send({ ...handshake.answer, id: request.id }).catch(() => undefined);
+    else entry.output.pending.add(request.id);
+    return entry;
+  };
+
+  const keepStarting = (entry: RunningServer) => {
+    if (starting || !entry.output.handshake || !running.includes(entry)) return false;
+    entry.output.transport = null;
+    entry.output.pending.clear();
+    starting = entry;
+    return true;
+  };
+
   const open = () => {
-    let child: ChildProcess | null = null;
-    const pending = new Set<RequestId>();
+    let live: RunningServer | null = null;
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomBytes(16).toString("hex"),
       onsessioninitialized: (id) => {
@@ -58,20 +134,30 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     });
     transports.add(transport);
     transport.onmessage = (message) => {
-      if (!child) {
-        const started = startServer(launch, transport, pending);
-        children.add(started);
-        started.once("exit", () => children.delete(started));
-        started.once("error", () => children.delete(started));
-        child = started;
+      const initialize = isJSONRPCRequest(message) && message.method === "initialize" ? message : null;
+      if (!live && initialize) {
+        live = adoptStartingServer(transport, initialize);
+        if (live) return;
       }
-      if (isJSONRPCRequest(message)) pending.add(message.id);
-      child.stdin?.write(serializeMessage(message));
+      live ??= launchServer(transport);
+      const output = live.output;
+      if (isJSONRPCRequest(message)) output.pending.add(message.id);
+      if (initialize && !output.handshake)
+        output.handshake = {
+          request: initialize.id,
+          reply: initialize.id,
+          client: handshakeClient(initialize),
+          answer: null,
+        };
+      if (isJSONRPCNotification(message) && message.method === "notifications/initialized") live.initialized = true;
+      live.child.stdin?.write(serializeMessage(message));
     };
     transport.onclose = () => {
       transports.delete(transport);
       if (transport.sessionId) sessions.delete(transport.sessionId);
-      if (child) void stopServer(child);
+      if (!live || live.output.transport !== transport) return;
+      if (abandoned.has(transport) && keepStarting(live)) return;
+      void stopServer(live.child);
     };
     return transport;
   };
@@ -93,6 +179,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       response.once("close", () => {
         if (response.writableFinished || closing) return;
         launch.onStartAbandoned?.();
+        abandoned.add(transport);
         void transport.close().catch(() => undefined);
       });
     void transport
@@ -104,6 +191,34 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
         if (!existing && !transport.sessionId) void transport.close();
       });
   };
+
+  const callTool = (name: string, args: McpToolArguments) =>
+    Effect.callback<RelayedMcpToolOutcome | null>((resume, signal) => {
+      const target = running.findLast((entry) => entry.initialized && entry.child.stdin?.writable === true);
+      if (closing || !target) return resume(Effect.succeed(null));
+      const id = `openbot-${randomBytes(12).toString("hex")}`;
+      target.output.own.set(id, (answer) => {
+        target.output.own.delete(id);
+        resume(Effect.succeed(relayedOutcome(answer)));
+      });
+      target.child.stdin?.write(
+        serializeMessage({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }),
+      );
+      signal.addEventListener("abort", () => {
+        if (!target.output.own.delete(id)) return;
+        target.child.stdin?.write(
+          serializeMessage({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: id } }),
+        );
+      });
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: MCP_TOOL_CALL_TIMEOUT_MS,
+        orElse: () =>
+          Effect.succeed({
+            error: sourceText("error.backend.mcpServerNoAnswer", { seconds: MCP_TOOL_CALL_TIMEOUT_MS / 1000 }),
+          }),
+      }),
+    );
 
   const server = createServer(handle);
   yield* providerCall(
@@ -133,14 +248,22 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
         await Promise.all([...children].map(stopServer));
         await closed;
       }),
+    callTool,
   } satisfies StdioMcpRelay;
 });
 
-function startServer(
-  launch: StdioMcpLaunch,
-  transport: StreamableHTTPServerTransport,
-  pending: Set<RequestId>,
-): ChildProcess {
+function relayedOutcome(answer: JSONRPCResultResponse | JSONRPCErrorResponse | null): RelayedMcpToolOutcome {
+  if (answer === null) return { error: sourceText("error.backend.mcpServerStoppedDuringCall") };
+  if (!isJSONRPCResultResponse(answer)) return { error: boundedError(answer.error.message) };
+  const decoded = CallToolResultSchema.safeParse(answer.result);
+  return decoded.success ? { result: decoded.data } : { error: boundedError(decoded.error.message) };
+}
+
+function handshakeClient(request: JSONRPCRequest): string {
+  return JSON.stringify([request.params?.protocolVersion, request.params?.capabilities]);
+}
+
+function startServer(launch: StdioMcpLaunch, output: ServerOutput): ChildProcess {
   const target = cliSpawnTarget(launch.command, launch.args);
   const child = spawn(target.command, target.args, {
     ...(launch.cwd ? { cwd: launch.cwd } : {}),
@@ -153,11 +276,15 @@ function startServer(
   endProcessGroupOnExit(child);
   const buffer = new ReadBuffer();
   const end = () => {
+    for (const answer of [...output.own.values()]) answer(null);
+    const { transport, pending } = output;
+    const ids = [...pending];
+    pending.clear();
+    if (!transport) return;
     const message = sourceText("error.backend.mcpServerStoppedDuringCall");
-    const answers = [...pending].map((id) =>
+    const answers = ids.map((id) =>
       transport.send({ jsonrpc: "2.0", id, error: { code: ErrorCode.InternalError, message } }).catch(() => undefined),
     );
-    pending.clear();
     void Promise.all(answers)
       .then(() => transport.close())
       .catch(() => undefined);
@@ -177,9 +304,22 @@ function startServer(
         continue;
       }
       if (!message) break;
-      if ((isJSONRPCResultResponse(message) || isJSONRPCErrorResponse(message)) && message.id !== undefined)
-        pending.delete(message.id);
-      void transport.send(message).catch(() => undefined);
+      if ((isJSONRPCResultResponse(message) || isJSONRPCErrorResponse(message)) && message.id !== undefined) {
+        const ownAnswer = output.own.get(message.id);
+        if (ownAnswer) {
+          ownAnswer(message);
+          continue;
+        }
+        output.pending.delete(message.id);
+        const handshake = output.handshake;
+        if (handshake && !handshake.answer && message.id === handshake.request) {
+          handshake.answer = message;
+          output.pending.delete(handshake.reply);
+          void output.transport?.send({ ...message, id: handshake.reply }).catch(() => undefined);
+          continue;
+        }
+      }
+      void output.transport?.send(message).catch(() => undefined);
     }
   });
   child.stdin?.on("error", () => undefined);
