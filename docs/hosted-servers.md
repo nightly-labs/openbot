@@ -731,9 +731,15 @@ update its heartbeat for 600 seconds" and sends `SIGKILL` to the process in
 `/run/openbot/openbot.pid`. `Restart=always` starts the service again 10 s later. The watchdog does
 nothing:
 
-- before the first change of the file in this run, so a slow start is not stopped;
+- before the first change of the file in this run;
+- until the start finishes: `openbot-start-attempts-v1.json` in the same folder has
+  `"attempt":null` only after the migrations, the services and the renderer load. Migrations and the
+  database `quick_check` run on the main thread and can take longer than 10 minutes on a large
+  database;
+- while the run marker does not have `"state":"running"`. Quitting and the server safe mode stop the
+  heartbeat, and the safe mode stays alive to keep the host reachable;
 - when the folder of the file has less than 1 MB free, because main ignores a failed write;
-- when the process in the pid file is not `openbot`.
+- when the process in the pid file is not `openbot` in the cgroup of the service.
 
 The watchdog counts reads and does not compare clock times, so a boat resume, which moves the clock
 forward, does not stop OpenBot. It does not help when the whole machine stops responding; that needs a
@@ -746,7 +752,8 @@ main crashed it. The main thread then stopped in a blocking read of a Unix socke
 line and used no CPU, and the host stayed off Signal for 24 hours until a restart. The Chromium call
 that blocked is not confirmed: the processes were gone after the restart.
 `scripts/hosted-watchdog-e2e.ts` (`bun run test:hosted-watchdog`) runs the watchdog with a 1 s
-interval against fake apps that write, stop writing or never write the file.
+interval against fake apps that write, stop writing or never write the file, that did not finish
+their start, that quit, or that are not `openbot`.
 
 ## Memory
 
