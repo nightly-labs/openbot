@@ -40,15 +40,23 @@ const FITTED_WINDOW = currentDevicePlatform() === "darwin";
 const POINTER_ZONE_WHILE_MOVING = currentDevicePlatform() === "win32";
 const WIDEN_WAIT_MS = 250;
 
-function nextResize(): Promise<void> {
+function nextGrowth(): Promise<void> {
   return new Promise((resolve) => {
+    let width = window.innerWidth;
+    let height = window.innerHeight;
     const done = () => {
-      window.removeEventListener("resize", done);
+      window.removeEventListener("resize", resized);
       clearTimeout(timer);
       resolve();
     };
+    const resized = () => {
+      const grew = window.innerWidth > width || window.innerHeight > height;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      if (grew) done();
+    };
     const timer = setTimeout(done, WIDEN_WAIT_MS);
-    window.addEventListener("resize", done);
+    window.addEventListener("resize", resized);
   });
 }
 
@@ -68,7 +76,7 @@ export function AgentDockSurface() {
   let received = false;
   let chatOpen = false;
   let pointerIn = false;
-  let pressed = false;
+  let menuWanted = false;
   let widening: Promise<void> | null = null;
   let dragging = false;
   let shelfShown = false;
@@ -144,10 +152,13 @@ export function AgentDockSurface() {
     };
   }
 
+  const fitted = () => sentExtent !== "" && sentExtent !== "null";
+
   function syncExtent() {
     const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
+    if (menuOpen()) menuWanted = false;
     const extent =
-      dockShape === null || pressed || menuOpen()
+      dockShape === null || menuWanted || menuOpen() || (pointerIn && !fitted())
         ? null
         : windowExtent(
             isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
@@ -155,8 +166,8 @@ export function AgentDockSurface() {
           );
     const key = JSON.stringify(extent);
     if (key === sentExtent) return;
-    if (extent === null && sentExtent !== "" && sentExtent !== "null") {
-      const resized = nextResize();
+    if (extent === null && fitted()) {
+      const resized = nextGrowth();
       widening = resized;
       void resized.then(() => {
         if (widening === resized) widening = null;
@@ -189,7 +200,7 @@ export function AgentDockSurface() {
   const sync = () => {
     updateTuck();
     if (FITTED_WINDOW) syncExtent();
-    const next = { interactive: pointerIn || pressed, keyboard: chatOpen || menuOpen() };
+    const next = { interactive: pointerIn, keyboard: chatOpen || menuOpen() };
     if (next.interactive === sent?.interactive && next.keyboard === sent.keyboard) return;
     sent = next;
     void agentDockPort()
@@ -218,23 +229,23 @@ export function AgentDockSurface() {
         target !== document.documentElement &&
         target !== document.body &&
         target.id !== "root";
-      if (event.type === "mousemove" && !pointerIn) pressed = false;
+      if (event.type === "mousemove" && !pointerIn) menuWanted = false;
       sync();
     };
     const onLeave = () => {
       pointerIn = false;
-      pressed = false;
-      sync();
-    };
-    const onPress = (event: PointerEvent) => {
-      if (!FITTED_WINDOW || !event.isTrusted || !pointerIn) return;
-      pressed = true;
+      menuWanted = false;
       sync();
     };
     const onContextMenu = (event: MouseEvent) => {
-      const resized = widening;
       const target = event.target;
-      if (!resized || !event.isTrusted || !(target instanceof Element)) return;
+      if (!FITTED_WINDOW || !event.isTrusted || !(target instanceof Element)) return;
+      if (fitted()) {
+        menuWanted = true;
+        syncExtent();
+      }
+      const resized = widening;
+      if (!resized) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       const before = agentDockBody()?.getBoundingClientRect();
@@ -270,7 +281,6 @@ export function AgentDockSurface() {
     document.addEventListener("mouseover", onPointer);
     document.addEventListener("mousemove", onPointer);
     document.documentElement.addEventListener("mouseleave", onLeave);
-    window.addEventListener("pointerdown", onPress, true);
     window.addEventListener("contextmenu", onContextMenu, true);
     window.addEventListener("blur", onBlur);
     return () => {
@@ -280,7 +290,6 @@ export function AgentDockSurface() {
       document.removeEventListener("mouseover", onPointer);
       document.removeEventListener("mousemove", onPointer);
       document.documentElement.removeEventListener("mouseleave", onLeave);
-      window.removeEventListener("pointerdown", onPress, true);
       window.removeEventListener("contextmenu", onContextMenu, true);
       window.removeEventListener("blur", onBlur);
       stopTuckTimer();
