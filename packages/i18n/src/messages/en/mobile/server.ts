@@ -6,8 +6,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.remoteDesktop.unlockPrompt": "Unlock to control the computer",
   "mobile.server.remoteDesktop.connecting": "Connecting to the computer…",
   "mobile.server.remoteDesktop.unsupported": "This server cannot share its screen. Update OpenBot on the computer.",
-  "mobile.server.remoteDesktop.notReady":
-    "Remote desktop is not set up on this computer. Set it up in OpenBot on the computer, in Settings.",
   "mobile.server.remoteDesktop.offline": "The server is not connected. Try again when it is online.",
   "mobile.server.remoteDesktop.appUpdate": "Update the app to control a computer.",
   "mobile.server.remoteDesktop.streamNotReady": "The computer did not send its screen. Try again.",

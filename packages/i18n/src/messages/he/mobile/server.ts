@@ -7,8 +7,6 @@ export const messages = {
   "mobile.server.remoteDesktop.unlockPrompt": "יש לבטל את הנעילה כדי לשלוט במחשב",
   "mobile.server.remoteDesktop.connecting": "מתחבר למחשב…",
   "mobile.server.remoteDesktop.unsupported": "השרת הזה לא יכול לשתף את המסך שלו. יש לעדכן את OpenBot במחשב.",
-  "mobile.server.remoteDesktop.notReady":
-    "שולחן עבודה מרוחק לא הוגדר במחשב הזה. יש להגדיר אותו ב-OpenBot במחשב, בהגדרות.",
   "mobile.server.remoteDesktop.offline": "השרת לא מחובר. אפשר לנסות שוב כשהוא יהיה מקוון.",
   "mobile.server.remoteDesktop.appUpdate": "יש לעדכן את האפליקציה כדי לשלוט במחשב.",
   "mobile.server.remoteDesktop.streamNotReady": "המחשב לא שלח את המסך שלו. אפשר לנסות שוב.",

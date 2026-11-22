@@ -2333,21 +2333,6 @@
     "tr",
     "zh"
   ],
-  "mobile.server.remoteDesktop.notReady": [
-    "ar",
-    "de",
-    "es",
-    "fr",
-    "it",
-    "ja",
-    "ko",
-    "nl",
-    "pl",
-    "pt",
-    "ru",
-    "tr",
-    "zh"
-  ],
   "mobile.server.remoteDesktop.offline": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "mobile.server.remoteDesktop.options": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "mobile.server.remoteDesktop.pasteFailed": [
