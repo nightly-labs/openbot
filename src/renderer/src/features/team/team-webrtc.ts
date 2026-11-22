@@ -66,6 +66,7 @@ interface MainBridgeMessage {
   localFingerprint?: string;
   remoteFingerprint?: string;
   iceServers?: RTCIceServer[];
+  retryInMs?: number;
 }
 
 interface PeerState {
@@ -109,6 +110,7 @@ const DISCONNECT_GRACE_MS = 15_000;
 const SIGNAL_READY_DEADLINE_MS = 30_000;
 const SIGNAL_PROBE_INTERVAL_MS = 4 * 60_000;
 const RELAYED_FRAME_DEADLINE_MS = 30_000;
+const SIGNAL_HOLD_SPREAD_MS = 5_000;
 
 const peers = new Map<string, PeerState>();
 let signalRetryAt = 0;
@@ -963,10 +965,12 @@ function replaceSignal(state: PeerState): void {
 function scheduleSignalReconnect(state: PeerState): void {
   if (state.reconnectTimer !== null) return;
   const attempt = state.reconnectAttempt++;
+  const holdMs = signalRetryAt - Date.now();
   const delay = Math.max(
-    signalRetryAt - Date.now(),
+    holdMs > 0 ? holdMs + Math.random() * SIGNAL_HOLD_SPREAD_MS : 0,
     attempt === 0 ? 500 + Math.random() * 3_500 : Math.min(30_000, 500 * 2 ** attempt) * (0.5 + Math.random() / 2),
   );
+  if (holdMs > 0) post({ type: "signal-held", peerId: state.id, retryInMs: Math.ceil(delay) });
   state.reconnectTimer = window.setTimeout(() => {
     state.reconnectTimer = null;
     connectSignal(state);
