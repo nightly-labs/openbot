@@ -558,6 +558,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             onClose: closePanelThread,
             onMove: moveSideThread,
             onToChat: movePanelThreadToChat,
+            onArchive: props.threads?.header.onArchive,
+            onDelete: props.threads?.header.onDelete,
           }}
           files={{
             items: sidePanel().files,
