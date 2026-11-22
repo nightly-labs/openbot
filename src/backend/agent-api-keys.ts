@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { constants } from "node:fs";
-import { access, lstat, readdir, readFile, readlink, rename, rm, symlink } from "node:fs/promises";
+import { lstat, readdir, readFile, readlink, rename, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { API_KEY_NAME_PATTERN } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -236,14 +235,9 @@ export class AgentApiKeys {
     const keys = (this.#readyVault()?.apiKeys(agentId) ?? []).filter(({ name }) => API_KEY_NAME_PATTERN.test(name));
     return Effect.promise(async () => {
       const readable: SavedApiKey[] = [];
-      for (const { name, own } of keys) {
+      for (const { name, value, own } of keys) {
         const path = join(folder, name);
-        if (
-          await access(path, constants.R_OK).then(
-            () => true,
-            () => false,
-          )
-        )
+        if ((await readFile(path, "utf8").catch(() => null)) === value)
           readable.push({ name, path, ...(own ? {} : { source: "vault" as const }) });
       }
       return readable;
