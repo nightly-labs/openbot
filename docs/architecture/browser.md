@@ -700,7 +700,10 @@ answer every dialog. Then the waiting start continues. While a view runs, the en
 events on, so it also sees a dialog that the member's own click opens. A dialog that opened while
 the engine did not watch stays unknown: `Page.enable` waits behind it and reports nothing. While a
 dialog is open, the gateway drops pointer and key input and answers `copy` with no text. The desktop
-and web clients show the dialog in `ConfirmDialog`, and the phone in `Alert.alert`.
+and web clients show the dialog as a sheet at the top of the page area, named after the site of the
+tab ("openbot.run says"). It dims only the page: the tabs, the address and the chat box stay usable.
+A click outside it does not answer it, Escape answers Cancel, and OK has the focus. Before the first
+frame, the page area says that the page waits for the answer. The phone shows it in `Alert.alert`.
 
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
 own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`

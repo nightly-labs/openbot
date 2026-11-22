@@ -4,7 +4,7 @@ import {
   type BrowserLiveViewDialog,
   type BrowserLiveViewInput,
 } from "@openbot/contracts/ipc";
-import { ConfirmDialog, ErrorReference, MessageSquareText, toast } from "@openbot/ui";
+import { AlertDialog, Button, ErrorReference, Globe2, toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
@@ -31,7 +31,17 @@ interface BrowserLiveViewProps {
   tabId: string;
   active: boolean;
   clipboard: boolean;
+  site?: string | undefined;
   onFrameSize?: (size: { width: number; height: number }) => void;
+}
+
+export function browserPageSite(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).hostname || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export default function BrowserLiveView(props: BrowserLiveViewProps) {
@@ -320,21 +330,63 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       />
       <Show when={!state.live}>
         <div class="browser-empty-state">
-          <span>{state.message ?? t("browser.liveView.connecting")}</span>
+          <span>
+            {state.message ?? (dialog() ? t("browser.liveView.dialog.waiting") : t("browser.liveView.connecting"))}
+          </span>
           <ErrorReference reference={state.reference} />
         </div>
       </Show>
-      <ConfirmDialog
+      <AlertDialog.Root
         open={dialog() !== null}
-        tone="default"
-        icon={<MessageSquareText />}
-        title={t("browser.liveView.dialog.title")}
-        description={dialog()?.message}
-        confirmLabel={t("browser.liveView.dialog.ok")}
-        hideCancel={dialog()?.type === "alert"}
-        onConfirm={() => answerDialog(true)}
-        onCancel={() => answerDialog(false)}
-      />
+        modal={false}
+        onOpenChange={(open) => {
+          if (!open) answerDialog(false);
+        }}
+      >
+        <Show when={dialog()}>
+          {(open) => (
+            <div class="browser-live-view-dialog-scrim">
+              <AlertDialog.Content
+                class="browser-live-view-dialog"
+                onOpenAutoFocus={(event) => event.preventDefault()}
+                onCloseAutoFocus={(event) => {
+                  event.preventDefault();
+                  canvas()?.focus({ preventScroll: true });
+                }}
+                onInteractOutside={(event) => event.preventDefault()}
+              >
+                <AlertDialog.Title class="browser-live-view-dialog-site">
+                  <Globe2 aria-hidden="true" />
+                  {props.site
+                    ? t("browser.liveView.dialog.site", { site: props.site })
+                    : t("browser.liveView.dialog.page")}
+                </AlertDialog.Title>
+                <AlertDialog.Description class="browser-live-view-dialog-message">
+                  {open().message}
+                </AlertDialog.Description>
+                <div class="browser-live-view-dialog-actions">
+                  <Show when={open().type === "confirm"}>
+                    <Button variant="ghost" size="sm" onClick={() => answerDialog(false)}>
+                      {t("common.cancel")}
+                    </Button>
+                  </Show>
+                  <Button
+                    size="sm"
+                    ref={(element: HTMLButtonElement) => {
+                      requestAnimationFrame(() => {
+                        if (element.isConnected) element.focus({ preventScroll: true });
+                      });
+                    }}
+                    onClick={() => answerDialog(true)}
+                  >
+                    {t("browser.liveView.dialog.ok")}
+                  </Button>
+                </div>
+              </AlertDialog.Content>
+            </div>
+          )}
+        </Show>
+      </AlertDialog.Root>
     </div>
   );
 }
