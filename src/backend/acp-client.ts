@@ -154,6 +154,8 @@ const ACP_PROMPT_AUDIO_BASE64_BYTES = 19 * 1024 * 1024;
 
 const ACP_TURN_STALL_MS = 5 * 60_000;
 
+export const CURSOR_TURN_STALL_MS = 30 * 60_000;
+
 const ACP_MODEL_RETRY_GRACE = 1.2;
 
 const ACP_FIRST_UPDATE_MS = 3 * 60_000;
@@ -1432,12 +1434,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #initializeConnection(
     connection: ClientSideConnection,
   ): Effect.Effect<InitializeResponse, ProviderClientOperationError> {
+    const clientCapabilities = {
+      ...OPENBOT_ACP_CLIENT_CAPABILITIES,
+      ...this.#flavor.clientCapabilities,
+    };
     return providerCall(() =>
       connection.initialize({
         protocolVersion: 1,
         clientCapabilities: this.#flavor.childSessionUpdates
-          ? { ...OPENBOT_ACP_CLIENT_CAPABILITIES, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
-          : OPENBOT_ACP_CLIENT_CAPABILITIES,
+          ? { ...clientCapabilities, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
+          : clientCapabilities,
         clientInfo: this.#flavor.clientInfo ?? OPENBOT_ACP_CLIENT_INFO,
       }),
     );

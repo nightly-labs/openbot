@@ -15,7 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
+import { AcpAgentClient, type AcpHistoryPersistence, CURSOR_TURN_STALL_MS } from "./acp-client";
 import {
   CLINE_ACP_FLAVOR,
   COPILOT_ACP_FLAVOR,
@@ -977,6 +977,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       new AcpAgentClient(cli, timeout, {
         provider: "cursor",
         flavor: CURSOR_ACP_FLAVOR,
+        turnStallMs: CURSOR_TURN_STALL_MS,
         argv: ["acp"],
         env: {},
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, cursorStatePaths()) } : {}),
@@ -1003,6 +1004,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       new AcpAgentClient(cli, timeout, {
         provider: "cursor",
         flavor: CURSOR_ACP_FLAVOR,
+        turnStallMs: CURSOR_TURN_STALL_MS,
         argv: ["acp"],
         profileGeneration: true,
         env: {},
