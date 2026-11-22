@@ -158,6 +158,10 @@ const LAUNCH_START_CONCURRENCY = 2;
 const SIGN_IN_FILE_POLL_MS = 2_000;
 const SIGN_IN_RECHECK_DELAYS_MS: readonly number[] = [5_000, 10_000, 20_000];
 
+function releasedUsageKey(provider: AgentProvider, model: string): string {
+  return `${provider}\u0000${model}`;
+}
+
 function signInFileVersion(paths: readonly string[]): string {
   return paths
     .map((path) => {
@@ -369,6 +373,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   readonly #usageUnreported = new Set<AgentProvider>();
   readonly #usageGates = new Map<AgentProvider, UsageReadGate>();
+  readonly #releasedUsage = new Map<string, { gate: UsageReadGate; usage: AccountUsage }>();
   readonly #customAgentUsage = new Map<string, { prompt: string; text: string | null; readAt: number }>();
   readonly #customAgentUsageLock = Semaphore.makeUnsafe(1);
   #idleCheck: NodeJS.Timeout | null = null;
@@ -1099,7 +1104,11 @@ export class ProviderRuntime implements ProviderPort {
     const read = client
       ? this.#refreshUsage(client, scope.model, false)
       : releasedCli
-        ? this.#readReleasedUsage(scope.provider, releasedCli, scope.model).pipe(deadline)
+        ? this.#pacedReleasedUsage(
+            scope.provider,
+            scope.model,
+            this.#readReleasedUsage(scope.provider, releasedCli, scope.model).pipe(deadline),
+          )
         : undefined;
     if (!read) return { limits: [] };
     return yield* this.#usageGate(scope.provider).unlessWaiting({
@@ -1123,6 +1132,26 @@ export class ProviderRuntime implements ProviderPort {
       !accounts.usageLeavesSession
       ? cli
       : undefined;
+  }
+
+  #pacedReleasedUsage<E, R>(
+    provider: AgentProvider,
+    model: string,
+    read: Effect.Effect<AccountUsage, E, R>,
+  ): Effect.Effect<AccountUsage, E, R> {
+    const key = releasedUsageKey(provider, model);
+    const paced = this.#releasedUsage.get(key) ?? { gate: new UsageReadGate(), usage: { limits: [] } };
+    this.#releasedUsage.set(key, paced);
+    return paced.gate.run({
+      read: read.pipe(
+        Effect.tap((usage) =>
+          Effect.sync(() => {
+            paced.usage = usage;
+          }),
+        ),
+      ),
+      kept: () => structuredClone(paced.usage),
+    });
   }
 
   readonly #readReleasedUsage = Effect.fn("ProviderRuntime.readReleasedUsage")(function* (
@@ -1315,6 +1344,8 @@ export class ProviderRuntime implements ProviderPort {
     this.#usageGate(provider).reset();
     this.#lastUsage.delete(provider);
     this.#ownResetCredits.delete(provider);
+    for (const key of [...this.#releasedUsage.keys()])
+      if (key.startsWith(releasedUsageKey(provider, ""))) this.#releasedUsage.delete(key);
   }
 
   #usageGate(provider: AgentProvider): UsageReadGate {

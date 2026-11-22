@@ -88,6 +88,8 @@ interface Report {
   released?: boolean;
   afterIdleStop?: Reading;
   usageReadProcesses?: number;
+  pacedReadings?: Reading[];
+  pacedProcesses?: number;
   error?: string;
 }
 
@@ -159,11 +161,18 @@ try {
   const startsBefore = protocol().filter((line) => line.start).length;
   report.afterIdleStop = reading(await runCauseEffect(providers.usage({ provider: "codex", model: MODEL })));
   report.usageReadProcesses = protocol().filter((line) => line.start).length - startsBefore;
+  const together = await Promise.all(
+    Array.from({ length: 5 }, () => runCauseEffect(providers.usage({ provider: "codex", model: MODEL }))),
+  );
+  report.pacedReadings = together.map(reading);
+  report.pacedProcesses = protocol().filter((line) => line.start).length - startsBefore - report.usageReadProcesses;
   report.passed =
     report.running.usedPercent === 3 &&
     report.released &&
     report.afterIdleStop.usedPercent === 3 &&
-    report.usageReadProcesses === 1;
+    report.usageReadProcesses === 1 &&
+    report.pacedReadings.every((paced) => paced.usedPercent === 3) &&
+    report.pacedProcesses === 0;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {
