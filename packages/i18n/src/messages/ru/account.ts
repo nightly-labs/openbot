@@ -20,7 +20,7 @@ export const messages = {
   "account.usage.notReported": "Лимит не указан",
   "account.usage.value.notReported": "Не сообщается",
   "account.usage.providerNotReported": "Нет данных об использовании",
-  "account.usage.readFailed": "Не удалось прочитать использование. Повтор позже.",
+  "account.usage.readFailed": "Не удалось прочитать данные",
   "account.usage.row.unavailable": "{name}, недоступно",
   "account.usage.row.notReported": "{name}, данные об использовании не передаются",
   "account.usage.row.loading": "{name}, загрузка",

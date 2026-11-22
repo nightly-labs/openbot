@@ -20,7 +20,7 @@ export const messages = {
   "account.usage.notReported": "Limit bildirilmedi",
   "account.usage.value.notReported": "Bildirilmedi",
   "account.usage.providerNotReported": "Kullanım verisi yok",
-  "account.usage.readFailed": "Kullanım okunamadı. Daha sonra yeniden denenecek.",
+  "account.usage.readFailed": "Kullanım okunamadı",
   "account.usage.row.unavailable": "{name}, kullanılamıyor",
   "account.usage.row.notReported": "{name}, kullanım bildirilmedi",
   "account.usage.row.loading": "{name}, yükleniyor",
