@@ -2718,6 +2718,7 @@ export class ChannelService {
         message.itemType !== "commentary"
       )
         message = { ...message, replyToMessageId: task.requestMessageId };
+      if (entryId !== message.id) message = { ...message, id: entryId };
       const messageId =
         original?.superseded && task?.revision === assignment.taskRevision
           ? `${entryId}-revision-${task.revision}`
