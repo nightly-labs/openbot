@@ -44,6 +44,7 @@ interface Report {
   passed: boolean;
   atStart?: { state: AgentProviderState | undefined; spawns: number };
   offHarness?: { restart: CustomProviderRestart; spawns: number };
+  noEndpoint?: { restart: CustomProviderRestart; spawns: number };
   afterSave?: {
     restart: CustomProviderRestart;
     states: (AgentProviderState | undefined)[];
@@ -81,6 +82,14 @@ let committedRevision = 0;
 let resolveActivation: (revision: number) => void = () => {};
 const activation = new Promise<number>((resolveWait) => {
   resolveActivation = resolveWait;
+});
+const customProviders = new CustomProviderStore({
+  path: endpointsPath,
+  cipher: {
+    encrypt: (value: string) => Buffer.from(Buffer.from(value, "utf8").toString("hex"), "utf8"),
+    decrypt: (value: Buffer) => Buffer.from(value.toString("utf8"), "hex").toString("utf8"),
+    canPersist: () => true,
+  },
 });
 const store = new AgentStore(join(root, "profile"), join(root, "home"), new OpenBotDatabase(join(root, "profile")));
 const piStates: (AgentProviderState | undefined)[] = [];
@@ -121,18 +130,10 @@ const providers = new ProviderRuntime({
   preferredProvider: "pi",
   clientFactory: null,
   bundledExecutables: {},
-  credentials: NO_PROVIDER_CREDENTIALS,
+  credentials: { ...NO_PROVIDER_CREDENTIALS, customProviders: () => customProviders.configs() },
   redactMcp: (text) => text,
 });
 
-const customProviders = new CustomProviderStore({
-  path: endpointsPath,
-  cipher: {
-    encrypt: (value: string) => Buffer.from(Buffer.from(value, "utf8").toString("hex"), "utf8"),
-    decrypt: (value: Buffer) => Buffer.from(value.toString("utf8"), "hex").toString("utf8"),
-    canPersist: () => true,
-  },
-});
 const changes = createCustomProviderChanges({
   service: {
     saveCustomProvider: (_id, _harness, persist) =>
@@ -175,10 +176,13 @@ function waitForPiStates(from: number, states: readonly AgentProviderState[]): P
 }
 
 function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), WAIT_MS)),
-  ]);
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), WAIT_MS);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 try {
@@ -195,6 +199,11 @@ try {
   report.offHarness = { restart: offRestart, spawns: await spawns() };
   assert.equal(offRestart, "not-running", "a harness that is turned off does not start");
   assert.equal(report.offHarness.spawns, report.atStart.spawns);
+
+  const noEndpointRestart = await runCauseEffect(providers.reloadCustomProviderConfig("pi"));
+  report.noEndpoint = { restart: noEndpointRestart, spawns: await spawns() };
+  assert.equal(noEndpointRestart, "not-running", "a signed-out Pi with no saved endpoint does not start");
+  assert.equal(report.noEndpoint.spawns, report.atStart.spawns);
 
   const from = piStates.length;
   const result = await runCauseEffect(
@@ -234,13 +243,16 @@ try {
   report.error = error instanceof Error ? error.message : String(error);
   throw error;
 } finally {
-  for (const client of await runCauseEffect(providers.dispose())) await runCauseEffect(client.stop());
-  for (const [key, value] of Object.entries(saved)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
-  await rm(root, { recursive: true, force: true });
+  try {
+    for (const client of await runCauseEffect(providers.dispose())) await runCauseEffect(client.stop());
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
 }
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

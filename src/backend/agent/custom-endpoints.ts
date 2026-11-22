@@ -122,7 +122,7 @@ export class CustomEndpoints {
     const releasedAt = this.#releasedAt(modelId, provider);
     if (releasedAt === null) return true;
     if (this.#hooks.endpointHarness(modelId.slice(0, modelId.indexOf("/"))) !== provider) return false;
-    return configRevision === null || configRevision >= releasedAt;
+    return (configRevision ?? this.#committedRevision) >= releasedAt;
   }
 
   #releasedAt(modelId: string, provider: AgentProvider): number | null {

@@ -2094,7 +2094,8 @@ export class ProviderRuntime implements ProviderPort {
       !this.#off.has(harness) &&
       this.signInRequired(harness) &&
       !this.#cliLogin.has(harness) &&
-      !this.#providerConnectionCommands.has(harness)
+      !this.#providerConnectionCommands.has(harness) &&
+      customProvidersOn(this.#credentials.customProviders, harness)().length > 0
     );
   }
 
