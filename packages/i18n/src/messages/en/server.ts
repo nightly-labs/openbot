@@ -18,6 +18,8 @@ export const messages = defineMessages("server", {
   "server.connection.planHint": "Open account settings to check the server plan.",
   "server.connection.loadingHint": "You can select another server while this one loads.",
   "server.connection.cachedHint": "Loaded content and drafts are kept. Server actions will resume after reconnection.",
+  "server.connection.computerOffline":
+    "{name} is offline. Make sure that its computer is on, OpenBot is open, and Publish this server is on in Server settings > Members.",
   "server.connection.conversationFailed": "The conversation could not load. Try again.",
   "server.connection.panelsFailed": "Some workspace panels could not load. Try again.",
   "server.connection.retry": "Retry",
@@ -652,6 +654,7 @@ export const messages = defineMessages("server", {
     "There is no separate remote desktop password. The settings below choose who can control this computer.",
   "server.desktop.componentInstalled": "Host component installed",
   "server.desktop.componentNotInstalled": "Host component not installed",
+  "server.desktop.needsX11Session": "Needs an X11 session",
   "server.desktop.sessions": "Unattended: {unattended} · Active sessions: {active}/{max}",
   "server.desktop.unattendedEnabled": "enabled",
   "server.desktop.unattendedUnavailable": "not available",

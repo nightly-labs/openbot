@@ -1219,6 +1219,8 @@ export const messages = {
     "ChatGPT usa questa chiave, non il tuo piano ChatGPT. OpenAI addebita ogni richiesta alla chiave. L'utilizzo del piano non viene mostrato.",
   "mobile.server.providers.codexKeyAlternative":
     "Oppure accedi con una chiave API di OpenAI. OpenAI addebita ogni richiesta alla chiave.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse usa questa chiave, non il tuo accesso. Per usare il tuo accesso, rimuovi la chiave.",
   "mobile.server.providers.sectionUse": "Utilizzo",
   "mobile.server.providers.unused": "Nessun agente lo usa",
   "mobile.server.providers.usedByCount": { one: "1 agente lo usa", other: "{count} agenti lo usano" },

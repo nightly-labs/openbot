@@ -273,6 +273,8 @@ export const messages = {
     "OpenCode nie mógł odczytać rozumowania tego modelu przy tym poziomie wysiłku. Wybierz niższy wysiłek lub inny model, a potem wyślij wiadomość ponownie.",
   "error.provider.opencodeModelNotServed":
     "Dostawca modelu nie udostępnia teraz tego modelu Twojemu kontu. Wybierz inny model, a następnie wyślij wiadomość ponownie.",
+  "error.provider.opencodeSafetyBlocked":
+    "Dostawca modelu zablokował tę wiadomość z powodu swoich zasad bezpieczeństwa. Wyślij prośbę ponownie innymi słowami. Jeśli zablokuje też kolejne wiadomości, rozpocznij nowy czat lub wybierz inny model.",
   "error.provider.opencodeNetwork":
     "OpenCode nie połączył się z dostawcą modelu. Sprawdź połączenie sieciowe komputera, na którym działa OpenBot, a potem spróbuj ponownie.\n{detail}",
   "error.provider.codexStateBusy":
@@ -586,6 +588,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Tura Muse nie powiodła się.",
   "error.provider.museModelUnavailable":
     "Muse nie może użyć tego modelu. Muse może być niedostępny w kraju, w którym działa ten agent, albo to konto nie ma dostępu do modelu. Wybierz inny model i spróbuj ponownie.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse nie mógł ukończyć tego żądania. Muse używa zapisanego klucza Meta API, a nie Twojego logowania. Zastąp klucz lub usuń go w Ustawieniach, aby używać logowania.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse nie może wygenerować profilu bez dostępu do zewnętrznych narzędzi. Wygeneruj profil innym dostawcą, a potem wybierz Muse dla agenta.",
   "error.provider.museAuthUnverified":

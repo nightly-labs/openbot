@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Możesz wybrać inny serwer, gdy ten się wczytuje.",
   "server.connection.cachedHint":
     "Wczytana zawartość i wersje robocze są zachowane. Działania serwera wznowią się po ponownym połączeniu.",
+  "server.connection.computerOffline":
+    "{name} jest offline. Sprawdź, czy jego komputer jest włączony, OpenBot jest otwarty, a opcja Opublikuj ten serwer jest włączona w Ustawienia serwera > Członkowie.",
   "server.connection.conversationFailed": "Nie udało się wczytać rozmowy. Spróbuj ponownie.",
   "server.connection.panelsFailed": "Nie udało się wczytać niektórych paneli obszaru roboczego. Spróbuj ponownie.",
   "server.connection.retry": "Ponów",
@@ -615,6 +617,7 @@ export const messages = {
     "Nie ma osobnego hasła do pulpitu zdalnego. Ustawienia poniżej określają, kto może sterować tym komputerem.",
   "server.desktop.componentInstalled": "Komponent hosta zainstalowany",
   "server.desktop.componentNotInstalled": "Komponent hosta niezainstalowany",
+  "server.desktop.needsX11Session": "Wymaga sesji X11",
   "server.desktop.sessions": "Tryb bez nadzoru: {unattended} · Aktywne sesje: {active}/{max}",
   "server.desktop.unattendedEnabled": "włączony",
   "server.desktop.unattendedUnavailable": "niedostępny",

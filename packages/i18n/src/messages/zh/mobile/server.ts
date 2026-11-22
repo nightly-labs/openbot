@@ -1097,6 +1097,7 @@ export const messages = {
   "mobile.server.providers.codexKeyInUse":
     "ChatGPT 使用该密钥，而不是你的 ChatGPT 套餐。OpenAI 按每个请求向该密钥计费。不显示套餐用量。",
   "mobile.server.providers.codexKeyAlternative": "或使用 OpenAI API 密钥登录。OpenAI 按每个请求向该密钥计费。",
+  "mobile.server.providers.museKeyInUse": "Muse 使用此密钥，而不是你的登录。要使用你的登录，请移除该密钥。",
   "mobile.server.providers.sectionUse": "使用",
   "mobile.server.providers.unused": "没有助手在使用",
   "mobile.server.providers.usedByCount": { other: "{count} 个助手在使用" },

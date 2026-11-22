@@ -287,6 +287,8 @@ export const messages = {
     "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeModelNotServed":
     "モデルのプロバイダーは現在、このモデルをあなたのアカウントに提供していません。別のモデルを選んでから、メッセージをもう一度送信してください。",
+  "error.provider.opencodeSafetyBlocked":
+    "モデルのプロバイダーが安全ルールによりこのメッセージをブロックしました。別の言葉でもう一度リクエストを送ってください。次のメッセージもブロックされる場合は、新しいチャットを始めるか、別のモデルを選んでください。",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
   "error.provider.codexStateBusy":
@@ -617,6 +619,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse のターンに失敗しました。",
   "error.provider.museModelUnavailable":
     "Muse はこのモデルを使用できません。このエージェントが動作している国では Muse を利用できないか、このアカウントにモデルへのアクセス権がない可能性があります。別のモデルを選択してから、もう一度お試しください。\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse はこのリクエストを完了できませんでした。Muse はサインインではなく、保存された Meta API キーを使います。キーを置き換えるか、設定でキーを削除してサインインを使ってください。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse は外部ツールにアクセスできないため、プロフィールを生成できません。別のプロバイダーでプロフィールを生成してから、エージェントに Muse を選択してください。",
   "error.provider.museAuthUnverified":

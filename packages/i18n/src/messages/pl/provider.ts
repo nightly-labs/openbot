@@ -290,6 +290,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot wyloguje {provider} na serwerze.",
   "provider.settings.geminiKeyReplacesAccount":
     "Zapisany klucz API Gemini jest używany zamiast logowania przez Google. Aby używać planu Google i jego modeli, usuń klucz.",
+  "provider.settings.museKeyInUse":
+    "Muse używa tego klucza, a nie Twojego logowania. Aby używać logowania, usuń klucz.",
   "provider.settings.versionInstalledByUser": "{version} · zainstalowana przez Ciebie",
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Nieużywana: {version} · zainstalowana przez Ciebie",

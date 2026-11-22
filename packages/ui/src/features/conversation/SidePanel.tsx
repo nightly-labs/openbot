@@ -1,5 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Archive,
   Badge,
   Button,
   buttonVariants,
@@ -16,6 +17,7 @@ import {
   Plus,
   Settings,
   Tabs,
+  Trash2,
   Workflow,
   X,
 } from "@openbot/ui";
@@ -25,7 +27,7 @@ import {
 } from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComputerIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { TabShape } from "@openbot/ui/features/conversation/TabShape";
-import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
+import { type ThreadItem, threadBusy } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, flush, onSettled, Show, untrack } from "solid-js";
@@ -182,6 +184,8 @@ export interface SidePanelThreads {
   onClose: (id: string) => void;
   onMove: (id: string, index: number) => void;
   onToChat: (id: string) => void;
+  onArchive?: ((id: string) => void) | undefined;
+  onDelete?: ((id: string) => void) | undefined;
 }
 
 interface TabHold {
@@ -255,6 +259,11 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     const tab = liveMenuTab();
     return tab && "thread" in tab ? tab.thread : undefined;
   };
+  const menuThreadItem = () => {
+    const id = menuThread();
+    return id === undefined ? undefined : props.threads?.items.find((item) => item.id === id);
+  };
+  const threadRemovable = () => props.threads?.onArchive !== undefined || props.threads?.onDelete !== undefined;
   const closeMenuTab = () => {
     const tab = liveMenuTab();
     if (!tab) return;
@@ -291,6 +300,37 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
               <X aria-hidden="true" />
               {t("conversation.threads.closeTab")}
             </ContextMenu.Item>
+          </Show>
+          <Show when={threadRemovable() && menuThreadItem()}>
+            {(thread) => (
+              <>
+                <ContextMenu.Separator />
+                <Show when={props.threads?.onArchive}>
+                  {(archive) => (
+                    <ContextMenu.Item
+                      class="side-panel-menu-item"
+                      disabled={threadBusy(thread().status)}
+                      onSelect={() => archive()(thread().id)}
+                    >
+                      <Archive aria-hidden="true" />
+                      {t("conversation.threads.archive")}
+                    </ContextMenu.Item>
+                  )}
+                </Show>
+                <Show when={props.threads?.onDelete}>
+                  {(remove) => (
+                    <ContextMenu.Item
+                      class="side-panel-menu-item ui-action-menu-danger"
+                      disabled={threadBusy(thread().status) || thread().status.kind === "queued"}
+                      onSelect={() => remove()(thread().id)}
+                    >
+                      <Trash2 aria-hidden="true" />
+                      {t("common.delete")}
+                    </ContextMenu.Item>
+                  )}
+                </Show>
+              </>
+            )}
           </Show>
         </ContextMenu.Content>
       </ContextMenu.Portal>

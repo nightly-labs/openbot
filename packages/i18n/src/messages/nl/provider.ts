@@ -298,6 +298,8 @@ export const messages = {
     "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van een Google-aanmelding. Verwijder de sleutel om een Google-abonnement en de modellen ervan te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
+  "provider.settings.museKeyInUse":
+    "Muse gebruikt deze sleutel, niet je login. Verwijder de sleutel om je login te gebruiken.",
   "provider.settings.addKey": "Sleutel toevoegen",
   "provider.settings.changeKey": "Sleutel wijzigen",
   "provider.settings.runtime": "Runtime",

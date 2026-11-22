@@ -1858,6 +1858,11 @@ export class ProviderRuntime implements ProviderPort {
     return this.#providerAccounts?.liveVoiceAccount() ?? null;
   }
 
+  codexPlanAccountInPlaceOfKey(): string | undefined {
+    if (this.#accounts.get("codex")?.type !== "apiKey") return undefined;
+    return this.#providerAccounts?.planAccounts("codex")[0];
+  }
+
   otherCodexAccounts(inUse: string): boolean {
     const ownSignIn =
       this.status().providers?.find((row) => row.id === "codex")?.state === "available" &&

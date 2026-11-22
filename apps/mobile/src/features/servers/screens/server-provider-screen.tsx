@@ -105,6 +105,7 @@ function keyDescription(row: ProviderRow, key: ProviderApiKeyStatus | undefined,
   if (row.id === "opencode") return t("mobile.server.providers.keyOptional");
   if (row.id === "antigravity" && saved) return t("mobile.server.providers.geminiKeyInUse");
   if (row.id === "claude" && saved) return t("mobile.server.providers.claudeKeyInUse");
+  if (row.id === "muse" && saved) return t("mobile.server.providers.museKeyInUse");
   if (row.id === "codex")
     return t(saved ? "mobile.server.providers.codexKeyInUse" : "mobile.server.providers.codexKeyAlternative");
   if (isKeyOnlyProvider(row.id)) return t("mobile.server.providers.keyHint");

@@ -121,6 +121,7 @@ export const messages = {
   "mobile.workflow.output.chatChannel": "قناة OpenBot",
   "mobile.workflow.output.file": "ملف",
   "mobile.workflow.status.running": "قيد التشغيل",
+  "mobile.workflow.status.waiting": "في قائمة الانتظار",
   "mobile.workflow.status.approval": "في انتظارك",
   "mobile.workflow.status.stopping": "جارٍ الإيقاف",
   "mobile.workflow.status.done": "تم",

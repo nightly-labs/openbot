@@ -979,7 +979,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const choose = providerSettings()?.accountActions?.setLiveVoiceAccount;
     const codex = providerAdmin.status().providers?.find((row) => row.id === "codex");
     if (!choose || !codex?.accounts) return undefined;
-    return { accounts: codex.accounts, accountId: codex.liveVoiceAccount ?? null, choose };
+    return {
+      accounts: codex.accounts,
+      accountId: codex.liveVoiceAccount ?? null,
+      defaultUsesKey: codex.apiKeyInUse === true,
+      choose,
+    };
   };
   const accountUsage = () => withHostAccountUsage(usageReading.accountUsage(), providerAdmin.hostAccounts.limits());
   const agentAccountChoice = createMemo(
@@ -2788,10 +2793,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const unavailable = async (): Promise<never> => {
     throw new Error(t("webClient.error.desktopOnly"));
   };
-  const connectionDetail = () =>
-    workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
-      ? (workspace.state.connectionError ?? null)
-      : null;
+  const connectionDetail = () => {
+    if (workspace.state.hostedSleep === "sleeping" || workspace.state.hostedIssue || hostUpdating()) return null;
+    if (workspace.state.hostOffline && workspace.state.host && workspace.state.host.hosted !== true)
+      return {
+        message: t("server.connection.computerOffline", { name: workspace.state.host.name }),
+        reference: workspace.state.connectionError?.reference ?? null,
+      };
+    return workspace.state.connectionError ?? null;
+  };
   const frameConnecting = () =>
     connectionShown() &&
     !fullWindowLoading() &&

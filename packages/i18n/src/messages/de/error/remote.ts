@@ -32,6 +32,8 @@ export const messages = {
     "Die Verbindung zum Host ist zu langsam für das Bild. Versuche es erneut: Die nächste Verbindung nutzt eine niedrigere Qualität.",
   "error.remote.streamTooSlow":
     "Die Verbindung zum Host ist zu langsam für das Bild. Nutze ein schnelleres Netzwerk und versuche es erneut.",
+  "error.remote.noPictureSwitchEncoder":
+    "Der Host hat kein Bild gesendet. Versuche es erneut: Die nächste Verbindung nutzt eine Videoeinstellung, die auf mehr Computern funktioniert.",
   "error.remote.teamSessionExpired": "Die Teamsitzung ist abgelaufen.",
   "error.remote.finishTestBeforeSwitch": "Beende den Remote-Desktop-Test, bevor du den Bildschirm wechselst.",
   "error.remote.displayNotFound": "Remote-Bildschirm nicht gefunden.",

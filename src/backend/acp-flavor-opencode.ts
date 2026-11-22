@@ -106,6 +106,14 @@ function openCodeAuthRequired(
 
 const NVIDIA_MODEL_NOT_SERVED = /\bFunction '[^']*': Not found for account\b/u;
 const NVIDIA_MODEL_DEGRADED = /\bDEGRADED function cannot be invoked\b/iu;
+const NVIDIA_SAFETY_SCREENING = /\binput rejected by content safety screening\b/iu;
+
+function isOpenCodeSafetyRefusal(error: unknown): boolean {
+  return (
+    error === "refusal" ||
+    (error instanceof RequestError && error.code === -32603 && NVIDIA_SAFETY_SCREENING.test(error.message))
+  );
+}
 
 function isReasoningEffortRefusal(error: unknown): boolean {
   if (!(error instanceof RequestError) || error.code !== -32603) return false;
@@ -142,6 +150,10 @@ function openCodeRequestFailure(
   log: (text: string) => void,
   endpoint: AcpCustomEndpoint | null,
 ): string {
+  if (isOpenCodeSafetyRefusal(error)) {
+    logger.warn("A model provider's safety rules refused an OpenCode turn.", { detail });
+    return sourceText("error.provider.opencodeSafetyBlocked");
+  }
   if (!(error instanceof RequestError) || error.code !== -32603) return detail;
   const reason = error.message.replace(/^Internal error:\s*/u, "");
   if (isRecord(error.data) && error.data.errorName === "provider.free-limit")
@@ -212,6 +224,7 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
 
 function openCodeFailureCause(error: unknown): CauseCode | null {
   if (!(error instanceof RequestError)) return null;
+  if (isOpenCodeSafetyRefusal(error)) return "content_blocked";
   if (NVIDIA_MODEL_NOT_SERVED.test(error.message)) return "model_not_found";
   if (NVIDIA_MODEL_DEGRADED.test(error.message)) return "provider_unavailable";
   if (!isRecord(error.data)) return null;

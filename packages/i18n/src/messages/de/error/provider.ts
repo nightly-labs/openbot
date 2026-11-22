@@ -288,6 +288,8 @@ export const messages = {
     "OpenCode konnte das Denken dieses Modells bei diesem Aufwand nicht lesen. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht dann erneut.",
   "error.provider.opencodeModelNotServed":
     "Der Modellanbieter stellt dieses Modell deinem Konto gerade nicht bereit. Wähle ein anderes Modell und sende deine Nachricht dann erneut.",
+  "error.provider.opencodeSafetyBlocked":
+    "Der Modellanbieter hat diese Nachricht wegen seiner Sicherheitsregeln blockiert. Sende deine Anfrage erneut mit anderen Worten. Wenn er auch deine nächsten Nachrichten blockiert, starte einen neuen Chat oder wähle ein anderes Modell.",
   "error.provider.opencodeNetwork":
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
   "error.provider.codexStateBusy":
@@ -620,6 +622,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Der Muse-Durchlauf ist fehlgeschlagen.",
   "error.provider.museModelUnavailable":
     "Muse kann dieses Modell nicht verwenden. Muse ist im Land, in dem dieser Agent läuft, möglicherweise nicht verfügbar, oder dieses Konto hat keinen Zugriff auf das Modell. Wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse konnte diese Anfrage nicht abschließen. Muse nutzt deinen gespeicherten Meta-API-Schlüssel, nicht deine Anmeldung. Ersetze den Schlüssel oder entferne ihn in den Einstellungen, um deine Anmeldung zu nutzen.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse kann ohne Zugriff auf externe Werkzeuge kein Profil erstellen. Verwende einen anderen Anbieter, um das Profil zu erstellen, und wähle dann Muse für den Agenten.",
   "error.provider.museAuthUnverified":

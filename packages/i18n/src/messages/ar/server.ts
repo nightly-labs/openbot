@@ -20,6 +20,8 @@ export const messages = {
   "server.connection.planHint": "افتح إعدادات الحساب للتحقق من خطة الخادم.",
   "server.connection.loadingHint": "يمكنك اختيار خادم آخر أثناء تحميل هذا الخادم.",
   "server.connection.cachedHint": "يُحتفظ بالمحتوى المحمّل والمسودات. ستُستأنف إجراءات الخادم بعد إعادة الاتصال.",
+  "server.connection.computerOffline":
+    "{name} غير متصل. تأكد من أن حاسوبه يعمل، وأن OpenBot مفتوح، وأن نشر هذا الخادم مفعّل في إعدادات الخادم > الأعضاء.",
   "server.connection.conversationFailed": "تعذّر تحميل المحادثة. أعد المحاولة.",
   "server.connection.panelsFailed": "تعذّر تحميل بعض لوحات مساحة العمل. أعد المحاولة.",
   "server.connection.retry": "إعادة المحاولة",
@@ -717,6 +719,7 @@ export const messages = {
     "لا توجد كلمة مرور منفصلة لسطح المكتب البعيد. تحدد الإعدادات أدناه من يمكنه التحكم في هذا الحاسوب.",
   "server.desktop.componentInstalled": "مكوّن المضيف مثبّت",
   "server.desktop.componentNotInstalled": "مكوّن المضيف غير مثبّت",
+  "server.desktop.needsX11Session": "يتطلب جلسة X11",
   "server.desktop.sessions": "دون مراقبة: {unattended} · الجلسات النشطة: {active}/{max}",
   "server.desktop.unattendedEnabled": "مفعّل",
   "server.desktop.unattendedUnavailable": "غير متاح",

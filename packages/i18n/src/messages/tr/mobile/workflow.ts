@@ -101,6 +101,7 @@ export const messages = {
   "mobile.workflow.output.chatChannel": "OpenBot kanalı",
   "mobile.workflow.output.file": "Dosya",
   "mobile.workflow.status.running": "Çalışıyor",
+  "mobile.workflow.status.waiting": "Kuyrukta",
   "mobile.workflow.status.approval": "Sizi bekliyor",
   "mobile.workflow.status.stopping": "Durduruluyor",
   "mobile.workflow.status.done": "Bitti",

@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Puedes seleccionar otro servidor mientras este se carga.",
   "server.connection.cachedHint":
     "El contenido cargado y los borradores se conservan. Las acciones del servidor se reanudarán tras la reconexión.",
+  "server.connection.computerOffline":
+    "{name} está sin conexión. Comprueba que su equipo esté encendido, que OpenBot esté abierto y que Publicar este servidor esté activado en Ajustes del servidor > Miembros.",
   "server.connection.conversationFailed": "No se pudo cargar la conversación. Inténtalo de nuevo.",
   "server.connection.panelsFailed": "Algunos paneles del espacio de trabajo no se pudieron cargar. Inténtalo de nuevo.",
   "server.connection.retry": "Reintentar",
@@ -560,6 +562,7 @@ export const messages = {
     "No hay una contraseña aparte para el escritorio remoto. Los ajustes de abajo eligen quién puede controlar este equipo.",
   "server.desktop.componentInstalled": "Componente del host instalado",
   "server.desktop.componentNotInstalled": "Componente del host sin instalar",
+  "server.desktop.needsX11Session": "Requiere sesión X11",
   "server.desktop.sessions": "Acceso desatendido: {unattended} · Sesiones activas: {active}/{max}",
   "server.desktop.unattendedEnabled": "activado",
   "server.desktop.unattendedUnavailable": "no disponible",

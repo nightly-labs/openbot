@@ -464,12 +464,24 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (!detail) throw new WorkflowStoreError({ code: "missing", message: sourceText("error.workflow.missing") });
           return detail;
         };
+        const queuedSteps = new Set<string>();
+        const waitsInQueue = (step: StoredWorkflowStep) =>
+          step.kind === "agent" &&
+          step.status === "running" &&
+          step.deliveryId !== null &&
+          dependencies.delivery(step.deliveryId)?.status === "queued";
+        const shownStep = (step: StoredWorkflowStep): WorkflowStep => {
+          if (!waitsInQueue(step)) return publicStep(step);
+          queuedSteps.add(step.id);
+          return { ...publicStep(step), waiting: true };
+        };
         const runDetail = (run: StoredWorkflowRun): WorkflowRunDetail => ({
           run: publicRun(run),
-          steps: runs.steps(run.id).map(publicStep),
+          steps: runs.steps(run.id).map(shownStep),
         });
         const titleOf = (workflowId: string) => store.detail(workflowId)?.summary.title ?? "";
         const settle = (step: StoredWorkflowStep, end: WorkflowStepEnd) => {
+          queuedSteps.delete(step.id);
           const ended = runs.settleStep(step.id, end, now());
           if (ended) changed(step.workflowId);
           return ended;
@@ -594,6 +606,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               status: "failed",
               error: delivery.error ?? sourceText("error.workflow.agentStepStopped"),
             });
+          const queued = delivery.status === "queued";
+          if (queued !== queuedSteps.has(step.id)) {
+            if (queued) queuedSteps.add(step.id);
+            else queuedSteps.delete(step.id);
+            changed(step.workflowId);
+          }
           return false;
         });
 
@@ -1457,6 +1475,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         });
 
         const sweepOnce = Effect.fn("Workflows.sweepOnce")(function* () {
+          for (const stepId of queuedSteps) if (runs.step(stepId)?.status !== "running") queuedSteps.delete(stepId);
           const runIds = new Set<string>();
           for (const run of runs.openRuns()) {
             runIds.add(run.id);
@@ -2157,7 +2176,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               changed(input.workflowId);
               if (step.status === "running" && !step.deliveryId && !working.has(step.id))
                 yield* execute(step, node, null);
-              return publicStep(runs.step(step.id) ?? step);
+              return shownStep(runs.step(step.id) ?? step);
             }),
           );
         });
@@ -2232,7 +2251,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               if (step.status === "running" && !step.deliveryId && !working.has(step.id))
                 yield* execute(step, node, run);
               if (run) yield* advance(run.id);
-              return publicStep(runs.step(step.id) ?? step);
+              return shownStep(runs.step(step.id) ?? step);
             }),
           );
         });
@@ -2255,7 +2274,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         const runPage = Effect.fn("Workflows.runs")(function* (input: WorkflowRunsInput) {
           return yield* attempt(() => {
             detailOf(input.workflowId);
-            return runs.page(input.workflowId, input.before, input.limit);
+            return runs.page(input.workflowId, input.before, input.limit, shownStep);
           });
         });
 

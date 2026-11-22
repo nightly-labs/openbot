@@ -178,12 +178,16 @@ export function WorkspaceShell(props: {
     "workspace-ready": () => remote() && scope.loaded(),
     "conversation-ready": () => remote() && activeConversation()?.loaded === true,
   });
-  const offlineUpsell = createHostedUpsellOffline(
-    () => remote() && activeServer()?.issue?.reference === "signal/host_unavailable",
-  );
+  const hostUnavailable = () => remote() && activeServer()?.issue?.reference === "signal/host_unavailable";
+  const offlineUpsell = createHostedUpsellOffline(hostUnavailable);
   const connectionFailure = () => {
     if (activeServer()?.hostRestart?.state === "restarting") return null;
     const issue = activeServer()?.issue;
+    if (issue && hostUnavailable() && activeServer()?.hosted !== true)
+      return {
+        message: t("server.connection.computerOffline", { name: activeServer()?.name ?? "" }),
+        reference: issue.reference ?? null,
+      };
     if (issue) return { message: sourceText(issue.message), reference: issue.reference ?? null };
     return scope.connection.failed ? scope.connection.failure : null;
   };

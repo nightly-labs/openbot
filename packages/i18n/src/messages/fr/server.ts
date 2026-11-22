@@ -22,6 +22,8 @@ export const messages = {
   "server.connection.loadingHint": "Vous pouvez sélectionner un autre serveur pendant le chargement de celui-ci.",
   "server.connection.cachedHint":
     "Le contenu chargé et les brouillons sont conservés. Les actions du serveur reprendront après la reconnexion.",
+  "server.connection.computerOffline":
+    "{name} est hors ligne. Vérifiez que son ordinateur est allumé, qu'OpenBot est ouvert et que Publier ce serveur est activé dans Réglages du serveur > Membres.",
   "server.connection.conversationFailed": "Impossible de charger la conversation. Réessayez.",
   "server.connection.panelsFailed": "Certains panneaux de l’espace de travail n’ont pas pu se charger. Réessayez.",
   "server.connection.retry": "Réessayer",
@@ -557,6 +559,7 @@ export const messages = {
     "Il n’y a pas de mot de passe distinct pour le bureau à distance. Les réglages ci-dessous choisissent qui peut contrôler cet ordinateur.",
   "server.desktop.componentInstalled": "Composant hôte installé",
   "server.desktop.componentNotInstalled": "Composant hôte non installé",
+  "server.desktop.needsX11Session": "Session X11 requise",
   "server.desktop.sessions": "Sans surveillance : {unattended} · Sessions actives : {active}/{max}",
   "server.desktop.unattendedEnabled": "activé",
   "server.desktop.unattendedUnavailable": "non disponible",

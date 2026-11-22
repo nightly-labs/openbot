@@ -278,6 +278,8 @@ export const messages = {
     "OpenCode bu efor düzeyinde bu modelin akıl yürütmesini okuyamadı. Daha düşük bir efor ya da başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.opencodeModelNotServed":
     "Model sağlayıcısı bu modeli şu anda hesabınıza sunmuyor. Başka bir model seçin, ardından mesajınızı yeniden gönderin.",
+  "error.provider.opencodeSafetyBlocked":
+    "Model sağlayıcısı, güvenlik kuralları nedeniyle bu mesajı engelledi. İsteğinizi farklı kelimelerle yeniden gönderin. Sonraki mesajlarınızı da engellerse yeni bir sohbet başlatın veya başka bir model seçin.",
   "error.provider.opencodeNetwork":
     "OpenCode model sağlayıcısına bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını kontrol edin, ardından tekrar deneyin.\n{detail}",
   "error.provider.codexStateBusy":
@@ -593,6 +595,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse turu başarısız oldu.",
   "error.provider.museModelUnavailable":
     "Muse bu modeli kullanamıyor. Muse, bu ajanın çalıştığı ülkede kullanılamıyor olabilir ya da bu hesabın modele erişimi olmayabilir. Başka bir model seçip yeniden deneyin.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse bu isteği tamamlayamadı. Muse oturum açmanızı değil, kayıtlı Meta API anahtarınızı kullanır. Anahtarı değiştirin veya oturum açmanızı kullanmak için Ayarlar'da kaldırın.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse, harici araçlara erişim olmadan profil oluşturamaz. Profili oluşturmak için başka bir sağlayıcı kullanın, ardından ajan için Muse'u seçin.",
   "error.provider.museAuthUnverified":

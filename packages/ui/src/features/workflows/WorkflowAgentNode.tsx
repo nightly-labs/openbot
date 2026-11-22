@@ -137,7 +137,7 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
           class="wfn-run"
           fullWidth
           loading={run.running()}
-          loadingLabel={t("workflow.node.running")}
+          loadingLabel={board.waiting(props.id) ? t("workflow.node.waiting") : t("workflow.node.running")}
           disabled={!task().trim() || locked() || !agent()}
           onClick={run.start}
         >

@@ -1480,6 +1480,8 @@ export const messages = {
   "mobile.server.providers.codexKeyInUse":
     "ChatGPT משתמש במפתח הזה, ולא בתוכנית ChatGPT שלך. OpenAI מחייבת כל בקשה במפתח. השימוש בתוכנית לא מוצג.",
   "mobile.server.providers.codexKeyAlternative": "או להתחבר עם מפתח OpenAI API. OpenAI מחייבת כל בקשה במפתח.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse משתמש במפתח הזה, לא בהתחברות שלך. כדי להשתמש בהתחברות, יש להסיר את המפתח.",
   "mobile.server.providers.sectionUse": "שימוש",
   "mobile.server.providers.unused": "אף סוכן לא משתמש בו",
   "mobile.server.providers.usedByCount": {

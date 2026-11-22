@@ -95,6 +95,7 @@ export interface AgentDockMessage {
   kind: "text" | "error";
   body: string;
   attachments: AttachmentSummary[];
+  visual?: boolean;
 }
 
 export interface AgentDockApproval {
@@ -605,7 +606,8 @@ function isMessage(value: unknown): value is AgentDockMessage {
     (value.senderMember === null || isConversationMessageSender(value.senderMember)) &&
     isOneOf(["text", "error"] as const, value.kind) &&
     isBoundedString(value.body, INPUT_LIMITS.messageText) &&
-    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary)
+    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary) &&
+    (value.visual === undefined || isBoolean(value.visual))
   );
 }
 

@@ -262,6 +262,7 @@ export const messages = {
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
   "provider.settings.geminiKeyReplacesAccount":
     "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
+  "provider.settings.museKeyInUse": "O Muse usa esta chave, não o seu login. Para usar o seu login, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",

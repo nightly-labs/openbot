@@ -19,6 +19,8 @@ export const messages = {
   "server.connection.planHint": "打开账号设置查看服务器套餐。",
   "server.connection.loadingHint": "加载期间你可以切换到其他服务器。",
   "server.connection.cachedHint": "已加载的内容和草稿会保留，服务器操作将在重新连接后继续。",
+  "server.connection.computerOffline":
+    "{name} 已离线。请确认它的电脑已开机并打开了 OpenBot，且已在服务器设置 > 成员中打开发布该服务器。",
   "server.connection.conversationFailed": "对话加载失败，请重试。",
   "server.connection.panelsFailed": "部分工作区面板加载失败，请重试。",
   "server.connection.retry": "重试",
@@ -581,6 +583,7 @@ export const messages = {
   "server.desktop.gatewayPolicyDescription": "远程桌面没有单独的密码。下方设置决定谁可以控制此电脑。",
   "server.desktop.componentInstalled": "主机组件已安装",
   "server.desktop.componentNotInstalled": "主机组件未安装",
+  "server.desktop.needsX11Session": "需要 X11 会话",
   "server.desktop.sessions": "无人值守：{unattended} · 活跃会话：{active}/{max}",
   "server.desktop.unattendedEnabled": "已启用",
   "server.desktop.unattendedUnavailable": "不可用",

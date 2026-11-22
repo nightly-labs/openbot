@@ -1216,6 +1216,8 @@ export const messages = {
     "ChatGPT, ChatGPT planınızı değil bu anahtarı kullanır. OpenAI her isteği anahtara faturalandırır. Planın kullanımı gösterilmez.",
   "mobile.server.providers.codexKeyAlternative":
     "Ya da bir OpenAI API anahtarıyla oturum açın. OpenAI her isteği anahtara faturalandırır.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse oturum açmanızı değil, bu anahtarı kullanır. Oturum açmanızı kullanmak için anahtarı kaldırın.",
   "mobile.server.providers.sectionUse": "Kullanım",
   "mobile.server.providers.unused": "Hiçbir ajan kullanmıyor",
   "mobile.server.providers.usedByCount": { one: "1 ajan kullanıyor", other: "{count} ajan kullanıyor" },
