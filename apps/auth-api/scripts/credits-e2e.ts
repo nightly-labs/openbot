@@ -1278,6 +1278,19 @@ async function creditActivity(database: DatabaseSync, credits: CreditService) {
     member.entries.map((item) => item.id),
   );
   check("an account that is not a member sees no activity", outsider.entries.length === 0, outsider);
+  const setActor = database.prepare("UPDATE credit_holds SET actor_user_id = ? WHERE job_id = 'job-s1'");
+  setActor.run(null);
+  const afterDelete = (await activity(OWNER.id)).entries.find((item) => item.id === "hold:job-s1");
+  setActor.run(MEMBER.id);
+  const refund = kinds(owner.entries, "refund")[0];
+  check(
+    "a generation of a deleted account shows a member, and only OpenBot entries show OpenBot",
+    afterDelete?.actor === "member" &&
+      afterDelete.actorName === undefined &&
+      refund?.actor === "openbot" &&
+      serverMove?.actor === "you",
+    { afterDelete, refund },
+  );
   const ordered = owner.entries.every((item, index, all) => index === 0 || (all[index - 1]?.at ?? 0) >= item.at);
   check(
     "the activity is newest first, has a limit, and the client contract accepts it",

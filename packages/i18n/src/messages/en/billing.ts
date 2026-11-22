@@ -324,6 +324,7 @@ export const messages = defineMessages("billing", {
   "billing.credits.activity.movedTo": "Moved to {name}",
   "billing.credits.activity.movedFrom": "Moved from {name}",
   "billing.credits.activity.yourCredits": "your credits",
+  "billing.credits.activity.ownerCredits": "the owner's credits",
   "billing.credits.activity.someServer": "a server",
   "billing.credits.activity.member": "A member",
   "billing.credits.activity.openbot": "OpenBot",

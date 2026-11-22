@@ -259,6 +259,22 @@
     "tr",
     "zh"
   ],
+  "billing.credits.activity.ownerCredits": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "billing.credits.activity.plus": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "billing.credits.activity.refund": [
     "ar",

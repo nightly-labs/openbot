@@ -88,6 +88,14 @@ const ACTIVITY_SQL = `
    ORDER BY e.at DESC, e.id DESC
    LIMIT ?2`;
 
+const OPENBOT_KINDS: readonly CreditActivityKind[] = ["free", "expired", "refund"];
+
+function activityActor(row: ActivityRow, kind: CreditActivityKind, userId: string): CreditActivityEntry["actor"] {
+  if (row.actor_id === userId) return "you";
+  if (row.actor_id === null && OPENBOT_KINDS.includes(kind)) return "openbot";
+  return "member";
+}
+
 function activityStatus(row: ActivityRow): CreditActivityStatus | undefined {
   if (row.status === "held") return "running";
   if (row.status !== "released") return undefined;
@@ -102,7 +110,7 @@ function activityEntry(row: ActivityRow, userId: string): CreditActivityEntry | 
     kind,
     at: row.at,
     credits: creditsFromTenths(row.tenths),
-    actor: row.actor_id === null ? "openbot" : row.actor_id === userId ? "you" : "member",
+    actor: activityActor(row, kind, userId),
   };
   if (row.actor_name) entry.actorName = row.actor_name;
   if (row.server_id) entry.serverId = row.server_id;

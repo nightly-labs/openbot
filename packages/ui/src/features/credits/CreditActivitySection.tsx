@@ -117,8 +117,12 @@ function ActivityRow(props: { entry: CreditActivityEntry; credits: CreditsState;
   const serverName = (serverId: string) =>
     props.credits.servers.find((server) => server.serverId === serverId)?.name ??
     t("billing.credits.activity.someServer");
-  const counterpart = () =>
-    props.entry.otherServerId ? serverName(props.entry.otherServerId) : t("billing.credits.activity.yourCredits");
+  const counterpart = () => {
+    if (props.entry.otherServerId) return serverName(props.entry.otherServerId);
+    return props.entry.actor === "you"
+      ? t("billing.credits.activity.yourCredits")
+      : t("billing.credits.activity.ownerCredits");
+  };
   const title = () => {
     const entry = props.entry;
     switch (entry.kind) {
