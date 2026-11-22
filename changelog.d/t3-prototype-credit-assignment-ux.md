@@ -26,5 +26,7 @@
   When the network fails, the step shows the error at once. Retry then gets the same generation, so
   you do not pay again, unless you changed the step. When a server signs in to an account during a
   generation, it still gets the file and does not pay a second time.
+  A batch makes up to 4 results with an OpenBot model at the same time. Each result is a separate
+  charge, and a failed result uses no credits.
   This works on this computer, on a joined server and in the web client.
   A joined server must also be on the new version to show these models.

@@ -380,6 +380,30 @@ try {
     { step: stored(editedRetry.id).status, old: jobs.get(edited.stepId), fresh: jobs.get(editedRetry.id) },
   );
 
+  const BATCH = 4;
+  const batch: string[] = [];
+  for (let take = 0; take < BATCH; take += 1)
+    batch.push(
+      (await runCauseEffect(workflows.runStep({ workflowId, nodeId: "poster", requestId: `paid-batch-${take}` }))).id,
+    );
+  await until("every take of the batch reaches the account service", () => batch.every((id) => jobs.has(id)));
+  check(
+    "a batch of 4 paid takes runs at the same time",
+    batch.every((id) => jobs.get(id)?.status === "processing" && stored(id).status === "running"),
+    batch.map((id) => ({ step: stored(id).status, job: jobs.get(id) })),
+  );
+  const filesBeforeBatch = files.length;
+  for (const id of batch) finish(id);
+  await until("every take of the batch ends", () => batch.every((id) => stored(id).status !== "running"));
+  const outputs = new Set(batch.map((id) => stored(id).output));
+  check(
+    "each take of the batch gets its own file with one charge",
+    batch.every((id) => stored(id).status === "done" && jobs.get(id)?.submits === 1 && jobs.get(id)?.downloads === 1) &&
+      outputs.size === BATCH &&
+      files.length === filesBeforeBatch + BATCH,
+    batch.map((id) => ({ step: stored(id).status, output: stored(id).output, job: jobs.get(id) })),
+  );
+
   report.passed = true;
 } catch (error) {
   report.failure = error instanceof Error ? (error.stack ?? error.message) : String(error);

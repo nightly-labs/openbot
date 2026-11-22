@@ -193,7 +193,8 @@ const GITHUB_SELF_WINDOW_MS = 60 * 60_000;
 const CREDIT_MEDIA_AT_ONCE = 4;
 const SUBSCRIPTION_MEDIA_AT_ONCE = 2;
 
-const paysWithCredits = (provider: WorkflowMediaProvider) => provider === "sunra" || provider === "higgsfield";
+const paysWithCredits = (provider: WorkflowMediaProvider) =>
+  provider === "sunra" || provider === "higgsfield" || provider === "openbot";
 
 class WorkflowFailed extends Schema.TaggedError<WorkflowFailed>()("WorkflowFailed", {
   cause: Schema.Defect(),
