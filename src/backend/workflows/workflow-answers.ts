@@ -7,6 +7,7 @@ import {
   type WorkflowAnswer,
   type WorkflowAnswerField,
   type WorkflowAnswerSource,
+  type WorkflowAnswerValue,
   type WorkflowAnswerValueProblem,
   type WorkflowFields,
   type WorkflowGraph,
@@ -20,21 +21,31 @@ import {
   workflowAnswerTemplateText,
   workflowAnswerValueText,
   workflowNodeAnswerNames,
+  workflowTriggerFields,
+  workflowTriggerRecord,
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { StoredWorkflowStep } from "./workflow-run-store";
+import { workflowScheduleRecord } from "./workflow-triggers";
 
 export function answerFields(fields: WorkflowFields | null | undefined): WorkflowAnswerField[] {
   const spec = fields?.[WORKFLOW_ANSWER_FIELD];
   return typeof spec === "string" && spec.trim() ? parseWorkflowAnswerSpec(spec).fields : [];
 }
 
-function givenAnswer({ node, fields }: WorkflowAnswerSource, output: string): WorkflowAnswer {
+function givenAnswer({ node, fields, builtIn }: WorkflowAnswerSource, output: string): WorkflowAnswer {
+  if (builtIn) return triggerAnswer(node, output);
   const record = lastJsonObject(output);
   if (!record) return {};
   const given = node.kind === "trigger" && Object.hasOwn(record, "data") ? record.data : record;
   return checkWorkflowAnswer(fields, given).answer;
+}
+
+function triggerAnswer(node: WorkflowNode, output: string): WorkflowAnswer {
+  const fields = workflowTriggerFields(node);
+  const record = node.fields.trigger === "schedule" ? workflowScheduleRecord(output) : lastJsonObject(output);
+  return record ? checkWorkflowAnswer(fields, workflowTriggerRecord(fields, record)).answer : {};
 }
 
 type GivenAnswer = { source: WorkflowAnswerSource; answer: WorkflowAnswer };
@@ -61,7 +72,17 @@ export function stepAnswer(
   return Object.fromEntries(givenAnswers(graph, nodeId, latest).flatMap(({ answer }) => Object.entries(answer)));
 }
 
-export type TemplateReader = "model" | "person";
+export type TemplateReader = "model" | "person" | "lines";
+
+function readerText(
+  reader: TemplateReader,
+  field: WorkflowAnswerField,
+  value: WorkflowAnswerValue | undefined,
+): string {
+  if (reader === "model") return workflowAnswerTemplateText(field, value);
+  if (reader === "lines" && Array.isArray(value)) return value.join("\n");
+  return workflowAnswerValueText(value);
+}
 
 export function templateValues(
   graph: WorkflowGraph,
@@ -75,10 +96,7 @@ export function templateValues(
     for (const field of source.fields) {
       if (!Object.hasOwn(answer, field.name)) continue;
       const value = answer[field.name];
-      values.set(
-        field.name,
-        reader === "person" ? workflowAnswerValueText(value) : workflowAnswerTemplateText(field, value),
-      );
+      values.set(field.name, readerText(reader, field, value));
     }
   return values;
 }
@@ -91,7 +109,7 @@ export function stepAnswerGap(
   endedWithoutAnswer: (nodeId: string) => boolean,
 ): AnswerGap | null {
   const sources = workflowAnswerSources(graph, node.id);
-  const typed = sources.length > 0;
+  const typed = sources.some((source) => !source.builtIn);
   const problems = nodeAnswerProblemsWithoutPaths(graph, node).filter((problem) => typed && problem.code !== "check");
   if (problems.length > 0)
     return { kind: "setup", names: [...new Set(problems.map(workflowAnswerProblemName))].join(", ") };

@@ -6,6 +6,7 @@ export const messages = {
   "error.workflow.versionMissing": "이 버전의 워크플로는 더 이상 존재하지 않아요.",
   "error.workflow.annotation": "텍스트, 메모, 도형에는 연결을 추가할 수 없어요.",
   "error.workflow.port": "단계가 이 유형의 입력을 받을 수 없어요.",
+  "error.workflow.unknownValue": "이 OpenBot은 단계의 설정을 알지 못합니다. OpenBot을 업데이트한 후 다시 시도하세요.",
   "error.workflow.branch": "‘예’와 ‘아니요’ 연결은 조건에만 있을 수 있어요.",
   "error.workflow.conditionBranch": "조건에서 나가는 각 연결은 ‘예’ 또는 ‘아니요’여야 해요.",
   "error.workflow.duplicateEdge": "이 두 단계에는 이미 이 연결이 있어요.",

@@ -1,8 +1,9 @@
-import { Button, Check, CircleCheck, Textarea, UserCheck, X } from "@openbot/ui";
+import { Button, Check, CircleCheck, UserCheck, X } from "@openbot/ui";
 import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
+import { NameField } from "./workflow-name-field";
 import { Field, NodeShell, NodeToolbar, useLocked, useTextField } from "./workflow-node-parts";
 
 interface Answer {
@@ -48,7 +49,8 @@ export function ApprovalNode(props: { id: string; question?: string }) {
       toolbar={<NodeToolbar id={props.id} name={t("workflow.approval.name")} locked={locked()} onLock={setLocked} />}
     >
       <Field class="wfn-block-field">
-        <Textarea
+        <NameField
+          node={props.id}
           class="wfn-input"
           aria-label={t("workflow.approval.question")}
           placeholder={t("workflow.approval.questionPlaceholder")}

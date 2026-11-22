@@ -2,9 +2,13 @@ import {
   type AgentStepActivity,
   type RoutineSchedule,
   type StoredFileRow,
+  WORKFLOW_TRIGGER_FIELDS_FORMAT,
   type WorkflowAnswerProblem,
+  type WorkflowAnswerScope,
+  type WorkflowAnswerSource,
   type WorkflowGraph,
   workflowAnswerProblems,
+  workflowAnswerSources,
   workflowInputAnswerFields,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -200,6 +204,7 @@ export interface WfnBoard {
   setFields: (id: string, values: WfnFields) => void;
   githubTriggers: (id: string) => string[];
   answerNames: (id: string) => readonly string[];
+  answerSources: (id: string) => readonly WorkflowAnswerSource[];
   answerProblems: (id: string) => readonly WorkflowAnswerProblem[];
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
@@ -408,7 +413,10 @@ function copyFields(fields: Record<string, WfnFields>): Record<string, WfnFields
 
 export function isEditable(element: Element | null): boolean {
   return (
-    element instanceof HTMLElement && (element.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName))
+    element instanceof HTMLElement &&
+    (element.isContentEditable ||
+      element.classList.contains("wfn-name-field") ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName))
   );
 }
 
@@ -663,11 +671,14 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  const answerScope = (): WorkflowAnswerScope => ({
+    triggerFields: (options.features?.()?.format ?? 1) >= WORKFLOW_TRIGGER_FIELDS_FORMAT,
+  });
   const answerProblemsByNode = createMemo(
     () => {
       const graph = options.graph?.();
       const byNode = new Map<string, WorkflowAnswerProblem[]>();
-      for (const problem of graph ? workflowAnswerProblems(graph) : [])
+      for (const problem of graph ? workflowAnswerProblems(graph, answerScope()) : [])
         byNode.set(problem.nodeId, [...(byNode.get(problem.nodeId) ?? []), problem]);
       return byNode;
     },
@@ -876,7 +887,11 @@ export function createBoard(options: BoardOptions) {
     },
     answerNames: (id) => {
       const graph = options.graph?.();
-      return graph ? [...workflowInputAnswerFields(graph, id).keys()] : [];
+      return graph ? [...workflowInputAnswerFields(graph, id, answerScope()).keys()] : [];
+    },
+    answerSources: (id) => {
+      const graph = options.graph?.();
+      return graph ? workflowAnswerSources(graph, id, graph.edges, answerScope()) : [];
     },
     answerProblems: (id) => answerProblemsByNode().get(id) ?? NO_ANSWER_PROBLEMS,
     inputs: (id, type) =>

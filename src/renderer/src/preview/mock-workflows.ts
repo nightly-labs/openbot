@@ -7,6 +7,7 @@ import {
   prunedWorkflowFolders,
   type StartWorkflowRunInput,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
+  WORKFLOW_FORMAT,
   WORKFLOW_MAX_VERSIONS,
   WORKFLOW_MEDIA_MODELS,
   type WorkflowDetail,
@@ -31,6 +32,7 @@ import {
   workflowCatalogProvider,
   workflowFixedCatalogModel,
   workflowGitHubTriggerRepositories,
+  workflowGraphFormat,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { nextValidRoutineOccurrence } from "@openbot/team-client/routine-schedule";
@@ -226,6 +228,8 @@ export function mockWorkflows(
       graph: structuredClone(graph),
       revision,
       triggers: triggersOf(id, graph),
+      format: workflowGraphFormat(graph),
+      hostFormat: WORKFLOW_FORMAT,
     };
     records.set(id, { detail, versions });
     return detail;

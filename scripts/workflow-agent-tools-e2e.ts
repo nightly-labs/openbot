@@ -546,19 +546,9 @@ try {
     prTrigger,
   );
   assert.ok(prTrigger);
-  const storedBad = await runCauseEffect(
-    workflows.saveGraph({
-      workflowId: reviewId,
-      baseRevision: reviewDetail.revision,
-      graph: {
-        ...reviewDetail.graph,
-        nodes: reviewDetail.graph.nodes.map((node) =>
-          node.id === prTrigger.id ? { ...node, fields: { ...node.fields, event: "pull_request.opened" } } : node,
-        ),
-      },
-    }),
-  );
-  assert.ok(storedBad.ok);
+  database.connection
+    .prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = ?")
+    .run(JSON.stringify({ ...prTrigger.fields, event: "pull_request.opened" }), reviewId, prTrigger.id);
   const otherField = await call("event-kept", "edit_workflow", {
     workflowId: reviewId,
     ops: [{ op: "update", node: prTrigger.id, fields: { filters: "notBot" } }],
@@ -682,6 +672,26 @@ try {
     "an unknown media kind is refused",
     !badMedia.ok && JSON.stringify(badMedia.value).includes("video"),
     badMedia.value,
+  );
+  const badEffort = await call("failure-effort", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "llm", fields: { prompt: "Say hi.", effort: "turbo" } }],
+  });
+  check(
+    "an unknown registry value is refused with the values to use",
+    !badEffort.ok &&
+      JSON.stringify(badEffort.value).includes("Set effort to one of: ") &&
+      JSON.stringify(badEffort.value).includes("high"),
+    badEffort.value,
+  );
+  const badAction = await call("failure-action", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "output", fields: { target: "discord", action: "edit" } }],
+  });
+  check(
+    "an unknown output action is refused",
+    !badAction.ok && JSON.stringify(badAction.value).includes("Set action to one of: "),
+    badAction.value,
   );
   const media = await call("media", "edit_workflow", {
     workflowId,

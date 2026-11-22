@@ -8,6 +8,7 @@ import {
   type WorkflowRunDetail,
   type WorkflowRunPage,
   type WorkflowStep,
+  workflowNeedsAdmin,
 } from "@openbot/contracts/ipc";
 import {
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
@@ -125,9 +126,7 @@ const DISPLAY_FIELD_KEYS: ReadonlySet<string> = new Set([
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
   for (const node of graph.nodes) {
-    const kind = node.kind === "trigger" ? node.fields.trigger : node.kind === "output" ? node.fields.target : null;
-    if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack" && kind !== "chat-channel")
-      continue;
+    if (!workflowNeedsAdmin(node)) continue;
     const fields = Object.keys(node.fields)
       .filter((key) => !DISPLAY_FIELD_KEYS.has(key))
       .sort()

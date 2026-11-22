@@ -1,4 +1,6 @@
 import { workflowForwardEdges, workflowNamePathProblems } from "./ipc-workflow-answer-paths";
+import { WORKFLOW_TEMPLATE_FIELDS } from "./ipc-workflow-nodes";
+import { workflowTriggerFields } from "./ipc-workflow-trigger-fields";
 import type { WorkflowEdge, WorkflowGraph, WorkflowNode, WorkflowNodeKind } from "./ipc-workflows";
 import { type DynamicRecord, isDynamicRecord } from "./runtime-values";
 
@@ -309,12 +311,6 @@ export function fillWorkflowTemplate(text: string, values: ReadonlyMap<string, s
   return text.replace(TEMPLATE, (whole, name: string) => values.get(name) ?? whole);
 }
 
-export const WORKFLOW_TEMPLATE_FIELDS: Readonly<Partial<Record<WorkflowNodeKind, readonly string[]>>> = {
-  agent: ["task"],
-  llm: ["prompt", "system"],
-  approval: ["question"],
-};
-
 export const WORKFLOW_CHECK_OPERATORS = ["=", "!=", ">", ">=", "<", "<=", "contains", "set", "unset"] as const;
 export type WorkflowCheckOperator = (typeof WORKFLOW_CHECK_OPERATORS)[number];
 
@@ -464,13 +460,21 @@ const PASS_THROUGH_KINDS: ReadonlySet<WorkflowNodeKind> = new Set(["condition", 
 
 export interface WorkflowAnswerSource {
   node: WorkflowNode;
-  fields: WorkflowAnswerField[];
+  fields: readonly WorkflowAnswerField[];
+  builtIn: boolean;
 }
+
+export interface WorkflowAnswerScope {
+  triggerFields: boolean;
+}
+
+export const WORKFLOW_HOST_ANSWER_SCOPE: WorkflowAnswerScope = { triggerFields: true };
 
 export function workflowAnswerSources(
   graph: WorkflowGraph,
   nodeId: string,
   edges: readonly WorkflowEdge[] = graph.edges,
+  scope: WorkflowAnswerScope = WORKFLOW_HOST_ANSWER_SCOPE,
 ): WorkflowAnswerSource[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const sources: WorkflowAnswerSource[] = [];
@@ -482,7 +486,9 @@ export function workflowAnswerSources(
       const node = nodes.get(edge.from);
       if (!node) continue;
       const fields = workflowAnswerFieldsOf(node);
-      if (fields.length > 0) sources.push({ node, fields });
+      const builtIn = fields.length === 0 && scope.triggerFields ? workflowTriggerFields(node) : [];
+      if (fields.length > 0) sources.push({ node, fields, builtIn: false });
+      else if (builtIn.length > 0) sources.push({ node, fields: builtIn, builtIn: true });
       else if (PASS_THROUGH_KINDS.has(node.kind)) visit(node.id);
     }
   };
@@ -490,9 +496,13 @@ export function workflowAnswerSources(
   return sources;
 }
 
-export function workflowInputAnswerFields(graph: WorkflowGraph, nodeId: string): Map<string, WorkflowAnswerField[]> {
+export function workflowInputAnswerFields(
+  graph: WorkflowGraph,
+  nodeId: string,
+  scope: WorkflowAnswerScope = WORKFLOW_HOST_ANSWER_SCOPE,
+): Map<string, WorkflowAnswerField[]> {
   const found = new Map<string, WorkflowAnswerField[]>();
-  for (const { fields } of workflowAnswerSources(graph, nodeId))
+  for (const { fields } of workflowAnswerSources(graph, nodeId, graph.edges, scope))
     for (const field of fields) found.set(field.name, [...(found.get(field.name) ?? []), field]);
   return found;
 }
@@ -507,18 +517,26 @@ export type WorkflowAnswerProblem =
   | { nodeId: string; code: "path"; name: string }
   | { nodeId: string; code: "repeated"; name: string };
 
-export function workflowAnswerProblems(graph: WorkflowGraph): WorkflowAnswerProblem[] {
+export function workflowAnswerProblems(
+  graph: WorkflowGraph,
+  scope: WorkflowAnswerScope = WORKFLOW_HOST_ANSWER_SCOPE,
+): WorkflowAnswerProblem[] {
   const forward = workflowForwardEdges(graph);
-  return graph.nodes.flatMap((node) => answerProblemsOf(graph, node, forward));
+  return graph.nodes.flatMap((node) => answerProblemsOf(graph, node, scope, forward));
 }
 
-export function nodeAnswerProblemsWithoutPaths(graph: WorkflowGraph, node: WorkflowNode): WorkflowAnswerProblem[] {
-  return answerProblemsOf(graph, node, null);
+export function nodeAnswerProblemsWithoutPaths(
+  graph: WorkflowGraph,
+  node: WorkflowNode,
+  scope: WorkflowAnswerScope = WORKFLOW_HOST_ANSWER_SCOPE,
+): WorkflowAnswerProblem[] {
+  return answerProblemsOf(graph, node, scope, null);
 }
 
 function answerProblemsOf(
   graph: WorkflowGraph,
   node: WorkflowNode,
+  scope: WorkflowAnswerScope,
   forward: readonly WorkflowEdge[] | null,
 ): WorkflowAnswerProblem[] {
   const problems: WorkflowAnswerProblem[] = [];
@@ -532,7 +550,7 @@ function answerProblemsOf(
     workflowTemplateNames(fieldString(node, field)).map((name) => ({ field, name })),
   );
   if (!check && names.length === 0) return problems;
-  const available = workflowInputAnswerFields(graph, node.id);
+  const available = workflowInputAnswerFields(graph, node.id, scope);
   const fieldOf = (name: string): WorkflowAnswerField | null | undefined => {
     const options = available.get(name);
     if (!options) return undefined;
@@ -566,7 +584,7 @@ function answerProblemsOf(
     (name) => available.has(name) && !conflicts.has(name),
   );
   if (!forward) return problems;
-  const sources = workflowAnswerSources(graph, node.id, forward);
+  const sources = workflowAnswerSources(graph, node.id, forward, scope);
   const required = new Set(reached.filter((name) => available.get(name)?.some((field) => !field.optional)));
   for (const { name, code } of workflowNamePathProblems(graph, node.id, forward, sources, reached, required))
     problems.push({ nodeId: node.id, code, name });

@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "このバージョンのワークフローはもう存在しません。",
   "error.workflow.annotation": "テキスト、メモ、図形には接続を付けられません。",
   "error.workflow.port": "このステップはこの種類の入力を受け取れません。",
+  "error.workflow.unknownValue":
+    "この OpenBot はステップの設定を認識できません。OpenBot を更新してから、もう一度お試しください。",
   "error.workflow.branch": "「はい」と「いいえ」の接続を持てるのは条件だけです。",
   "error.workflow.conditionBranch": "条件からの接続は、それぞれ「はい」か「いいえ」である必要があります。",
   "error.workflow.duplicateEdge": "この 2 つのステップにはすでにこの接続があります。",

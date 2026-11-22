@@ -402,8 +402,15 @@ changed, on this computer and on a joined host.
   differs from a field only in case; other extra keys are dropped. `check` on a
   condition (`priority = high and count > 2`, `urgent`, `not done`, `title contains "refund"`, joined
   with `and` and `or`) tests the answers before it and makes no model call. `{{name}}` in an agent
-  task, a model prompt or system text, or an approval question takes the value of that field. Only
-  the names that a connected step before it declares are replaced. When a connected step before it
+  task, a model prompt or system text, an approval question, or the message, title, labels or person
+  of an output takes the value of that field. An output with a message sends the filled message in
+  place of its input; a GitHub output with `item: input` reads the number from the message. Only
+  the names that a connected step before it declares are replaced. A schedule, GitHub, Discord,
+  Telegram or Slack trigger with no answer spec gives fixed fields (`workflowTriggerFields` in
+  `packages/contracts/src/ipc-workflow-trigger-fields.ts`), read from its event JSON or, for a
+  schedule, from its run text (`workflowScheduleRecord`). These built-in fields do not make the
+  step typed: an unknown `{{name}}` after such a trigger stays as it is. A declared field with the
+  same name wins. When a connected step before it
   declares answer fields, an unknown `{{name}}`, a check field that no step gives, a bad answer spec
   or a type conflict fails the step before it runs (`answerSetup`); with no typed step before it,
   `{{...}}` text stays as it is, as in released workflows. A join keeps its released walk, but a step
