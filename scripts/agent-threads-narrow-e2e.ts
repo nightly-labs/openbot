@@ -1,15 +1,3 @@
-// Checks the thread controls of the chat header at three window sizes, in this worktree's running dev
-// app. It starts one side thread with a short real provider turn, so start the app with `bun run dev`
-// (never `--shared`), and pass an agent whose provider is signed in:
-// `bun scripts/agent-threads-narrow-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// The main window cannot be narrower than 960 px, so the script sets the page size with CDP
-// emulation, which also stands for a chat pane that a side panel makes narrow. At each size it checks
-// which controls show (tabs; one button with the open thread; only the icon buttons) and that "New
-// thread" and the thread list take a click, so no other control covers them. It records the space
-// between "New thread" and the next header control, and the lines of the composer hint, with a
-// screenshot; it does not assert layout. At the end it removes the emulation and deletes the thread.
-// Writes .openbot-build/agent-threads-narrow-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -40,7 +28,6 @@ interface SizeReport {
   switcher: boolean;
   newThreadTakesClick: boolean;
   listTakesClick: boolean;
-  /** Pixels between "New thread" and the next control of the header, or null with no next control. */
   gapAfterNewThread: number | null;
   placeholderLines: number | null;
   screenshot: string;
@@ -69,7 +56,6 @@ async function readTask(): Promise<AgentTask | undefined> {
   return snapshot.tasks.find((task) => task.id === taskId);
 }
 
-/** Layout values for the report: the space after "New thread", and the lines of the composer hint. */
 function measure(newThreadLabel: string): Promise<{ gap: number | null; lines: number | null }> {
   return page.evaluate((label) => {
     const plus = [...document.querySelectorAll<HTMLElement>(".conversation-header button")].find(
@@ -112,7 +98,6 @@ try {
     .first()
     .click();
 
-  // A side thread, so the header has a thread row, with its tab open.
   const task = await page.evaluate(
     (input) => window.openbot.agent.startTask({ ...input, clientMessageId: crypto.randomUUID() }),
     { agentId, text: SHORT_PROMPT },

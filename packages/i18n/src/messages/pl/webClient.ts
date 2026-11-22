@@ -9,6 +9,9 @@ export const messages = {
   "webClient.loadingLine.prompts": "Rozplątujemy prompty…",
   "webClient.loadingLine.sleepy": "Grzecznie prosimy śpiocha…",
   "webClient.loadingLine.almost": "Prawie gotowe. Chyba.",
+  "webClient.slowLoad.title": "OpenBot ładuje się dłużej niż zwykle",
+  "webClient.slowLoad.body": "Sprawdź połączenie z internetem, a potem odśwież stronę.",
+  "webClient.slowLoad.reload": "Odśwież",
   "webClient.login.failed": "Logowanie nie powiodło się.",
   "webClient.login.requestFailed": "Żądanie do usługi kont nie powiodło się.",
   "webClient.login.sessionFailed": "Nie udało się sprawdzić tej sesji.",
@@ -17,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Odpowiedź logowania jest nieprawidłowa.",
   "webClient.pane.navigation": "Nawigacja obszaru roboczego",
   "webClient.pane.chat": "Czat",
-  "webClient.pane.routines": "Rutyny",
   "webClient.pane.workspace": "Obszar roboczy",
   "webClient.phoneApp.title": "Użyj aplikacji OpenBot",
   "webClient.phoneApp.description":

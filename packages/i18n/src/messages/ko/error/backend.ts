@@ -219,7 +219,7 @@ export const messages = {
   "error.backend.agentWaitGone": "이 대기는 열려 있지 않아요. 에이전트가 닫았거나 누군가 취소했어요.",
   "error.backend.agentWaitNoRequest": "대기를 이어가려면 메시지가 필요한데, 이 턴에는 메시지가 없어요.",
   "error.backend.agentWaitOwnChatOnly":
-    "대기는 자신의 채팅에서만 열 수 있어요. 채널이나 메시징 작업에서는 대기할 수 없어요.",
+    "대기는 자신의 채팅이나 사이드 스레드에서 열 수 있어요. 채널이나 메시징 대화에서는 대기할 수 없어요.",
   "error.backend.agentWaitNoteRequired": "대기 목적을 알려 주는 짧은 메모를 입력하세요.",
   "error.backend.agentWaitRoutineGone": "이 에이전트에는 이 ID의 루틴이 없어요.",
   "error.backend.agentWaitNoRoutine":
@@ -287,6 +287,12 @@ export const messages = {
     "{provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. {provider}은(는) 이 서버의 도구를 사용할 수 없어요. {provider}은(는) 서버를 직접 시작하므로 OpenBot의 연결 테스트는 성공할 수 있어요. 새 채팅을 시작해 다시 시도하세요.",
   "error.backend.mcpServerTimedOutInProvider":
     "서버가 제시간에 응답하지 않아 {provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. 새 채팅을 시작해 다시 시도하세요.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "서버를 지금 사용할 수 없어 {provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. 몇 분 기다린 후 새 채팅을 시작해 다시 시도하세요.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider}이(가) MCP 서버 {name}에 연결할 수 없었어요. 마켓플레이스, 앱에서 {name}을(를) 열고 주소가 올바른지, 서버가 실행 중인지 확인하세요. 그런 다음 새 채팅을 시작해 다시 시도하세요.",
+  "error.backend.githubToolsNotStarted":
+    "GitHub가 응답하지 않아 {provider}이(가) GitHub 도구를 가져올 수 없었어요. 마켓플레이스, 앱에서 GitHub를 열고, 요청하면 다시 연결하세요. 그런 다음 새 채팅을 시작해 다시 시도하세요.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot이 이 서버용 로컬 로그인 연결을 시작할 수 없었어요. OpenBot을 다시 시작한 후 시도해 주세요.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -322,6 +328,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "폴더가 없거나 이미 삭제되었어요.",
   "error.backend.libraryFolderOtherAgent": "파일은 해당 에이전트의 폴더에만 넣을 수 있어요.",
   "error.backend.libraryFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없어요.",
+  "error.backend.workflowFolderLimit": "서버 하나에는 워크플로 폴더를 최대 {limit}개까지 둘 수 있어요.",
+  "error.backend.workflowFolderPlacementLimit": "폴더에 있는 워크플로가 너무 많아요.",
   "error.backend.sectionNameDuplicate": "섹션 이름은 고유해야 해요.",
   "error.backend.directMessageRequired": "먼저 메시지를 작성하세요.",
   "error.backend.directMessageTooLong": "다이렉트 메시지는 최대 {limit}자까지 쓸 수 있어요.",
@@ -355,9 +363,11 @@ export const messages = {
     "이 신고는 OpenBot 휴대폰 앱에서만 보낼 수 있어요. 휴대폰의 버전과 지원 로그를 추가하기 때문이에요. 휴대폰에서 이 채팅을 열어 주세요. 거기서도 이 메시지가 보이면 휴대폰 앱을 업데이트해 주세요.",
   "error.backend.takeoverInactive": "이 브라우저 제어권 가져오기는 더 이상 활성 상태가 아니에요.",
   "error.backend.authSubmitting": "인증을 이미 제출하는 중이에요.",
+  "error.backend.apiKeyListFailed": "OpenBot이 저장된 API 키를 읽을 수 없었어요.",
   "error.backend.apiKeySaveFailed": "OpenBot이 API 키를 저장할 수 없었어요. 다시 시도해 주세요.",
-  "error.backend.apiKeyNotAllowed": "서버 소유자 또는 관리자만 API 키를 입력할 수 있어요.",
   "error.backend.apiKeySaving": "API 키를 이미 저장하는 중이에요.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot이 API 키를 읽지 못했어요. 8,000자 이하의 키를 입력하고 키를 사용할 대상을 선택하세요.",
   "error.backend.authRequestInactive": "이 보안 인증 요청은 더 이상 활성 상태가 아니에요.",
   "error.backend.secureAuthUnavailable": "보안 인증을 사용할 수 없어요.",
   "error.backend.browserUrlRequired": "브라우저 URL이 필요해요.",
@@ -397,7 +407,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "팝업을 불러올 수 없어요. 원래 페이지에서 로그인을 다시 시도하세요.",
   "error.backend.browserTabNotFound": "브라우저 탭을 찾을 수 없어요.",
   "error.backend.authActive": "인증이 이미 진행 중이에요.",
-  "error.backend.authHttpsRequired": "보안 인증에는 HTTPS가 필요해요.",
+  "error.backend.authWebPageRequired": "보안 인증에는 HTTP/HTTPS가 필요해요.",
   "error.backend.authDigitsRange": "인증 코드는 4~12자리여야 해요.",
   "error.backend.authExpired": "인증 요청이 만료되었어요.",
   "error.backend.authDigitsRequired": "요청된 자릿수만큼 숫자를 입력하세요.",
@@ -433,6 +443,7 @@ export const messages = {
   "error.backend.threadMoveRefused": "이 에이전트에게만 보낸 메시지만 새 스레드에서 실행할 수 있어요.",
   "error.backend.taskTitleRequired": "작업에 짧은 제목을 지정하세요.",
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",
+  "error.backend.taskControlInvalid": "시작한 작업의 taskId를 지정하세요. 메시지에는 텍스트도 필요해요.",
   "error.backend.taskOwnChatOnly":
     "작업은 자신의 채팅에서만 시작할 수 있어요. 채널, 메시징 대화, 다른 작업에서는 시작할 수 없어요.",
   "error.backend.taskUnfinishedLimit":
@@ -440,5 +451,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "이 에이전트에는 열린 작업이 {count}개 있어요. 작업 하나를 닫은 후 다른 작업을 시작하거나 여세요.",
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.taskMessageFailed": "OpenBot이 작업에 메시지를 보낼 수 없었어요. 나중에 다시 시도하세요.",
   "error.backend.taskStartFailed": "OpenBot이 작업을 시작할 수 없었어요. 대신 이 턴에서 작업을 처리하세요.",
 } as const satisfies PartialTranslation<typeof source>;

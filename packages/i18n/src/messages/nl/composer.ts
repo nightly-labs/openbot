@@ -104,7 +104,7 @@ export const messages = {
   "composer.voice.progress": "Spraakmodel downloaden {progress}%",
   "composer.voice.recording": "Spraakopname",
   "composer.voice.limitSoon": "De opname stopt over {seconds} seconden.",
-  "composer.voice.limitReached": "De opname is gestopt bij de limiet van 2 minuten. Wat je zei staat in het bericht.",
+  "composer.voice.limitReached": "De opname is gestopt bij de limiet van 10 minuten. Wat je zei staat in het bericht.",
   "composer.send.saveQueued": "Bericht in wachtrij opslaan",
   "composer.send.voice": "Spraakbericht sturen",
   "composer.send.message": "Bericht sturen",

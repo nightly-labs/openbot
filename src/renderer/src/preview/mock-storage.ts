@@ -4,6 +4,7 @@ import {
   type GetStorageUsageInput,
   type StorageDesktopApi,
   type StorageUsage,
+  type StoredFileRow,
 } from "@openbot/contracts/ipc";
 import {
   FILES_AGENT_USAGE,
@@ -12,23 +13,23 @@ import {
   FILES_CONVERSATIONS,
   FILES_REMOVABLE_RUNTIMES,
   FILES_ROWS,
+  FILES_WORKFLOW_ROWS,
 } from "../../stories/files-fixtures";
 
 const GB = 1024 ** 3;
 const FREE_BYTES = 182 * GB;
 
-/**
- * The Files fixtures as one server's storage, so a delete or clear in the preview shows at once.
- * `onFoldersChanged` sends `library-folders-changed`, as a host does after each folder change.
- */
+function placeableAgent(file: StoredFileRow | undefined): string | null | undefined {
+  return file?.agentId === null && file.workflow === undefined ? undefined : file?.agentId;
+}
+
 export function createMockStorage(onFoldersChanged: () => void = () => undefined): StorageDesktopApi {
-  let files = structuredClone(FILES_ROWS);
+  let files = structuredClone([...FILES_ROWS, ...FILES_WORKFLOW_ROWS]);
   let breakdown = structuredClone(FILES_BREAKDOWN);
   let removableRuntimes = structuredClone(FILES_REMOVABLE_RUNTIMES);
   let libraryFolders = structuredClone(EMPTY_LIBRARY_FOLDERS);
 
   const usage = (input: GetStorageUsageInput): StorageUsage => {
-    // The fixtures hold no channel messages, so a channel has no files here.
     const inScope = (agentId: string | null, conversationId: string | null) =>
       input.scope === "host" ||
       (input.scope === "agent" && agentId === input.agentId) ||
@@ -53,7 +54,6 @@ export function createMockStorage(onFoldersChanged: () => void = () => undefined
   return {
     getUsage: async (input) => usage(input),
     getDisk: async () => ({ freeBytes: FREE_BYTES, totalBytes: 994 * GB }),
-    // The disk matches `getDisk`; memory and CPU are those of a busy 16 GB, 10-core machine.
     getMachineMetrics: async () => ({
       diskUsedBytes: 812 * GB,
       diskFreeBytes: FREE_BYTES,
@@ -78,9 +78,8 @@ export function createMockStorage(onFoldersChanged: () => void = () => undefined
     getLibraryFolders: async () => structuredClone(libraryFolders),
     changeLibraryFolders: async (action) => {
       libraryFolders = applyLibraryFolderAction(libraryFolders, action, {
-        // The preview has no fixed list of agents: each agent can have folders.
         agentIds: { has: () => true },
-        fileAgent: (fileId) => files.find((file) => file.id === fileId)?.agentId,
+        fileAgent: (fileId) => placeableAgent(files.find((file) => file.id === fileId)),
       });
       onFoldersChanged();
       return structuredClone(libraryFolders);

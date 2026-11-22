@@ -75,9 +75,6 @@
   }
 }
 
-/* The leading icon of a section is muted at rest, as in menus and on the page rail. It takes the primary text
- * color with the label on hover, on keyboard focus and on the open section. The line does not change. Other
- * icons in the row, such as the warning of a marketplace app, keep their own colors. */
 .settings-modal-nav-item > svg:first-child {
   color: var(--openbot-text-muted);
 }
@@ -92,7 +89,6 @@
   }
 }
 
-/* The label of a group of sections. The space above it separates the group from the one before it. */
 .settings-modal-nav-heading {
   margin: var(--openbot-space-4) 0 var(--openbot-space-1);
   padding: 0 var(--openbot-space-2);
@@ -115,7 +111,6 @@
   display: contents;
 }
 
-/* The top row has no room for the description of the section, so only screen readers read it. */
 .settings-page-description {
   position: absolute;
   width: 1px;
@@ -169,11 +164,6 @@
   opacity: 1;
 }
 
-/*
- * `--settings-modal-floating-space` is the height of whatever `floatingContent` the caller floats
- * over the end of the panel, such as the server settings error toast. The panel spends it as extra
- * end padding, so its last control scrolls clear of the floating element instead of under it.
- */
 .settings-modal-content {
   height: 100%;
   min-height: 0;
@@ -181,11 +171,7 @@
   align-content: start;
   gap: var(--openbot-space-6);
   overflow-y: auto;
-  /*
-   * The inline padding stays a plain token so the panel text keeps the same left edge as the section
-   * title above the panel, when the window does not put that title in its top row. A gutter subtracted from the padding only lines up when the platform draws a classic
-   * scrollbar; with overlay scrollbars it moved the whole panel inward.
-   */
+
   padding: 0 var(--openbot-space-6) calc(var(--openbot-space-6) + var(--settings-modal-floating-space, 0px));
   scrollbar-gutter: stable;
 }
@@ -394,7 +380,6 @@
   padding: var(--openbot-space-3) 0;
 }
 
-/* The row has no inline padding of its own here, so the message moves left to stay under the name. */
 .provider-picker-embedded .provider-picker-check-error.provider-picker-used-by {
   margin-top: calc(-1 * var(--openbot-space-4));
   padding-block: 0 var(--openbot-space-3);
@@ -424,8 +409,6 @@
   content: "";
 }
 
-/* The row pads its own inline edges here, so the button margin goes and the gap between two
-   actions has to come from the wrapper instead. */
 .provider-picker-embedded .provider-picker-actions {
   gap: var(--openbot-space-2);
 }
@@ -435,8 +418,6 @@
   margin-inline-end: 0;
 }
 
-/* Row actions keep the onboarding colours: Download and Update stay light and only Connect takes
-   the accent, so the modal's accent primary button does not repaint them. */
 .settings-modal .ui-button-variant-default.provider-picker-install:not(.provider-picker-connect) {
   background: var(--openbot-surface-light);
   color: var(--openbot-text-on-light);
@@ -468,7 +449,6 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* An account line is one size below its provider. */
 .settings-modal .provider-picker-account .provider-picker-name {
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
@@ -483,30 +463,25 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Every select of a settings row has one width, in your settings and in server settings. */
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-select {
   width: 168px;
 }
 
-/* The backdrop row: Remove, "Upload image…" and the select, on one line. */
 .settings-backdrop-control {
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
 }
 
-/* Long choices, such as browser names, voice models and timezones. */
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-link-select {
   width: 220px;
 }
 
-/* A line between the two fixed places and the browsers. */
 .ui-select-item.settings-modal-select-group-end {
   margin-bottom: var(--openbot-space-1);
   border-bottom: 1px solid var(--openbot-border);
 }
 
-/* The command field under the link list on Linux and Windows. */
 .settings-modal-link-command {
   display: flex;
   min-width: 0;
@@ -515,13 +490,11 @@
   gap: var(--openbot-space-2);
 }
 
-/* Every select in settings, with or without `settings-modal-select`, has the same fill. */
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-content .ui-select-trigger {
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-secondary);
 }
 
-/* The fill above has a higher specificity than the hover and open fill of the primitive, so it sets them again. */
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-content .ui-select-trigger[data-expanded] {
   background: var(--openbot-hover);
 }
@@ -722,7 +695,6 @@
     flex: 0 0 auto;
   }
 
-  /* The sections are in one row that scrolls, so the labels of the groups do not show. */
   .settings-modal-nav-heading {
     display: none;
   }
@@ -813,7 +785,6 @@
     justify-content: flex-end;
   }
 
-  /* Server settings rows do not stack, so their selects keep the width of their value. */
   .server-settings-modal-shell .settings-modal-select {
     width: auto;
   }
@@ -839,7 +810,6 @@
   }
 }
 
-/* The Profile side panel is as narrow as a small screen, so its name field goes under its label. */
 .settings-panel .settings-identity-name-row {
   align-items: flex-start;
   flex-direction: column;
@@ -849,15 +819,10 @@
   width: 100%;
 }
 
-/* Back and Continue of the phone dialog follow the reading direction. */
 .settings-mobile-dialog-footer svg:is([class~="lucide-arrow-left"], [class~="lucide-arrow-right"]):dir(rtl) {
   transform: scaleX(-1);
 }
 
-/*
- * A settings page: a large title at the start of the content, and below it the groups of the page. The
- * rules are last because they must outweigh every rule of the panel above.
- */
 .settings-modal-page > .settings-modal-main > .settings-modal-scroll-frame > .settings-modal-content {
   gap: var(--openbot-space-6);
   padding-top: var(--openbot-space-6);
@@ -871,7 +836,6 @@
   line-height: var(--openbot-leading-3xl);
 }
 
-/* A group title is the size of a row title, so the groups of a long page are easy to find. */
 .settings-modal-page .ui-settings-section-heading {
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-lg);
@@ -879,7 +843,6 @@
   line-height: var(--openbot-leading-lg);
 }
 
-/* One card with a thin line around it, on the background of the page. */
 .settings-modal-page .settings-modal-card:is(.ui-card, .ui-item-group) {
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-card);
@@ -891,7 +854,6 @@
   padding: calc(var(--openbot-space-2) + var(--openbot-space-0-5)) var(--openbot-space-4);
 }
 
-/* A row title is regular text. Its description is a step smaller, in the muted color. */
 .settings-modal-page :where(.ui-item-title, .ui-switch-label),
 .settings-modal-page .settings-modal-row-title {
   font-size: var(--openbot-text-lg);

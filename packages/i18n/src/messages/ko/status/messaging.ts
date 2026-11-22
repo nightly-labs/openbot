@@ -13,6 +13,7 @@ export const messages = {
   "status.messaging.stopped": "중지됨",
   "status.messaging.stop": "중지",
   "status.messaging.approvalTitle": "OpenBot이 계속 진행하려면 승인이 필요해요.",
+  "status.messaging.approvalTitleTeammate": "팀원 {agent}이(가) 계속 진행하려면 승인이 필요해요.",
   "status.messaging.approvalCommand": "명령 실행",
   "status.messaging.approvalFileChange": "파일 변경",
   "status.messaging.approvalPermissions": "추가 권한 받기",
@@ -35,7 +36,7 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot이 Slack 설치를 받았어요. 이 탭을 닫아도 돼요.",
   "status.messaging.signInUnknown": "OpenBot이 시작한 Slack 설치가 아니에요. OpenBot에서 다시 시작해 주세요.",
   "status.messaging.telegramNoAgent":
-    "아직 여기서 답변할 수 있는 에이전트가 없어요. OpenBot에서 Telegram Orchestrator를 추가하세요.",
+    "아직 여기서 답변할 수 있는 에이전트가 없어요. OpenBot에서 마켓플레이스 > 앱 > Telegram을 열고 에이전트 추가를 클릭하세요.",
   "status.messaging.telegramLinked":
     "OpenBot이 이 채팅에 연결되었어요. {bot}을(를) 멘션하거나 OpenBot의 메시지에 답장해서 에이전트에게 요청하세요.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",

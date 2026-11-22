@@ -21,10 +21,8 @@ import type { MobileWorkspaceState, ServerChecks } from "@/features/workspace/mo
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** The choices of one agent for one setting, in menu order. */
 export const AGENT_DEFAULT_CHOICE_ORDER: readonly AgentDefaultChoice[] = ["default", "on", "off"];
 
-/** The settings in page order, with the title and description that the agent settings show. */
 export const AGENT_DEFAULT_SETTINGS = [
   { key: "allowAutomation", title: "mobile.agent.host.automation", description: "mobile.agent.host.automationFooter" },
   { key: "allowNewChat", title: "mobile.agent.agentNewChat.title", description: "mobile.agent.agentNewChat.footer" },
@@ -38,17 +36,14 @@ export const AGENT_DEFAULT_SETTINGS = [
 
 export type AgentDefaultSettingInfo = (typeof AGENT_DEFAULT_SETTINGS)[number];
 
-/** The setting of a route parameter, or null when the parameter is not a setting. */
 export function agentDefaultSettingInfo(value: string | undefined): AgentDefaultSettingInfo | null {
   return AGENT_DEFAULT_SETTINGS.find((setting) => setting.key === value) ?? null;
 }
 
-/** The default of a setting. For "Steer agents while they work", on is Steer. */
 export function agentDefaultOn(overview: AgentDefaultsOverview, setting: AgentDefaultSetting): boolean {
   return setting === "busyMessageMode" ? overview.busyMessageMode === "steer" : overview.defaults[setting];
 }
 
-/** The change of the default of a setting. */
 export function agentDefaultInput(setting: AgentDefaultSetting, on: boolean): UpdateAgentDefaultsInput {
   switch (setting) {
     case "busyMessageMode":
@@ -62,7 +57,6 @@ export function agentDefaultInput(setting: AgentDefaultSetting, on: boolean): Up
   }
 }
 
-/** The own value of the agent, or "default" when it has none and follows the default. */
 export function agentDefaultChoice(agent: AgentDefaultsAgentValues, setting: AgentDefaultSetting): AgentDefaultChoice {
   const own = agent[setting];
   if (own === null) return "default";
@@ -70,7 +64,6 @@ export function agentDefaultChoice(agent: AgentDefaultsAgentValues, setting: Age
   return own ? "on" : "off";
 }
 
-/** True when the setting applies to the agent, from its own value or from the default. */
 export function agentDefaultApplies(
   overview: AgentDefaultsOverview,
   agent: AgentDefaultsAgentValues,
@@ -80,7 +73,6 @@ export function agentDefaultApplies(
   return choice === "default" ? agentDefaultOn(overview, setting) : choice === "on";
 }
 
-/** The overview after a choice, so the page shows it during the save. */
 function withChoice(
   overview: AgentDefaultsOverview,
   agentIds: readonly string[],
@@ -97,7 +89,6 @@ function withChoice(
   };
 }
 
-/** The overview after a change of the defaults, so the page shows it during the save. */
 function withDefaults(overview: AgentDefaultsOverview, input: UpdateAgentDefaultsInput): AgentDefaultsOverview {
   const { busyMessageMode, ...defaults } = input;
   return {
@@ -109,10 +100,6 @@ function withDefaults(overview: AgentDefaultsOverview, input: UpdateAgentDefault
 
 const permits = (serverId: string) => (checks: ServerChecks) => checks.canManageAgentDefaults(serverId);
 
-/**
- * The servers whose agent defaults this member can change: `enabled` while the server is online,
- * `disabled` while it is not connected but served `agent-defaults-v1` at its last connection.
- */
 export function agentDefaultsServers(
   workspace: Pick<MobileWorkspaceState, "knownServerChecks" | "servers"> & ServerChecks,
 ): { serverId: string; state: Exclude<ServerRowState, "hidden"> }[] {
@@ -122,17 +109,11 @@ export function agentDefaultsServers(
   });
 }
 
-/** One agent of the overview, with the name and the avatar of the workspace agent list. */
 export interface AgentDefaultsRow {
   agent: MobileAgent;
   values: AgentDefaultsAgentValues;
 }
 
-/**
- * Settings > Agents of one server (`agent-defaults-v1`). The server page and each setting page read
- * one query, so a change on a setting page shows on the server page. A change saves at once, shows
- * during the save, and goes back on a failure. The host checks the role again on every call.
- */
 export function useAgentDefaults(serverId: string) {
   const { t, errorMessage } = useText();
   const queryScope = useQueryScope();
@@ -149,18 +130,14 @@ export function useAgentDefaults(serverId: string) {
     queryKey,
     enabled: online,
     retry: false,
-    // Another device can change these at any time, so a reopened page reads the host again.
     staleTime: 0,
     queryFn: () => loadAgentDefaults(serverId),
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // A second tap can come before the render that disables the control, and it would save from the same value.
   const pending = useRef(false);
   const overview = query.data ?? null;
 
-  // The order of the workspace agent list. The host does not list an agent that it hides from this
-  // member, and the page cannot name an agent that the workspace does not know.
   const agents = useMemo<AgentDefaultsRow[]>(() => {
     if (!overview) return [];
     const values = new Map(overview.agents.map((agent) => [agent.agentId, agent]));
@@ -179,7 +156,6 @@ export function useAgentDefaults(serverId: string) {
     pending.current = true;
     setSaving(true);
     setError(null);
-    // A read that an `agents-changed` event started must not put the old value back after the save.
     await queryClient.cancelQueries({ queryKey, exact: true });
     queryClient.setQueryData<AgentDefaultsOverview | null>(queryKey, change(current));
     try {
@@ -203,7 +179,6 @@ export function useAgentDefaults(serverId: string) {
     overview,
     agents,
     error,
-    /** Controls take changes only while the server is online and no save runs. */
     enabled: online && !saving && overview !== null,
     updateDefaults: (input: UpdateAgentDefaultsInput) =>
       save(

@@ -1,17 +1,9 @@
-// Replays a transcript of a real provider CLI that `record-provider-transcript.ts` wrote. The path is
-// in `TRANSCRIPT`. Each request from the client takes the next recorded client request with the same
-// method. The agent then sends what the real CLI sent for it: the recorded messages up to the answer,
-// with the answer's id changed to the live id, and the notifications that followed before the next
-// recorded request. Each recorded message is sent once.
-//
-// A request with no recorded match gets a JSON-RPC error. `FAKE_LOG` gets one entry per request.
 import { readFileSync } from "node:fs";
 import { logEntry } from "../acp-agent";
 import type { TranscriptLine } from "../transcript-proxy";
 import type { TranscriptJsonObject } from "../transcript-redaction";
 
 interface RecordedMessage {
-  /** The whole recorded message, as the agent sends it. */
   raw: TranscriptJsonObject;
   id?: number | string;
   method?: string;
@@ -34,7 +26,6 @@ const message = (index: number): RecordedMessage => {
     ...(typeof method === "string" ? { method } : {}),
   };
 };
-// A client notification, such as `session/cancel`, has no id and gets no answer, so it is not a request.
 const isRequest = (index: number) =>
   lines[index]?.from === "client" && message(index).method !== undefined && message(index).id !== undefined;
 
@@ -61,7 +52,6 @@ function answer(live: { id: number | string; method: string }): void {
     const entry = message(index);
     if (lines[index]?.from !== "agent" || sent.has(index)) continue;
     const isAnswer = entry.method === undefined && entry.id !== undefined;
-    // An answer to another request waits for that request, and what came after it waits too.
     if (isAnswer && entry.id !== recordedId) {
       if (answered) break;
       continue;
@@ -86,5 +76,4 @@ process.stdin.on("data", (chunk: string) => {
     }
   }
 });
-// A real agent runs until the client stops it, also after stdin ends.
 setInterval(() => {}, 1000);

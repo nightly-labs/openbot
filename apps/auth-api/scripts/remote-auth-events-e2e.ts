@@ -1,12 +1,3 @@
-// Runs the real account server delivery of the remote auth event outbox on a migrated SQLite database,
-// with a fake Signal (#2243). Drains that run at the same time must send each event once, one drain
-// sends at most 6 events at a time, a failed send waits with the backoff, a stopped drain keeps the
-// events that it sent, and the hosted server cron
-// sends the events of its deletes once, after the deletes, not inside each one. With two Signals,
-// each one gets each event once, and only the Signal that failed gets it again.
-//
-// Run: bun run test:remote-auth-events
-// It writes .openbot-build/remote-auth-events-e2e/report.json and exits non-zero on a failure.
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -49,7 +40,6 @@ function seedProfileEvents(database: DatabaseSync, count: number, now: number) {
   }
 }
 
-/** Resolves when the condition holds, and fails after a limit so a wrong delivery cannot hang the run. */
 async function waitFor(condition: () => boolean): Promise<boolean> {
   const deadline = Date.now() + WAIT_LIMIT_MS;
   while (!condition()) {
@@ -59,7 +49,6 @@ async function waitFor(condition: () => boolean): Promise<boolean> {
   return true;
 }
 
-/** Signal's auth event endpoint at `now`. It holds each answer until `release`, and keeps each body it gets. */
 function fakeSignal(now: number, answer: (body: string) => number = () => 204) {
   let release = () => {};
   const released = new Promise<void>((done) => {
@@ -98,7 +87,6 @@ function fakeSignal(now: number, answer: (body: string) => number = () => 204) {
   };
 }
 
-/** Counts the queries that read the next events to send, so a check can wait until each drain read. */
 function countingD1(database: DatabaseSync) {
   const d1 = sqliteD1(database);
   const counter = { reads: 0 };
@@ -194,7 +182,6 @@ async function aStoppedDrainKeepsTheSentEvents() {
   const now = Date.UTC(2026, 9, 16, 12);
   seedProfileEvents(database, 10, now);
   let answered = 0;
-  // Signal answers each event except `user-9`, and the Worker stops the drain while it waits for that one.
   const signalFetch = async (_input: string | URL | Request, init?: RequestInit) => {
     if (JSON.parse(String(init?.body)).userId === "user-9") return new Promise<Response>(() => {});
     answered += 1;
@@ -219,7 +206,6 @@ async function aStoppedDrainKeepsTheSentEvents() {
 
 async function cronSendsTheEventsOfItsDeletesOnceAfterThem() {
   const database = await migratedDatabase();
-  // Before the events of the check, so that the cron's own drain does not read them.
   const now = Date.now() - 1_000;
   database
     .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
@@ -250,7 +236,6 @@ async function cronSendsTheEventsOfItsDeletesOnceAfterThem() {
       )
       .run(serverId, `bx_${index}`, `key-${index}`);
   }
-  // Events of earlier requests, which the cron's own drain reads beside the hosted server check.
   seedProfileEvents(database, 5, now);
 
   const order: string[] = [];
@@ -278,7 +263,6 @@ async function cronSendsTheEventsOfItsDeletesOnceAfterThem() {
   const privateJwk = await crypto.subtle.exportKey("jwk", privateKey);
   try {
     await createWorkerHandler(() => new Response(null, { status: 404 })).scheduled(
-      // Not midnight, so the daily retention does not run.
       { scheduledTime: now },
       {
         DB: sqliteD1(database),
@@ -307,7 +291,6 @@ async function cronSendsTheEventsOfItsDeletesOnceAfterThem() {
   check("the cron sends each event once", duplicates(signal.state.bodies).length === 0, {
     duplicates: duplicates(signal.state.bodies),
   });
-  // Per server: one auth epoch event and one servers event for its member.
   check("the cron sends the 5 earlier events and the 4 events of its deletes", signal.state.bodies.length === 9, {
     sends: signal.state.bodies.length,
   });
@@ -367,7 +350,6 @@ async function eachSignalGetsEachEventAndOnlyTheFailedOneRetries() {
     bodies.push(body);
     return new Response(null, { status: url === SECOND_SIGNAL_URL && !state.secondUp ? 503 : 204 });
   };
-  // The list replaces the single URL, which this fake Signal refuses.
   const bindings = {
     DB: sqliteD1(database),
     REMOTE_AUTH_WEBHOOK_URL: "https://old-signal.test/internal/auth-events",
@@ -407,7 +389,6 @@ async function eachSignalGetsEachEventAndOnlyTheFailedOneRetries() {
     rows: pendingTargets(database),
   });
 
-  // An event whose only target is no longer configured needs no send.
   database
     .prepare(
       `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at, pending_targets)

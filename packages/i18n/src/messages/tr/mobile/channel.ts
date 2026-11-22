@@ -81,6 +81,9 @@ export const messages = {
   "mobile.channel.form.deselectAll": "Seçimi kaldır",
   "mobile.channel.form.memories": "Hafızalar",
   "mobile.channel.form.routines": "Rutinler",
+  "mobile.channel.folders.description":
+    "{channel} kanalının tüm üyeleri bu klasörlerde dosyaları değiştirebilir ve komut çalıştırabilir.",
+  "mobile.channel.folders.removeBody": "{channel} üyeleri artık {folder} içindeki dosyaları değiştiremez",
   "mobile.channel.form.deleteTitle": "Kanal silinsin mi?",
   "mobile.channel.form.deleteBody":
     "Bu işlem kanalı durdurur. Geçmişi yalnızca önizleme amacıyla Silinen kanallar bölümünde kalır. Oradan geri yükleyebilirsiniz. Üye ajanlar korunur.",

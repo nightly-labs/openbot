@@ -1,9 +1,8 @@
-/** A condition: a rule that sends the run down one of two branches. */
-
 import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort } from "@openbot/contracts/ipc";
 import { Button, CircleCheck, Play, Split, Textarea } from "@openbot/ui";
 import { createMemo, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { AnswerAction, AnswerProblems, AnswerSummary, useAnswerText } from "./workflow-answer-parts";
 import { BRANCH_NAME, resultValue, useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
@@ -22,14 +21,10 @@ import {
   useTextField,
   type WfProvider,
 } from "./workflow-node-parts";
+import { StepSettingsAction } from "./workflow-step-settings";
 
 const BRANCHES = ["yes", "no"] as const;
 
-/**
- * A rule that sends the run down one of two branches, and the model that judges it. Each branch has
- * its own output port on its row. After a run, the branch that the run took has a check and the
- * other branch dims.
- */
 export function ConditionNode(props: { id: string; rule?: string }) {
   const board = useBoard();
   const { t } = useText();
@@ -39,8 +34,6 @@ export function ConditionNode(props: { id: string; rule?: string }) {
     untrack(() => props.rule ?? ""),
   );
   const models = () => board.catalogs().models;
-  // A condition saved before it had a model has none, and the host chooses the model and effort of
-  // each run. The model pill then says Auto, and the effort pill shows when the user chooses a model.
   const [model] = useField<AgentModelId>(() => props.id, "model", "", asString);
   const [provider] = useField<WfProvider | "">(() => props.id, "provider", "", asProvider);
   const [effort, setEffort] = useField<AgentReasoningEffort | "">(
@@ -50,13 +43,18 @@ export function ConditionNode(props: { id: string; rule?: string }) {
     oneOf(AGENT_REASONING_EFFORTS),
   );
   const chosen = () => modelOption(models(), model());
-  /** The provider tab that the model menu opens on: the one of the step, else the one of a new step. */
   const tab = createMemo(
     (): WfProvider => provider() || chosen()?.provider || defaultWorkflowModel(board.catalogs())?.provider || "codex",
   );
+  const [check] = useAnswerText(() => props.id, "check");
+  const checked = () => board.catalogs().answers === true && check().trim() !== "";
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
-  const taken = () => (run.running() ? undefined : resultValue(board.shown(props.id)));
+  const taken = () => {
+    if (run.running()) return undefined;
+    const shown = board.shown(props.id);
+    return shown?.branch ?? resultValue(shown);
+  };
   return (
     <NodeShell
       action={
@@ -78,44 +76,53 @@ export function ConditionNode(props: { id: string; rule?: string }) {
       kind="condition"
       inputs={["text"]}
       requires
-      toolbar={<NodeToolbar id={props.id} name={t("workflow.condition.name")} locked={locked()} onLock={setLocked} />}
+      toolbar={
+        <NodeToolbar id={props.id} name={t("workflow.condition.name")} locked={locked()} onLock={setLocked}>
+          <AnswerAction id={props.id} field="check" locked={locked()} />
+          <StepSettingsAction id={props.id} kind="condition" />
+        </NodeToolbar>
+      }
     >
-      <Field class="wfn-block-field">
-        <Textarea
-          class="wfn-input"
-          aria-label={t("workflow.condition.rule")}
-          placeholder={t("workflow.condition.rulePlaceholder")}
-          readonly={locked()}
-          value={rule()}
-          onValueChange={setRule}
-        />
-        <div class="wfn-field-foot wfn-condition-foot">
-          <ModelPill
-            provider={tab()}
-            value={model()}
-            placeholder={t("workflow.model.auto")}
-            disabled={locked()}
-            onChange={(next, nextProvider) => {
-              const options = modelOption(models(), next);
-              const current = effort();
-              const keep = current !== "" && options?.supportedReasoningEfforts.includes(current);
-              board.setFields(props.id, {
-                model: next,
-                provider: nextProvider,
-                ...(keep ? {} : { effort: options?.defaultReasoningEffort ?? "medium" }),
-              });
-            }}
+      <Show when={!checked()}>
+        <Field class="wfn-block-field">
+          <Textarea
+            class="wfn-input"
+            aria-label={t("workflow.condition.rule")}
+            placeholder={t("workflow.condition.rulePlaceholder")}
+            readonly={locked()}
+            value={rule()}
+            onValueChange={setRule}
           />
-          <Show when={model()}>
-            <EffortPill
-              efforts={chosen()?.supportedReasoningEfforts ?? []}
-              value={effort() || chosen()?.defaultReasoningEffort || "medium"}
+          <div class="wfn-field-foot wfn-condition-foot">
+            <ModelPill
+              provider={tab()}
+              value={model()}
+              placeholder={t("workflow.model.auto")}
               disabled={locked()}
-              onChange={setEffort}
+              onChange={(next, nextProvider) => {
+                const options = modelOption(models(), next);
+                const current = effort();
+                const keep = current !== "" && options?.supportedReasoningEfforts.includes(current);
+                board.setFields(props.id, {
+                  model: next,
+                  provider: nextProvider,
+                  ...(keep ? {} : { effort: options?.defaultReasoningEffort ?? "medium" }),
+                });
+              }}
             />
-          </Show>
-        </div>
-      </Field>
+            <Show when={model()}>
+              <EffortPill
+                efforts={chosen()?.supportedReasoningEfforts ?? []}
+                value={effort() || chosen()?.defaultReasoningEffort || "medium"}
+                disabled={locked()}
+                onChange={setEffort}
+              />
+            </Show>
+          </div>
+        </Field>
+      </Show>
+      <AnswerSummary id={props.id} field="check" />
+      <AnswerProblems id={props.id} />
       <For each={BRANCHES}>
         {(branch) => (
           <div

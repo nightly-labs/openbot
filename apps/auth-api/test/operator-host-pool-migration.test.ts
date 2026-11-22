@@ -53,7 +53,6 @@ describe("operator host pool migration", () => {
   it("accepts the writes of the Worker that runs before the deploy", () => {
     const database = beforeMigration();
     database.exec(migration(MIGRATION));
-    // The deployed Worker names no new column: its insert, its plan end, its renewal and its delete.
     database.exec(`
       INSERT INTO hosted_servers(
         server_id, owner_user_id, name, size, plan, billing_interval, currency, desired_state, observed_state,
@@ -98,7 +97,6 @@ describe("operator host pool migration", () => {
     ] as const) {
       expect(() => add.run(host, location, product, 12)).toThrow(/CHECK constraint failed/u);
     }
-    // A machine leaves the pool and keeps its record.
     database.exec("UPDATE operator_hosts SET removed_at = 13 WHERE host_id = 'leaseweb:12728113'");
     expect(database.prepare("SELECT host_id, removed_at FROM operator_hosts ORDER BY host_id").all()).toEqual([
       { host_id: "leaseweb:12728110", removed_at: null },

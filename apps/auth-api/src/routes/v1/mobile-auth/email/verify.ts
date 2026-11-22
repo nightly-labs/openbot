@@ -1,3 +1,4 @@
+import { isReferralCode } from "@openbot/contracts/referral";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
@@ -6,8 +7,6 @@ import { readJsonObject } from "../../../../server/json-body";
 import { apiError, authErrorResponse, json, requestAuthService } from "../../../../server/request-auth";
 import { requestSourceIp } from "../../../../server/source-ip";
 
-// The phone requests the code through `/v1/auth/email/start`. Only this step makes the session a
-// mobile session; `/v1/auth/email/verify` makes a desktop session.
 export const Route = createFileRoute("/v1/mobile-auth/email/verify")({
   server: {
     handlers: {
@@ -31,6 +30,7 @@ export const Route = createFileRoute("/v1/mobile-auth/email/verify")({
                 code: body.code,
                 sourceIp: requestSourceIp(request),
                 device: { id: body.deviceId, name: body.deviceName, platform: body.platform },
+                referralCode: isReferralCode(body.referralCode) ? body.referralCode : null,
               }),
             );
           }),

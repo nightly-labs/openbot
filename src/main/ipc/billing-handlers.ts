@@ -1,5 +1,3 @@
-// The Stripe plans of the account's servers.
-
 import { parseBillingPortalRequest, parseBillingStorageRequest } from "@openbot/contracts/billing";
 import { parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
 import { sourceText } from "@openbot/i18n/source";

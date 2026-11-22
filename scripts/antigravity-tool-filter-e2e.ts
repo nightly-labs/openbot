@@ -1,9 +1,3 @@
-// Runs the real `antigravity` provider driver against a fake Antigravity CLI 1.5.4, to check that
-// each `session/new`, `session/load` and `session/resume` request asks Antigravity to remove its
-// `schedule` and `run_workflow` tools. A load or resume sends the filter again, so a session that an
-// earlier release opened also gets it. The model catalog probe sends no prompt, and it opens outside the
-// workspace, so it is not checked. The fake server writes each session request to a log.
-// `bun scripts/antigravity-tool-filter-e2e.ts`. Writes .openbot-build/antigravity-tool-filter-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -18,7 +12,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-tool-fil
 const NL = String.fromCharCode(10);
 const DISABLED = ["schedule", "run_workflow"];
 
-// With `FAKE_AGY_RESUME=1` the server advertises `session/resume`, otherwise only `session/load`.
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -63,7 +56,6 @@ interface SessionRequest {
 
 interface Report {
   passed: boolean;
-  /** The session requests of each case, with the restore method that the server advertises. */
   cases: Array<{ restore: "load" | "resume"; requests: SessionRequest[] }>;
   error?: string;
 }
@@ -71,7 +63,6 @@ interface Report {
 const report: Report = { passed: false, cases: [] };
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-filter-e2e-"));
 const clients: AgentClient[] = [];
-// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(root, "gemini");
 
 try {
@@ -96,7 +87,6 @@ try {
       client.start();
       return client;
     };
-    // A session, then a new process that opens it again, as after a restart.
     let client = open();
     const threadId = await startThread(client, { cwd: workspace });
     await runCauseEffect(client.stop());

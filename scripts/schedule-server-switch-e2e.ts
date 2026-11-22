@@ -1,9 +1,3 @@
-// Checks that the Schedule loads again when the server changes while it is open (#2300). It drives
-// the real app against the preview mock in a running Storybook. Read-only. Pass the Storybook URL
-// that `bun run storybook` reports: `bun scripts/schedule-server-switch-e2e.ts --storybook=http://localhost:6006`.
-// Each server's calendar names its routines after the server, so a routine from the previous
-// server on screen is stale data. Writes .openbot-build/schedule-server-switch-e2e/report.json
-// and a screenshot.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -32,7 +26,6 @@ interface Report {
 
 const report: Report = { passed: false };
 
-/** Waits until the calendar is no longer loading, then fails on the load error. */
 async function calendarReady(page: Page): Promise<void> {
   const schedule = page.getByRole("region", { name: t("routine.calendar.title") });
   await schedule.waitFor();
@@ -43,7 +36,6 @@ async function calendarReady(page: Page): Promise<void> {
   assert.equal(await schedule.getByText(t("routine.calendar.loadFailed")).count(), 0, "The calendar shows its error.");
 }
 
-/** The routine names in the calendar's open view, from the run buttons ("<name>, <time>, <status>"). */
 async function visibleRoutines(page: Page): Promise<string[]> {
   const runs = page
     .getByRole("region", { name: t("routine.calendar.title") })
@@ -58,8 +50,6 @@ try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await page.goto(`${storybook}/iframe.html?id=app--playground&viewMode=story`);
   await page.getByRole("button", { name: t("app.rail.schedule"), exact: true }).waitFor();
-  // Each server has one routine named after it, with a run in the next hour. Each request is
-  // recorded with the server it asked.
   await page.evaluate(() => {
     const agent = window.openbot.agent;
     window.scheduleCalendarRequests = [];
@@ -98,7 +88,6 @@ try {
   await page.getByRole("button", { name: t("server.menu.open", { name: from.name }), exact: true }).click();
   await page.getByRole("menuitem", { name: to.name, exact: true }).click();
   await page.getByRole("button", { name: t("server.menu.open", { name: to.name }), exact: true }).waitFor();
-  // The server name changes before the open pane follows it, so wait for the request to the new server.
   await page.waitForFunction((serverId) => window.scheduleCalendarRequests?.includes(serverId), to.id);
   await calendarReady(page);
 

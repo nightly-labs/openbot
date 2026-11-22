@@ -1,8 +1,3 @@
-// Drives MuseAgentClient and the installed SDK over a fake Muse server to check that a session gets
-// the OpenBot instructions once and not with every turn. They must come again after a change, a
-// compaction, a failed turn and a restart. A memory edit sends one small update block with the next
-// turn, not the instructions again.
-// `bun run test:muse-instructions-once`. Writes .openbot-build/muse-instructions-once-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -17,8 +12,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/muse-instructions-on
 const INSTRUCTIONS = "You are a teammate in OpenBot. Memory: the user likes short answers.";
 const CHANGED = `${INSTRUCTIONS} Memory: the user works in Kraków.`;
 
-// The fake answers only the MSP requests that this test sends. A turn that says "compact-now"
-// reports a completed compaction item, and one that says "fail-now" ends as failed.
 const fixture = `#!${process.execPath}
 const fs = require("node:fs");
 const path = require("node:path");
@@ -128,7 +121,6 @@ try {
   };
   await turn("one", INSTRUCTIONS);
   await turn("two", null);
-  // A memory change reaches the held session through a resume, as `ThreadLifecycle` does.
   await runCauseEffect(client.request("thread/resume", { threadId: thread, ...params(CHANGED) }, (v) => v));
   await turn("three", CHANGED);
   await turn("compact-now", null);
@@ -136,7 +128,6 @@ try {
   await turn("fail-now", null);
   await turn("five", CHANGED);
   await turn("six", null);
-  // A new process opens the saved session, which may have lost its context.
   await runCauseEffect(client.stop());
   client = open();
   await runCauseEffect(client.request("thread/resume", { threadId: thread, ...params(CHANGED) }, (v) => v));
@@ -152,10 +143,8 @@ try {
     "The instructions come only when the session lacks them.",
   );
 
-  // A memory edit keeps the instructions, so the session cache stays valid.
   const memoryClient = open(memoryLog);
   const memory = (id: string, text: string) => ({ id, text, origin: "manual" as const });
-  // Enough memories that an update block is shorter than the full list, as in a real agent.
   const facts = [
     "The user likes short answers.",
     "The user writes TypeScript and reviews pull requests every morning.",

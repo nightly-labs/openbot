@@ -205,11 +205,11 @@ export const messages = {
     "هذا الاختيار لك وحدك ويُطبَّق على كل أجهزتك. عندما يكون الخادم مكتومًا أو مضبوطًا على «لا شيء»، يبقى هذا الوكيل صامتًا أيضًا.",
 
   "agentSettings.newChat.title": "دردشة جديدة",
-  "agentSettings.newChat.description": "ينسى الوكيل هذه الدردشة. ويبقى إعداده.",
+  "agentSettings.newChat.description": "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. ويبقى إعداده.",
   "agentSettings.newChat.button": "بدء",
   "agentSettings.newChat.confirmTitle": "هل تريد بدء دردشة جديدة مع {name}؟",
   "agentSettings.newChat.confirmDescription":
-    "ينسى الوكيل هذه الدردشة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
+    "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.newChat.confirm": "بدء دردشة جديدة",
   "agentSettings.newChat.failed": "تعذّر بدء دردشة جديدة.",
   "agentSettings.deleteHistory.title": "حذف السجل",
@@ -285,6 +285,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "السماح للوكيل ببدء دردشة جديدة عندما تطول دردشته. يحفظ ملاحظات أولًا.",
   "agentSettings.quickAcknowledgement.title": "عرض الخطة قبل المهام الطويلة",
   "agentSettings.quickAcknowledgement.description": "قبل مهمة طويلة، يعرض الوكيل خطته.",
+  "agentSettings.builtinMemory.title": "ذاكرة OpenBot",
+  "agentSettings.builtinMemory.description":
+    "يحفظ الوكيل ذكرياته ويقرؤها. أوقفها لاستخدام تطبيق ذاكرة فقط، مثل Mem0. تبقى الذكريات المحفوظة.",
   "agentSettings.browserProfile.label": "ملف تعريف المتصفح",
   "agentSettings.browserProfile.shared": "مشترك",
   "agentSettings.browserProfile.agent": "هذا الوكيل فقط",
@@ -294,6 +297,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "يحتفظ كل ملف تعريف بعمليات تسجيل الدخول وملفات تعريف الارتباط الخاصة به. يؤدي التغيير إلى إغلاق علامات التبويب المفتوحة لدى الوكيل.",
   "agentSettings.browserProfile.manage": "إدارة",
+  "agentSettings.browserProfile.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل الدخول إلى هذه المواقع مرة أخرى.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "تعمل عملية {provider} كاملةً في بيئة معزولة، لذا تفشل الكتابة خارجها. متاح على macOS فقط.",
 } as const satisfies PartialTranslation<typeof source>;

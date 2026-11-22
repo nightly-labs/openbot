@@ -15,14 +15,11 @@ import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 
 export interface RoutineWebhookUrlFieldProps {
-  /** The URL the host made. Null until the relay registers the route. */
   url: string | null;
-  /** The relay connection of the host. Null when it is not known. */
   connected: boolean | null;
   onCopy?: (() => void) | undefined;
 }
 
-/** The URL of a saved webhook trigger, with a copy action beside it. */
 export function RoutineWebhookUrlField(props: RoutineWebhookUrlFieldProps) {
   const { t } = useText();
   return (
@@ -38,7 +35,6 @@ export function RoutineWebhookUrlField(props: RoutineWebhookUrlFieldProps) {
       >
         {(url) => (
           <>
-            {/* The row leaves out "https://" to show more of the path. Copy gives the full URL. */}
             <code class="routine-webhook-value" title={url()}>
               {url().replace(/^https:\/\//, "")}
             </code>
@@ -56,37 +52,21 @@ export function RoutineWebhookUrlField(props: RoutineWebhookUrlFieldProps) {
   );
 }
 
-/** Gives a new signing secret to the agent of the routine, which saves it as an API key. */
 export interface RoutineWebhookAgentSecret {
-  /** The routine that gets the secret. Another routine starts with no result. */
   routineId: string;
   agentName: string;
   give: () => Promise<void>;
 }
 
 export interface RoutineWebhookSecretFieldProps {
-  /** The signing secret that the host returned once. Null when there is nothing to show. */
   secret: string | null;
   onSecretDismiss: () => void;
-  /** Makes a new secret. The parent shows it through `secret`. */
   onRegenerateSecret: () => Promise<void>;
-  /**
-   * Replaces the secret with one that the sender made, such as a Composio or Svix secret. Leave it
-   * out when the host cannot do this.
-   */
   onUseSenderSecret?: ((secret: string) => Promise<void>) | undefined;
-  /**
-   * Gives a new secret to the agent of the routine, so that nobody copies it. Leave it out for a
-   * channel routine, which has no single agent, and for a host that cannot do this.
-   */
   agentSecret?: RoutineWebhookAgentSecret | undefined;
   onCopy?: (() => void) | undefined;
 }
 
-/**
- * The signing secret of a saved webhook trigger: shown once with a copy action and a warning,
- * then masked with a regenerate action that asks first.
- */
 export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps) {
   const { t, errorMessage } = useText();
   const [confirm, setConfirm] = createSignal<{ pending: boolean; error: string | null } | null>(null);
@@ -97,8 +77,6 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
     given: false,
   });
   const [agentConfirm, setAgentConfirm] = createSignal(false);
-  // A draft change gives a new action object, and an effect runs again for an equal value. The memo
-  // resets the result only when another routine opens.
   const agentRoutine = createMemo(() => props.agentSecret?.routineId);
   createEffect(agentRoutine, () => {
     setAgent({ pending: false, error: null, given: false });
@@ -212,7 +190,6 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
               </IconButton>
             )}
           </Show>
-          {/* A sender such as Composio makes its own secret, so this stays beside a new secret too. */}
           <Show when={props.onUseSenderSecret}>
             <IconButton
               variant="ghost"
@@ -310,22 +287,15 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
 }
 
 export interface RoutineWebhookEndpointProps {
-  /** The URL the host made. Null until the relay registers the route. */
   url: string | null;
-  /** The relay connection of the host. Null when it is not known. */
   connected: boolean | null;
-  /** The signing secret that the host returned once. Null when there is nothing to show. */
   secret: string | null;
   onSecretDismiss: () => void;
-  /** Makes a new secret. The parent shows it through `secret`. */
   onRegenerateSecret: () => Promise<void>;
-  /** Replaces the secret with one that the sender made. Leave it out when the host cannot do this. */
   onUseSenderSecret?: ((secret: string) => Promise<void>) | undefined;
-  /** Gives a new secret to the agent of the routine. Leave it out when the host cannot do this. */
   agentSecret?: RoutineWebhookAgentSecret | undefined;
 }
 
-/** The URL and the signing secret of a saved webhook trigger, each with one action beside it. */
 export function RoutineWebhookEndpoint(props: RoutineWebhookEndpointProps) {
   const { t } = useText();
   return (

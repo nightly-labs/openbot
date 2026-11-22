@@ -1,15 +1,3 @@
-// Checks the queue reads of an agent with a long mailbox history (#2240). Runs the real mailbox
-// store and SQLite on a temporary profile, with many messages and many deliveries to one agent.
-// Checks that `listQueue`, `senderAgentIdsForRecipient` and `conversationMessages` give the rows of
-// the seeded messages, and that the single-delivery reads (`getDelivery`, `nextQueued`,
-// `findDeliveriesByTurn`, `unresolvedDeliveries`) give the same queue positions as `listQueue`. It
-// checks that repeated chat page reads of `conversationMessages` give the rows that a new store
-// reads from SQLite, also after a change (#11884). It records the time of the reads that each queue
-// change, each turn start and each chat page read makes. No app, provider, account or network is
-// started.
-//
-// Run: bun scripts/mailbox-queue-scale-e2e.ts
-// Writes .openbot-build/mailbox-queue-scale-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -24,7 +12,6 @@ const AGENT = "agent-a";
 const OTHER_AGENT = "agent-b";
 const SENDERS = ["sender-0", "sender-1", "sender-2", "sender-3"];
 const SEEDED_MESSAGES = 10_000;
-/** Each fifth message goes to `AGENT`, so it has 2,000 deliveries. */
 const AGENT_EVERY = 5;
 const COMPLETED = 1_000;
 const TIMED_READS = 20;
@@ -132,7 +119,6 @@ function checkQueue(mailbox: MailboxStore, seeded: Seeded[]): void {
   report.checks.push(`conversationMessages: ${rows.length} rows with their message text and sender`);
 }
 
-/** The single-delivery reads give the positions of `listQueue`. Starts 3 deliveries in one turn. */
 async function checkDeliveryReads(mailbox: MailboxStore, seeded: Seeded[]): Promise<string[]> {
   const positionOf = () =>
     new Map(mailbox.listQueue(AGENT).deliveries.map((delivery) => [delivery.id, delivery.position]));
@@ -178,13 +164,11 @@ async function checkDeliveryReads(mailbox: MailboxStore, seeded: Seeded[]): Prom
   return started;
 }
 
-/** The chat page windows that `MailboxSync.reconcilePersistedMailboxMessages` reads, oldest row first. */
 function pageWindows(mailbox: MailboxStore): (string | undefined)[] {
   const rows = mailbox.conversationMessages(AGENT);
   return [undefined, rows[0]?.createdAt, rows[Math.floor(rows.length / 2)]?.createdAt, rows.at(-1)?.createdAt];
 }
 
-/** The rows of each page window in `mailbox`, and in a new store that reads the same SQLite rows. */
 async function checkPageReadsMatchStored(mailbox: MailboxStore, path: string, shared: string, label: string) {
   const fresh = new MailboxStore(path, shared, database);
   await runCauseEffect(fresh.initialize());
@@ -196,10 +180,6 @@ async function checkPageReadsMatchStored(mailbox: MailboxStore, path: string, sh
   }
 }
 
-/**
- * The mailbox rows that each chat page read gets (#11884): a repeated read, a read after a caller
- * changed the rows it got, and a read after a delivery ends give the rows that SQLite holds.
- */
 async function checkPageReads(mailbox: MailboxStore, path: string, shared: string, started: string[]) {
   await checkPageReadsMatchStored(mailbox, path, shared, "before a change");
   const rows = mailbox.conversationMessages(AGENT);
@@ -220,11 +200,6 @@ async function checkPageReads(mailbox: MailboxStore, path: string, shared: strin
   report.checks.push("conversationMessages: a page read after a delivery ends gives its new status");
 }
 
-/**
- * The mailbox reads of chat page reads: each moves the page window, as new chat rows do. The second
- * time is of the first read after a mailbox change. Forgetting a key that no message has is such a
- * change, with no write.
- */
 function timePageReads(mailbox: MailboxStore) {
   const windows = pageWindows(mailbox);
   const perRead = (change: () => void) => {
@@ -245,7 +220,6 @@ function timePageReads(mailbox: MailboxStore) {
   };
 }
 
-/** The reads that a turn start and a turn end make for one delivery. */
 function timeDeliveryReads(mailbox: MailboxStore, seeded: Seeded[]) {
   const queuedId = seeded[COMPLETED + 500]?.deliveryId;
   assert.ok(queuedId);
@@ -257,13 +231,11 @@ function timeDeliveryReads(mailbox: MailboxStore, seeded: Seeded[]) {
   return {
     deliveryReads: TIMED_DELIVERY_READS,
     getDeliveryMs: perCall(() => mailbox.getDelivery(queuedId)),
-    // The agent's own chat runs the started turn, so a task lane with no message scans the whole queue.
     nextQueuedMs: perCall(() => mailbox.nextQueued(AGENT, "task-none")),
     findDeliveriesByTurnMs: perCall(() => mailbox.findDeliveriesByTurn(AGENT, TURN_ID)),
   };
 }
 
-/** The reads `MailboxSync.emitQueue` makes on each queue change. */
 function timeQueueChanges(mailbox: MailboxStore): NonNullable<Report["timing"]> {
   const started = performance.now();
   for (let index = 0; index < TIMED_READS; index += 1) {

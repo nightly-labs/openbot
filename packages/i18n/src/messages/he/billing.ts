@@ -149,7 +149,7 @@ export const messages = {
   "billing.order.currency": "מטבע",
   "billing.order.monthly": "חודשי",
   "billing.order.yearly": "שנתי",
-  "billing.order.yearlySaving": "−{percent}% בחיוב שנתי",
+  "billing.order.yearlySaving": "הנחה של {percent}% בחיוב שנתי",
   "billing.order.server.title": "שרת מאוחסן",
   "billing.order.server.summary": "אנחנו מפעילים את OpenBot עבור הצוות שלך.",
   "billing.order.server.none": "ללא שרת",
@@ -167,7 +167,7 @@ export const messages = {
   "billing.order.license.noneDetail": "שימוש אישי ולא מסחרי",
   "billing.order.license.starter": "רישיון Starter",
   "billing.order.license.team": "רישיון Team",
-  "billing.order.license.bundleSaving": "−{percent}% עם השרת שלך",
+  "billing.order.license.bundleSaving": "הנחה של {percent}% עם השרת שלך",
   "billing.order.license.teamDetail": "{included} כלולים, +{price} לכל נוסף",
   "billing.order.license.serverMembers": {
     one: "בשרת שלך יש חבר אחד",

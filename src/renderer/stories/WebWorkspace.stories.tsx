@@ -21,7 +21,6 @@ import { createMockWebRuntime, mockWebRuntimeFor } from "../src/preview/mock-web
 import { AGENT_ID, TABS_KEY, THREAD_OPTIONS } from "./agent-threads-fixtures";
 import "../src/features/web-client/web-client.css";
 
-/** The account service: the marketplace catalog is a mock, and other routes go to the network. */
 const accountFetch = mockAccountCatalogFetch();
 
 const meta = {
@@ -51,12 +50,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Connected: Story = {};
 
-/** The Marketplace page, opened on an app by a `/app?plugin=<slug>` link. */
 export const MarketplaceApp: Story = {
   args: { pluginSlug: "linear" },
 };
 
-/** A long conversation. `bun run perf:web` streams replies into it and counts the host requests. */
 export const LongConversation: Story = {
   args: { createRuntime: createBenchWebRuntime },
 };
@@ -73,7 +70,6 @@ const failedHostsRuntime: WebRuntimeFactory = (...args) => ({
   },
 });
 
-/** Another tab has the host open until "Use here" takes it. */
 const otherTabRuntime: WebRuntimeFactory = (...args) => {
   const runtime = createMockWebRuntime(...args);
   return {
@@ -95,10 +91,8 @@ const incompatibleRuntime: WebRuntimeFactory = (...args) => ({
   },
 });
 
-/** How long the host takes to answer in `SavedFrameSlowConnect`, so the loading screen and its exit both show. */
 const SLOW_CONNECT_MS = 6_000;
 
-/** The last visit saved a frame of the workspace, and the host answers slowly. */
 const savedFrameSlowRuntime: WebRuntimeFactory = (accountId, events) => {
   const mock = createMockOpenBot();
   const runtime = mockWebRuntimeFor(mock, events);
@@ -107,7 +101,6 @@ const savedFrameSlowRuntime: WebRuntimeFactory = (accountId, events) => {
   });
   return {
     ...runtime,
-    // The frame is read when the connect starts, so the host list waits for the write.
     listHosts: async () => {
       await saved;
       return runtime.listHosts();
@@ -119,7 +112,6 @@ const savedFrameSlowRuntime: WebRuntimeFactory = (accountId, events) => {
   };
 };
 
-/** A new page with a saved frame: the chat shows the loader of its history until the host answers. */
 export const SavedFrameSlowConnect: Story = {
   args: { createRuntime: savedFrameSlowRuntime },
 };
@@ -142,11 +134,6 @@ export const Incompatible: Story = {
 
 const NEW_SERVER_ID = "cloud-server";
 
-/**
- * A server the user just bought or set up, next to the preview computer: no agents, and no provider
- * signed in on the host. The host serves the provider routes, so an owner sees the provider step
- * before the agent form. Claude signs in with a pasted code; any code connects it.
- */
 const newServerRuntime: WebRuntimeFactory = (accountId, events, accountFetch) => {
   const base = createMockWebRuntime(accountId, events, accountFetch);
   const team = createMockOpenBot();
@@ -190,7 +177,6 @@ const newServerRuntime: WebRuntimeFactory = (accountId, events, accountFetch) =>
       verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
       expiresAt: Date.now() + 600_000,
     }),
-    // The host checks the code for a moment, then Claude is signed in.
     [PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit]: () => {
       const claude = { id: "claude", version: "2.1.263", message: null } as const;
       setClaude({ ...claude, state: "sign-in-required", connectionState: "connecting" });
@@ -237,7 +223,6 @@ export const NewServer: Story = {
   args: { createRuntime: newServerRuntime },
 };
 
-/** A host with side threads: the agent-tasks routes, and rename and delete through `agent-threads-v1`. */
 const threadsRuntime: WebRuntimeFactory = (_accountId, events) => {
   const mock = createMockOpenBot(THREAD_OPTIONS);
   const base = mockWebRuntimeFor(mock, events);
@@ -281,7 +266,6 @@ const threadsRuntime: WebRuntimeFactory = (_accountId, events) => {
   };
 };
 
-/** Side threads in the browser: Chief has two open thread tabs. Open Chief to see them. */
 export const Threads: Story = {
   args: { createRuntime: threadsRuntime },
   render: (args) => {
@@ -298,7 +282,6 @@ export const Threads: Story = {
   },
 };
 
-/** The account server's hosted server list, with the server that Checkout paid for already running. */
 const checkoutFetch: typeof fetch = async (input) => {
   const url = String(input instanceof Request ? input.url : input);
   const body = url.endsWith("/hosting/plans")
@@ -325,7 +308,6 @@ const checkoutFetch: typeof fetch = async (input) => {
   return body ? Response.json(body) : accountFetch(input);
 };
 
-/** The return from Stripe Checkout: the add server dialog opens on the new server's setup. */
 export const CheckoutReturn: Story = {
   args: {
     createRuntime: newServerRuntime,
@@ -334,7 +316,6 @@ export const CheckoutReturn: Story = {
   },
 };
 
-/** A hosted server that stopped because nobody used it. A key press or a click wakes it. */
 const sleepingRuntime: WebRuntimeFactory = (...args) => ({
   ...createMockWebRuntime(...args),
   connect: async () => {
@@ -366,7 +347,6 @@ export const HostedServerAsleep: Story = {
   args: { createRuntime: sleepingRuntime, accountFetch: sleepingFetch },
 };
 
-/** Another tab has the cloud server open. The server rail opens the other server. */
 const otherTabServersRuntime: WebRuntimeFactory = (...args) => {
   const runtime = createMockWebRuntime(...args);
   return {

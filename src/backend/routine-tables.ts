@@ -2,10 +2,6 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { sourceText } from "@openbot/i18n/source";
 import type { RoutineTables } from "./routine-store";
 
-/**
- * The tables of each routine owner. They live apart from the stores so that the webhook routes,
- * which read both owners, can import them without an import cycle.
- */
 export const ROUTINE_TABLES = {
   agent: {
     ownerKind: "agent",

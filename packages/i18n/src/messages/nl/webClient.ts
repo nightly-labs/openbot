@@ -9,6 +9,9 @@ export const messages = {
   "webClient.loadingLine.prompts": "De prompts ontwarren…",
   "webClient.loadingLine.sleepy": "De slaapkop vriendelijk vragen…",
   "webClient.loadingLine.almost": "Bijna klaar. Waarschijnlijk.",
+  "webClient.slowLoad.title": "OpenBot laadt langzamer dan normaal",
+  "webClient.slowLoad.body": "Controleer je internetverbinding en laad de pagina daarna opnieuw.",
+  "webClient.slowLoad.reload": "Opnieuw laden",
   "webClient.login.failed": "Inloggen mislukt.",
   "webClient.login.requestFailed": "Het accountverzoek is mislukt.",
   "webClient.login.sessionFailed": "Kan deze sessie niet controleren.",
@@ -17,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Het antwoord op het inloggen is ongeldig.",
   "webClient.pane.navigation": "Navigatie in werkruimte",
   "webClient.pane.chat": "Chat",
-  "webClient.pane.routines": "Routines",
   "webClient.pane.workspace": "Werkruimte",
   "webClient.phoneApp.title": "Gebruik de OpenBot-app",
   "webClient.phoneApp.description":

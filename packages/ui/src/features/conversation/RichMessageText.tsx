@@ -30,23 +30,12 @@ export interface RichMessageTextProps {
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
   onOpenAttachment?: ((attachment: AttachmentSummary) => void) | undefined;
-  /**
-   * Opens a file chip. `asWritten` is the code span text when the chip joined it to the folder that the
-   * message names; it opens in the workspace when the joined path does not.
-   */
   onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
-  /** Shows the passage that a quote tag names. Without it, a quote is a chip that does nothing. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
-  /** Shows the browser tab or opens the thread that a tag names. Without it, the chip does nothing. */
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   showCitationFooter?: boolean;
-  /** The characters of a streaming body after this text. It fades the words revealed last. */
   streamingTailAfter?: number | undefined;
-  /**
-   * False shows only the link icon, so that no linked site is asked for its favicon. Use it for
-   * text that another person wrote, such as the instructions of a shared agent.
-   */
   linkFavicons?: boolean | undefined;
 }
 
@@ -56,17 +45,10 @@ const UNAVAILABLE_TAG_LABELS = {
   mcp: "chat.tag.unavailableMcp",
 } as const satisfies Record<UnavailableTagKind, AppTextKey>;
 
-/*
- * A quote carries its own text, so it never depends on something that can go away. A tab or a thread
- * keeps the name it had when the message was sent, as an MCP server does: the message records what
- * the user asked.
- */
 type UnavailableTagKind = Exclude<ChatTagKind, "quote" | "tab" | "thread">;
 
 export function RichMessageText(props: RichMessageTextProps) {
   const { t } = useText();
-  // The parent gives new props when an agent changes. These memos keep the same lists, so the maps
-  // below, the parsed parts and their chips are not made again.
   const citationList = createMemo(() => props.citations);
   const attachmentList = createMemo(() => props.attachments);
   const skillList = createMemo(() => props.skills);
@@ -76,8 +58,6 @@ export function RichMessageText(props: RichMessageTextProps) {
   const attachmentsById = createMemo(
     () => new Map((attachmentList() ?? []).map((attachment) => [attachment.id, attachment])),
   );
-  // The parser reads only the id and the name of each agent. So a new avatar does not parse each
-  // message again and build its chips again: a chip gets its agent's avatar from `agentsById`.
   const taggedAgents = createMemo(() => props.agents, { equals: sameAgentNames });
   const agentsById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
   const liveAgent = (agent: ComposerAgent) => agentsById().get(agent.id) ?? agent;
@@ -103,7 +83,6 @@ export function RichMessageText(props: RichMessageTextProps) {
   } | null>(null);
 
   const openTooltip = (anchor: HTMLElement, content: string, onlyWhenTruncated = false) => {
-    // The chip, not its inline name, clips the name and shows the ellipsis.
     if (onlyWhenTruncated && anchor.scrollWidth <= anchor.clientWidth + 1) {
       setTooltip(null);
       return;
@@ -317,8 +296,6 @@ function StreamingTailText(props: { body: string; after: number }) {
       {parts().prefix}
       <For each={parts().chunks}>
         {(chunk) => (
-          /* The block that holds the tail renders again on each step. A delay of minus the step's
-             age continues its fade where it was, instead of starting it again. */
           <span
             class="t-stream-w"
             style={{ "animation-delay": `${Math.min(0, chunk.revealedAt - performance.now())}ms` }}
@@ -333,15 +310,9 @@ function StreamingTailText(props: { body: string; after: number }) {
 
 export function MessageLink(props: {
   url: string;
-  /** The native tooltip. Omit it when the link text already shows the URL. */
   title?: string | undefined;
   children: JSX.Element;
-  /** False keeps the request for the linked site's favicon from being made. */
   favicon?: boolean;
-  /**
-   * True when the link text is the URL. The URL then gets its own direction, so its punctuation
-   * does not mix with the text around it in a right-to-left paragraph.
-   */
   isolate?: boolean | undefined;
   onOpenLink: (url: string) => void;
 }) {
@@ -376,7 +347,6 @@ export function MessageLink(props: {
   );
 }
 
-/** A part that shows its source text as it is, so its length counts body characters. */
 function plainTextPart(part: RichMessagePart): boolean {
   return !(
     part.agent ||
@@ -395,14 +365,8 @@ interface RichMessagePart {
   text: string;
   agent?: ComposerAgent | undefined;
   skill?: ComposerSkill;
-  /**
-   * An MCP server tag carries the name it was written with, and nothing looks it up. A message is a
-   * record of what the user asked, and a server removed since does not make that record wrong.
-   */
   mcpName?: string;
-  /** Text the user quoted from a message of this chat. */
   quote?: { messageId: string; text: string };
-  /** A browser tab, by tab id, or a side thread, by task id. */
   reference?: { kind: "tab" | "thread"; id: string };
   unavailableKind?: UnavailableTagKind;
   citation?: MessageCitation;
@@ -411,7 +375,6 @@ interface RichMessagePart {
   url?: string;
 }
 
-/** True when both lists have the same agents, in the same order, with the same names. */
 function sameAgentNames(left: ComposerAgent[], right: ComposerAgent[]): boolean {
   return (
     left.length === right.length &&
@@ -551,7 +514,6 @@ function linkedMessageParts(body: string): RichMessagePart[] {
   return parts.length > 0 ? parts : [{ text: body }];
 }
 
-/** The URL as a tooltip, unless the link text is already that URL. */
 export function linkTitle(text: string, url: string): string | undefined {
   return text === url || `${text}/` === url ? undefined : url;
 }

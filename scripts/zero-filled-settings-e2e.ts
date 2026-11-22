@@ -1,12 +1,3 @@
-// Runs the real team and remote server stores against settings files that a power loss on NTFS
-// filled with zeros. JSON.parse rejected such a file with "Unexpected token '\0'", and the Windows
-// error box showed only "Unexpected token '", so OpenBot did not start. The stores must move the file
-// aside and start empty. An empty file gets the same result. A file that is not JSON must still stop
-// the start, with an error that names the file and quotes nothing from it. A byte order mark must not
-// stop the start.
-//
-// Run: bun scripts/zero-filled-settings-e2e.ts
-// It writes .openbot-build/zero-filled-settings-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/app";
 
 export const messages = {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "正在加载 OpenBot",
   "app.leftPanel.resize": "调整左侧栏宽度",
   "app.host.thisMac": "这台 Mac",
@@ -33,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "无法重启 {name}",
   "app.provider.included": "{name} 已包含在 OpenBot 中。",
   "app.clipboard.copyFailed": "无法复制文本。",
-  "app.voice.tooLong": "语音录制最长为两分钟。",
+  "app.voice.tooLong": "语音录制最长为 10 分钟。",
   "app.avatar.type": "请选择 PNG、JPEG、GIF 或 WebP 图片。",
   "app.avatar.size": "请选择小于 10 MB 的图片。",
   "app.avatar.processingUnavailable": "图片处理不可用。",
@@ -48,7 +47,6 @@ export const messages = {
   "app.questionnaire.empty": "没有问题",
   "app.standingApproval.title": "始终允许 {name}？",
   "app.standingApproval.titleUnnamed": "始终允许该助手？",
-  // The page rail and the settings page of the desktop window.
   "app.rail.label": "页面",
   "app.rail.website": "OpenBot 网站",
   "app.rail.agents": "助手",

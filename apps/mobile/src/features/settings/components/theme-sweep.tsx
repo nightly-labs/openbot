@@ -15,7 +15,6 @@ import { scheduleOnRN } from "react-native-worklets";
 import { endThemeSweep, reportThemeSweepShown, useThemeSweep } from "@/features/settings/model/theme-sweep";
 import { isIOS } from "@/shared/lib/platform";
 
-// The values of the desktop sweep (`src/renderer/src/theme-sweep.ts`), in screen heights.
 const SWEEP_MS = 1200;
 const AHEAD = 0.14;
 const BEHIND = 0.32;
@@ -28,10 +27,6 @@ const PULL = 8;
 const EDGE_GAIN = 2.2;
 const CHANNEL_SPREAD = 0.08;
 
-// The old theme opens from the front of an ellipse at the bottom middle (or top middle) of the
-// screen. The wash of the desktop shader moves with the front, and a ripple moves the old picture
-// ahead of it, with a small split of its colors. Everything after the front is transparent, so the
-// live app shows in the new theme.
 const SOURCE = `
 uniform shader image;
 uniform float2 resolution;
@@ -54,11 +49,9 @@ half4 main(float2 position) {
   if (down > 0.5) uv.y = 1.0 - uv.y;
   float t = time;
 
-  // The front without its wave: the old picture opens here.
   float plain = (length(float2(uv.x - 0.5, uv.y / radius)) - 1.0) * radius;
   float keep = clamp((plain + ${(REVEAL_LAG + REVEAL).toFixed(3)}) / ${REVEAL.toFixed(3)}, 0.0, 1.0);
 
-  // The ripple moves the old picture ahead of the front, more at the sides of the screen.
   float u = plain / ${CREST.toFixed(3)};
   float move = ${PUSH.toFixed(1)} * exp(-u * u) - ${PULL.toFixed(1)} * exp(-((u + 2.6) / 1.4) * ((u + 2.6) / 1.4));
   float across = uv.x * 2.0 - 1.0;
@@ -69,7 +62,6 @@ half4 main(float2 position) {
   half4 blue = image.eval(position - ahead * move * ${(1 - CHANNEL_SPREAD).toFixed(2)});
   half4 old = half4(red.r, green.g, blue.b, 1.0) * half(keep);
 
-  // The wash: the front bends and breathes as it moves.
   float x = uv.x - 0.5 + 0.05 * sin(uv.y * 6.0 + t * 2.5) + 0.02 * sin(uv.y * 13.0 - t * 3.6);
   float wave = radius * (1.0 + 0.08 * sin(uv.x * 7.0 - t * 3.2) + 0.04 * sin(uv.x * 15.0 + t * 4.1)
     + 0.02 * sin(uv.x * 29.0 - t * 5.3));
@@ -84,7 +76,6 @@ half4 main(float2 position) {
 }
 `;
 
-// Compiled on first use, not when the app starts.
 let effect: SkRuntimeEffect | null | undefined;
 function sweepEffect(): SkRuntimeEffect | null {
   if (effect === undefined) effect = Skia.RuntimeEffect.Make(SOURCE);
@@ -102,15 +93,10 @@ function smoothstep(from: number, to: number, value: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/**
- * The theme change sweep of `sweepTheme`, above the whole app. On iOS it sits above sheets too.
- * Decorative and does not take touches: the live app under it already shows the new theme.
- */
 export function ThemeSweep() {
   const image = useThemeSweep((state) => state.image);
   const shader = sweepEffect();
   useEffect(() => {
-    // A phone that cannot compile the shader changes the theme at once.
     if (!image || shader) return;
     endThemeSweep();
     image.dispose();
@@ -127,11 +113,9 @@ function SweepCanvas({ image, shader }: { image: SkImage; shader: SkRuntimeEffec
   const running = useThemeSweep((state) => state.running);
   const progress = useSharedValue(0);
 
-  // The canvas draws the picture until it unmounts, so it frees the picture then.
   useEffect(() => () => image.dispose(), [image]);
 
   useEffect(() => {
-    // The canvas draws the picture in the frame after it mounts.
     let second = 0;
     const first = requestAnimationFrame(() => {
       second = requestAnimationFrame(reportThemeSweepShown);
@@ -159,7 +143,6 @@ function SweepCanvas({ image, shader }: { image: SkImage; shader: SkRuntimeEffec
       progress: value,
       time: (value * SWEEP_MS) / 1000,
       down: down ? 1 : 0,
-      // The wash fades in at the start and out at the end, so no tint stays in the corners when the canvas goes.
       alpha: 0.8 * smoothstep(0, 0.12, value) * (1 - smoothstep(0.85, 1, value)),
     };
   });
@@ -173,8 +156,6 @@ function SweepCanvas({ image, shader }: { image: SkImage; shader: SkRuntimeEffec
     >
       <Fill>
         <Shader source={shader} uniforms={uniforms}>
-          {/* The picture is the whole window, from its top edge. Its height follows its own aspect, so a
-              window that is taller than the reported window height does not stretch it. */}
           <ImageShader
             image={image}
             fit="fill"

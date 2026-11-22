@@ -1,14 +1,3 @@
-// Makes and checks `src/main/released-schema-versions.ts`: for each released desktop version, the
-// highest `openbot.db` schema version that it can open. The values come from the migration list of
-// `src/backend/openbot-database-schema.ts` at each `v<x.y.z>` tag.
-//
-//   bun scripts/released-schema-versions.ts          checks the table against the tags
-//   bun scripts/released-schema-versions.ts --write  writes the table again from the tags
-//
-// The table is frozen. A version that has this change records its own schema version in the start
-// attempts file when it finishes a start (`src/main/start-attempts.ts`), so a new release does not
-// need an entry. The check also stops when a tag after LAST_RELEASE does not have this table, because
-// that release does not record its schema version. `release.yml` runs the check for each release.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -17,14 +6,12 @@ import { compareReleaseVersions, parseReleaseVersion } from "../packages/contrac
 const ROOT = resolve(import.meta.dirname, "..");
 const TABLE = join(ROOT, "src/main/released-schema-versions.ts");
 const SCHEMA_SOURCE = "src/backend/openbot-database-schema.ts";
-/** The last release that does not record its schema version. Later releases are not in the table. */
 const LAST_RELEASE = "0.72.0";
 
 function git(args: string[]): string {
   return execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 }
 
-/** Tags are filtered to X.Y.Z before they come here, so each one parses. */
 function compareVersions(left: string, right: string): number {
   const a = parseReleaseVersion(left);
   const b = parseReleaseVersion(right);
@@ -32,7 +19,6 @@ function compareVersions(left: string, right: string): number {
   return compareReleaseVersions(a, b);
 }
 
-/** The highest schema version that the source of one release can open. 0 when it has no database. */
 function highestSchemaVersion(source: string | null, tag: string): number {
   if (source === null) return 0;
   const list = source.indexOf("const MIGRATIONS");
@@ -48,7 +34,6 @@ function highestSchemaVersion(source: string | null, tag: string): number {
     }
     return Math.max(...versions);
   }
-  // The first releases had one schema version and no migration list.
   const single = /const SCHEMA_VERSION = (\d+);/.exec(source)?.[1];
   if (single) return Number.parseInt(single, 10);
   throw new Error(`${tag}: no schema version found in ${SCHEMA_SOURCE}.`);
@@ -81,7 +66,6 @@ function tableFromTags(): Map<string, number> {
       source = null;
     }
     const schema = highestSchemaVersion(source, `v${version}`);
-    // A release never opens fewer schema versions than the release before it.
     if (schema < previous) throw new Error(`v${version} has schema ${schema}, less than ${previous} before it.`);
     previous = schema;
     table.set(version, schema);

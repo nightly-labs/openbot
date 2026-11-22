@@ -18,12 +18,10 @@ import { authApiErrorCode, authApiRateLimit } from "./central-auth-manager";
 
 const logger = createOpenBotLogger("feedback");
 
-/** This build's version and system, for feedback, so the user does not look them up. */
 export function feedbackFacts(host?: FeedbackHost): FeedbackFacts {
   const platform = bugReportPlatform(process.platform);
   return {
     platform,
-    // electron-vite starts a script, so Electron reports its own version in development.
     version: app.isPackaged ? app.getVersion() : developmentVersion,
     os: `${platform} ${process.getSystemVersion()} (${process.arch})`,
     builtFromSource: !app.isPackaged,
@@ -56,14 +54,9 @@ function similarIssues(value: unknown): SimilarFeedbackIssue[] {
   });
 }
 
-/**
- * Sends approved feedback with the account session. The account service opens the issue as
- * `openbotgit[bot]`, so the user needs no GitHub account, and the issue does not name the account.
- */
 export function feedbackSender(auth: FeedbackAuth): AgentFeedback {
   return {
     signedIn: () => auth.getState().status === "signed_in",
-    // A search that fails, or an account service without it, must not stop the report.
     similar: (title) =>
       auth.getState().status !== "signed_in"
         ? Effect.succeed([])
@@ -103,7 +96,6 @@ export function feedbackSender(auth: FeedbackAuth): AgentFeedback {
             },
           )
           .pipe(
-            // The account takes a few reports a minute and more a day. The agent says when it can send again.
             Effect.catch((error) => {
               const limit = authApiRateLimit(error.cause);
               if (!limit) return Effect.fail(error);
@@ -135,16 +127,13 @@ export function feedbackSender(auth: FeedbackAuth): AgentFeedback {
           .pipe(
             Effect.catch((error): Effect.Effect<FeedbackWithdrawResult, CentralAuthOperationError> => {
               const code = authApiErrorCode(error.cause);
-              // Another account sent it, or the account service changed its key since the send.
               if (code === "feedback_not_yours") return Effect.succeed({ status: "notYours" } as const);
-              // No private repository, no GitHub App, or no feedback on this account service.
               if (
                 code === "feedback_withdraw_unavailable" ||
                 code === "github_app_unavailable" ||
                 code === "feedback_unavailable"
               )
                 return Effect.succeed({ status: "unavailable" } as const);
-              // A maintainer moved the issue to another public repository: it is still public.
               if (code === "feedback_moved") return Effect.succeed({ status: "moved" } as const);
               const limit = authApiRateLimit(error.cause);
               if (limit)

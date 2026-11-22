@@ -1,14 +1,3 @@
-// Runs the real Electron with the Linux password store choice of `src/main/linux-password-store.ts`
-// (#2374) and reads the `safeStorage` backend that Chromium selected:
-// 1. A desktop that Chromium does not map (Hyprland, sway, LXQt, none) gets `gnome_libsecret`.
-//    Without the change, these get `basic_text`.
-// 2. A desktop that Chromium maps keeps its own backend: GNOME and XFCE libsecret, KDE KWallet, also
-//    through the `DESKTOP_SESSION` fallback.
-// 3. A `--password-store` that the user gives wins.
-// 4. With no Secret Service, encryption stays unavailable, so nothing is stored in plain text.
-//
-// Run on Linux with a display (CI uses xvfb-run): bun scripts/linux-password-store-e2e.ts
-// It writes .openbot-build/linux-password-store-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync } from "node:fs";
@@ -29,7 +18,6 @@ const electronPath = join(
   "dist",
   readFileSync(join(ROOT, "node_modules", "electron", "path.txt"), "utf8").trim(),
 );
-// The desktop hints that Chromium reads. Each case starts with none of them.
 const DESKTOP_VARIABLES = [
   "XDG_CURRENT_DESKTOP",
   "DESKTOP_SESSION",
@@ -110,8 +98,6 @@ process.exit(passed ? 0 : 1);
 async function launch(index: number, item: Case): Promise<Result> {
   const base = withoutElectronRuntimeFlags(process.env);
   for (const name of DESKTOP_VARIABLES) delete base[name];
-  // No session bus: the test must not reach a keyring of the computer that runs it. An unset address
-  // is not enough, because GLib then finds $XDG_RUNTIME_DIR/bus.
   base.DBUS_SESSION_BUS_ADDRESS = "unix:path=/nonexistent/openbot-e2e-bus";
   const readyFile = join(root, `ready-${index}.json`);
   const log = openSync(join(OUT, `electron-${index}.log`), "w");

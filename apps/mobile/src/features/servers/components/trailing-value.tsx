@@ -4,7 +4,6 @@ import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
-/** A value and the disclosure chevron at the end of a navigation row. */
 export function TrailingValue({ value, tone }: { value: string; tone?: "warning" }) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   return (

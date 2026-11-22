@@ -1,7 +1,3 @@
-// The `cline --acp` of `cline-plan-limit-failover-e2e.ts`, as Cline 3.0.74. A prompt with `LIMIT-NOW`
-// on a model in `FAKE_SPENT_MODELS` fails as Cline fails it when the weekly ClinePass allowance is
-// spent: an ACP "Internal error" with Cline's text in `data.details` (#10674). Each other prompt
-// answers "Done.". `FAKE_MODELS` lists the models, the first one for a new session.
 import { logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 if (process.argv.includes("--version")) {

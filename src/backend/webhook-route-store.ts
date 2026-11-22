@@ -15,17 +15,11 @@ import { ROUTINE_TABLES } from "./routine-tables";
 
 const RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Who answers a route: an agent or channel routine, or a webhook trigger of a workflow. The
- * workflow arm stays in the backend; the events API and `events-v1` name routine owners only.
- */
 export type WebhookRouteOwner = EventRoutineOwner | { kind: "workflow"; id: string };
 
-/** What the main process needs to verify and route one inbound request. */
 interface WebhookRoute {
   routeId: string;
   owner: WebhookRouteOwner;
-  /** The routine, or the trigger node of a workflow. */
   routineId: string;
   url: string | null;
   secretCiphertext: string;
@@ -54,17 +48,11 @@ const ROUTE_SELECT = Object.values(ROUTINE_TABLES)
   )
   .join(" UNION ALL ");
 
-/** Each table that holds routes. A route ID is in one of them only. */
 const ROUTE_TABLES = [
   ...Object.values(ROUTINE_TABLES).map(({ webhookTable }) => webhookTable),
   "workflow_trigger_webhooks",
 ];
 
-/**
- * Owns the public side of webhook triggers: the route that the relay forwards, its secret, the
- * revocations that the relay still has to drain, and the receipts that make a redelivery a no-op.
- * The trigger row itself belongs to the routine, and `RoutineStore` writes it.
- */
 export class WebhookRouteStore {
   constructor(private readonly database: OpenBotDatabase) {}
 
@@ -77,18 +65,12 @@ export class WebhookRouteStore {
     return databaseRows(this.database.connection.prepare(`${ROUTE_SELECT} ORDER BY route_id`).all()).map(route);
   }
 
-  /** Saves the relay URL only while the route is still the routine's, so a late registration cannot win. */
   setUrl(routeId: string, url: string | null): void {
     for (const webhookTable of ROUTE_TABLES) {
       this.database.connection.prepare(`UPDATE ${webhookTable} SET url = ? WHERE route_id = ?`).run(url, routeId);
     }
   }
 
-  /**
-   * Gives a route a new random ID and no URL, after the relay refused the old ID for good: it was
-   * revoked, or another host or account owns it. The secret stays, so only the URL changes. No
-   * revocation is queued, because the relay refuses that too. Returns `null` when the route is gone.
-   */
   replaceRouteId(routeId: string, now = new Date()): string | null {
     const replacement = randomUUID();
     for (const webhookTable of ROUTE_TABLES) {
@@ -111,7 +93,6 @@ export class WebhookRouteStore {
     if (rotated.changes === 0) throw new RoutineInputError(sourceText("error.backend.routineGone"));
   }
 
-  /** Whether a workflow trigger has a route yet. Its first secret makes one. */
   hasWorkflowRoute(workflowId: string, nodeId: string): boolean {
     return isDynamicRecord(
       this.database.connection
@@ -120,11 +101,6 @@ export class WebhookRouteStore {
     );
   }
 
-  /**
-   * Gives a webhook trigger of a workflow a new secret. The first secret also makes its route, with a
-   * random ID and no URL until the relay registers it. Returns false when the node is not a webhook
-   * trigger of that workflow.
-   */
   rotateWorkflowSecret(workflowId: string, nodeId: string, secretCiphertext: string, now = new Date()): boolean {
     const at = now.toISOString();
     const result = this.database.connection
@@ -170,7 +146,6 @@ export class WebhookRouteStore {
   }
 }
 
-/** A receipt past retention no longer counts, so its delivery ID starts a new run. */
 export function hasWebhookReceipt(
   db: OpenBotDatabase["connection"],
   receipt: Pick<WebhookReceipt, "ownerKind" | "routineId" | "deliveryId" | "receivedAt">,
@@ -185,7 +160,6 @@ export function hasWebhookReceipt(
   );
 }
 
-/** Records one verified request in the caller's transaction and drops receipts past retention. */
 export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt: WebhookReceipt): void {
   db.prepare("DELETE FROM projection_webhook_receipts WHERE received_at < ?").run(
     webhookReceiptCutoff(receipt.receivedAt),
@@ -207,16 +181,10 @@ export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt:
   );
 }
 
-/** The oldest receive time that a receipt keeps. Older delivery IDs count as new again. */
 export function webhookReceiptCutoff(receivedAt: string): string {
   return new Date(Date.parse(receivedAt) - RECEIPT_RETENTION_MS).toISOString();
 }
 
-/**
- * Queues the relay revocation of each webhook route of these routines, in the caller's transaction,
- * before their trigger rows go. A routine delete, a switch to a schedule and an owner delete all
- * pass through here, so the public URL stops working with the trigger that it named.
- */
 export function revokeRoutineWebhooks(
   db: OpenBotDatabase["connection"],
   ownerKind: EventRoutineOwner["kind"],

@@ -20,18 +20,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/remote/api/node_modules ./remote/api/node_modules
-# Source, not just the manifest: workspace packages here ship as raw TypeScript, so the symlink
-# `node_modules/@openbot/contracts` carries over from the install stage resolves into a directory
-# with nothing in it to import. The image would build and the container would die on first
-# import, and no CI job builds this image.
 COPY packages/contracts ./packages/contracts
 COPY remote/api ./remote/api
 USER bun
 WORKDIR /app/remote/api
 EXPOSE 8443
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD bun -e 'const r=await fetch("http://127.0.0.1:8080/health/ready");process.exit(r.ok?0:1)'
-# The release commit, which `/health/live` shows. It changes with each release, so it comes last
-# and the layers above stay cached. The deploy sets it with `--build-arg`.
 ARG OPENBOT_SOURCE_COMMIT=unknown
 ENV OPENBOT_SOURCE_COMMIT=$OPENBOT_SOURCE_COMMIT
 ENTRYPOINT ["bun", "src/index.ts"]

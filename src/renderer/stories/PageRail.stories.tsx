@@ -33,7 +33,6 @@ const usageRows = accountUsageProviderRows({
   ],
 });
 
-/** A merged Cursor plan counts the Grok plan quota: one Grok ring, and its card lists Cursor too. */
 const sharedQuotaRows = accountUsageProviderRows({
   limits: [
     {
@@ -59,7 +58,6 @@ const windowWeek = (usedPercent: number) => ({
   resetsAt: nowSeconds + 4 * 86_400,
 });
 
-/** Three Codex and three Claude accounts, and four other plans: ten rings, more than the rail has room for. */
 const manyAccountRows = accountUsageProviderRows(
   {
     limits: [
@@ -97,43 +95,44 @@ const manyAccountRows = accountUsageProviderRows(
   ],
 );
 
-/** An example answer. Each agent writes its own text, which the card shows as it is. */
 const customAgentUsage: CustomAgentUsageRailRow[] = [
   { id: "devin", name: "Devin", text: "Plan: Team\nACUs used this cycle: 42 of 250\nThe cycle resets in 12 days." },
 ];
 
-/** On the Canvas page: a Sunra team member with 120 of a 500-credit quota left. */
-const teamCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 120, quota: 500 }];
+const teamCredits: MediaCreditsRailRow[] = [
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 120, quota: 500 },
+];
 
-/** A personal Sunra account has no quota of its own. */
-const personalCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 2140, quota: null }];
+const personalCredits: MediaCreditsRailRow[] = [
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 2140, quota: null },
+];
 
-/** Sunra and Higgsfield both signed in on the host: one button for each service. */
 const bothCredits: MediaCreditsRailRow[] = [
   ...teamCredits,
-  { provider: "higgsfield", name: "Higgsfield", available: 860, quota: null },
+  { key: "higgsfield", provider: "higgsfield", name: "Higgsfield", available: 860, quota: null, number: 1 },
 ];
 
-/** Almost no Sunra team credits, and no Higgsfield credits. */
+const twoAccountCredits: MediaCreditsRailRow[] = [
+  { key: "higgsfield:first", provider: "higgsfield", name: "Higgsfield", available: 860, quota: null, number: 1 },
+  { key: "higgsfield:second", provider: "higgsfield", name: "Higgsfield 2", available: 95, quota: null, number: 2 },
+];
+
 const lowCredits: MediaCreditsRailRow[] = [
-  { provider: "sunra", name: "Sunra", available: 140, quota: 2000 },
-  { provider: "higgsfield", name: "Higgsfield", available: 0, quota: null },
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 140, quota: 2000 },
+  { key: "higgsfield", provider: "higgsfield", name: "Higgsfield", available: 0, quota: null },
 ];
 
-/** The page rail as the desktop window shows it, with the menu of the open server at its end. Hover a button, or move to it with Tab, to see its tooltip. */
 function RailPreview(props: {
   updateReady?: boolean;
   logo?: PageRailProps["logo"];
   customAgentUsage?: readonly CustomAgentUsageRailRow[];
   usageRows?: PageRailProps["usageRows"];
   mediaCredits?: readonly MediaCreditsRailRow[];
-  /** Pins the CRM, whose button has a right-click menu. */
   crm?: boolean;
 }) {
   const { t } = useText();
   const [current, setCurrent] = createSignal<PageRailPage | null>("agents");
   const [pinned, setPinned] = createSignal<readonly PageRailPinnablePage[]>(props.crm ? ["usage", "crm"] : ["usage"]);
-  /** Named functions, not ternary props. */
   function crmAction(): (() => void) | undefined {
     if (!props.crm) return undefined;
     return () => setCurrent("crm");
@@ -143,7 +142,6 @@ function RailPreview(props: {
     return () => setCurrent("crm");
   }
   return (
-    // The extra box keeps the rail out of the rule that hides it in a narrow window.
     <div class="app-window" style={{ height: "100vh" }}>
       <div style={{ display: "flex" }}>
         <PageRail
@@ -158,7 +156,6 @@ function RailPreview(props: {
           mediaCredits={props.mediaCredits}
           onMediaCredits={fn()}
           onAgents={() => setCurrent("agents")}
-          onRoutines={() => setCurrent("routines")}
           onSchedule={() => setCurrent("schedule")}
           onUsage={() => setCurrent("usage")}
           onCrm={crmAction()}
@@ -210,60 +207,50 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** The Settings tooltip also says what the dot stands for. */
 export const SettingsNotice: Story = {
   args: { updateReady: true },
 };
 
-/** A custom agent with a usage command: its logo with no ring. Hover it to see the answer. */
 export const CustomAgentUsage: Story = {
   args: { customAgentUsage },
 };
 
-/** Grok and a merged Cursor plan share one quota, so the rail shows the Grok ring alone. */
 export const SharedQuota: Story = {
   args: { usageRows: sharedQuotaRows },
 };
 
-/**
- * Ten accounts: the rings that fit, at most four, then one "+N" ring. The rings with the least left
- * stay. Hover "+N" to see the other accounts, and make the window shorter to see fewer rings.
- */
 export const ManyAccounts: Story = {
   args: { usageRows: manyAccountRows },
 };
 
-/** The web client: no macOS window buttons, so the logo in the top row links to the OpenBot site. */
 export const WebLogo: Story = {
   args: { logo: { variant: "production", href: "/" } },
 };
 
-/** Windows and Linux: the logo is in the top row, with no link. */
 export const DesktopLogo: Story = {
   args: { logo: { variant: "production" } },
 };
 
-/** The Canvas page with a Sunra team quota: the logo with the number of credits left. Hover it to see the quota. */
 export const MediaCreditsQuota: Story = {
   args: { mediaCredits: teamCredits },
 };
 
-/** The Canvas page with a personal Sunra account: the logo with the number of credits under it. */
 export const MediaCreditsPersonal: Story = {
   args: { mediaCredits: personalCredits },
 };
 
-/** The Canvas page with Sunra and Higgsfield: a button for each service. */
 export const MediaCreditsTwoServices: Story = {
   args: { mediaCredits: bothCredits },
 };
 
-/** Low credits: 7% of the Sunra team quota is left, and the Higgsfield account has none. Both numbers show in red. */
+export const MediaCreditsTwoAccounts: Story = {
+  args: { mediaCredits: twoAccountCredits },
+};
+
 export const MediaCreditsLow: Story = {
   args: { mediaCredits: lowCredits },
 };
 
-/** The CRM is pinned. Right-click its button for Connectors and Unpin; the other pinned buttons have Unpin. */
 export const CrmMenu: Story = {
   args: { crm: true },
 };

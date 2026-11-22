@@ -18,23 +18,32 @@ export const messages = {
   "error.workflow.agentStepEnded": "Ajana giden mesaj, ajan yanıt vermeden kaldırıldı.",
   "error.workflow.agentStepStopped": "Ajan bu adımı yanıtlamadan durdu. Adımı yeniden çalıştırın.",
   "error.workflow.conditionUnclear": "Model evet ya da hayır yanıtı vermedi.",
+  "error.workflow.answerInvalid": "Yanıt bu adımın istediği alanları içermiyordu: {fields}. Adımı yeniden çalıştırın.",
+  "error.workflow.checkInvalid": "Bu adımın denetimi geçerli değil. Düzeltin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelFailed": "Model yanıt veremedi. Adımı yeniden çalıştırın.",
   "error.workflow.modelTimedOut":
     "Model zamanında yanıt vermedi. Bu adım için daha düşük bir efor veya daha hızlı bir model seçin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelToolUse":
     "Model bir araç kullanmaya çalıştı, ancak bu adım yalnızca metinle yanıt verebilir. Adımı yeniden çalıştırın veya başka bir model seçin.",
+  "error.workflow.modelImageUnsupported":
+    "Bu adımın modeli resimleri okuyamaz. Okuyabilen bir model seçin veya resim bağlantısını kaldırın.",
+  "error.workflow.modelImageType":
+    "Model adımı yalnızca PNG, JPEG, GIF ve WebP resimlerini okuyabilir. Bu türlerden birinde bir resim bağlayın.",
   "error.workflow.modelUnavailable": "Bu adımın modeli kullanılamıyor. Bu adım için başka bir model seçin.",
   "error.workflow.providerBusy": "Sağlayıcı meşgul. Birkaç dakika bekleyin, sonra adımı yeniden çalıştırın.",
   "error.workflow.providerOffline":
     "OpenBot sağlayıcıya ulaşamadı. İnternet bağlantısını kontrol edin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelBusy": "Başka bir model isteği çalışıyor. Adımı birazdan yeniden çalıştırın.",
   "error.workflow.mediaFailed": "Model görseli veya videoyu oluşturamadı. Adımı yeniden çalıştırın.",
+  "error.workflow.mediaNotMade": "Model görseli veya videoyu oluşturmadı. Modelin yanıtı: {answer}",
   "error.workflow.pictureMissing": "Görsel artık sunucuda değil. Yeniden gönderin.",
   "error.workflow.pictureType": "PNG, JPEG veya WebP görseli kullanın.",
   "error.workflow.mediaInputMissing": "Önceki bir adımın görseli kullanılamıyor. O adımı yeniden çalıştırın.",
   "error.workflow.mediaEmptyRequest":
     "Bir açıklama yazın ya da bir metin veya görsel gelmesi için önceki adımları çalıştırın.",
   "error.workflow.mediaInputNotImage": "Bu adım yalnızca görsel alır, video almaz. Videodan gelen bağlantıyı kaldırın.",
+  "error.workflow.mediaInputNotClip":
+    "Bu giriş yalnızca video ve ses dosyası alır. Dosyadan gelen bağlantıyı kaldırın.",
   "error.workflow.stepMissing": "Bu adım artık yok.",
   "error.workflow.nodeMissing": "Bu adım iş akışında yok.",
   "error.workflow.runMissing": "Bu çalıştırma artık yok.",

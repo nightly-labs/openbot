@@ -10,21 +10,11 @@ import { codeRuns, useCodeTokenColors } from "./chat-code-block";
 
 const FONT_SIZE = 13;
 const LINE_HEIGHT = 20;
-/** The monospace font of `Typography.Code` on each platform. */
 const CODE_FONT = isIOS ? "Menlo" : "monospace";
-/** The width of one digit of the code font, in points, so the gutter fits the last line number. */
 const DIGIT_WIDTH = 8;
 const GUTTER_GAP = 14;
 const SIDE_PADDING = 16;
 
-/**
- * The code of a preview on its own screen, as an editor shows a file: the screen background, a
- * column of line numbers, and the colours of the code block in the chat. The code is one text, so
- * a finger selects any part of it with the system handles and copies it. iOS `Text` copies only
- * the whole text, so on iOS the code is a read-only text field, as Select Text in a message is.
- * Without wrap the lines scroll sideways together and the numbers stay in place. With wrap a
- * line can take several rows, so the numbers would no longer match their lines and are hidden.
- */
 export function CodeDocument({
   text,
   language,
@@ -40,11 +30,9 @@ export function CodeDocument({
   wrap: boolean;
   topInset: number;
   bottomInset: number;
-  /** The number of the first line, when the text is a later part of a long file. */
   firstLine?: number;
 }) {
   const { foreground, muted, colors } = useCodeTokenColors();
-  // The code keeps clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const insets = useSafeAreaInsets();
   const sides = { paddingLeft: insets.left + SIDE_PADDING, paddingRight: insets.right + SIDE_PADDING };
   const [tokens, setTokens] = useState<CodeToken[] | null>(null);
@@ -71,8 +59,6 @@ export function CodeDocument({
   const androidRuns = isIOS ? null : codeRuns(tokens ?? [{ text, offset: 0 }], colors, foreground);
   const runs = androidRuns
     ? // Android: plain native spans in one run for each colour, inside the code style of
-      // `SelectableCode`. A file has thousands of tokens, and a text with a span set for each token
-      // blocked the main thread. `codeRuns` also limits the coloured runs on Android.
       androidRuns.map((run) =>
         run.color === undefined ? (
           run.text

@@ -39,54 +39,32 @@ import type { JSX } from "@solidjs/web";
 import { createStore, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 
-/**
- * A new proxy, or a change to one. A change also has the address that the person changed, so that
- * the host can refuse it when a different admin changed the proxy first. `assignTo` is the named
- * profile that uses a new proxy at once.
- */
 export interface BrowserProxyDraft {
   proxyId?: string;
   previousAddress?: string;
-  /** The address has no password, and the saved password stays. */
   keepPassword?: boolean;
   address: string;
   assignTo?: string;
 }
 
-/** The proxy choice of the named profiles, for a server with proxy routes. */
 export interface BrowserProfileProxies {
   list: readonly BrowserProxySummary[];
-  /** The computers of members. Each one sends pages through the OpenBot app of its member. */
   computers: readonly BrowserProxyComputer[];
-  /**
-   * Whether this app shares its connection with the server. Undefined: this app cannot share it,
-   * as on the web client or for the computer that runs the agents.
-   */
   sharing?: boolean | undefined;
   onSave: (draft: BrowserProxyDraft) => Promise<void>;
-  /**
-   * Its profiles change to the proxy settings of the computer. `profileIds`: the profiles that the
-   * person saw use it; the host refuses the delete when they changed. Takes a computer id too.
-   */
   onDelete: (proxyId: string, profileIds: readonly string[]) => Promise<void>;
-  /** Null: the proxy settings of the computer ("Automatic"). Takes a computer id too. */
   onSetProfileProxy: (profileId: string, proxyId: string | null) => Promise<void>;
-  /** On also adds the computer of this member. `assignTo`: the named profile that uses it at once. */
   onSetSharing?: (sharing: boolean, assignTo?: string) => Promise<void>;
 }
 
-/** A saved proxy or the computer of a member, as one choice for a profile. */
 export interface BrowserProxyChoice {
   id: string;
   name: string;
-  /** Why the last page load through it failed, or null. */
   failure: BrowserProxyFailure | null;
-  /** A computer whose app does not share its connection now. */
   offline: boolean;
   profileIds: readonly string[];
 }
 
-/** The name of a member's computer, as the panel shows it. */
 export function browserComputerName(
   computer: Pick<BrowserProxyComputer, "mine" | "name">,
   t: ReturnType<typeof useText>["t"],
@@ -97,7 +75,6 @@ export function browserComputerName(
     : t("browser.proxies.memberComputer", { name: computer.name });
 }
 
-/** The name of the proxy of each named profile, by profile id, as the panel shows it. */
 export function browserProfileProxyNames(
   proxies: readonly (BrowserProxyNameParts & Pick<BrowserProxySummary, "profileIds">)[],
   computers: readonly Pick<BrowserProxyComputer, "mine" | "name" | "profileIds">[],
@@ -111,7 +88,6 @@ export function browserProfileProxyNames(
   return names;
 }
 
-/** Each proxy and each computer, in the order the panel shows them. */
 export function browserProxyChoices(
   proxies: BrowserProfileProxies,
   t: ReturnType<typeof useText>["t"],
@@ -136,10 +112,6 @@ export function browserProxyChoices(
 
 const AUTOMATIC = "automatic";
 
-/**
- * Runs `next` after a menu closes. The menu gives the focus back to its trigger two frames after it
- * closes (focusRestoreHandler in @openbot/ui complex.tsx), so a dialog opens after that.
- */
 export function createAfterMenuClose() {
   let afterClose: (() => void) | undefined;
   return {
@@ -165,18 +137,12 @@ function MenuMark(props: { on: boolean }) {
   );
 }
 
-/**
- * The "Proxy" submenu of a named profile: Automatic, each saved proxy and computer, a new proxy, and
- * this computer when this app can share its connection and the server does not have it yet.
- */
 export function BrowserProxySubmenu(props: {
   choices: readonly BrowserProxyChoice[];
-  /** The proxy of the profile, or null for Automatic. */
   value: string | null;
   mount: HTMLElement | undefined;
   onChange: (proxyId: string | null) => void;
   onNew: () => void;
-  /** Absent when this app cannot add its computer. */
   onUseComputer?: (() => void) | undefined;
 }) {
   const { t } = useText();
@@ -225,10 +191,6 @@ export function BrowserProxySubmenu(props: {
   );
 }
 
-/**
- * The proxy of a named profile, at the end of its row. It is red when the proxy does not answer or
- * refuses the sign-in, or when the computer of the profile does not share its connection now.
- */
 export function BrowserProxyBadge(props: { proxy: BrowserProxyChoice }) {
   const { t } = useText();
   const problem = () => {
@@ -256,10 +218,6 @@ export function BrowserProxyBadge(props: { proxy: BrowserProxyChoice }) {
   );
 }
 
-/**
- * Asks before this app shares its internet connection with the server. Sharing stays on for the
- * server until the member stops it, and it works only while this app is open.
- */
 export function BrowserComputerShareDialog(props: {
   open: boolean;
   error: JSX.Element | undefined;
@@ -282,7 +240,6 @@ export function BrowserComputerShareDialog(props: {
   );
 }
 
-/** Tells that a change closes open tabs. */
 export function BrowserProxyClosesTabs(props: { count: number }) {
   const { t } = useText();
   return (
@@ -292,12 +249,6 @@ export function BrowserProxyClosesTabs(props: { count: number }) {
   );
 }
 
-/**
- * Adds or changes a proxy with one address field. A saved password shows as a mask: when the mask
- * stays, the password stays. `closesTabs`: the open tabs that the save closes. An edit that does not
- * change the address closes the dialog with no save, so it keeps the open tabs. `proxies`: the saved
- * proxies, to name the proxy as the list does.
- */
 export function BrowserProxyDialog(props: {
   proxy: BrowserProxySummary | null;
   proxies: readonly BrowserProxySummary[];
@@ -370,7 +321,6 @@ export function BrowserProxyDialog(props: {
   );
 }
 
-/** The saved proxies and the computers of the server, above its profiles. */
 export function BrowserProxyList(props: {
   proxies: BrowserProfileProxies;
   disabled: boolean;
@@ -378,7 +328,6 @@ export function BrowserProxyList(props: {
   onAdd: () => void;
   onEdit: (proxy: BrowserProxySummary) => void;
   onDelete: (proxy: BrowserProxyChoice) => void;
-  /** Asks before this app shares its connection. */
   onShare: () => void;
   onStopSharing: () => void;
 }) {
@@ -452,13 +401,8 @@ export function BrowserProxyList(props: {
   );
 }
 
-/**
- * The computer of one member. The row of this member's own computer can stop or start the sharing
- * of this app's connection, when this app can share it.
- */
 function BrowserComputerRow(props: {
   computer: BrowserProxyComputer;
-  /** Undefined: not the computer of this app, or this app cannot share. */
   sharing: boolean | undefined;
   disabled: boolean;
   mount: HTMLElement | undefined;
@@ -522,7 +466,6 @@ function BrowserProxyRowMenu(props: {
   name: string;
   disabled: boolean;
   mount: HTMLElement | undefined;
-  /** Absent for a computer: it has no address to change. */
   onEdit?: () => void;
   onDelete: () => void;
 }) {

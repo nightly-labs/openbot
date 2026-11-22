@@ -7,7 +7,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** How often the agents of this computer review their memories, read and set from a joined server. Frozen by `memory-review-v1`. */
 export async function routeMemoryReview(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -24,7 +23,6 @@ export async function routeMemoryReview(
   requireAdmin(member);
   const body = await readJson(request);
   if (url.pathname === MEMORY_REVIEW_ROUTES.settings) return json(200, hostMemoryReview(setting.get()));
-  // The snapshot names every value this host permits, so only a malformed request sends another.
   if (!isMemoryReviewInterval(body.interval)) throw new HttpError(400, "Memory review interval is required.");
   return json(200, hostMemoryReview(await runCauseEffect(setting.set({ interval: body.interval }))));
 }

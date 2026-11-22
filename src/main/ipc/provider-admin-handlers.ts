@@ -1,11 +1,3 @@
-import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
-import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
-import { Cause, Effect, Exit, Fiber } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// The providers of one server's host: code sign-in, API keys, managed CLI runtimes and custom
-// endpoints. On a joined server they belong to the host, so the request goes there, and the host
-// answers only an owner or admin. A key only travels towards the host; no result carries one.
-
 import type { DownloadableProviderId } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -47,6 +39,11 @@ import {
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import {
+  decodeLiveVoiceAccount,
+  LIVE_VOICE_ACCOUNT_CAPABILITY,
+  LIVE_VOICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/live-voice-account-v1";
+import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-code-v1";
@@ -76,6 +73,7 @@ import {
   PROVIDER_HOST_SIGN_IN_ERROR_LIMIT,
   PROVIDER_HOST_SIGN_IN_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import { providerSignInRelay } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import {
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_SIGN_OUT_ROUTES,
@@ -95,12 +93,10 @@ import {
   PROVIDERS_SIGN_IN_V3_ROUTES,
 } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_CAPABILITY, PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
-import {
-  SIGN_IN_RELAY_CAPABILITY,
-  SIGN_IN_RELAY_PROVIDERS,
-  SIGN_IN_RELAY_ROUTES,
-} from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
+import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { sourceText } from "@openbot/i18n/source";
+import { Cause, Effect, Exit, Fiber } from "effect";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -116,6 +112,7 @@ import {
 } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import { type SignInRelayClient, signInRelayRemote } from "../sign-in-relay-client";
 import { parseProviderId, parseSetup } from "./app-inputs";
 import {
@@ -133,6 +130,7 @@ import {
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  parseSetLiveVoiceAccountInput,
   parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
@@ -171,17 +169,14 @@ interface ProviderAdminIpcDependencies {
   >;
   customProviders: PeerCustomProviderChanges & Pick<CustomProviderChanges, "update">;
   remoteServers: ProviderAdminRemoteServers;
-  /** Opens the page of a joined server's sign-in in this computer's browser, and relays the callback. */
   relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
 }
 
-/** A relayed sign-in that runs on this computer, and how it ended once it did. */
 interface RelayedSignIn {
   fiber: Fiber.Fiber<McpTestResult, unknown>;
   result: { error: string | null } | null;
 }
 
-/** As the host's long provider start (3 minutes), with the key check and the model list after it. */
 const ACCOUNT_KEY_CONNECT_TIMEOUT_MS = 4 * 60_000;
 
 export function providerAdminIpcHandlers({
@@ -198,16 +193,11 @@ export function providerAdminIpcHandlers({
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
 
-  /** A change, then the host's status, so the result is the same `AgentStatus` the local change gives. */
   async function remoteChange(serverId: string, path: string, body: unknown): Promise<AgentStatus> {
     await remote(serverId, path, body, acceptEmpty);
     return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));
   }
 
-  /**
-   * The runtime routes of the host: `providers-v8` names any provider, `providers-v4` includes Cursor
-   * and Cline, `providers-v2` Gemini, and `providers-v1` none of them.
-   */
   function keyRoutes(serverId: string) {
     if (remoteServers.supportsCapability(serverId, PROVIDERS_V8_CAPABILITY)) return PROVIDERS_V8_ROUTES;
     return remoteServers.supportsCapability(serverId, PROVIDERS_V5_CAPABILITY)
@@ -223,11 +213,6 @@ export function providerAdminIpcHandlers({
       : PROVIDERS_ADMIN_ROUTES;
   }
 
-  /**
-   * The sign-in routes of the host: `providers-v8` names any provider, `providers-v4` signs in Codex, Claude, Grok, Cursor and Cline,
-   * and `providers-v3` Codex, Claude and Grok. An older host has `providers-v1` only, which signs in
-   * Codex, so another provider is refused here and not by the host.
-   */
   function signInRoutes(serverId: string, provider: AgentProviderId) {
     if (remoteServers.supportsCapability(serverId, PROVIDERS_V8_CAPABILITY)) return PROVIDERS_V8_ROUTES;
     if (remoteServers.supportsCapability(serverId, PROVIDERS_V4_CAPABILITY)) return PROVIDERS_V4_ROUTES;
@@ -236,10 +221,6 @@ export function providerAdminIpcHandlers({
     return PROVIDERS_ADMIN_ROUTES;
   }
 
-  /**
-   * A sign-in in the browser of a joined server's host, which only a host with
-   * `provider-host-sign-in-v1` runs. This computer signs in with its own browser, through Connect.
-   */
   const hostSignIn = <T>(run: (provider: AgentProviderId, serverId: string) => Promise<T>) =>
     scopedHandler(parseProviderId, {
       local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
@@ -250,7 +231,6 @@ export function providerAdminIpcHandlers({
       },
     });
 
-  /** The accounts of a joined server's host's providers, which only a host with `provider-accounts-v1` holds. */
   function requireAccounts(serverId: string): void {
     if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNTS_CAPABILITY))
       throw new Error(sourceText("error.team.providersUnsupported"));
@@ -277,17 +257,12 @@ export function providerAdminIpcHandlers({
       },
     });
 
-  /** The code sign-in of an account of a joined server's host, which only a host with `provider-account-code-v1` runs. */
   function accountCode<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_CODE_CAPABILITY))
       throw new Error(sourceText("error.team.providersUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
 
-  /**
-   * The provider that a new agent of a joined server's host starts on, which only a host with
-   * `provider-default-v1` serves. This computer's own is `app.saveSetup`.
-   */
   function hostDefaultProvider(serverId: string, path: string, body: unknown) {
     if (!remoteServers.supportsCapability(serverId, PROVIDER_DEFAULT_CAPABILITY))
       throw new Error(sourceText("error.team.providerDefaultUnsupported"));
@@ -296,20 +271,12 @@ export function providerAdminIpcHandlers({
     );
   }
 
-  /**
-   * The on/off switch of a joined server's host's built-in providers, which only a host with
-   * `provider-use-v1` serves. This computer's own switch is `providers.setProviderOn`.
-   */
   function providerUse(serverId: string, path: string, body: unknown) {
     if (!remoteServers.supportsCapability(serverId, PROVIDER_USE_CAPABILITY))
       throw new Error(sourceText("error.team.providerUseUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decodeProviderUseFromHost, { method: "POST", body }));
   }
 
-  /**
-   * The usage reset credits of a joined server's host's accounts, which only a host with
-   * `provider-usage-reset-v1` spends. This computer's own go through `providers`.
-   */
   const usageResetRequest = <I, T>(
     parse: (value: unknown) => I,
     path: string,
@@ -325,11 +292,6 @@ export function providerAdminIpcHandlers({
       },
     });
 
-  /**
-   * A sign-in that a joined server's host starts and that opens in this computer's browser, for the
-   * providers that only a host with `sign-in-relay-v1` relays. It runs here until it ends, and the
-   * renderer reads `relaySignInStatus` as it does for the host's own page.
-   */
   const relayed = new Map<string, RelayedSignIn>();
   const relayKey = (serverId: string, provider: AgentProviderId) => `provider\n${serverId}\n${provider}`;
   const relaySignIn = <I, T>(parse: (value: unknown) => I, run: (input: I, serverId: string) => T | Promise<T>) =>
@@ -337,19 +299,14 @@ export function providerAdminIpcHandlers({
       local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
       remote: run,
     });
-  function requireRelay(serverId: string, provider: AgentProviderId): void {
-    if (
-      !remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY) ||
-      !SIGN_IN_RELAY_PROVIDERS.some((candidate) => candidate === provider)
-    )
-      throw new Error(sourceText("error.team.providersUnsupported"));
+  function requireRelay(serverId: string, provider: AgentProviderId): string {
+    const match = providerSignInRelay(provider, (capability) => remoteServers.supportsCapability(serverId, capability));
+    if (!match) throw new Error(sourceText("error.team.providersUnsupported"));
+    return match.relay.start;
   }
-  /** Starts the flow that the `start` route opens on the host, in place of any relayed sign-in of `provider`. */
   async function startRelay(serverId: string, provider: AgentProviderId, path: string, body: unknown): Promise<void> {
     const key = relayKey(serverId, provider);
     await stopRelay(key);
-    // Two quick starts both pass the stop above before either one runs its flow. The later start stops
-    // the flow of the earlier one here, so no flow runs on the host that the status and cancel cannot reach.
     while (relayed.has(key)) await stopRelay(key);
     const post = <T>(path: string, decoder: ResponseDecoder<T>, body: unknown) =>
       remoteServers.request(serverId, path, decoder, { method: "POST", body });
@@ -366,15 +323,9 @@ export function providerAdminIpcHandlers({
   async function stopRelay(key: string): Promise<void> {
     const running = relayed.get(key);
     relayed.delete(key);
-    // The interrupt cancels the flow on the host, which stops the host's sign-in.
     if (running) await Effect.runPromise(Fiber.interrupt(running.fiber));
   }
 
-  /**
-   * `custom-provider-harness-choice-v1` also lets a save or an edit name the harness;
-   * `custom-provider-edit-v1` also names the header names of each endpoint, so an edit keeps them;
-   * `custom-provider-harness-v1` names the harness of each endpoint; `providers-v1` does neither.
-   */
   function customRoutes(serverId: string) {
     if (remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY))
       return CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES;
@@ -384,7 +335,6 @@ export function providerAdminIpcHandlers({
       : PROVIDERS_ADMIN_ROUTES;
   }
 
-  /** `providers-v8` lists the runtimes as rows; the older route sets give the IPC record. */
   function runtimeDecoder(serverId: string) {
     return remoteServers.supportsCapability(serverId, PROVIDERS_V8_CAPABILITY)
       ? decodeProviderRuntimeSnapshotV8
@@ -427,8 +377,6 @@ export function providerAdminIpcHandlers({
       cancelHostSignIn: hostSignIn((provider, serverId) =>
         remoteChange(serverId, PROVIDER_HOST_SIGN_IN_ROUTES.cancel, { provider }),
       ),
-      // A host with `provider-account-models-v1` also gives the models of each account after the
-      // first. When that read fails, the accounts come without them, as from an older host.
       accounts: scopedQueryHandler({
         local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
         remote: (serverId) => {
@@ -450,8 +398,6 @@ export function providerAdminIpcHandlers({
                 })
                 .pipe(Effect.orElseSucceed(() => null))
             : Effect.succeed(null);
-          // A host with `provider-account-pool-v1` also gives its pools. When that read fails, the
-          // accounts come without them, as from an older host.
           const pools = remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY)
             ? remoteServers
                 .request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.list, decodeHostProviderAccountPools, {
@@ -460,11 +406,23 @@ export function providerAdminIpcHandlers({
                 })
                 .pipe(Effect.orElseSucceed(() => null))
             : Effect.succeed(null);
+          const liveVoice = remoteServers.supportsCapability(serverId, LIVE_VOICE_ACCOUNT_CAPABILITY)
+            ? remoteServers
+                .request(serverId, LIVE_VOICE_ACCOUNT_ROUTES.settings, decodeLiveVoiceAccount, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(
+                  Effect.map((accountId) => ({ accountId })),
+                  Effect.orElseSucceed(() => null),
+                )
+            : Effect.succeed(null);
           return runCauseEffect(
-            Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
-              Effect.map(([accounts, extra, pooled]) => {
+            Effect.all([list, models, pools, liveVoice], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled, voice]) => {
                 const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
-                return pooled ? { ...withModels, pools: pooled } : withModels;
+                const withPools = pooled ? { ...withModels, pools: pooled } : withModels;
+                return voice ? { ...withPools, liveVoiceAccount: voice.accountId } : withPools;
               }),
             ),
           );
@@ -494,7 +452,6 @@ export function providerAdminIpcHandlers({
           if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_KEYS_CAPABILITY))
             throw new Error(sourceText("error.team.providersUnsupported"));
           return runCauseEffect(
-            // The host answers after it checked the key in a new provider process, which can start slowly.
             remoteServers.request(serverId, PROVIDER_ACCOUNT_KEYS_ROUTES.connect, acceptEmpty, {
               method: "POST",
               body: input,
@@ -540,6 +497,19 @@ export function providerAdminIpcHandlers({
           );
         },
       }),
+      setLiveVoiceAccount: scopedHandler(parseSetLiveVoiceAccountInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, LIVE_VOICE_ACCOUNT_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, LIVE_VOICE_ACCOUNT_ROUTES.update, acceptEmpty, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
       hostDefaultProvider: scopedQueryHandler({
         local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
         remote: (serverId) => hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.settings, {}),
@@ -571,7 +541,6 @@ export function providerAdminIpcHandlers({
         PROVIDER_USAGE_RESET_ROUTES.consume,
         decodeProviderUsageResetOutcomeFromHost,
       ),
-      // This computer's own sign-in goes through `providers`.
       signOut: scopedHandler(parseProviderId, {
         local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
         remote: (provider, serverId) => {
@@ -586,8 +555,7 @@ export function providerAdminIpcHandlers({
         },
       }),
       startRelaySignIn: relaySignIn(parseProviderId, (provider, serverId) => {
-        requireRelay(serverId, provider);
-        return startRelay(serverId, provider, SIGN_IN_RELAY_ROUTES.providerStart, { provider });
+        return startRelay(serverId, provider, requireRelay(serverId, provider), { provider });
       }),
       startAccountRelaySignIn: relaySignIn(parseConnectProviderAccountInput, ({ provider, accountId }, serverId) => {
         const accountRelay = providerAccountRelay((capability) =>
@@ -675,8 +643,6 @@ export function providerAdminIpcHandlers({
         local: (input) => runCauseEffect(customProviders.save(input)),
         remote: (input, serverId) => {
           const routes = customRoutes(serverId);
-          // The harness choice route needs a harness; a client that names none adds the endpoint on
-          // the default one, as the older routes do.
           const body =
             routes === CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES
               ? { ...input, harness: input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS }
@@ -687,12 +653,8 @@ export function providerAdminIpcHandlers({
       updateCustomProvider: scopedHandler(parseUpdateCustomProvider, {
         local: (input) => runCauseEffect(customProviders.update(input)),
         remote: (input, serverId) => {
-          // A host without `custom-provider-edit-v1` has no edit route.
           if (!remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_EDIT_CAPABILITY))
             throw new Error(sourceText("error.provider.localOnly"));
-          // The host keeps the model settings; the wire has none. An edit that names a harness moves
-          // the endpoint to it on a host with `custom-provider-harness-choice-v1`; otherwise the
-          // endpoint keeps its harness.
           const body = {
             id: input.id,
             name: input.name,
@@ -723,13 +685,11 @@ export function providerAdminIpcHandlers({
   };
 }
 
-/** The error never quotes the code, which is a credential. */
 function parseSubmitCodeLoginInput(value: unknown): SubmitProviderCodeLoginInput {
   if (!isDynamicRecord(value) || !isString(value.code)) throw new Error(sourceText("error.provider.codeLoginBadCode"));
   return { provider: parseProviderId(value.provider), code: normalizePastedCode(value.code) };
 }
 
-/** As `parseSubmitCodeLoginInput`, with the account whose sign-in waits for the code. */
 function parseSubmitAccountCodeLoginInput(value: unknown): SubmitProviderAccountCodeLoginInput {
   const { provider, code } = parseSubmitCodeLoginInput(value);
   return {
@@ -738,7 +698,6 @@ function parseSubmitAccountCodeLoginInput(value: unknown): SubmitProviderAccount
   };
 }
 
-/** The address holds a grant, so the error never quotes it. */
 function parsePasteRelaySignInInput(value: unknown): PasteProviderRelaySignInInput {
   if (!isObject(value)) throw new Error(sourceText("error.mcp.relayAddressInvalid"));
   return {
@@ -747,7 +706,6 @@ function parsePasteRelaySignInInput(value: unknown): PasteProviderRelaySignInInp
   };
 }
 
-/** How a relayed sign-in ended, in the words the renderer shows. */
 function relayEnding(exit: Exit.Exit<McpTestResult, unknown>): { error: string | null } {
   if (Exit.isSuccess(exit)) return { error: exit.value.error?.slice(0, PROVIDER_HOST_SIGN_IN_ERROR_LIMIT) ?? null };
   const cause = Cause.squash(exit.cause);

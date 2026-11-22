@@ -1,9 +1,6 @@
-// Signal protocol addresses of WhatsApp JIDs (`<name>.<deviceId>`) and sender key names.
-
 import { jidDecode } from "@openbot/whatsapp/baileys";
 
 export interface SignalAddress {
-  /** JID user, with `_<domainType>` for every domain except WhatsApp (0). */
   name: string;
   deviceId: number;
 }
@@ -25,7 +22,6 @@ export function addressToString(address: SignalAddress): string {
   return `${address.name}.${address.deviceId}`;
 }
 
-/** Storage name of the sender key of `author` in `group`: `<group>::<name>::<deviceId>`. */
 export function senderKeyName(group: string, author: SignalAddress): string {
   return `${group}::${author.name}::${author.deviceId}`;
 }

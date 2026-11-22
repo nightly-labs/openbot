@@ -1,10 +1,3 @@
-// Checks the move of a routine to a new time zone, as the desktop prompt does after the device zone
-// changed. Each save goes through the real IPC decoder (`parseSaveEventRoutine`) into
-// `RoutineScheduler.saveRecord` on the real SQLite stores. The clock is moved with `setSystemTime`.
-// No provider, account or network is started: a queued delivery is cancelled to end its run.
-// Run: `bun scripts/routine-timezone-move-e2e.ts`.
-// Writes .openbot-build/routine-timezone-move-e2e/report.json.
-
 import { setSystemTime } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -28,7 +21,6 @@ import { parseSaveEventRoutine } from "../src/main/host-events-inputs";
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(ROOT, ".openbot-build", "routine-timezone-move-e2e");
 const STEP_DEADLINE_MS = 15_000;
-// In March 2031 Cairo is UTC+2 and Istanbul is UTC+3.
 const FROM = "Africa/Cairo";
 const TO = "Europe/Istanbul";
 const at = (day: string, time: string) => new Date(`2031-03-${day}T${time}:00.000Z`);
@@ -56,7 +48,13 @@ const scheduler = new RoutineScheduler({
   waits: new AgentWaits({
     store: new AgentWaitStore({ database }),
     mailbox,
-    hooks: { emit: () => {}, ownsRoutine: () => true, hasRoutine: () => true, requireKnownAgent: () => {} },
+    hooks: {
+      emit: () => {},
+      ownsRoutine: () => true,
+      hasRoutine: () => true,
+      requireKnownAgent: () => {},
+      isSideThread: () => false,
+    },
   }),
   timezone: () => "UTC",
   hooks: {
@@ -72,6 +70,7 @@ const scheduler = new RoutineScheduler({
     isRunning: () => false,
     usageLimited: () => false,
     routineThread: () => null,
+    waitThread: () => null,
     routineDeleted: () => Effect.void,
   },
 });
@@ -90,7 +89,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check awaits its own operation.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -119,7 +117,6 @@ function runCount(id: string): number {
   return runStore.listRuns(agentId, id, 50, true).length;
 }
 
-/** Saves a routine as the desktop prompt sends it, through the IPC decoder. */
 function save(id: string | undefined, timezone: string, name: string, schedule: RoutineSchedule) {
   const input = parseSaveEventRoutine({
     ...(id === undefined ? {} : { id }),
@@ -187,7 +184,6 @@ try {
   await step("A one-time run that is already past in the new zone is refused and keeps its zone", async () => {
     setSystemTime(at("05", "06:00"));
     const once = save(undefined, FROM, "One reminder", { kind: "once", date: "2031-03-05", time: "09:30" });
-    // 09:30 in Istanbul is 06:30 UTC; 09:30 in Cairo is 07:30 UTC.
     setSystemTime(at("05", "07:00"));
     assert.throws(() => save(once.id, TO, "One reminder", { kind: "once", date: "2031-03-05", time: "09:30" }));
     assert.equal(routine(once.id).timezone, FROM);

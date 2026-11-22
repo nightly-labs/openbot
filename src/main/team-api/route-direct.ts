@@ -1,11 +1,3 @@
-// Direct messages between two people on the team.
-//
-// Every handler goes through the server's own DM facade rather than the chat store, because that
-// facade is where the recipient check and the realtime publish live. Its refusals are `HttpError`s:
-// 400 for a message to yourself, 403 when the sender has no team access, and 404 when the recipient
-// is not on the team or is disabled. A member list can be out of date, so these are client errors,
-// not 500s for the error log.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   DirectConversationPage,

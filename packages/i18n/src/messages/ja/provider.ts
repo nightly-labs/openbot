@@ -8,7 +8,6 @@ export const messages = {
   "provider.custom.description": "自分のモデルエンドポイント",
   "provider.custom.addLabel": "カスタムプロバイダーを追加",
   "provider.custom.installLabel": "カスタムプロバイダーをインストール",
-  // 日本語に単数複数の区別はないので、どの個数でも同じ形です。
   "provider.endpointCount": { other: "エンドポイント {count} 件" },
   "provider.customAgentCount": { other: "カスタムエージェント {count} 件" },
   "provider.manageEndpoints": { other: "エンドポイント {count} 件を管理" },
@@ -120,6 +119,8 @@ export const messages = {
   "provider.picker.download": "{name} のダウンロード",
   "provider.picker.search": "モデルを検索",
   "provider.picker.noMatches": "検索に一致するモデルはありません。",
+  "provider.picker.openrouterNoMatches":
+    "検索に一致するモデルはありません。openrouter.ai のプライバシー、プロバイダー、ガードレールの設定によって、このリストのモデルが非表示になることがあります。",
   "provider.picker.workspaceOnlyUnavailable":
     "これらのモデルは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、エージェントの設定で「権限」を変更してください。",
   "provider.picker.olderModels": "以前のモデル",
@@ -336,4 +337,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "ダウンロードを削除できませんでした。",
   "provider.settings.disconnectLocalOnly":
     "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI はサインインしたままです。",
+  "provider.settings.updateAll": "すべて更新",
 } as const satisfies PartialTranslation<typeof source>;

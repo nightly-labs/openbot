@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "Não foi possível reiniciar {name}",
   "app.provider.included": "{name} está incluído no OpenBot.",
   "app.clipboard.copyFailed": "Não foi possível copiar o texto.",
-  "app.voice.tooLong": "As gravações de voz são limitadas a dois minutos.",
+  "app.voice.tooLong": "As gravações de voz são limitadas a 10 minutos.",
   "app.avatar.type": "Escolha uma imagem PNG, JPEG, GIF ou WebP.",
   "app.avatar.size": "Escolha uma imagem menor que 10 MB.",
   "app.avatar.processingUnavailable": "O processamento de imagem está indisponível.",
