@@ -19,6 +19,9 @@ export const messages = {
   "error.workflow.agentStepEnded": "Le message à l’agent a été supprimé avant sa réponse.",
   "error.workflow.agentStepStopped": "L’agent s’est arrêté avant de répondre à cette étape. Relancez l’étape.",
   "error.workflow.conditionUnclear": "Le modèle n’a pas répondu oui ou non.",
+  "error.workflow.answerInvalid":
+    "La réponse n’avait pas les champs demandés par cette étape : {fields}. Relancez l’étape.",
+  "error.workflow.checkInvalid": "La vérification de cette étape n’est pas valide. Corrigez-la, puis relancez l’étape.",
   "error.workflow.modelFailed": "Le modèle n’a pas pu répondre. Relancez l’étape.",
   "error.workflow.modelTimedOut":
     "Le modèle n’a pas répondu à temps. Choisissez un effort plus bas ou un modèle plus rapide pour cette étape, puis relancez-la.",
@@ -35,6 +38,7 @@ export const messages = {
     "OpenBot n’a pas pu joindre le fournisseur. Vérifiez la connexion internet, puis relancez l’étape.",
   "error.workflow.modelBusy": "Une autre requête au modèle est en cours. Relancez l’étape bientôt.",
   "error.workflow.mediaFailed": "Le modèle n’a pas pu créer l’image ou la vidéo. Relancez l’étape.",
+  "error.workflow.mediaNotMade": "Le modèle n’a pas créé l’image ou la vidéo. Sa réponse : {answer}",
   "error.workflow.pictureMissing": "L’image n’est plus sur le serveur. Envoyez-la de nouveau.",
   "error.workflow.pictureType": "Utilisez une image PNG, JPEG ou WebP.",
   "error.workflow.mediaInputMissing": "Une image d’une étape précédente n’est pas disponible. Relancez cette étape.",

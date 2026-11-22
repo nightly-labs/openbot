@@ -96,6 +96,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Esta conexão não pode parar a execução de uma rotina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
   "error.team.libraryFoldersUnsupported": "Esta conexão não oferece suporte a pastas da Biblioteca.",
+  "error.team.workflowFoldersUnsupported": "Esta conexão não oferece suporte a pastas de fluxos de trabalho.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",
   "error.team.sidebarPinsUnsupported":
@@ -136,6 +137,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Esta conexão não oferece suporte a destinos de rotinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexão não oferece suporte ao limite de memórias dos agentes.",
   "error.team.agentFoldersUnsupported": "Esta conexão não oferece suporte às pastas dos agentes.",
+  "error.team.channelFoldersUnsupported": "Esta conexão não oferece suporte às pastas dos canais.",
   "error.team.folderUnavailable": "Esta pasta não está disponível no computador host.",
   "error.team.memoryReviewUnsupported": "Esta conexão não oferece suporte à revisão de memórias.",
   "error.team.skillLearningUnsupported": "Esta conexão não oferece suporte ao aprendizado de habilidades.",
@@ -155,6 +157,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Esta conexão não oferece suporte a servidores MCP.",
   "error.team.mcpServerListNeedsUpdate":
     "Atualize o OpenBot neste dispositivo para usar mais de {limit} servidores MCP neste servidor.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Atualize o OpenBot neste dispositivo para usar mais de {limit} contas de um provedor neste servidor.",
   "error.team.storageUnsupported": "Esta conexão não oferece suporte a armazenamento.",
   "error.team.machineResourcesUnsupported": "Esta conexão não oferece suporte ao uso da máquina.",
   "error.team.machineAlertMemberInvalid":
@@ -198,6 +202,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Esta conexão não suporta a personalidade do servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexão não suporta esperas abertas.",
   "error.team.pendingApprovalUnsupported": "Esta conexão não permite ler uma aprovação completa.",
+  "error.team.pendingPromptsUnsupported": "Esta conexão não permite ler as perguntas abertas.",
   "error.team.phoneFeedbackUnsupported": "Esta conexão não permite enviar um relato pelo app do celular.",
   "error.team.messagePinsUnsupported": "Esta conexão não oferece suporte a mensagens fixadas.",
   "error.team.queuedMessageThreadUnsupported":

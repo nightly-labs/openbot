@@ -5,7 +5,7 @@ import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/i
 import { Effect } from "effect";
 import { isPathInside } from "../path-containment";
 
-type SandboxedAgent = Pick<AgentSummary, "access" | "additionalFolders" | "provider" | "workspacePath">;
+type SandboxedAgent = Pick<AgentSummary, "id" | "access" | "additionalFolders" | "provider" | "workspacePath">;
 
 export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "danger-full-access" {
   return workspaceAccessEnforced(agent) ? "workspace-write" : "danger-full-access";
@@ -13,10 +13,21 @@ export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "da
 
 const foundFolders = new Map<string, boolean>();
 
-export const checkAgentFolders = Effect.fn("checkAgentFolders")(function* (
-  agent: Pick<AgentSummary, "additionalFolders">,
-) {
-  const folders = agent.additionalFolders ?? [];
+type FolderAgent = Pick<AgentSummary, "id" | "additionalFolders">;
+
+let channelFoldersOf: (agentId: string) => readonly string[] = () => [];
+
+export function setChannelFolderSource(source: (agentId: string) => readonly string[]): void {
+  channelFoldersOf = source;
+}
+
+export function effectiveAgentFolders(agent: FolderAgent): string[] {
+  const own = agent.additionalFolders ?? [];
+  return [...own, ...channelFoldersOf(agent.id).filter((folder) => !own.includes(folder))];
+}
+
+export const checkAgentFolders = Effect.fn("checkAgentFolders")(function* (agent: FolderAgent) {
+  const folders = effectiveAgentFolders(agent);
   const found = yield* Effect.promise(() =>
     Promise.all(
       folders.map((folder) =>
@@ -30,12 +41,12 @@ export const checkAgentFolders = Effect.fn("checkAgentFolders")(function* (
   for (const [index, folder] of folders.entries()) foundFolders.set(folder, found[index] === true);
 });
 
-export function existingAgentFolders(agent: Pick<AgentSummary, "additionalFolders">): string[] {
-  return (agent.additionalFolders ?? []).filter((folder) => foundFolders.get(folder) === true);
+export function existingAgentFolders(agent: FolderAgent): string[] {
+  return effectiveAgentFolders(agent).filter((folder) => foundFolders.get(folder) === true);
 }
 
 export function workspaceWritableRoots(
-  agent: Pick<AgentSummary, "additionalFolders" | "workspacePath">,
+  agent: Pick<AgentSummary, "id" | "additionalFolders" | "workspacePath">,
   sharedRoot: string,
 ) {
   return [agent.workspacePath, sharedRoot, ...existingAgentFolders(agent)];
@@ -46,7 +57,7 @@ export function workspaceExcludedFolders(agent: Pick<AgentSummary, "access" | "e
 }
 
 export function confinedWritesAllowed(
-  agent: Pick<AgentSummary, "access" | "additionalFolders" | "excludedFolders" | "workspacePath">,
+  agent: Pick<AgentSummary, "id" | "access" | "additionalFolders" | "excludedFolders" | "workspacePath">,
   sharedRoot: string,
   paths: readonly string[],
 ): boolean {

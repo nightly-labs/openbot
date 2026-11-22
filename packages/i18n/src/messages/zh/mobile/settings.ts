@@ -435,6 +435,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "服务器",
   "mobile.settings.voice.gptLive.serversFooter":
     "点按需要登录的服务器，即可将 Codex 连接到 ChatGPT 账户。只有所有者或管理员能看到服务器的登录状态。",
+  "mobile.settings.voice.gptLive.account": "GPT 实时语音账号",
   "mobile.settings.voice.gptLive.status.ready": "就绪",
   "mobile.settings.voice.gptLive.status.supported": "支持",
   "mobile.settings.voice.gptLive.status.offline": "离线",

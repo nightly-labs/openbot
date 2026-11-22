@@ -56,6 +56,12 @@ export const messages = {
   "error.agent.modelUnavailable": "選択したエージェントのモデルを使用できません。",
   "error.agent.modelProviderNotConnected":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} が接続されていません。",
+  "error.agent.modelProviderSignInRequired":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} へのサインインが必要です。{provider} にサインインしてから、もう一度お試しください。",
+  "error.agent.modelProviderNotInstalled":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} がインストールされていません。",
+  "error.agent.modelProviderOutdated":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} の更新が必要です。",
   "error.agent.modelListEmpty":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} はモデルを 1 つも返しませんでした。最後のエラー: {detail}",
   "error.agent.modelListEmptyNoError":

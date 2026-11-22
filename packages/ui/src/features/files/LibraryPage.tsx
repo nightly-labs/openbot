@@ -1,4 +1,5 @@
 import {
+  type AttachmentSummary,
   LIBRARY_FOLDER_LIMITS,
   type LibraryFolder,
   type LibraryFolderAction,
@@ -6,6 +7,7 @@ import {
   libraryFolderBranch,
   libraryFolderPath,
   libraryFolderTree,
+  type StoredFileWorkflow,
 } from "@openbot/contracts/ipc";
 import {
   ArrowRight,
@@ -65,8 +67,13 @@ import {
   fileIdGroups,
   freeFolderName,
   isRecentFile,
+  isWorkflowLocation,
   type LibraryLocation,
+  libraryWorkflowTree,
+  type WorkflowLocation,
+  workflowFolderKey,
 } from "./library-folders-view";
+import { createLibraryMosaic } from "./library-mosaic";
 import { createLibraryPictureLoader } from "./library-picture-loader";
 import { createMarqueeSelection } from "./marquee-selection";
 
@@ -94,6 +101,7 @@ export interface LibraryPageProps {
   initialFavorites?: readonly string[] | undefined;
   onFavoritesChange?: ((keys: readonly string[]) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  pictureUrl?: ((file: StoredFileRow) => string | null) | undefined;
   opensFiles?: boolean | undefined;
 }
 
@@ -142,6 +150,8 @@ export function LibraryPage(props: LibraryPageProps) {
     source: untrack(() => props.mediaSource),
     file: (fileId) => untrack(fileById).get(fileId),
   });
+  const pictureUrl = (file: StoredFileRow) => props.pictureUrl?.(file) ?? file.previewUrl;
+  const mosaic = createLibraryMosaic();
   const agents = () => props.agents ?? NO_AGENTS;
   const agentById = createMemo(() => new Map(agents().map((agent) => [agent.id, agent])));
   const agentOf = (agentId: string | null) => (agentId ? agentById().get(agentId) : undefined);
@@ -157,10 +167,25 @@ export function LibraryPage(props: LibraryPageProps) {
   const organizes = (agentId: string | null): agentId is string =>
     agentId !== null && agentOf(agentId) !== undefined && (props.canOrganize?.(agentId) ?? true);
   const removedFilesExist = createMemo(() => files().some(fromRemovedAgent));
+  const isWorkflowFile = (file: StoredFileRow) => file.agentId === null && file.workflow !== undefined;
   function folderOf(file: StoredFileRow): LibraryFolder | undefined {
-    const folderId = file.agentId === null ? undefined : snapshot()?.placement[file.id];
+    const folderId = file.agentId === null && !isWorkflowFile(file) ? undefined : snapshot()?.placement[file.id];
     const folder = folderId === undefined ? undefined : folderById().get(folderId);
-    return folder?.agentId === file.agentId ? folder : undefined;
+    if (!folder) return undefined;
+    return folder.agentId === file.agentId || isWorkflowFile(file) ? folder : undefined;
+  }
+  const holderOf = (file: StoredFileRow) => file.agentId ?? folderOf(file)?.agentId ?? null;
+  const workflowTree = createMemo(() => libraryWorkflowTree(files()));
+  const workflowById = createMemo(() => {
+    const byId = new Map<string, StoredFileWorkflow>();
+    for (const { workflow } of files()) if (workflow && !byId.has(workflow.id)) byId.set(workflow.id, workflow);
+    return byId;
+  });
+  const workflowName = (workflow: StoredFileWorkflow) => workflow.name || t("workflow.canvas.untitled");
+  function workflowPlace(at: WorkflowLocation): LibraryLocation {
+    if (at.kind === "workflowFolder")
+      return workflowTree().folders.some((folder) => folder.id === at.folderId) ? at : ALL_FILES;
+    return workflowById().has(at.workflowId) ? at : ALL_FILES;
   }
   const [location, setLocation] = createSignal<LibraryLocation>(untrack(() => props.initialLocation) ?? ALL_FILES);
   const place = createMemo<LibraryLocation>(() => {
@@ -168,6 +193,7 @@ export function LibraryPage(props: LibraryPageProps) {
     if (!folderMode() || at.kind === "all") return ALL_FILES;
     if (at.kind === "recent" || at.kind === "unsorted") return at;
     if (at.kind === "removed") return removedFilesExist() ? at : ALL_FILES;
+    if (isWorkflowLocation(at)) return workflowPlace(at);
     if (!agentOf(at.agentId)) return ALL_FILES;
     if (at.kind === "agent") return at;
     return folderById().get(at.folderId)?.agentId === at.agentId ? at : { kind: "agent", agentId: at.agentId };
@@ -207,9 +233,10 @@ export function LibraryPage(props: LibraryPageProps) {
   const latestOfAgent = createMemo(() => {
     const latest = new Map<string, number>();
     for (const file of files()) {
-      if (file.agentId === null) continue;
+      const holder = holderOf(file);
+      if (holder === null) continue;
       const time = Date.parse(file.createdAt);
-      if (time > (latest.get(file.agentId) ?? Number.NEGATIVE_INFINITY)) latest.set(file.agentId, time);
+      if (time > (latest.get(holder) ?? Number.NEGATIVE_INFINITY)) latest.set(holder, time);
     }
     return latest;
   });
@@ -236,8 +263,9 @@ export function LibraryPage(props: LibraryPageProps) {
     let removed = 0;
     for (const file of files()) {
       if (fromRemovedAgent(file)) removed += 1;
-      if (!agentOf(file.agentId) || file.agentId === null) continue;
-      agent.set(file.agentId, (agent.get(file.agentId) ?? 0) + 1);
+      const holder = holderOf(file);
+      if (!agentOf(holder) || holder === null) continue;
+      agent.set(holder, (agent.get(holder) ?? 0) + 1);
       if (isRecentFile(file.createdAt, now)) recent += 1;
       let at = folderOf(file);
       if (!at) unsorted += 1;
@@ -280,12 +308,14 @@ export function LibraryPage(props: LibraryPageProps) {
     if (at.kind === "removed") return files().filter(fromRemovedAgent);
     if (at.kind === "recent") {
       const now = props.now ?? new Date();
-      return files().filter((file) => agentOf(file.agentId) !== undefined && isRecentFile(file.createdAt, now));
+      return files().filter((file) => agentOf(holderOf(file)) !== undefined && isRecentFile(file.createdAt, now));
     }
     if (at.kind === "unsorted") {
       return files().filter((file) => agentOf(file.agentId) !== undefined && folderOf(file) === undefined);
     }
-    if (at.kind === "agent") return files().filter((file) => file.agentId === at.agentId);
+    if (at.kind === "agent") return files().filter((file) => holderOf(file) === at.agentId);
+    if (at.kind === "workflowFolder") return files().filter((file) => file.workflow?.folder?.id === at.folderId);
+    if (at.kind === "workflow") return files().filter((file) => file.workflow?.id === at.workflowId);
     const branch = libraryFolderBranch(folderList(), at.folderId);
     return files().filter((file) => {
       const folder = folderOf(file);
@@ -303,7 +333,18 @@ export function LibraryPage(props: LibraryPageProps) {
     props.onSaveFiles !== undefined && (file.status === "available" || file.status === "remote");
   const canDeleteFile = (file: StoredFileRow) =>
     props.canDelete === true && file.deletable && props.onDeleteFiles !== undefined;
-  const canMove = (file: StoredFileRow) => folderMode() && organizes(file.agentId);
+  const workflowFileTargets = createMemo(() =>
+    organizableAgents().flatMap((agent) => {
+      const folders = libraryFolderTree(folderList(), agent.id);
+      return folders.length > 0 || canCreateFolder() ? [{ id: agent.id, name: agent.name, folders }] : [];
+    }),
+  );
+  const canMove = (file: StoredFileRow) => {
+    if (!folderMode()) return false;
+    if (!isWorkflowFile(file)) return organizes(file.agentId);
+    const folder = folderOf(file);
+    return folder ? organizes(folder.agentId) : workflowFileTargets().length > 0;
+  };
   const canSelect = (file: StoredFileRow) => canSave(file) || canDeleteFile(file) || canMove(file);
   const selecting = () => selection() !== null;
   const busy = () => step().kind === "working";
@@ -320,8 +361,9 @@ export function LibraryPage(props: LibraryPageProps) {
   const pressed = (file: StoredFileRow) => (selecting() ? (isSelected(file) ? "true" : "false") : undefined);
   const pillOpen = () => selected().length > 0 || step().kind !== "actions";
   const pillCanDelete = () => props.canDelete === true && props.onDeleteFiles !== undefined;
+  const selectionOfWorkflows = () => selected().length > 0 && selected().every(isWorkflowFile);
   const moveAgent = createMemo(() => {
-    const ids = new Set(selected().map((file) => file.agentId));
+    const ids = new Set(selected().flatMap((file) => (isWorkflowFile(file) ? [] : [file.agentId])));
     const [only = null] = ids;
     return folderMode() && ids.size === 1 && organizes(only) ? agentOf(only) : undefined;
   });
@@ -329,9 +371,13 @@ export function LibraryPage(props: LibraryPageProps) {
     const agent = moveAgent();
     return agent ? libraryFolderTree(folderList(), agent.id) : [];
   });
+  const moveGroups = () => (selectionOfWorkflows() ? workflowFileTargets() : undefined);
   const selectionInFolder = () => selected().some((file) => folderOf(file) !== undefined);
-  const canMoveSelection = () =>
-    moveAgent() !== undefined && (moveFolders().length > 0 || selectionInFolder() || canCreateFolder());
+  const canMoveSelection = () => {
+    if (!folderMode()) return false;
+    if (selectionOfWorkflows()) return workflowFileTargets().length > 0 || selectionInFolder();
+    return moveAgent() !== undefined && (moveFolders().length > 0 || selectionInFolder() || canCreateFolder());
+  };
 
   function folderLine(file: StoredFileRow): string | undefined {
     const folder = folderOf(file);
@@ -342,6 +388,15 @@ export function LibraryPage(props: LibraryPageProps) {
     return below.length > 0 ? below.map((step) => step.name).join(" \u203a ") : undefined;
   }
 
+  function workflowLine(file: StoredFileRow): string | undefined {
+    const workflow = file.workflow;
+    const at = place();
+    if (!workflow || at.kind === "workflow") return undefined;
+    const name = workflowName(workflow);
+    return workflow.folder && at.kind !== "workflowFolder" ? `${workflow.folder.name} \u203a ${name}` : name;
+  }
+  const fileLine = (file: StoredFileRow) => folderLine(file) ?? workflowLine(file);
+
   const title = () => {
     const at = place();
     if (at.kind === "all") return t("files.library.allFiles");
@@ -349,7 +404,17 @@ export function LibraryPage(props: LibraryPageProps) {
     if (at.kind === "recent") return t("files.library.recent");
     if (at.kind === "unsorted") return t("files.library.unsorted");
     if (at.kind === "folder") return folderById().get(at.folderId)?.name ?? "";
+    if (at.kind === "workflowFolder")
+      return workflowTree().folders.find((folder) => folder.id === at.folderId)?.name ?? "";
+    if (at.kind === "workflow") {
+      const workflow = workflowById().get(at.workflowId);
+      return workflow ? workflowName(workflow) : "";
+    }
     return agentName(at.agentId) ?? "";
+  };
+  const placeWorkflowFolder = () => {
+    const at = place();
+    return at.kind === "workflow" ? (workflowById().get(at.workflowId)?.folder ?? null) : null;
   };
   const placeAgent = () => {
     const at = place();
@@ -393,6 +458,8 @@ export function LibraryPage(props: LibraryPageProps) {
     if (busy()) return;
     if (next.kind === "agent" || next.kind === "folder")
       reveal(next.agentId, next.kind === "folder" ? next.folderId : undefined);
+    const workflowFolder = next.kind === "workflow" ? workflowById().get(next.workflowId)?.folder : undefined;
+    if (workflowFolder) setOpen(workflowFolderKey(workflowFolder.id), true);
     setLocation(next);
     clearFilters();
     setStep({ kind: "actions" });
@@ -554,6 +621,11 @@ export function LibraryPage(props: LibraryPageProps) {
     setSelection(null);
   }
 
+  function moveToNewFolderOf(agentId: string): void {
+    placeInNewFolder(agentId, selected());
+    setSelection(null);
+  }
+
   function moveFolder(folderId: string, parentId: string | undefined, beforeFolderId: string | null): void {
     send({ type: "move", folderId, parentId: parentId ?? null, beforeFolderId });
   }
@@ -633,11 +705,14 @@ export function LibraryPage(props: LibraryPageProps) {
     if (!file) return null;
     const moved = isSelected(file) ? selected() : [file];
     if (!moved.some(canMove)) return null;
-    const owners = new Set(moved.map((candidate) => candidate.agentId));
+    const anyAgent = moved.every(isWorkflowFile);
+    const owners = new Set(moved.map((candidate) => (anyAgent ? holderOf(candidate) : candidate.agentId)));
+    if (anyAgent) owners.delete(null);
     const [only = null] = owners;
     return {
       kind: "files",
       agentId: owners.size === 1 && organizes(only) ? only : null,
+      anyAgent,
       ids: moved.map((candidate) => candidate.id),
       label: moved.length === 1 ? file.name : fileCountLabel(moved.length, t),
     };
@@ -686,9 +761,10 @@ export function LibraryPage(props: LibraryPageProps) {
   });
   const newTarget = createMemo<LibraryNewFolderTarget | null>(() => {
     const item = drag.state.item;
-    if (item?.kind !== "files" || item.agentId === null || !canCreateFolder() || !organizes(item.agentId)) return null;
+    if (item?.kind !== "files" || item.anyAgent || item.agentId === null) return null;
+    if (!canCreateFolder() || !organizes(item.agentId)) return null;
     const at = place();
-    if (at.kind === "removed") return null;
+    if (at.kind === "removed" || isWorkflowLocation(at)) return null;
     if (at.kind === "folder") {
       return at.agentId === item.agentId && canHoldFolder(folderList(), at.folderId)
         ? { agentId: item.agentId, parentId: at.folderId }
@@ -700,7 +776,7 @@ export function LibraryPage(props: LibraryPageProps) {
   const newFolderPlace = () => {
     const at = place();
     if (!canCreateFolder() || selecting()) return null;
-    if (at.kind === "removed") return null;
+    if (at.kind === "removed" || isWorkflowLocation(at)) return null;
     if (at.kind === "agent" || at.kind === "folder") {
       const parentId = at.kind === "folder" ? at.folderId : undefined;
       return organizes(at.agentId) && canHoldFolder(folderList(), parentId) ? "here" : null;
@@ -825,6 +901,11 @@ export function LibraryPage(props: LibraryPageProps) {
     setLightbox({ images, index: Math.max(0, images.indexOf(file)), origin });
   }
 
+  function stripUrl(image: AttachmentSummary): string | null {
+    const file = fileById().get(image.id);
+    return file ? pictureUrl(file) : image.previewUrl;
+  }
+
   function act(file: StoredFileRow, action: StoredFileAction): void {
     if (action === "delete") setPendingDelete(file);
     else void props.onAction(file, action);
@@ -912,27 +993,38 @@ export function LibraryPage(props: LibraryPageProps) {
       const agentId = file().agentId;
       return agentId ? libraryFolderTree(folderList(), agentId) : [];
     };
+    const groups = () => (isWorkflowFile(file()) ? workflowFileTargets() : undefined);
     const newFolderFor = () => {
       const agentId = file().agentId;
       return agentId && canCreateFolder() ? () => placeInNewFolder(agentId, [file()]) : undefined;
     };
-    const offered = () =>
-      canMove(file()) && (folders().length > 0 || folderOf(file()) !== undefined || canCreateFolder());
+    const newFolderInFor = () =>
+      isWorkflowFile(file()) && canCreateFolder()
+        ? (agentId: string) => placeInNewFolder(agentId, [file()])
+        : undefined;
+    const offered = () => {
+      if (!canMove(file())) return false;
+      if (isWorkflowFile(file())) return true;
+      return folders().length > 0 || folderOf(file()) !== undefined || canCreateFolder();
+    };
     return (
       <Show when={offered()}>
         <LibraryMoveSubmenu
           folders={folders()}
+          groups={groups()}
           current={folderOf(file())?.id}
           canRemove={folderOf(file()) !== undefined}
           onMove={(folder) => placeFiles([file()], folder)}
           onNewFolder={newFolderFor()}
+          onNewFolderIn={newFolderInFor()}
         />
       </Show>
     );
   };
   const listRowMenu = () => (folderMode() ? (file: StoredFileRow) => moveSubmenu(() => file) : undefined);
-  const listFolderLabel = () => (folderMode() ? folderLine : undefined);
-  const selectionNewFolder = () => (canCreateFolder() ? moveToNewFolder : undefined);
+  const listFolderLabel = () => (folderMode() ? fileLine : undefined);
+  const selectionNewFolder = () => (canCreateFolder() && !selectionOfWorkflows() ? moveToNewFolder : undefined);
+  const selectionNewFolderIn = () => (canCreateFolder() && selectionOfWorkflows() ? moveToNewFolderOf : undefined);
 
   const pillMove = (): JSX.Element => (
     <Show when={folderMode()}>
@@ -948,9 +1040,11 @@ export function LibraryPage(props: LibraryPageProps) {
           <DropdownMenu.Content>
             <LibraryMoveItems
               folders={moveFolders()}
+              groups={moveGroups()}
               canRemove={selectionInFolder()}
               onMove={moveTo}
               onNewFolder={selectionNewFolder()}
+              onNewFolderIn={selectionNewFolderIn()}
             />
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
@@ -960,7 +1054,8 @@ export function LibraryPage(props: LibraryPageProps) {
 
   const tileDisabled = (file: StoredFileRow) =>
     selecting() ? !canSelect(file) : !isPicture(file) && file.status !== "available";
-  const tileSource = (file: StoredFileRow) => folderLine(file) ?? file.conversation?.title ?? agentName(file.agentId);
+  const tileSource = (file: StoredFileRow) =>
+    folderLine(file) ?? file.conversation?.title ?? agentName(file.agentId) ?? workflowLine(file);
 
   const frame = (): JSX.Element => (
     <div class="library-frame" data-pill={pillOpen() ? "" : undefined}>
@@ -1001,6 +1096,7 @@ export function LibraryPage(props: LibraryPageProps) {
             fileCount={(folderId) => libraryCounts().folder.get(folderId) ?? 0}
             folderCount={(folderId) => childCounts().get(folderId) ?? 0}
             peek={(folderId) => peeks().get(folderId) ?? NO_FILES}
+            pictureUrl={pictureUrl}
             newTarget={newTarget()}
             newMark={drag.newMark}
             dropMark={drag.dropMark}
@@ -1051,12 +1147,13 @@ export function LibraryPage(props: LibraryPageProps) {
                   folderLabel={listFolderLabel()}
                   rowMenu={listRowMenu()}
                   opensFiles={props.opensFiles}
+                  pictureUrl={pictureUrl}
                   onPreview={(file) => open(file, undefined)}
                   onAction={props.onAction}
                 />
               }
             >
-              <ul class="library-grid" data-layout={view()}>
+              <ul ref={mosaic.attach} class="library-grid" data-layout={view()}>
                 <For each={shown()} keyed={(file) => file.id}>
                   {(file) => {
                     const id = untrack(() => file().id);
@@ -1114,7 +1211,7 @@ export function LibraryPage(props: LibraryPageProps) {
                                 ref={(element) => thumbnails.set(id, element)}
                                 onClick={(event) => activate(file(), event)}
                               >
-                                <img src={file().previewUrl ?? ""} alt="" loading="lazy" draggable="false" />
+                                <img src={pictureUrl(file()) ?? ""} alt="" loading="lazy" draggable="false" />
                               </Button>
                             </Show>
                           }
@@ -1140,7 +1237,7 @@ export function LibraryPage(props: LibraryPageProps) {
                                   </span>
                                 }
                               >
-                                <img src={file().previewUrl ?? ""} alt="" loading="lazy" draggable="false" />
+                                <img src={pictureUrl(file()) ?? ""} alt="" loading="lazy" draggable="false" />
                               </Show>
                             </span>
                             <span class="library-folder-tile-name library-truncate">{file().name}</span>
@@ -1219,6 +1316,7 @@ export function LibraryPage(props: LibraryPageProps) {
             onDownload={(image) => downloadImage(image.id)}
             macWindowControls={props.macWindowControls}
             stripLabel={t("files.library.images")}
+            stripUrl={stripUrl}
             onClose={() => setLightbox(null)}
           />
         )}
@@ -1234,6 +1332,7 @@ export function LibraryPage(props: LibraryPageProps) {
           title={title()}
           agent={placeAgent()}
           parents={parentFolders()}
+          workflowFolder={placeWorkflowFolder()}
           dropMark={drag.dropMark}
           onGo={go}
         >
@@ -1284,6 +1383,7 @@ export function LibraryPage(props: LibraryPageProps) {
           canCreate={canCreateFolder()}
           canOrganize={organizes}
           removedFiles={removedFilesExist()}
+          workflows={workflowTree()}
           onSearch={setSearch}
           onGo={go}
           onOpenChange={setOpen}

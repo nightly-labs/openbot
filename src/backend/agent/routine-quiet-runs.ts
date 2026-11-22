@@ -13,7 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { bridgedToolName, getString, type ThreadItem } from "../protocol";
 
-const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
+export const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
 
 const HERMES_SILENT_MARKER = "[silent]";
 
@@ -145,10 +145,13 @@ export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: s
   return true;
 }
 
-export function textAnswersOnly(snapshot: ConversationSnapshot, turnId: string): boolean {
+export function writesNoAnswer(snapshot: ConversationSnapshot, turnId: string): boolean {
   return snapshot.messages.every(
     (message) =>
-      message.author !== "assistant" || message.turnId !== turnId || isWorkNote(message) || isTextAnswer(message),
+      message.author !== "assistant" ||
+      message.turnId !== turnId ||
+      isWorkNote(message) ||
+      (isTextAnswer(message) && !keptQuietAnswer(message)),
   );
 }
 

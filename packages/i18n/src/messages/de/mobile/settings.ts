@@ -474,6 +474,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Server",
   "mobile.settings.voice.gptLive.serversFooter":
     "Tippe auf einen Server, der eine Anmeldung braucht, um Codex mit einem ChatGPT-Konto zu verbinden. Nur ein Eigentümer oder Admin sieht die Anmeldung eines Servers.",
+  "mobile.settings.voice.gptLive.account": "Konto für GPT-Live-Sprache",
   "mobile.settings.voice.gptLive.status.ready": "Bereit",
   "mobile.settings.voice.gptLive.status.supported": "Unterstützt",
   "mobile.settings.voice.gptLive.status.offline": "Offline",

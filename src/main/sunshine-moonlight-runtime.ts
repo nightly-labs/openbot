@@ -60,15 +60,15 @@ const SUNSHINE_START_ATTEMPTS = 3;
 const MOONLIGHT_WEBRTC_RANGE_SIZE = 32;
 const MOONLIGHT_WEBRTC_RANGE_START = 40_000;
 const SUNSHINE_SCREEN_CAPTURE_DENIED = "No screen capture permission";
-const SUNSHINE_DIAGNOSTIC_OVERLAP = SUNSHINE_SCREEN_CAPTURE_DENIED.length;
+const SUNSHINE_WINDOWS_CAPTURE_DENIED = "DuplicateOutput() test failed [0x80070005]";
 
-function createScreenCaptureDenialWatcher(): (message: string) => boolean {
+function createOutputPhraseWatcher(phrase: string): (message: string) => boolean {
   let printed = "";
   return (message) => {
     printed = `${printed}${message}`;
-    const denied = printed.includes(SUNSHINE_SCREEN_CAPTURE_DENIED);
-    printed = printed.slice(-SUNSHINE_DIAGNOSTIC_OVERLAP);
-    return denied;
+    const said = printed.includes(phrase);
+    printed = printed.slice(-phrase.length);
+    return said;
   };
 }
 
@@ -339,6 +339,7 @@ export class SunshineMoonlightRuntime {
   readonly #pairingName = `openbot-remote-${randomBytes(16).toString("hex")}`;
   #state: SunshineMoonlightRuntimeState | null = null;
   #screenCaptureDenied = false;
+  #windowsCaptureDenied = false;
   readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
   #selectedDisplayId: string | null = null;
   readonly #lifecycle = new LifecycleGate<SunshineMoonlightRuntimeState, RemoteDesktopOperationError>();
@@ -380,6 +381,10 @@ export class SunshineMoonlightRuntime {
 
   screenCaptureDenied(): boolean {
     return this.#screenCaptureDenied;
+  }
+
+  windowsCaptureDenied(): boolean {
+    return this.#windowsCaptureDenied;
   }
 
   readonly start = Effect.fn("SunshineMoonlightRuntime.start")(() =>
@@ -737,7 +742,7 @@ export class SunshineMoonlightRuntime {
         yield* stopRemoteProcess(sunshine).pipe(Effect.catch(() => Effect.void));
         this.#sunshine = null;
       }
-      if (attempt + 1 >= SUNSHINE_START_ATTEMPTS) break;
+      if (attempt + 1 >= SUNSHINE_START_ATTEMPTS || this.#windowsCaptureDenied) break;
       if (this.#ownsSunshineAllocation && this.#sunshineBasePort !== null) {
         releaseSunshineBasePort(this.#sunshineBasePort);
         this.#sunshineBasePort = yield* allocateSunshineBasePort();
@@ -751,6 +756,7 @@ export class SunshineMoonlightRuntime {
     this: SunshineMoonlightRuntime,
   ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     this.#screenCaptureDenied = false;
+    this.#windowsCaptureDenied = false;
     const executable = windowsShortPath(this.#options.paths.sunshine);
     this.#sunshine = yield* desktopSync(() =>
       this.#spawn(executable, [join(windowsShortPath(this.#options.stateDirectory), "sunshine.conf")], {
@@ -766,6 +772,7 @@ export class SunshineMoonlightRuntime {
       yield* desktopSync(() => this.#requireSunshineHttpsPort()),
       join(this.#options.stateDirectory, "sunshine-cert.pem"),
       this.#sunshine,
+      () => this.#windowsCaptureDenied,
     );
   });
 
@@ -1087,9 +1094,13 @@ export class SunshineMoonlightRuntime {
 
   #pipeDiagnostics(process: ChildProcess, source: "sunshine" | "moonlight"): void {
     for (const stream of [process.stdout, process.stderr]) {
-      const saidCaptureDenied = createScreenCaptureDenialWatcher();
+      const saidCaptureDenied = createOutputPhraseWatcher(SUNSHINE_SCREEN_CAPTURE_DENIED);
+      const saidWindowsCaptureDenied = createOutputPhraseWatcher(SUNSHINE_WINDOWS_CAPTURE_DENIED);
       stream?.on("data", (chunk) => {
-        if (source === "sunshine" && saidCaptureDenied(chunk.toString("utf8"))) this.#screenCaptureDenied = true;
+        if (source !== "sunshine") return;
+        const text = chunk.toString("utf8");
+        if (saidCaptureDenied(text)) this.#screenCaptureDenied = true;
+        if (saidWindowsCaptureDenied(text)) this.#windowsCaptureDenied = true;
       });
       forwardDiagnosticLines(stream, (text) =>
         this.#options.onDiagnostic?.(source, text.replaceAll(this.#moonlightHeader, "[REDACTED]")),
@@ -1289,10 +1300,12 @@ const waitForHttpsEffect = Effect.fn("RemoteDesktop.waitForHttps")(function* (
   port: number,
   certificatePath: string,
   child?: WatchedChild | null,
+  captureDenied: () => boolean = () => false,
 ) {
   const deadline = Date.now() + 20_000;
   let lastError: unknown;
   while (Date.now() < deadline) {
+    if (captureDenied()) return yield* desktopFailure(new Error(sourceText("error.remote.windowsCaptureDenied")));
     if (childEnded(child))
       return yield* desktopFailure(
         new Error(sourceText("error.backend.sunshineExited", { port }), { cause: lastError }),

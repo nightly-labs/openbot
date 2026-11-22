@@ -324,6 +324,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Geen modellen beschikbaar voor deze aanbieder.",
   "mobile.agent.runtime.searchModels": "Modellen zoeken",
   "mobile.agent.runtime.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Deze provider werkt niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig eerst ‘Machtigingen’ om hem te gebruiken.",
   "mobile.agent.runtime.usageLimit": "Gebruikslimiet bereikt",
@@ -407,6 +409,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Plan tonen vóór lange taken",
   "mobile.agent.planCard.footer":
     "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
+  "mobile.agent.builtinMemory.label": "OpenBot-geheugen",
+  "mobile.agent.builtinMemory.footer":
+    "De agent bewaart en leest zijn eigen herinneringen. Zet dit uit om alleen een geheugen-app zoals Mem0 te gebruiken. Bewaarde herinneringen blijven.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.advanced.behavior": "Gedrag",
@@ -490,6 +495,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Deze host kan geen agents publiceren vanaf een extern apparaat.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens zonder cache-lezingen",
   "mobile.agent.usage.estimatedCost": "Geschatte kosten",
+  "mobile.agent.usage.noCostEstimate": "Geen kostenschatting",
   "mobile.agent.usage.daily": "Dagelijks gebruik",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Kosten",
@@ -615,7 +621,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Geen chat geopend",
   "mobile.agent.home.noChatOpenBody": "Kies een chat in de lijst.",
   "mobile.agent.home.chatListWidth": "Breedte van chatlijst",
-  "mobile.agent.home.serverTitle": "{name}, servers openen",
   "mobile.agent.home.waiting": "Wachten op verbinding",
   "mobile.agent.home.waitingBody": "De lijst met agents wordt geladen zodra deze server verbonden is.",
   "mobile.agent.home.noAgents": "Geen agents op deze server",

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Custom server plan"
+  short_description: "Show, set, change or remove the paid plan of a custom server"
+  default_prompt: "Use $custom-server-plan to set the paid plan of a custom server."

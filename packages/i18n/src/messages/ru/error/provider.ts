@@ -19,6 +19,8 @@ export const messages = {
     "{provider} сообщает, что лимит вашего тарифа исчерпан. Выберите другую модель или перейдите на более высокий тариф {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} не загрузил инструменты OpenBot, поэтому этот агент не может ими пользоваться и связываться с коллегами. Политика команды {provider} может блокировать локальные MCP-серверы. Попросите администратора команды разрешить их и повторите попытку.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} выполнил это сообщение без инструментов OpenBot, поэтому агент не смог связаться с коллегами, воспользоваться браузером или прикрепить файлы. Повторите попытку.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} не удалось запустить MCP-сервер {name}, поэтому ответ остановлен. Этот сервер находится в ваших собственных настройках {provider}, а не в OpenBot. Удалите или исправьте его там, затем начните новый чат.",
   "error.provider.endpointsReadOnly":
@@ -279,6 +281,8 @@ export const messages = {
     "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode не смог открыть свою базу данных, потому что её изменила более новая версия OpenCode. Обновите OpenCode до версии 2 или новее и повторите попытку.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok не запустился, потому что параметр allowed_models в его настройках не включает его модель по умолчанию. Добавьте модель по умолчанию в allowed_models или удалите allowed_models, затем повторите попытку.",
   "error.provider.opencodeNoAnswer":
     "Модель OpenCode завершила ход без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -414,6 +418,8 @@ export const messages = {
     "Этот чат стал слишком большим, чтобы отправить его модели. Часто причина — изображения в чате. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.opencodeSessionRejected":
     "OpenCode отклонил запрос и не указал причину. Это может произойти в длинном чате или после смены модели. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель или меньший уровень усилий.",
+  "error.provider.opencodeInputRefused":
+    "Модель отклонила содержимое этого чата и не указала причину. Причиной может быть файл в чате, например PDF или изображение. OpenBot начал новый сеанс OpenCode с историей чата. Отправьте сообщение ещё раз без файла или выберите другую модель.",
   "error.provider.opencodeCompactionFailed":
     "Модель не смогла сжать этот длинный чат, чтобы освободить место в окне контекста. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите более сильную модель.",
   "error.provider.museMcpStartupFault":
@@ -530,6 +536,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
   "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
   "error.provider.acpSessionBusy": "{provider} ещё завершает остановленный ход. Повторите попытку чуть позже.",
+  "error.provider.acpSessionStale":
+    "{provider} не удалось загрузить последнюю версию этого чата. Отправьте сообщение ещё раз.",
   "error.provider.acpModelNotOffered":
     "{provider} сейчас не предлагает {model}. Выберите другую модель для этого агента и попробуйте снова.",
   "error.provider.piStopped": "Pi не запущен. Подключите Pi и повторите попытку.",

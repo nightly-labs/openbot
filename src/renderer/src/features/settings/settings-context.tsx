@@ -1,3 +1,4 @@
+import type { MobilePlatformLogoVariant } from "@openbot/brand";
 import {
   type ApprovalAutomationPreference,
   agentAutoApprovalEnabled,
@@ -10,6 +11,7 @@ import {
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import type { AppTextKey } from "@openbot/i18n";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import type { MobileInstallRequest } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from "../../action-sounds";
@@ -119,10 +121,13 @@ const Settings = createSimpleContext({
     let notificationFocusNonce = 0;
     const [appSettingRowRequest, setAppSettingRowRequest] = createSignal<AppSettingRowRequest | null>(null);
     let appSettingRowNonce = 0;
+    const [mobileInstallRequest, setMobileInstallRequest] = createSignal<MobileInstallRequest | null>(null);
+    let mobileInstallNonce = 0;
     createEffect(appSettingsOpen, (open) => {
       if (open) return;
       setNotificationFocusRequest(null);
       setAppSettingRowRequest(null);
+      setMobileInstallRequest(null);
     });
     const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
       serverId: string;
@@ -454,6 +459,15 @@ const Settings = createSimpleContext({
       openAppSettings(trigger, "hosted-servers");
     }
 
+    function openMobileInstall(platform: MobilePlatformLogoVariant, trigger?: HTMLElement | null): void {
+      setMobileInstallRequest({ platform, nonce: ++mobileInstallNonce });
+      openAppSettings(trigger, "mobile-connect");
+    }
+
+    function clearMobileInstallRequest(): void {
+      setMobileInstallRequest(null);
+    }
+
     onSettled(() => {
       const handleSettingsShortcut = (event: KeyboardEvent) => {
         if (!isOpenSettingsShortcut(event)) return;
@@ -685,6 +699,9 @@ const Settings = createSimpleContext({
       openAppSettingRow,
       hostedServerDeleteRequest,
       openHostedServerDelete,
+      mobileInstallRequest,
+      openMobileInstall,
+      clearMobileInstallRequest,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,

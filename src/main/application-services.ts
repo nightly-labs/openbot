@@ -5,7 +5,11 @@ import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
-import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  isKeyOnlyProvider,
+  isManagedRuntimeProvider,
+  type ManagedProviderId,
+} from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
@@ -25,6 +29,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentBrowserProfile,
+  agentMemoryEnabled,
   type ChannelCommand,
   DEFAULT_APP_LANGUAGE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
@@ -61,6 +66,7 @@ import {
   nativeImage,
   net,
   powerMonitor,
+  powerSaveBlocker,
   screen,
   shell,
   systemPreferences,
@@ -103,14 +109,11 @@ import { WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime"
 import { OpenBotDatabase } from "../backend/openbot-database";
 import { PASSWORD_MANAGER_BRANDS } from "../backend/password-vault";
 import { passwordVaultRouter } from "../backend/password-vault-router";
+import { perfTime } from "../backend/perf-probe-hooks";
 import { sweepProviderTemp } from "../backend/provider-temp";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
-import {
-  createRoutineFlows,
-  type RoutineFlowsHandle,
-  routineFlowNoticeEvent,
-} from "../backend/routine-flows/routine-flows";
+import { createRoutineFlows, routineFlowNoticeEvent } from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
 import {
   createRoutineResults,
@@ -122,7 +125,9 @@ import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usa
 import { TeamChatStore } from "../backend/team-chat-store";
 import { UserBrowsingLog } from "../backend/user-browsing-log";
 import { UserFilesBytes } from "../backend/user-files-bytes";
+import { WORKFLOW_FOLDERS_FILE, WorkflowFoldersStore } from "../backend/workflow-folders-store";
 import { clearFlatBackground } from "../backend/workflows/flat-background";
+import { workflowFileOwners } from "../backend/workflows/workflow-file-owners";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
@@ -189,6 +194,7 @@ import { BrowserViewClient } from "./browser-view-client";
 import { BrowsingMemoryPreferenceStore } from "./browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
 import { type CentralAuthManager, isHostNotOnAccount } from "./central-auth-manager";
+import { type ChannelFolders, createChannelFolders } from "./channel-folders";
 import { ChatVisualPreviewer } from "./chat-visual-preview";
 import {
   type ClaudeCompactWindowControl,
@@ -201,6 +207,7 @@ import {
   createClaudeUserSetupPreferenceStore,
 } from "./claude-user-setup-preference-store";
 import { createComputerIdle } from "./computer-idle";
+import { ComputerUseDisplayAwake } from "./computer-use-display-awake";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
 import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
@@ -226,6 +233,7 @@ import { type CustomProviderChanges, createCustomProviderChanges } from "./custo
 import { CustomProviderStore } from "./custom-provider-store";
 import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
 import { desktopShowsAgentEvent } from "./desktop-notifications";
+import { DetachedBrowserWindow } from "./detached-browser-window";
 import { shouldAutoStartHost } from "./development-profile";
 import {
   applyDevelopmentRemoteAccount,
@@ -312,6 +320,7 @@ import { localSkillTools } from "./local-skill-tools";
 import { createLoginItem } from "./login-item";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
+import { restartFromInstalledCopy } from "./mac-installed-copy";
 import { hidePanelFromWindowSwitchers } from "./mac-panel-activation";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { MACHINE_ALERTS_PREFERENCE_FILE, MachineAlertMonitor, MachineAlertPreferenceStore } from "./machine-alerts";
@@ -359,7 +368,6 @@ import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/pr
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
-import { createProviderCliAppVersionStore } from "./provider-cli-app-version-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { createProviderDetection, type ProviderDetection } from "./provider-detection";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
@@ -477,6 +485,7 @@ import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process"
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WebhookRelay } from "./webhook-relay";
 import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
+import { WorkflowFoldersService } from "./workflow-folders-service";
 import { sizeWorkflowPicture } from "./workflow-picture-size";
 
 const logger = createOpenBotLogger("application-services");
@@ -495,7 +504,6 @@ const INTERFACE_SIZE_PREFERENCE_FILE = "openbot-interface-size-preference-v1.jso
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const PUSH_NOTIFICATION_FILE = "openbot-push-notifications-v1.json";
 const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
-const PROVIDER_CLI_APP_VERSION_FILE = "openbot-provider-cli-app-version-v1.json";
 const AGENT_DEFAULTS_PREFERENCE_FILE = "openbot-agent-defaults-v1.json";
 const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
@@ -564,6 +572,7 @@ const TEARDOWN_ORDER = {
   mcpHostSignIns: 29,
   browser: 30,
   browserPictureInPicture: 40,
+  detachedBrowserWindow: 40.5,
   localSignIn: 41,
   browserDock: 42,
   browserView: 45,
@@ -636,7 +645,6 @@ export interface ApplicationServiceContext {
 
 export interface ApplicationServices {
   service: AgentService;
-  routineFlows: RoutineFlowsHandle;
   workflows: WorkflowsHandle;
   workflowGitHub: WorkflowGitHubDirectory;
   crm: CrmHandle;
@@ -657,8 +665,10 @@ export interface ApplicationServices {
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
   libraryFoldersService: LibraryFoldersService;
+  workflowFoldersService: WorkflowFoldersService;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
+  detachedBrowserWindow: DetachedBrowserWindow;
   localSignIn: LocalSignInWindows;
   browserDock: BrowserDockOverlay;
   browserView: BrowserViewClient;
@@ -677,6 +687,7 @@ export interface ApplicationServices {
   agentHostSettings: AgentHostSettingsService;
   agentDefaultsSettings: AgentDefaultsSettingsService;
   agentFolders: AgentFolders;
+  channelFolders: ChannelFolders;
   agentInstructions: AgentInstructionsFiles;
   browserProfiles: BrowserProfileService;
   language: LanguageService;
@@ -830,6 +841,7 @@ async function createMessagingServices({
     agents: {
       listAgents: () => service.listAgents(),
       respondToApproval: (input) => service.respondToApproval(input, { owner: false }),
+      approvalExecutionThreadId: (requestId) => service.approvalExecutionThreadId(requestId),
       onEvent: (listener) => {
         service.on("event", listener);
         return () => service.off("event", listener);
@@ -1247,6 +1259,8 @@ export async function createApplicationServices({
   await runCauseEffect(sidebarLayout.initialize());
   const libraryFolders = new LibraryFoldersStore(join(app.getPath("userData"), LIBRARY_FOLDERS_FILE));
   await runCauseEffect(libraryFolders.initialize());
+  const workflowFolders = new WorkflowFoldersStore(join(app.getPath("userData"), WORKFLOW_FOLDERS_FILE));
+  await runCauseEffect(workflowFolders.initialize());
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
   await runCauseEffect(mailbox.initialize());
   configureApplicationProtocol();
@@ -1310,11 +1324,15 @@ export async function createApplicationServices({
   let agentBrowserProfiles: BrowserProfileService | null = null;
   let crmHandle: CrmHandle | null = null;
   const agentThreads = new AgentThreadStore(store.database);
+  const agentMemoryOn = (agentId: string) => {
+    const agent = store.get(agentId);
+    return agent === undefined || agentMemoryEnabled(agent);
+  };
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
     browserProfile: (agentId) => {
-      const agent = store.list().find((candidate) => candidate.id === agentId);
+      const agent = store.get(agentId);
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
@@ -1325,13 +1343,15 @@ export async function createApplicationServices({
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
     pagePreload: join(__dirname, "../preload/browserPage.cjs"),
     siteMemories: (agentId, hostname) =>
-      siteMemoryStore
-        .forHost(agentId, hostname)
-        .flatMap(({ id, site, text }) => (site ? [{ id, site, text: redactSecrets(text) }] : [])),
+      agentMemoryOn(agentId)
+        ? siteMemoryStore
+            .forHost(agentId, hostname)
+            .flatMap(({ id, site, text }) => (site ? [{ id, site, text: redactSecrets(text) }] : []))
+        : [],
     userBrowsing: {
       enabled: () => browsingMemory.get().enabled,
       record: (agentId, step) => {
-        Effect.runFork(userBrowsing.record(agentId, step));
+        if (agentMemoryOn(agentId)) Effect.runFork(userBrowsing.record(agentId, step));
       },
     },
     hideFromWindowSwitchers: hidePanelFromWindowSwitchers,
@@ -1352,6 +1372,23 @@ export async function createApplicationServices({
     },
   });
   teardown.push(TEARDOWN_ORDER.browserPictureInPicture, "picture in picture", () => browserPictureInPicture.destroy());
+  const detachedBrowserWindow = new DetachedBrowserWindow({
+    mainWindow,
+    browser,
+    preloadPath: join(__dirname, "../preload/index.cjs"),
+    iconPath: appIconPath,
+    title: () => language.translate("browser.panel.label"),
+    ...(developmentUrl === undefined ? {} : { developmentUrl }),
+    onEvent: (event) => {
+      const window = windows.getMainWindow();
+      if (!window || window.isDestroyed()) return;
+      sendToRenderer(window, IPC_ENDPOINTS.browser.windowEvent, event);
+    },
+    onModel: (window, model) => {
+      sendToRenderer(window, IPC_ENDPOINTS.browser.windowModel, model);
+    },
+  });
+  teardown.push(TEARDOWN_ORDER.detachedBrowserWindow, "the browser window", () => detachedBrowserWindow.destroy());
   const localSignIn = new LocalSignInWindows();
   teardown.push(TEARDOWN_ORDER.localSignIn, "the local sign-in window", () => Effect.runPromise(localSignIn.discard()));
   const browserDock = new BrowserDockOverlay({
@@ -1525,14 +1562,7 @@ export async function createApplicationServices({
     join(app.getPath("userData"), "openbot-provider-accounts-v1.json"),
     join(app.getPath("userData"), "provider-accounts"),
   );
-  const providerCliAppVersion = createProviderCliAppVersionStore(
-    join(app.getPath("userData"), PROVIDER_CLI_APP_VERSION_FILE),
-  );
-  await Promise.all([
-    runCauseEffect(providerUse.load()),
-    runCauseEffect(providerAccounts.load()),
-    runCauseEffect(providerCliAppVersion.load()),
-  ]);
+  await Promise.all([runCauseEffect(providerUse.load()), runCauseEffect(providerAccounts.load())]);
   const providerRuntimesRoot =
     localServerChild?.runtimeRoot ??
     providerRuntimeRoot({
@@ -1782,7 +1812,10 @@ export async function createApplicationServices({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({
       spawnHost: spawnAgentDatabaseHost,
-      onStatementSettled: (durationMs) => statementTimings.record(durationMs),
+      onStatementSettled: (durationMs, request) => {
+        statementTimings.record(durationMs);
+        perfTime(`agentdb.${request}`, durationMs);
+      },
       onHostStartFailed: ({ reason, output, consecutiveFailures, retryAfterMs }) =>
         logger.warn(
           `The shared data process ${reason} (failed starts in a row: ${consecutiveFailures}, next start after ${retryAfterMs} ms).`,
@@ -1833,6 +1866,13 @@ export async function createApplicationServices({
     quitting,
   });
   teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => runCauseEffect(cuaDriver.stop()));
+  const computerUseDisplayAwake = new ComputerUseDisplayAwake({
+    turnRunning: () => service.earliestRunningTurnStartedAt() !== null,
+    start: () => powerSaveBlocker.start("prevent-display-sleep"),
+    stop: (id) => powerSaveBlocker.stop(id),
+  });
+  if (process.platform === "darwin") cuaDriver.onToolCall(() => computerUseDisplayAwake.noteToolCall());
+  teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use display hold", () => computerUseDisplayAwake.release());
   const computerUseReads = new CuaDriverDaemonClient(() =>
     cuaDriver.mcpServerForProviders() ? cuaDriver.socketPath() : null,
   );
@@ -1912,6 +1952,11 @@ export async function createApplicationServices({
       config.command === "npx" &&
       catalogPluginSlug(config, catalogPluginServers, homedir()) !== null,
   );
+  const workflowStore = new WorkflowStore({
+    database: store.database,
+    nextDueAt: workflowScheduleDueAt(() => serverTimezone.effective()),
+  });
+  const workflowRuns = new WorkflowRunStore({ database: store.database });
   const userData = app.getPath("userData");
   const storageSources = {
     roots: {
@@ -1943,6 +1988,12 @@ export async function createApplicationServices({
           )
         : null,
     ...(hostedServer ? { userFiles: new UserFilesBytes(userData, homedir()) } : {}),
+    workflowFiles: () =>
+      workflowFileOwners({
+        outputs: () => workflowRuns.mediaOutputs(),
+        workflows: () => workflowStore.list(),
+        folders: (workflowIds) => workflowFolders.getSnapshot({ workflowIds }),
+      }),
   };
   const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));
@@ -2220,10 +2271,6 @@ export async function createApplicationServices({
     }),
   );
   teardown.push(TEARDOWN_ORDER.routineFlows, "the routine flows", () => Effect.runPromise(routineFlowRuntime.close()));
-  const workflowStore = new WorkflowStore({
-    database: store.database,
-    nextDueAt: workflowScheduleDueAt(() => serverTimezone.effective()),
-  });
   const githubRest = createGitHubRest({
     fetch: (url, init) => fetch(url, init),
     tokens: (repository) => githubConnector.repositoryTokens(repository),
@@ -2233,7 +2280,7 @@ export async function createApplicationServices({
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({
       store: workflowStore,
-      runs: new WorkflowRunStore({ database: store.database }),
+      runs: workflowRuns,
       github: new WorkflowGitHubStore({ database: store.database }),
       githubApp: () => githubAppConfig()?.slug ?? null,
       watchGitHub: (repositories) => githubRelay.setRepositories(repositories),
@@ -2306,6 +2353,7 @@ export async function createApplicationServices({
       runEnded: (end) => service.notifyWorkflowRunEnded(end),
     }),
   );
+  const workflowFoldersService = new WorkflowFoldersService({ store: workflowFolders, workflows: workflowRuntime });
   workflowTriggers = new WorkflowTriggers({
     store: workflowStore,
     timezone: () => serverTimezone.effective(),
@@ -2479,12 +2527,14 @@ export async function createApplicationServices({
   );
   service.on("event", (event) => {
     if (event.type === "turn-started") startComputerUseHighlight();
+    if (event.type === "turn-completed" && !event.continues) computerUseDisplayAwake.turnEnded();
   });
   if (!setupState.completed || service.enabledMcpServers().length > 0)
     Effect.runFork(providerRuntimes.ensureToolRuntimes());
   performance.mark("openbot:services.messaging");
   await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
   libraryFolders.onChanged(() => service.notifyLibraryFoldersChanged());
+  workflowFolders.onChanged(() => service.notifyWorkflowFoldersChanged());
   await runCauseEffect(libraryFolders.reconcileAgents(new Set(service.listAgents().map((agent) => agent.id))));
   await runCauseEffect(
     libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
@@ -2510,7 +2560,10 @@ export async function createApplicationServices({
   };
   const trackSystemCliVersions = (status: AgentStatus): void => {
     let copyInUse = false;
-    const agentProviders = hostedServer === null ? null : new Set(service.listAgents().map((agent) => agent.provider));
+    const agentProviders =
+      hostedServer === null
+        ? null
+        : new Set(service.listAgents().map((agent) => (isKeyOnlyProvider(agent.provider) ? "pi" : agent.provider)));
     for (const provider of status.providers ?? []) {
       if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
@@ -2535,20 +2588,13 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
-  const appUpgraded = providerCliAppVersion.get().appVersion !== app.getVersion();
   if (diskRestoring()) {
     updateCheckWait = Effect.runFork(
-      diskRestoreEnded.pipe(
-        Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded }))),
-      ),
+      diskRestoreEnded.pipe(Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks()))),
     );
   } else {
-    providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+    providerRuntimes.startUpdateChecks();
   }
-  if (appUpgraded)
-    void runCauseEffect(providerCliAppVersion.set({ appVersion: app.getVersion() })).catch((error) =>
-      logger.warn("The provider CLI app version did not save.", toLogValue(error)),
-    );
   providerRuntimes.on("ready", (runtime) => {
     if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes());
   });
@@ -2732,6 +2778,11 @@ export async function createApplicationServices({
   const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode, agentDefaults });
   const agentDefaultsSettings = createAgentDefaultsSettings({ agents: service, agentDefaults, busyMessageMode });
   const agentFolders = createAgentFolders({ service, userDataPath: app.getPath("userData") });
+  const channelFolders = createChannelFolders({
+    service,
+    userDataPath: app.getPath("userData"),
+    browse: agentFolders.browse,
+  });
   const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
     store: browserProfileStore,
@@ -3051,6 +3102,7 @@ export async function createApplicationServices({
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
+    signInWaits: service.signInWaits,
     agentsReady: () => agentInitialization.awaitRoster(),
     events,
     skills,
@@ -3076,6 +3128,7 @@ export async function createApplicationServices({
     providerSignOut: service,
     storage: storageUsage,
     libraryFolders: libraryFoldersService,
+    workflowFolders: workflowFoldersService,
     machine: machineAlerts,
     backgroundProcesses: {
       list: () => listBackgroundProcesses(process.platform, service.listAgents()),
@@ -3118,6 +3171,7 @@ export async function createApplicationServices({
       agentHost: agentHostSettings,
       agentDefaults: agentDefaultsSettings,
       folders: agentFolders,
+      channelFolders,
       instructions: agentInstructions,
       sessionSettings: service,
       acpRegistry,
@@ -3256,7 +3310,7 @@ export async function createApplicationServices({
       if (powerMonitor.getSystemIdleState(awayAfterMs / 1_000) !== "active") return false;
       if (computerIdle.seconds() * 1_000 >= awayAfterMs) return false;
       if (window.isFocused()) return true;
-      if (!Notification.isSupported()) return false;
+      if (!event || !Notification.isSupported()) return false;
       const local = remoteServers.list().find((server) => server.id === LOCAL_SERVER_ID);
       return desktopShowsAgentEvent(
         event,
@@ -3910,6 +3964,7 @@ export async function createApplicationServices({
             readNotInstalledUpdate(join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE), app.getVersion()),
           ),
           appBundlePath: join(app.getPath("exe"), "..", "..", ".."),
+          restartFromInstalledCopy: (bundlePath: string) => restartFromInstalledCopy(app, bundlePath, currentVersion),
         }
       : {}),
     appImagePath,
@@ -4142,7 +4197,6 @@ export async function createApplicationServices({
 
   return {
     service,
-    routineFlows: routineFlowRuntime,
     workflows: workflowRuntime,
     workflowGitHub,
     crm,
@@ -4163,8 +4217,10 @@ export async function createApplicationServices({
     mailbox,
     storageUsage,
     libraryFoldersService,
+    workflowFoldersService,
     browser,
     browserPictureInPicture,
+    detachedBrowserWindow,
     localSignIn,
     browserDock,
     browserView,
@@ -4178,6 +4234,7 @@ export async function createApplicationServices({
     agentHostSettings,
     agentDefaultsSettings,
     agentFolders,
+    channelFolders,
     agentInstructions,
     browserProfiles,
     language,

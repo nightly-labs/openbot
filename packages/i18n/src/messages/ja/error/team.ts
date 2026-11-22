@@ -90,6 +90,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "この接続ではルーティンの実行を停止できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
   "error.team.libraryFoldersUnsupported": "この接続ではライブラリのフォルダーを使用できません。",
+  "error.team.workflowFoldersUnsupported": "この接続はワークフローのフォルダーに対応していません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
   "error.team.sidebarPinsUnsupported":
@@ -129,6 +130,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",
   "error.team.agentMemoryLimitUnsupported": "この接続はエージェントのメモリー上限に対応していません。",
   "error.team.agentFoldersUnsupported": "この接続はエージェントのフォルダーに対応していません。",
+  "error.team.channelFoldersUnsupported": "この接続はチャンネルのフォルダーに対応していません。",
   "error.team.folderUnavailable": "このフォルダーはホストのコンピューターで使用できません。",
   "error.team.memoryReviewUnsupported": "この接続はメモリーの見直しに対応していません。",
   "error.team.skillLearningUnsupported": "この接続はスキル学習に対応していません。",
@@ -148,6 +150,8 @@ export const messages = {
   "error.team.mcpUnsupported": "この接続では MCP サーバーを利用できません。",
   "error.team.mcpServerListNeedsUpdate":
     "このサーバーで {limit} 個を超える MCP サーバーを使うには、このデバイスの OpenBot を更新してください。",
+  "error.team.providerAccountListNeedsUpdate":
+    "このサーバーで 1 つのプロバイダーのアカウントを {limit} 個より多く使うには、このデバイスの OpenBot を更新してください。",
   "error.team.storageUnsupported": "この接続ではストレージを利用できません。",
   "error.team.machineResourcesUnsupported": "この接続ではマシンの使用状況を利用できません。",
   "error.team.machineAlertMemberInvalid":
@@ -191,6 +195,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "この接続はサーバーのパーソナリティに対応していません。",
   "error.team.agentWaitsUnsupported": "この接続では未完了の待機を使用できません。",
   "error.team.pendingApprovalUnsupported": "この接続では承認リクエスト全体を読み込めません。",
+  "error.team.pendingPromptsUnsupported": "この接続では未回答の質問を読み込めません。",
   "error.team.phoneFeedbackUnsupported": "この接続ではスマートフォンアプリからレポートを送信できません。",
   "error.team.messagePinsUnsupported": "この接続はピン留めしたメッセージに対応していません。",
   "error.team.queuedMessageThreadUnsupported":

@@ -52,13 +52,15 @@ import {
   type ConversationTransaction,
   withDatabaseTransaction,
 } from "./conversation-runtime";
-import { failedRunReason, routineStatusForDelivery } from "./delivery-content";
+import { failedRunReason, routineStatusForDelivery, type SkippedRoutineRuns } from "./delivery-content";
 import { quietRoutineRun } from "./routine-quiet-runs";
 import {
   localTimezone,
   type OpenBotToolResponse,
   openBotToolFailure,
   openBotToolResult,
+  ROUTINE_LIST_TRUNCATION_NOTE,
+  routineListInstruction,
   routineToolAgentId,
   routineToolArguments,
   routineToolPolicies,
@@ -100,6 +102,7 @@ export interface RoutineHooks {
   isRunning(): boolean;
   usageLimited(agentId: string): boolean;
   routineThread(agentId: string, routineId: string, routineName: string): { taskId: string; threadId: string } | null;
+  waitThread(agentId: string, taskId: string): { taskId: string; threadId: string } | null;
   routineDeleted(agentId: string, routineId: string): Effect.Effect<void>;
 }
 
@@ -195,6 +198,17 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.runForDelivery(deliveryId);
   }
 
+  skippedBefore(run: RoutineRun): SkippedRoutineRuns | null {
+    if (run.kind !== "scheduled" || run.source !== undefined) return null;
+    const { rows, complete } = this.#routines.skippedBefore(run);
+    if (rows.length === 0) return null;
+    return {
+      count: rows.reduce((total, row) => total + row.count, 0),
+      complete,
+      reasons: [...new Set(rows.map((row) => (row.error ? redactText(row.error) : SKIPPED_WHILE_CLOSED)))],
+    };
+  }
+
   workflowRunSource(deliveryId: string): WorkflowRunSource | null {
     const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
     return sender?.kind === "routine" ? this.#workflowRuns.handoffSource(sender.runId) : null;
@@ -217,9 +231,49 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#waits.wokenBy(deliveryId);
   }
 
+  continuesWait(deliveryId: string): boolean {
+    const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (delivery?.sender.kind !== "routine" || this.#mailbox.taskIdForDelivery(deliveryId) === null) return false;
+    const run = this.#routines.run(delivery.sender.runId);
+    return run?.agentId === delivery.recipientAgentId && run.deliveryId !== null && run.deliveryId !== deliveryId;
+  }
+
+  linkedRunForDelivery(deliveryId: string): RoutineRun | null {
+    const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (delivery?.sender.kind !== "routine") return null;
+    const run = this.#routines.run(delivery.sender.runId);
+    return run && run.agentId !== delivery.recipientAgentId ? run : null;
+  }
+
   quietRunForDelivery(deliveryId: string): boolean {
+    const run = this.#routines.runForDelivery(deliveryId) ?? this.linkedRunForDelivery(deliveryId);
+    return run === null ? this.workflowRunSource(deliveryId) !== null : quietRoutineRun(run);
+  }
+
+  retriesAfterRestart(deliveryId: string): boolean {
     const run = this.#routines.runForDelivery(deliveryId);
-    return run !== null && quietRoutineRun(run);
+    if (
+      run?.kind !== "scheduled" ||
+      run.source !== undefined ||
+      !["queued", "running", "needs-attention"].includes(run.status)
+    )
+      return false;
+    const routine = this.#routines.getRecord(run.agentId, run.routineId);
+    if (
+      routine?.missedPolicy !== "run-once" ||
+      routine.trigger.kind !== "schedule" ||
+      routine.trigger.id !== run.triggerId ||
+      Date.parse(routine.updatedAt) > Date.parse(run.createdAt)
+    )
+      return false;
+    if (routine.trigger.schedule.kind === "once") return true;
+    return (
+      routine.active &&
+      Date.parse(routine.trigger.nextRunAt) > Date.now() &&
+      !this.#routines
+        .listRuns(run.agentId, run.routineId, 50, true)
+        .some((other) => other.kind === "scheduled" && other.scheduledFor > run.scheduledFor)
+    );
   }
 
   duplicate(sourceAgentId: string, targetAgentId: string, now: Date): Map<string, Routine> {
@@ -286,7 +340,7 @@ export class RoutineScheduler implements RoutineDueSource {
     this.stateChanged(agentId);
   }
 
-  resumeAfterFailedRun(
+  resumeAfterRunPause(
     pause: { agentId: string; routineId: string; updatedAt: string },
     params: DynamicToolCallParams,
   ): "resumed" | "kept" | "failed" {
@@ -297,7 +351,7 @@ export class RoutineScheduler implements RoutineDueSource {
       this.update({ agentId, routineId, active: true }, this.#toolMutationOptions(agentId, agentId, params));
       return "resumed";
     } catch (error) {
-      logger.warn("A routine that a failed run paused could not be turned on again.", {
+      logger.warn("A routine that a run paused could not be turned on again.", {
         error: error instanceof Error ? error.message : String(error),
       });
       return "failed";
@@ -567,15 +621,34 @@ export class RoutineScheduler implements RoutineDueSource {
     requestedByPerson: () => boolean,
   ) {
     if (params.tool === "list_routines") {
-      const args = routineToolArguments(params.arguments, ["agentId"]);
+      const args = routineToolArguments(params.arguments, ["agentId", "routineId"]);
       const agentId = this.#toolAgentId(args, senderAgentId);
+      const onlyId =
+        args.routineId === undefined
+          ? null
+          : this.#requireToolRoutine(
+              agentId,
+              routineToolString(args.routineId, "routineId", INPUT_LIMITS.identifier, "routineId is required."),
+            ).id;
+      const shown = (routine: { id: string }) => onlyId === null || routine.id === onlyId;
+      const routines = this.list(agentId)
+        .filter(shown)
+        .map((routine) => ({
+          ...routine,
+          ...(onlyId === null ? routineListInstruction(routine.instruction) : {}),
+          lastRun: this.#lastRun(agentId, routine.id),
+        }));
       return openBotToolResult({
-        routines: this.list(agentId).map((routine) => ({ ...routine, lastRun: this.#lastRun(agentId, routine.id) })),
+        routines,
+        ...(routines.some((routine) => "instructionTruncated" in routine)
+          ? { truncatedInstructions: ROUTINE_LIST_TRUNCATION_NOTE }
+          : {}),
         webhookRoutines: this.#routines.listRecords(agentId).flatMap((routine) =>
-          routine.trigger.kind === "webhook"
+          routine.trigger.kind === "webhook" && shown(routine)
             ? [
                 {
                   ...webhookRoutineSummary({ ...routine, trigger: routine.trigger }),
+                  ...(onlyId === null ? {} : { instruction: routine.instruction }),
                   lastRun: this.#lastRun(agentId, routine.id),
                 },
               ]
@@ -986,9 +1059,12 @@ export class RoutineScheduler implements RoutineDueSource {
     const agent = yield* this.#store.getOrCreate(run.agentId).pipe(toRoutineOperationFailed);
     return yield* Effect.gen({ self: this }, function* () {
       yield* routineStep(validateRecipient);
-      const thread = yield* routineStep(() =>
-        record?.runIn === "thread" ? this.#hooks.routineThread(agent.id, run.routineId, run.routineName) : null,
-      );
+      const thread = yield* routineStep(() => {
+        const waitTaskId = waitId ? this.#waits.sideThreadOfWait(agent.id, waitId) : null;
+        const waitThread = waitTaskId ? this.#hooks.waitThread(agent.id, waitTaskId) : null;
+        if (waitThread) return waitThread;
+        return record?.runIn === "thread" ? this.#hooks.routineThread(agent.id, run.routineId, run.routineName) : null;
+      });
       const receipt = yield* this.#mailbox
         .enqueue({
           ...(thread ? { taskId: thread.taskId } : {}),
@@ -1029,7 +1105,11 @@ export class RoutineScheduler implements RoutineDueSource {
         yield* routineStep(() => this.#hooks.emitQueue(agent.id));
         return queued ?? { ...run, status: "cancelled" as const };
       }
-      yield* routineStep(() => this.#waits.wakeForRun(run, deliveryId, waitId));
+      const inSideThreads = yield* routineStep(() =>
+        this.#waits.wakeForRun(run, deliveryId, waitId, thread?.taskId ?? null),
+      );
+      for (const [taskId, waitIds] of inSideThreads)
+        yield* this.#wakeInSideThread(run, agent.id, taskId, waitIds, deliveryId);
       if (thread) {
         yield* routineStep(() => {
           this.#hooks.emitQueue(agent.id);
@@ -1062,6 +1142,47 @@ export class RoutineScheduler implements RoutineDueSource {
       ),
     );
   }, Effect.uninterruptible);
+
+  readonly #wakeInSideThread = Effect.fn("RoutineScheduler.wakeInSideThread")(function* (
+    this: RoutineScheduler,
+    run: RoutineRun,
+    agentId: string,
+    taskId: string,
+    waitIds: readonly string[],
+    runDeliveryId: string,
+  ) {
+    const keepInRun = (failure: { cause: unknown }) =>
+      Effect.sync(() => {
+        logger.warn("Could not continue open waits in their side thread.", { agentId, error: failure.cause });
+        return runDeliveryId;
+      });
+    const wokenIn = yield* Effect.gen({ self: this }, function* () {
+      const thread = yield* routineStep(() => this.#hooks.waitThread(agentId, taskId));
+      if (!thread) return runDeliveryId;
+      const receipt = yield* this.#mailbox.enqueue({
+        taskId: thread.taskId,
+        sender: {
+          kind: "routine",
+          routineId: run.routineId,
+          runId: run.id,
+          routineName: run.routineName,
+          scheduledFor: run.scheduledFor,
+        },
+        recipientAgentIds: [agentId],
+        text: run.instruction,
+        draftIds: [],
+        replyToMessageId: null,
+        idempotencyKey: `routine-wait:${runDeliveryId}:${thread.taskId}`,
+      });
+      return receipt.deliveries[0]?.id ?? runDeliveryId;
+    }).pipe(Effect.catch(keepInRun));
+    yield* routineStep(() => {
+      this.#waits.markWoken(agentId, waitIds, wokenIn);
+      if (wokenIn === runDeliveryId) return;
+      this.#hooks.emitQueue(agentId);
+      this.#hooks.scheduleDrain(agentId);
+    }).pipe(Effect.catch(keepInRun));
+  });
 
   #runsToCancelOnDeletion(agentId: string, routineId: string, interruptedRuns: RoutineRun[]): RoutineRun[] {
     const current = new Map(this.#routines.activeRuns(agentId, routineId).map((run) => [run.id, run]));

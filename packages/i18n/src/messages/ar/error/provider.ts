@@ -16,6 +16,8 @@ export const messages = {
   "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":
     "لم يحمّل {provider} أدوات OpenBot، لذا لا يمكن لهذا الوكيل استخدامها أو الوصول إلى زملائه. قد تحظر سياسة فريق {provider} خوادم MCP المحلية. اطلب من مسؤول فريقك السماح بها، ثم أعد المحاولة.",
+  "error.provider.acpToolsNotLoaded":
+    "شغّل {provider} هذه الرسالة بدون أدوات OpenBot، لذا لم يتمكن الوكيل من الوصول إلى زملائه أو استخدام المتصفح أو إرفاق الملفات. أعد المحاولة.",
   "error.provider.acpOwnMcpServerFailed":
     "تعذّر على {provider} تشغيل خادم MCP {name}، لذا توقّف الرد. هذا الخادم موجود في إعدادات {provider} الخاصة بك، وليس في OpenBot. أزِل الخادم من هناك أو أصلحه، ثم ابدأ محادثة جديدة.",
   "error.provider.endpointsReadOnly":
@@ -263,6 +265,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "لا يمكن لمعالج هذا الكمبيوتر تشغيل هذا المزوّد. استخدم مزوّدًا آخر.",
   "error.provider.opencodeDatabaseNewer":
     "تعذّر على OpenCode فتح قاعدة بياناته لأن إصدارًا أحدث من OpenCode غيّرها. حدّث OpenCode إلى الإصدار 2 أو أحدث، ثم أعد المحاولة.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "لم يبدأ Grok لأن الإعداد allowed_models في ملف إعداداته لا يتضمن نموذجه الافتراضي. أضف النموذج الافتراضي إلى allowed_models، أو احذف allowed_models، ثم أعد المحاولة.",
   "error.provider.opencodeNoAnswer": "أنهى نموذج OpenCode الدور بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "أنهى نموذج OpenCode الدور بعد الاستدلال، بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
@@ -393,6 +397,8 @@ export const messages = {
     "أصبحت هذه الدردشة كبيرة جدًا بحيث لا يمكن إرسالها إلى النموذج. غالبًا ما تسبب الصور في الدردشة ذلك. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.opencodeSessionRejected":
     "رفض OpenCode الطلب ولم يذكر السبب. قد يحدث هذا في دردشة طويلة أو بعد تغيير النموذج. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا مختلفًا أو مستوى جهد أقل.",
+  "error.provider.opencodeInputRefused":
+    "رفض النموذج محتوى هذه الدردشة ولم يذكر السبب. قد يسبب ذلك ملف في الدردشة، مثل ملف PDF أو صورة. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أرسل رسالتك مرة أخرى بدون الملف، أو اختر نموذجًا مختلفًا.",
   "error.provider.opencodeCompactionFailed":
     "لم يتمكن النموذج من تلخيص هذه الدردشة الطويلة لإفساح المجال في نافذة السياق. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا أقوى.",
   "error.provider.museMcpStartupFault":
@@ -500,6 +506,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
   "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",
+  "error.provider.acpSessionStale": "تعذّر على {provider} تحميل أحدث نسخة من هذه المحادثة. أرسل رسالتك مرة أخرى.",
   "error.provider.acpModelNotOffered":
     "لا يوفّر {provider} النموذج {model} الآن. اختر نموذجًا آخر لهذا الوكيل، ثم حاول مرة أخرى.",
   "error.provider.piStopped": "Pi لا يعمل. اربط Pi وأعد المحاولة.",

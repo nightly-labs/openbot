@@ -156,7 +156,6 @@ function RailPreview(props: {
           mediaCredits={props.mediaCredits}
           onMediaCredits={fn()}
           onAgents={() => setCurrent("agents")}
-          onRoutines={() => setCurrent("routines")}
           onSchedule={() => setCurrent("schedule")}
           onUsage={() => setCurrent("usage")}
           onCrm={crmAction()}

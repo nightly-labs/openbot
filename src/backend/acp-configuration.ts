@@ -787,7 +787,7 @@ function normalizeEffort(value: string): string | null {
   const normalized = value.toLowerCase().replaceAll("-", "_");
   if (isReasoningEffort(normalized)) return normalized;
   if (normalized === "off") return "none";
-  if (normalized === "thinking") return "high";
+  if (normalized === "thinking" || normalized === "on") return "high";
   if (["extra_high", "very_high"].includes(normalized)) return "xhigh";
   return null;
 }

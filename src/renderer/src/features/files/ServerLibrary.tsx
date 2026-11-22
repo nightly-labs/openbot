@@ -9,7 +9,11 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
-import { attachmentFilePreview } from "../conversation/attachment-preview";
+import {
+  attachmentFilePreview,
+  openedAttachmentUrl,
+  remoteAttachmentUrlWith,
+} from "../conversation/attachment-preview";
 import { type AgentLevelsSource, createAgentLevels } from "../conversation/message-delete-access";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import type { FilesPort } from "./files-port";
@@ -26,6 +30,11 @@ import { escapeClosesViewer } from "./viewer-escape";
 const FilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
 const VIEWER_WIDTH = 4000;
+
+function thumbnailUrl(file: StoredFileRow): string | null {
+  if (file.previewUrl === null || file.previewKind !== "image") return file.previewUrl;
+  return remoteAttachmentUrlWith(file.previewUrl, "preview");
+}
 
 interface Viewing {
   file: StoredFileRow;
@@ -154,6 +163,7 @@ export function ServerLibrary(props: ServerLibraryProps) {
             initialFavorites={readLibraryFavorites(props.serverId)}
             onFavoritesChange={saveFavorites}
             mediaSource={props.mediaSource}
+            pictureUrl={thumbnailUrl}
             opensFiles={props.opensFiles}
           />
         </Show>
@@ -203,7 +213,7 @@ function LibraryViewer(props: {
           macWindowControls={platform.appInfo()?.platform === "darwin"}
           preview={props.viewing.preview}
           agents={props.agents}
-          sourceUrl={file().previewUrl ?? null}
+          sourceUrl={openedAttachmentUrl(file().previewUrl)}
           maxWidth={() => VIEWER_WIDTH}
           onWidthChange={() => undefined}
           onOpenLink={props.onOpenUrl}

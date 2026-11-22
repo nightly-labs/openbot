@@ -19,6 +19,8 @@ export const messages = {
     "O {provider} informa que seu plano se esgotou. Escolha outro modelo ou faça upgrade do seu plano do {provider}.",
   "error.provider.acpMcpNotLoaded":
     "O {provider} não carregou as ferramentas do OpenBot, então este agente não pode usá-las nem falar com os colegas. Uma política de equipe do {provider} pode bloquear servidores MCP locais. Peça ao administrador da sua equipe para permiti-los e tente de novo.",
+  "error.provider.acpToolsNotLoaded":
+    "O {provider} executou esta mensagem sem as ferramentas do OpenBot, então o agente não pôde falar com os colegas, usar o navegador nem anexar arquivos. Tente de novo.",
   "error.provider.acpOwnMcpServerFailed":
     "O {provider} não conseguiu iniciar o servidor MCP {name}, então a resposta parou. Este servidor está nas suas próprias configurações do {provider}, não no OpenBot. Remova ou repare o servidor lá e depois inicie um novo chat.",
   "error.provider.endpointsReadOnly":
@@ -288,6 +290,8 @@ export const messages = {
     "O processador deste computador não consegue executar este provedor. Use outro provedor.",
   "error.provider.opencodeDatabaseNewer":
     "O OpenCode não conseguiu abrir o banco de dados porque uma versão mais recente do OpenCode o alterou. Atualize o OpenCode para a versão 2 ou posterior e tente novamente.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "O Grok não iniciou porque a configuração allowed_models dele não inclui o modelo padrão. Adicione o modelo padrão a allowed_models, ou remova allowed_models, e tente de novo.",
   "error.provider.opencodeNoAnswer":
     "O modelo do OpenCode encerrou o turno sem resposta. Tente novamente ou escolha outro modelo.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -423,6 +427,8 @@ export const messages = {
     "Este chat ficou grande demais para ser enviado ao modelo. As imagens do chat costumam causar isso. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":
     "O OpenCode recusou a solicitação e não informou a causa. Isso pode acontecer em um chat longo ou depois de trocar de modelo. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo ou um esforço menor.",
+  "error.provider.opencodeInputRefused":
+    "O modelo recusou o conteúdo deste chat e não informou a causa. Um arquivo no chat, como um PDF ou uma imagem, pode causar isso. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Envie sua mensagem de novo sem o arquivo ou escolha outro modelo.",
   "error.provider.opencodeCompactionFailed":
     "O modelo não conseguiu resumir este chat longo para liberar espaço na janela de contexto. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha um modelo mais potente.",
   "error.provider.museMcpStartupFault":
@@ -539,6 +545,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Aguarde o turno atual do Pi terminar.",
   "error.provider.acpSessionBusy":
     "{provider} ainda está terminando um turno interrompido. Tente novamente em instantes.",
+  "error.provider.acpSessionStale":
+    "{provider} não conseguiu carregar a versão mais recente desta conversa. Envie sua mensagem novamente.",
   "error.provider.acpModelNotOffered":
     "{provider} não oferece {model} agora. Escolha outro modelo para este agente e tente novamente.",
   "error.provider.piStopped": "O Pi não está rodando. Conecte o Pi e tente de novo.",

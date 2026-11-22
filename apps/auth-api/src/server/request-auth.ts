@@ -13,6 +13,7 @@ import { AuthOperationError, AuthService, AuthServiceError } from "./auth-servic
 import { BillingError, type BillingService } from "./billing-service";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
+import { CustomServerOffers } from "./custom-server-offers";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
@@ -157,6 +158,10 @@ export function requestBillingService(): BillingService | null {
   return requestHostedBilling().billing;
 }
 
+export function requestCustomServerOffers(): CustomServerOffers {
+  return new CustomServerOffers({ database: requireWorkerBindings(env).DB, billing: requestBillingService() });
+}
+
 export function billingErrorResponse(error: unknown): Response {
   if (error instanceof BillingError) return apiError(error.status, error.code, error.message);
   return authErrorResponse(error);
@@ -177,7 +182,11 @@ export function requireSitePublishingEnabled(): void {
 }
 
 export function hostedSiteErrorResponse(error: unknown): Response {
-  if (error instanceof HostedSiteInputError) return apiError(error.status, error.code, error.message);
+  if (error instanceof HostedSiteInputError) {
+    const response = apiError(error.status, error.code, error.message);
+    if (error.retryAfterSeconds !== undefined) response.headers.set("Retry-After", String(error.retryAfterSeconds));
+    return response;
+  }
   return authErrorResponse(error);
 }
 

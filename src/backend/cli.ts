@@ -803,6 +803,13 @@ function parseMistralVersion(output: string): string {
 
 export const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
 
+export const ANTIGRAVITY_UPDATE_ENV: Readonly<Record<string, string>> = { AGY_CLI_DISABLE_AUTO_UPDATE: "true" };
+
+const VERSION_READ_ENV: Partial<Record<AgentProviderId, Readonly<Record<string, string>>>> = {
+  copilot: COPILOT_ENV,
+  antigravity: ANTIGRAVITY_UPDATE_ENV,
+};
+
 type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
 export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output: string) => string>> = {
@@ -1181,7 +1188,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const slow = slowVersionReads.has(candidate);
   const firstTimeout = provider === "antigravity" ? ANTIGRAVITY_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS;
   const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : firstTimeout);
-  const providerEnv = provider === "copilot" ? COPILOT_ENV : {};
+  const providerEnv = VERSION_READ_ENV[provider] ?? {};
   const output = yield* Effect.tryPromise({
     try: (signal) =>
       target

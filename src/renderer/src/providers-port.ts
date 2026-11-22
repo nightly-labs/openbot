@@ -18,6 +18,7 @@ export interface ProvidersPort {
   renameProviderAccount: OpenBotDesktopApi["renameProviderAccount"];
   removeProviderAccount: OpenBotDesktopApi["removeProviderAccount"];
   setProviderAccountPool: OpenBotDesktopApi["setProviderAccountPool"];
+  setLiveVoiceAccount: OpenBotDesktopApi["setLiveVoiceAccount"];
   signOutProvider: OpenBotDesktopApi["signOutProvider"];
   providerUsageResets: OpenBotDesktopApi["providerUsageResets"];
   resetProviderUsage: OpenBotDesktopApi["resetProviderUsage"];

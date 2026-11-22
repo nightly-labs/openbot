@@ -2,7 +2,7 @@ import {
   type AgentAnalytics,
   type AnalyticsAgent,
   type AnalyticsProviderDay,
-  agentProviderCliName,
+  agentProviderName,
   analyticsTokens,
   isAgentProvider,
 } from "@openbot/contracts/ipc";
@@ -16,7 +16,7 @@ import { UsageChart, useUsageSeriesColor } from "./usage-chart";
 import { UsageBar, UsageValue } from "./usage-motion";
 import { UsageSegments } from "./usage-segments";
 
-const providerName = (value: string) => (isAgentProvider(value) ? agentProviderCliName(value) : value);
+const providerName = (value: string) => (isAgentProvider(value) ? agentProviderName(value) : value);
 
 export interface UsageAgentRow extends AnalyticsAgent {
   name: string;
@@ -36,7 +36,7 @@ export function AgentUsageReport({
     value === null ? t("mobile.agent.runtime.unavailable") : format.number(value);
   const money = (value: number | null) =>
     value === null
-      ? t("mobile.agent.runtime.unavailable")
+      ? t("mobile.agent.usage.noCostEstimate")
       : format.currencyUsd(value, { minimumFractionDigits: 4, maximumFractionDigits: 4, useGrouping: false });
   const date = (value: string, includeYear = false) =>
     format.date(new Date(`${value}T12:00:00Z`), {

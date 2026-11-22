@@ -5,7 +5,18 @@ import { useText } from "@openbot/ui/text";
 import { For, onSettled, Show } from "solid-js";
 import { ThreadStatusMark, ThreadStatusText, ThreadTabIcon, threadAttention } from "./ThreadStatusMark";
 import { ThreadTitle } from "./ThreadTitle";
-import type { ThreadHeaderProps, ThreadRowMode } from "./thread-types";
+import type { ThreadHeaderProps, ThreadRowMode, ThreadStem } from "./thread-types";
+
+export function ThreadStemMark(props: { stem: ThreadStem }) {
+  return (
+    <span class="agent-threads-menu-stem" aria-hidden="true">
+      <For each={props.stem.through}>
+        {(line) => <span class={["agent-threads-stem-rail", line && "agent-threads-stem-line"]} />}
+      </For>
+      <span class={["agent-threads-stem-elbow", props.stem.last && "agent-threads-stem-last"]} />
+    </span>
+  );
+}
 
 function ThreadMenuList(props: ThreadHeaderProps) {
   const { format } = useText();
@@ -21,16 +32,7 @@ function ThreadMenuList(props: ThreadHeaderProps) {
             aria-current={current(thread.id)}
             onSelectAfterClose={() => props.onOpen(thread.id)}
           >
-            <Show when={thread.stem}>
-              {(stem) => (
-                <span class="agent-threads-menu-stem" aria-hidden="true">
-                  <For each={stem().through}>
-                    {(line) => <span class={["agent-threads-stem-rail", line && "agent-threads-stem-line"]} />}
-                  </For>
-                  <span class={["agent-threads-stem-elbow", stem().last && "agent-threads-stem-last"]} />
-                </span>
-              )}
-            </Show>
+            <Show when={thread.stem}>{(stem) => <ThreadStemMark stem={stem()} />}</Show>
             <ThreadTitle class="agent-threads-menu-title" title={thread.title} />
             <ThreadStatusMark status={thread.status} unread={thread.unread} />
             <span class="agent-threads-menu-time ui-menu-trailing">{sidebarMessageTime(thread.updatedAt, format)}</span>

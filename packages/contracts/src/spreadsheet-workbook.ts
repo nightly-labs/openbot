@@ -1,4 +1,5 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8 } from "fflate";
+import { unzipOfficeXml } from "./office-zip";
 
 export interface SpreadsheetNumberFormat {
   number: (value: number, options?: Intl.NumberFormatOptions) => string;
@@ -10,8 +11,6 @@ const ENGLISH_NUMBERS: SpreadsheetNumberFormat = {
 
 export const SPREADSHEET_MAX_ROWS = 500;
 export const SPREADSHEET_MAX_COLUMNS = 50;
-const MAX_ZIP_ENTRY_BYTES = 8 * 1024 * 1024;
-const MAX_ZIP_EXPANDED_BYTES = 32 * 1024 * 1024;
 const XLSX_XML_ENTRY =
   /^xl\/(?:workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|styles\.xml|worksheets\/[^/]+\.xml)$/u;
 
@@ -240,28 +239,11 @@ function parseSheet(
   return { sheet: { name, rows }, truncated };
 }
 
-function unzipSpreadsheet(bytes: Uint8Array) {
-  let expandedBytes = 0;
-  return unzipSync(bytes, {
-    filter: (file) => {
-      if (!XLSX_XML_ENTRY.test(file.name)) return false;
-      if (file.originalSize > MAX_ZIP_ENTRY_BYTES) {
-        throw new Error("The spreadsheet preview is too large to read safely.");
-      }
-      expandedBytes += file.originalSize;
-      if (expandedBytes > MAX_ZIP_EXPANDED_BYTES) {
-        throw new Error("The spreadsheet preview is too large to read safely.");
-      }
-      return true;
-    },
-  });
-}
-
 export function parseSpreadsheet(
   bytes: Uint8Array,
   numbers: SpreadsheetNumberFormat = ENGLISH_NUMBERS,
 ): SpreadsheetData {
-  const files = unzipSpreadsheet(bytes);
+  const files = unzipOfficeXml(bytes, XLSX_XML_ENTRY);
   const workbook = xmlDocument(files["xl/workbook.xml"], "xl/workbook.xml");
   const dateSystem = workbook.getElementsByTagNameNS("*", "workbookPr")[0]?.getAttribute("date1904");
   const date1904 = dateSystem === "1" || dateSystem === "true";

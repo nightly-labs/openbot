@@ -1,4 +1,4 @@
-import type { BrowserControlSession, BrowserPreview, BrowserTab, BrowserTeachStep } from "@openbot/contracts/ipc";
+import type { BrowserPreview, BrowserTab, BrowserTeachStep } from "@openbot/contracts/ipc";
 import { BROWSER_TEACH_CAPABILITY } from "@openbot/contracts/team-protocol/browser-teach-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -11,6 +11,11 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { actionToast } from "../../../action-toast";
 import { desktopAnalytics } from "../../../analytics";
+import {
+  newestBrowserControlSession,
+  ownsBrowserTab,
+  browserControlForTab as sharedBrowserControlForTab,
+} from "../../browser/browser-window-model";
 import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { conversationPort } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -59,6 +64,7 @@ function canonicalBrowserUrl(url: string): string {
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
+  reattachBrowserWindow: () => void;
   closeBrowserPane: () => void;
 }
 
@@ -92,11 +98,9 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   const browserPipOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-pip";
   const screenOpen = () => browserSidebarOpen() || browserExpandedOpen() || browserPipOpen();
   const allBrowserTabs = createMemo(() => (deps.props.browserEnabled === false ? [] : deps.props.browserTabs));
-  const ownsTab = (agent: Pick<AgentProfile, "id" | "threadId">, tab: BrowserTab) =>
-    tab.ownerAgentId ? tab.ownerAgentId === agent.id : Boolean(agent.threadId && tab.ownerThreadId === agent.threadId);
   const tabsOwnedBy = (agent: Pick<AgentProfile, "id" | "threadId">) =>
-    allBrowserTabs().filter((tab) => ownsTab(agent, tab));
-  const browserTabOwner = (tab: BrowserTab) => deps.props.agents.find((agent) => ownsTab(agent, tab));
+    allBrowserTabs().filter((tab) => ownsBrowserTab(agent, tab));
+  const browserTabOwner = (tab: BrowserTab) => deps.props.agents.find((agent) => ownsBrowserTab(agent, tab));
   const channel = untrack(() => deps.props.channel);
   const viewId = () => deps.props.agent?.id ?? channel?.id ?? null;
   const viewOwner = () => ({ agentId: deps.props.agent?.id ?? null, threadId: deps.props.agent?.threadId ?? null });
@@ -414,16 +418,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
 
   const agentsByThreadId = createMemo(() => new Map(deps.props.agents.map((agent) => [agent.threadId, agent])));
 
-  const newestSession = (sessions: readonly BrowserControlSession[]) => {
-    let acting: BrowserControlSession | undefined;
-    let newest: BrowserControlSession | undefined;
-    for (const session of sessions) {
-      if (!newest || session.startedAt > newest.startedAt) newest = session;
-      if (session.phase === "acting" && (!acting || session.startedAt > acting.startedAt)) acting = session;
-    }
-    return acting ?? newest;
-  };
-
   const activeBrowserControl = createMemo(() => {
     if (deps.props.browserEnabled === false) return undefined;
     const sessions = deps.props.browserControlState.sessions;
@@ -435,7 +429,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       ? sessions.filter((session) => session.threadId === deps.props.agent?.threadId)
       : [];
     const candidates = forActiveTab.length > 0 ? forActiveTab : forActiveAgent;
-    return newestSession(candidates);
+    return newestBrowserControlSession(candidates);
   });
   const actingBrowserControl = createMemo(() => {
     const control = activeBrowserControl();
@@ -445,14 +439,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const control = activeBrowserControl();
     return control ? agentsByThreadId().get(control.threadId) : undefined;
   });
-  const browserControlForTab = (tab: BrowserTab) => {
-    const sessions = deps.props.browserControlState.sessions.filter(
-      (session) =>
-        session.tabId === tab.id ||
-        (session.tabId === null && tab.id === activeBrowserTab()?.id && session.threadId === tab.ownerThreadId),
-    );
-    return newestSession(sessions);
-  };
+  const browserControlForTab = (tab: BrowserTab) =>
+    sharedBrowserControlForTab(deps.props.browserControlState.sessions, tab, activeBrowserTab()?.id);
   const browserControllerForTab = (tab: BrowserTab) => {
     const control = browserControlForTab(tab);
     return control ? agentsByThreadId().get(control.threadId) : undefined;
@@ -730,7 +718,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (!canTeachBrowserTask() || teach()) return;
     const tab = activeBrowserTab() ?? (await openBrowserAddress(BROWSER_NEW_TAB_URL, true));
     if (!tab || closingBrowserTabIds.has(tab.id)) return;
-    deps.panels.setActiveRightPanel("browser-expanded");
+    deps.panels.reattachBrowserWindow();
     setTeach({ phase: "ready", pending: false });
   }
 

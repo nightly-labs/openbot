@@ -88,6 +88,7 @@ const HOLD_TEXT = {
   "server-busy": "conversation.threads.hold.serverBusy",
   "agent-busy": "conversation.threads.hold.agentBusy",
   "one-turn": "conversation.threads.hold.oneTurn",
+  "sign-in": "conversation.threads.hold.signIn",
 } as const satisfies Record<Exclude<AgentTaskHold, "task-limit">, AppTextKey>;
 
 const STICK_DISTANCE = 48;
@@ -103,6 +104,7 @@ const MARKER_ROW_KINDS: ReadonlySet<ChatActionMarkerModel["kind"]> = new Set([
   "sign-in-failure",
 ]);
 const NEAR_SCROLL_VIEWS = 2;
+const OLDER_PRELOAD_VIEWS = 1;
 
 function shownInThread(message: AgentMessage): boolean {
   if (message.kind === "thinking" || message.kind === "memory-changes") return false;
@@ -256,12 +258,37 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: limitedQuoteText(text) }));
   const otherThreads = createMemo(() => props.threads?.filter((thread) => thread.id !== props.task?.id));
   let scroller: HTMLElement | undefined;
+  let messageList: HTMLDivElement | undefined;
   let atEnd = true;
-  let olderAnchor: { firstId: string | undefined; row: Element; top: number } | undefined;
+  let olderAnchor: { firstId: string | undefined; content: HTMLElement; top: number } | undefined;
+  let autoLoadedFirstId: string | undefined | null = null;
+  function firstVisibleRow(element: HTMLElement): HTMLElement | undefined {
+    const viewTop = element.getBoundingClientRect().top;
+    const rows = element.querySelectorAll<HTMLElement>(".virtual-chat-row");
+    for (const row of rows) if (row.getBoundingClientRect().bottom > viewTop) return row;
+    return rows[0];
+  }
+  function contentTop(content: HTMLElement, element: HTMLElement): number {
+    return content.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+  }
   function loadOlder(older: AgentThreadOlderMessages): void {
-    const row = scroller?.querySelector(".virtual-chat-row");
-    if (row) olderAnchor = { firstId: props.messages[0]?.id, row, top: row.getBoundingClientRect().top };
+    const row = scroller && firstVisibleRow(scroller);
+    const content = row?.lastElementChild instanceof HTMLElement ? row.lastElementChild : row;
+    if (scroller && content)
+      olderAnchor = { firstId: props.messages[0]?.id, content, top: contentTop(content, scroller) };
     older.onLoad();
+  }
+  function loadOlderNearTop(element: HTMLElement): void {
+    const older = untrack(() => props.olderMessages);
+    if (!older || older.loading) return;
+    if (element.scrollTop > element.clientHeight * OLDER_PRELOAD_VIEWS) {
+      autoLoadedFirstId = null;
+      return;
+    }
+    const firstId = untrack(() => props.messages[0]?.id);
+    if (firstId === autoLoadedFirstId) return;
+    autoLoadedFirstId = firstId;
+    loadOlder(older);
   }
   createEffect(
     () => props.olderMessages?.loading === true,
@@ -289,12 +316,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (taskId === shownTaskId) return;
       shownTaskId = taskId;
       atEnd = true;
+      olderAnchor = undefined;
+      autoLoadedFirstId = null;
       if (scroller) scroller.scrollTop = scroller.scrollHeight;
     },
   );
   onSettled(() => {
     const element = scroller;
-    const list = element?.firstElementChild;
+    const list = messageList;
     if (!element || !list) return fades.stop;
     let lastTop = element.scrollTop;
     let lastHeight = element.scrollHeight;
@@ -304,18 +333,19 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       else if (scrollTop < lastTop && scrollHeight >= lastHeight) atEnd = false;
       lastTop = scrollTop;
       lastHeight = scrollHeight;
+      loadOlderNearTop(element);
     };
     const follow = new ResizeObserver(() => {
       const anchor = olderAnchor;
       if (anchor && untrack(() => props.messages[0]?.id) !== anchor.firstId) {
         olderAnchor = undefined;
-        element.scrollTop += anchor.row.getBoundingClientRect().top - anchor.top;
-        return;
-      }
-      if (atEnd) element.scrollTop = element.scrollHeight;
+        if (anchor.content.isConnected) element.scrollTop += contentTop(anchor.content, element) - anchor.top;
+      } else if (atEnd) element.scrollTop = element.scrollHeight;
+      loadOlderNearTop(element);
     });
     follow.observe(list);
     if (atEnd) element.scrollTop = element.scrollHeight;
+    loadOlderNearTop(element);
     element.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       follow.disconnect();
@@ -709,7 +739,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         <Show when={props.newerMessages}>
           {(newer) => <ScrollToLatestButton onClick={() => loadLatest(newer())} />}
         </Show>
-        <div class="virtual-chat-list virtual-chat-list-static" ref={fades.watch}>
+        <div
+          class="virtual-chat-list virtual-chat-list-static"
+          ref={(element: HTMLDivElement) => {
+            messageList = element;
+            fades.watch(element);
+          }}
+        >
           <Show when={props.olderMessages}>
             {(older) => (
               <div class="conversation-history-status">

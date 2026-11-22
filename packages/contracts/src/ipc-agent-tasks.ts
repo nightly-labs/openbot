@@ -40,6 +40,7 @@ export const AGENT_TASK_HOLDS = [
   "server-busy",
   "agent-busy",
   "one-turn",
+  "sign-in",
 ] as const;
 export type AgentTaskHold = (typeof AGENT_TASK_HOLDS)[number];
 
@@ -177,6 +178,11 @@ export function agentThreadTitle(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const title = value.trim();
   return title && title.length <= INPUT_LIMITS.agentTaskTitle && !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(title) ? title : null;
+}
+
+export function fitAgentTaskTitle(title: string): string {
+  const limit = INPUT_LIMITS.agentTaskTitle;
+  return title.length > limit ? `${title.slice(0, limit - 1)}…` : title;
 }
 
 function isAgentTaskQueuedMessage(value: unknown): value is AgentTaskQueuedMessage {

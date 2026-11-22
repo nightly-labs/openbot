@@ -144,6 +144,12 @@ export function isRustLogBelowErrorDiagnostic(message: string): boolean {
   return RUST_LOG_RECORD.test(message);
 }
 
+const PI_WARNING_RECORD = /^Warning: /u;
+
+export function isPiWarningDiagnostic(message: string): boolean {
+  return PI_WARNING_RECORD.test(message);
+}
+
 export const LOG_TIMESTAMP_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+/;
 
 export function isUsageLimitDiagnostic(message: string): boolean {
@@ -238,7 +244,7 @@ export function isRequestBodyLimitDiagnostic(message: string): boolean {
 }
 
 export function isUnreadableContentDiagnostic(message: string): boolean {
-  return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
+  return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bmultimodal processing is not enabled\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
     message,
   );
 }

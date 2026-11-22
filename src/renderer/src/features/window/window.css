@@ -211,8 +211,10 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-compact
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     --conversation-header-shift: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
   }
 
@@ -227,8 +229,10 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"]
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     max-width: calc(100% - var(--conversation-header-shift, 0px));
     margin-inline-start: var(--conversation-header-shift, 0px);
     transition:
@@ -268,8 +272,10 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-closed
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     --conversation-header-shift: var(--top-row-tabs-start);
   }
 
@@ -311,7 +317,7 @@
   }
 
   .app-window > .app-frame-edge > .sidebar,
-  .app-window > .app-frame-edge :is(.conversation-panel, .direct-conversation, .diagram-view),
+  .app-window > .app-frame-edge :is(.conversation-panel, .direct-conversation, .workflows-notice),
   .app-window > .app-frame-edge :is(.settings-panel, .browser-panel) {
     background: transparent;
   }
@@ -333,20 +339,8 @@
     > .app-frame-edge
     :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
     > .tab-shape {
-    --tab-shape-curve: var(--openbot-radius-md);
-    position: absolute;
-    z-index: -1;
-    top: var(--tab-shape-top, 0);
-    left: var(--tab-shape-left, 0);
-    right: var(--tab-shape-right, 100%);
+    --tab-shape-fill: var(--openbot-bg-canvas);
     display: block;
-    height: var(--tab-shape-height, 0);
-    border: 1px solid var(--openbot-border);
-    border-bottom: 0;
-    border-start-start-radius: var(--openbot-radius-md);
-    border-start-end-radius: var(--openbot-radius-md);
-    background: var(--openbot-bg-canvas);
-    pointer-events: none;
     transition:
       left var(--openbot-duration-overlay) var(--openbot-ease-out) var(--tab-shape-start-delay, 0ms),
       right var(--openbot-duration-overlay) var(--openbot-ease-out) var(--tab-shape-end-delay, 0ms),
@@ -360,73 +354,6 @@
     :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
     > .tab-shape:is([data-hidden], [data-instant]) {
     transition: none;
-  }
-
-  :root:not([data-openbot-window-glass])
-    .app-window
-    > .app-frame-edge
-    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
-    > .tab-shape[data-hidden] {
-    visibility: hidden;
-  }
-
-  :root:not([data-openbot-window-glass])
-    .app-window
-    > .app-frame-edge
-    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
-    > .tab-shape::before,
-  :root:not([data-openbot-window-glass])
-    .app-window
-    > .app-frame-edge
-    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
-    > .tab-shape::after {
-    position: absolute;
-    bottom: 0;
-    width: calc(var(--tab-shape-curve) + 1px);
-    height: calc(var(--tab-shape-curve) + 1px);
-    content: "";
-  }
-
-  :root:not([data-openbot-window-glass])
-    .app-window
-    > .app-frame-edge
-    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
-    > .tab-shape::before {
-    left: calc(-1 * var(--tab-shape-curve) - 1px);
-    background:
-      radial-gradient(
-        circle at 0 0,
-        transparent var(--tab-shape-curve),
-        var(--openbot-border) var(--tab-shape-curve),
-        var(--openbot-border) calc(var(--tab-shape-curve) + 1px),
-        transparent calc(var(--tab-shape-curve) + 1px)
-      ),
-      radial-gradient(
-        circle at 0 0,
-        transparent var(--tab-shape-curve),
-        var(--openbot-bg-canvas) var(--tab-shape-curve)
-      );
-  }
-
-  :root:not([data-openbot-window-glass])
-    .app-window
-    > .app-frame-edge
-    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
-    > .tab-shape::after {
-    right: calc(-1 * var(--tab-shape-curve) - 1px);
-    background:
-      radial-gradient(
-        circle at 100% 0,
-        transparent var(--tab-shape-curve),
-        var(--openbot-border) var(--tab-shape-curve),
-        var(--openbot-border) calc(var(--tab-shape-curve) + 1px),
-        transparent calc(var(--tab-shape-curve) + 1px)
-      ),
-      radial-gradient(
-        circle at 100% 0,
-        transparent var(--tab-shape-curve),
-        var(--openbot-bg-canvas) var(--tab-shape-curve)
-      );
   }
 
   :root:not([data-openbot-window-glass])
@@ -538,13 +465,6 @@
   .app-window > .app-frame-edge .side-panel-maximized > :is(.settings-panel, .browser-panel) {
     border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
     background: var(--openbot-bg-canvas);
-  }
-
-  .app-window > .app-frame-edge .diagram-view-body {
-    border-top: 0;
-    border-inline-end: 0;
-    border-radius: 0;
-    border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
   }
 
   .app-window > .app-frame-edge .conversation-header-actions {

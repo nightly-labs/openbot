@@ -14,7 +14,8 @@ description: "Edit a draft so that it sounds human and sounds like the user. Lea
 ## Inputs
 
 1. **The draft.** Paste path: text or a file the user gives. Tool path: a document in a signed-in tab in
-   `openbot_browser`, or an installed plugin found with `tool_search` (Notion, Atlassian). Read only.
+   `openbot_browser`, or the tools of an installed plugin (Notion, Atlassian), which
+   `openbot.tool_search` does not list. Read only.
 2. **Voice samples.** 1 to 3 pieces that the user wrote, of 150 words or more in total. The user can paste them or
    point to their published pages or sent mail in a signed-in tab. If there are none, ask once with `ask_user`:
    "Paste 1 to 3 samples of your writing, or should I use a plain neutral voice?"

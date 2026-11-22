@@ -86,6 +86,14 @@ window only by `app` or `window` title removes the cursor, because only the driv
 The driver skips the reads between the steps of a batch and does one read at the end. The tap keeps
 the `screenshot_width` of that end read (`observation.state` in the answer) as of a direct read.
 
+On macOS, driver 0.52.9 keeps no screenshot frame after a read that ends in
+`ax_window_unresolved`: the window exists, but no accessibility window claims it, as with Premiere
+Pro. Every pixel action on that window is then refused as `window_never_read`, also in the
+foreground, and a new full read does the same again (#14480, upstream trycua/cua#6755). A
+screenshot-only read (`include_accessibility_tree: false`, `include_screenshot: true`) has no
+accessibility result to fail, so the driver keeps its frame. The agent instructions name that read
+on macOS. When a driver release with trycua/cua#8117 is pinned, the rule can go.
+
 ### Agent display on a server
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in
@@ -140,6 +148,20 @@ Because the driver draws no cursor, its motion styles do not apply. The renderer
 `adaptive` style itself (`agent-cursor-motion.ts`, a port of the driver's `trajectory.rs`): a Fitts
 min-jerk glide, or a wide swoop for a move over 900 points. The tap does not delay a request, so the
 cursor shows where an action went, from 180 ms to about 1.1 s after the driver acts.
+
+On macOS the daemon gets `CUA_DRIVER_KEEP_DISPLAY_AWAKE=0`, and OpenBot keeps the display awake
+itself. The tap starts before the daemon, and the daemon gets the variable only when the tap listens:
+without the tap, provider calls go to the daemon directly and OpenBot cannot see them, so the
+driver's guard stays on. The driver's own guard holds `PreventUserIdleDisplaySleep` until 600 s after the last tool
+call, and `end_session` counts as a call, so the display stayed on for up to 10 minutes after the
+agent stopped, against the user's display sleep setting. The tap reports each provider tool call.
+`ComputerUseDisplayAwake` (`computer-use-display-awake.ts`) then holds Electron's
+`prevent-display-sleep` blocker, the same assertion, from each call. A `turn-completed` event
+without `continues` releases it when no turn runs, so the hold stays between the turns of one task, and it is always released 600 s after the last call, as the driver's
+guard was. A call outside a turn, such as background provider work, thus keeps the driver's hold
+time, and the display never stays on longer than before. The guard exists because display sleep locks the
+session, and a locked session gives Computer Use no windows and no input. OpenBot's own
+`list_windows` reads for the highlight go to the daemon socket, not to the tap, so they take no hold.
 
 Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 `CUA_DRIVER_RS_UPDATE_CHECK=0`. OpenBot ships the driver, so its vendor analytics are not something
@@ -316,7 +338,8 @@ approval flow.
 Codex loads its bundled Computer Use plugins by default (`computer-use@openai-bundled`, which starts
 `node_repl` and `cua_node`, and `unified-computer-use@openai-bundled`). A session without Computer
 Use sets `plugins.<id>.enabled = false` for both in the thread configuration: an agent with the
-setting off, or a task or channel thread beside the agent's own chat. The thread value wins over the
+setting off, or a task thread beside the agent's own chat. Routine and channel threads keep the
+agent's setting. The thread value wins over the
 user's own Codex file. Codex (0.160 to 0.170) does not read `features.computer_use`, so OpenBot does not use it.
 A loaded session keeps the plugins of its start, so the session fingerprint has a value for a
 session without Computer Use. The next turn replaces a session from before, and a session whose

@@ -20,6 +20,9 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "De agent is gestopt voordat hij deze stap beantwoordde. Voer de stap opnieuw uit.",
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
+  "error.workflow.answerInvalid":
+    "Het antwoord had niet de velden die deze stap vraagt: {fields}. Voer de stap opnieuw uit.",
+  "error.workflow.checkInvalid": "De controle van deze stap is ongeldig. Corrigeer hem en voer de stap opnieuw uit.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
   "error.workflow.modelTimedOut":
     "Het model antwoordde niet op tijd. Kies een lager denkniveau of een sneller model voor deze stap en voer hem opnieuw uit.",
@@ -36,6 +39,7 @@ export const messages = {
     "OpenBot kon de provider niet bereiken. Controleer de internetverbinding en voer de stap dan opnieuw uit.",
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
   "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
+  "error.workflow.mediaNotMade": "Het model heeft de afbeelding of video niet gemaakt. Het antwoordde: {answer}",
   "error.workflow.pictureMissing": "De afbeelding staat niet meer op de server. Stuur hem opnieuw.",
   "error.workflow.pictureType": "Gebruik een PNG-, JPEG- of WebP-afbeelding.",
   "error.workflow.mediaInputMissing":

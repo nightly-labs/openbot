@@ -7,6 +7,7 @@ import type {
   AgentDockSeatRef as AgentDockSeatContract,
   AgentRuntimeApproval,
 } from "@openbot/contracts/ipc";
+import { AGENT_DOCK_LIMITS, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AgentDock,
@@ -22,14 +23,20 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
-import { windowShape } from "../../window-shape";
-import { AGENT_DOCK_STRIP_REST, AGENT_DOCK_STRIP_WIDTH, AgentDockEdgeStrip } from "./AgentDockEdgeStrip";
+import { windowExtent, windowShape } from "../../window-shape";
+import {
+  AGENT_DOCK_STRIP_FEEL,
+  AGENT_DOCK_STRIP_REST,
+  AGENT_DOCK_STRIP_WIDTH,
+  AgentDockEdgeStrip,
+} from "./AgentDockEdgeStrip";
 import { agentDockPort } from "./agent-dock-port";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
 const TUCK_DELAY_MS = 900;
 const EDGE_STRIP = 4;
 const SHAPED_WINDOW = currentDevicePlatform() === "linux" || currentDevicePlatform() === "win32";
+const FITTED_WINDOW = currentDevicePlatform() === "darwin";
 const POINTER_ZONE_WHILE_MOVING = currentDevicePlatform() === "win32";
 
 export function AgentDockSurface() {
@@ -57,6 +64,7 @@ export function AgentDockSurface() {
   let sent: { interactive: boolean; keyboard: boolean } | null = null;
   let dockShape: readonly AgentDockShapeRect[] | null = null;
   let sentShape = "";
+  let sentExtent = "";
   let failed: { seatKey: string; text: string; clientMessageId: string } | null = null;
 
   const apply = (next: AgentDockPresentation | null) => {
@@ -102,24 +110,50 @@ export function AgentDockSurface() {
   const stripOn = () => (presentation()?.autoHide ?? false) && (presentation()?.edgeStrip ?? false);
   const asks = createMemo(() => (presentation()?.seats ?? []).some((seat) => seat.state?.kind === "waiting"));
 
+  function tuckedStrip(body: DOMRect | undefined, reach: number): AgentDockShapeRect {
+    const width = body ? AGENT_DOCK_STRIP_WIDTH + reach : EDGE_STRIP;
+    const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
+    if (!body) {
+      return {
+        x,
+        y: window.innerHeight / 2 - AGENT_DOCK_LIMITS.inputExtent,
+        width,
+        height: AGENT_DOCK_LIMITS.inputExtent * 2,
+      };
+    }
+    return {
+      x,
+      y: Math.round(body.top + (body.height * (1 - AGENT_DOCK_STRIP_REST)) / 2) - reach,
+      width,
+      height: Math.round(body.height * AGENT_DOCK_STRIP_REST) + reach * 2,
+    };
+  }
+
+  function syncExtent() {
+    const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
+    const extent =
+      dockShape === null || pointerIn || menuOpen()
+        ? null
+        : windowExtent(
+            isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
+            presentation()?.edge ?? "right",
+          );
+    const key = JSON.stringify(extent);
+    if (key === sentExtent) return;
+    sentExtent = key;
+    void agentDockPort()
+      .agentDock.setExtent(extent)
+      .catch(() => undefined);
+  }
+
   function syncShape() {
+    if (FITTED_WINDOW) syncExtent();
     if (!SHAPED_WINDOW) return;
     const whole = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
     const parts = dockShape === null || menuOpen() ? [whole] : [...dockShape];
     if (isTucked) {
       const body = edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
-      const width = body ? AGENT_DOCK_STRIP_WIDTH : EDGE_STRIP;
-      const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
-      parts.push(
-        body
-          ? {
-              x,
-              y: Math.round(body.top + (body.height * (1 - AGENT_DOCK_STRIP_REST)) / 2),
-              width,
-              height: Math.round(body.height * AGENT_DOCK_STRIP_REST),
-            }
-          : { x, y: 0, width, height: window.innerHeight },
-      );
+      parts.push(tuckedStrip(body, 0));
     }
     const shape = POINTER_ZONE_WHILE_MOVING && dockShape === null && !menuOpen() ? [] : windowShape(parts);
     const key = JSON.stringify(shape);
@@ -132,6 +166,7 @@ export function AgentDockSurface() {
 
   const sync = () => {
     updateTuck();
+    if (FITTED_WINDOW) syncExtent();
     const next = { interactive: pointerIn, keyboard: chatOpen || menuOpen() };
     if (next.interactive === sent?.interactive && next.keyboard === sent.keyboard) return;
     sent = next;
@@ -284,6 +319,7 @@ export function AgentDockSurface() {
       });
       return true;
     },
+    takeoverDone: ({ request }) => server === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, server),
     usageLimitSend: async (limit, option, remember) => {
       await perform({
@@ -323,7 +359,7 @@ export function AgentDockSurface() {
             side={presentation()?.edge ?? "right"}
             tucked={tucked()}
             onShapeChange={
-              SHAPED_WINDOW
+              SHAPED_WINDOW || FITTED_WINDOW
                 ? (parts) => {
                     dockShape = parts;
                     syncShape();

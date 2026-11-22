@@ -90,6 +90,7 @@ export const messages = defineMessages("error.team", {
   "error.team.routineFlowStopUnsupported": "This connection cannot stop a routine run.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
   "error.team.libraryFoldersUnsupported": "Library folders are not supported by this connection.",
+  "error.team.workflowFoldersUnsupported": "Workflow folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
     "This server cannot keep your own notification level for each agent. Update OpenBot on the computer that runs it.",
   "error.team.sidebarPinsUnsupported":
@@ -129,6 +130,7 @@ export const messages = defineMessages("error.team", {
   "error.team.routineResultsUnsupported": "Routine destinations are not supported by this connection.",
   "error.team.agentMemoryLimitUnsupported": "The agent memory limit is not supported by this connection.",
   "error.team.agentFoldersUnsupported": "The agent folders are not supported by this connection.",
+  "error.team.channelFoldersUnsupported": "The channel folders are not supported by this connection.",
   "error.team.folderUnavailable": "This folder is not available on the host computer.",
   "error.team.memoryReviewUnsupported": "The memory review is not supported by this connection.",
   "error.team.skillLearningUnsupported": "Skill learning is not supported by this connection.",
@@ -153,6 +155,8 @@ export const messages = defineMessages("error.team", {
   "error.team.mcpUnsupported": "MCP servers are not supported by this connection.",
   "error.team.mcpServerListNeedsUpdate":
     "Update OpenBot on this device to use more than {limit} MCP servers on this server.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Update OpenBot on this device to use more than {limit} accounts of one provider on this server.",
   "error.team.storageUnsupported": "Storage is not supported by this connection.",
   "error.team.machineResourcesUnsupported": "Machine use is not supported by this connection.",
   "error.team.machineAlertMemberInvalid": "Only an owner or admin of this server can get machine alerts.",
@@ -195,6 +199,7 @@ export const messages = defineMessages("error.team", {
   "error.team.hostPersonalityUnsupported": "The server personality is not supported by this connection.",
   "error.team.agentWaitsUnsupported": "Open waits are not supported by this connection.",
   "error.team.pendingApprovalUnsupported": "Reading a whole approval is not supported by this connection.",
+  "error.team.pendingPromptsUnsupported": "Reading the open questions is not supported by this connection.",
   "error.team.phoneFeedbackUnsupported": "Sending a report from the phone app is not supported by this connection.",
   "error.team.messagePinsUnsupported": "Pinned messages are not supported by this connection.",
   "error.team.queuedMessageThreadUnsupported":

@@ -56,7 +56,7 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
 export async function launchBenchApp(options: LaunchBenchAppOptions): Promise<BenchApp> {
   const { projectRoot, instanceId, logger } = options;
   if (!existsSync(join(projectRoot, "out", "main", "index.js"))) {
-    throw new Error("No built app in out/. Run `bun run build` first.");
+    throw new Error("No built app in out/. Run `bun run build` or `bun run build:bench` first.");
   }
   const executable = electronExecutable(projectRoot);
   const startedAt = Date.now();
@@ -71,19 +71,24 @@ export async function launchBenchApp(options: LaunchBenchAppOptions): Promise<Be
       mkdirSync(dirname(options.logPath), { recursive: true });
       logFile = openSync(options.logPath, "a", 0o600);
     }
-    const spawned = spawn(executable, [`--inspect=127.0.0.1:${inspectorPort}`, projectRoot], {
-      cwd: projectRoot,
-      detached: true,
-      stdio: logFile === null ? "ignore" : ["ignore", logFile, logFile],
-      env: {
-        ...withoutElectronRuntimeFlags(process.env),
-        OPENBOT_APP_VARIANT: "preview",
-        OPENBOT_DEV_PROFILE: "app",
-        OPENBOT_DEV_INSTANCE_ID: instanceId,
-        OPENBOT_DEV_REMOTE_DEBUGGING_PORT: String(remoteDebuggingPort),
-        ...options.environment,
+    const linuxCi = process.platform === "linux" && process.env.CI === "true";
+    const spawned = spawn(
+      executable,
+      [`--inspect=127.0.0.1:${inspectorPort}`, ...(linuxCi ? ["--no-sandbox"] : []), projectRoot],
+      {
+        cwd: projectRoot,
+        detached: true,
+        stdio: logFile === null ? "ignore" : ["ignore", logFile, logFile],
+        env: {
+          ...withoutElectronRuntimeFlags(process.env),
+          OPENBOT_APP_VARIANT: "preview",
+          OPENBOT_DEV_PROFILE: "app",
+          OPENBOT_DEV_INSTANCE_ID: instanceId,
+          OPENBOT_DEV_REMOTE_DEBUGGING_PORT: String(remoteDebuggingPort),
+          ...options.environment,
+        },
       },
-    });
+    );
     if (logFile !== null) closeSync(logFile);
     if (spawned.pid === undefined) throw new Error("Electron did not start.");
     const stack: DevStackRecord = {

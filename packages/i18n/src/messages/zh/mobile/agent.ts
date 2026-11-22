@@ -310,6 +310,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "该服务商没有可用模型。",
   "mobile.agent.runtime.searchModels": "搜索模型",
   "mobile.agent.runtime.noMatches": "没有匹配的模型。",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "没有匹配的模型。你在 openrouter.ai 上的隐私、提供商和防护设置可能会在此列表中隐藏部分模型。",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "在 Windows 和 Linux 上，此提供商无法以“仅工作区”运行。要使用它，请先更改“权限”。",
   "mobile.agent.runtime.usageLimit": "已达用量上限",
@@ -384,6 +386,9 @@ export const messages = {
   "mobile.agent.browserProfile.saveFailed": "OpenBot 无法更改助手的浏览器配置文件。",
   "mobile.agent.planCard.label": "长任务开始前显示计划",
   "mobile.agent.planCard.footer": "长任务开始前，助手会先显示计划。10 秒后或你点按“开始”时，任务开始。",
+  "mobile.agent.builtinMemory.label": "OpenBot 记忆",
+  "mobile.agent.builtinMemory.footer":
+    "助手会保存并读取自己的记忆。关闭后只使用记忆应用，例如 Mem0。已保存的记忆会保留。",
   "mobile.agent.workspace.title": "工作区文件夹",
   "mobile.agent.workspace.footer": "该助手在主机电脑上的文件夹。",
   "mobile.agent.advanced.behavior": "行为",
@@ -462,6 +467,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "这台主机不支持从远程设备发布助手。",
   "mobile.agent.usage.tokensWithoutCacheReads": "不含缓存读取的 token",
   "mobile.agent.usage.estimatedCost": "预计费用",
+  "mobile.agent.usage.noCostEstimate": "无费用估算",
   "mobile.agent.usage.daily": "每日用量",
   "mobile.agent.usage.tokens": "Token",
   "mobile.agent.usage.cost": "费用",
@@ -579,7 +585,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "未打开聊天",
   "mobile.agent.home.noChatOpenBody": "请在列表中选择一个聊天。",
   "mobile.agent.home.chatListWidth": "聊天列表宽度",
-  "mobile.agent.home.serverTitle": "{name}，打开服务器列表",
   "mobile.agent.home.waiting": "等待连接",
   "mobile.agent.home.waitingBody": "该服务器连接成功后就会加载助手列表。",
   "mobile.agent.home.noAgents": "该服务器上没有助手",

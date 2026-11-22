@@ -18,6 +18,9 @@ export const messages = {
   "error.workflow.agentStepEnded": "Wiadomość do agenta została usunięta, zanim odpowiedział.",
   "error.workflow.agentStepStopped": "Agent zatrzymał się, zanim odpowiedział na ten krok. Uruchom krok ponownie.",
   "error.workflow.conditionUnclear": "Model nie odpowiedział tak ani nie.",
+  "error.workflow.answerInvalid": "Odpowiedź nie miała pól, których wymaga ten krok: {fields}. Uruchom krok ponownie.",
+  "error.workflow.checkInvalid":
+    "Warunek sprawdzenia w tym kroku jest nieprawidłowy. Popraw go i uruchom krok ponownie.",
   "error.workflow.modelFailed": "Model nie mógł odpowiedzieć. Uruchom krok ponownie.",
   "error.workflow.modelTimedOut":
     "Model nie odpowiedział na czas. Wybierz mniejszy wysiłek lub szybszy model dla tego kroku, a potem uruchom go ponownie.",
@@ -33,6 +36,7 @@ export const messages = {
     "OpenBot nie mógł połączyć się z dostawcą. Sprawdź połączenie z internetem, a potem uruchom krok ponownie.",
   "error.workflow.modelBusy": "Trwa inne zapytanie do modelu. Uruchom krok ponownie za chwilę.",
   "error.workflow.mediaFailed": "Model nie mógł utworzyć obrazu ani wideo. Uruchom krok ponownie.",
+  "error.workflow.mediaNotMade": "Model nie utworzył obrazu ani wideo. Odpowiedź modelu: {answer}",
   "error.workflow.pictureMissing": "Obrazu nie ma już na serwerze. Wyślij go ponownie.",
   "error.workflow.pictureType": "Użyj obrazu PNG, JPEG lub WebP.",
   "error.workflow.mediaInputMissing": "Obraz z wcześniejszego kroku jest niedostępny. Uruchom ten krok ponownie.",

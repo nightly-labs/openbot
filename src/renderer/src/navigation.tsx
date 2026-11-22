@@ -254,7 +254,7 @@ const Navigation = createSimpleContext({
     onSettled(() => {
       const onKeyDown = (event: KeyboardEvent) => {
         if (handledElsewhere(event)) return;
-        const command = chatHistoryShortcut(event, platform.appInfo()?.platform === "darwin");
+        const command = chatHistoryShortcut(event);
         if (!command) return;
         event.preventDefault();
         if (command === "back") goBack();

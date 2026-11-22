@@ -24,6 +24,7 @@ interface LibraryFolderTilesProps {
   fileCount: (folderId: string) => number;
   folderCount: (folderId: string) => number;
   peek: (folderId: string) => readonly StoredFileRow[];
+  pictureUrl: (file: StoredFileRow) => string | null;
   newTarget: LibraryNewFolderTarget | null;
   newMark: (agentId: string, parentId: string | undefined) => "into" | undefined;
   dropMark: (agentId: string, folderId: string | null) => LibraryDropMark | undefined;
@@ -45,8 +46,8 @@ interface LibraryFolderTilesProps {
 
 const PEEK = 3;
 
-function PeekFile(props: { file: StoredFileRow }) {
-  const picture = () => (fileTypeOf(props.file) === "images" ? props.file.previewUrl : undefined);
+function PeekFile(props: { file: StoredFileRow; pictureUrl: (file: StoredFileRow) => string | null }) {
+  const picture = () => (fileTypeOf(props.file) === "images" ? props.pictureUrl(props.file) : undefined);
   return (
     <span
       class="library-folder-card-sheet"
@@ -87,7 +88,7 @@ function FolderCard(props: { tiles: LibraryFolderTilesProps; folder: LibraryFold
     <>
       <span class="library-folder-card-art" aria-hidden="true">
         <For each={peek()} keyed={(file) => file.id}>
-          {(file) => <PeekFile file={file()} />}
+          {(file) => <PeekFile file={file()} pictureUrl={tiles().pictureUrl} />}
         </For>
       </span>
       <span class="library-folder-card-front">

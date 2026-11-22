@@ -404,9 +404,10 @@ export class McpGateway {
 
   signInApp(input: McpSignInAppInput): McpSignInAppState {
     const config = this.#httpRow(input.mcpServerId);
+    const oauth = this.#oauth;
     return {
-      redirectUrl: this.#oauth?.redirectUrl ?? null,
-      app: config && this.#oauth ? this.#oauth.signInApp(config.url) : null,
+      redirectUrl: oauth && config ? oauth.signInAppRedirectUrl(config.url) : (oauth?.redirectUrl ?? null),
+      app: config && oauth ? oauth.signInApp(config.url) : null,
     };
   }
 

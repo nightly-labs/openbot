@@ -93,6 +93,7 @@ export { default as Inbox } from "lucide-solid/icons/inbox";
 export { default as Info } from "lucide-solid/icons/info";
 export { default as KeyRound } from "lucide-solid/icons/key-round";
 export { default as KeySquare } from "lucide-solid/icons/key-square";
+export { default as Keyboard } from "lucide-solid/icons/keyboard";
 export { default as Layers } from "lucide-solid/icons/layers";
 export { default as LayoutDashboard } from "lucide-solid/icons/layout-dashboard";
 export { default as LayoutGrid } from "lucide-solid/icons/layout-grid";
@@ -118,6 +119,7 @@ export { default as MessageCircleQuestionMark } from "lucide-solid/icons/message
 export { default as MessageSquare } from "lucide-solid/icons/message-square";
 export { default as MessageSquareReply } from "lucide-solid/icons/message-square-reply";
 export { default as MessageSquareText } from "lucide-solid/icons/message-square-text";
+export { default as MessagesSquare } from "lucide-solid/icons/messages-square";
 export { default as Mic } from "lucide-solid/icons/mic";
 export { default as MicOff } from "lucide-solid/icons/mic-off";
 export { default as Minimize2 } from "lucide-solid/icons/minimize-2";
@@ -127,6 +129,7 @@ export { default as MonitorSmartphone } from "lucide-solid/icons/monitor-smartph
 export { default as Moon } from "lucide-solid/icons/moon";
 export { default as MousePointer2 } from "lucide-solid/icons/mouse-pointer-2";
 export { default as MousePointerClick } from "lucide-solid/icons/mouse-pointer-click";
+export { default as Network } from "lucide-solid/icons/network";
 export { default as OctagonX } from "lucide-solid/icons/octagon-x";
 export { default as Option } from "lucide-solid/icons/option";
 export { default as Palette } from "lucide-solid/icons/palette";

@@ -19,7 +19,6 @@ export const messages = defineMessages("webClient", {
   "webClient.login.responseInvalid": "The sign-in response is invalid.",
   "webClient.pane.navigation": "Workspace navigation",
   "webClient.pane.chat": "Chat",
-  "webClient.pane.routines": "Routines",
   "webClient.pane.workspace": "Workspace",
   "webClient.phoneApp.title": "Use the OpenBot app",
   "webClient.phoneApp.description": "On a phone, OpenBot works best in the app. Sign in with the same email.",

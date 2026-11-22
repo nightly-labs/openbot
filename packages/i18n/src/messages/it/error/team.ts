@@ -103,6 +103,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Questa connessione non può fermare l’esecuzione di una routine.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.libraryFoldersUnsupported": "Le cartelle della Libreria non sono supportate da questa connessione.",
+  "error.team.workflowFoldersUnsupported": "Questa connessione non supporta le cartelle di workflow.",
   "error.team.agentNotificationLevelsUnsupported":
     "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.sidebarPinsUnsupported":
@@ -144,6 +145,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
   "error.team.agentMemoryLimitUnsupported": "Questa connessione non supporta il limite di memorie degli agenti.",
   "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",
+  "error.team.channelFoldersUnsupported": "Questa connessione non supporta le cartelle dei canali.",
   "error.team.folderUnavailable": "Questa cartella non è disponibile sul computer host.",
   "error.team.memoryReviewUnsupported": "Questa connessione non supporta la revisione delle memorie.",
   "error.team.skillLearningUnsupported": "Questa connessione non supporta l’apprendimento delle skill.",
@@ -165,6 +167,8 @@ export const messages = {
   "error.team.mcpUnsupported": "I server MCP non sono supportati da questa connessione.",
   "error.team.mcpServerListNeedsUpdate":
     "Aggiorna OpenBot su questo dispositivo per usare più di {limit} server MCP su questo server.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Aggiorna OpenBot su questo dispositivo per usare più di {limit} account di un provider su questo server.",
   "error.team.storageUnsupported": "L'archiviazione non è supportata da questa connessione.",
   "error.team.machineResourcesUnsupported": "L'uso della macchina non è supportato da questa connessione.",
   "error.team.machineAlertMemberInvalid":
@@ -208,6 +212,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
   "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
   "error.team.pendingApprovalUnsupported": "Questa connessione non permette di leggere un'approvazione completa.",
+  "error.team.pendingPromptsUnsupported": "Questa connessione non permette di leggere le domande aperte.",
   "error.team.phoneFeedbackUnsupported":
     "Questa connessione non permette di inviare una segnalazione dall'app del telefono.",
   "error.team.messagePinsUnsupported": "Questa connessione non supporta i messaggi fissati.",

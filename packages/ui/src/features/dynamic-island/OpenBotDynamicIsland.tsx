@@ -413,7 +413,8 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   const [outgoingPresentation, setOutgoingPresentation] = createSignal<DynamicIslandPresentation>();
   const [modeTransitioning, setModeTransitioning] = createSignal(false);
   const [hovered, setHovered] = createSignal(false);
-  const ambientMotion = hovered;
+  const windowMotion = useAmbientMotion();
+  const ambientMotion = () => windowMotion() && hovered();
   let transitionRoot: HTMLDivElement | undefined;
   let modeAnimations: Animation[] = [];
   let modeTransitionVersion = 0;

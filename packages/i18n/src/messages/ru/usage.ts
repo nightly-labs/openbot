@@ -9,6 +9,7 @@ export const messages = {
   "usage.period.days90": "90 дней",
   "usage.period.year": "1 год",
   "usage.unavailable": "Недоступно",
+  "usage.noCostEstimate": "Нет оценки стоимости",
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "Токенов: {tokens}",
   "usage.chart.costDescription":

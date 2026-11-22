@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "{name} を再起動できませんでした",
   "app.provider.included": "{name} は OpenBot に含まれています。",
   "app.clipboard.copyFailed": "テキストをコピーできませんでした。",
-  "app.voice.tooLong": "音声の録音は 2 分までです。",
+  "app.voice.tooLong": "音声の録音は 10 分までです。",
   "app.avatar.type": "PNG、JPEG、GIF、または WebP の画像を選んでください。",
   "app.avatar.size": "10 MB より小さい画像を選んでください。",
   "app.avatar.processingUnavailable": "画像を処理できません。",
