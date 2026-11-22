@@ -34,7 +34,7 @@ import {
   TriangleAlert,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { ProviderAccountRenameField } from "../../components/ProviderAccountList";
 import { type ConnectorDetail, ConnectorDetailPanel, connectorDescription } from "../connectors/ConnectorDetailPanel";
 import type { ConnectorId } from "../connectors/connectors";
@@ -667,6 +667,9 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
   const model = () => props.scope.model;
   const [confirm, setConfirm] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
+  // The id, not the row: the row is a new object at each connector poll (every 3 s), and a new card
+  // would lose the sign-in or test result it shows (#12431).
+  const serverId = createMemo(() => props.app.server.id);
   const remove = () => {
     setBusy(true);
     void model()
@@ -728,7 +731,7 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
       </SettingsSection>
       <Show when={model().canConnectApps() ? model().servers : undefined}>
         {/* In JSX, so the card follows the slot and the row. */}
-        {(slots) => <>{slots().controls({ id: props.app.server.id })}</>}
+        {(slots) => <>{slots().controls({ id: serverId() })}</>}
       </Show>
       <Show when={model().mcpAccess}>
         {(access) => (
