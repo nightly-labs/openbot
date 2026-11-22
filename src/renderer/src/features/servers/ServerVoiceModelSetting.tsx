@@ -39,14 +39,16 @@ export function ServerVoiceModelSetting(
   const [snapshot, setSnapshot] = createSignal<HostVoiceModel | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
   let generation = 0;
+  let writeGeneration = 0;
 
   function load(serverId: string): void {
     const current = ++generation;
+    const writes = writeGeneration;
     untrack(calls)
       .getVoiceModel(serverId)
       .then(
         (next) => {
-          if (current !== generation) return;
+          if (current !== generation || writes !== writeGeneration) return;
           setSnapshot(next);
           setLoadError(null);
         },
@@ -116,10 +118,10 @@ export function ServerVoiceModelSetting(
 
   function change(action: HostVoiceModelAction, modelId: LocalVoiceModelId): void {
     const serverId = props.serverId;
-    const request = ++generation;
+    const request = ++writeGeneration;
     void props.run("voice-model", async () => {
       const next = await calls().changeVoiceModel({ action, modelId }, serverId);
-      if (request === generation) setSnapshot(next);
+      if (request === writeGeneration && serverId === props.serverId) setSnapshot(next);
     });
   }
 
@@ -154,6 +156,7 @@ export function ServerVoiceModelSetting(
         </Show>
       </ItemGroup>
       <ModelDownloadToasts
+        scope={`server-${props.serverId}`}
         downloads={downloads()}
         running={running()}
         onCancel={(modelId) => {

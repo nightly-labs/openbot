@@ -21,6 +21,7 @@ import type {
   CentralAuthState,
   CentralAuthUser,
   ComputerUseState,
+  HostVoiceModelChange,
   ProviderRuntimeSnapshot,
   SpeechModelStatus,
   VoiceModelStatus,
@@ -3234,10 +3235,14 @@ export async function createApplicationServices({
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
       timezone: serverTimezone,
-      voiceModel: {
-        snapshot: () => hostVoiceModel.snapshot(),
-        change: (change) => hostVoiceModel.change(change),
-      },
+      ...(hostedServer || serverModeEnvironment || localServerChild
+        ? {
+            voiceModel: {
+              snapshot: () => hostVoiceModel.snapshot(),
+              change: (change: HostVoiceModelChange) => hostVoiceModel.change(change),
+            },
+          }
+        : {}),
       turnLimits: hostTurnLimits,
       ...(serverModeEnvironment
         ? {

@@ -291,6 +291,7 @@ export interface ModelDownload {
 }
 
 interface ModelDownloadToastsProps {
+  scope?: string;
   downloads: readonly ModelDownload[];
   running: readonly string[];
   onCancel: (id: string) => void;
@@ -313,7 +314,7 @@ export function ModelDownloadToasts(props: ModelDownloadToastsProps) {
   const owner = getOwner();
   const open = new Map<string, () => void>();
   const cancelled = new Set<string>();
-  const toastId = (id: string) => `voice-model-${id}`;
+  const toastId = (id: string) => (props.scope ? `voice-model-${props.scope}-${id}` : `voice-model-${id}`);
   const download = (id: string) => props.downloads.find((entry) => entry.id === id);
 
   const raise = (id: string) => {

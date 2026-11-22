@@ -58,8 +58,7 @@ export function ServerVoiceModelScreen() {
       return t("mobile.server.settings.voiceModelDownloading", {
         percent: format.percent((current.progress ?? 0) / 100, { maximumFractionDigits: 0 }),
       });
-    if (current?.phase === "error")
-      return errorMessage(current.message, t("mobile.server.settings.voiceModelSaveFailed"));
+    if (current?.phase === "error") return errorMessage(current.message, t("error.voice.downloadFailed"));
     return t("mobile.server.settings.voiceModelSize", { size: format.fileSize(model.bytes) });
   };
 

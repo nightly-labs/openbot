@@ -1040,7 +1040,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
-| `host-voice-model-v1` | Read the speech recognition model of the host and its downloads, and select, download, stop or remove a model. Owner or admin. Protocol 10 only | `hostAdmin` |
+| `host-voice-model-v1` | Read the speech recognition model of the host and its downloads, and select, download, stop or remove a model. Owner or admin. Only a server in server mode, a hosted server or a server on a computer advertises it: the desktop app of a person keeps the model in its own Settings > Voice. Protocol 10 only | `hostAdmin` |
 | `host-turn-limits-v1` | Read and set the turns at the same time on the host (1 to 128, unlimited, or automatic) and the default task limit of an agent (1 to 64). Owner or admin. Protocol 9 only | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
