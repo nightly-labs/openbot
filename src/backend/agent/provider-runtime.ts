@@ -2066,6 +2066,13 @@ export class ProviderRuntime implements ProviderPort {
     if (!this.#clients.has(harness)) {
       if (this.#released.has(harness))
         yield* this.ensureProvider(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope));
+      else if (this.#waitsForEndpoint(harness)) {
+        yield* this.#startProvider(harness, { preserveCheckErrors: true }).pipe(
+          Effect.ignore,
+          Effect.forkIn(this.#scope),
+        );
+        return "restarted";
+      }
       return "not-running";
     }
     if (this.#hooks.isProviderBusy(harness)) {
@@ -2081,6 +2088,15 @@ export class ProviderRuntime implements ProviderPort {
     }
     return "restarted";
   }, Effect.uninterruptible).bind(this);
+
+  #waitsForEndpoint(harness: CustomProviderHarness): boolean {
+    return (
+      !this.#off.has(harness) &&
+      this.signInRequired(harness) &&
+      !this.#cliLogin.has(harness) &&
+      !this.#providerConnectionCommands.has(harness)
+    );
+  }
 
   readonly reloadAgentEnvironment = Effect.fn("ProviderRuntime.reloadAgentEnvironment")(function* (
     this: ProviderRuntime,
