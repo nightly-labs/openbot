@@ -563,7 +563,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (delivery.status === "completed") {
             if (delivery.error) return settle(step, { status: "failed", error: delivery.error });
             const fields = answerFields(step.settings);
-            if (fields.length > 0 && step.output !== null) return settle(step, { status: "done", output: step.output });
+            const toolAnswer = fields.length > 0 ? (runs.step(step.id)?.output ?? null) : null;
+            if (toolAnswer !== null) return settle(step, { status: "done", output: toolAnswer });
             const answer = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             const output = answer === null || isNoUpdateAnswer(answer) ? "" : answer;
             if (fields.length === 0) return settle(step, { status: "done", output });
