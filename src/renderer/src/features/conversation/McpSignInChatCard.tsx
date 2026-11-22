@@ -34,13 +34,19 @@ export function McpSignInChatCard(props: McpSignInChatCardProps) {
     if (checking()) return "checking";
     return props.signedIn ? "signed-in" : "sign-in";
   };
+  const savedRow = async (serverId: string) => {
+    const rows = await conversationRuntime(view).agent.listMcpServers(serverId);
+    return rows.find((row) => row.id === props.config.id && row.transport === "http");
+  };
   const worksWithoutSignIn = async (): Promise<boolean> => {
     const serverId = view.server?.id;
     const test = conversationRuntime(view).agent.testMcpServer;
-    if (!serverId || !test || !heldByAppWithoutSignIn(props.config)) return false;
+    if (!serverId || !test) return false;
     setChecking(true);
     try {
-      return (await test({ config: props.config }, serverId)).error === null;
+      const row = await savedRow(serverId);
+      if (!row || !heldByAppWithoutSignIn(row)) return false;
+      return (await test({ config: row }, serverId)).error === null;
     } catch {
       return false;
     } finally {
