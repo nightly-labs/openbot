@@ -116,11 +116,29 @@ type RemoteTeamCommandInput =
       downloadSize?: number;
     };
 
+const partialFile = (uri: string) => new File(`${uri}.part`);
+
 function removePartialFile(uri: string) {
   try {
-    const file = new File(uri);
-    if (file.exists) file.delete();
+    const part = partialFile(uri);
+    if (part.exists) part.delete();
   } catch {}
+}
+
+async function keepDownloadedFile(uri: string, size: number) {
+  const file = new File(uri);
+  if (file.exists && file.size === size) return removePartialFile(uri);
+  try {
+    await partialFile(uri).move(file, { overwrite: true });
+  } catch (error) {
+    removePartialFile(uri);
+    throw error;
+  }
+}
+
+function savedTo(result: RemoteTeamCommandResult, uri: string) {
+  const file = isDynamicRecord(result.body) ? result.body.file : undefined;
+  return result.ok && isDynamicRecord(file) && file.ref === uri;
 }
 
 function liveVoiceErrorText(path: string, status: number, body: unknown): string | null {
@@ -218,24 +236,29 @@ export const RemoteTeamTransport = memo(
                 }
               : { id, type: "disconnect" };
         const fileRef = command.type === "request" ? command.upload?.file?.ref : undefined;
-        const savedFile = command.type === "request" ? command.largeDownload?.file : undefined;
+        const saved = command.type === "request" ? command.largeDownload : undefined;
+        const savedFile = saved?.file;
         if (!onUploadProgress && !onDownloadProgress && !fileRef && !savedFile) return mailbox.send(command);
         if (onUploadProgress) uploadListeners.current.set(id, onUploadProgress);
         if (onDownloadProgress) downloadListeners.current.set(id, onDownloadProgress);
         if (fileRef) uploadFiles.current.set(fileRef, (uploadFiles.current.get(fileRef) ?? 0) + 1);
         if (savedFile) downloadFiles.current.add(savedFile);
-        const sent = savedFile
-          ? mailbox.send(command).then(
-              (result) => {
-                if (!result.ok) removePartialFile(savedFile);
-                return result;
-              },
-              (error: unknown) => {
-                removePartialFile(savedFile);
-                throw error;
-              },
-            )
-          : mailbox.send(command);
+        const sent =
+          saved && savedFile
+            ? mailbox.send(command).then(
+                async (result) => {
+                  downloadFiles.current.delete(savedFile);
+                  if (savedTo(result, savedFile)) await keepDownloadedFile(savedFile, saved.maxBytes);
+                  else removePartialFile(savedFile);
+                  return result;
+                },
+                (error: unknown) => {
+                  downloadFiles.current.delete(savedFile);
+                  removePartialFile(savedFile);
+                  throw error;
+                },
+              )
+            : mailbox.send(command);
         return sent.finally(() => {
           uploadListeners.current.delete(id);
           downloadListeners.current.delete(id);
@@ -421,7 +444,7 @@ export const RemoteTeamTransport = memo(
       digestUploadFile: async (ref: string) => uploadFile(ref).digest("SHA-256"),
       writeDownloadFile: async ({ ref, base64, append }: { ref: string; base64: string; append: boolean }) => {
         if (!downloadFiles.current.has(ref)) throw new Error("The file is not part of a download.");
-        await new File(ref).write(base64, { encoding: "base64", append });
+        await partialFile(ref).write(base64, { encoding: "base64", append });
       },
       readUploadFile: async ({ ref, offset, length }: { ref: string; offset: number; length: number }) => {
         const handle = uploadFile(ref).open(FileMode.ReadOnly);
