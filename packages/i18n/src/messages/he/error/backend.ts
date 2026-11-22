@@ -53,6 +53,8 @@ export const messages = {
   "error.backend.browserSignInOpenFailed": "OpenBot לא הצליח לפתוח את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
+  "error.backend.browserHttpSignInInactive": "האתר הזה כבר לא מבקש התחברות. יש לטעון מחדש את הדף כדי לנסות שוב.",
+  "error.backend.browserHttpSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות לאתר.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",
   "error.backend.browserUrlProtocol": "מותר להשתמש רק בכתובות דפדפן של HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine לא הפך למוכן.",

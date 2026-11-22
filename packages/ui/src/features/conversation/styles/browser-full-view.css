@@ -99,6 +99,52 @@ body[data-browser-full-view] .app-frame {
   font-size: var(--openbot-text-sm);
 }
 
+.browser-http-sign-in {
+  display: flex;
+  min-width: 0;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-http-sign-in-text {
+  display: flex;
+  min-width: 12rem;
+  flex: 1 1 16rem;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.browser-http-sign-in-text svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.browser-http-sign-in-error {
+  color: var(--openbot-danger);
+}
+
+.browser-http-sign-in-fields {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 28rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.browser-http-sign-in-fields .ui-input {
+  min-width: 8rem;
+  flex: 1 1 10rem;
+}
+
 .browser-teach-text {
   min-width: 0;
   flex: 1;

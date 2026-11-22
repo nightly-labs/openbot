@@ -1,5 +1,5 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
-import type { MobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import type { MobileBrowserTabs, MobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import type { MobileAgentActivities } from "./agent-activity";
 import type { MobileContextStates } from "./context-states";
 import type { PendingApproval } from "./pending-approvals";
@@ -16,6 +16,7 @@ export interface LiveWorkspaceState {
   firstUnreadMessageIds: Record<string, string | null>;
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
   browserTabs: Record<string, MobileBrowserTabs>;
+  browserHttpSignIns: Record<string, MobileHttpSignIns>;
   approvalRequests: Record<string, readonly PendingApproval[]>;
 }
 
@@ -30,6 +31,7 @@ export class LiveWorkspaceStore {
     firstUnreadMessageIds: {},
     browserRequests: {},
     browserTabs: {},
+    browserHttpSignIns: {},
     approvalRequests: {},
   };
   readonly #listeners = new Set<() => void>();

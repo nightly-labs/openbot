@@ -28,6 +28,7 @@ import { AGENT_THREAD_REQUESTS_ROUTES } from "@openbot/contracts/team-protocol/a
 import { AGENT_USAGE_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { AGENT_WAITS_ROUTES } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { BACKGROUND_PROCESSES_ROUTES } from "@openbot/contracts/team-protocol/background-processes-v1";
+import { BROWSER_HTTP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
 import { BROWSER_PAGE_STATE_ROUTES } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_USER_CONTROL_ROUTES } from "@openbot/contracts/team-protocol/browser-user-control-v1";
@@ -235,6 +236,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_THREAD_QUEUE_ROUTES.list,
   BROWSER_USER_CONTROL_ROUTES.state,
   BROWSER_PAGE_STATE_ROUTES.state,
+  BROWSER_HTTP_SIGN_IN_ROUTES.state,
 ]);
 
 const PASSIVE_PATTERNS: readonly RegExp[] = [

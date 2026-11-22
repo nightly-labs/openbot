@@ -24,6 +24,7 @@ export default function BrowserFullViewAdapter() {
     openBrowserWindow,
     reloadBrowserTab,
     stopBrowserTab,
+    answerBrowserHttpSignIn,
     setActiveRightPanel,
     setBrowserSurfaceElement,
     showBrowserPip,
@@ -99,6 +100,11 @@ export default function BrowserFullViewAdapter() {
       onEnterPip={props.runtime ? () => undefined : showBrowserPip}
       onOpenWindow={windowOpener()}
       onSignInLocally={localSignIn.canStart(activeBrowserTab()) ? localSignIn.start : undefined}
+      onHttpSignIn={
+        props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-http-sign-in")
+          ? answerBrowserHttpSignIn
+          : undefined
+      }
       teach={teach()}
       dock={<BrowserDockAdapter tab={activeBrowserTab()} overlay={!props.runtime && props.server?.kind === "local"} />}
       dialogs={

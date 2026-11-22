@@ -70,6 +70,19 @@ export interface BrowserHostTab {
   viewContextMenu: { deliver: (menu: BrowserViewContextMenu) => void; until: number } | null;
   visitedHost?: string | undefined;
   secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean } | undefined;
+  /** The sign-in prompt that the site shows itself, which the user answers above the page. */
+  httpSignIn?: BrowserHttpSignInPrompt | undefined;
+  /** The user's answer to `httpSignIn`, for one try at the next prompt of the same site and realm. */
+  httpSignInAnswer?: (BrowserHttpSignInRealm & { username: string; password: string }) | undefined;
+}
+
+export interface BrowserHttpSignInRealm {
+  origin: string;
+  realm: string;
+}
+
+export interface BrowserHttpSignInPrompt extends BrowserHttpSignInRealm {
+  refused: boolean;
 }
 
 export type KeepQueueBlocked = (work: Effect.Effect<unknown, BrowserOperationError>) => void;
@@ -117,6 +130,9 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
     canGoForward: hasHistoryEntry(tab.contents, 1),
     ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
     ...(tab.popupFailure ? { popupFailure: tab.popupFailure } : {}),
+    ...(tab.httpSignIn && !tab.secret
+      ? { httpSignIn: { origin: tab.httpSignIn.origin, ...(tab.httpSignIn.refused ? { refused: true as const } : {}) } }
+      : {}),
   };
 }
 

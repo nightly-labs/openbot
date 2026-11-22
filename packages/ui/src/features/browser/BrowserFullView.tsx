@@ -4,6 +4,7 @@ import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
 import { createEffect, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
 import { BrowserAddressRow } from "./BrowserAddressRow";
+import { BrowserHttpSignInBar } from "./BrowserHttpSignInBar";
 import BrowserLiveView from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
 import { BrowserTabSwitcher } from "./BrowserTabSwitcher";
@@ -33,6 +34,11 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
   const narrow = createNarrow();
   const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
   const popupFailure = () => props.activeTab?.popupFailure;
+  const httpSignInKey = () => {
+    const tab = props.activeTab;
+    return props.onHttpSignIn && tab?.httpSignIn ? `${tab.id}\n${tab.httpSignIn.origin}` : undefined;
+  };
+  const httpSignInSite = (origin: string) => (URL.canParse(origin) ? new URL(origin).host : origin);
   const [frameSize, setFrameSize] = createSignal<{ width: number; height: number } | undefined>(undefined, {
     equals: (previous, next) => previous?.width === next?.width && previous?.height === next?.height,
   });
@@ -257,6 +263,21 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
                 <CloseIcon />
               </Button>
             </Alert>
+          </Show>
+          <Show when={httpSignInKey()} keyed>
+            {(key) => {
+              const [tabId = "", origin = ""] = key.split("\n");
+              const answer = (value: { username: string; password: string } | null) =>
+                props.onHttpSignIn?.(tabId, value) ?? Promise.resolve();
+              return (
+                <BrowserHttpSignInBar
+                  site={httpSignInSite(origin)}
+                  refused={props.activeTab?.httpSignIn?.refused === true}
+                  onSubmit={(username, password) => answer({ username, password })}
+                  onCancel={() => answer(null)}
+                />
+              );
+            }}
           </Show>
           <Show when={props.teach}>
             {(teach) => (

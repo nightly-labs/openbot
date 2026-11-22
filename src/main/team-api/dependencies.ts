@@ -550,6 +550,7 @@ export type TeamApiBrowser = Pick<
   | "stopTeach"
   | "stop"
   | "importSignIn"
+  | "answerHttpSignIn"
   | "startView"
   | "dispatchViewInput"
   | "copyViewSelection"

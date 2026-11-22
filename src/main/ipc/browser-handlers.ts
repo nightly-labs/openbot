@@ -6,6 +6,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
   decodeBrowserPageStateSnapshot,
@@ -61,6 +66,7 @@ import {
   parseBrowserTeachStop,
   parseBrowserWindowAction,
   parseBrowserWindowModel,
+  parseHttpSignInAnswer,
   parseLocalSignIn,
   parseLocalSignInFinish,
   parseVisibility,
@@ -108,6 +114,7 @@ export interface BrowserIpcDependencies {
     | "getControlState"
     | "capturePreview"
     | "setVisible"
+    | "answerHttpSignIn"
   >;
   remoteServers: Pick<RemoteServerManager, "activeServerId" | "supportsCapability" | "request">;
   browserView: Pick<BrowserViewClient, "start" | "stop" | "sendInput">;
@@ -155,8 +162,24 @@ export function browserIpcHandlers({
       return state ? { ...tab, canGoBack: state.canGoBack, canGoForward: state.canGoForward } : tab;
     });
   };
+  const withHttpSignIn = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_HTTP_SIGN_IN_CAPABILITY)) return tabs;
+    const snapshot = await runCauseEffect(
+      remoteServers.request(serverId, BROWSER_HTTP_SIGN_IN_ROUTES.state, decodeBrowserHttpSignInSnapshot, {
+        method: "POST",
+        body: {},
+      }),
+    );
+    const prompts = new Map(snapshot.tabs.map((prompt) => [prompt.tabId, prompt]));
+    return tabs.map((tab) => {
+      const prompt = prompts.get(tab.id);
+      return prompt
+        ? { ...tab, httpSignIn: { origin: prompt.origin, ...(prompt.refused ? { refused: true } : {}) } }
+        : tab;
+    });
+  };
   const withTabState = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> =>
-    withPageState(serverId, await withUserControl(serverId, tabs));
+    withHttpSignIn(serverId, await withPageState(serverId, await withUserControl(serverId, tabs)));
   const userControlRequest = async (serverId: string, route: string, tabId: string): Promise<void> => {
     if (!remoteServers.supportsCapability(serverId, BROWSER_USER_CONTROL_CAPABILITY))
       throw new Error(sourceText("error.backend.browserUserControlUnsupported"));
@@ -264,6 +287,21 @@ export function browserIpcHandlers({
               remoteServers.request(serverId, BROWSER_PAGE_STATE_ROUTES.stop, decodeBrowserPageStateSnapshot, {
                 method: "POST",
                 body: { tabId },
+              }),
+            );
+          },
+        }),
+      ),
+      answerHttpSignIn: payloadHandler(parseHttpSignInAnswer, (answer) =>
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browser.answerHttpSignIn(answer)),
+          remote: async (serverId) => {
+            if (!remoteServers.supportsCapability(serverId, BROWSER_HTTP_SIGN_IN_CAPABILITY))
+              throw new Error(sourceText("error.backend.browserHttpSignInUnsupported"));
+            await runCauseEffect(
+              remoteServers.request(serverId, BROWSER_HTTP_SIGN_IN_ROUTES.answer, decodeBrowserHttpSignInSnapshot, {
+                method: "POST",
+                body: answer,
               }),
             );
           },

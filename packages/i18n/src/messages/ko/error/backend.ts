@@ -56,6 +56,9 @@ export const messages = {
   "error.backend.browserSignInOpenFailed": "OpenBot이 로그인 창을 열 수 없었어요.",
   "error.backend.browserSignInReadFailed": "OpenBot이 창에서 로그인 정보를 읽을 수 없었어요.",
   "error.backend.browserStopUnsupported": "이 원격 호스트는 페이지 로딩을 중지할 수 없어요.",
+  "error.backend.browserHttpSignInInactive":
+    "이 사이트는 더 이상 로그인을 요구하지 않아요. 다시 시도하려면 페이지를 새로고침하세요.",
+  "error.backend.browserHttpSignInUnsupported": "이 원격 호스트는 사이트 로그인을 받을 수 없어요.",
   "error.backend.sharedDataLocalOnly": "공유 데이터는 이 에이전트를 실행하는 컴퓨터에서 관리해요.",
   "error.backend.browserUrlProtocol": "브라우저 URL은 HTTP(S)만 사용할 수 있어요.",
   "error.backend.sunshineNotReady": "Sunshine이 준비되지 않았어요.",

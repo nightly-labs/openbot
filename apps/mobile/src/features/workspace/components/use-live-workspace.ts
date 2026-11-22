@@ -75,6 +75,14 @@ export function useAgentBrowserTabs(serverId: string, agentId: string, threadId:
   const state = useSyncExternalStore(liveState.subscribe, select);
   return useMemo(() => agentBrowserTabs(state, agentId, threadId), [state, agentId, threadId]);
 }
+export function useBrowserHttpSignIn(serverId: string, tabId: string | null) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(
+    () => (tabId === null ? undefined : liveState.get().browserHttpSignIns[serverId]?.[tabId]),
+    [liveState, serverId, tabId],
+  );
+  return useSyncExternalStore(liveState.subscribe, select);
+}
 export function useBrowserTabsLoaded(serverId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const select = useCallback(() => liveState.get().browserTabs[serverId] !== undefined, [liveState, serverId]);

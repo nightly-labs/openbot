@@ -49,6 +49,7 @@ import type {
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   BranchAgentTaskInput,
+  BrowserHttpSignInInput,
   BrowserProfileList,
   BrowserProfileSummary,
   BrowserProxyList,
@@ -299,6 +300,7 @@ export interface MobileBrowserViewSupport {
   contextMenu: boolean;
   viewport: boolean;
   navigation: boolean;
+  httpSignIn: boolean;
 }
 
 type MobileBrowserTabAction =
@@ -316,6 +318,8 @@ export interface MobileWorkspaceContextValue {
     listener: (event: BrowserViewBridgeEvent) => void,
   ) => RemoteBrowserViewSession | null;
   controlBrowserTab: (serverId: string, action: MobileBrowserTabAction) => Promise<MobileBrowserTab | null>;
+  /** Answers the sign-in prompt that the site of a tab shows itself, or closes it with `cancel`. */
+  answerBrowserHttpSignIn: (serverId: string, input: BrowserHttpSignInInput) => Promise<void>;
   respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
   readsWholeApprovals: (serverId: string) => boolean;
   readWholeApproval: (serverId: string, approval: PendingApproval) => Promise<void>;

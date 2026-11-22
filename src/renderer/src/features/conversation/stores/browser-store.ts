@@ -597,6 +597,13 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   }
 
+  /** Rejects with the reason, so the sign-in box can show it. */
+  async function answerBrowserHttpSignIn(tabId: string, answer: { username: string; password: string } | null) {
+    await conversationRuntime(deps.props).browser.answerHttpSignIn(
+      answer ? { tabId, username: answer.username, password: answer.password } : { tabId, cancel: true },
+    );
+  }
+
   async function navigateBrowserTab(tabId: string, direction: "back" | "forward") {
     if (
       !browserInteractionAvailable() ||
@@ -820,6 +827,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserTabOwner,
     reloadBrowserTab,
     stopBrowserTab,
+    answerBrowserHttpSignIn,
     navigateBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,

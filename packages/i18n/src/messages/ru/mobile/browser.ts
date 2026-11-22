@@ -89,4 +89,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Вернуть управление",
   "mobile.browser.help.handBack.body":
     "Когда агент просит вас взять управление, выберите «Готово» в меню ···. Затем агент продолжит работу в этой вкладке.",
+  "mobile.browser.httpSignIn.title": "Вход в {site}",
+  "mobile.browser.httpSignIn.description": "Этот сайт запрашивает собственное имя пользователя и пароль.",
+  "mobile.browser.httpSignIn.refused": "Сайт не принял это имя пользователя или пароль.",
+  "mobile.browser.httpSignIn.username": "Имя пользователя",
+  "mobile.browser.httpSignIn.password": "Пароль",
+  "mobile.browser.httpSignIn.submit": "Войти",
+  "mobile.browser.httpSignIn.failed": "OpenBot не удалось отправить вход.",
 } as const satisfies PartialTranslation<typeof source>;

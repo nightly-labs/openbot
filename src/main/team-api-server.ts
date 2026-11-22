@@ -10,6 +10,7 @@ import {
   type AgentSummary,
   AnalyticsInputError,
   agentAccessRank,
+  browserHttpSignInPrompts,
   type ChatColors,
   canAdministerServer,
   type DirectConversationPage,
@@ -63,6 +64,7 @@ import { AGENT_THREAD_REQUESTS_CAPABILITY } from "@openbot/contracts/team-protoc
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
+import { BROWSER_HTTP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-events-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
@@ -1971,6 +1973,12 @@ export class TeamApiServer {
     client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-page-state-changed", tabs })));
   }
 
+  #sendBrowserHttpSignIn(client: Ws.WebSocket, connection: EventClientState): void {
+    const tabs = browserHttpSignInPrompts(this.#options.browser.listTabs());
+    if (client.readyState !== webSockets.WebSocket.OPEN) return;
+    client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-http-sign-in-changed", tabs })));
+  }
+
   #eventFor(connection: EventClientState, event: AgentEvent, access?: () => EventAccess): AgentEvent {
     if (event.type === "usage-changed" && event.usage.limits.some((limit) => limit.accountId !== undefined))
       return {
@@ -1983,6 +1991,15 @@ export class TeamApiServer {
       return { ...event, tabIds: event.tabIds.filter((tabId) => !hidden(tabId)) };
     }
     if (event.type === "browser-page-state-changed") {
+      const hidden = this.#hiddenTab(
+        connection,
+        event.tabs.map((tab) => tab.tabId),
+        access,
+      );
+      if (!hidden) return event;
+      return { ...event, tabs: event.tabs.filter((tab) => !hidden(tab.tabId)) };
+    }
+    if (event.type === "browser-http-sign-in-changed") {
       const hidden = this.#hiddenTab(
         connection,
         event.tabs.map((tab) => tab.tabId),
@@ -2090,6 +2107,7 @@ export class TeamApiServer {
               connection.capabilities.has(HOST_MEMBER_UPDATE_CAPABILITY);
             const userControlWasSent = connection.capabilities.has(BROWSER_USER_CONTROL_CAPABILITY);
             const pageStateWasSent = connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY);
+            const httpSignInWasSent = connection.capabilities.has(BROWSER_HTTP_SIGN_IN_CAPABILITY);
             const machineAlertsWereSent = connection.capabilities.has(MACHINE_RESOURCES_CAPABILITY);
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
@@ -2103,6 +2121,8 @@ export class TeamApiServer {
               this.#sendBrowserUserControl(client, connection);
             if (!pageStateWasSent && connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY))
               this.#sendBrowserPageState(client, connection);
+            if (!httpSignInWasSent && connection.capabilities.has(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+              this.#sendBrowserHttpSignIn(client, connection);
             if (!colorsWereSent && connection.capabilities.has(AGENT_COLORS_CAPABILITY))
               this.#sendAgentColors(client, connection);
             if (!chatColorsWereSent && connection.capabilities.has(CHAT_COLORS_CAPABILITY))
@@ -3030,6 +3050,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "agent-access-changed") return AGENT_ACCESS_CAPABILITY;
   if (event.type === "browser-user-control-changed") return BROWSER_USER_CONTROL_CAPABILITY;
   if (event.type === "browser-page-state-changed") return BROWSER_PAGE_STATE_CAPABILITY;
+  if (event.type === "browser-http-sign-in-changed") return BROWSER_HTTP_SIGN_IN_CAPABILITY;
   if (
     event.type === "agent-tasks-changed" ||
     event.type === "agent-task-conversation" ||

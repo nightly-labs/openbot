@@ -1574,6 +1574,7 @@ const openbotApi: OpenBotDesktopApi = {
       windowEvent: decodeBrowserWindowEvent,
       openLocalSignIn: decodeBrowserLocalSignInEnd,
       finishLocalSignIn: decodeBrowserLocalSignInResult,
+      answerHttpSignIn: decodeVoid,
     }),
     sendLiveViewInput: (input) =>
       ipcRenderer.invoke(IPC_ENDPOINTS.browserInput.sendLiveViewInput.channel, input).then(decodeVoid),

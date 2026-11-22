@@ -48,6 +48,11 @@ export interface BrowserFullViewProps {
   onEnterPip: () => void;
   onOpenWindow?: (() => void) | undefined;
   onSignInLocally?: ((tabId: string) => void) | undefined;
+  /**
+   * Answers the sign-in prompt that the site of a tab shows itself, or closes it with `null`. Without
+   * it, the view does not show the prompt.
+   */
+  onHttpSignIn?: ((tabId: string, answer: { username: string; password: string } | null) => Promise<void>) | undefined;
   macWindowControls?: boolean;
   shortcuts?: BrowserShortcutPlatform | undefined;
   teach?: BrowserTeachBarProps | undefined;

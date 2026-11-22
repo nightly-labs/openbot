@@ -691,6 +691,7 @@ export function createWebWorkspace(
                 ...(kept?.userControl ? { userControl: true as const } : {}),
                 ...(kept?.canGoBack === undefined ? {} : { canGoBack: kept.canGoBack }),
                 ...(kept?.canGoForward === undefined ? {} : { canGoForward: kept.canGoForward }),
+                ...(kept?.httpSignIn === undefined ? {} : { httpSignIn: kept.httpSignIn }),
               };
             });
             draft.activeBrowserTabId = event.activeTabId;
@@ -702,6 +703,19 @@ export function createWebWorkspace(
               ...tab,
               ...states.get(tab.id),
             }));
+          });
+        if (event.type === "browser-http-sign-in-changed")
+          setState((draft) => {
+            const prompts = new Map(event.tabs.map((prompt) => [prompt.tabId, prompt]));
+            draft.browserTabs = draft.browserTabs.map(({ httpSignIn: _signIn, ...tab }) => {
+              const prompt = prompts.get(tab.id);
+              return prompt
+                ? {
+                    ...tab,
+                    httpSignIn: { origin: prompt.origin, ...(prompt.refused ? { refused: true as const } : {}) },
+                  }
+                : tab;
+            });
           });
         if (event.type === "browser-user-control-changed")
           setState((draft) => {

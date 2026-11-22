@@ -180,6 +180,12 @@ export const messages = defineMessages("browser", {
   "browser.signIn.notFound": "OpenBot found no sign-in for {site}. Sign in in the window, then select Done.",
   "browser.signIn.stillSignedOut": "{server} still shows a sign-in page for {site}. Finish the sign-in in the window.",
   "browser.signIn.failed": "OpenBot could not send the sign-in.",
+  "browser.httpSignIn.title": "Sign in to {site}",
+  "browser.httpSignIn.description": "This site asks for its own username and password.",
+  "browser.httpSignIn.refused": "The site did not accept this username or password.",
+  "browser.httpSignIn.username": "Username",
+  "browser.httpSignIn.password": "Password",
+  "browser.httpSignIn.submit": "Sign in",
   "browser.profiles.title": "Browser profiles",
   "browser.profiles.subtitle":
     "Each profile keeps its own sign-ins, cookies and site data on the computer that runs OpenBot.",

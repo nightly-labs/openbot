@@ -239,6 +239,7 @@ const teamBrowser: TeamApiBrowser = {
   dispatchViewInput: unused,
   copyViewSelection: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 interface Host {

@@ -83,4 +83,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "操作を戻す",
   "mobile.browser.help.handBack.body":
     "エージェントから操作の引き継ぎを求められたら、··· メニューで「完了しました」を選びます。エージェントはこのタブで作業を続けます。",
+  "mobile.browser.httpSignIn.title": "{site} にサインイン",
+  "mobile.browser.httpSignIn.description": "このサイトは独自のユーザー名とパスワードを求めています。",
+  "mobile.browser.httpSignIn.refused": "サイトはこのユーザー名またはパスワードを受け付けませんでした。",
+  "mobile.browser.httpSignIn.username": "ユーザー名",
+  "mobile.browser.httpSignIn.password": "パスワード",
+  "mobile.browser.httpSignIn.submit": "サインイン",
+  "mobile.browser.httpSignIn.failed": "OpenBot はサインインを送信できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

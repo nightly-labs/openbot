@@ -174,6 +174,12 @@ export const messages = {
   "browser.signIn.notFound": "O OpenBot não encontrou um login para {site}. Entre na janela e selecione Concluído.",
   "browser.signIn.stillSignedOut": "{server} ainda mostra uma página de login de {site}. Termine o login na janela.",
   "browser.signIn.failed": "O OpenBot não conseguiu enviar o login.",
+  "browser.httpSignIn.title": "Entrar em {site}",
+  "browser.httpSignIn.description": "Este site pede o próprio nome de usuário e senha.",
+  "browser.httpSignIn.refused": "O site não aceitou este nome de usuário ou esta senha.",
+  "browser.httpSignIn.username": "Nome de usuário",
+  "browser.httpSignIn.password": "Senha",
+  "browser.httpSignIn.submit": "Entrar",
   "browser.profiles.title": "Perfis do navegador",
   "browser.profiles.subtitle":
     "Cada perfil mantém logins, cookies e dados de sites próprios no computador que executa o OpenBot.",

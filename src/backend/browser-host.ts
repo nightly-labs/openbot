@@ -9,6 +9,7 @@ import type {
   BrowserControlState,
   BrowserElement,
   BrowserEnvironment,
+  BrowserHttpSignInInput,
   BrowserImageMode,
   BrowserJsonValue,
   BrowserNavigationDirection,
@@ -39,6 +40,8 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
+  type AuthenticationResponseDetails,
+  type AuthInfo,
   app,
   BaseWindow,
   BrowserWindow,
@@ -1203,6 +1206,30 @@ export class BrowserHost {
     if (this.#takeoverTabIds.has(tabId)) this.#takeoverSignInTabIds.add(tabId);
     yield* this.reload(tabId).pipe(Effect.ignore);
     return { cookies: count, storage: stored };
+  }).bind(this);
+
+  /**
+   * Answers the sign-in prompt that the site of a tab shows itself, and loads the page again with the
+   * answer. The answer stays in memory for that one try only.
+   */
+  readonly answerHttpSignIn = Effect.fn("BrowserHost.answerHttpSignIn")(function* (
+    this: BrowserHost,
+    input: BrowserHttpSignInInput,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const tab = yield* this.#requireTab(input.tabId);
+    const prompt = tab.httpSignIn;
+    if (!prompt) return yield* browserFailure(new Error(sourceText("error.backend.browserHttpSignInInactive")));
+    delete tab.httpSignIn;
+    this.#emitChanged();
+    if ("cancel" in input) return;
+    tab.httpSignInAnswer = {
+      origin: prompt.origin,
+      realm: prompt.realm,
+      username: input.username,
+      password: input.password,
+    };
+    if (this.#takeoverTabIds.has(input.tabId)) this.#takeoverSignInTabIds.add(input.tabId);
+    yield* this.reload(input.tabId).pipe(Effect.ignore);
   }).bind(this);
 
   readonly stop = Effect.fn("BrowserHost.stop")(function* (
@@ -3610,13 +3637,49 @@ export class BrowserHost {
     });
   }
 
+  /**
+   * The sign-in prompt that a site shows itself (HTTP Basic or Digest). The user's answer from
+   * `answerHttpSignIn` goes to the next prompt of the same site and realm, once. Any other prompt of a
+   * page load over HTTPS shows above the page for the user to answer; Electron cancels it, so the page
+   * keeps what the site sent, and the page load and the agent do not wait.
+   */
+  #siteSignIn(
+    tab: BrowserHostTab,
+    details: AuthenticationResponseDetails,
+    authInfo: AuthInfo,
+    event: ElectronEvent,
+    callback: (username?: string, password?: string) => void,
+  ): void {
+    const scheme = authInfo.scheme.toLowerCase();
+    const url = URL.canParse(details.url) ? new URL(details.url) : null;
+    if (
+      !details.isRequestForNavigation ||
+      (scheme !== "basic" && scheme !== "digest") ||
+      url?.protocol !== "https:" ||
+      tab.secret
+    )
+      return;
+    const answer = tab.httpSignInAnswer;
+    delete tab.httpSignInAnswer;
+    if (answer && answer.origin === url.origin && answer.realm === authInfo.realm) {
+      event.preventDefault();
+      callback(answer.username, answer.password);
+      return;
+    }
+    tab.httpSignIn = { origin: url.origin, realm: authInfo.realm, refused: !details.firstAuthAttempt };
+    this.#emitChanged();
+  }
+
   #bindTabEvents(tab: BrowserHostTab): void {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
     if (this.#tabProxy(tab)) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
     let proxySignIns = 0;
-    contents.on("login", (event, _details, authInfo, callback) => {
-      if (!authInfo.isProxy) return;
+    contents.on("login", (event, details, authInfo, callback) => {
+      if (!authInfo.isProxy) {
+        this.#siteSignIn(tab, details, authInfo, event, callback);
+        return;
+      }
       event.preventDefault();
       const signIn = this.#tabProxySignIn(tab);
       if (
@@ -3635,6 +3698,12 @@ export class BrowserHost {
     contents.on("did-navigate", () => {
       proxySignIns = 0;
       this.#proxySignInRefused.delete(tab);
+      delete tab.httpSignInAnswer;
+    });
+    contents.on("did-start-navigation", (details) => {
+      if (!details.isMainFrame || details.isSameDocument || !tab.httpSignIn) return;
+      delete tab.httpSignIn;
+      changed();
     });
     contents.on("close", () => {
       if (tab.contents !== contents) return;

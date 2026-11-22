@@ -183,6 +183,12 @@ export const messages = {
     "OpenBot nie znalazł logowania do {site}. Zaloguj się w oknie, a następnie wybierz Gotowe.",
   "browser.signIn.stillSignedOut": "{server} nadal pokazuje stronę logowania do {site}. Dokończ logowanie w oknie.",
   "browser.signIn.failed": "OpenBot nie mógł wysłać logowania.",
+  "browser.httpSignIn.title": "Zaloguj się do {site}",
+  "browser.httpSignIn.description": "Ta strona prosi o własną nazwę użytkownika i hasło.",
+  "browser.httpSignIn.refused": "Strona nie przyjęła tej nazwy użytkownika lub tego hasła.",
+  "browser.httpSignIn.username": "Nazwa użytkownika",
+  "browser.httpSignIn.password": "Hasło",
+  "browser.httpSignIn.submit": "Zaloguj się",
   "browser.profiles.title": "Profile przeglądarki",
   "browser.profiles.subtitle":
     "Każdy profil przechowuje na komputerze, na którym działa OpenBot, własne logowania, pliki cookie i dane witryn.",

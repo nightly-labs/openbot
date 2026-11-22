@@ -56,6 +56,8 @@ export const messages = {
   "error.backend.browserSignInOpenFailed": "OpenBot non è riuscito ad aprire la finestra di accesso.",
   "error.backend.browserSignInReadFailed": "OpenBot non è riuscito a leggere l’accesso dalla finestra.",
   "error.backend.browserStopUnsupported": "Questo host remoto non può interrompere il caricamento di una pagina.",
+  "error.backend.browserHttpSignInInactive": "Questo sito non chiede più l’accesso. Ricarica la pagina per riprovare.",
+  "error.backend.browserHttpSignInUnsupported": "Questo host remoto non può ricevere un accesso a un sito.",
   "error.backend.sharedDataLocalOnly": "I dati condivisi sono gestiti sul computer su cui girano questi agenti.",
   "error.backend.browserUrlProtocol": "Sono consentiti solo URL del browser HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine non è diventato pronto.",

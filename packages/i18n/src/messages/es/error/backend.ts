@@ -59,6 +59,9 @@ export const messages = {
   "error.backend.browserSignInOpenFailed": "OpenBot no pudo abrir la ventana de inicio de sesión.",
   "error.backend.browserSignInReadFailed": "OpenBot no pudo leer el inicio de sesión de la ventana.",
   "error.backend.browserStopUnsupported": "Este host remoto no puede detener la carga de una página.",
+  "error.backend.browserHttpSignInInactive":
+    "Este sitio ya no pide iniciar sesión. Vuelve a cargar la página para intentarlo de nuevo.",
+  "error.backend.browserHttpSignInUnsupported": "Este host remoto no puede recibir un inicio de sesión en un sitio.",
   "error.backend.sharedDataLocalOnly": "Los datos compartidos se gestionan en el equipo que ejecuta estos agentes.",
   "error.backend.browserUrlProtocol": "Solo se permiten URL HTTP(S) en el navegador.",
   "error.backend.sunshineNotReady": "Sunshine no llegó a estar listo.",

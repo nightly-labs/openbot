@@ -84,4 +84,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Kontrolü geri ver",
   "mobile.browser.help.handBack.body":
     "Bir ajan sizden devralmanızı istediğinde ··· menüsünde “Bitirdim” seçeneğini seçin. Ajan bu sekmede devam eder.",
+  "mobile.browser.httpSignIn.title": "{site} sitesinde oturum aç",
+  "mobile.browser.httpSignIn.description": "Bu site kendi kullanıcı adını ve şifresini istiyor.",
+  "mobile.browser.httpSignIn.refused": "Site bu kullanıcı adını veya şifreyi kabul etmedi.",
+  "mobile.browser.httpSignIn.username": "Kullanıcı adı",
+  "mobile.browser.httpSignIn.password": "Şifre",
+  "mobile.browser.httpSignIn.submit": "Oturum aç",
+  "mobile.browser.httpSignIn.failed": "OpenBot oturumu gönderemedi.",
 } as const satisfies PartialTranslation<typeof source>;

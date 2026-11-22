@@ -177,6 +177,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} mostra ancora una pagina di accesso di {site}. Completa l’accesso nella finestra.",
   "browser.signIn.failed": "OpenBot non è riuscito a inviare l’accesso.",
+  "browser.httpSignIn.title": "Accedi a {site}",
+  "browser.httpSignIn.description": "Questo sito chiede un proprio nome utente e una propria password.",
+  "browser.httpSignIn.refused": "Il sito non ha accettato questo nome utente o questa password.",
+  "browser.httpSignIn.username": "Nome utente",
+  "browser.httpSignIn.password": "Password",
+  "browser.httpSignIn.submit": "Accedi",
   "browser.profiles.title": "Profili del browser",
   "browser.profiles.subtitle":
     "Ogni profilo mantiene accessi, cookie e dati dei siti propri sul computer su cui gira OpenBot.",

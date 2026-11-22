@@ -49,6 +49,7 @@ import { ATTACHMENT_PREVIEW_CAPABILITY } from "./attachment-preview-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
+import { BROWSER_HTTP_SIGN_IN_CAPABILITY } from "./browser-http-sign-in-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "./browser-page-state-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "./browser-profiles-events-v1";
@@ -328,6 +329,7 @@ export {
   BACKGROUND_PROCESSES_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PROFILES_CAPABILITY,
   BROWSER_PROFILES_EVENTS_CAPABILITY,
@@ -799,6 +801,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [STORAGE_WORKFLOW_FILES_CAPABILITY, V10],
   [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
   [CHANNEL_FOLDERS_CAPABILITY, V10],
+  [BROWSER_HTTP_SIGN_IN_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

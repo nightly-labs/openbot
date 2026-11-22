@@ -84,4 +84,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "돌려주기",
   "mobile.browser.help.handBack.body":
     "에이전트가 직접 처리해 달라고 요청하면 ··· 메뉴에서 완료했어요를 선택하세요. 그러면 에이전트가 이 탭에서 이어서 작업해요.",
+  "mobile.browser.httpSignIn.title": "{site}에 로그인",
+  "mobile.browser.httpSignIn.description": "이 사이트는 자체 사용자 이름과 비밀번호를 요구해요.",
+  "mobile.browser.httpSignIn.refused": "사이트가 이 사용자 이름이나 비밀번호를 받아들이지 않았어요.",
+  "mobile.browser.httpSignIn.username": "사용자 이름",
+  "mobile.browser.httpSignIn.password": "비밀번호",
+  "mobile.browser.httpSignIn.submit": "로그인",
+  "mobile.browser.httpSignIn.failed": "OpenBot이 로그인 정보를 보내지 못했어요.",
 } as const satisfies PartialTranslation<typeof source>;

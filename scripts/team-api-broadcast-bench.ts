@@ -430,6 +430,7 @@ const browser: TeamApiBrowser = {
   dispatchViewInput: unused("dispatchViewInput"),
   copyViewSelection: unused("copyViewSelection"),
   importSignIn: unused("importSignIn"),
+  answerHttpSignIn: unused("answerHttpSignIn"),
 };
 
 const mailbox: TeamApiMailbox = { resolveAttachment: () => Effect.succeed(null) };

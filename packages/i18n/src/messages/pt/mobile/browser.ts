@@ -84,4 +84,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Devolver o controle",
   "mobile.browser.help.handBack.body":
     "Quando um agente pedir que você assuma o controle, escolha Concluí no menu ···. O agente continua nesta aba.",
+  "mobile.browser.httpSignIn.title": "Entrar em {site}",
+  "mobile.browser.httpSignIn.description": "Este site pede o próprio nome de usuário e senha.",
+  "mobile.browser.httpSignIn.refused": "O site não aceitou este nome de usuário ou esta senha.",
+  "mobile.browser.httpSignIn.username": "Nome de usuário",
+  "mobile.browser.httpSignIn.password": "Senha",
+  "mobile.browser.httpSignIn.submit": "Entrar",
+  "mobile.browser.httpSignIn.failed": "O OpenBot não conseguiu enviar o login.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -174,6 +174,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} にはまだ {site} のサインインページが表示されています。ウィンドウでサインインを完了してください。",
   "browser.signIn.failed": "OpenBot はサインインを送信できませんでした。",
+  "browser.httpSignIn.title": "{site} にサインイン",
+  "browser.httpSignIn.description": "このサイトは独自のユーザー名とパスワードを求めています。",
+  "browser.httpSignIn.refused": "サイトはこのユーザー名またはパスワードを受け付けませんでした。",
+  "browser.httpSignIn.username": "ユーザー名",
+  "browser.httpSignIn.password": "パスワード",
+  "browser.httpSignIn.submit": "サインイン",
   "browser.profiles.title": "ブラウザープロファイル",
   "browser.profiles.subtitle":
     "各プロファイルは、専用のサインイン、Cookie、サイトデータを OpenBot を実行しているコンピューターに保持します。",

@@ -392,6 +392,7 @@ export function createWebConversationRuntime(
       publishWindowModel: async () => {},
       reload: (tabId) => remote.reloadBrowserTab(tabId),
       stop: (tabId) => remote.stopBrowserTab(tabId),
+      answerHttpSignIn: (input) => remote.answerBrowserHttpSignIn(input),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
       releaseControl: (tabId) => remote.releaseBrowserControl(tabId),
       startTeach: (tabId) => remote.startBrowserTeach(tabId),

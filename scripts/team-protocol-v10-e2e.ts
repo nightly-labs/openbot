@@ -353,6 +353,7 @@ try {
       dispatchViewInput: unused,
       copyViewSelection: unused,
       importSignIn: unused,
+      answerHttpSignIn: unused,
     },
     sidebarLayout: sidebar,
     agentAccess: access,

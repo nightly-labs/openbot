@@ -85,4 +85,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Rendre la main",
   "mobile.browser.help.handBack.body":
     "Quand un agent vous demande de prendre la main, choisissez « J’ai terminé » dans le menu ···. L’agent continue ensuite dans cet onglet.",
+  "mobile.browser.httpSignIn.title": "Se connecter à {site}",
+  "mobile.browser.httpSignIn.description": "Ce site demande son propre nom d’utilisateur et son mot de passe.",
+  "mobile.browser.httpSignIn.refused": "Le site n’a pas accepté ce nom d’utilisateur ou ce mot de passe.",
+  "mobile.browser.httpSignIn.username": "Nom d’utilisateur",
+  "mobile.browser.httpSignIn.password": "Mot de passe",
+  "mobile.browser.httpSignIn.submit": "Se connecter",
+  "mobile.browser.httpSignIn.failed": "OpenBot n’a pas pu envoyer la connexion.",
 } as const satisfies PartialTranslation<typeof source>;

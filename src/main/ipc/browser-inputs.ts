@@ -6,6 +6,7 @@ import {
   BROWSER_CONTROL_DETAIL_ACTIONS,
   type BrowserBounds,
   type BrowserControlSession,
+  type BrowserHttpSignInInput,
   type BrowserLocalSignInFinish,
   type BrowserLocalSignInInput,
   type BrowserNavigateInput,
@@ -20,7 +21,11 @@ import {
   type BrowserWindowTabDetails,
   isAvatarColor,
 } from "@openbot/contracts/ipc";
-import { isBoolean, isNumber, isOneOf } from "@openbot/contracts/runtime-values";
+import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import {
+  BROWSER_HTTP_SIGN_IN_PASSWORD_LIMIT,
+  BROWSER_HTTP_SIGN_IN_USERNAME_LIMIT,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { decodeBrowserTabs } from "../remote-device-decoding";
 import { isObject, requireString } from "./validation";
@@ -113,6 +118,21 @@ export function parseLocalSignInFinish(value: unknown): BrowserLocalSignInFinish
   if (!isObject(value) || !isBoolean(value.send)) throw new Error("Invalid browser sign-in request.");
   if (value.check !== undefined && !isBoolean(value.check)) throw new Error("Invalid browser sign-in request.");
   return { send: value.send, check: value.check === true };
+}
+
+/** Never include the rejected payload in validation errors. */
+export function parseHttpSignInAnswer(value: unknown): BrowserHttpSignInInput {
+  if (!isObject(value)) throw new Error("Invalid browser sign-in answer.");
+  const tabId = requireString(value.tabId, "tabId");
+  if (value.cancel === true) return { tabId, cancel: true };
+  if (
+    !isString(value.username) ||
+    value.username.length > BROWSER_HTTP_SIGN_IN_USERNAME_LIMIT ||
+    !isString(value.password) ||
+    value.password.length > BROWSER_HTTP_SIGN_IN_PASSWORD_LIMIT
+  )
+    throw new Error("Invalid browser sign-in answer.");
+  return { tabId, username: value.username, password: value.password };
 }
 
 const BROWSER_WINDOW_LIST_LIMIT = 1_000;

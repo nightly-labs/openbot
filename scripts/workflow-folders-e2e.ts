@@ -176,6 +176,7 @@ const teamBrowser: TeamApiBrowser = {
   dispatchViewInput: unused,
   copyViewSelection: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const root = await mkdtemp(join(tmpdir(), "openbot-workflow-folders-"));

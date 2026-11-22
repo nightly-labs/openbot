@@ -185,6 +185,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} toont nog een inlogpagina voor {site}. Rond het inloggen af in het venster.",
   "browser.signIn.failed": "OpenBot kon de login niet versturen.",
+  "browser.httpSignIn.title": "Inloggen bij {site}",
+  "browser.httpSignIn.description": "Deze site vraagt om een eigen gebruikersnaam en wachtwoord.",
+  "browser.httpSignIn.refused": "De site heeft deze gebruikersnaam of dit wachtwoord niet geaccepteerd.",
+  "browser.httpSignIn.username": "Gebruikersnaam",
+  "browser.httpSignIn.password": "Wachtwoord",
+  "browser.httpSignIn.submit": "Inloggen",
   "browser.profiles.title": "Browserprofielen",
   "browser.profiles.subtitle":
     "Elk profiel bewaart eigen logins, cookies en sitegegevens op de computer waarop OpenBot draait.",

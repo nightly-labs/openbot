@@ -144,6 +144,17 @@ export function createMockBrowser(
     closePictureInPicture: async () => undefined,
     openLocalSignIn: async () => ({ signedIn: false }),
     finishLocalSignIn: async ({ send }) => (send ? { cookies: 12, signedIn: true } : null),
+    answerHttpSignIn: async ({ tabId }) => {
+      if (!browserTabs.some((tab) => tab.id === tabId && tab.httpSignIn))
+        throw new Error("This site no longer asks for a sign-in.");
+      browserTabs = browserTabs.map((tab) => {
+        if (tab.id !== tabId) return tab;
+        const { httpSignIn: _signIn, ...rest } = tab;
+        return rest;
+      });
+      emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+      emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
+    },
     dockPictureInPicture: async () => {
       emit(browserPictureInPictureListeners, { type: "dock" });
     },

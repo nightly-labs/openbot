@@ -56,6 +56,9 @@ export const messages = {
   "error.backend.browserSignInOpenFailed": "OpenBot не удалось открыть окно входа.",
   "error.backend.browserSignInReadFailed": "OpenBot не удалось прочитать вход из окна.",
   "error.backend.browserStopUnsupported": "Этот удалённый хост не может остановить загрузку страницы.",
+  "error.backend.browserHttpSignInInactive":
+    "Этот сайт больше не запрашивает вход. Перезагрузите страницу, чтобы попробовать снова.",
+  "error.backend.browserHttpSignInUnsupported": "Этот удалённый хост не может принять вход на сайт.",
   "error.backend.sharedDataLocalOnly": "Общими данными управляют на компьютере, где работают эти агенты.",
   "error.backend.browserUrlProtocol": "Допускаются только URL браузера с HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine не стал готов.",

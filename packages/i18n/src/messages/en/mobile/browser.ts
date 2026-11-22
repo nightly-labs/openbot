@@ -81,4 +81,11 @@ export const messages = defineMessages("mobile.browser", {
   "mobile.browser.help.handBack.title": "Hand it back",
   "mobile.browser.help.handBack.body":
     "When an agent asks you to take over, choose I'm done in the ··· menu. The agent then continues in this tab.",
+  "mobile.browser.httpSignIn.title": "Sign in to {site}",
+  "mobile.browser.httpSignIn.description": "This site asks for its own username and password.",
+  "mobile.browser.httpSignIn.refused": "The site did not accept this username or password.",
+  "mobile.browser.httpSignIn.username": "Username",
+  "mobile.browser.httpSignIn.password": "Password",
+  "mobile.browser.httpSignIn.submit": "Sign in",
+  "mobile.browser.httpSignIn.failed": "OpenBot could not send the sign-in.",
 });

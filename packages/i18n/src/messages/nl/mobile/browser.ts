@@ -85,4 +85,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Geef terug",
   "mobile.browser.help.handBack.body":
     "Als een agent je vraagt het over te nemen, kies je Ik ben klaar in het ···-menu. De agent gaat dan verder in dit tabblad.",
+  "mobile.browser.httpSignIn.title": "Inloggen bij {site}",
+  "mobile.browser.httpSignIn.description": "Deze site vraagt om een eigen gebruikersnaam en wachtwoord.",
+  "mobile.browser.httpSignIn.refused": "De site heeft deze gebruikersnaam of dit wachtwoord niet geaccepteerd.",
+  "mobile.browser.httpSignIn.username": "Gebruikersnaam",
+  "mobile.browser.httpSignIn.password": "Wachtwoord",
+  "mobile.browser.httpSignIn.submit": "Inloggen",
+  "mobile.browser.httpSignIn.failed": "OpenBot kon de login niet versturen.",
 } as const satisfies PartialTranslation<typeof source>;

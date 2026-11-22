@@ -8,6 +8,7 @@ import {
   type BrowserControlState,
   type BrowserDisplayState,
   type BrowserEnvironment,
+  type BrowserHttpSignIn,
   type BrowserLiveViewEvent,
   type BrowserLocalSignInEnd,
   type BrowserLocalSignInResult,
@@ -264,6 +265,7 @@ function browserTab(tab: DynamicRecord): BrowserTab {
     userControl,
     canGoBack,
     canGoForward,
+    httpSignIn,
   } = tab;
   if (recording !== undefined && !isBoolean(recording)) throw new Error("Invalid recording.");
   if (canGoBack !== undefined && !isBoolean(canGoBack)) throw new Error("Invalid canGoBack.");
@@ -287,6 +289,7 @@ function browserTab(tab: DynamicRecord): BrowserTab {
     ...(userControl === true ? { userControl } : {}),
     ...(canGoBack === undefined ? {} : { canGoBack }),
     ...(canGoForward === undefined ? {} : { canGoForward }),
+    ...(httpSignIn === undefined ? {} : { httpSignIn: httpSignInOf(httpSignIn) }),
   };
 }
 
@@ -312,6 +315,15 @@ function browserViewport(value: unknown): BrowserViewport {
     deviceScaleFactor: requiredNumber(viewport, "deviceScaleFactor"),
     preset,
   };
+}
+
+function httpSignInOf(value: unknown): BrowserHttpSignIn {
+  const signIn = decodeRecord(value, "browser HTTP sign-in");
+  const origin = requiredString(signIn, "origin");
+  if (!URL.canParse(origin) || new URL(origin).protocol !== "https:" || new URL(origin).origin !== origin)
+    throw new Error("Invalid browser HTTP sign-in origin.");
+  if (signIn.refused !== undefined && signIn.refused !== true) throw new Error("Invalid browser HTTP sign-in.");
+  return { origin, ...(signIn.refused === true ? { refused: true } : {}) };
 }
 
 function popupFailureOf(value: unknown): { id: string; message: string } {

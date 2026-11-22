@@ -181,6 +181,10 @@ import {
   BITWARDEN_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
   BROWSER_PROFILES_CAPABILITY,
   BROWSER_PROFILES_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-profiles-v1";
@@ -1967,6 +1971,17 @@ const browser: TeamApiBrowser = {
   importSignIn: (tabId, cookies, storage = null) => {
     record("importSignIn", tabId, cookies.length, storage?.origin ?? null, storage?.entries.length ?? 0);
     return Effect.succeed({ cookies: cookies.length, storage: storage?.entries.length ?? 0 });
+  },
+  answerHttpSignIn: (input) => {
+    // Only the lengths go to the report: the answer is a password.
+    if ("cancel" in input) record("answerHttpSignIn", input.tabId, "cancel");
+    else record("answerHttpSignIn", input.tabId, "answer", input.username.length, input.password.length);
+    browserTabs = browserTabs.map((tab) => {
+      if (tab.id !== input.tabId) return tab;
+      const { httpSignIn: _signIn, ...rest } = tab;
+      return rest;
+    });
+    return Effect.void;
   },
 };
 
@@ -6789,6 +6804,108 @@ try {
         isDeepStrictEqual(callsOf("installSkill").slice(installsBefore), [[{ agentId: "agent-ada", skillId }]]),
       { oldClient: summary(oldClient), install: summary(install) },
     );
+  }
+
+  {
+    const v10 = { capabilities: [BROWSER_HTTP_SIGN_IN_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises browser-http-sign-in to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(BROWSER_HTTP_SIGN_IN_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSER_HTTP_SIGN_IN_CAPABILITY),
+      [summary(compatibility).status, list(field(older.body, "capabilities")).length],
+    );
+    const savedTabs = browserTabs;
+    const siteTab = (id: string, origin: string, refused: boolean) => ({
+      id,
+      title: "Files",
+      url: `${origin}/`,
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId: null,
+      httpSignIn: { origin, ...(refused ? { refused: true as const } : {}) },
+    });
+    browserTabs = [
+      siteTab("tab-site", "https://files.example.com", false),
+      siteTab("tab-private", "https://private.example.com", true),
+    ];
+    const answersBefore = callsOf("answerHttpSignIn").length;
+    const unsupported = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, {
+      token: bobToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the site sign-in routes without the capability get 400 browserHttpSignInUnsupported",
+      errorIs(unsupported, 400, sourceText("error.backend.browserHttpSignInUnsupported")),
+      summary(unsupported),
+    );
+    const memberState = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, { token: bobToken, json: {}, ...v10 });
+    const adminState = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, { token: adaToken, json: {}, ...v10 });
+    check(
+      "a member sees the site sign-in prompts of the tabs they can see; an admin sees all of them",
+      memberState.status === 200 &&
+        isDeepStrictEqual(memberState.body, {
+          tabs: [{ tabId: "tab-site", origin: "https://files.example.com", refused: false }],
+        }) &&
+        isDeepStrictEqual(adminState.body, {
+          tabs: [
+            { tabId: "tab-site", origin: "https://files.example.com", refused: false },
+            { tabId: "tab-private", origin: "https://private.example.com", refused: true },
+          ],
+        }),
+      [summary(memberState), summary(adminState)],
+    );
+    const hidden = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-private", username: "bob", password: "e2e-password" },
+      ...v10,
+    });
+    const extra = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-site", username: "bob", password: "e2e-password", url: "https://other.example.com" },
+      ...v10,
+    });
+    const tooLong = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-site", username: "bob", password: "x".repeat(4097) },
+      ...v10,
+    });
+    check(
+      "the host refuses a site sign-in for a hidden tab, with an unknown field, or with a too long password",
+      errorIs(hidden, 404, sourceText("error.backend.browserTabNotFound")) &&
+        extra.status === 400 &&
+        tooLong.status === 400 &&
+        callsOf("answerHttpSignIn").length === answersBefore,
+      [summary(hidden), summary(extra), summary(tooLong)],
+    );
+    const answered = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-site", username: "bob", password: "e2e-password" },
+      ...v10,
+    });
+    check(
+      "a member answers a site sign-in; the host gets the answer, and the prompt is gone from the reply",
+      answered.status === 200 &&
+        isDeepStrictEqual(answered.body, { tabs: [] }) &&
+        isDeepStrictEqual(callsOf("answerHttpSignIn").slice(answersBefore), [["tab-site", "answer", 3, 12]]),
+      summary(answered),
+    );
+    browserTabs = [siteTab("tab-site", "https://files.example.com", true)];
+    const cancelled = await call("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-site", cancel: true },
+      ...v10,
+    });
+    check(
+      "a member closes a site sign-in prompt without an answer",
+      cancelled.status === 200 &&
+        isDeepStrictEqual(callsOf("answerHttpSignIn").at(-1), ["tab-site", "cancel"]) &&
+        isDeepStrictEqual(cancelled.body, { tabs: [] }),
+      summary(cancelled),
+    );
+    browserTabs = savedTabs;
   }
 
   {
