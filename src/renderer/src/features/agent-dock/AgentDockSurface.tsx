@@ -38,6 +38,27 @@ const EDGE_STRIP = 4;
 const SHAPED_WINDOW = currentDevicePlatform() === "linux" || currentDevicePlatform() === "win32";
 const FITTED_WINDOW = currentDevicePlatform() === "darwin";
 const POINTER_ZONE_WHILE_MOVING = currentDevicePlatform() === "win32";
+const WIDEN_WAIT_MS = 250;
+
+function nextGrowth(): Promise<void> {
+  return new Promise((resolve) => {
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    const done = () => {
+      window.removeEventListener("resize", resized);
+      clearTimeout(timer);
+      resolve();
+    };
+    const resized = () => {
+      const grew = window.innerWidth > width || window.innerHeight > height;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      if (grew) done();
+    };
+    const timer = setTimeout(done, WIDEN_WAIT_MS);
+    window.addEventListener("resize", resized);
+  });
+}
 
 export function AgentDockSurface() {
   const { t, errorMessage } = useText();
@@ -55,6 +76,8 @@ export function AgentDockSurface() {
   let received = false;
   let chatOpen = false;
   let pointerIn = false;
+  let menuWanted = false;
+  let widening: Promise<void> | null = null;
   let dragging = false;
   let shelfShown = false;
   let autoHide = false;
@@ -129,10 +152,13 @@ export function AgentDockSurface() {
     };
   }
 
+  const fitted = () => sentExtent !== "" && sentExtent !== "null";
+
   function syncExtent() {
     const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
+    if (menuOpen()) menuWanted = false;
     const extent =
-      dockShape === null || pointerIn || menuOpen()
+      dockShape === null || menuWanted || menuOpen() || (pointerIn && !fitted())
         ? null
         : windowExtent(
             isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
@@ -140,6 +166,13 @@ export function AgentDockSurface() {
           );
     const key = JSON.stringify(extent);
     if (key === sentExtent) return;
+    if (extent === null && fitted()) {
+      const resized = nextGrowth();
+      widening = resized;
+      void resized.then(() => {
+        if (widening === resized) widening = null;
+      });
+    }
     sentExtent = key;
     void agentDockPort()
       .agentDock.setExtent(extent)
@@ -196,11 +229,48 @@ export function AgentDockSurface() {
         target !== document.documentElement &&
         target !== document.body &&
         target.id !== "root";
+      if (event.type === "mousemove" && !pointerIn) menuWanted = false;
       sync();
     };
     const onLeave = () => {
       pointerIn = false;
+      menuWanted = false;
       sync();
+    };
+    const onContextMenu = (event: MouseEvent) => {
+      const target = event.target;
+      if (!FITTED_WINDOW || !event.isTrusted || !(target instanceof Element)) return;
+      if (fitted()) {
+        menuWanted = true;
+        syncExtent();
+      }
+      const resized = widening;
+      if (!resized) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const before = agentDockBody()?.getBoundingClientRect();
+      void resized.then(() => {
+        if (!target.isConnected) return;
+        const after = agentDockBody()?.getBoundingClientRect();
+        target.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window,
+            button: event.button,
+            buttons: event.buttons,
+            screenX: event.screenX,
+            screenY: event.screenY,
+            clientX: event.clientX + (before && after ? after.left - before.left : 0),
+            clientY: event.clientY + (before && after ? after.top - before.top : 0),
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey,
+            altKey: event.altKey,
+            metaKey: event.metaKey,
+          }),
+        );
+      });
     };
     const onBlur = () => setBlurRequest((value) => value + 1);
     const menus = new MutationObserver(() => {
@@ -211,6 +281,7 @@ export function AgentDockSurface() {
     document.addEventListener("mouseover", onPointer);
     document.addEventListener("mousemove", onPointer);
     document.documentElement.addEventListener("mouseleave", onLeave);
+    window.addEventListener("contextmenu", onContextMenu, true);
     window.addEventListener("blur", onBlur);
     return () => {
       unsubscribe();
@@ -219,6 +290,7 @@ export function AgentDockSurface() {
       document.removeEventListener("mouseover", onPointer);
       document.removeEventListener("mousemove", onPointer);
       document.documentElement.removeEventListener("mouseleave", onLeave);
+      window.removeEventListener("contextmenu", onContextMenu, true);
       window.removeEventListener("blur", onBlur);
       stopTuckTimer();
     };
