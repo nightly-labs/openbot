@@ -125,6 +125,9 @@ interface PreparedSignal {
 const PREPARED_SIGNAL_LIFETIME_MS = 30_000;
 const preparedSignals = new Map<string, PreparedSignal>();
 const dataChannelNames = ["rpc", "events", "files", "desktop"] as const;
+const DATA_CHANNEL_QUEUE_BYTES = 256 * 1024;
+const DATA_CHANNEL_LOW_BYTES = 64 * 1024;
+const EGRESS_QUEUE_BYTES = 4 * 1024 * 1024;
 const maximumIceRestarts = 10;
 let mainPort: MessagePort;
 
@@ -224,7 +227,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       if (channel?.readyState !== "open" || data === undefined)
         throw new Error(sourceText("error.remote.channelNotOpen"));
       const sent = state.egressChain.then(async () => {
-        await waitForWritableChannel(channel);
+        await waitForWritableChannel(channel, EGRESS_QUEUE_BYTES);
         if (channel.readyState !== "open") throw new Error(sourceText("error.remote.channelNotOpen"));
         if (isString(data)) channel.send(data);
         else channel.send(data);
@@ -707,7 +710,7 @@ function bindDataChannel(
   channel: RTCDataChannel,
 ): void {
   channel.binaryType = "arraybuffer";
-  channel.bufferedAmountLowThreshold = 1024 * 1024;
+  channel.bufferedAmountLowThreshold = DATA_CHANNEL_LOW_BYTES;
   state.channels[kind] = channel;
   state.payloadDecoders[kind]?.reset();
   const decoder = new TeamWebRtcPayloadDecoder();
@@ -796,14 +799,17 @@ async function sendChannelPayload(
 ): Promise<void> {
   const maximumMessageSize = state.peerConnection?.sctp?.maxMessageSize ?? Number.POSITIVE_INFINITY;
   for (const frame of encodeTeamWebRtcPayload(data, maximumMessageSize)) {
-    await waitForWritableChannel(channel);
+    await waitForWritableChannel(channel, DATA_CHANNEL_QUEUE_BYTES);
     if (isString(frame)) channel.send(frame);
     else channel.send(frame);
   }
 }
 
-function waitForWritableChannel(channel: RTCDataChannel): Promise<void> {
-  if (channel.bufferedAmount <= 4 * 1024 * 1024) return Promise.resolve();
+async function waitForWritableChannel(channel: RTCDataChannel, queueBytes: number): Promise<void> {
+  while (channel.bufferedAmount > queueBytes) await waitForLowBuffer(channel);
+}
+
+function waitForLowBuffer(channel: RTCDataChannel): Promise<void> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = window.setTimeout(() => {
