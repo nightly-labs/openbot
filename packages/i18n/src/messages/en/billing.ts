@@ -259,6 +259,8 @@ export const messages = defineMessages("billing", {
   "billing.credits.get": "Get",
   "billing.credits.for": "For",
   "billing.credits.forLabel": "Buy credits for",
+  "billing.credits.searchTargets": "Search",
+  "billing.credits.noTarget": "Nothing named “{query}”",
   "billing.credits.you": "You",
   "billing.credits.yours": "Your credits",
   "billing.credits.personal": "Personal",

@@ -1,6 +1,7 @@
 import type { CreditServerRole, CreditsState } from "@openbot/contracts/credits";
 import type { AppTextKey } from "@openbot/i18n";
-import { SearchSelect, ServerPlushLogo, UserRound } from "@openbot/ui";
+import { ChevronsUpDown, ServerPlushLogo, UserRound } from "@openbot/ui";
+import { SearchPicker } from "@openbot/ui/components/SearchPicker";
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 import { useText } from "../../text";
@@ -48,23 +49,14 @@ export function CreditTargetLogo(props: { target: CreditTarget; class?: string |
   );
 }
 
-function TargetOption(props: { target: CreditTarget }) {
-  const { t, format } = useText();
+function TargetRole(props: { target: CreditTarget }) {
+  const { t } = useText();
   const role = () => {
     const value = props.target.role;
     if (value === null) return t("billing.credits.personal");
     return t(ROLE_LABEL[value]);
   };
-  return (
-    <span class="credit-option" data-personal={props.target.serverId === null ? "" : undefined}>
-      <CreditTargetLogo target={props.target} />
-      <span class="credit-option-who">
-        <span class="credit-option-name">{props.target.name}</span>
-        <span class="credit-option-role">{role()}</span>
-      </span>
-      <CreditAmount value={format.number(props.target.balance)} class="credit-option-balance" />
-    </span>
-  );
+  return <span class="credit-picker-role">{role()}</span>;
 }
 
 export function CreditTargetSelect(props: {
@@ -78,24 +70,34 @@ export function CreditTargetSelect(props: {
       <span class="credit-corner-for" aria-hidden="true">
         {t("billing.credits.for")}
       </span>
-      <SearchSelect<CreditTarget>
-        class="credit-corner-select"
-        size="sm"
-        aria-label={t("billing.credits.forLabel")}
-        placement="bottom-end"
+      <SearchPicker<CreditTarget>
         options={props.targets}
-        value={props.value}
-        label={(target) => target.name}
-        optionValue={targetKey}
-        itemContent={(target) => <TargetOption target={target} />}
+        optionKey={targetKey}
+        optionName={(target) => target.name}
+        value={targetKey(props.value)}
         onChange={props.onChange}
+        label={t("billing.credits.forLabel")}
+        searchLabel={t("billing.credits.searchTargets")}
+        emptyText={(query) => t("billing.credits.noTarget", { query })}
+        leading={(target) => <CreditTargetLogo target={target} class="credit-picker-logo" />}
+        trailing={(target) => (
+          <>
+            <TargetRole target={target} />
+            <CreditAmount value={format.number(target.balance)} class="credit-picker-balance" />
+          </>
+        )}
+        align="end"
+        menuClass="credit-picker-menu"
+        triggerClass="credit-corner-select"
+        triggerLabel={t("billing.credits.forLabel")}
       >
         <span class="credit-corner-value">
           <CreditTargetLogo target={props.value} />
           <span class="credit-corner-name">{props.value.name}</span>
           <CreditAmount value={format.number(props.value.balance)} class="credit-corner-balance" />
         </span>
-      </SearchSelect>
+        <ChevronsUpDown class="credit-corner-chevron" aria-hidden="true" />
+      </SearchPicker>
     </div>
   );
 }
