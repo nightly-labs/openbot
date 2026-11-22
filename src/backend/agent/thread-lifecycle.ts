@@ -80,7 +80,7 @@ import { mcpFallbackRunsServer } from "./mcp-tools";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
-import { visibleDynamicTools } from "./tool-catalog";
+import { toolCatalogNames, visibleDynamicTools } from "./tool-catalog";
 import {
   AGENT_INSTRUCTIONS_FILE_BYTES,
   missingInstructionFileNames,
@@ -1176,6 +1176,7 @@ export class ThreadLifecycle {
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
+      ...(client.provider === "antigravity" ? { toolCatalog: toolCatalogNames(client.provider) } : {}),
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };
