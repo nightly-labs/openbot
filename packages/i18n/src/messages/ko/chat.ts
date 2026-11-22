@@ -102,6 +102,7 @@ export const messages = {
   "chat.awaiting.state.working": "작업 중",
   "chat.awaiting.state.replied": "답변함",
   "chat.awaiting.state.failed": "실패",
+  "chat.awaiting.state.stopped": "중지됨",
   "chat.awaiting.readsNext": "다음에 {name}이(가) 읽어요",
   "chat.awaiting.working": "{name} 작업 중",
   "chat.awaiting.needsYou": "{name}에게 확인이 필요해요",
