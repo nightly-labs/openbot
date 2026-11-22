@@ -221,12 +221,20 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     const before = storedTabs(agentId);
     const wasActive = activeId(agentId) === id;
     const index = tabOrder(agentId).indexOf(id);
+    const sideIndex = before.side.indexOf(id);
     const restore = entry.state !== "closed";
     close(agentId, id);
     setHiddenThread(id, true);
 
     function showTab(): void {
       setHiddenThread(id, false);
+      if (sideIndex >= 0) {
+        const side = keptSideIds(agentId).filter((other) => other !== id);
+        side.splice(Math.min(sideIndex, side.length), 0, id);
+        const active = activeId(agentId);
+        writeTabs(agentId, { open: keptIds(agentId), active: active === MAIN_THREAD_ID ? null : active, side });
+        return;
+      }
       if (index < 0) return;
       const open = openIds(agentId).filter((other) => other !== id);
       open.splice(Math.max(0, index - 1), 0, id);
