@@ -803,8 +803,11 @@ async function sendChannelPayload(
   }
 }
 
-function waitForWritableChannel(channel: RTCDataChannel, queueBytes: number): Promise<void> {
-  if (channel.bufferedAmount <= queueBytes) return Promise.resolve();
+async function waitForWritableChannel(channel: RTCDataChannel, queueBytes: number): Promise<void> {
+  while (channel.bufferedAmount > queueBytes) await waitForLowBuffer(channel);
+}
+
+function waitForLowBuffer(channel: RTCDataChannel): Promise<void> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = window.setTimeout(() => {
