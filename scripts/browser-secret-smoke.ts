@@ -96,6 +96,56 @@ async function runFrameScenario(browser: BrowserHost): Promise<void> {
   if (!passed) throw new Error(`Secure fill in a frame is wrong: ${JSON.stringify(report)}`);
 }
 
+async function failedFillEndsView(browser: BrowserHost): Promise<string | null> {
+  const tab = await runCauseEffect(
+    browser.open("https://authentication.openbot.test/long-form", "secret-thread", "secret-agent"),
+  );
+  try {
+    const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
+    if (!contents) throw new Error("Missing failed fill live view fixture.");
+    let ended: (reason: string) => void = () => {};
+    const viewEnded = new Promise<string | null>((resolve) => {
+      const timer = setTimeout(() => resolve(null), 20_000);
+      ended = (reason) => {
+        clearTimeout(timer);
+        resolve(reason);
+      };
+    });
+    const stopView = await runCauseEffect(
+      browser.startView(
+        tab.id,
+        () => {},
+        (reason) => ended(reason),
+      ),
+    );
+    try {
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "live-view-failed-fill",
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "on_input",
+          },
+        }),
+      );
+      await contents.executeJavaScript("document.querySelector('#password').id = 'rendered-again'", true);
+      await runCauseEffect(handoff.submit("fixture-password-337120", false)).catch(() => undefined);
+      return await viewEnded;
+    } finally {
+      await runCauseEffect(stopView());
+    }
+  } finally {
+    await runCauseEffect(browser.close(tab.id));
+  }
+}
+
 async function runLiveViewScenario(browser: BrowserHost): Promise<void> {
   const tab = await runCauseEffect(
     browser.open("https://authentication.openbot.test/long-form", "secret-thread", "secret-agent"),
@@ -177,13 +227,15 @@ async function runLiveViewScenario(browser: BrowserHost): Promise<void> {
         true,
       ),
     );
+    const failedFillViewEnded = await failedFillEndsView(browser);
     const report = {
       status:
         submission === "submitted" &&
         scrolledWithCard &&
         scrolledAfterSubmit &&
         endedReason === null &&
-        !page.includes(secret)
+        !page.includes(secret) &&
+        failedFillViewEnded !== null
           ? "passed"
           : "issues_found",
       submission,
@@ -191,6 +243,7 @@ async function runLiveViewScenario(browser: BrowserHost): Promise<void> {
       scrolledAfterSubmit,
       viewEnded: endedReason,
       secretInPage: page.includes(secret),
+      failedFillViewEnded,
     };
     await mkdir(".openbot-build", { recursive: true });
     await writeFile(".openbot-build/browser-secret-live-view.json", JSON.stringify(report, null, 2));

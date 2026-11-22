@@ -2249,7 +2249,7 @@ export class BrowserHost {
     const pauseUntilProtectionEnds = (previous: () => Effect.Effect<void>) => {
       const protectionEnded = Deferred.makeUnsafe<void>();
       const stopListening = this.onChanged(() => {
-        if (tabGone() || !tab.secret?.submitted) Deferred.doneUnsafe(protectionEnded, Effect.void);
+        if (tabGone() || !tab.secret?.running) Deferred.doneUnsafe(protectionEnded, Effect.void);
       });
       const release = () => {
         stopListening();
@@ -2264,7 +2264,7 @@ export class BrowserHost {
           yield* Deferred.await(protectionEnded);
           stopListening();
           if (stopped) return;
-          if (tabGone() || tab.filledCard || tab.secretShown) return endForAuthentication();
+          if (tabGone() || tab.secret?.submitted || tab.filledCard || tab.secretShown) return endForAuthentication();
           const streamGeneration = tab.captureGeneration;
           generation = streamGeneration;
           stopStream = yield* openStream(streamGeneration);
