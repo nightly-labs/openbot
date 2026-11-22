@@ -276,6 +276,10 @@ export class MessagingService {
     );
     this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
+      keysUnreadable: (connectionId) => {
+        const record = this.#threads.store.connection(connectionId);
+        return record ? this.#summary(record).state === "secret_storage_unavailable" : false;
+      },
       places: (connectionId) => this.#outboundPlaces(connectionId),
       history: (connectionId, placeId, limit, filter) => this.#outboundHistory(connectionId, placeId, limit, filter),
       post: (connectionId, target, markdown, files, embeds) =>
