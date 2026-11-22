@@ -1,4 +1,4 @@
-import { SIDEBAR_FOLDER_LEVELS } from "@openbot/contracts/ipc";
+import { SIDEBAR_FOLDER_LEVELS, workflowTriggerFields } from "@openbot/contracts/ipc";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import { ROUTINE_INSTRUCTION_RULE } from "../routine-tool-schema";
 
@@ -8,6 +8,17 @@ export interface ToolGuidanceOptions {
 
 const RECIPIENT_RULE =
   "Choose recipients for new work from your own sidebar section first: a section_teammates block in your instructions, or the latest openbot_section_teammates block in a user message, lists them. Go outside it only when no section teammate fits, more expertise is needed, or the user names another agent. With no section list, choose by name, title, and description, and give ungrouped agents no priority. Recipients that the user names and replies to existing messages come first. Use openbot.list_agents to compare descriptions and status, and openbot.list_sections only to see other sections. Send only to the selected stable ids.";
+
+const TRIGGER_FIELD_RULE = `A trigger with no answer gives fixed fields: ${(
+  ["schedule", "github", "discord", "telegram", "slack"] as const
+)
+  .map(
+    (trigger) =>
+      `${trigger} ${workflowTriggerFields({ kind: "trigger", fields: { trigger } })
+        .map((field) => field.name)
+        .join(" ")}`,
+  )
+  .join("; ")}.`;
 
 export function toolGuidance(
   namespace: string,
@@ -132,6 +143,7 @@ function openbotGuidance(namespace: string, tool: string): string {
       return [
         "Read a workflow, change it in one openbot.edit_workflow call: give each new node a ref; add with from also connects. To insert: disconnect, add with from, connect on. Send no at; move if asked; tidy cleans up. The result maps refs to ids; do not reread.",
         "Fields by kind: trigger trigger (manual|schedule|webhook|github|discord|telegram|slack), schedule {kind:daily|weekdays|weekly|hourly|custom,time:HH:mm,weekday:0-6,minute,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule (yes/no) or check (priority = high and count > 2), edges branch yes|no; both: provider, model, effort only if asked; approval question; output target notify|chat-channel channelId|channel connectionId, placeId (openbot.messaging_list_places)|github|discord|telegram|slack, message (sent in place of the input); prompt text; image prompt, media image|video, model only if asked. text, note, shape have no edges. answer on agent, llm, webhook trigger: lines name: text|number|yes/no|list|a|b, name? optional. {{name}} gives an earlier field in task, prompt, system, question and output message, title, labels, person.",
+        TRIGGER_FIELD_RULE,
         "Only a person-started turn can change, delete or run a workflow; OpenBot confirms deletes. Run one only if asked or to test a build, with a case as input. No tool waits for a run: read it once; report what ran and runs.",
       ].join("\n");
     case "crm_find":

@@ -533,6 +533,11 @@ Format 2 adds the output `message` and `{{name}}` in the output title, labels an
 format 1 sends the input and keeps `{{...}}` text as it is, so a client shows the message field only
 when `hostFormat` is 2 or higher, or when the field already has a value.
 
+Format 3 adds the built-in fields of schedule, GitHub, Discord, Telegram and Slack triggers. A graph
+is format 3 when a step after the trigger reads one of these names in `{{name}}` or in a check, and no
+step declares that name. A host of format 2 does not give these fields, so the editor offers them,
+and checks names against them, only when `hostFormat` is 3 or higher (`WorkflowAnswerScope`).
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes

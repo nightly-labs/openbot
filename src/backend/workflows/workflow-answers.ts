@@ -22,21 +22,31 @@ import {
   workflowAnswerTemplateText,
   workflowAnswerValueText,
   workflowNodeAnswerNames,
+  workflowTriggerFields,
+  workflowTriggerRecord,
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { StoredWorkflowStep } from "./workflow-run-store";
+import { workflowScheduleRecord } from "./workflow-triggers";
 
 export function answerFields(fields: WorkflowFields | null | undefined): WorkflowAnswerField[] {
   const spec = fields?.[WORKFLOW_ANSWER_FIELD];
   return typeof spec === "string" && spec.trim() ? parseWorkflowAnswerSpec(spec).fields : [];
 }
 
-function givenAnswer({ node, fields }: WorkflowAnswerSource, output: string): WorkflowAnswer {
+function givenAnswer({ node, fields, builtIn }: WorkflowAnswerSource, output: string): WorkflowAnswer {
+  if (builtIn) return triggerAnswer(node, output);
   const record = lastJsonObject(output);
   if (!record) return {};
   const given = node.kind === "trigger" && Object.hasOwn(record, "data") ? record.data : record;
   return checkWorkflowAnswer(fields, given).answer;
+}
+
+function triggerAnswer(node: WorkflowNode, output: string): WorkflowAnswer {
+  const fields = workflowTriggerFields(node);
+  const record = node.fields.trigger === "schedule" ? workflowScheduleRecord(output) : lastJsonObject(output);
+  return record ? checkWorkflowAnswer(fields, workflowTriggerRecord(fields, record)).answer : {};
 }
 
 type GivenAnswer = { source: WorkflowAnswerSource; answer: WorkflowAnswer };
@@ -102,7 +112,7 @@ export function stepAnswerGap(
   endedWithoutAnswer: (nodeId: string) => boolean,
 ): AnswerGap | null {
   const sources = workflowAnswerSources(graph, node.id);
-  const typed = sources.length > 0;
+  const typed = sources.some((source) => !source.builtIn);
   const problems = nodeAnswerProblems(graph, node).filter(
     (problem) => !SAVE_ONLY_PROBLEMS.has(problem.code) && (typed || problem.code !== "template"),
   );

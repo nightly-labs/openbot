@@ -155,7 +155,7 @@ try {
   };
   check(
     "an output with a message or a {{name}} in title, labels or person needs format 2; plain fields stay format 1",
-    WORKFLOW_FORMAT === 2 && report.formats.plain === 1 && report.formats.message === 2 && report.formats.titled === 2,
+    WORKFLOW_FORMAT >= 2 && report.formats.plain === 1 && report.formats.message === 2 && report.formats.titled === 2,
     report.formats,
   );
   const messageId = await saved("Format of a saved graph", message);

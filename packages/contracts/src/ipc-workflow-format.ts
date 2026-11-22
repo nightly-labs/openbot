@@ -1,7 +1,8 @@
+import { WORKFLOW_TRIGGER_FIELDS_FORMAT, workflowTriggerFields } from "./ipc-workflow-trigger-fields";
 import type { WorkflowEdge, WorkflowGraph, WorkflowNode, WorkflowNodeSize, WorkflowStroke } from "./ipc-workflows";
 import { isDynamicRecord } from "./runtime-values";
 
-export const WORKFLOW_FORMAT = 2;
+export const WORKFLOW_FORMAT = 3;
 
 interface WorkflowFormatRule {
   readonly since: number;
@@ -21,8 +22,35 @@ function outputUsesNames(node: WorkflowNode): boolean {
   });
 }
 
+const NAME_TEMPLATES = /\{\{\s*([A-Za-z_][A-Za-z0-9_]{0,39})\s*\}\}/gu;
+const NAME_WORDS = /[A-Za-z_][A-Za-z0-9_]{0,39}/gu;
+const DECLARED_NAMES = /^\s*([A-Za-z_][A-Za-z0-9_]{0,39})\??\s*:/gmu;
+
+function namesIn(node: WorkflowNode, name: string, value: string): string[] {
+  if (node.kind === "condition" && name === "check") return [...value.matchAll(NAME_WORDS)].map((match) => match[0]);
+  return [...value.matchAll(NAME_TEMPLATES)].flatMap((match) => (match[1] ? [match[1]] : []));
+}
+
+function usesTriggerFields(graph: WorkflowGraph): boolean {
+  const builtIn = new Set(graph.nodes.flatMap((node) => workflowTriggerFields(node).map((field) => field.name)));
+  for (const node of graph.nodes) {
+    const answer = node.fields.answer;
+    if (typeof answer !== "string") continue;
+    for (const match of answer.matchAll(DECLARED_NAMES)) if (match[1]) builtIn.delete(match[1]);
+  }
+  if (builtIn.size === 0) return false;
+  return graph.nodes.some(
+    (node) =>
+      node.kind !== "trigger" &&
+      Object.entries(node.fields).some(
+        ([name, value]) => typeof value === "string" && namesIn(node, name, value).some((used) => builtIn.has(used)),
+      ),
+  );
+}
+
 const WORKFLOW_FORMAT_RULES: readonly WorkflowFormatRule[] = [
   { since: 2, uses: (graph) => graph.nodes.some(outputUsesNames) },
+  { since: WORKFLOW_TRIGGER_FIELDS_FORMAT, uses: usesTriggerFields },
 ];
 
 export function workflowGraphFormat(graph: WorkflowGraph): number {

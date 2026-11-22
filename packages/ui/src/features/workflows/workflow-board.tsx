@@ -2,7 +2,9 @@ import {
   type AgentStepActivity,
   type RoutineSchedule,
   type StoredFileRow,
+  WORKFLOW_TRIGGER_FIELDS_FORMAT,
   type WorkflowAnswerProblem,
+  type WorkflowAnswerScope,
   type WorkflowGraph,
   workflowAnswerProblems,
   workflowInputAnswerFields,
@@ -640,11 +642,14 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  const answerScope = (): WorkflowAnswerScope => ({
+    triggerFields: (options.features?.()?.format ?? 1) >= WORKFLOW_TRIGGER_FIELDS_FORMAT,
+  });
   const answerProblemsByNode = createMemo(
     () => {
       const graph = options.graph?.();
       const byNode = new Map<string, WorkflowAnswerProblem[]>();
-      for (const problem of graph ? workflowAnswerProblems(graph) : [])
+      for (const problem of graph ? workflowAnswerProblems(graph, answerScope()) : [])
         byNode.set(problem.nodeId, [...(byNode.get(problem.nodeId) ?? []), problem]);
       return byNode;
     },
@@ -853,7 +858,7 @@ export function createBoard(options: BoardOptions) {
     },
     answerNames: (id) => {
       const graph = options.graph?.();
-      return graph ? [...workflowInputAnswerFields(graph, id).keys()] : [];
+      return graph ? [...workflowInputAnswerFields(graph, id, answerScope()).keys()] : [];
     },
     answerProblems: (id) => answerProblemsByNode().get(id) ?? NO_ANSWER_PROBLEMS,
     inputs: (id, type) =>
