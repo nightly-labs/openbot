@@ -3149,11 +3149,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (turn.beforeWakeEcho) {
       if (update.sessionUpdate === "user_message_chunk" && update.content.type === "text") {
         if (isTurnContextBlock(update.content.text)) turn.beforeWakeEcho = null;
-      } else if (!SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+        return;
+      }
+      if (SESSION_STATE_UPDATES.has(update.sessionUpdate) || update.sessionUpdate === "tool_call_update") return;
+      if (update.sessionUpdate !== "tool_call") {
         turn.answered = true;
         turn.beforeWakeEcho.push(update);
+        return;
       }
-      return;
+      this.#releaseBeforeWakeEcho(thread, turn);
     }
     const retry = turn.stopped ? null : this.#flavor.retryUpdate?.(update);
     if (retry) {
@@ -3173,6 +3177,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#emitTurnProgress(thread, turn, recovered);
     }
     this.#applyTurnUpdate(thread, turn, update);
+  }
+
+  #releaseBeforeWakeEcho(thread: AcpThread, turn: AcpTurn): void {
+    const held = turn.beforeWakeEcho ?? [];
+    turn.beforeWakeEcho = null;
+    for (const update of held) this.#applyTurnUpdate(thread, turn, update);
   }
 
   #emitTurnProgress(thread: AcpThread, turn: AcpTurn, detail: string): void {
@@ -3948,9 +3958,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     error: unknown,
   ) {
     if (thread.activeTurn !== turn || turn.completing) return;
-    const beforeEcho = turn.beforeWakeEcho ?? [];
-    turn.beforeWakeEcho = null;
-    for (const update of beforeEcho) this.#applyTurnUpdate(thread, turn, update);
+    this.#releaseBeforeWakeEcho(thread, turn);
     turn.completing = true;
     if (this.#flavor.childSessionUpdates) yield* Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
     if (status === "failed") {
