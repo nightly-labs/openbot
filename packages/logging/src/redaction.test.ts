@@ -438,6 +438,9 @@ describe("registerSecretValue", () => {
     expect(redactPostText("Token: `mt4f9a2c7e1b3d5f60` and http://127.0.0.1:4100/mcp/mt4f9a2c7e1b3d5f60")).toBe(
       "Token: `[redacted]` and http://127.0.0.1:4100/mcp/[redacted]",
     );
+    expect(redactPostText("https://x.example/cb?next=%2Fa%3Ftoken%3Dmt4f9a2c7e1b3d5f60%26b%3D1")).toBe(
+      "https://x.example/cb?next=%2Fa%3Ftoken%3D[redacted]%26b%3D1",
+    );
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {

@@ -111,7 +111,8 @@ export function redactPostText(value: string): string {
 }
 
 const POST_TOKEN_CHARACTER = /[\p{L}\p{N}._~+@%-]/u;
-const POST_TOKEN_TAIL = /^[\p{L}\p{N}._~+@%-]*/u;
+const POST_TOKEN_TAIL = /^[\p{L}\p{N}._~+@-]*/u;
+const PERCENT_ESCAPE_BEFORE = /%[0-9A-Fa-f]{2}$/u;
 const SENTENCE_DOTS = /^\.*$/u;
 
 function maskWholeRegisteredSecrets(value: string): string {
@@ -122,8 +123,13 @@ function maskWholeRegisteredSecrets(value: string): string {
   );
 }
 
+function endsWithPercentEscape(value: string, end: number): boolean {
+  return PERCENT_ESCAPE_BEFORE.test(value.slice(Math.max(0, end - 3), end));
+}
+
 function isWholeToken(value: string, start: number, end: number): boolean {
-  if (start > 0 && POST_TOKEN_CHARACTER.test(value.charAt(start - 1))) return false;
+  if (start > 0 && POST_TOKEN_CHARACTER.test(value.charAt(start - 1)) && !endsWithPercentEscape(value, start))
+    return false;
   return SENTENCE_DOTS.test(POST_TOKEN_TAIL.exec(value.slice(end))?.[0] ?? "");
 }
 
