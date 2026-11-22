@@ -153,7 +153,7 @@ function openCodeRequestFailure(
   endpoint: AcpCustomEndpoint | null,
 ): string {
   if (isOpenCodeSafetyRefusal(error)) {
-    log(`The model provider's safety rules refused this turn: ${detail}`);
+    logger.warn("A model provider's safety rules refused an OpenCode turn.", { detail });
     return sourceText("error.provider.opencodeSafetyBlocked");
   }
   if (!(error instanceof RequestError) || error.code !== -32603) return detail;
