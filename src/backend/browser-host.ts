@@ -2251,6 +2251,12 @@ export class BrowserHost {
       const stopListening = this.onChanged(() => {
         if (tabGone() || !tab.secret?.submitted) Deferred.doneUnsafe(protectionEnded, Effect.void);
       });
+      const release = () => {
+        stopListening();
+        if (resume !== protectionEnded) return;
+        resume = undefined;
+        paused = undefined;
+      };
       resume = protectionEnded;
       paused = Effect.runFork(
         Effect.gen(function* () {
@@ -2262,15 +2268,12 @@ export class BrowserHost {
           const streamGeneration = tab.captureGeneration;
           generation = streamGeneration;
           stopStream = yield* openStream(streamGeneration);
+          if (stopped) return;
+          release();
+          if (!showsPage(streamGeneration) || tabGone()) invalidate();
         }).pipe(
-          Effect.catch(() => Effect.sync(endForAuthentication)),
-          Effect.ensuring(
-            Effect.sync(() => {
-              stopListening();
-              resume = undefined;
-              paused = undefined;
-            }),
-          ),
+          Effect.catchCause(() => Effect.sync(endForAuthentication)),
+          Effect.ensuring(Effect.sync(release)),
         ),
       );
     };
