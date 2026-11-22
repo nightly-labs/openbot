@@ -1805,13 +1805,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               currentModelId = currentModelFromSessionSetup(response);
               listsModels = sessionListsModels(response);
             }
-            if (
-              sessionTransport &&
-              this.#flavor.modelsLoadWithSession &&
-              !listsModels &&
-              this.#models.length > 0 &&
-              this.#requestedModel(params)
-            )
+            if (sessionTransport && this.#flavor.modelsLoadWithSession && !listsModels && this.#models.length > 0)
               return yield* providerFailure(
                 new SessionModelsNotLoadedError(
                   sourceText("error.provider.acpModelsNotLoaded", { provider: this.#label }),
