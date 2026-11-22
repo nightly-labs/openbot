@@ -95,6 +95,7 @@ export const messages = {
     "Moje agenty AI pracują teraz na moim komputerze z OpenBotem. Moje czaty i pliki zostają u mnie. Wypróbuj: {site}",
   "app.socialFollow.redditTitle": "Jak używam OpenBota",
   "app.rail.usageRings": "Użycie {name}: {windows}. Otwórz użycie",
+  "app.rail.usageUnavailable": "Użycie {name} niedostępne. Otwórz użycie",
   "app.rail.customAgentUsage": "Użycie {name}. Otwórz użycie",
   "app.rail.moreUsage": {
     one: "Jeszcze {count} konto. Otwórz użycie",

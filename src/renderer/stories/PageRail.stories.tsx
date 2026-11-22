@@ -49,6 +49,17 @@ const sharedQuotaRows = accountUsageProviderRows({
   ],
 });
 
+const readFailedRows = accountUsageProviderRows({
+  limits: [
+    {
+      id: "codex",
+      primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: nowSeconds + 2 * 3_600 },
+      secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: nowSeconds + 4 * 86_400 },
+    },
+    { id: "grok", primary: null, secondary: null, readFailed: true },
+  ],
+});
+
 const account = (id: string, label: string) =>
   ({ id, label, email: `${label.toLowerCase()}@example.com`, state: "connected", message: null }) as const;
 const window5h = (usedPercent: number) => ({ usedPercent, windowDurationMins: 300, resetsAt: nowSeconds + 7_200 });
@@ -217,6 +228,10 @@ export const CustomAgentUsage: Story = {
 
 export const SharedQuota: Story = {
   args: { usageRows: sharedQuotaRows },
+};
+
+export const UsageReadFailed: Story = {
+  args: { usageRows: readFailedRows },
 };
 
 export const ManyAccounts: Story = {

@@ -174,11 +174,15 @@ export function withUsageEvent(current: AccountUsage | null | undefined, event: 
         kept,
         limit.primary || limit.secondary || !kept
           ? limit
-          : { ...limit, primary: kept.primary, secondary: kept.secondary },
+          : { ...withoutReadFailed(limit), primary: kept.primary, secondary: kept.secondary },
       ),
     );
   }
   return { limits: [...limits.values()] };
+}
+
+function withoutReadFailed({ readFailed: _readFailed, ...limit }: AccountUsageLimit): AccountUsageLimit {
+  return limit;
 }
 
 function decodeAccountUsage(value: unknown): AccountUsage {
