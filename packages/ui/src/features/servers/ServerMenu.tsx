@@ -341,7 +341,7 @@ export function ServerMenu(props: ServerMenuProps) {
                     </DropdownMenu.SubTrigger>
                     <DropdownMenu.Portal>
                       <DropdownMenu.SubContent
-                        class="ui-action-menu agent-context-menu"
+                        class="ui-action-menu agent-context-menu server-submenu"
                         aria-label={t("server.rail.actions")}
                       >
                         <Show when={serverWallet(server().id)}>

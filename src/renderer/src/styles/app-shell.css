@@ -1078,6 +1078,10 @@ textarea {
   overflow-y: auto;
 }
 
+.server-submenu {
+  min-width: 280px;
+}
+
 .server-menu-row {
   gap: var(--openbot-space-2);
 }
