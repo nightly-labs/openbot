@@ -243,7 +243,12 @@ import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import type { CreationPreference } from "../agents/agent-creation-model";
-import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
+import {
+  agentErrorDetails,
+  claimErrorToast,
+  createTurnErrorBanners,
+  readableAgentError,
+} from "../agents/agent-error-text";
 import { agentTakeoverTabIds } from "../agents/agent-thread-attention";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
@@ -2018,21 +2023,33 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       applyAgentLevels(hostId, levels);
     }),
   );
-  const retryNotices = createRetryNotices();
+  const errorBanners = createTurnErrorBanners();
+  const isMainThread = (agentId: string, threadId: string) =>
+    workspace.state.agents.some((agent) => agent.id === agentId && agent.threadId === threadId);
   onCleanup(
     workspace.onHostEvent((event) => {
       const serverId = server()?.id;
+      if (event.type === "turn-started") {
+        if (serverId && isMainThread(event.agentId, event.threadId))
+          errorBanners.noteTurnStarted(composerDraftKey({ agentId: event.agentId, serverId }));
+        return;
+      }
       if (event.type === "turn-completed") {
         if (!serverId) return;
         const key = composerDraftKey({ agentId: event.agentId, serverId });
-        retryNotices.clearAtTurnEnd(key, controller.setConversationErrors, controller.setConversationErrorRuns);
+        errorBanners.clearAtTurnEnd(
+          key,
+          event.status === "completed" && isMainThread(event.agentId, event.threadId),
+          controller.setConversationErrors,
+          controller.setConversationErrorRuns,
+        );
         return;
       }
       if (event.type !== "error") return;
       if (event.agentId && serverId) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
         const message = readableAgentError(event.message);
-        retryNotices.noteError(key, event.message, message);
+        errorBanners.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         const details = agentErrorDetails(event.message, message);
         controller.setConversationErrorRuns((current) => {
