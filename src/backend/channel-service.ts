@@ -43,6 +43,7 @@ import { type ChannelOperationError, channelFailure, channelResult, channelSync 
 import {
   assignmentText,
   boundedHistoryPage,
+  CHANNEL_LANGUAGE_RULE,
   ChannelHistory,
   type ChannelTextModel,
   type DeliveredChannelContext,
@@ -3447,10 +3448,11 @@ export class ChannelService {
     return {
       accepted: true,
       taskId: next.id,
-      instruction:
+      instruction: `${
         tool === "channel_transfer"
           ? "Ownership has transferred. End this turn."
-          : "The assigned member will return a result in this chat. End your turn while waiting for required results.",
+          : "The assigned member will return a result in this chat. End your turn while waiting for required results."
+      } ${CHANNEL_LANGUAGE_RULE}`,
     };
   }).bind(this);
 
