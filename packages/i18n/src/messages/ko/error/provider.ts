@@ -141,6 +141,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "제공자 키에 공백이나 키에 쓸 수 없는 문자가 있어요.",
   "error.provider.noModel": "선택한 제공자에 사용할 수 있는 모델이 없어요.",
   "error.provider.noModelNamed": "{provider}에 사용할 수 있는 모델이 없어요.",
+  "error.provider.acpModelsNotLoaded": "{provider}에서 모델을 불러오지 못했어요. 메시지를 다시 보내 주세요.",
   "error.provider.acpNoModels": "ACP CLI가 ACP 모델을 알리지 않았어요. OpenBot은 대체 모델을 추측하지 않아요.",
   "error.provider.endpointRemoveBusy":
     "이 엔드포인트를 제거하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
@@ -531,6 +532,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "현재 제공자 세션에서는 이 설정을 사용할 수 없어요.",
   "error.provider.sessionSettingInvalid": "이 설정에 사용할 수 없는 값이에요.",
   "error.provider.sessionSettingsBusy": "세션 설정을 변경하기 전에 현재 턴이 끝날 때까지 기다려 주세요.",
+  "error.provider.sessionSettingsTimedOut": "에이전트 세션이 제시간에 응답하지 않았어요. 다시 시도하세요.",
   "error.provider.piOutdated":
     "Pi {version}이(가) 너무 오래되었어요. 네이티브 RPC 및 MCP 지원을 위해 Pi 1.1.0 이상을 설치하세요.",
   "error.provider.nativeMissing": "{provider} CLI가 설치되어 있지 않아요. 설정에서 다운로드하세요.",

@@ -35,6 +35,7 @@ import type {
   AgentTasksSnapshot,
   AgentTaskWindow,
   AgentWaitsSnapshot,
+  ArchivedAgentTasksPage,
   AskSideQuestionInput,
   AttachmentDataInput,
   AvatarImageInput,
@@ -72,6 +73,7 @@ import type {
   GenerateAgentProfileInput,
   HiddenAgentsSnapshot,
   HostAnalyticsInput,
+  ListArchivedAgentTasksInput,
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   LocalBrowserSecretResponse,
@@ -159,10 +161,12 @@ import {
   sameAgentBrowserProfile,
   sameAgentModelChoice,
   WORKFLOW_CATALOG_PROVIDERS,
+  WORKFLOW_MEDIA_CATALOG_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX,
   WORKFLOWS_USAGE_ID,
   type WorkflowCatalogProvider,
+  type WorkflowCatalogSource,
   type WorkflowMediaCatalog,
   type WorkflowMediaCredits,
   type WorkflowMediaPrice,
@@ -170,6 +174,7 @@ import {
   type WorkflowMediaProvider,
   type WorkflowMediaProviders,
   type WorkflowMediaSpecs,
+  workflowCatalogSource,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { AGENT_THREAD_READS_LIMIT } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
@@ -251,6 +256,7 @@ import {
   type AgentFeedback,
   type AgentMessageSteer,
   type AgentServerClaims,
+  type McpServerOwnerHooks,
   OpenBotToolRouter,
 } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
@@ -326,7 +332,6 @@ import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
-import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
@@ -360,6 +365,7 @@ import { shortenDiagnostic } from "./stderr-diagnostics";
 import { extractJsonObject } from "./structured-output";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
+import { type CreditMediaGateway, CreditMediaWorkflows } from "./workflows/credit-media";
 import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
 import { WorkflowMediaCatalogCache } from "./workflows/media-catalog";
 import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
@@ -407,6 +413,8 @@ export interface AgentServiceOptions {
   browser: AgentBrowserHost;
   requestTimeoutMs?: number;
   contextCompactionTimeoutMs?: number;
+  cacheExpiryCompactionDelayMs?: number;
+  cacheExpiryCompaction?: () => boolean;
   memoryReviewIdleMs?: number;
   finishCheck?: boolean;
   preferredProvider?: AgentProvider;
@@ -432,6 +440,7 @@ export interface AgentServiceOptions {
   crm?: (() => CrmHandle | null) | undefined;
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   personCanAdminister?: ((personId: string) => boolean) | undefined;
+  mcpServerOwners?: McpServerOwnerHooks | undefined;
   sidebarLayout?: AgentSidebar | null;
   libraryFolders?: AgentLibraryFolders | null;
   credentials?: ProviderClientContext;
@@ -476,6 +485,7 @@ export interface AgentServiceOptions {
   computerUseOnWayland?: boolean;
   computerUseInputRefused?: () => boolean;
   codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
+  creditMedia?: CreditMediaGateway | null;
 }
 
 const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -546,6 +556,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
   readonly #mediaCatalog: WorkflowMediaCatalogCache;
+  readonly #creditMedia: CreditMediaWorkflows | null;
   readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
   readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
@@ -646,6 +657,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       signIn: (provider) => this.#mediaSignIn(provider),
       warn: (message, details) => logger.warn(message, details),
     });
+    this.#creditMedia = options.creditMedia
+      ? new CreditMediaWorkflows({
+          gateway: options.creditMedia,
+          warn: (message, details) => logger.warn(message, details),
+        })
+      : null;
     this.#sidebarLayout = sidebarLayout;
     this.#libraryFolders = libraryFolders;
     this.#profileSave = new ProfileSave(store, {
@@ -863,6 +880,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hostedSites,
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+      reportFailure: (code, error, agentId) => {
+        this.#reportFailure(code, error, agentId);
+      },
       isStopping: () => this.#stopping,
       redact: (text) => this.#mcp.redact(text),
     });
@@ -1129,7 +1149,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               endpoint.id,
               {
                 harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
-                models: endpoint.models.map((model) => encodedModelId(`${endpoint.id}/`, model.id)),
+                modelIds: endpoint.models.map((model) => model.id),
               },
             ]),
           ),
@@ -1148,6 +1168,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#compaction = new ContextCompaction({
       timeoutMs: options.contextCompactionTimeoutMs,
+      cacheExpiryDelayMs: options.cacheExpiryCompactionDelayMs,
+      cacheExpiryEnabled: options.cacheExpiryCompaction,
       changed: () => this.#emitRuntimeSnapshot(),
       store,
       providers: this.#providers,
@@ -1161,6 +1183,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.channels.contextCompacted(threadId);
         this.messaging.contextCompacted(threadId);
       },
+      compactBeforeCacheExpiry: (agentId, threadId) =>
+        Effect.runFork(this.#compactBeforeCacheExpiry(agentId, threadId).pipe(Effect.forkIn(this.#scope))),
     });
     this.#attention = new AttentionRegistry({
       conversation: this.#conversation,
@@ -1493,6 +1517,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       reportsCompactions: (agentId) => this.#reportsCompactions(agentId),
       quietTurn: (turnId) => this.#turn.quietChannelTurn(turnId),
+      channelNote: (turnId, messageId) => this.#turn.channelNote(turnId, messageId),
       provisionalAnswers: (agentId) => {
         const agent = this.#store.get(agentId);
         return (agent ? this.#providers.clientForAgent(agent)?.provisionalAnswers : undefined) === true;
@@ -1883,6 +1908,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         backupReadyAt: (agentId) => this.#backupReadyAt(agentId),
+        backupsAtLimit: (agentId) => this.#backupsAtLimit(agentId),
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
@@ -2045,6 +2071,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? {}
         : { crmAgentVisibleToMembers: options.crmAgentVisibleToMembers }),
       ...(options.personCanAdminister === undefined ? {} : { personCanAdminister: options.personCanAdminister }),
+      ...(options.mcpServerOwners === undefined ? {} : { mcpServerOwners: options.mcpServerOwners }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
@@ -2988,10 +3015,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   readonly workflowMediaCatalog = Effect.fn("AgentService.workflowMediaCatalog")(function* (
     this: AgentService,
-    only?: WorkflowCatalogProvider,
+    only?: WorkflowCatalogSource,
   ) {
     if (this.#stopping) return { models: [] } satisfies WorkflowMediaCatalog;
-    return yield* this.#mediaCatalog.catalog(only);
+    const credit =
+      this.#creditMedia && (only === undefined || only === "openbot")
+        ? this.#creditMedia.catalog()
+        : Effect.succeed([]);
+    const services =
+      only === "openbot"
+        ? Effect.succeed({ models: [] } satisfies WorkflowMediaCatalog)
+        : this.#mediaCatalog.catalog(only);
+    const [listed, credits] = yield* Effect.all([services, credit], { concurrency: "unbounded" });
+    return {
+      models: [...credits, ...listed.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
+    } satisfies WorkflowMediaCatalog;
   }).bind(this);
 
   readonly workflowMediaPrice = Effect.fn("AgentService.workflowMediaPrice")(function* (
@@ -2999,18 +3037,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     request: WorkflowMediaPriceRequest,
   ) {
     if (this.#stopping) return { credits: null } satisfies WorkflowMediaPrice;
+    if (workflowCatalogSource(request.model) === "openbot")
+      return {
+        credits: this.#creditMedia ? yield* this.#creditMedia.price(request) : null,
+      } satisfies WorkflowMediaPrice;
     return yield* this.#mediaCatalog.price(request);
   }).bind(this);
 
   workflowMediaProviders(): WorkflowMediaProviders {
-    return workflowMediaProvidersOf(this.#mediaServiceAccounts().map(({ account }) => account));
+    return {
+      ...workflowMediaProvidersOf(this.#mediaServiceAccounts().map(({ account }) => account)),
+      openbot: this.#creditMedia?.available() === true,
+    };
   }
 
   readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (
     this: AgentService,
-    only?: WorkflowCatalogProvider,
+    only?: WorkflowCatalogSource,
   ) {
     if (this.#stopping) return { sunra: null, higgsfield: null, accounts: null } satisfies WorkflowMediaCredits;
+    const openbot =
+      this.#creditMedia && (only === undefined || only === "openbot") ? yield* this.#creditMedia.credits() : null;
+    if (only === "openbot")
+      return { sunra: null, higgsfield: null, accounts: null, openbot } satisfies WorkflowMediaCredits;
     const all = this.#mediaServiceAccounts();
     const accounts = only ? all.filter((account) => account.provider === only).slice(0, 1) : all;
     const orNull = <A>(read: Effect.Effect<A, { readonly message: string }>, service: string) =>
@@ -3029,13 +3078,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { concurrency: "unbounded" },
     );
     const listed = accounts.map(({ account }, index) => ({ ...account, credits: credits[index] ?? null }));
-    return { ...workflowMediaCreditsOf(listed), accounts: only ? null : listed } satisfies WorkflowMediaCredits;
+    return {
+      ...workflowMediaCreditsOf(listed),
+      accounts: only ? null : listed,
+      ...(only ? {} : { openbot }),
+    } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   readonly generateWorkflowMedia = Effect.fn("AgentService.generateWorkflowMedia")(
     function* (
       this: AgentService,
       input: {
+        jobId: string;
+        earlierJobIds: readonly string[];
         kind: GeneratedMediaKind;
         provider: WorkflowMediaProvider;
         model: string;
@@ -3051,6 +3106,32 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const pictures = input.images.filter(
         (image): image is { role: MediaPictureRole; attachmentId: string } => image.role !== "file",
       );
+      if (input.provider === "openbot") {
+        if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        if (!this.#creditMedia) return yield* failed(sourceText("error.billing.mediaSignInRequired"));
+        return yield* this.#creditMedia
+          .generate(
+            {
+              resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
+              store: (file) => this.#mailbox.storeGeneratedAttachment(file),
+            },
+            {
+              jobId: input.jobId,
+              earlierJobIds: input.earlierJobIds,
+              kind: input.kind,
+              model: input.catalogId,
+              prompt: input.prompt,
+              specs: input.specs,
+              images: pictures,
+            },
+          )
+          .pipe(
+            Effect.tapError((failure) =>
+              Effect.sync(() => logger.warn("Could not make workflow media with credits.", { error: failure.message })),
+            ),
+            Effect.mapError((failure) => failed(failure.message)),
+          );
+      }
       if (input.provider === "sunra") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
         const signIn = yield* this.#mediaStepSignIn("sunra", input.account);
@@ -4151,6 +4232,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  #backupsAtLimit(agentId: string): boolean {
+    const agent = this.#store.get(agentId);
+    if (!agent?.backupModels?.automatic || this.#mayFailOver(agentId)) return false;
+    const current = agentModelChoice(agent);
+    const backups = agent.backupModels.order.filter((choice) => !sameAgentModelChoice(choice, current));
+    return (
+      backups.length > 0 &&
+      backups.every((choice) => {
+        const limit = usageLimitOf(choice);
+        return this.#usageLimits.isLimited(limit) || this.#usageLimits.isFailed(limit);
+      })
+    );
+  }
+
   #waitsForLimit(agentId: string): boolean {
     return !this.#mayFailOver(agentId);
   }
@@ -4663,6 +4758,68 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* this.#compaction.request(input.agentId, externalThreadId);
   }, Effect.uninterruptible).bind(this);
 
+  readonly #compactBeforeCacheExpiry = Effect.fn("AgentService.compactBeforeCacheExpiry")(function* (
+    this: AgentService,
+    agentId: string,
+    externalThreadId: string,
+  ) {
+    if (yield* this.#holdsBackgroundWork(externalThreadId)) return;
+    const reserved = yield* lifecycleStep("compact before cache expiry", () =>
+      this.#reserveCacheExpiryCompaction(agentId, externalThreadId),
+    ).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("The compaction before the prompt cache expires did not start.", { error: failure.cause });
+          return false;
+        }),
+      ),
+    );
+    if (reserved) yield* this.#compaction.request(agentId, externalThreadId);
+  }, Effect.uninterruptible).bind(this);
+
+  readonly #holdsBackgroundWork = Effect.fn("AgentService.holdsBackgroundWork")(function* (
+    this: AgentService,
+    externalThreadId: string,
+  ) {
+    const client = this.#conversation.openClientFor(externalThreadId);
+    if (!client?.holdsBackgroundWork) return false;
+    const background = yield* Effect.result(client.holdsBackgroundWork(externalThreadId));
+    return Result.isFailure(background) || background.success;
+  }).bind(this);
+
+  #reserveCacheExpiryCompaction(agentId: string, externalThreadId: string): boolean {
+    const agent = this.#store.get(agentId);
+    const client = agent ? this.#providers.clientForAgent(agent) : null;
+    if (
+      !agent ||
+      !client ||
+      client.contextCompaction === "handoff" ||
+      !this.#providers.agentClientRunning(agent) ||
+      this.#conversation.openClientFor(externalThreadId) !== client
+    )
+      return false;
+    const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    if (this.#store.database.activeProviderSession(threadId, agent.provider)?.externalSessionId !== externalThreadId)
+      return false;
+    const taskId = this.#tasks.taskForThread(threadId);
+    const main = threadId === agent.threadId;
+    const task = taskId !== null && !this.#tasks.isRoutineThreadId(threadId);
+    const channel = this.channels.store.channelForThread(threadId) !== null;
+    if (!main && !task && !channel) return false;
+    if (
+      !this.#usageLimits.mayDrain(agentId) ||
+      this.#mailbox.hasUnfinishedDelivery(agentId) ||
+      this.#compaction.heldThreads(agentId).length > 0 ||
+      this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
+      this.#conversation.workingSnapshot(agentId)?.activeTurnId ||
+      this.#store.database.readActiveTurnId(agentId, threadId) ||
+      (main && this.#threads.mainContextBusy(agent)) ||
+      (task && taskId !== null && this.#mailbox.taskBusy(agentId, taskId))
+    )
+      return false;
+    return this.#compaction.reserve(agentId, externalThreadId, true, null, "cacheExpiry");
+  }
+
   readonly clearChannelContext = Effect.fn("AgentService.clearChannelContext")(function* (
     this: AgentService,
     channelId: string,
@@ -4728,7 +4885,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     const contexts = yield* this.channels.compactTargets(channelId);
     const { agents: members, candidates: found } = yield* lifecycleStep("find channel compact members", () =>
-      this.#channelCompactCandidates(contexts),
+      this.#channelCompactCandidates(channelId, contexts),
     );
     const stoppedMembers = [...new Set(found.map(({ agentId }) => members.get(agentId)))].filter(
       (agent): agent is AgentSummary =>
@@ -4751,7 +4908,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { discard: true },
     );
     const sessions = yield* lifecycleStep("compact channel context", () => {
-      const { agents, candidates } = this.#channelCompactCandidates(contexts);
+      const { agents, candidates } = this.#channelCompactCandidates(channelId, contexts);
       const reserved = candidates.filter(({ agentId, externalSessionId }) =>
         this.#compaction.reserve(agentId, externalSessionId, true),
       );
@@ -4765,7 +4922,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }, Effect.uninterruptible).bind(this);
 
-  #channelCompactCandidates(contexts: ReadonlyArray<{ agentId: string; threadId: string }>): {
+  #channelCompactCandidates(
+    channelId: string,
+    contexts: ReadonlyArray<{ agentId: string; threadId: string }>,
+  ): {
     agents: Map<string, AgentSummary>;
     candidates: Array<{ agentId: string; threadId: string; externalSessionId: string }>;
   } {
@@ -4775,7 +4935,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
       return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
     });
-    if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
+    if (
+      this.channels.compactionBlocked(channelId) ||
+      candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId))
+    )
       throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
     return { agents, candidates };
   }
@@ -4785,12 +4948,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     agents: ReadonlyMap<string, AgentSummary>,
   ): string {
     if (!candidates.length) return sourceText("error.backend.channelCompactNoSession");
-    const onRequest = candidates.some(({ agentId }) => {
-      const agent = agents.get(agentId);
-      return agent !== undefined && this.#mayCompactOnRequest(agent);
-    });
+    const onRequest = candidates
+      .map(({ agentId }) => agents.get(agentId))
+      .filter((agent): agent is AgentSummary => agent !== undefined && this.#mayCompactOnRequest(agent));
+    if (!onRequest.length) return sourceText("error.backend.channelCompactNotSupported");
     return sourceText(
-      onRequest ? "error.backend.channelCompactUnavailable" : "error.backend.channelCompactNotSupported",
+      onRequest.some((agent) => !this.#providers.agentClientRunning(agent))
+        ? "error.backend.channelCompactProviderUnavailable"
+        : "error.backend.channelCompactUnavailable",
     );
   }
 
@@ -6063,6 +6228,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#tasks.snapshot(agentId);
   }
 
+  listArchivedTasks(input: ListArchivedAgentTasksInput): ArchivedAgentTasksPage {
+    return this.#tasks.archivedPage(input.agentId, input.before);
+  }
+
   readTask(agentId: string, taskId: string): ConversationSnapshot {
     return structuredClone(this.#tasks.read(agentId, taskId));
   }
@@ -6731,15 +6900,31 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #steerAgentMessage(recipientAgentId: string, deliveryId: string, wait: boolean): Effect.Effect<AgentMessageSteer> {
     const agent = this.#store.get(recipientAgentId);
-    const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
-    if (!agent || !snapshot || !this.#mailbox.joinsChatTurn(deliveryId)) return Effect.succeed(null);
-    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId)) return Effect.succeed(null);
-    return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
+    if (!agent || !this.#mailbox.joinsRunningTurn(deliveryId)) return Effect.succeed(null);
+    const taskId = this.#mailbox.taskIdForDelivery(deliveryId);
+    const task = taskId === null ? null : this.#runningTask(recipientAgentId, taskId);
+    const snapshot = taskId === null ? this.#conversation.snapshotToUpdate(recipientAgentId) : task?.snapshot;
+    if (!snapshot) return Effect.succeed(null);
+    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId, taskId))
+      return Effect.succeed(null);
+    return this.#steerWhenBusy(agent, task, snapshot, deliveryId, false, wait);
   }
 
-  #personTurn(agentId: string, turnId: string): boolean {
+  #runningTask(
+    agentId: string,
+    taskId: string,
+  ): { taskId: string; threadId: string; snapshot: ConversationSnapshot } | null {
+    const threadId = this.#tasks.threadId(taskId);
+    const snapshot =
+      threadId === null
+        ? undefined
+        : this.#conversation.workingTaskSnapshots(agentId).find((candidate) => candidate.threadId === threadId);
+    return threadId !== null && snapshot ? { taskId, threadId, snapshot } : null;
+  }
+
+  #personTurn(agentId: string, turnId: string, taskId: string | null): boolean {
     const linked = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, null);
+    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, taskId);
     return (
       deliveries.length > 0 &&
       deliveries.every(({ delivery }) => {
@@ -7035,6 +7220,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emitError(code: string, error: unknown, agentId?: string, context?: FailureContext, link?: string): void {
+    const message = this.#reportFailure(code, error, agentId, context);
+    this.#emit({
+      type: "error",
+      ...(agentId !== undefined ? { agentId } : {}),
+      code,
+      message,
+      ...(context?.provider ? { provider: context.provider } : {}),
+      ...(context?.model ? { model: context.model } : {}),
+      ...(link ? { link } : {}),
+    });
+  }
+
+  #reportFailure(code: string, error: unknown, agentId?: string, context?: FailureContext): string {
     const causeCode = context?.causeCode ?? classifyFailure(error);
     this.emit("failure", {
       ...context,
@@ -7052,15 +7250,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       causeCode,
       message: shortenDiagnostic(message),
     });
-    this.#emit({
-      type: "error",
-      ...(agentId !== undefined ? { agentId } : {}),
-      code,
-      message,
-      ...(context?.provider ? { provider: context.provider } : {}),
-      ...(context?.model ? { model: context.model } : {}),
-      ...(link ? { link } : {}),
-    });
+    return message;
   }
 
   #emitRuntimeSnapshot(): void {

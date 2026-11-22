@@ -1,9 +1,12 @@
 import {
+  ELEVENLABS_VOICE_MODEL_ID,
   type SpeechModelStatus,
   VOICE_KEY_PROVIDER_NAMES,
   type VoiceKeyProvider,
+  type VoiceModelInfo,
   type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   Download,
@@ -27,6 +30,17 @@ import {
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createRoot, createStore, getOwner, onCleanup, runWithOwner, Show, untrack } from "solid-js";
+
+export const MODEL_DESCRIPTION = {
+  "parakeet-tdt-0.6b-v3": "settings.voice.model.parakeet.description",
+  "parakeet-unified-en-0.6b": "settings.voice.model.parakeetUnified.description",
+  "bark-3.0-plus": "settings.voice.model.bark.description",
+  "whisper-turbo": "settings.voice.model.whisper.description",
+  "cohere-transcribe-03-2026": "settings.voice.model.cohere.description",
+  [ELEVENLABS_VOICE_MODEL_ID]: "settings.voice.model.elevenlabs.description",
+  "groq-whisper-large-v3-turbo": "settings.voice.model.groqTurbo.description",
+  "groq-whisper-large-v3": "settings.voice.model.groqLarge.description",
+} as const satisfies Record<VoiceModelInfo["id"], AppTextKey>;
 
 export type ModelPlace = "local" | VoiceKeyProvider;
 
@@ -72,6 +86,7 @@ interface VoiceModelRowProps<Id extends string> {
   action?: JSX.Element | undefined;
   disabled: boolean;
   mount: HTMLElement | undefined;
+  onServer?: boolean;
 }
 
 export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) {
@@ -84,7 +99,11 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
       ids: props.choices.filter((choice) => choice.place === place).map((choice) => choice.id),
     })).filter((group) => group.ids.length > 0);
   const groupName = (place: ModelPlace) =>
-    place === "local" ? t("settings.voice.model.group.local") : VOICE_KEY_PROVIDER_NAMES[place];
+    place !== "local"
+      ? VOICE_KEY_PROVIDER_NAMES[place]
+      : props.onServer
+        ? t("server.settings.voiceModel.group")
+        : t("settings.voice.model.group.local");
   const phase = () => props.file?.status?.phase;
   const fileText = (): string | null => {
     const file = props.file;
@@ -135,7 +154,11 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
               variant="ghost"
               size="sm"
               type="button"
-              aria-label={t("settings.voice.model.removeLabel", { name: name() })}
+              aria-label={
+                props.onServer
+                  ? t("server.settings.voiceModel.removeLabel", { name: name() })
+                  : t("settings.voice.model.removeLabel", { name: name() })
+              }
               onClick={() => props.onRemove()}
             >
               {t("common.remove")}
@@ -268,6 +291,7 @@ export interface ModelDownload {
 }
 
 interface ModelDownloadToastsProps {
+  scope?: string;
   downloads: readonly ModelDownload[];
   running: readonly string[];
   onCancel: (id: string) => void;
@@ -290,7 +314,7 @@ export function ModelDownloadToasts(props: ModelDownloadToastsProps) {
   const owner = getOwner();
   const open = new Map<string, () => void>();
   const cancelled = new Set<string>();
-  const toastId = (id: string) => `voice-model-${id}`;
+  const toastId = (id: string) => (props.scope ? `voice-model-${props.scope}-${id}` : `voice-model-${id}`);
   const download = (id: string) => props.downloads.find((entry) => entry.id === id);
 
   const raise = (id: string) => {

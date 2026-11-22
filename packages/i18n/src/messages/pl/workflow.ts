@@ -285,6 +285,10 @@ export const messages = {
   "workflow.answer.problem.field": "Żaden wcześniejszy krok nie podaje {name}.",
   "workflow.answer.problem.test": "Nie można tak porównać {name}.",
   "workflow.answer.problem.conflict": "Dwa wcześniejsze kroki podają {name} z różnymi typami.",
+  "workflow.answer.problem.path":
+    "Nie każda ścieżka do tego kroku podaje {name}. Oznacz pole jako opcjonalne ({name}?) albo podaj je na każdej ścieżce.",
+  "workflow.answer.problem.repeated":
+    "Dwa wcześniejsze kroki mogą podać {name} w tym samym uruchomieniu. Zmień nazwę jednego z nich.",
   "workflow.check.title": "Sprawdzenie",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Pola: {names}",

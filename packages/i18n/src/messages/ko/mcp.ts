@@ -98,6 +98,7 @@ export const messages = {
   "mcp.panel.signIn": "로그인",
   "mcp.panel.signOut": "로그아웃",
   "mcp.panel.cancelSignIn": "로그인 취소",
+  "mcp.panel.useAddress": "이 주소 사용",
   "mcp.panel.signInTo": "{name}에 로그인",
   "mcp.panel.signInWaiting": {
     other: "브라우저에서 로그인을 완료하세요. OpenBot은 {count}분 후 대기를 중지해요.",

@@ -87,6 +87,8 @@ export const messages = defineMessages("error.backend", {
     "The members of this channel have no conversation to compact yet. Compact it after a member answers in the channel.",
   "error.backend.channelCompactNotSupported":
     "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
+  "error.backend.channelCompactProviderUnavailable":
+    "The provider of the channel members does not work now. Refresh the providers, then compact the channel again.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelArchiveRunning": "Stop the running work in this channel, then delete it.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
@@ -264,6 +266,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInOnHost": "This server asks for a sign-in. Sign in to it in OpenBot on the host computer.",
   "error.backend.mcpSignInNeedsHttps":
     "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "This server signs in only at {url}. Change the URL to this address, then sign in again.",
   "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
   "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
   "error.backend.mcpSignInRefused": "The sign-in page refused access. Sign in again.",

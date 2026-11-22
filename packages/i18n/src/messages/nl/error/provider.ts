@@ -143,6 +143,7 @@ export const messages = {
     "De sleutel van de aanbieder bevat een spatie of een teken dat een sleutel niet kan bevatten.",
   "error.provider.noModel": "De gekozen aanbieder heeft geen beschikbaar model.",
   "error.provider.noModelNamed": "{provider} heeft geen model beschikbaar.",
+  "error.provider.acpModelsNotLoaded": "{provider} kon zijn modellen niet laden. Stuur je bericht opnieuw.",
   "error.provider.acpNoModels": "ACP CLI heeft geen ACP-modellen aangeboden. OpenBot raadt geen reservemodel.",
   "error.provider.endpointRemoveBusy":
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je dit endpoint verwijdert.",
@@ -540,6 +541,7 @@ export const messages = {
     "Deze instelling is niet beschikbaar in de huidige sessie van de aanbieder.",
   "error.provider.sessionSettingInvalid": "Deze waarde is niet beschikbaar voor de instelling.",
   "error.provider.sessionSettingsBusy": "Wacht tot de huidige beurt klaar is voordat je een sessie-instelling wijzigt.",
+  "error.provider.sessionSettingsTimedOut": "De sessie van de agent reageerde niet op tijd. Probeer het opnieuw.",
   "error.provider.piOutdated":
     "Pi {version} is te oud. Installeer Pi 1.1.0 of nieuwer voor native ondersteuning van RPC en MCP.",
   "error.provider.nativeMissing": "De {provider} CLI is niet geïnstalleerd. Download hem in Instellingen.",

@@ -1109,7 +1109,14 @@ as Connect JSON to `https://api2.cursor.sh` or `CURSOR_API_ENDPOINT`, with the C
 The token comes from where the CLI keeps it: on macOS the login Keychain item `cursor-access-token`
 (account `cursor-user`), read with `/usr/bin/security` because the CLI writes it with that tool,
 then `~/.cursor/auth.json`; on Linux `$XDG_CONFIG_HOME/cursor/auth.json` or
-`~/.config/cursor/auth.json`; on Windows `%APPDATA%\Cursor\auth.json`. Cursor does not document
+`~/.config/cursor/auth.json`; on Windows `%APPDATA%\Cursor\auth.json`. A Linux CLI from 2026.11.22 with
+a desktop keyring keeps its sign-in in the Secret Service (service `cursor-credentials`, account
+`cursor-user`) and leaves only `{"storedIn":"os-secret-store"}` in `auth.json`. With that marker the
+reader runs `secret-tool search`, not `lookup`, so a locked keyring gives no reading and no unlock
+prompt at each poll. It keeps a token until the CLI rewrites `auth.json`, which the CLI does after
+each keyring write, and a read with no token (locked keyring, no session bus, no `secret-tool`) for 30
+minutes. Windows 2026.11.22 keeps its
+sign-in in `auth.dpapi`, which the reader does not read. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a
 `cursor` row, because both windows have the same length. The total of that split plan
@@ -1397,7 +1404,12 @@ closed.
 The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `hermes acp`. OpenBot has
 no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
 and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
-`PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
+`PATH` and in `~/.local/bin`, and on Windows also in `bin` of `HERMES_HOME` and of
+`%LOCALAPPDATA%\hermes`, where the Hermes Windows installer puts it. It reads the version from
+`hermes acp --version`, or from `Hermes Agent vX.Y.Z` in `hermes --version` before Hermes 0.14.
+On Windows, `where.exe` for each provider CLI also searches the User and Machine `PATH` that the registry
+holds now, after the `PATH` that OpenBot got at start, so a check finds a CLI that was installed or
+repaired while OpenBot was open.
 
 A missing CLI is `not-installed`. On macOS and Linux, with no `OPENBOT_HERMES_PATH`, its row has a
 Download: `HermesInstaller` (`src/main/hermes-installer.ts`) runs the official installer as the

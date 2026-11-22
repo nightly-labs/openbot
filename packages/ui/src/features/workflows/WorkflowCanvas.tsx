@@ -2377,6 +2377,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return kind !== undefined && kind !== "approval" && isWorkflowStepKind(kind) && !running() && !frozen();
   };
   const runNode = (id: string) => {
+    if (board.creditsShort(id)) return;
     if (kindOf(id) === "trigger") props.onRun({ fromNodeId: id });
     else props.onRunStep(id, takesOf(id));
   };
@@ -3594,7 +3595,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 {(id) => (
                   <>
                     <Show when={runnable(id())}>
-                      <ContextMenu.Item onSelect={() => board.runStep(id())}>
+                      <ContextMenu.Item disabled={board.creditsShort(id())} onSelect={() => board.runStep(id())}>
                         <Play aria-hidden="true" />
                         <span class="wfn-menu-text">
                           {kindOf(id()) === "trigger"

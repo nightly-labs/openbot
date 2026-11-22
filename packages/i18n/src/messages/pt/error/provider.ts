@@ -148,6 +148,7 @@ export const messages = {
     "A chave do provedor contém um espaço ou um caractere que uma chave não pode conter.",
   "error.provider.noModel": "O provedor selecionado não tem nenhum modelo disponível.",
   "error.provider.noModelNamed": "{provider} não tem nenhum modelo disponível.",
+  "error.provider.acpModelsNotLoaded": "O {provider} não conseguiu carregar os modelos. Envie sua mensagem de novo.",
   "error.provider.acpNoModels":
     "A CLI ACP não anunciou nenhum modelo ACP. O OpenBot não vai escolher um modelo alternativo por suposição.",
   "error.provider.endpointRemoveBusy": "Aguarde o turno ativo e a fila terminarem antes de remover este endpoint.",
@@ -538,6 +539,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Esta configuração não está disponível na sessão atual do provedor.",
   "error.provider.sessionSettingInvalid": "Este valor não está disponível para a configuração.",
   "error.provider.sessionSettingsBusy": "Aguarde o turno atual terminar antes de mudar uma configuração de sessão.",
+  "error.provider.sessionSettingsTimedOut": "A sessão do agente não respondeu a tempo. Tente novamente.",
   "error.provider.piOutdated":
     "O Pi {version} é antigo demais. Instale o Pi 1.1.0 ou mais recente para suporte a RPC e MCP nativos.",
   "error.provider.nativeMissing": "A CLI do {provider} não está instalada. Baixe-a em Configurações.",

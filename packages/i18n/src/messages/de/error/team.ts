@@ -136,6 +136,8 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Diese Verbindung unterstützt keine Änderungen der Serveridentität.",
   "error.team.hostUpdateUnsupported": "Diese Verbindung unterstützt keine Host-Aktualisierungen.",
   "error.team.hostTimezoneUnsupported": "Diese Verbindung unterstützt die Zeitzone des Servers nicht.",
+  "error.team.hostVoiceModelUnsupported":
+    "Das Spracherkennungsmodell des Servers wird von dieser Verbindung nicht unterstützt.",
   "error.team.hostRestartUnsupported": "Diese Verbindung unterstützt keinen Neustart des Servers.",
   "error.team.ownerTransferUnsupported": "Die Übertragung des Eigentums wird von diesem Server nicht unterstützt.",
   "error.team.hostKeyRotationUnsupported": "Diese Verbindung unterstützt keine Änderung des Serverschlüssels.",
@@ -152,6 +154,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported":
     "Diese Verbindung unterstützt den Schalter für die Claude-Code-Einrichtung nicht.",
   "error.team.claudeCompactWindowUnsupported": "Diese Verbindung unterstützt die Claude-Komprimierungsgröße nicht.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Diese Verbindung unterstützt das Komprimieren vor Ablauf des Caches nicht.",
   "error.team.providerEnvironmentUnsupported": "Diese Verbindung unterstützt keine Anbietervariablen.",
   "error.team.modelVisibilityUnsupported": "Diese Verbindung unterstützt die Modellliste nicht.",
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",

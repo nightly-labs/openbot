@@ -37,6 +37,7 @@ import {
   type BrowserProfileSummary,
   type BrowserProxyList,
   type BrowserProxySummary,
+  type CacheExpiryCompactionSetting,
   type CancelMcpSignInInput,
   type ChannelFolderChange,
   type ChannelFolderInput,
@@ -101,6 +102,7 @@ import {
   decodeHostVaultCodes,
   decodeHostVaultImport,
   decodeHostVaultState,
+  decodeHostVoiceModel,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
   decodeInstalledSkills,
@@ -150,6 +152,8 @@ import {
   type HostTimezoneSettings,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
+  type HostVoiceModel,
+  type HostVoiceModelChange,
   type InstallAgentTemplateInput,
   type InstalledSkill,
   type InstallMarketplaceAgentInput,
@@ -311,6 +315,10 @@ import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bit
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import {
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+  decodeCacheExpiryCompactionResponse,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
 import { CHANNEL_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
@@ -334,6 +342,7 @@ import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-relea
 import { HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import {
   decodeLiveVoiceAccount,
@@ -832,6 +841,17 @@ export function setHostTimezone(
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
 }
 
+export function getHostVoiceModel(request: TeamApiRequest): Effect.Effect<HostVoiceModel, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_VOICE_MODEL_ROUTES.settings, decodeHostVoiceModel, {}));
+}
+
+export function changeHostVoiceModel(
+  request: TeamApiRequest,
+  { action, modelId }: HostVoiceModelChange,
+): Effect.Effect<HostVoiceModel, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_VOICE_MODEL_ROUTES.change, decodeHostVoiceModel, { action, modelId }));
+}
+
 export function requestHostRestart(request: TeamApiRequest): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_RESTART_ROUTES.restart, ignoreResponse, {}));
 }
@@ -1019,6 +1039,23 @@ export function setHostPromptCacheTtl(
   ttl: PromptCacheTtl,
 ): Effect.Effect<PromptCacheTtlSetting, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROMPT_CACHE_TTL_ROUTES.update, decodePromptCacheTtlSetting, { ttl }));
+}
+
+export function getHostCacheExpiryCompaction(
+  request: TeamApiRequest,
+): Effect.Effect<CacheExpiryCompactionSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, decodeCacheExpiryCompactionResponse, {}),
+  );
+}
+
+export function setHostCacheExpiryCompaction(
+  request: TeamApiRequest,
+  enabled: boolean,
+): Effect.Effect<CacheExpiryCompactionSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, decodeCacheExpiryCompactionResponse, { enabled }),
+  );
 }
 
 export function getHostClaudeCompactWindow(

@@ -297,6 +297,9 @@ export const messages = {
   "workflow.answer.problem.field": "لا توجد خطوة قبل هذه تعطي {name}.",
   "workflow.answer.problem.test": "لا يمكن مقارنة {name} بهذه الطريقة.",
   "workflow.answer.problem.conflict": "خطوتان قبل هذه تعطيان {name} بنوعين مختلفين.",
+  "workflow.answer.problem.path":
+    "لا تعطي كل المسارات إلى هذه الخطوة {name}. اجعله اختياريًا ({name}?) أو أعطه في كل مسار.",
+  "workflow.answer.problem.repeated": "يمكن لخطوتين قبل هذه أن تعطيا {name} في التشغيل نفسه. أعد تسمية إحداهما.",
   "workflow.check.title": "الفحص",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "الحقول: {names}",

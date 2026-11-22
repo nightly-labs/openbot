@@ -20,6 +20,14 @@ export const messages = {
   "error.workflow.agentStepStopped": "Агент остановился, не ответив на этот шаг. Запустите шаг снова.",
   "error.workflow.conditionUnclear": "Модель не ответила «да» или «нет».",
   "error.workflow.answerInvalid": "В ответе нет полей, которые нужны этому шагу: {fields}. Запустите шаг снова.",
+  "error.workflow.answerSetup":
+    "С полями ответа этого рабочего процесса здесь проблема: {fields}. Исправьте рабочий процесс и снова запустите шаг.",
+  "error.workflow.answerSourceEnded":
+    "У этих полей нет значения, потому что шаг, который их даёт, не завершился: {fields}. Сначала снова запустите тот шаг.",
+  "error.workflow.runInputInvalid":
+    "Входные данные запуска не подходят к полям ответа триггера: {fields}. Отправьте один объект JSON с этими полями.",
+  "error.workflow.sourceNotDone":
+    "Предыдущий шаг завершился с ошибкой или был остановлен при последнем запуске. Сначала снова запустите тот шаг.",
   "error.workflow.checkInvalid": "Проверка этого шага недействительна. Исправьте её и запустите шаг снова.",
   "error.workflow.modelFailed": "Модель не смогла ответить. Запустите шаг снова.",
   "error.workflow.modelTimedOut":

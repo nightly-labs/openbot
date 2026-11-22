@@ -33,6 +33,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import { AGENT_ARCHIVED_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
@@ -68,6 +69,7 @@ import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "@openbot/contracts/team-prot
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
+import { CACHE_EXPIRY_COMPACTION_CAPABILITY } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
 import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
@@ -131,6 +133,7 @@ import {
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
+  PROMPT_CACHE_TTL_PI_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -172,6 +175,7 @@ import {
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   type TeamCurrentCapability,
@@ -194,6 +198,7 @@ import {
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
@@ -221,6 +226,7 @@ import {
   type HostRestartEvent,
   type HostRestartState,
 } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
@@ -276,6 +282,7 @@ import {
   withUiBlockVaultRequests,
 } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import { USAGE_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/usage-credits-v1";
+import { usageEventWithoutReadFailed } from "@openbot/contracts/team-protocol/usage-read-failed-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -376,6 +383,7 @@ import { agentTasksWireSnapshot, routeAgentTasks } from "./team-api/route-agent-
 import { routeAgentThreadQueue } from "./team-api/route-agent-thread-queue";
 import { routeAgentThreadRequests } from "./team-api/route-agent-thread-requests";
 import {
+  routeAgentArchivedThreads,
   routeAgentThreadBranches,
   routeAgentThreadFiles,
   routeAgentThreadPages,
@@ -392,6 +400,7 @@ import { hiddenTabTest, routeBrowser, visibleControlState } from "./team-api/rou
 import { routeBrowserProfiles } from "./team-api/route-browser-profiles";
 import { routeBrowserProxies } from "./team-api/route-browser-proxies";
 import { routeBrowsingMemory } from "./team-api/route-browsing-memory";
+import { routeCacheExpiryCompaction } from "./team-api/route-cache-expiry-compaction";
 import { routeChannelFolders } from "./team-api/route-channel-folders";
 import { routeChannels } from "./team-api/route-channels";
 import { chatColorsOf, routeChatColors, visibleChatColors } from "./team-api/route-chat-colors";
@@ -422,6 +431,7 @@ import { routeHostRestart } from "./team-api/route-host-restart";
 import { routeHostTimezone } from "./team-api/route-host-timezone";
 import { routeHostTurnLimits } from "./team-api/route-host-turn-limits";
 import { routeHostUpdate } from "./team-api/route-host-update";
+import { routeHostVoiceModel } from "./team-api/route-host-voice-model";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
 import { routeInstanceTransferChunks } from "./team-api/route-instance-transfer-chunks";
@@ -1291,6 +1301,7 @@ export class TeamApiServer {
       if ((await routeAgentThreadReplies(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadBranches(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadPages(context, this.#options.agentTasks, hidden)) === "handled") return;
+      if ((await routeAgentArchivedThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeGithubSkills(context, this.#options.admin)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
@@ -1304,6 +1315,7 @@ export class TeamApiServer {
       if ((await routeHostAppearance(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostVoiceModel(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTurnLimits(context, this.#options.admin)) === "handled") return;
       if ((await routeHostRestart(context, this.#options.admin)) === "handled") return;
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
@@ -1316,6 +1328,7 @@ export class TeamApiServer {
       if ((await routePromptCacheTtl(context, this.#options.admin)) === "handled") return;
       if ((await routeClaudeUserSetup(context, this.#options.admin)) === "handled") return;
       if ((await routeClaudeCompactWindow(context, this.#options.admin)) === "handled") return;
+      if ((await routeCacheExpiryCompaction(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderEnvironment(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderDetection(context, this.#options.admin)) === "handled") return;
       if ((await routeModelVisibility(context, this.#options.admin)) === "handled") return;
@@ -1563,8 +1576,10 @@ export class TeamApiServer {
     providerHidden?: ReadonlySet<string>,
   ): string | null {
     const protocol = eventProtocol(capabilities);
-    const visible = this.#peerView(event, capabilities, blocked, providerHidden);
-    if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
+    const view = this.#peerView(event, capabilities, blocked, providerHidden);
+    if (!isAgentEvent(view) && !isTeamRealtimeEvent(view)) return null;
+    const visible = usageEventForPeer(view, capabilities);
+    if (visible === null) return null;
     if (protocol !== 1) {
       const encoded = (
         protocol === 8
@@ -1585,6 +1600,7 @@ export class TeamApiServer {
         backgroundWork: capabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
         usageGroups: capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
+        usageReadFailed: capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         queueHold: capabilities.has(QUEUE_HOLD_CAPABILITY),
         queueHoldSignIn: capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
@@ -2405,6 +2421,7 @@ export class TeamApiServer {
       memoryChanges: route.capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
       usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
       usageGroups: route.capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
+      usageReadFailed: route.capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY),
       agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
       queueHold: route.capabilities.has(QUEUE_HOLD_CAPABILITY),
       queueHoldSignIn: route.capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
@@ -2734,6 +2751,7 @@ export class TeamApiServer {
         if (capability === AGENT_THREAD_REPLIES_CAPABILITY) return this.#options.agentTasks !== undefined;
         if (capability === AGENT_THREAD_BRANCHES_CAPABILITY) return this.#options.agentTasks !== undefined;
         if (capability === AGENT_THREAD_PAGES_CAPABILITY) return this.#options.agentTasks !== undefined;
+        if (capability === AGENT_ARCHIVED_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
         if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === AGENT_BACKUP_MODELS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
@@ -2786,6 +2804,7 @@ export class TeamApiServer {
         if (capability === HOST_APPEARANCE_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
         if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
+        if (capability === HOST_VOICE_MODEL_CAPABILITY) return this.#options.admin?.voiceModel !== undefined;
         if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
         if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
         if (capability === OWNER_TRANSFER_CAPABILITY) return this.#options.admin?.ownerTransfer === true;
@@ -2796,10 +2815,13 @@ export class TeamApiServer {
         if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
         if (capability === SKILL_LEARNING_CAPABILITY) return this.#options.admin?.skillLearning !== undefined;
         if (capability === BROWSING_MEMORY_CAPABILITY) return this.#options.admin?.browsingMemory !== undefined;
-        if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
+        if (capability === PROMPT_CACHE_TTL_CAPABILITY || capability === PROMPT_CACHE_TTL_PI_CAPABILITY)
+          return this.#options.admin?.promptCacheTtl !== undefined;
         if (capability === CLAUDE_USER_SETUP_CAPABILITY) return this.#options.admin?.claudeUserSetup !== undefined;
         if (capability === CLAUDE_COMPACT_WINDOW_CAPABILITY)
           return this.#options.admin?.claudeCompactWindow !== undefined;
+        if (capability === CACHE_EXPIRY_COMPACTION_CAPABILITY)
+          return this.#options.admin?.cacheExpiryCompaction !== undefined;
         if (capability === PROVIDER_ENVIRONMENT_CAPABILITY)
           return this.#options.admin?.providerEnvironment !== undefined;
         if (capability === PROVIDER_DETECTION_CAPABILITY) return this.#options.admin?.providerDetection !== undefined;
@@ -2839,6 +2861,7 @@ export class TeamApiServer {
         if (capability === WORKFLOWS_HIGGSFIELD_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_MEDIA_CATALOG_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY) return this.#options.workflows !== undefined;
+        if (capability === WORKFLOWS_CREDIT_MEDIA_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_STEP_SETTINGS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
@@ -2979,6 +3002,15 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
   };
 }
 
+function usageEventForPeer(
+  event: AgentEvent | TeamRealtimeEvent,
+  capabilities: ReadonlySet<string>,
+): AgentEvent | TeamRealtimeEvent | null {
+  if (event.type !== "usage-changed" || capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY)) return event;
+  const usage = usageEventWithoutReadFailed(event.usage);
+  return usage === event.usage ? event : usage && { ...event, usage };
+}
+
 function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 | 6 | 7 | 8 {
   if (capabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)) return 8;
   if (capabilities.has(TEAM_PI_MUSE_CAPABILITY)) return 7;
@@ -2994,6 +3026,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_CONTEXT_USAGE_CAPABILITY,
   AGENT_BACKGROUND_WORK_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,

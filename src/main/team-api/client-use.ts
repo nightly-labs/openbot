@@ -32,6 +32,7 @@ import { BROWSER_PAGE_STATE_ROUTES } from "@openbot/contracts/team-protocol/brow
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_USER_CONTROL_ROUTES } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CACHE_EXPIRY_COMPACTION_ROUTES } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
 import { CHANNEL_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
@@ -49,6 +50,7 @@ import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-relea
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { LIBRARY_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "@openbot/contracts/team-protocol/live-activity-push-v1";
@@ -124,6 +126,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   HOST_RELEASE_ROUTES.status,
   HOST_MEMBER_UPDATE_ROUTES.status,
   HOST_TIMEZONE_ROUTES.settings,
+  HOST_VOICE_MODEL_ROUTES.settings,
   HOST_TURN_LIMITS_ROUTES.settings,
   HOST_PERSONALITY_ROUTES.settings,
   AGENT_MEMORY_LIMIT_ROUTES.settings,
@@ -132,6 +135,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   BROWSING_MEMORY_ROUTES.settings,
   PROMPT_CACHE_TTL_ROUTES.settings,
   CLAUDE_COMPACT_WINDOW_ROUTES.settings,
+  CACHE_EXPIRY_COMPACTION_ROUTES.settings,
   PROVIDER_ENVIRONMENT_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,

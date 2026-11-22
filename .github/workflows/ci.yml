@@ -466,6 +466,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:hosted-update-idle-wait
 
+      - name: Run the hosted watchdog E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:hosted-watchdog
+
       - name: Run the messaging pause and resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-pause-resume
@@ -742,6 +746,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
 
+      - name: Run the credit media workflow E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-workflow
+
+      - name: Run the workflow paid media E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-paid-media
+
+      - name: Run the credit media payer switch E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-payer-switch
+
       - name: Run the workflow Discord E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-discord
@@ -873,6 +889,7 @@ jobs:
             .openbot-build/agent-create-retry-e2e/
             .openbot-build/update-host-takeover-e2e/
             .openbot-build/hosted-update-idle-wait-e2e/
+            .openbot-build/hosted-watchdog-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/
@@ -937,6 +954,9 @@ jobs:
             .openbot-build/antigravity-failing-session-e2e/
             .openbot-build/antigravity-verification-link-e2e/
             .openbot-build/workflow-model-steps-e2e/
+            .openbot-build/credit-media-workflow-e2e/
+            .openbot-build/workflow-paid-media-e2e/
+            .openbot-build/credit-media-payer-switch-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
             .openbot-build/workflow-slack-e2e/

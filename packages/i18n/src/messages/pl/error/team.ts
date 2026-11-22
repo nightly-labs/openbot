@@ -125,6 +125,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "To połączenie nie obsługuje zmian tożsamości serwera.",
   "error.team.hostUpdateUnsupported": "To połączenie nie obsługuje aktualizacji hosta.",
   "error.team.hostTimezoneUnsupported": "To połączenie nie obsługuje strefy czasowej serwera.",
+  "error.team.hostVoiceModelUnsupported": "To połączenie nie obsługuje modelu rozpoznawania mowy serwera.",
   "error.team.hostRestartUnsupported": "To połączenie nie obsługuje ponownego uruchamiania serwera.",
   "error.team.ownerTransferUnsupported": "Ten serwer nie obsługuje przekazania własności.",
   "error.team.hostKeyRotationUnsupported": "To połączenie nie obsługuje zmiany klucza serwera.",
@@ -140,6 +141,8 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "To połączenie nie obsługuje czasu pamięci podręcznej promptów.",
   "error.team.claudeUserSetupUnsupported": "To połączenie nie obsługuje przełącznika konfiguracji Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "To połączenie nie obsługuje rozmiaru kompaktowania Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "To połączenie nie obsługuje kompaktowania przed wygaśnięciem pamięci podręcznej.",
   "error.team.providerEnvironmentUnsupported": "To połączenie nie obsługuje zmiennych dostawcy.",
   "error.team.modelVisibilityUnsupported": "To połączenie nie obsługuje listy modeli.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",

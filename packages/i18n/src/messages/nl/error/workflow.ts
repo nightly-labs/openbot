@@ -22,6 +22,14 @@ export const messages = {
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
   "error.workflow.answerInvalid":
     "Het antwoord had niet de velden die deze stap vraagt: {fields}. Voer de stap opnieuw uit.",
+  "error.workflow.answerSetup":
+    "De antwoordvelden van deze workflow hebben hier een probleem: {fields}. Corrigeer de workflow en voer de stap daarna opnieuw uit.",
+  "error.workflow.answerSourceEnded":
+    "Deze velden hebben geen waarde, omdat de stap die ze levert niet is voltooid: {fields}. Voer eerst die stap opnieuw uit.",
+  "error.workflow.runInputInvalid":
+    "De invoer van de run past niet bij de antwoordvelden van de trigger: {fields}. Stuur één JSON-object met deze velden.",
+  "error.workflow.sourceNotDone":
+    "Een eerdere stap is de laatste keer mislukt of gestopt. Voer eerst die stap opnieuw uit.",
   "error.workflow.checkInvalid": "De controle van deze stap is ongeldig. Corrigeer hem en voer de stap opnieuw uit.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
   "error.workflow.modelTimedOut":

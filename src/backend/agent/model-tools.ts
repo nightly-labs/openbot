@@ -12,6 +12,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   AGENT_PROVIDERS,
+  composedCustomModelId,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   defaultProviderModel,
   sameAgentModelChoice,
@@ -367,9 +368,13 @@ export function requestedToolModel(request: ModelRequest, models: AgentModelOpti
   let chosen: AgentModelOption | null = null;
   if (model !== undefined) {
     const own = (candidate: AgentModelOption) => provider === undefined || candidate.provider === provider;
+    const separator = model.indexOf("/");
+    const escaped =
+      separator > 0 ? composedCustomModelId(model.slice(0, separator), model.slice(separator + 1)) : model;
     chosen =
       models.find((candidate) => candidate.id === model && own(candidate)) ??
       models.find((candidate) => isEncodedModelOf(candidate.id, model) && own(candidate)) ??
+      models.find((candidate) => candidate.id === escaped && own(candidate)) ??
       null;
     if (!chosen && models.length === 0) throw new AgentSettingsRefused(sourceText("error.agent.modelUnavailable"));
     if (!chosen) {

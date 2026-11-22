@@ -129,6 +129,7 @@ export const queryKeys = {
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
   ownerTransfer: (scope: QueryScope, serverId: string) => ["owner-transfer", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  serverVoiceModel: (scope: QueryScope, serverId: string) => ["server-voice-model", ...scope, serverId],
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
   memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
@@ -169,6 +170,11 @@ export const queryKeys = {
     ...provider,
   ],
   providerPromptCache: (scope: QueryScope, serverId: string) => ["provider-prompt-cache", ...scope, serverId],
+  providerCacheExpiryCompaction: (scope: QueryScope, serverId: string) => [
+    "provider-cache-expiry-compaction",
+    ...scope,
+    serverId,
+  ],
   providerCompactWindow: (scope: QueryScope, serverId: string) => ["provider-compact-window", ...scope, serverId],
   providerEnvironment: (scope: QueryScope, serverId: string, provider: string) => [
     "provider-environment",

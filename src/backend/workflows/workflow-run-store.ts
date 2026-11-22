@@ -277,6 +277,20 @@ export class WorkflowRunStore {
     return row ? toStep(row) : null;
   }
 
+  earlierAttempts(step: StoredWorkflowStep, limit: number): StoredWorkflowStep[] {
+    const rows =
+      step.runId === null
+        ? this.#database.connection
+            .prepare(
+              `${STEP_SELECT} WHERE run_id IS NULL AND workflow_id = ? AND node_id = ? AND rowid < ? ORDER BY rowid DESC LIMIT ?`,
+            )
+            .all(step.workflowId, step.nodeId, step.sequence, limit)
+        : this.#database.connection
+            .prepare(`${STEP_SELECT} WHERE run_id = ? AND node_id = ? AND attempt < ? ORDER BY attempt DESC LIMIT ?`)
+            .all(step.runId, step.nodeId, step.attempt, limit);
+    return databaseRows(rows).map(toStep);
+  }
+
   openSteps(): StoredWorkflowStep[] {
     return databaseRows(
       this.#database.connection
@@ -290,6 +304,19 @@ export class WorkflowRunStore {
       this.#database.connection
         .prepare(
           `${STEP_SELECT} WHERE workflow_id = ? AND status = 'done'
+             AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
+           ORDER BY created_at, attempt, step_id`,
+        )
+        .all(workflowId),
+    ).map(toStep);
+    return new Map(rows.map((step) => [step.nodeId, step]));
+  }
+
+  latestSettled(workflowId: string): Map<string, StoredWorkflowStep> {
+    const rows = databaseRows(
+      this.#database.connection
+        .prepare(
+          `${STEP_SELECT} WHERE workflow_id = ? AND status IN ('done', 'failed', 'stopped')
              AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
            ORDER BY created_at, attempt, step_id`,
         )

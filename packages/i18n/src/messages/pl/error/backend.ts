@@ -91,6 +91,8 @@ export const messages = {
     "Członkowie tego kanału nie mają jeszcze rozmowy do skompaktowania. Skompaktuj go, gdy członek odpowie w kanale.",
   "error.backend.channelCompactNotSupported":
     "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Dostawca członków kanału teraz nie działa. Odśwież dostawców, a potem ponownie kompaktuj kanał.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
   "error.backend.channelArchiveRunning": "Zatrzymaj trwającą pracę w tym kanale, a potem go usuń.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
@@ -271,6 +273,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Ten serwer wymaga zalogowania. Zaloguj się do niego w OpenBot na komputerze hosta.",
   "error.backend.mcpSignInNeedsHttps":
     "Ten serwer wymaga zalogowania, a OpenBot loguje się tylko przez https. Zmień URL na {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Ten serwer pozwala zalogować się tylko pod adresem {url}. Zmień URL na ten adres, a potem zaloguj się ponownie.",
   "error.backend.mcpSignInCancelled": "Logowanie zostało anulowane.",
   "error.backend.mcpSignInTimedOut": "Logowanie nie zostało ukończone w przeglądarce.",
   "error.backend.mcpSignInRefused": "Strona logowania odmówiła dostępu. Zaloguj się ponownie.",

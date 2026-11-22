@@ -15,6 +15,7 @@ import {
   type ProviderRuntimeDownload,
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
+  savedCustomModelId,
   type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { Text } from "@openbot/ui";
@@ -149,7 +150,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   const firstEndpointModel = () => {
     const endpoint = customProviders().find((item) => item.models.length > 0);
     const firstModel = endpoint?.models[0];
-    return endpoint && firstModel ? `${endpoint.id}/${firstModel.id}` : null;
+    return endpoint && firstModel ? savedCustomModelId(endpoint.id, endpoint.harness, firstModel.id) : null;
   };
 
   async function selectProvider(
@@ -189,7 +190,11 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   async function selectSavedEndpoint(value: SaveCustomProviderInput): Promise<void> {
     const firstModel = value.models[0];
     if (props.defaultProvider && firstModel) {
-      await selectProvider(value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, true, `${value.id}/${firstModel.id}`);
+      await selectProvider(
+        value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+        true,
+        savedCustomModelId(value.id, value.harness, firstModel.id),
+      );
     }
   }
   const detectedApi = createMemo((): DetectedProviderApi | undefined => {
@@ -220,12 +225,14 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
     },
     onUpdated: (input) => {
       const provider = props.defaultProvider?.preferredProvider ?? null;
-      const model = isCustomProviderHarness(provider) ? props.defaultProvider?.preferredModel : null;
-      if (!provider || !model?.startsWith(`${input.id}/`)) return;
-      if (!input.models.some((item) => model === `${input.id}/${item.id}`)) {
+      if (!isCustomProviderHarness(provider)) return;
+      const model = props.defaultProvider?.preferredModel;
+      if (!model?.startsWith(`${input.id}/`)) return;
+      const kept = input.models.find((item) => model === savedCustomModelId(input.id, provider, item.id));
+      if (!kept) {
         void selectProvider(provider, false, null);
       } else if (input.harness && input.harness !== provider) {
-        void selectProvider(input.harness, true, model);
+        void selectProvider(input.harness, true, savedCustomModelId(input.id, input.harness, kept.id));
       }
     },
   });

@@ -116,7 +116,10 @@ interface InstructionsFileInPrompt {
   hiddenFromCli: AgentInstructionFileName[];
 }
 
-const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
+const CODEX_TOOLS_CONFIG = {
+  update_plan: { enabled: true },
+  experimental_request_user_input: { enabled: false },
+} as const;
 
 export const CODEX_FEATURES_CONFIG = { "features.goals": false, "features.request_permissions_tool": false } as const;
 

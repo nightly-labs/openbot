@@ -18,6 +18,13 @@ export const messages = {
   "error.workflow.agentStepStopped": "توقّف الوكيل قبل أن يجيب عن هذه الخطوة. شغّل الخطوة مرة أخرى.",
   "error.workflow.conditionUnclear": "لم يجب النموذج بـ «نعم» أو «لا».",
   "error.workflow.answerInvalid": "لم تتضمن الإجابة الحقول التي تطلبها هذه الخطوة: {fields}. شغّل الخطوة مرة أخرى.",
+  "error.workflow.answerSetup":
+    "توجد مشكلة في حقول الإجابة لسير العمل هذا هنا: {fields}. صحّح سير العمل، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.answerSourceEnded":
+    "لا توجد قيمة لهذه الحقول لأن الخطوة التي تعطيها لم تكتمل: {fields}. شغّل تلك الخطوة مرة أخرى أولًا.",
+  "error.workflow.runInputInvalid":
+    "مدخلات التشغيل لا تطابق حقول الإجابة للمشغّل: {fields}. أرسل كائن JSON واحدًا بهذه الحقول.",
+  "error.workflow.sourceNotDone": "فشلت خطوة سابقة أو توقفت في آخر مرة تم تشغيلها. شغّل تلك الخطوة مرة أخرى أولًا.",
   "error.workflow.checkInvalid": "شرط التحقق في هذه الخطوة غير صالح. صحّحه ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.modelFailed": "تعذّر على النموذج الإجابة. شغّل الخطوة مرة أخرى.",
   "error.workflow.modelTimedOut":

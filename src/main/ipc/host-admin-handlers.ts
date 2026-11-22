@@ -11,6 +11,7 @@ import {
   decodeHostTimezoneSettings,
   decodeHostTurnLimits,
   decodeHostUpdateStatus,
+  decodeHostVoiceModel,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
   decodeProviderModelVisibility,
@@ -19,6 +20,7 @@ import {
   type HostTurnLimitsInput,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
+  type HostVoiceModelChange,
   hostAgentMemoryLimit,
   hostBrowsingMemory,
   hostMemoryReview,
@@ -38,6 +40,7 @@ import {
   type ProviderModelVisibilityChange,
   parseAgentAccessChange,
   parseHostTurnLimitsInput,
+  parseHostVoiceModelChange,
   parseProviderModelVisibilityChange,
   parseProviderModelVisibilityProvider,
   type ServerAuditLog,
@@ -57,6 +60,11 @@ import {
   BROWSING_MEMORY_CAPABILITY,
   BROWSING_MEMORY_ROUTES,
 } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import {
+  CACHE_EXPIRY_COMPACTION_CAPABILITY,
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+  decodeCacheExpiryCompactionResponse,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
 import {
   CLAUDE_COMPACT_WINDOW_CAPABILITY,
   CLAUDE_COMPACT_WINDOW_ROUTES,
@@ -95,6 +103,10 @@ import {
 } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
+  HOST_VOICE_MODEL_CAPABILITY,
+  HOST_VOICE_MODEL_ROUTES,
+} from "@openbot/contracts/team-protocol/host-voice-model-v1";
+import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
@@ -120,10 +132,12 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { CacheExpiryCompactionControl } from "../cache-expiry-compaction-preference-store";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
 import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
+import type { HostVoiceModelService } from "../host-voice-model";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
@@ -163,6 +177,7 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity" | "rotateIdentityKey">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  voiceModel: Pick<HostVoiceModelService, "snapshot" | "change">;
   hostTurnLimits: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
@@ -172,6 +187,7 @@ interface HostAdminIpcDependencies {
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup: ClaudeUserSetupControl;
+  cacheExpiryCompaction: CacheExpiryCompactionControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
   providerEnvironment: Pick<ProviderEnvironmentControl, "get" | "set">;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
@@ -190,6 +206,7 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  voiceModel,
   hostTurnLimits,
   serverPersonality,
   agentMemoryLimit,
@@ -199,6 +216,7 @@ export function hostAdminIpcHandlers({
   machineAlerts,
   promptCacheTtl,
   claudeUserSetup,
+  cacheExpiryCompaction,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -224,6 +242,11 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, HOST_TIMEZONE_CAPABILITY))
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
+  }
+  function remoteVoiceModel(serverId: string, route: string, body: Record<string, never> | HostVoiceModelChange) {
+    if (!remoteServers.supportsCapability(serverId, HOST_VOICE_MODEL_CAPABILITY))
+      throw new Error(sourceText("error.team.hostVoiceModelUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostVoiceModel, { method: "POST", body }));
   }
   function remoteTurnLimits(serverId: string, route: string, body: Record<string, never> | HostTurnLimitsInput) {
     if (!remoteServers.supportsCapability(serverId, HOST_TURN_LIMITS_CAPABILITY))
@@ -270,6 +293,13 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.claudeUserSetupUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodeClaudeUserSetupResponse, { method: "POST", body }),
+    );
+  }
+  function remoteCacheExpiryCompaction(serverId: string, route: string, body: { enabled?: boolean }) {
+    if (!remoteServers.supportsCapability(serverId, CACHE_EXPIRY_COMPACTION_CAPABILITY))
+      throw new Error(sourceText("error.team.cacheExpiryCompactionUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeCacheExpiryCompactionResponse, { method: "POST", body }),
     );
   }
   function remoteClaudeCompactWindow(serverId: string, route: string, body: { tokens?: number | null }) {
@@ -437,6 +467,14 @@ export function hostAdminIpcHandlers({
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
       }),
+      getVoiceModel: scopedQueryHandler({
+        local: () => runCauseEffect(voiceModel.snapshot()),
+        remote: (serverId) => remoteVoiceModel(serverId, HOST_VOICE_MODEL_ROUTES.settings, {}),
+      }),
+      changeVoiceModel: scopedHandler(parseHostVoiceModelChange, {
+        local: (change) => runCauseEffect(voiceModel.change(change)),
+        remote: (change, serverId) => remoteVoiceModel(serverId, HOST_VOICE_MODEL_ROUTES.change, change),
+      }),
       getTurnLimits: scopedQueryHandler({
         local: () => hostTurnLimits.get(),
         remote: (serverId) => remoteTurnLimits(serverId, HOST_TURN_LIMITS_ROUTES.settings, {}),
@@ -525,6 +563,15 @@ export function hostAdminIpcHandlers({
         local: (enabled) => runCauseEffect(claudeUserSetup.set(enabled)),
         remote: (enabled, serverId) => remoteClaudeUserSetup(serverId, CLAUDE_USER_SETUP_ROUTES.update, { enabled }),
       }),
+      getCacheExpiryCompaction: scopedQueryHandler({
+        local: () => cacheExpiryCompaction.get(),
+        remote: (serverId) => remoteCacheExpiryCompaction(serverId, CACHE_EXPIRY_COMPACTION_ROUTES.settings, {}),
+      }),
+      setCacheExpiryCompaction: scopedHandler(parseCacheExpiryCompaction, {
+        local: (enabled) => runCauseEffect(cacheExpiryCompaction.set(enabled)),
+        remote: (enabled, serverId) =>
+          remoteCacheExpiryCompaction(serverId, CACHE_EXPIRY_COMPACTION_ROUTES.update, { enabled }),
+      }),
       getClaudeCompactWindow: scopedQueryHandler({
         local: () => claudeCompactWindow.get(),
         remote: (serverId) => remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.settings, {}),
@@ -608,6 +655,11 @@ function wireIdentity(input: UpdateHostIdentityInput) {
 
 function parseClaudeUserSetup(value: unknown): boolean {
   if (typeof value !== "boolean") throw new Error("Invalid Claude setup setting.");
+  return value;
+}
+
+function parseCacheExpiryCompaction(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Invalid cache expiry compaction setting.");
   return value;
 }
 

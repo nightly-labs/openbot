@@ -19,6 +19,14 @@ export const messages = {
   "error.workflow.agentStepStopped": "에이전트가 이 단계에 답하기 전에 멈췄어요. 단계를 다시 실행해 주세요.",
   "error.workflow.conditionUnclear": "모델이 ‘예’ 또는 ‘아니요’로 답하지 않았어요.",
   "error.workflow.answerInvalid": "답에 이 단계가 요구하는 필드가 없었어요: {fields}. 단계를 다시 실행해 주세요.",
+  "error.workflow.answerSetup":
+    "이 워크플로의 답변 필드에 여기서 문제가 있습니다: {fields}. 워크플로를 고친 다음 단계를 다시 실행하세요.",
+  "error.workflow.answerSourceEnded":
+    "이 필드를 주는 단계가 끝나지 않아서 값이 없습니다: {fields}. 먼저 그 단계를 다시 실행하세요.",
+  "error.workflow.runInputInvalid":
+    "실행 입력이 트리거의 답변 필드와 맞지 않습니다: {fields}. 이 필드가 있는 JSON 객체 하나를 보내세요.",
+  "error.workflow.sourceNotDone":
+    "이전 단계가 마지막 실행에서 실패했거나 중지되었습니다. 먼저 그 단계를 다시 실행하세요.",
   "error.workflow.checkInvalid": "이 단계의 확인 조건이 올바르지 않아요. 고친 뒤 단계를 다시 실행해 주세요.",
   "error.workflow.modelFailed": "모델이 답할 수 없었어요. 단계를 다시 실행해 주세요.",
   "error.workflow.modelTimedOut":

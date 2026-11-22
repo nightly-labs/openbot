@@ -714,7 +714,11 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
 - **Updates.** Telegram posts to `https://signal.openbot.run/v1/telegram/updates/<bot ID>` with a
   secret header that Signal derives for each bot. Signal reads only the chat ID, a link code and a
   callback query ID, and sends `telegram-delivery` to the socket that holds the chat. It always
-  answers 200: Telegram would hold back the bot's other chats behind one offline host. The Telegram
+  answers 200: Telegram would hold back the bot's other chats behind one offline host. When the
+  route lookup (`/v2/remote/route-wake`) answers `hostId: null`, the chat has no link: a direct
+  message, a mention or a command there gets one `status.messaging.telegramNotLinked` notice from
+  Signal, at most once a day for each chat. A failed lookup, or a chat that this Signal saw linked,
+  revoked or named in a route ticket, gets none. The Telegram
   route ticket (`telegramRoute` in the hello, audience `openbot-telegram-route`, the Slack route key)
   and `telegram-route-revoked` work as the Slack ones do. A chat that is not in the ticket's chat list
   reports `not_linked` as a Slack workspace does, and Reconnect opens a new link for the chat. A chat
@@ -790,7 +794,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
   `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactPostText`
-  (the secret rules of `redactText`; an email address that the agent wrote stays).
+  (key formats: private keys, Bearer and Authorization values, link passwords, webhook links, known
+  key prefixes and JWTs; a registered secret only as a whole token, so a saved value inside a word,
+  an email address or a domain stays, because a match inside a word hides normal text; labeled
+  passwords that are not registered and email addresses stay).
   A `messaging_history` call that names a connection and a place goes the same way
   (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
   `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a

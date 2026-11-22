@@ -265,6 +265,8 @@ function describeProbeFailure(
   accountRefused: boolean,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
+  const otherAddress = signIn?.otherAddress();
+  if (otherAddress) return sourceText("error.backend.mcpSignInOtherAddress", { url: otherAddress });
   if (signIn?.signInServerMissing()) return BEARER_KEY;
   if (signIn && isRegistrationRefusal(error, signIn))
     return signIn.registrationUnsupported() ? REGISTRATION_UNAVAILABLE : REGISTRATION_REFUSED;

@@ -91,6 +91,8 @@ export const messages = {
     "このチャンネルのメンバーには、まだ圧縮する会話がありません。メンバーがチャンネルで回答した後に圧縮してください。",
   "error.backend.channelCompactNotSupported":
     "このチャンネルのどのメンバーも、要求に応じて圧縮できません。対応しているメンバーは、コンテキストがほぼいっぱいになると自動で圧縮します。",
+  "error.backend.channelCompactProviderUnavailable":
+    "チャンネルメンバーのプロバイダーが現在動作していません。プロバイダーを更新してから、もう一度チャンネルを圧縮してください。",
   "error.backend.channelArchived":
     "メッセージを送信したりタスクを変更したりする前に、このチャンネルを復元してください。",
   "error.backend.channelArchiveRunning": "このチャンネルで実行中の作業を停止してから削除してください。",
@@ -281,6 +283,8 @@ export const messages = {
     "このサーバーはサインインを求めています。ホストコンピューターの OpenBot でサインインしてください。",
   "error.backend.mcpSignInNeedsHttps":
     "このサーバーはサインインを求めていますが、OpenBot は https でのみサインインします。URL を {url} に変更してください。",
+  "error.backend.mcpSignInOtherAddress":
+    "このサーバーは {url} でのみサインインできます。URL をこのアドレスに変更してから、もう一度サインインしてください。",
   "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
   "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
   "error.backend.mcpSignInRefused": "サインインページでアクセスが拒否されました。もう一度サインインしてください。",

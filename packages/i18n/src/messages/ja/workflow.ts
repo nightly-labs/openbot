@@ -256,6 +256,10 @@ export const messages = {
   "workflow.answer.problem.field": "この前のステップに {name} を出すものがありません。",
   "workflow.answer.problem.test": "{name} はこの方法では比較できません。",
   "workflow.answer.problem.conflict": "前の 2 つのステップが異なる型の {name} を出しています。",
+  "workflow.answer.problem.path":
+    "このステップへのすべての経路が {name} を出すわけではありません。任意 ({name}?) にするか、すべての経路で出してください。",
+  "workflow.answer.problem.repeated":
+    "前の 2 つのステップが同じ実行で {name} を出す可能性があります。どちらかの名前を変えてください。",
   "workflow.check.title": "チェック",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "フィールド: {names}",

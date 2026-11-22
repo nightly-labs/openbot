@@ -259,6 +259,10 @@ export const messages = {
   "workflow.answer.problem.field": "Aucune étape précédente ne fournit {name}.",
   "workflow.answer.problem.test": "{name} ne peut pas être comparé ainsi.",
   "workflow.answer.problem.conflict": "Deux étapes précédentes fournissent {name} avec des types différents.",
+  "workflow.answer.problem.path":
+    "Tous les chemins vers cette étape ne fournissent pas {name}. Rendez-le facultatif ({name}?) ou fournissez-le sur chaque chemin.",
+  "workflow.answer.problem.repeated":
+    "Deux étapes précédentes peuvent fournir {name} dans la même exécution. Renommez l’une d’elles.",
   "workflow.check.title": "Vérification",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Champs : {names}",

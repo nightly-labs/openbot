@@ -1,3 +1,4 @@
+import type { CreditsState } from "@openbot/contracts/credits";
 import type {
   AccountSession,
   AppInfo,
@@ -5,6 +6,7 @@ import type {
   AvatarImageInput,
   BillingDesktopApi,
   CentralAuthUser,
+  CreditsDesktopApi,
   DynamicIslandGeometry,
   HostedServersDesktopApi,
   LicenseDesktopApi,
@@ -32,6 +34,9 @@ import { BillingPanel } from "@openbot/ui/features/billing/BillingPanel";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
+import { CreditActivitySection } from "@openbot/ui/features/credits/CreditActivitySection";
+import { CreditsSection } from "@openbot/ui/features/credits/CreditsSection";
+import { createCreditsStore } from "@openbot/ui/features/credits/credits-store";
 import { ReferralPanel } from "@openbot/ui/features/referral/ReferralPanel";
 import { createReferralStore } from "@openbot/ui/features/referral/referral-store";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
@@ -107,6 +112,9 @@ export interface SettingsModalProps {
   billingApi?: BillingDesktopApi;
   referralApi?: ReferralDesktopApi | undefined;
   licenseApi?: LicenseDesktopApi | undefined;
+  creditsApi?: CreditsDesktopApi | undefined;
+  onCreditsChange?: ((credits: CreditsState) => void) | undefined;
+  onBuyCredits?: ((serverId: string | null) => void) | undefined;
   onContactUs?: (() => void) | undefined;
   hostedServersApi?: HostedServersDesktopApi | undefined;
   onAddHostedServer?: (() => void) | undefined;
@@ -149,6 +157,12 @@ export function SettingsModal(props: SettingsModalProps) {
     () => props.licenseApi,
     () => props.open && activeTab() === "billing",
     trackLicenseEvent,
+  );
+  const credits = createCreditsStore(
+    () => props.creditsApi,
+    () => props.open && activeTab() === "billing",
+    (state) => props.onCreditsChange?.(state),
+    { activity: true },
   );
   const hostedServers = createSettingsHostedServersStore(props, () => activeTab() === "billing");
   const voice = createSettingsVoiceStore(() => props.open && activeTab() === "voice");
@@ -416,6 +430,16 @@ export function SettingsModal(props: SettingsModalProps) {
                 onContactUs={licenseContactUs(props.onContactUs)}
                 billingDetails={props.billingApi}
               />
+            }
+            credits={
+              <Show when={props.onBuyCredits}>
+                {(onBuy) => (
+                  <>
+                    <CreditsSection store={credits} onBuy={(serverId) => onBuy()(serverId)} />
+                    <CreditActivitySection store={credits} />
+                  </>
+                )}
+              </Show>
             }
           />
         </Tabs.Content>

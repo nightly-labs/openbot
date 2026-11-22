@@ -9,24 +9,41 @@ const RETRY_NOTICE_KEYS: ReadonlySet<string> = new Set([
   "error.backend.providerModelAtCapacity",
 ]);
 
-export function createRetryNotices() {
-  const shown = new Map<string, string>();
+export function createTurnErrorBanners() {
+  const retryNotices = new Map<string, string>();
+  const errors = new Map<string, string>();
+  const errorsBeforeTurn = new Map<string, string>();
   return {
     noteError(key: string, message: string, readable: string): void {
+      errors.set(key, readable);
+      errorsBeforeTurn.delete(key);
       if (matchingSourceKeys(message.trim()).some((sourceKey) => RETRY_NOTICE_KEYS.has(sourceKey)))
-        shown.set(key, readable);
-      else shown.delete(key);
+        retryNotices.set(key, readable);
+      else retryNotices.delete(key);
+    },
+    noteTurnStarted(key: string): void {
+      const error = errors.get(key);
+      if (error !== undefined) errorsBeforeTurn.set(key, error);
     },
     clearAtTurnEnd<Run extends { message: string }>(
       key: string,
+      newerTurnSucceeded: boolean,
       setErrors: BannerUpdate<string>,
       setRuns: BannerUpdate<Run>,
     ): void {
-      const notice = shown.get(key);
-      if (notice === undefined) return;
-      shown.delete(key);
-      setErrors((current) => (current[key] === notice ? withoutBanner(current, key) : current));
-      setRuns((current) => (current[key]?.message === notice ? withoutBanner(current, key) : current));
+      const stale = new Set<string>();
+      const notice = retryNotices.get(key);
+      if (notice !== undefined) stale.add(notice);
+      retryNotices.delete(key);
+      const earlierError = newerTurnSucceeded ? errorsBeforeTurn.get(key) : undefined;
+      if (earlierError !== undefined) {
+        stale.add(earlierError);
+        errorsBeforeTurn.delete(key);
+        if (errors.get(key) === earlierError) errors.delete(key);
+      }
+      if (stale.size === 0) return;
+      setErrors((current) => (stale.has(current[key] ?? "") ? withoutBanner(current, key) : current));
+      setRuns((current) => (stale.has(current[key]?.message ?? "") ? withoutBanner(current, key) : current));
     },
   };
 }

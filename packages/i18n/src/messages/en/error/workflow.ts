@@ -18,6 +18,14 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
   "error.workflow.answerInvalid":
     "The answer did not have the fields that this step asks for: {fields}. Run the step again.",
+  "error.workflow.answerSetup":
+    "The answer fields of this workflow have a problem here: {fields}. Correct the workflow, then run the step again.",
+  "error.workflow.answerSourceEnded":
+    "These fields have no value, because the step that gives them did not finish: {fields}. Run that step again first.",
+  "error.workflow.runInputInvalid":
+    "The run input does not fit the answer fields of the trigger: {fields}. Send one JSON object with these fields.",
+  "error.workflow.sourceNotDone":
+    "A step before this one failed or stopped the last time it ran. Run that step again first.",
   "error.workflow.checkInvalid": "The check of this step is not valid. Correct it, then run the step again.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
   "error.workflow.modelTimedOut":
@@ -42,6 +50,14 @@ export const messages = defineMessages("error.workflow", {
     "Write a description, or run the steps before this one so that a text or a picture comes in.",
   "error.workflow.mediaInputNotImage":
     "This step takes only pictures, not videos. Remove the connection from the video.",
+  "error.workflow.mediaInputTooLarge":
+    "A picture for this step is too large. Use pictures of 7 MB or less each, and 14 MB or less together.",
+  "error.workflow.mediaInputType":
+    "This model takes only PNG, JPEG and WebP pictures. Connect a picture of one of these types.",
+  "error.workflow.creditMediaPictureRequired":
+    "This model needs a picture. Connect a picture step to this step, then run it again.",
+  "error.workflow.creditMediaPromptRequired":
+    "This model needs a description. Write one in this step, or connect a text step to it.",
   "error.workflow.mediaInputNotClip":
     "This input takes only videos and audio files. Remove the connection from the file.",
   "error.workflow.stepMissing": "This step no longer exists.",

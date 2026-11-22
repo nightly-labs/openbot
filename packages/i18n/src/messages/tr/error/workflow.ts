@@ -19,6 +19,14 @@ export const messages = {
   "error.workflow.agentStepStopped": "Ajan bu adımı yanıtlamadan durdu. Adımı yeniden çalıştırın.",
   "error.workflow.conditionUnclear": "Model evet ya da hayır yanıtı vermedi.",
   "error.workflow.answerInvalid": "Yanıt bu adımın istediği alanları içermiyordu: {fields}. Adımı yeniden çalıştırın.",
+  "error.workflow.answerSetup":
+    "Bu iş akışının yanıt alanlarında burada bir sorun var: {fields}. İş akışını düzeltin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.answerSourceEnded":
+    "Bu alanların değeri yok, çünkü onları veren adım tamamlanmadı: {fields}. Önce o adımı yeniden çalıştırın.",
+  "error.workflow.runInputInvalid":
+    "Çalıştırma girdisi tetikleyicinin yanıt alanlarına uymuyor: {fields}. Bu alanlarla bir JSON nesnesi gönderin.",
+  "error.workflow.sourceNotDone":
+    "Önceki bir adım son çalıştığında başarısız oldu veya durduruldu. Önce o adımı yeniden çalıştırın.",
   "error.workflow.checkInvalid": "Bu adımın denetimi geçerli değil. Düzeltin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelFailed": "Model yanıt veremedi. Adımı yeniden çalıştırın.",
   "error.workflow.modelTimedOut":
