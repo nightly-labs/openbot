@@ -355,7 +355,7 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
     credits: 2,
   },
   { modelId: "nano-banana", name: "Nano Banana", maker: "google", kind: "image", unit: "image", credits: 1.5 },
-  { modelId: "nano-banana-2.1", name: "Nano Banana 2.1", maker: "google", kind: "image", unit: "image", credits: 1.5 },
+  { modelId: "nano-banana-2.1", name: "Nano Banana 2.1", maker: "google", kind: "image", unit: "image", credits: 1.8 },
   { modelId: "recraft-v4", name: "Recraft V4", maker: "recraft", kind: "image", unit: "image", credits: 1.5 },
   { modelId: "recraft-v4.1", name: "Recraft V4.1", maker: "recraft", kind: "image", unit: "image", credits: 1.5 },
   { modelId: "seedream-4.5", name: "Seedream 4.5", maker: "bytedance", kind: "image", unit: "image", credits: 1.5 },
@@ -373,7 +373,7 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
     maker: "bytedance",
     kind: "image",
     unit: "image",
-    credits: 1.6,
+    credits: 2,
   },
   { modelId: "grok-imagine", name: "Grok Imagine", maker: "xai", kind: "image", unit: "image", credits: 1 },
   { modelId: "kling-image-3.0", name: "Kling Image 3.0", maker: "kling", kind: "image", unit: "image", credits: 1 },
@@ -721,4 +721,82 @@ export function parseCreditTransferRequest(value: unknown): CreditTransferReques
 
 export function parseCreditCheckoutUrl(value: unknown): string | null {
   return isDynamicRecord(value) && isStripeCheckoutUrl(value.url) ? value.url : null;
+}
+
+export type CreditActivityKind = "generation" | "purchase" | "move" | "free" | "expired" | "refund";
+export type CreditActivityStatus = "running" | "failed" | "canceled";
+export type CreditActivityActor = "you" | "member" | "openbot";
+
+export interface CreditActivityEntry {
+  id: string;
+  kind: CreditActivityKind;
+  at: number;
+  credits: number;
+  actor: CreditActivityActor;
+  actorName?: string;
+  serverId?: string;
+  otherServerId?: string;
+  modelName?: string;
+  maker?: string;
+  status?: CreditActivityStatus;
+}
+
+export interface CreditActivity {
+  entries: CreditActivityEntry[];
+}
+
+export const CREDIT_ACTIVITY_LIMIT = 50;
+export const EMPTY_CREDIT_ACTIVITY: CreditActivity = { entries: [] };
+
+const CREDIT_ACTIVITY_KINDS: readonly CreditActivityKind[] = [
+  "generation",
+  "purchase",
+  "move",
+  "free",
+  "expired",
+  "refund",
+];
+const CREDIT_ACTIVITY_STATUSES: readonly CreditActivityStatus[] = ["running", "failed", "canceled"];
+const CREDIT_ACTIVITY_ACTORS: readonly CreditActivityActor[] = ["you", "member", "openbot"];
+const MAX_ACTIVITY_TEXT_LENGTH = 200;
+
+function isActivityText(value: unknown): value is string {
+  return isString(value) && value.length > 0 && value.length <= MAX_ACTIVITY_TEXT_LENGTH;
+}
+
+function parseActivityEntry(value: unknown): CreditActivityEntry | null {
+  if (
+    !isDynamicRecord(value) ||
+    !isActivityText(value.id) ||
+    !isOneOf(CREDIT_ACTIVITY_KINDS, value.kind) ||
+    !isTimestamp(value.at) ||
+    !isNumber(value.credits) ||
+    !Number.isFinite(value.credits) ||
+    !isOneOf(CREDIT_ACTIVITY_ACTORS, value.actor)
+  )
+    return null;
+  const entry: CreditActivityEntry = {
+    id: value.id,
+    kind: value.kind,
+    at: value.at,
+    credits: value.credits,
+    actor: value.actor,
+  };
+  if (isActivityText(value.actorName)) entry.actorName = value.actorName;
+  if (isServerId(value.serverId)) entry.serverId = value.serverId;
+  if (isServerId(value.otherServerId)) entry.otherServerId = value.otherServerId;
+  if (isActivityText(value.modelName)) entry.modelName = value.modelName;
+  if (isActivityText(value.maker)) entry.maker = value.maker;
+  if (isOneOf(CREDIT_ACTIVITY_STATUSES, value.status)) entry.status = value.status;
+  return entry;
+}
+
+export function parseCreditActivity(value: unknown): CreditActivity | null {
+  if (!isDynamicRecord(value) || !Array.isArray(value.entries)) return null;
+  const entries: CreditActivityEntry[] = [];
+  for (const item of value.entries.slice(0, CREDIT_ACTIVITY_LIMIT)) {
+    const entry = parseActivityEntry(item);
+    if (entry) entries.push(entry);
+  }
+  return { entries };
 }

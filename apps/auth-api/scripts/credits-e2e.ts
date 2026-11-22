@@ -4,10 +4,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
+  CREDIT_ACTIVITY_LIMIT,
   CREDIT_METADATA,
   CREDIT_METADATA_KIND,
+  type CreditActivityEntry,
   creditLookupKey,
   creditStops,
+  parseCreditActivity,
   parseCreditTransferRequest,
 } from "@openbot/contracts/credits";
 import { Effect } from "effect";
@@ -1075,6 +1078,8 @@ async function holdsAndSpending() {
     { quiet, calls },
   );
 
+  await creditActivity(database, credits);
+
   const plane = await controlPlane(database);
   await Effect.runPromise(plane.removeOwnedHost(OWNER.id, SERVER_ID));
   const moved = await run(spending.find("job-s1"));
@@ -1200,6 +1205,99 @@ async function holdsAndSpending() {
       hostPaid.every((event) => event.profileId === OWNER.id && event.properties.get("wallet") === "server") &&
       eventsOf(hostPaid, OWNER.id, { action: "media_charged", credits: 40, credits_held: 60 }).length === 1,
     readable(hostPaid),
+  );
+}
+
+async function creditActivity(database: DatabaseSync, credits: CreditService) {
+  database.prepare("UPDATE users SET name = ? WHERE id = ?").run("Maya Member", MEMBER.id);
+  database
+    .prepare(
+      `INSERT INTO credit_media_models(model_id, upstream_id, kind, name, maker, updated_at)
+       VALUES ('seedance-2.5', 'upstream/seedance', 'video', 'Seedance 2.5', 'ByteDance', 1)`,
+    )
+    .run();
+  const activity = (userId: string) => Effect.runPromise(credits.activity(userId));
+  const owner = await activity(OWNER.id);
+  const member = await activity(MEMBER.id);
+  const outsider = await activity(OUTSIDER.id);
+  const entry = (id: string) => owner.entries.find((item) => item.id === id);
+  const kinds = (entries: readonly CreditActivityEntry[], kind: CreditActivityEntry["kind"], serverId?: string) =>
+    entries.filter((item) => item.kind === kind && item.serverId === serverId);
+  const personalMove = kinds(owner.entries, "move")[0];
+  const serverMove = kinds(owner.entries, "move", SERVER_ID)[0];
+  check(
+    "the activity shows purchases, moves on both sides and refunds of the owner",
+    kinds(owner.entries, "purchase").some((item) => item.credits === 2_000 && item.actor === "you") &&
+      personalMove?.credits === -1_000 &&
+      personalMove.otherServerId === SERVER_ID &&
+      serverMove?.credits === 1_000 &&
+      serverMove.otherServerId === undefined &&
+      kinds(owner.entries, "refund").length === 1,
+    { personalMove, serverMove },
+  );
+  const charged = entry("hold:job-1");
+  const partial = entry("hold:job-p");
+  const canceled = entry("hold:job-c");
+  const refused = entry("hold:job-f");
+  const running = entry("hold:job-s1");
+  check(
+    "a generation shows its model, its charged credits, and its status when it runs, fails or is canceled",
+    charged?.kind === "generation" &&
+      charged.credits === -300 &&
+      charged.status === undefined &&
+      charged.modelName === "Seedance 2.5" &&
+      charged.maker === "ByteDance" &&
+      partial?.credits === -120 &&
+      canceled?.status === "canceled" &&
+      canceled.credits === 0 &&
+      refused?.status === "failed" &&
+      refused.credits === 0 &&
+      running?.status === "running" &&
+      running.credits === -400 &&
+      running.serverId === SERVER_ID,
+    { charged, partial, canceled, refused, running },
+  );
+  check(
+    "a server owner sees the name of the member who used server credits, and no email",
+    running?.actor === "member" &&
+      running.actorName === "Maya Member" &&
+      !JSON.stringify([owner, member]).includes("@"),
+    running,
+  );
+  check(
+    "the activity has no spend rows, so a charged generation shows once",
+    owner.entries.every((item) => !item.id.startsWith("spend:")) &&
+      owner.entries.filter((item) => item.id === "hold:job-1").length === 1,
+  );
+  check(
+    "a member sees only the server activity that the member started",
+    member.entries.length > 0 &&
+      member.entries.every((item) => item.serverId === SERVER_ID && item.actor === "you") &&
+      member.entries.some((item) => item.id === "hold:job-s1") &&
+      !member.entries.some((item) => item.kind === "move"),
+    member.entries.map((item) => item.id),
+  );
+  check("an account that is not a member sees no activity", outsider.entries.length === 0, outsider);
+  const setActor = database.prepare("UPDATE credit_holds SET actor_user_id = ? WHERE job_id = 'job-s1'");
+  setActor.run(null);
+  const afterDelete = (await activity(OWNER.id)).entries.find((item) => item.id === "hold:job-s1");
+  setActor.run(MEMBER.id);
+  const refund = kinds(owner.entries, "refund")[0];
+  check(
+    "a generation of a deleted account shows a member, and only OpenBot entries show OpenBot",
+    afterDelete?.actor === "member" &&
+      afterDelete.actorName === undefined &&
+      refund?.actor === "openbot" &&
+      serverMove?.actor === "you",
+    { afterDelete, refund },
+  );
+  const ordered = owner.entries.every((item, index, all) => index === 0 || (all[index - 1]?.at ?? 0) >= item.at);
+  check(
+    "the activity is newest first, has a limit, and the client contract accepts it",
+    ordered &&
+      owner.entries.length <= CREDIT_ACTIVITY_LIMIT &&
+      parseCreditActivity(JSON.parse(JSON.stringify(owner))) !== null,
+    owner.entries.length,
   );
 }
 

@@ -164,6 +164,7 @@ import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { BuyCreditsPage } from "@openbot/ui/features/credits/BuyCreditsPage";
+import { CreditActivitySection } from "@openbot/ui/features/credits/CreditActivitySection";
 import { CreditsSection } from "@openbot/ui/features/credits/CreditsSection";
 import { type CreditsMenu, createCreditsStore, createCreditsSummary } from "@openbot/ui/features/credits/credits-store";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
@@ -1430,6 +1431,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => creditsCalls,
     () => billingOpen() || creditsOpen() !== null,
     (state) => creditsSummary.adopt(state),
+    { activity: true },
   );
   const creditsSummary = createCreditsSummary(
     () => creditsCalls,
@@ -3574,13 +3576,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       />
                     }
                     credits={
-                      <CreditsSection
-                        store={credits}
-                        onBuy={(serverId) => {
-                          setBillingOpen(false);
-                          openCredits(serverId);
-                        }}
-                      />
+                      <>
+                        <CreditsSection
+                          store={credits}
+                          onBuy={(serverId) => {
+                            setBillingOpen(false);
+                            openCredits(serverId);
+                          }}
+                        />
+                        <CreditActivitySection store={credits} />
+                      </>
                     }
                   />
                   <ServerUpgradeOffer

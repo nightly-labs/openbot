@@ -4,6 +4,7 @@ import { parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
 import { WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM } from "@openbot/contracts/company-sign-in";
 import {
   CREDITS_UNAVAILABLE_STATE,
+  EMPTY_CREDIT_ACTIVITY,
   parseCreditCheckoutRequest,
   parseCreditTransferRequest,
 } from "@openbot/contracts/credits";
@@ -528,6 +529,8 @@ const handleCredits = Effect.fn("BrowserApi.handleCredits")(function* (
   const billing = services.billing();
   if (path === "v1/me/credits" && request.method === "GET")
     return json(billing ? yield* billing.credits.getState(user.id) : CREDITS_UNAVAILABLE_STATE);
+  if (path === "v1/me/credits/activity" && request.method === "GET")
+    return json(billing ? yield* billing.credits.activity(user.id) : EMPTY_CREDIT_ACTIVITY);
   if (request.method !== "POST") return null;
   if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
   const body = yield* readJsonObject(request);

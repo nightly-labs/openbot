@@ -17,8 +17,14 @@
   owner 50 credits with Starter, or 100 credits plus 50 for each extra user with Team. A yearly
   license gives them every month. Free credits are used first and expire at the end of their month;
   Settings > Billing shows how many expire and when. Moved to a server, they keep the same end date.
+- Settings > Billing shows your credit activity under the balances: purchases, moves, free credits
+  that you got or that ended, refunds, and each generation with its model, credits and status. Tabs
+  show all activity, only used credits, or only added credits. A server owner or admin also sees the
+  activity of the server's members, with their names; a member sees only their own server activity.
+  This works in the desktop app, with a joined server and in the web client.
 - OpenBot models in workflows. An image or video step can use an OpenBot model, which OpenBot
-  credits pay for, with no other sign-in. The model list shows the price of each step in credits. On a
+  credits pay for, with no other sign-in. The model list shows the logo of the company that made each
+  model, and the price of each step in credits. On a
   server, the server's credits pay. On a computer that hosts a server, that server's credits pay too.
   Elsewhere, the credits of your account pay. A charge is exact to 0.1 credit, and you can
   move tenths of a credit. A failed or refused generation, or one that takes too long, uses no credits. A generation that was sent

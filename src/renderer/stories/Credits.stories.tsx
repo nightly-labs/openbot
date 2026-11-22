@@ -1,8 +1,9 @@
 import type { BillingDetails } from "@openbot/contracts/billing-details";
 import type { CreditsState } from "@openbot/contracts/credits";
-import { CREDITS_UNAVAILABLE_STATE } from "@openbot/contracts/credits";
+import { CREDITS_UNAVAILABLE_STATE, EMPTY_CREDIT_ACTIVITY } from "@openbot/contracts/credits";
 import type { BillingDetailsCalls } from "@openbot/ui/features/billing/BillingDetailsFields";
 import { BuyCreditsPage } from "@openbot/ui/features/credits/BuyCreditsPage";
+import { CreditActivitySection } from "@openbot/ui/features/credits/CreditActivitySection";
 import { CreditsSection } from "@openbot/ui/features/credits/CreditsSection";
 import { type CreditsCalls, createCreditsStore } from "@openbot/ui/features/credits/credits-store";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -37,10 +38,13 @@ function SectionStory(props: { calls: CreditsCalls }) {
   const store = createCreditsStore(
     () => props.calls,
     () => true,
+    undefined,
+    { activity: true },
   );
   return (
     <main class="foundation-story" style={{ "max-width": "640px" }}>
       <CreditsSection store={store} onBuy={() => undefined} />
+      <CreditActivitySection store={store} />
     </main>
   );
 }
@@ -48,6 +52,7 @@ function SectionStory(props: { calls: CreditsCalls }) {
 function fixedCalls(state: CreditsState): CreditsCalls {
   return {
     getState: async () => state,
+    getActivity: async () => EMPTY_CREDIT_ACTIVITY,
     openCheckout: async () => undefined,
     transfer: async () => state,
   };

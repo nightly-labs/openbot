@@ -108,21 +108,11 @@
   background: var(--openbot-bg-control);
 }
 
-.credits-logo-image,
-.credits-logo-mono {
+.credits-logo > .maker-logo {
   width: 22px;
   height: 22px;
-}
-
-.credits-logo-mono {
-  background: var(--openbot-text-primary);
-  mask: var(--credits-logo) center / contain no-repeat;
-}
-
-.credits-logo-monogram {
   color: var(--openbot-text-primary);
   font-size: 17px;
-  font-weight: 600;
 }
 
 .credits-row-body {

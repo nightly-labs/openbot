@@ -1,7 +1,12 @@
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
 import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
-import { type CreditsState, parseCreditsState } from "@openbot/contracts/credits";
+import {
+  type CreditActivity,
+  type CreditsState,
+  parseCreditActivity,
+  parseCreditsState,
+} from "@openbot/contracts/credits";
 import {
   type CustomServerCheckoutResult,
   parseCustomServerCheckoutResult,
@@ -774,6 +779,12 @@ export function decodeCreditsState(value: unknown): CreditsState {
   const state = parseCreditsState(value);
   if (!state) throw new Error("Invalid credits state response.");
   return state;
+}
+
+export function decodeCreditActivity(value: unknown): CreditActivity {
+  const activity = parseCreditActivity(value);
+  if (!activity) throw new Error("Invalid credit activity response.");
+  return activity;
 }
 
 export function decodeLicenseState(value: unknown): LicenseState {

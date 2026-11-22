@@ -180,6 +180,7 @@ import {
   decodeBusyMessageModePreference,
   decodeCentralAuthState,
   decodeChatWindowTargets,
+  decodeCreditActivity,
   decodeCreditsState,
   decodeCustomAgentCheckResult,
   decodeCustomAgentResult,
@@ -1151,6 +1152,7 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   credits: bridgeGroup(IPC_ENDPOINTS.credits, {
     getState: decodeCreditsState,
+    getActivity: decodeCreditActivity,
     openCheckout: decodeVoid,
     transfer: decodeCreditsState,
   }),

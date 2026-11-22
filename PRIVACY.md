@@ -473,6 +473,10 @@ The service stores:
   monthly credits of a paid license, it keeps a grant record: the license, the account or server that
   has them, the credits given and left, and the start and end times. Deleting the account removes the
   grant records of its own balance.
+  Settings > Billing shows an account the ledger entries and holds of its own balance and of the
+  servers where it is a member. The owner and the admins of a server see all of the server's entries,
+  with the names of the accounts that acted. Other members see only the entries that they made. No
+  email address is shown.
   The service also keeps a credit audit record for each credit change and each failed credit action:
   checkouts that open or expire, purchases, moves, reversals, free credits, holds, starts, charges and
   releases, and refused checkouts, moves and generations. A record has the action, the result and the

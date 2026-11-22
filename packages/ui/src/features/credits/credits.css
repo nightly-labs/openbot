@@ -983,6 +983,50 @@ svg.credit-target-logo {
   height: 32px;
 }
 
+.credit-activity-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+}
+
+.credit-activity-icon svg,
+.credit-activity-icon .maker-logo {
+  width: 16px;
+  height: 16px;
+}
+
+.credit-activity-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+}
+
+.credit-activity-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--openbot-text-primary);
+  white-space: nowrap;
+}
+
+.credit-activity-amount[data-positive] {
+  color: var(--openbot-success-text);
+}
+
+.credit-activity-amount[data-pending] {
+  color: var(--openbot-text-dim);
+}
+
+.credit-activity-more {
+  justify-self: center;
+  margin-block-start: var(--openbot-space-2);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .credit-page,
   .credit-split,
