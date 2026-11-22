@@ -312,7 +312,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function promptCacheSource(): ProviderPromptCacheSource | undefined {
     const options = props.hostPromptCacheTtl;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "prompt-cache-ttl-v1")) return undefined;
-    return { ...options, serverId: props.server.id };
+    return {
+      ...options,
+      serverId: props.server.id,
+      appliesToPi: local() || serverCanAdminister(props.server, "prompt-cache-ttl-pi-v1"),
+      compaction: local() || serverCanAdminister(props.server, "cache-expiry-compaction-v1"),
+    };
   }
   function claudeUserSetupSource(): ProviderClaudeUserSetupSource | undefined {
     const options = props.claudeUserSetup;

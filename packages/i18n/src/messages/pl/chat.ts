@@ -585,6 +585,8 @@ export const messages = {
   "chat.compaction.running": "Kompaktowanie kontekstu",
   "chat.compaction.completed": "Skompaktowano kontekst",
   "chat.compaction.failed": "Nie udało się skompaktować kontekstu",
+  "chat.compaction.cacheExpiryRunning": "Kompaktowanie kontekstu przed wygaśnięciem pamięci podręcznej promptów",
+  "chat.compaction.cacheExpiryCompleted": "Skompaktowano kontekst przed wygaśnięciem pamięci podręcznej promptów",
   "chat.compaction.tokens": "{before} → {after} tokenów",
   "chat.compaction.continues": "Wiadomości z kolejki są dalej przetwarzane.",
   "chat.reference.kind.tab": "Karta przeglądarki",

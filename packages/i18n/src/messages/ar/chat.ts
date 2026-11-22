@@ -643,6 +643,8 @@ export const messages = {
   "chat.compaction.running": "جارٍ ضغط السياق",
   "chat.compaction.completed": "تم ضغط السياق",
   "chat.compaction.failed": "تعذّر ضغط السياق",
+  "chat.compaction.cacheExpiryRunning": "جارٍ ضغط السياق قبل انتهاء ذاكرة التخزين المؤقت للموجّه",
+  "chat.compaction.cacheExpiryCompleted": "تم ضغط السياق قبل انتهاء ذاكرة التخزين المؤقت للموجّه",
   "chat.compaction.tokens": "{before} → {after} رمز",
   "chat.compaction.continues": "تتابع الرسائل في قائمة الانتظار.",
   "chat.reference.kind.tab": "علامة تبويب المتصفح",

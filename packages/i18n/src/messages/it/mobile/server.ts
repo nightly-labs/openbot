@@ -1140,11 +1140,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Impossibile modificare i modelli. Riprova.",
   "mobile.server.providers.promptCache": "Cache dei prompt",
   "mobile.server.providers.promptCacheHint":
-    "Per quanto tempo Claude tiene in cache il contesto di un agente tra i turni. La modifica vale al prossimo avvio di Claude.",
-  "mobile.server.providers.promptCacheDefault": "Predefinito di Claude Code",
+    "Per quanto tempo Claude e Pi tengono il contesto di un agente nella cache tra un turno e l’altro. La modifica si applica al prossimo avvio del provider.",
+  "mobile.server.providers.promptCacheDefault": "Predefinito del provider",
   "mobile.server.providers.promptCacheHour": "1 ora",
   "mobile.server.providers.promptCacheLoadFailed":
     "Impossibile caricare la durata della cache dei prompt di questo server.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compatta prima della scadenza della cache",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Quando una chat con 200K o più token di contesto è inattiva con una cache di 1 ora, l’agente compatta il contesto prima della scadenza della cache. Così il messaggio successivo non rilegge tutto il contesto senza cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Impossibile caricare l’impostazione di compattazione di questo server.",
   "mobile.server.providers.compactWindow": "Compatta le chat a",
   "mobile.server.providers.compactWindowHint":
     "Claude Code riassume i turni più vecchi di una chat quando la chat raggiunge questa dimensione. Più basso mantiene i turni rapidi ed economici. Più alto conserva più dettagli. Un modello con una finestra più piccola compatta al proprio limite.",

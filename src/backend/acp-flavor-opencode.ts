@@ -5,6 +5,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, type AcpRetryCause, shownFailureDetail } from "./acp-flavor";
 import {
+  isContextTooSmallFailure,
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
@@ -103,9 +104,6 @@ function openCodeAuthRequired(
     : sourceText("error.provider.opencodeAuthRequired", { provider });
 }
 
-const OPENCODE_CONTEXT_TOO_SMALL =
-  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
-
 const NVIDIA_MODEL_NOT_SERVED = /\bFunction '[^']*': Not found for account\b/u;
 const NVIDIA_MODEL_DEGRADED = /\bDEGRADED function cannot be invoked\b/iu;
 
@@ -169,7 +167,7 @@ function openCodeRequestFailure(
     logger.warn("A model server ran out of memory for an OpenCode request.", { reason: redact(reason) });
     return sourceText("error.provider.opencodeOutOfMemory");
   }
-  if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
+  if (isContextTooSmallFailure(reason)) {
     log(`OpenCode request does not fit the model's context window: ${reason}`);
     return sourceText("error.provider.opencodeContextTooSmall");
   }

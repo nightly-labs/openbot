@@ -580,6 +580,8 @@ export const messages = {
   "chat.compaction.running": "Сжатие контекста",
   "chat.compaction.completed": "Контекст сжат",
   "chat.compaction.failed": "Не удалось сжать контекст",
+  "chat.compaction.cacheExpiryRunning": "Сжатие контекста до истечения кэша промптов",
+  "chat.compaction.cacheExpiryCompleted": "Контекст сжат до истечения кэша промптов",
   "chat.compaction.tokens": "{before} → {after} токенов",
   "chat.compaction.continues": "Сообщения в очереди продолжат отправляться.",
   "chat.reference.kind.tab": "Вкладка браузера",

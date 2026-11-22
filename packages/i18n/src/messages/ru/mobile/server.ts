@@ -1245,10 +1245,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Не удалось изменить модели. Попробуйте ещё раз.",
   "mobile.server.providers.promptCache": "Кеш промптов",
   "mobile.server.providers.promptCacheHint":
-    "Сколько Claude хранит контекст агента в кеше между ходами. Изменение применяется при следующем запуске Claude.",
-  "mobile.server.providers.promptCacheDefault": "По умолчанию Claude Code",
+    "Как долго Claude и Pi хранят контекст агента в кэше между ходами. Изменение применяется при следующем запуске провайдера.",
+  "mobile.server.providers.promptCacheDefault": "По умолчанию у провайдера",
   "mobile.server.providers.promptCacheHour": "1 час",
   "mobile.server.providers.promptCacheLoadFailed": "Не удалось загрузить время кеша промптов этого сервера.",
+  "mobile.server.providers.cacheExpiryCompaction": "Сжимать до истечения кэша",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Когда чат с контекстом от 200K токенов простаивает с кэшем на 1 час, агент сжимает контекст до истечения кэша. Тогда следующее сообщение не читает весь контекст заново без кэша.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Не удалось загрузить настройку сжатия этого сервера.",
   "mobile.server.providers.compactWindow": "Сжимать чаты при",
   "mobile.server.providers.compactWindowHint":
     "Claude Code кратко излагает старые ходы чата, когда чат достигает этого размера. Меньше — ходы быстрее и дешевле. Больше — сохраняется больше деталей. Модель с меньшим окном сжимает на своём пределе.",

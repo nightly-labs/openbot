@@ -306,6 +306,20 @@ const MARKERS: { label: string; compaction: ContextCompactionView }[] = [
     label: "Failed or timed out",
     compaction: { status: "failed", timestamp: minutesAgo(5), beforeTokens: 221_400 },
   },
+  {
+    label: "Before the prompt cache expires",
+    compaction: { status: "running", timestamp: minutesAgo(0), beforeTokens: 611_000, reason: "cacheExpiry" },
+  },
+  {
+    label: "Compacted before the prompt cache expired",
+    compaction: {
+      status: "completed",
+      timestamp: minutesAgo(1),
+      beforeTokens: 611_000,
+      afterTokens: 19_400,
+      reason: "cacheExpiry",
+    },
+  },
 ];
 
 export const CompactionMarkers: Story = {

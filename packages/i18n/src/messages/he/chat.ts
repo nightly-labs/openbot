@@ -499,6 +499,8 @@ export const messages = {
   "chat.compaction.running": "מכווץ הקשר",
   "chat.compaction.completed": "ההקשר כווץ",
   "chat.compaction.failed": "לא ניתן היה לכווץ את ההקשר",
+  "chat.compaction.cacheExpiryRunning": "מכווץ הקשר לפני שמטמון ההנחיות יפוג",
+  "chat.compaction.cacheExpiryCompleted": "ההקשר כווץ לפני שמטמון ההנחיות פג",
   "chat.compaction.tokens": "{before} ← {after} טוקנים",
   "chat.compaction.continues": "הודעות שבתור ממשיכות.",
   "chat.reference.kind.tab": "לשונית דפדפן",

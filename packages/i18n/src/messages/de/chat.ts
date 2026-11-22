@@ -502,6 +502,8 @@ export const messages = {
   "chat.compaction.running": "Kontext wird komprimiert",
   "chat.compaction.completed": "Kontext komprimiert",
   "chat.compaction.failed": "Kontext konnte nicht komprimiert werden",
+  "chat.compaction.cacheExpiryRunning": "Kontext wird komprimiert, bevor der Prompt-Cache abläuft",
+  "chat.compaction.cacheExpiryCompleted": "Kontext komprimiert, bevor der Prompt-Cache abgelaufen ist",
   "chat.compaction.tokens": "{before} → {after} Tokens",
   "chat.compaction.continues": "Nachrichten in der Warteschlange werden weiter verarbeitet.",
   "chat.reference.kind.tab": "Browser-Tab",

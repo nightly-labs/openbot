@@ -259,6 +259,7 @@ import type {
   SetBrowserProfileProxyInput,
 } from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
+import type { CacheExpiryCompactionSetting } from "./ipc-cache-expiry-compaction";
 import type {
   BrowseChannelFoldersInput,
   ChannelFolderChange,
@@ -1236,6 +1237,12 @@ export const IPC_ENDPOINTS = {
     getPromptCacheTtl: scopedQuery<PromptCacheTtlSetting, "required">()("host-admin:get-prompt-cache-ttl"),
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
+    ),
+    getCacheExpiryCompaction: scopedQuery<CacheExpiryCompactionSetting, "required">()(
+      "host-admin:get-cache-expiry-compaction",
+    ),
+    setCacheExpiryCompaction: scopedRequest<boolean, CacheExpiryCompactionSetting, "required">()(
+      "host-admin:set-cache-expiry-compaction",
     ),
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
