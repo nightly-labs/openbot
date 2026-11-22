@@ -19,6 +19,38 @@ if [ "${1:-}" = --stop ]; then
   fi
   exit 0
 fi
+if [ "${1:-}" = --watchdog ]; then
+  pid_file=$2 heartbeat=$3 interval=$4 limit=$5
+  running_openbot() {
+    local comm
+    [[ $1 =~ ^[1-9][0-9]*$ ]] || return 1
+    comm=$(ps -o comm= -p "$1" 2>/dev/null) || return 1
+    [ "${comm##*/}" = openbot ]
+  }
+  seen=$(cat "$heartbeat" 2>/dev/null) || seen=""
+  armed=0 misses=0
+  while sleep "$interval"; do
+    current=$(cat "$heartbeat" 2>/dev/null) || current=""
+    if [ "$current" != "$seen" ]; then
+      seen=$current armed=1 misses=0
+      continue
+    fi
+    [ "$armed" -eq 1 ] || continue
+    misses=$((misses + 1))
+    [ "$misses" -ge "$limit" ] || continue
+    free_kb=$(df -Pk "${heartbeat%/*}" 2>/dev/null | awk 'NR == 2 { print $4 }') || free_kb=""
+    if [[ ! $free_kb =~ ^[0-9]+$ ]] || [ "$free_kb" -lt 1024 ]; then continue; fi
+    pid=$(cat "$pid_file" 2>/dev/null) || pid=""
+    if ! running_openbot "$pid"; then
+      armed=0 misses=0
+      continue
+    fi
+    echo "OpenBot did not update its heartbeat for $((interval * limit)) seconds. The watchdog stops it, and systemd starts it again." >&2
+    kill -KILL "$pid" 2>/dev/null || true
+    exit 0
+  done
+  exit 0
+fi
 state="$HOME/.config/openbot-hosted"
 mode=hosted
 if [ -r /opt/OpenBot/hosted/mode ] && [ "$(</opt/OpenBot/hosted/mode)" = self ]; then mode=self; fi
@@ -98,6 +130,8 @@ export GNOME_KEYRING_CONTROL
     find "$keyrings" -maxdepth 1 -name "${keyring##*/}.temp-*" ! -samefile "$keyring" -delete
   done
 ) &
+
+"$0" --watchdog "$XDG_RUNTIME_DIR/openbot.pid" "${XDG_CONFIG_HOME:-$HOME/.config}/OpenBot/openbot-run-marker-v1.json" 30 20 &
 
 openbot=(bash -c 'echo "$$" >"$XDG_RUNTIME_DIR/openbot.pid" && exec "$@"' openbot-hosted-server
   /opt/OpenBot/app/openbot --password-store=gnome-libsecret)

@@ -721,6 +721,33 @@ each claim, so a VM that has no working session cannot sign in after the change;
 A start that cannot reach the account server does not use the claim. The start retry signs in
 again with backoff (30 s to 10 min) and then publishes the host.
 
+## Watchdog
+
+Before it starts OpenBot, `openbot-hosted-server` starts itself again with `--watchdog` in the
+background. Main rewrites `~/.config/OpenBot/openbot-run-marker-v1.json` every 60 s from its event
+loop (`src/main/run-marker.ts`). The watchdog reads the file every 30 s. When the content does not
+change in 20 reads (10 minutes) after it changed once in this run, the watchdog logs "OpenBot did not
+update its heartbeat for 600 seconds" and sends `SIGKILL` to the process in
+`/run/openbot/openbot.pid`. `Restart=always` starts the service again 10 s later. The watchdog does
+nothing:
+
+- before the first change of the file in this run, so a slow start is not stopped;
+- when the folder of the file has less than 1 MB free, because main ignores a failed write;
+- when the process in the pid file is not `openbot`.
+
+The watchdog counts reads and does not compare clock times, so a boat resume, which moves the clock
+forward, does not stop OpenBot. It does not help when the whole machine stops responding; that needs a
+reboot of the VM.
+
+On 2026-11-21 a Standard server on Leaseweb (0.75.0) ran out of memory: agent dev servers, browser
+tabs and Docker used 11 GB and 6 GB of swap. The Team WebRTC bridge did not answer its checks, and
+main crashed it. The main thread then stopped in a blocking read of a Unix socket
+(`unix_seqpacket_recvmsg`, probably the reply of the zygote) and never returned. Main wrote no log
+line and used no CPU, and the host stayed off Signal for 24 hours until a restart. The Chromium call
+that blocked is not confirmed: the processes were gone after the restart.
+`scripts/hosted-watchdog-e2e.ts` (`bun run test:hosted-watchdog`) runs the watchdog with a 1 s
+interval against fake apps that write, stop writing or never write the file.
+
 ## Memory
 
 One systemd unit holds OpenBot, its browser tabs and every agent process: one `claude` process for
