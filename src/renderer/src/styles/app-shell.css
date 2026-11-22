@@ -1175,7 +1175,7 @@ textarea {
   white-space: nowrap;
 }
 
-.ui-action-menu.server-menu .server-menu-credits-buy [role="menuitem"].server-menu-credits-get {
+.ui-action-menu .server-menu-credits-buy [role="menuitem"].server-menu-credits-get {
   width: auto;
   height: var(--openbot-control-sm);
   min-height: var(--openbot-control-sm);
@@ -1189,7 +1189,7 @@ textarea {
   font-weight: var(--openbot-weight-medium);
 }
 
-.ui-action-menu.server-menu
+.ui-action-menu
   .server-menu-credits-buy
   [role="menuitem"].server-menu-credits-get:is(:hover, :focus-visible, [data-highlighted]) {
   background: color-mix(in srgb, var(--openbot-surface-light) 82%, transparent);

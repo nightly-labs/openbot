@@ -83,29 +83,19 @@ function CheckCircle(props: { checked: boolean }) {
   );
 }
 
-function CreditsItem(props: { label: string; balance: string; onSelect: () => void }) {
-  return (
-    <DropdownMenu.Item onSelect={props.onSelect}>
-      <CreditIcon class="agent-context-icon size-4" />
-      <span>{props.label}</span>
-      <span class="ui-menu-trailing server-menu-credit-value">{props.balance}</span>
-    </DropdownMenu.Item>
-  );
-}
-
-function CreditsCard(props: { balance: number; onOpen: () => void }) {
+function CreditsCard(props: { label: string; buyLabel: string; balance: number; onOpen: () => void }) {
   const { t, format } = useText();
   return (
     <div class="server-menu-credits-card">
       <DropdownMenu.Item
         class="server-menu-credits-line"
         aria-label={[
-          t("billing.credits.yours"),
+          props.label,
           t("billing.credits.amount", { count: props.balance, amount: format.number(props.balance) }),
         ].join(", ")}
         onSelect={props.onOpen}
       >
-        <span class="server-menu-credits-label">{t("billing.credits.yours")}</span>
+        <span class="server-menu-credits-label">{props.label}</span>
         <CreditAmount value={format.number(props.balance)} class="ui-menu-trailing server-menu-credit-value" />
       </DropdownMenu.Item>
       <div class="server-menu-credits-buy">
@@ -113,11 +103,7 @@ function CreditsCard(props: { balance: number; onOpen: () => void }) {
         <span class="server-menu-credits-buy-label" aria-hidden="true">
           {t("billing.credits.buy")}
         </span>
-        <DropdownMenu.Item
-          class="server-menu-credits-get"
-          aria-label={t("billing.credits.buy")}
-          onSelect={props.onOpen}
-        >
+        <DropdownMenu.Item class="server-menu-credits-get" aria-label={props.buyLabel} onSelect={props.onOpen}>
           {t("billing.credits.get")}
         </DropdownMenu.Item>
       </div>
@@ -151,7 +137,14 @@ export function ServerMenu(props: ServerMenuProps) {
   }
   const creditsCard = () => (
     <Show when={credits()}>
-      {(state) => <CreditsCard balance={state().balance} onOpen={() => openCredits(null)} />}
+      {(state) => (
+        <CreditsCard
+          label={t("billing.credits.yours")}
+          buyLabel={t("billing.credits.buy")}
+          balance={state().balance}
+          onOpen={() => openCredits(null)}
+        />
+      )}
     </Show>
   );
   function changeMenuOpen(open: boolean): void {
@@ -351,19 +344,14 @@ export function ServerMenu(props: ServerMenuProps) {
                         class="ui-action-menu agent-context-menu"
                         aria-label={t("server.rail.actions")}
                       >
-                        <div class="ui-menu-label" aria-hidden="true">
-                          {server().name}
-                        </div>
                         <Show when={serverWallet(server().id)}>
                           {(wallet) => (
-                            <>
-                              <CreditsItem
-                                label={t("billing.credits.title")}
-                                balance={format.number(wallet().balance)}
-                                onSelect={() => openCredits(wallet().serverId)}
-                              />
-                              <DropdownMenu.Separator />
-                            </>
+                            <CreditsCard
+                              label={t("billing.credits.serversTitle")}
+                              buyLabel={t("billing.credits.buyFor", { name: server().name })}
+                              balance={wallet().balance}
+                              onOpen={() => openCredits(wallet().serverId)}
+                            />
                           )}
                         </Show>
                         <ServerActionItems
