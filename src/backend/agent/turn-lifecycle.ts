@@ -907,7 +907,6 @@ export class TurnLifecycle {
   #holdNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
-      (source.provider !== "codex" && source.provider !== "claude") ||
       running === undefined ||
       (running.startedBackgroundWork && this.#waitingThreads.has(threadId)) ||
       running.compacted ||
@@ -942,6 +941,7 @@ export class TurnLifecycle {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
       return false;
     }
+    if (source.provider !== "codex" && source.provider !== "claude") return false;
     if (deliveries.every(({ delivery }) => this.#mailbox.answersHandledRequest(delivery.id))) {
       logger.info("A turn for another teammate result to a handled request ended quietly.", {
         agentId,
@@ -1343,7 +1343,8 @@ export class TurnLifecycle {
             item.text.trim()
           )
             running.narration = itemId;
-        } else if (running && isRepeatedWork(item)) running.narration = null;
+        } else if (running && isRepeatedWork(item) && !keepsNarration(item, notification.method === "item/completed"))
+          running.narration = null;
         if (item.type === "contextCompaction") {
           if (running) running.compacted = true;
           if (this.#conversation.openClientFor(threadId) !== source) return;
@@ -3477,6 +3478,36 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown;
   if (item.type !== "agentMessage") return true;
   if (item.failureReport === true) return false;
   return item.phase !== "commentary" && hasText(item);
+}
+
+const NARRATION_KEEPING_TOOLS = new Set([
+  "messaging_history",
+  "messaging_list_places",
+  "messaging_remember",
+  "messaging_forget_memory",
+  "remember",
+  "forget_memory",
+  "search_memories",
+  "history_read",
+  "history_search",
+  "react_to_user_message",
+]);
+
+function keepsNarration(item: DynamicRecord, completed: boolean): boolean {
+  const threadItem = toThreadItem(item);
+  if (threadItem === null) return false;
+  const tool = openBotTool(threadItem);
+  if (tool !== null) return NARRATION_KEEPING_TOOLS.has(tool);
+  if (threadItem.type !== "toolCall" || getString(threadItem, "name") !== "execute") return false;
+  if (!completed) return true;
+  const calls = getArray(getRecord(getRecord(threadItem, "result"), "metadata"), "toolCalls");
+  return calls.length > 0 && calls.every((call) => NARRATION_KEEPING_TOOLS.has(codeModeOpenBotTool(call) ?? ""));
+}
+
+function codeModeOpenBotTool(call: unknown): string | null {
+  const tool = getString(call, "tool");
+  const name = tool === "openbot.tool_call" ? getString(getRecord(call, "input"), "name") : tool;
+  return name?.startsWith("openbot.") ? name.slice("openbot.".length) : null;
 }
 
 function isUserReactionCall(item: DynamicRecord): boolean {
