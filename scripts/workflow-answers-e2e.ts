@@ -27,6 +27,7 @@ type DeliveryState = { status: "running" | "completed"; turnId: string | null; e
 interface Report {
   checks: string[];
   modelPrompts: string[];
+  modelSchemas: unknown[];
   handoffs: { deliveryId: string; text: string; idempotencyKey: string }[];
   notices: string[];
   promptBytes: Record<string, number>;
@@ -34,7 +35,15 @@ interface Report {
   failure?: string;
 }
 
-const report: Report = { checks: [], modelPrompts: [], handoffs: [], notices: [], promptBytes: {}, passed: false };
+const report: Report = {
+  checks: [],
+  modelPrompts: [],
+  modelSchemas: [],
+  handoffs: [],
+  notices: [],
+  promptBytes: {},
+  passed: false,
+};
 const check = (name: string, ok: boolean, detail?: unknown) => {
   assert.ok(ok, `${name}${detail === undefined ? "" : `: ${JSON.stringify(detail)}`}`);
   report.checks.push(name);
@@ -163,6 +172,7 @@ try {
       stopDelivery: () => Effect.void,
       generateText: (request) => {
         report.modelPrompts.push(request.prompt);
+        report.modelSchemas.push(request.outputSchema ?? null);
         if (report.modelPrompts.length === failModelCall) return Effect.fail({ message: MODEL_TIMEOUT });
         return Effect.succeed(modelReplies.shift() ?? "");
       },
@@ -188,6 +198,18 @@ try {
     ask,
   );
   report.promptBytes.modelAsk = Buffer.byteLength(ask ?? "");
+  const schema = report.modelSchemas[0];
+  check(
+    "the model step gives the provider the JSON Schema of its answer fields",
+    JSON.stringify(schema) ===
+      JSON.stringify({
+        type: "object",
+        properties: { priority: { type: "string", enum: ["high", "normal", "low"] }, count: { type: "number" } },
+        required: ["priority", "count"],
+        additionalProperties: false,
+      }),
+    schema,
+  );
   check(
     "a wrong answer gets one more try that names the problem",
     report.modelPrompts.length === 2 && fix?.includes("Your answer did not fit") === true && fix.includes("priority"),

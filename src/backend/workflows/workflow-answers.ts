@@ -22,6 +22,7 @@ import {
   workflowAnswerValueText,
   workflowNodeAnswerNames,
 } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { StoredWorkflowStep } from "./workflow-run-store";
 
@@ -136,6 +137,32 @@ export function readableAnswerInputs(
 
 export function modelAnswerAsk(fields: readonly WorkflowAnswerField[]): string {
   return `Answer with only one JSON object, with no other text, with these fields:\n${workflowAnswerInstruction(fields)}`;
+}
+
+export function workflowAnswerJsonSchema(fields: readonly WorkflowAnswerField[]): DynamicRecord {
+  return {
+    type: "object",
+    properties: Object.fromEntries(fields.map((field) => [field.name, answerValueSchema(field)])),
+    required: fields.filter((field) => !field.optional).map((field) => field.name),
+    additionalProperties: false,
+  };
+}
+
+function answerValueSchema(field: WorkflowAnswerField): DynamicRecord {
+  switch (field.type) {
+    case "text":
+      return { type: "string" };
+    case "number":
+      return { type: "number" };
+    case "integer":
+      return { type: "integer" };
+    case "yes/no":
+      return { type: "boolean" };
+    case "list":
+      return { type: "array", items: { type: "string" } };
+    case "choice":
+      return { type: "string", enum: [...field.labels] };
+  }
 }
 
 export const WORKFLOW_ANSWER_TOOL = "workflow_answer";

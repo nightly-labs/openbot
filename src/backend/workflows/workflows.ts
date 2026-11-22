@@ -56,7 +56,7 @@ import {
   workflowMediaModel,
   workflowMediaSpecs,
 } from "@openbot/contracts/ipc";
-import { isOneOf } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import {
@@ -146,6 +146,7 @@ import {
   toolAnswerFixAsk,
   webhookAnswerEvent,
   withRunAnswerSpec,
+  workflowAnswerJsonSchema,
 } from "./workflow-answers";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
@@ -225,6 +226,7 @@ interface WorkflowTextRequest {
   effort: AgentReasoningEffort | null;
   prompt: string;
   images: readonly string[];
+  outputSchema?: DynamicRecord;
 }
 
 const MODEL_IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -610,6 +612,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               effort: isReasoningEffort(node.fields.effort) ? node.fields.effort : null,
               prompt: fields.length > 0 ? `${prompt}\n\n${modelAnswerAsk(fields)}` : prompt,
               images: images.success,
+              ...(fields.length > 0 ? { outputSchema: workflowAnswerJsonSchema(fields) } : {}),
             };
             const chosen = Effect.gen(function* () {
               if (!dependencies.chooseTextModel) return request;
