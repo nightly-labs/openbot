@@ -2086,6 +2086,11 @@ export async function createApplicationServices({
       const config = service.listMcpServers().find((saved) => catalogPluginSlug(saved, listed, homedir()) === appId);
       return config ? { config, setupSteps: server.setupSteps } : null;
     },
+    passwordManagerConnected: (manager) => {
+      if (manager === "onepassword") return onePasswordConnector.connected();
+      if (manager === "bitwarden") return bitwardenConnector.connected();
+      return passwordManagers.list().some((status) => status.manager === manager && status.state === "connected");
+    },
     mcpAgentAccess: (mcpServerId, agentId) => mcpAccessStore.allowsAgent(mcpServerId, agentId),
     prepareMcpTest: (config) =>
       prepareToolRuntimeForTest(config, {
