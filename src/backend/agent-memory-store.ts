@@ -19,7 +19,9 @@ const UNSPACED_SCRIPT =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 
 function unindexedTermMatcher(term: string): { term: string; pattern: RegExp } {
-  const touchingUnspacedText = `(?<=${UNSPACED_SCRIPT.source})${term}|${term}(?=${UNSPACED_SCRIPT.source})`;
+  const unspaced = UNSPACED_SCRIPT.source;
+  const edge = `${unspaced}|[^\\p{L}\\p{N}\\p{M}]`;
+  const touchingUnspacedText = `(?<=${unspaced})${term}(?=${edge}|$)|(?<=${edge}|^)${term}(?=${unspaced})`;
   return { term, pattern: new RegExp(UNSPACED_SCRIPT.test(term) ? term : touchingUnspacedText, "iu") };
 }
 
