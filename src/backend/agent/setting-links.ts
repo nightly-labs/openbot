@@ -1,4 +1,9 @@
-import { SETTING_LINK_IDS, type SettingLinkId } from "@openbot/contracts/ipc";
+import {
+  AGENT_PERMISSION_LEVELS,
+  type AgentPermissionLevel,
+  SETTING_LINK_IDS,
+  type SettingLinkId,
+} from "@openbot/contracts/ipc";
 
 interface SettingLinkEntry {
   title: string;
@@ -280,7 +285,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "agent.access": {
     title: "Access",
     place: `${AGENT} > Permissions`,
-    about: "What the agent can do without approval: ask first, workspace only, or full access.",
+    about:
+      "What the agent can do without approval: Workspace only, Ask first or Full access. The choices depend on the provider: read_agent gives them in permissionLevels.",
     words: "permissions approvals sandbox full access ask workspace security",
   },
   "agent.computer-use": {
@@ -350,6 +356,24 @@ export interface SettingLinkSummary {
 export function settingLinkSummary(id: SettingLinkId): SettingLinkSummary {
   const { title, place, about } = SETTING_LINKS[id];
   return { id, title, place, about };
+}
+
+const ACCESS_LEVEL_NAMES: Record<AgentPermissionLevel, string> = {
+  workspace: "Workspace only",
+  ask: "Ask first",
+  full: "Full access",
+};
+
+export function agentAccessSummary(
+  summary: SettingLinkSummary,
+  levels: readonly AgentPermissionLevel[],
+): SettingLinkSummary {
+  if (summary.id !== "agent.access" || levels.length === AGENT_PERMISSION_LEVELS.length) return summary;
+  const choices = levels.map((level) => ACCESS_LEVEL_NAMES[level]).join(", ");
+  return {
+    ...summary,
+    about: `What the agent can do without approval. Your choices are: ${choices}. For another agent, read_agent gives its choices in permissionLevels.`,
+  };
 }
 
 const terms = (text: string) =>
