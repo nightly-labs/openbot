@@ -2,7 +2,7 @@ import { type WorkflowMediaInput, workflowCatalogSource } from "@openbot/contrac
 import type { AppTranslate } from "@openbot/i18n";
 import { Button, Download, Film, Image, Maximize2, Mic, RotateCcw, Square, Textarea, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show, untrack } from "solid-js";
+import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
@@ -120,6 +120,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     untrack(() => ({ prompt: props.prompt, aspect: props.aspect })),
   );
   const { kind, prompt, specs, model, run } = step;
+  createEffect(step.short, (short) => {
+    board.markCreditsShort(props.id, short);
+    return () => board.markCreditsShort(props.id, false);
+  });
   const text = (key: keyof (typeof KIND_TEXT)["image"]) => t(KIND_TEXT[kind()][key]);
   const frameRatio = () => {
     const size = specs().size;

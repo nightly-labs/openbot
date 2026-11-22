@@ -88,34 +88,42 @@ const MODELS: CreditMediaModel[] = [
 
 const submits: { request: CreditMediaJobRequest; inputs: readonly CreditMediaUpload[] }[] = [];
 const stored: { name: string; mimeType: string; bytes: number }[] = [];
+let submitFailure: CreditMediaGatewayFailed | null = null;
+let jobLookups = 0;
 
 const gateway: CreditMediaGateway = {
   available: () => true,
   catalog: () => Effect.succeed({ models: MODELS }),
   balance: () => Effect.succeed({ wallet: "personal", available: 100 }),
   submit: (request, inputs) =>
-    Effect.sync(() => {
-      submits.push({ request, inputs });
-      const kind = MODELS.find((entry) => entry.id === request.model)?.kind;
-      return {
-        jobId: request.jobId,
-        model: request.model,
-        status: "completed" as const,
-        credits: 1,
-        pollAfterSeconds: 0,
-        outputs: [
-          {
-            index: 0,
-            mimeType: kind === "video" ? "video/mp4" : "image/png",
-            width: null,
-            height: null,
-            durationMs: null,
-          },
-        ],
-        failure: null,
-      };
+    Effect.suspend(() => (submitFailure ? Effect.fail(submitFailure) : Effect.void)).pipe(
+      Effect.map(() => {
+        submits.push({ request, inputs });
+        const kind = MODELS.find((entry) => entry.id === request.model)?.kind;
+        return {
+          jobId: request.jobId,
+          model: request.model,
+          status: "completed" as const,
+          credits: 1,
+          pollAfterSeconds: 0,
+          outputs: [
+            {
+              index: 0,
+              mimeType: kind === "video" ? "video/mp4" : "image/png",
+              width: null,
+              height: null,
+              durationMs: null,
+            },
+          ],
+          failure: null,
+        };
+      }),
+    ),
+  job: () =>
+    Effect.suspend(() => {
+      jobLookups += 1;
+      return Effect.fail(new CreditMediaGatewayFailed({ message: "Not found.", status: 404, code: "not_found" }));
     }),
-  job: () => Effect.fail(new CreditMediaGatewayFailed({ message: "Not found.", status: 404 })),
   output: () => Effect.succeed(PNG),
 };
 
@@ -374,6 +382,31 @@ async function flow() {
       prices.image4k === 6 &&
       prices.video1080Silent === 48,
     prices,
+  );
+  const refused = async (code: string) => {
+    submitFailure = new CreditMediaGatewayFailed({ message: `Refused: ${code}.`, status: 409, code });
+    const lookupsBefore = jobLookups;
+    try {
+      const result = await generate({
+        kind: "image",
+        model: "image-text",
+        prompt: "A boat",
+        specs: specs(),
+        images: [],
+      });
+      return { failure: result.failure, lookups: jobLookups - lookupsBefore };
+    } finally {
+      submitFailure = null;
+    }
+  };
+  const notEnough = await refused("credits_spend_not_enough");
+  const conflict = await refused("credits_job_conflict");
+  check(
+    "a 409 for too few credits shows that error; only a job conflict looks up the job again",
+    notEnough.failure === "Refused: credits_spend_not_enough." &&
+      conflict.lookups === notEnough.lookups + 1 &&
+      conflict.failure === "Not found.",
+    { notEnough, conflict },
   );
   check(
     "each finished job stores its file with the right type",

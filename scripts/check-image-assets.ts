@@ -10,6 +10,7 @@ const ALLOWED_DIRECTORIES = [
   "apps/auth-api/public/",
   "apps/auth-api/content-art/",
   "apps/auth-api/src/content/guides/media/",
+  "apps/auth-api/src/components/credits/logos/",
   "scripts/hosting/desktop/",
 ] as const;
 

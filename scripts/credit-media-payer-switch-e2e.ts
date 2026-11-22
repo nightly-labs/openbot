@@ -80,8 +80,10 @@ function reset(session: boolean) {
   account.onSubmit = () => {};
 }
 
-function failure(status: number) {
-  return new CentralAuthOperationError({ cause: Object.assign(new Error(`Account service ${status}.`), { status }) });
+function failure(status: number, code = "") {
+  return new CentralAuthOperationError({
+    cause: Object.assign(new Error(`Account service ${status}.`), { status, code }),
+  });
 }
 
 function jobView(jobId: string, job: AccountJob): CreditMediaJob {
@@ -103,14 +105,14 @@ function requestJobId(init: RequestInit): string | null {
   return typeof part === "string" ? (parseCreditMediaJobRequest(JSON.parse(part))?.jobId ?? null) : null;
 }
 
-function handle(payer: string, path: string, init: RequestInit): { status: number; body?: unknown } {
+function handle(payer: string, path: string, init: RequestInit): { status: number; code?: string; body?: unknown } {
   if (path === "/v1/media/models") return { status: 200, body: { models: [MODEL] } };
   if (path === "/v1/media/balance") return { status: 200, body: { wallet: "personal", available: 100 } };
   if (path === "/v1/media/jobs/" && init.method === "POST") {
     const jobId = requestJobId(init);
     if (!jobId) return { status: 400 };
     const existing = account.jobs.get(jobId);
-    if (existing && existing.owner !== payer) return { status: 409 };
+    if (existing && existing.owner !== payer) return { status: 409, code: "credits_job_conflict" };
     const job = existing ?? { owner: payer, polls: 0, completeAfter: 2 };
     account.jobs.set(jobId, job);
     account.onSubmit();
@@ -129,7 +131,7 @@ function respond<T>(payer: string, path: string, init: RequestInit, read: (body:
   return Effect.suspend(() => {
     const result = handle(payer, path, init);
     account.calls.push({ payer, method: init.method ?? "GET", path, status: result.status });
-    if (result.status !== 200) return Effect.fail(failure(result.status));
+    if (result.status !== 200) return Effect.fail(failure(result.status, result.code));
     return Effect.try({ try: () => read(result.body), catch: (cause) => new CentralAuthOperationError({ cause }) });
   });
 }

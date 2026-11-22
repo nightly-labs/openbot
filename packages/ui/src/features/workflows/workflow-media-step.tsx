@@ -318,10 +318,6 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   };
   const short = () => exceeds(total());
   const retryShort = () => exceeds(price());
-  createEffect(short, (value) => {
-    board.markCreditsShort(id, value);
-    return () => board.markCreditsShort(id, false);
-  });
   const priced = (label: string, isShort: boolean) =>
     isShort ? [t("billing.credits.notEnough"), label].join(", ") : label;
   const runLabel = () => {

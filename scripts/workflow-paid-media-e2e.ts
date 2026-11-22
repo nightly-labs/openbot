@@ -71,7 +71,11 @@ let calls = { submit: 0, job: 0, output: 0 };
 const shaky = (kind: keyof typeof flaky) => {
   if (flaky[kind] <= 0) return null;
   flaky[kind] -= 1;
-  return new CreditMediaGatewayFailed({ message: "The network is down.", status: kind === "output" ? 503 : 0 });
+  return new CreditMediaGatewayFailed({
+    message: "The network is down.",
+    status: kind === "output" ? 503 : 0,
+    code: "",
+  });
 };
 
 const view = (jobId: string, job: FakeJob): CreditMediaJob => ({
@@ -105,7 +109,8 @@ const gateway: CreditMediaGateway = {
     Effect.suspend(() => {
       calls.job += 1;
       const job = jobs.get(jobId);
-      if (!job) return Effect.fail(new CreditMediaGatewayFailed({ message: "Not found.", status: 404 }));
+      if (!job)
+        return Effect.fail(new CreditMediaGatewayFailed({ message: "Not found.", status: 404, code: "not_found" }));
       const failure = shaky("job");
       if (failure) return Effect.fail(failure);
       return Effect.succeed(view(jobId, job));
@@ -117,7 +122,7 @@ const gateway: CreditMediaGateway = {
       if (failure) return Effect.fail(failure);
       const job = jobs.get(jobId);
       if (job?.status !== "completed")
-        return Effect.fail(new CreditMediaGatewayFailed({ message: "Not found.", status: 404 }));
+        return Effect.fail(new CreditMediaGatewayFailed({ message: "Not found.", status: 404, code: "not_found" }));
       job.downloads += 1;
       return Effect.succeed(PNG);
     }),

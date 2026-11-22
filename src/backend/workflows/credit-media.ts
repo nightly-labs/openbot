@@ -38,10 +38,11 @@ const POLL_MAX_SECONDS = 30;
 const SIGN_IN_CHECKS = 30;
 const NAME_MAX = 160;
 const AUDIO_OPTION = "audio";
+const CREDIT_JOB_CONFLICT = "credits_job_conflict";
 
 export class CreditMediaGatewayFailed extends Schema.TaggedError<CreditMediaGatewayFailed>()(
   "CreditMediaGatewayFailed",
-  { message: Schema.String, status: Schema.Number },
+  { message: Schema.String, status: Schema.Number, code: Schema.String },
 ) {}
 
 export interface CreditMediaUpload {
@@ -356,7 +357,7 @@ export class CreditMediaWorkflows {
     const gateway = this.#options.gateway;
     return yield* gateway.submit(creditJobRequest(model, request, request.jobId), uploads).pipe(
       Effect.catchIf(
-        (failure) => failure.status === 409,
+        (failure) => failure.code === CREDIT_JOB_CONFLICT,
         () => gateway.job(request.jobId),
       ),
       Effect.mapError(failedOf),

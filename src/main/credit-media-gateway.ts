@@ -45,13 +45,22 @@ function causeStatus(cause: unknown): number {
   return typeof cause.status === "number" ? cause.status : 0;
 }
 
+function causeCode(cause: unknown): string {
+  if (typeof cause !== "object" || cause === null || !("code" in cause)) return "";
+  return typeof cause.code === "string" ? cause.code : "";
+}
+
 function causeMessage(cause: unknown): string {
   if (causeStatus(cause) > 0 && cause instanceof Error && cause.message) return cause.message;
   return sourceText("error.workflow.mediaFailed");
 }
 
 function toGatewayFailed(error: CentralAuthOperationError) {
-  return new CreditMediaGatewayFailed({ message: causeMessage(error.cause), status: causeStatus(error.cause) });
+  return new CreditMediaGatewayFailed({
+    message: causeMessage(error.cause),
+    status: causeStatus(error.cause),
+    code: causeCode(error.cause),
+  });
 }
 
 function jobPath(jobId: string) {
@@ -81,7 +90,12 @@ export function createCreditMediaGateway({
     return server ? [server, ...personal] : personal;
   };
   const payer = (): Payer | null => payers()[0] ?? null;
-  const noPayer = () => new CreditMediaGatewayFailed({ message: sourceText("error.auth.signInRequired"), status: 401 });
+  const noPayer = () =>
+    new CreditMediaGatewayFailed({
+      message: sourceText("error.auth.signInRequired"),
+      status: 401,
+      code: "unauthorized",
+    });
 
   const call = <T, R>(
     current: Payer | null,
