@@ -4,6 +4,7 @@ export const LEFT_PANEL_CLOSED_STORAGE_KEY = "openbot:left-panel-closed";
 export const SERVER_VIEW_STORAGE_KEY = "openbot:server-view";
 export const SIDEBAR_CHAT_ORDER_STORAGE_KEY = "openbot:sidebar-chat-order";
 export const RAIL_PINS_STORAGE_KEY = "openbot:rail-pins";
+export const RAIL_HIDDEN_USAGE_STORAGE_KEY = "openbot:rail-hidden-usage";
 export const LEFT_PANEL_DEFAULT = 280;
 export const LEFT_PANEL_MIN = 128;
 export const LEFT_PANEL_MAX = 400;
