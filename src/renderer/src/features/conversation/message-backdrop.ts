@@ -7,8 +7,8 @@ import { useText } from "@openbot/ui/text";
 import { createEffect } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { showNewAgentBackdrop } from "../../agent-backdrops";
-import { setChatBackdrop } from "../../chat-backdrop-preference";
-import { addCustomBackdrop, customBackdropKind } from "../../custom-backdrops";
+import { setChatBackdrop, useChatBackdrop } from "../../chat-backdrop-preference";
+import { addCustomBackdrop, customBackdropKind, removeCustomBackdrop } from "../../custom-backdrops";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { PENDING_SEND_ID_PREFIX } from "./stores/pending-send-store";
 
@@ -78,9 +78,19 @@ export function useMessageBackdropAction(runtime: ConversationRuntime) {
 
   const useAsBackdrop = async (source: BackdropSource) => {
     try {
-      const id = await addCustomBackdrop({ name: source.name, mimeType: source.mimeType, bytes: await source.bytes() });
-      setChatBackdrop(customBackdropChoice(id));
-      actionToast.success(t("chat.menu.backdropSet"));
+      const bytes = await source.bytes();
+      const previous = useChatBackdrop()();
+      const id = await addCustomBackdrop({ name: source.name, mimeType: source.mimeType, bytes });
+      const choice = customBackdropChoice(id);
+      setChatBackdrop(choice);
+      const undo = () => {
+        if (useChatBackdrop()() !== choice) return;
+        setChatBackdrop(previous);
+        void removeCustomBackdrop(id).catch(() => {});
+      };
+      actionToast.success(t("chat.menu.backdropSet"), {
+        action: { label: t("chat.backdrop.undo"), onClick: undo },
+      });
     } catch {
       actionToast.error(t("chat.menu.backdropFailed"));
     }
