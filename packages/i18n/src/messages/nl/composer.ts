@@ -8,6 +8,13 @@ export const messages = {
   "composer.feedbackFix.body":
     "Melding #{number} wordt gecorrigeerd. Verstuur het verzoek, of annuleer om de melding te laten zoals hij is.",
   "composer.feedbackFix.cancel": "Annuleren",
+  "composer.browserTab.opened": "{name} heeft {title} geopend in de browser.",
+  "composer.browserTab.openedMany": {
+    one: "{name} heeft {count} pagina geopend in de browser.",
+    other: "{name} heeft {count} pagina's geopend in de browser.",
+  },
+  "composer.browserTab.open": "Pagina openen",
+  "composer.browserTab.hide": "Verbergen",
   "composer.providerWait.offlineTitle": "Geen internetverbinding",
   "composer.providerWait.offline": "{provider} kan pas antwoorden als deze computer weer online is.",
   "composer.providerWait.silent": "{provider} heeft al {duration} geen update gestuurd.",

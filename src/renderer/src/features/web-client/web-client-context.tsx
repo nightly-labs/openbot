@@ -164,6 +164,7 @@ interface WebWorkspaceState {
   threadContextStates: Record<string, AgentContextState>;
   backgroundWork: Record<string, number>;
   browserTabs: BrowserTab[];
+  noticedBrowserTabIds: string[];
   activeBrowserTabId: string | null;
   browserControlState: BrowserControlState;
   presence: TeamPresenceSnapshot | null;
@@ -247,6 +248,7 @@ export function createWebWorkspace(
     threadContextStates: {},
     backgroundWork: {},
     browserTabs: [],
+    noticedBrowserTabIds: [],
     activeBrowserTabId: null,
     browserControlState: { sessions: [] },
     presence: null,
@@ -1522,6 +1524,7 @@ export function createWebWorkspace(
           if (!isCurrent()) return;
           setState((draft) => {
             draft.browserTabs = browserTabs;
+            draft.noticedBrowserTabIds = browserTabs.map((tab) => tab.id);
             draft.activeBrowserTabId = browserTabs.some((tab) => tab.id === draft.activeBrowserTabId)
               ? draft.activeBrowserTabId
               : (browserTabs[0]?.id ?? null);
@@ -2386,6 +2389,13 @@ export function createWebWorkspace(
       if (state.browserTabs.some((tab) => tab.id === tabId))
         setState((draft) => {
           draft.activeBrowserTabId = tabId;
+        });
+    },
+    noticeBrowserTabs(tabIds: readonly string[]) {
+      const added = tabIds.filter((tabId) => !state.noticedBrowserTabIds.includes(tabId));
+      if (added.length > 0)
+        setState((draft) => {
+          draft.noticedBrowserTabIds.push(...added);
         });
     },
     async openSearchMessage(messageId: string): Promise<boolean> {

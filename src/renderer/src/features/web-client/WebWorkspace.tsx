@@ -2241,6 +2241,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes("browser-control") &&
       workspace.state.capabilities.includes("browser-view"),
   );
+  const noticedBrowserTabIds = createMemo(() =>
+    browserEnabled() ? new Set(workspace.state.noticedBrowserTabIds) : undefined,
+  );
   const clearSelectedAgentContext = createMemo(() => {
     const agent = workspace.selected();
     if (!agent || !workspace.runtime.admin || !workspace.state.capabilities.includes(CONTEXT_RESET_CAPABILITY))
@@ -3925,6 +3928,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   queue={workspace.state.selectedId ? workspace.state.queues[workspace.state.selectedId] : undefined}
                   browserRuntime={workspace.runtime.browser}
                   browserTabs={workspace.state.browserTabs}
+                  noticedBrowserTabIds={noticedBrowserTabIds()}
+                  onNoticeBrowserTabs={workspace.noticeBrowserTabs}
                   activeBrowserTabId={workspace.state.activeBrowserTabId}
                   browserVisibilitySuspended={workspace.state.status !== "online" || pageCovered()}
                   workspaceCovered={pageCovered() || hostOffline()}

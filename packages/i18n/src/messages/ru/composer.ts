@@ -8,6 +8,15 @@ export const messages = {
   "composer.feedbackFix.body":
     "Исправление отчёта #{number}. Отправьте запрос или отмените, чтобы оставить отчёт как есть.",
   "composer.feedbackFix.cancel": "Отмена",
+  "composer.browserTab.opened": "{name}: страница {title} открыта в браузере.",
+  "composer.browserTab.openedMany": {
+    one: "{name}: в браузере открыта {count} страница.",
+    few: "{name}: в браузере открыты {count} страницы.",
+    many: "{name}: в браузере открыто {count} страниц.",
+    other: "{name}: в браузере открыто {count} страницы.",
+  },
+  "composer.browserTab.open": "Открыть страницу",
+  "composer.browserTab.hide": "Скрыть",
   "composer.providerWait.offlineTitle": "Нет подключения к интернету",
   "composer.providerWait.offline": "{provider} не сможет ответить, пока этот компьютер не подключится к сети.",
   "composer.providerWait.silent": "Время без обновлений от {provider}: {duration}.",

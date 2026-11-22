@@ -56,6 +56,7 @@ import { readableAgentError } from "../agents/agent-error-text";
 import { customProviderRestartMessage } from "../custom-providers/custom-provider-restart";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
+import { ConversationBrowserTabNotice } from "./ConversationBrowserTabNotice";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { createComposerResize } from "./composer-resize";
 import { useConversationController } from "./conversation-controller-context";
@@ -589,6 +590,7 @@ export function ConversationComposer() {
           <ComposerStackCard when={providerWaitNotice()}>
             {(notice) => <ComposerNotice title={notice().title} body={notice().body} />}
           </ComposerStackCard>
+          <ConversationBrowserTabNotice />
           <ComposerStackCard when={textOnlyCustomModel()}>
             {(shown) => (
               <ComposerNotice

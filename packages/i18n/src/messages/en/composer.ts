@@ -5,6 +5,13 @@ export const messages = defineMessages("composer", {
   "composer.queueEdit.cancel": "Cancel edit",
   "composer.feedbackFix.body": "Correcting report #{number}. Send the request, or cancel to keep the report as it is.",
   "composer.feedbackFix.cancel": "Cancel",
+  "composer.browserTab.opened": "{name} opened {title} in the browser.",
+  "composer.browserTab.openedMany": {
+    one: "{name} opened {count} page in the browser.",
+    other: "{name} opened {count} pages in the browser.",
+  },
+  "composer.browserTab.open": "Open page",
+  "composer.browserTab.hide": "Hide",
   "composer.providerWait.offlineTitle": "No internet connection",
   "composer.providerWait.offline": "{provider} cannot reply until this computer is online again.",
   "composer.providerWait.silent": "{provider} has sent no update for {duration}.",

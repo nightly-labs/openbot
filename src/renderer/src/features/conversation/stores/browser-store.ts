@@ -298,6 +298,31 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     deps.props.onSelectAgent(agentId, MAIN_THREAD_ID);
   }
 
+  const unseenBrowserTabs = createMemo(() => {
+    const agent = deps.props.agent;
+    const noticed = deps.props.noticedBrowserTabIds;
+    if (!agent || channel || !noticed || deps.props.browserVisibilitySuspended) return [];
+    return deps.props.browserTabs.filter(
+      (tab) => ownsBrowserTab(agent, tab) && !noticed.has(tab.id) && !closingBrowserTabIds.has(tab.id),
+    );
+  });
+  function noticeBrowserTabs() {
+    const tabIds = untrack(unseenBrowserTabs).map((tab) => tab.id);
+    if (tabIds.length > 0) deps.props.onNoticeBrowserTabs?.(tabIds);
+  }
+  createEffect(
+    () => (screenOpen() ? unseenBrowserTabs().length : 0),
+    (unseenShown) => {
+      if (unseenShown > 0) noticeBrowserTabs();
+    },
+  );
+  const browserTabNotice = createMemo(() => {
+    const tabs = unseenBrowserTabs();
+    const newest = tabs.at(-1);
+    if (!newest || screenOpen() || deps.props.browserTakeover) return undefined;
+    return { tab: newest, count: tabs.length };
+  });
+
   const canOpenBrowserTakeoverTab = () => {
     const tab = browserTakeoverTab();
     if (!tab) return false;
@@ -803,6 +828,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     openBrowserTakeoverTab,
     openWaitingAgent,
     canOpenBrowserTakeoverTab,
+    browserTabNotice,
+    noticeBrowserTabs,
     localSignIn: {
       state: localSignIn,
       canStart: canSignInLocally,

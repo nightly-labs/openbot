@@ -7,6 +7,10 @@ export const messages = {
   "composer.feedbackFix.body":
     "보고서 #{number}을(를) 수정하는 중입니다. 요청을 보내거나, 취소해서 보고서를 그대로 두세요.",
   "composer.feedbackFix.cancel": "취소",
+  "composer.browserTab.opened": "{name}이(가) 브라우저에서 {title} 페이지를 열었어요.",
+  "composer.browserTab.openedMany": { other: "{name}이(가) 브라우저에서 페이지 {count}개를 열었어요." },
+  "composer.browserTab.open": "페이지 열기",
+  "composer.browserTab.hide": "숨기기",
   "composer.providerWait.offlineTitle": "인터넷에 연결되어 있지 않아요",
   "composer.providerWait.offline": "이 컴퓨터가 다시 온라인이 될 때까지 {provider}이(가) 답할 수 없어요.",
   "composer.providerWait.silent": "{provider}에서 {duration} 동안 업데이트가 없어요.",
