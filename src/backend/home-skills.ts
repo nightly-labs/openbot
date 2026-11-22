@@ -63,18 +63,33 @@ export const userSkillFolderNames = Effect.fn("HomeSkills.userFolderNames")(func
   return names;
 });
 
+// The chat skill list reads every home skill on each agent turn. Keep each file's parsed frontmatter until
+// its modification time or size changes, so an unchanged skill costs one stat, not a read and a parse.
+const parsedHomeSkills = new Map<
+  string,
+  { mtimeMs: number; size: number; checked: ReturnType<typeof readSkillFrontmatter> }
+>();
+
 export const listHomeSkills = Effect.fn("HomeSkills.list")(function* () {
   const root = homeSkillRoot();
   const skills: HomeSkill[] = [];
+  const seen = new Set<string>();
   for (const slug of [...(yield* skillFolderNames(root))].slice(0, MAX_HOME_SKILLS)) {
     const directory = join(root, slug);
     const file = join(directory, "SKILL.md");
     const size = yield* optionalRead(() => stat(file));
     if (Option.isNone(size) || size.value.size > MAX_SKILL_FILE_BYTES) continue;
-    const text = yield* optionalRead(() => readFile(file, "utf8"));
-    if (Option.isNone(text)) continue;
-    const checked = readSkillFrontmatter(text.value, slug);
+    seen.add(file);
+    const cached = parsedHomeSkills.get(file);
+    let checked = cached?.mtimeMs === size.value.mtimeMs && cached.size === size.value.size ? cached.checked : null;
+    if (!checked) {
+      const text = yield* optionalRead(() => readFile(file, "utf8"));
+      if (Option.isNone(text)) continue;
+      checked = readSkillFrontmatter(text.value, slug);
+      parsedHomeSkills.set(file, { mtimeMs: size.value.mtimeMs, size: size.value.size, checked });
+    }
     if (checked.problem === undefined) skills.push({ slug, description: checked.description, directory, file });
   }
+  for (const file of parsedHomeSkills.keys()) if (!seen.has(file)) parsedHomeSkills.delete(file);
   return skills;
 });
