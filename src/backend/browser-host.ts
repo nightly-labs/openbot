@@ -83,7 +83,12 @@ import {
   toPublicTab,
 } from "./browser-host-tab";
 import { BrowserHintRequests, sessionBrowserUserAgent } from "./browser-identity";
-import { describeBrowserTarget, navigateAndWait, waitForLoading } from "./browser-navigation";
+import {
+  describeBrowserTarget,
+  isCommittedNavigationTimeout,
+  navigateAndWait,
+  waitForLoading,
+} from "./browser-navigation";
 import {
   browserLoadOptions,
   browserRequestHeaders,
@@ -1020,7 +1025,10 @@ export class BrowserHost {
           tab.contents,
           () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
           null,
-        ).pipe(Effect.ensuring(Effect.sync(() => (tab.opening = false))));
+        ).pipe(
+          Effect.catchIf(isCommittedNavigationTimeout, () => Effect.void),
+          Effect.ensuring(Effect.sync(() => (tab.opening = false))),
+        );
         if (focus) {
           this.#focusTab(tab);
           setImmediate(() => this.#focusTab(tab));
