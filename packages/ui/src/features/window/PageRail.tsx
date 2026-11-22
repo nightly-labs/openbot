@@ -163,7 +163,7 @@ function UsageRings(props: {
   const rows = () => [props.row, ...props.shared];
   const label = () =>
     unavailable()
-      ? t("app.rail.usageUnavailable", { name: props.row.name })
+      ? t("app.rail.usageUnavailable", { name: format.list(rows().map((row) => row.name)) })
       : t("app.rail.usageRings", {
           name: format.list(rows().map((row) => row.name)),
           windows: rows()

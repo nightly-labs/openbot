@@ -379,6 +379,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   readonly #usageUnreported = new Set<AgentProvider>();
   readonly #usageReadFailed = new Set<AgentProvider>();
+  readonly #usageForgets = new Map<AgentProvider, number>();
   readonly #usageGates = new Map<AgentProvider, UsageReadGate>();
   readonly #releasedUsage = new Map<string, { gate: UsageReadGate; usage: AccountUsage }>();
   readonly #customAgentUsage = new Map<string, { prompt: string; text: string | null; readAt: number }>();
@@ -1069,6 +1070,7 @@ export class ProviderRuntime implements ProviderPort {
         });
       const readDefault = (provider: AgentProvider) =>
         Effect.gen({ self: this }, function* () {
+          const forgets = this.#usageForgets.get(provider) ?? 0;
           const limit = yield* this.#usageGate(provider)
             .run({
               read: readOwn(provider),
@@ -1083,7 +1085,7 @@ export class ProviderRuntime implements ProviderPort {
                 Effect.fail(error).pipe(
                   this.#logUsageFailure(provider),
                   Effect.map(() => {
-                    if (!usageReadRefused(error)) this.#usageReadFailed.add(provider);
+                    this.#noteUsageReadFailure(provider, error, forgets);
                     return keptReading(provider);
                   }),
                 ),
@@ -1364,10 +1366,17 @@ export class ProviderRuntime implements ProviderPort {
     this.#lastUsage.set(provider, { ...limit, id: provider });
   }
 
+  #noteUsageReadFailure(provider: AgentProvider, error: { readonly cause: unknown }, forgets: number): void {
+    if ((this.#usageForgets.get(provider) ?? 0) !== forgets) return;
+    if (usageReadRefused(error)) this.#usageReadFailed.delete(provider);
+    else this.#usageReadFailed.add(provider);
+  }
+
   #forgetUsage(provider: AgentProvider): void {
     this.#usageGate(provider).reset();
     this.#lastUsage.delete(provider);
     this.#usageReadFailed.delete(provider);
+    this.#usageForgets.set(provider, (this.#usageForgets.get(provider) ?? 0) + 1);
     this.#ownResetCredits.delete(provider);
     for (const key of [...this.#releasedUsage.keys()])
       if (key.startsWith(releasedUsageKey(provider, ""))) this.#releasedUsage.delete(key);
@@ -2898,11 +2907,15 @@ export class ProviderRuntime implements ProviderPort {
       ...(pushed.creditsAvailable === undefined ? {} : { creditsAvailable: pushed.creditsAvailable }),
     };
     this.#usageUnreported.delete(provider);
+    this.#usageReadFailed.delete(provider);
     this.#lastUsage.set(provider, limit);
     this.#noteCredits(source, limit);
-    const limits = [...this.#lastUsage]
-      .filter(([item]) => !this.#usageUnreported.has(item) && (this.#clients.has(item) || this.#released.has(item)))
-      .map(([, item]) => item);
+    const shown = (item: AgentProvider) =>
+      !this.#usageUnreported.has(item) && (this.#clients.has(item) || this.#released.has(item));
+    const limits = [
+      ...[...this.#lastUsage].filter(([item]) => shown(item)).map(([, item]) => item),
+      ...[...this.#usageReadFailed].filter((item) => !this.#lastUsage.has(item) && shown(item)).map(readFailedLimit),
+    ];
     this.#emit({ type: "usage-changed", usage: structuredClone({ limits }) });
   }
 
@@ -4521,7 +4534,8 @@ function readFailedLimit(provider: AgentProvider): AccountUsageLimit {
 
 function usageReadRefused(error: { readonly cause: unknown }): boolean {
   return (
-    (error.cause instanceof RequestError && error.cause.code === -32000) || classifyUserError(error.cause) === "auth"
+    (error.cause instanceof RequestError && error.cause.code === -32000) ||
+    ["auth", "permission"].includes(classifyUserError(error.cause))
   );
 }
 
