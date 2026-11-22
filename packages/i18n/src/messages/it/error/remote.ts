@@ -31,6 +31,8 @@ export const messages = {
     "La connessione all'host è troppo lenta per l'immagine. Riprova: la prossima connessione userà una qualità più bassa.",
   "error.remote.streamTooSlow":
     "La connessione all'host è troppo lenta per l'immagine. Usa una rete più veloce, poi riprova.",
+  "error.remote.noPictureSwitchEncoder":
+    "L'host non ha inviato alcuna immagine. Riprova: la prossima connessione usa un'impostazione video che funziona su più computer.",
   "error.remote.teamSessionExpired": "La sessione del team è scaduta.",
   "error.remote.finishTestBeforeSwitch": "Termina il test del desktop remoto prima di cambiare schermo.",
   "error.remote.displayNotFound": "Schermo remoto non trovato.",
