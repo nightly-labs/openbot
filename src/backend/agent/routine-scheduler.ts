@@ -113,8 +113,7 @@ const DELIVERY_TIMEZONE_LIMIT = 10_000;
 const SKIPPED_WHILE_CLOSED = "Skipped: OpenBot was closed at the scheduled time.";
 const QUEUED_RUN_REASONS: Record<string, string> = {
   "active-turn": "Waiting: another turn still runs in the same chat. This run starts when that turn ends.",
-  "provider-start":
-    "Waiting: the provider did not start a new chat in time. OpenBot tries again after 5, 15 and 30 minutes, then marks the run failed.",
+  "provider-start": "Waiting: the provider did not start a new chat in time. OpenBot tries again later.",
   "usage-limit": "Waiting: the provider usage limit is reached. This run starts when the limit resets.",
   "sign-in": "Waiting: the provider needs sign-in on the computer that runs OpenBot. This run starts after sign-in.",
 };
