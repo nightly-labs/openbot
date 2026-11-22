@@ -42,6 +42,12 @@ has no plan change (`subscription_update` is off); it cancels plans and updates 
 `POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
 `{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
 [Hosted servers](../../docs/hosted-servers.md#storage-tiers).
+The bootstrap also creates the `openbot_credits` Product and one Price for each credit amount
+(`openbot_credits_<n>`). `GET /v1/me/credits` returns the balance of the account and of its servers,
+`POST /v1/me/credits/checkout` with `{credits, currency, serverId?}` opens a Checkout, and
+`POST /v1/me/credits/transfer` with `{serverId, direction, credits}` moves credits between the account
+and a server that it owns. The web client uses the same routes under `/api/browser`.
+`bun run test:credits` checks them.
 
 The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
 `PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
@@ -71,7 +77,9 @@ failed renewal, cancel at the period end, plan change, renew, delete, another ac
 deleted customer, a refund, a dispute, the welcome email of a first plan, and the storage tiers
 (`storage-tier`, which needs the storage Prices of the bootstrap). The `license-*`
 scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
-renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
+renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. The `credits`
+scenario buys the smallest credit pack and checks the invoice: Polish VAT for PL and DE, the OSS amount for DE, and no VAT
+for US. Each scenario uses a Stripe
 test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
 `bun scripts/stripe-flows-e2e.ts --print-user-ids`, `HOSTED_SERVER_TEMPLATE=e2e-template`, and

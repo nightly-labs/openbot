@@ -44,7 +44,7 @@ import {
   type PlanUpdateStep,
   startClaudePlanTurn,
 } from "./agent/plan-updates";
-import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic, isSpentBalanceDiagnostic } from "./agent/provider-diagnostics";
 import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   endSubagentTurn,
@@ -129,6 +129,7 @@ import {
   CLAUDE_API_KEY_ACCOUNT_TYPE,
   CLAUDE_CLI_API_KEY_ACCOUNT_TYPE,
   getArray,
+  getRecord,
   getString,
   isRecord,
   type RequestId,
@@ -286,6 +287,7 @@ const OPENBOT_CLAUDE_CLIENT = {
   CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0",
   CLAUDE_CODE_ARTIFACT: "0",
   CLAUDE_CODE_ENTRYPOINT: "openbot",
+  CLAUDE_CODE_SILENT_TURN_REMINDER: "0",
 };
 const CLAUDE_TERMINAL_CHANNEL_TOOLS: readonly string[] = [
   "mcp__openbot__channel_result",
@@ -429,6 +431,10 @@ const CLAUDE_IDLE_THREAD_LIMIT = 1;
 const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
 
 const CLAUDE_STOP_CONFIRM_MS = 10_000;
+
+const CLAUDE_COMPACT_COMMAND = "/compact";
+
+const CLAUDE_CACHE_TTL_MS = { short: 5 * 60_000, long: 60 * 60_000 } as const;
 
 const CLAUDE_TURN_STALL_MS = 15 * 60_000;
 
@@ -585,6 +591,8 @@ const CLAUDE_LISTED_MODELS = new Set<string>();
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
+  readonly compactsOnDemand = true;
+  readonly #cacheTtls = new Map<string, number>();
   readonly turnContext = true;
   readonly userInputNote = true;
   readonly imageInput = (): boolean => true;
@@ -811,7 +819,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.awaitsResultTurn = false;
       this.#emitBackgroundWork(runtime, true);
     }
-    if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
+    if (runtime.consume) yield* Fiber.await(runtime.consume);
     if (turn && runtime.activeTurn === turn) {
       for (const [toolCallId, { name }] of turn.toolCalls) this.#emitToolCall(runtime, toolCallId, name, true);
       turn.toolCalls.clear();
@@ -991,12 +999,21 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         );
         return yield* providerSync(() => decoder(stopped ? {} : notRunning));
       }
-      case "thread/compact/start":
+      case "thread/compact/start": {
+        const threadId = yield* providerSync(() => requiredString(params, "threadId"));
+        yield* this.#threads
+          .startTurn(threadId, () => this.#openCompaction(threadId))
+          .pipe(toProviderClientOperationError);
         return yield* providerSync(() => decoder({}));
+      }
       default:
         return yield* providerFailure(new Error(`Claude adapter does not implement ${method}.`));
     }
   });
+
+  promptCacheTtlMs(externalThreadId: string): number | null {
+    return this.#cacheTtls.get(externalThreadId) ?? null;
+  }
 
   notify(): void {}
 
@@ -1349,7 +1366,18 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const stateDirectory = this.#stateDirectory;
     const userSetup = !config.profileGeneration && this.#userSetup();
     const skillPlugin =
-      config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
+      config.workspaceOnly && stateDirectory
+        ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd).pipe(
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                queryLogger.warn("Claude starts without the skills in the workspace .claude/skills.", {
+                  error: error.cause,
+                });
+                return null;
+              }),
+            ),
+          )
+        : null;
     const configDirectory = this.#configDirectory();
     yield* clearClaudeNeedsAuthMarks(
       configDirectory,
@@ -1629,6 +1657,28 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return { turn: { id: turnId, status: "inProgress" } };
   });
 
+  readonly #openCompaction = Effect.fn("ClaudeAgentClient.openCompaction")(function* (
+    this: ClaudeAgentClient,
+    threadId: string,
+  ): Effect.fn.Return<TurnResponse, ProviderClientOperationError> {
+    yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
+    const runtime = yield* providerSync(() => this.#requireThread(threadId));
+    if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
+    runtime.contextRequest += 1;
+    const turnId = randomUUID();
+    const turn = this.#beginTurn(runtime, turnId, false);
+    takePrompt(runtime, turnId);
+    turn.messageIds.add(turnId);
+    runtime.input.push({
+      type: "user",
+      message: { role: "user", content: CLAUDE_COMPACT_COMMAND },
+      parent_tool_use_id: null,
+      uuid: turnId,
+      session_id: threadId,
+    });
+    return { turn: { id: turnId, status: "inProgress" } };
+  });
+
   #turnActiveError(turn: ActiveTurn): Error {
     return turn.unprompted
       ? new ProviderTurnActiveError("Claude")
@@ -1714,7 +1764,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #holdSubagentLimit(runtime: ThreadRuntime, message: ClaudeStreamMessage): void {
     const text = messageText(message.message);
     const refusal = claudeUsageLimitRefusal(message);
-    if (isBalanceDiagnostic(text) || (!refusal && !isPlanLimitDiagnostic(text))) return;
+    if (isSpentBalanceDiagnostic(text) || (!refusal && !isPlanLimitDiagnostic(text))) return;
     if (runtime.activeTurn && !runtime.activeTurn.unprompted) return;
     runtime.subagentLimit = {
       resetsAt: refusal?.resetsAt ?? null,
@@ -1878,6 +1928,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const model = getString(message.message, "model");
       if (runtime.resumedUsage && id && model && isRecord(message.message))
         runtime.requestUsage.set(id, { model, usage: message.message.usage });
+      const cacheTtl = message.parent_tool_use_id ? null : claudeCacheWriteTtlMs(message.message);
+      if (cacheTtl !== null) this.#cacheTtls.set(runtime.id, cacheTtl);
     }
     if (message.type === "system" && message.subtype === "init") yield* this.#reportFailedMcpServers(runtime, message);
     if (message.type === "system" && message.subtype === "status") {
@@ -2045,7 +2097,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const text = messageText(message.message);
       if (message.error === "rate_limit") {
         const refusal = claudeUsageLimitRefusal(message);
-        if (isBalanceDiagnostic(text)) {
+        if (isSpentBalanceDiagnostic(text)) {
           turn.usageLimit = null;
           turn.balanceSpent = true;
         } else if (turn.usageLimit || refusal || isPlanLimitDiagnostic(text)) {
@@ -2239,7 +2291,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         limit &&
         !interrupted &&
         (limit.text !== null || limitError) &&
-        !isBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
+        !isSpentBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
       ) {
         this.emit("notification", {
           method: USAGE_LIMIT_METHOD,
@@ -3384,6 +3436,17 @@ function normalizeClaudeEffort(effort: string): ClaudeEffort {
 function promptUuid(runtime: ThreadRuntime, requested: string | null | undefined): UUID {
   const run = requested && isUuid(requested) ? untakenRunId(requested, runtime.promptIds) : null;
   return run && isUuid(run) ? run : randomUUID();
+}
+
+function claudeCacheWriteTtlMs(message: unknown): number | null {
+  const written = getRecord(getRecord(message, "usage"), "cache_creation");
+  const tokens = (key: string) => {
+    const value = written?.[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  };
+  if (tokens("ephemeral_5m_input_tokens") > 0) return CLAUDE_CACHE_TTL_MS.short;
+  if (tokens("ephemeral_1h_input_tokens") > 0) return CLAUDE_CACHE_TTL_MS.long;
+  return null;
 }
 
 function takePrompt(runtime: ThreadRuntime, uuid: string): void {

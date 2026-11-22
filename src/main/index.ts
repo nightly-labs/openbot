@@ -89,6 +89,7 @@ import { channelFolderIpcHandlers } from "./ipc/channel-folder-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { creditsIpcHandlers } from "./ipc/credits-handlers";
 import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
@@ -749,6 +750,7 @@ function registerIpcHandlers({
   serverPersonality,
   promptCacheTtl,
   claudeUserSetup,
+  cacheExpiryCompaction,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -777,6 +779,7 @@ function registerIpcHandlers({
   billing,
   referral,
   license,
+  credits,
   hostedServers,
   localServers,
   routineFeed,
@@ -792,6 +795,7 @@ function registerIpcHandlers({
   hermesImport,
   instanceTransfer,
   voice,
+  hostVoiceModel,
   speech,
   voiceServer,
   dynamicIsland,
@@ -918,6 +922,7 @@ function registerIpcHandlers({
     ...billingIpcHandlers({ billing }),
     ...referralIpcHandlers({ referral }),
     ...licenseIpcHandlers({ license }),
+    ...creditsIpcHandlers({ credits }),
     ...routineFeedIpcHandlers({ routineFeed }),
     ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
@@ -1007,6 +1012,7 @@ function registerIpcHandlers({
       host,
       remoteServers,
       serverTimezone,
+      voiceModel: hostVoiceModel,
       hostTurnLimits,
       serverPersonality,
       agentMemoryLimit,
@@ -1016,6 +1022,7 @@ function registerIpcHandlers({
       machineAlerts,
       promptCacheTtl,
       claudeUserSetup,
+      cacheExpiryCompaction,
       claudeCompactWindow,
       providerEnvironment,
       modelVisibility,

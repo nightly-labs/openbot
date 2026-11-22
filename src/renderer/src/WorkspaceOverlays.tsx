@@ -910,6 +910,7 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostVoiceModel={{}}
           hostTurnLimits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
@@ -1079,6 +1080,9 @@ function AppSettings(props: AccountProps) {
         billingApi={appPort().billing}
         referralApi={appPort().referral}
         licenseApi={appPort().license}
+        creditsApi={appPort().credits}
+        onCreditsChange={windowPage.adoptCredits}
+        onBuyCredits={(serverId) => windowPage.openCredits(serverId)}
         onContactUs={() => void appPort().openExternal("hosted-server-contact")}
         hostedServersApi={appPort().hostedServers}
         onAddHostedServer={() => {

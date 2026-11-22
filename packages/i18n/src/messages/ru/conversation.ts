@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Открыть в чате",
   "conversation.threads.archive": "Архивировать",
   "conversation.threads.archived": "В архиве",
+  "conversation.threads.archivedOlder": "Показать прежние ветки",
   "conversation.threads.restore": "Восстановить",
   "conversation.threads.deleteUndo.title": "Удалено: {title}",
   "conversation.threads.hold.threadLimit": {

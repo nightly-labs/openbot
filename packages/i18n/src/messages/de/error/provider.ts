@@ -147,6 +147,7 @@ export const messages = {
     "Der Anbieterschlüssel enthält ein Leerzeichen oder ein Zeichen, das in einem Schlüssel nicht vorkommen kann.",
   "error.provider.noModel": "Der gewählte Anbieter hat kein verfügbares Modell.",
   "error.provider.noModelNamed": "{provider} hat kein verfügbares Modell.",
+  "error.provider.acpModelsNotLoaded": "{provider} konnte seine Modelle nicht laden. Sende deine Nachricht erneut.",
   "error.provider.acpNoModels": "Die ACP CLI hat keine ACP-Modelle gemeldet. OpenBot wird kein Ersatzmodell erraten.",
   "error.provider.endpointRemoveBusy":
     "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du diesen Endpunkt entfernst.",
@@ -561,6 +562,8 @@ export const messages = {
   "error.provider.sessionSettingInvalid": "Dieser Wert ist für die Einstellung nicht verfügbar.",
   "error.provider.sessionSettingsBusy":
     "Warte, bis der aktuelle Durchlauf endet, bevor du eine Sitzungseinstellung änderst.",
+  "error.provider.sessionSettingsTimedOut":
+    "Die Sitzung des Agenten hat nicht rechtzeitig geantwortet. Versuche es erneut.",
   "error.provider.piOutdated":
     "Pi {version} ist zu alt. Installiere Pi 1.1.0 oder neuer für native RPC- und MCP-Unterstützung.",
   "error.provider.nativeMissing": "Die {provider} CLI ist nicht installiert. Lade sie in den Einstellungen herunter.",

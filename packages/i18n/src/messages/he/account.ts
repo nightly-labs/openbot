@@ -20,6 +20,7 @@ export const messages = {
   "account.usage.notReported": "לא דווחה מגבלה",
   "account.usage.value.notReported": "לא דווח",
   "account.usage.providerNotReported": "אין נתוני שימוש",
+  "account.usage.readFailed": "לא ניתן לקרוא את השימוש",
   "account.usage.row.unavailable": "{name}, לא זמין",
   "account.usage.row.notReported": "{name}, השימוש לא דווח",
   "account.usage.row.loading": "{name}, טוען",

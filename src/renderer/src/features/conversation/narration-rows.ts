@@ -28,6 +28,21 @@ export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef
   return rows;
 }
 
+export function naturalThreadRows(
+  messages: readonly AgentMessage[],
+  provider: AgentProviderRef | undefined,
+  held: (message: AgentMessage) => boolean,
+): AgentMessage[] {
+  const turns: AgentMessage[][] = [];
+  const listed = messages.flatMap((message) => {
+    if (message.kind !== "thinking") return [message];
+    const rows = [...narrationRows(message, provider), message];
+    turns.push(rows);
+    return rows;
+  });
+  return placeUpdatesAfterSteers(listed, turns).filter((message) => !held(message));
+}
+
 export function placeTurnRowsByTime(rows: readonly AgentMessage[], turns: readonly AgentMessage[][]): AgentMessage[] {
   const timed = turns.flatMap((turn) => {
     let at = "";

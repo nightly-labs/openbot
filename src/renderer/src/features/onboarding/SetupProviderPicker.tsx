@@ -13,6 +13,7 @@ import {
   isLocalOnlyProvider,
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
+  savedCustomModelId,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -280,7 +281,7 @@ export function createSetupProviders(
   function firstSavedCustomModel(): AgentModelId | null {
     for (const provider of props.customProviders ?? []) {
       const [model] = provider.models;
-      if (model) return `${provider.id}/${model.id}`;
+      if (model) return savedCustomModelId(provider.id, provider.harness, model.id);
     }
     return null;
   }
@@ -288,7 +289,7 @@ export function createSetupProviders(
   function selectSavedEndpoint(value: SaveCustomProviderInput): void {
     selectCustomProvider(value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
     const [firstModel] = value.models;
-    if (firstModel) setCustomModel(`${value.id}/${firstModel.id}`);
+    if (firstModel) setCustomModel(savedCustomModelId(value.id, value.harness, firstModel.id));
   }
 
   const detectedApi = createMemo((): DetectedProviderApi | undefined => {

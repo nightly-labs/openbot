@@ -334,10 +334,14 @@ export const messages = {
   "provider.settings.diagnostics": "אבחון",
   "provider.settings.cache": "מטמון",
   "provider.settings.promptCache": "מטמון הנחיות",
-  "provider.settings.promptCacheDescription": "כמה זמן Claude שומר במטמון את ההקשר של סוכן בין תורות.",
+  "provider.settings.promptCacheDescription": "כמה זמן Claude ו-Pi שומרים את ההקשר של סוכן במטמון בין תורות.",
   "provider.settings.promptCacheHour": "שעה",
-  "provider.settings.promptCacheDefault": "ברירת המחדל של Claude Code",
+  "provider.settings.promptCacheDefault": "ברירת המחדל של הספק",
   "provider.settings.promptCacheLoadFailed": "לא ניתן לטעון את זמן מטמון ההנחיות של השרת הזה.",
+  "provider.settings.cacheExpiryCompaction": "לכווץ לפני שהמטמון פג",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "כשצ׳אט עם הקשר של 200K טוקנים או יותר לא פעיל עם מטמון של שעה, הסוכן מכווץ את ההקשר לפני שהמטמון פג. כך ההודעה הבאה לא קוראת שוב את כל ההקשר בלי מטמון.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "לא ניתן לטעון את הגדרת הכיווץ של השרת הזה.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "שימוש בהגדרות Claude Code שלי",
   "provider.settings.claudeUserSetupDescription":

@@ -107,7 +107,35 @@ export function redactSecrets(value: string): string {
 }
 
 export function redactPostText(value: string): string {
-  return redact(value, false);
+  return maskWholeRegisteredSecrets(applyKeyFormatRules(value));
+}
+
+const POST_TOKEN_CHARACTER = /[\p{L}\p{N}._~+@%-]/u;
+const POST_TOKEN_TAIL = /^[\p{L}\p{N}._~+@-]*/u;
+const PERCENT_ESCAPE_BEFORE = /%[0-9A-Fa-f]{2}$/u;
+const SENTENCE_DOTS = /^\.*$/u;
+
+function maskWholeRegisteredSecrets(value: string): string {
+  const pattern = registeredSecretPattern;
+  if (!pattern) return value;
+  return value.replace(pattern, (secret: string, offset: number) =>
+    isWholeToken(value, offset, offset + secret.length) ? "[redacted]" : secret,
+  );
+}
+
+function endsWithPercentEscape(value: string, end: number): boolean {
+  return PERCENT_ESCAPE_BEFORE.test(value.slice(Math.max(0, end - 3), end));
+}
+
+function isLinkUser(value: string, start: number, end: number): boolean {
+  return value.charAt(end) === "@" && value.slice(Math.max(0, start - 3), start) === "://";
+}
+
+function isWholeToken(value: string, start: number, end: number): boolean {
+  if (isLinkUser(value, start, end)) return true;
+  if (start > 0 && POST_TOKEN_CHARACTER.test(value.charAt(start - 1)) && !endsWithPercentEscape(value, start))
+    return false;
+  return SENTENCE_DOTS.test(POST_TOKEN_TAIL.exec(value.slice(end))?.[0] ?? "");
 }
 
 function redact(value: string, emails: boolean, keepUnscanned = false): string {
@@ -162,19 +190,32 @@ function urlHosts(value: string): Uint8Array {
   return flags;
 }
 
-function applyTextRules(value: string, emails: boolean): string {
-  const redacted = value
+function applyKeyFormatRules(value: string): string {
+  return redactKeyFormatsAfterLabels(redactKeyFormatsBeforeLabels(value));
+}
+
+function redactKeyFormatsBeforeLabels(value: string): string {
+  return value
     .replace(PEM_PRIVATE_KEY, "[redacted]")
     .replace(COOKIE_HEADER, "$1[redacted]")
     .replace(AUTH_HEADER_SECRET, "$1[redacted]")
-    .replace(BEARER_SECRET, "[redacted]")
-    .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
-    .replace(JSON_BARE_KEY, redactAssignedValue)
-    .replace(QUERY_SECRET, "$1[redacted]")
+    .replace(BEARER_SECRET, "[redacted]");
+}
+
+function redactKeyFormatsAfterLabels(value: string): string {
+  return value
     .replace(URL_PASSWORD, "$1[redacted]")
     .replace(WEBHOOK_URL_SECRET, "$1[redacted]")
     .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
     .replace(JSON_WEB_TOKEN, "[redacted]");
+}
+
+function applyTextRules(value: string, emails: boolean): string {
+  const labeled = redactKeyFormatsBeforeLabels(value)
+    .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
+    .replace(JSON_BARE_KEY, redactAssignedValue)
+    .replace(QUERY_SECRET, "$1[redacted]");
+  const redacted = redactKeyFormatsAfterLabels(labeled);
   return emails ? redacted.replace(EMAIL, "[redacted-email]") : redacted;
 }
 

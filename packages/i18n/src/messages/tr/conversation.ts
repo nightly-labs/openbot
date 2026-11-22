@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Sohbette aç",
   "conversation.threads.archive": "Arşivle",
   "conversation.threads.archived": "Arşivlenenler",
+  "conversation.threads.archivedOlder": "Eski dizileri göster",
   "conversation.threads.restore": "Geri yükle",
   "conversation.threads.deleteUndo.title": "{title} silindi",
   "conversation.threads.hold.threadLimit": {

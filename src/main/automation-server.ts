@@ -24,7 +24,7 @@ import { createOpenBotLogger, type LogValue, registerSecretValue, toLogValue } f
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
-import { InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
+import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
 import { type ModelRequest, requestedRuntime } from "../backend/agent/model-tools";
 import type { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
@@ -215,6 +215,7 @@ export class AutomationServer {
     } catch (error) {
       if (error instanceof HttpError) return send(response, error.status, { error: error.message });
       if (error instanceof InactiveAttentionRequest) return send(response, 409, { error: error.message });
+      if (error instanceof ForbiddenAttentionAnswer) return send(response, 403, { error: error.message });
       if (error instanceof AgentSettingsRefused) return send(response, 409, { error: error.message });
       if (error instanceof ContextResetBusyError) return send(response, 409, { error: error.message });
       logger.warn("An automation request failed.", error);

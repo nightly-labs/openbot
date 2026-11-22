@@ -147,6 +147,8 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "プロバイダーキーに、キーに使えない空白または文字が含まれています。",
   "error.provider.noModel": "選択したプロバイダーに使用できるモデルがありません。",
   "error.provider.noModelNamed": "{provider} に使用できるモデルがありません。",
+  "error.provider.acpModelsNotLoaded":
+    "{provider} がモデルを読み込めませんでした。メッセージをもう一度送信してください。",
   "error.provider.acpNoModels": "ACP CLI が ACP モデルを通知しませんでした。OpenBot は代替モデルを推測しません。",
   "error.provider.endpointRemoveBusy":
     "このエンドポイントを削除する前に、実行中のターンとキューが終わるまでお待ちください。",
@@ -558,6 +560,8 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "この設定は現在のプロバイダーセッションでは利用できません。",
   "error.provider.sessionSettingInvalid": "この値はこの設定では利用できません。",
   "error.provider.sessionSettingsBusy": "セッションの設定を変更する前に、現在のターンが終わるまでお待ちください。",
+  "error.provider.sessionSettingsTimedOut":
+    "エージェントのセッションが時間内に応答しませんでした。もう一度お試しください。",
   "error.provider.piOutdated":
     "Pi {version} は古すぎます。ネイティブ RPC と MCP に対応するには、Pi 1.1.0 以降をインストールしてください。",
   "error.provider.nativeMissing": "{provider} CLI がインストールされていません。設定でダウンロードしてください。",

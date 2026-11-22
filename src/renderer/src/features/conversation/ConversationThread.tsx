@@ -28,10 +28,11 @@ import type { ConversationThreads } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
-import { narrationRows } from "./narration-rows";
+import { narrationRows, naturalThreadRows } from "./narration-rows";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { withQuestionContext } from "./stores/scroll-store";
 import { createTurnSteps } from "./turn-steps";
+import { createTurnStreamHold } from "./turn-stream-hold";
 import { useTurnTrace } from "./turn-trace";
 
 export function ConversationThread() {
@@ -101,9 +102,13 @@ export function ConversationThread() {
     [],
     { key: "id" },
   );
+  const streamHeld = createTurnStreamHold(() => props.threads?.open?.activeTurnId);
   const shownMessages = createMemo(() =>
-    withQuestionContext(messages, messages, props.prompt?.turnId, (thinking) =>
-      narrationRows(thinking, props.agent?.provider),
+    withQuestionContext(
+      props.responseStyle === "natural" ? naturalThreadRows(messages, props.agent?.provider, streamHeld) : messages,
+      messages,
+      props.prompt?.turnId,
+      (thinking) => narrationRows(thinking, props.agent?.provider),
     ),
   );
   const turnSteps = createTurnSteps({
@@ -338,6 +343,7 @@ export function ConversationThread() {
             copiedMessageId={copiedMessageId()}
             compactMessageActions={compactMessageActions()}
             bubbleStyle={bubbleStyle()}
+            responseStyle={props.responseStyle}
             onBranch={branch(current().threads)}
             onDeleteMessage={deleteMessage(current().threads)}
             messagePins={threadPins(current().threads.open?.id)}

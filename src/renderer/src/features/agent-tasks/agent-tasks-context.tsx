@@ -1,3 +1,4 @@
+import { AGENT_ARCHIVED_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import { AGENT_THREAD_PAGES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
@@ -31,6 +32,7 @@ const AgentTasks = createSimpleContext({
       messageDeletable: () => local() || activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY),
       pageable: () => local() || activeServerSupportsCapability(AGENT_THREAD_PAGES_CAPABILITY),
       aroundReadable: () => local() || activeServerSupportsCapability(MESSAGE_PINS_CAPABILITY),
+      archivedPageable: () => local() || activeServerSupportsCapability(AGENT_ARCHIVED_THREADS_CAPABILITY),
       reloadKey: () => {
         const server = activeServer();
         return `${server?.id ?? ""}:${server?.state ?? ""}:${agentStatus().phase}`;

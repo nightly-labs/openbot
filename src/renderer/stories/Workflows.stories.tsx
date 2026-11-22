@@ -430,6 +430,65 @@ export const ImageBatchFailedTake: Story = {
   ),
 };
 
+const CREDITS_IMAGE_MODEL: WorkflowCatalogs["imageModels"][number] = {
+  id: "openbot-story-image",
+  provider: "openbot",
+  name: "Story Image",
+  maker: "Northwind Labs",
+  credits: true,
+  kinds: ["image"],
+  voices: false,
+  subscription: "OpenBot",
+  aspects: ["1:1", "16:9"],
+};
+
+const TOO_FEW_CREDITS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: [CREDITS_IMAGE_MODEL, ...STORY_CATALOGS.imageModels],
+  creditBalance: 4,
+};
+
+const ENOUGH_CREDITS: WorkflowCatalogs = { ...TOO_FEW_CREDITS, creditBalance: 1250 };
+
+export const ImagePaidWithCredits: Story = {
+  name: "Image, paid with credits",
+  render: () => (
+    <NodeGallery
+      selected="batch"
+      catalogs={ENOUGH_CREDITS}
+      fields={{ single: { model: CREDITS_IMAGE_MODEL.id }, batch: { model: CREDITS_IMAGE_MODEL.id, batch: 4 } }}
+      results={{
+        batch: [
+          { id: "paid-result-1", at: todayAt(9, 0), value: STORY_IMAGES[0]?.name ?? "" },
+          { id: "paid-result-failed", at: todayAt(9, 4), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+    >
+      <ImageNode id="single" prompt="Hero image for the Atlas comparison page, one product window" />
+      <ImageNode id="batch" prompt="Four cover options for the Atlas launch post" />
+    </NodeGallery>
+  ),
+};
+
+export const ImageBatchTooFewCredits: Story = {
+  name: "Image, batch with too few credits",
+  render: () => (
+    <NodeGallery
+      selected="filled"
+      catalogs={TOO_FEW_CREDITS}
+      fields={{ filled: { model: CREDITS_IMAGE_MODEL.id, batch: 4 } }}
+      results={{
+        filled: [
+          { id: "credits-result-1", at: todayAt(9, 0), value: STORY_IMAGES[0]?.name ?? "" },
+          { id: "credits-result-failed", at: todayAt(9, 4), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+    >
+      <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
 const BRIEF = "Atlas launched on 22 Oct at €12 a seat, with a Slack connector";
 const REFERENCE = "story-reference-picture";
 const LONG_BRIEF = [
