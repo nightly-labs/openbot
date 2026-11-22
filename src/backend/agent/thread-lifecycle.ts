@@ -20,7 +20,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Cause, Deferred, Effect, Result, Schema, Semaphore } from "effect";
+import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
 import { type AgentClient, type AgentProvider, ProviderStoppedError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -1549,12 +1549,11 @@ export class ThreadLifecycle {
   ) {
     this.#givenTurnContext.delete(externalThreadId);
     if (!client?.releaseThread) return;
-    yield* client.releaseThread(externalThreadId, resumes).pipe(
-      Effect.catch((failure) => Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause))),
-      Effect.catchCauseIf(Cause.hasInterruptsOnly, (cause) =>
-        Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, Cause.squash(cause))),
-      ),
-    );
+    yield* client
+      .releaseThread(externalThreadId, resumes)
+      .pipe(
+        Effect.catch((failure) => Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause))),
+      );
   }, Effect.uninterruptible);
 
   readonly capturedWorkSteps = Effect.fn("ThreadLifecycle.capturedWorkSteps")(function* (
