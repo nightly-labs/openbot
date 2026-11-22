@@ -10,7 +10,7 @@ import { currentText } from "@/shared/lib/text";
 export function useWorkflowCommands(serverId: string) {
   const queryClient = useQueryClient();
   const queryScope = useQueryScope();
-  const { toggleWorkflowPin, startWorkflowRun, runWorkflowStep, runWorkflowGitHubLastEvent } =
+  const { toggleWorkflowPin, startWorkflowRun, runWorkflowStep, runWorkflowGitHubLastEvent, setWorkflowPaused } =
     useMobileWorkspaceActions();
   const started = async <T>(workflowId: string, start: () => Promise<T>): Promise<T | null> => {
     void haptics.impact("light");
@@ -29,7 +29,23 @@ export function useWorkflowCommands(serverId: string) {
       return null;
     }
   };
+  const setPaused = async (workflowId: string, paused: boolean) => {
+    void haptics.selection();
+    try {
+      await setWorkflowPaused({ workflowId, paused }, serverId);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workflowList(queryScope, serverId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(queryScope, serverId, workflowId) });
+    } catch (error) {
+      void haptics.notification("error");
+      const text = currentText();
+      Alert.alert(
+        text.t(paused ? "mobile.workflow.pause.failed" : "mobile.workflow.resume.failed"),
+        text.errorMessage(error, text.t("mobile.workflow.alert.tryAgain")),
+      );
+    }
+  };
   return {
+    setPaused,
     togglePin: (workflowId: string) => {
       void haptics.selection();
       toggleWorkflowPin(workflowId, serverId);

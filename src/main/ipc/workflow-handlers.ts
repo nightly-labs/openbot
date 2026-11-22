@@ -38,6 +38,10 @@ import {
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
@@ -93,6 +97,7 @@ import {
   parseRetryWorkflowStep,
   parseRunWorkflowStep,
   parseSaveWorkflowGraph,
+  parseSetWorkflowPaused,
   parseStartWorkflowRun,
   parseWorkflowDraftId,
   parseWorkflowGitHubLastEvent,
@@ -120,6 +125,7 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_CREDIT_MEDIA_CAPABILITY
       | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY
       | typeof WORKFLOWS_STEP_SETTINGS_CAPABILITY
+      | typeof WORKFLOWS_PAUSE_CAPABILITY
       | typeof WORKFLOW_FOLDERS_CAPABILITY,
   ): boolean;
   request<T>(
@@ -173,11 +179,23 @@ export function workflowIpcHandlers({
       }),
       create: scopedHandler(parseCreateWorkflow, {
         local: (input) => runCauseEffect(workflows.create(input)),
-        remote: (input, serverId) => remote(serverId, WORKFLOWS_ROUTES.create, decodeRemoteWorkflowDetail, input),
+        remote: ({ paused, ...input }, serverId) =>
+          remote(serverId, WORKFLOWS_ROUTES.create, decodeRemoteWorkflowDetail, {
+            ...input,
+            ...(paused && remoteServers.supportsCapability(serverId, WORKFLOWS_PAUSE_CAPABILITY) ? { paused } : {}),
+          }),
       }),
       rename: scopedHandler(parseRenameWorkflow, {
         local: (input) => runCauseEffect(workflows.rename(input)),
         remote: (input, serverId) => remote(serverId, WORKFLOWS_ROUTES.rename, decodeRemoteWorkflowSummary, input),
+      }),
+      setPaused: scopedHandler(parseSetWorkflowPaused, {
+        local: (input) => runCauseEffect(workflows.setPaused(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_PAUSE_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          return remote(serverId, WORKFLOWS_PAUSE_ROUTES.pause, decodeRemoteWorkflowSummary, input);
+        },
       }),
       delete: scopedHandler(parseWorkflowId, {
         local: (id) => runCauseEffect(workflows.remove(id)),

@@ -381,6 +381,7 @@ export type TeamApiWorkflows = Pick<
   | "get"
   | "create"
   | "rename"
+  | "setPaused"
   | "remove"
   | "saveGraph"
   | "versions"

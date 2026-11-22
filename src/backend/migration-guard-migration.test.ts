@@ -72,7 +72,7 @@ describe("migration guards", () => {
 
       migrateOpenBotDatabase(db);
 
-      expect(versions(db)).toEqual(range(8, 67));
+      expect(versions(db)).toEqual(range(8, 68));
       expect(contents(db)).toMatchObject(before);
       const violationsAfter = db.prepare("PRAGMA foreign_key_check").all();
       expect(violationsAfter).toHaveLength(violationsBefore.length);
@@ -111,7 +111,7 @@ describe("migration guards", () => {
 
     db.exec("DROP TRIGGER break_reference");
     migrateOpenBotDatabase(db);
-    expect(versions(db)).toEqual(range(8, 67));
+    expect(versions(db)).toEqual(range(8, 68));
     expect(contents(db)).toMatchObject(before);
   });
 
@@ -123,7 +123,7 @@ describe("migration guards", () => {
     expect(() => migrateOpenBotDatabase(db)).toThrow(
       `OpenBot database migration history is missing version ${missing}.`,
     );
-    expect(versions(db)).toEqual(range(8, 67).filter((version) => version !== missing));
+    expect(versions(db)).toEqual(range(8, 68).filter((version) => version !== missing));
     expect(db.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all()).toEqual(schemaBefore);
   });
 });

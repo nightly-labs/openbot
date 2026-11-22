@@ -911,6 +911,7 @@ const openbotApi: OpenBotDesktopApi = {
     get: decodeWorkflowDetail,
     create: decodeWorkflowDetail,
     rename: decodeWorkflowSummary,
+    setPaused: decodeWorkflowSummary,
     delete: decodeVoid,
     saveGraph: decodeWorkflowSaveResult,
     versions: decodeWorkflowVersions,

@@ -147,6 +147,7 @@ import type {
   SetWhatsAppOwnNumberInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
+  SetWorkflowPausedInput,
   SharedTable,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -717,6 +718,7 @@ export interface MobileWorkspaceContextValue {
   loadWorkflow: (workflowId: string, serverId: string) => Promise<WorkflowDetail>;
   createWorkflow: (input: CreateWorkflowInput, serverId: string) => Promise<WorkflowDetail>;
   renameWorkflow: (input: RenameWorkflowInput, serverId: string) => Promise<WorkflowSummary>;
+  setWorkflowPaused: (input: SetWorkflowPausedInput, serverId: string) => Promise<WorkflowSummary>;
   deleteWorkflow: (workflowId: string, serverId: string) => Promise<void>;
   saveWorkflowGraph: (input: SaveWorkflowGraphInput, serverId: string) => Promise<WorkflowSaveResult>;
   loadWorkflowRuns: (workflowId: string, serverId: string, before?: string) => Promise<WorkflowRunPage>;
@@ -733,6 +735,7 @@ export interface MobileWorkspaceContextValue {
   restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
   canUseWorkflowGitHub: (serverId: string) => boolean;
   canUseWorkflowChats: (serverId: string) => boolean;
+  canPauseWorkflows: (serverId: string) => boolean;
   loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
   loadWorkflowGitHubOptions: (repository: string, serverId: string) => Promise<WorkflowGitHubRepositoryOptions>;
   loadWorkflowGitHubHistory: (workflowId: string, serverId: string) => Promise<WorkflowGitHubHistory>;
@@ -830,6 +833,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
+  | "canPauseWorkflows"
   | "canReadServerStorage"
   | "canOrganizeLibrary"
   | "canControlComputer"

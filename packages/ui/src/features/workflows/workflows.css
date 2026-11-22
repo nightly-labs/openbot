@@ -590,13 +590,15 @@
   box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
 }
 
-.wfn-hud-viewing {
+.wfn-hud-viewing,
+.wfn-hud-paused {
   gap: var(--openbot-space-1-5);
   padding-inline-start: var(--openbot-space-3);
   font-variant-numeric: tabular-nums;
 }
 
-.wfn-stage .wfn-hud-viewing > svg {
+.wfn-stage .wfn-hud-viewing > svg,
+.wfn-stage .wfn-hud-paused > svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   color: var(--openbot-text-muted);
