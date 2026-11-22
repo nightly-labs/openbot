@@ -4880,6 +4880,42 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "imageat",
+    name: "imageat",
+    tagline: "AI images, videos, edits and voice",
+    description:
+      "imageat lets agents generate images and videos with models such as GPT Image, Nano Banana, Seedream, Kling, Veo and Seedance, edit photos (background removal and replacement, inpainting, object eraser, relighting, virtual try-on), make speech and sound effects, and check the credit balance. Each user signs in to their own imageat account through the browser, and every generation uses that account's credits.",
+    category: "design",
+    creatorName: "imageat",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-credits", text: "How many imageat credits do I have?" },
+      {
+        id: "prompt-product-shot",
+        text: "Make an imageat product photo of a glass perfume bottle on wet black stone.",
+      },
+      { id: "prompt-clip", text: "Turn this photo into a 5-second imageat video with a slow camera push-in." },
+    ],
+    websiteUrl: "https://imageat.com",
+    privacyPolicyUrl: "https://imageat.com/privacy-policy",
+    termsUrl: "https://imageat.com/terms-of-service",
+    featured: false,
+    apps: [
+      {
+        id: "app-imageat-mcp",
+        name: "imageat",
+        description:
+          "Image and video generation, photo edits, speech, sound effects and credits, over imageat's MCP server with browser sign-in.",
+        server: {
+          name: "imageat",
+          transport: "http",
+          url: "https://mcp.imageat.com/mcp",
+          auth: [{ id: "imageat-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "incidentio",
     name: "incident.io",
     tagline: "Incidents and on-call",

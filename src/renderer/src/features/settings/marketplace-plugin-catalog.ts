@@ -1,6 +1,26 @@
+/**
+ * The plugins the marketplace offers.
+ *
+ * Generated from marketplace/plugin-catalog/ by scripts/build-plugin-catalog.ts.
+ * Do not edit by hand: run bun run marketplace:build:plugins, or
+ * bun run marketplace:build:plugins -- --check to verify.
+ */
+
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
+/**
+ * The configuration an app installs as. The catalog states the name and how the server is reached -
+ * an address, or a command, its words and its fixed settings; the rest of the record and `enabled`
+ * are made here rather than stored as catalog data that could disagree with `normalizeMcpConfig`.
+ *
+ * A credential is never among them. What a server asks for is declared in `server.auth`, and the
+ * value is typed by the user in the connect dialog, which hands back the configuration that
+ * connected.
+ *
+ * The id is empty, which is what the store reads as "new". An id it does not hold is an edit of a
+ * row that is gone, and the save is refused.
+ */
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
   return {
     id: "",
@@ -5942,6 +5962,47 @@ const IFTTT: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/ifttt",
 };
 
+const IMAGEAT: MarketplacePluginDetail = {
+  id: "plugin-imageat",
+  slug: "imageat",
+  name: "imageat",
+  tagline: "AI images, videos, edits and voice",
+  description:
+    "imageat lets agents generate images and videos with models such as GPT Image, Nano Banana, Seedream, Kling, Veo and Seedance, edit photos (background removal and replacement, inpainting, object eraser, relighting, virtual try-on), make speech and sound effects, and check the credit balance. Each user signs in to their own imageat account through the browser, and every generation uses that account's credits.",
+  category: "design",
+  creatorName: "imageat",
+  iconUrl: "https://imageat.com/imageat-icon-new.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-credits", text: "How many imageat credits do I have?" },
+    { id: "prompt-product-shot", text: "Make an imageat product photo of a glass perfume bottle on wet black stone." },
+    { id: "prompt-clip", text: "Turn this photo into a 5-second imageat video with a slow camera push-in." },
+  ],
+  apps: [
+    {
+      id: "app-imageat-mcp",
+      name: "imageat",
+      description:
+        "Image and video generation, photo edits, speech, sound effects and credits, over imageat's MCP server with browser sign-in.",
+      iconUrl: "https://imageat.com/imageat-icon-new.png",
+      server: {
+        name: "imageat",
+        transport: "http",
+        url: "https://mcp.imageat.com/mcp",
+        auth: [{ id: "imageat-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://imageat.com",
+  privacyPolicyUrl: "https://imageat.com/privacy-policy",
+  termsUrl: "https://imageat.com/terms-of-service",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/imageat",
+};
+
 const INCIDENTIO: MarketplacePluginDetail = {
   id: "plugin-incidentio",
   slug: "incidentio",
@@ -10805,6 +10866,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   HUBSPOT,
   IBKR,
   IFTTT,
+  IMAGEAT,
   INCIDENTIO,
   INSTANTLY,
   INTERCOM,
