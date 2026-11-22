@@ -4187,8 +4187,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      ((this.options.confine &&
-        callsBridgeTool(thread, params.toolCall, kind === "permissions", this.#flavor.mcpCallInputNamesServer)) ||
+      ((this.options.confine && callsBridgeTool(thread, params.toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
         (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
@@ -4492,17 +4491,17 @@ function bestPermissionOption(options: PermissionOption[], accepted: boolean): P
 function callsBridgeTool(
   thread: AcpThread,
   toolCall: RequestPermissionRequest["toolCall"],
-  titleNamesTool: boolean,
+  kind: "command" | "file-change" | "permissions",
   inputNamesServer: true | undefined,
 ): boolean {
   const input = isRecord(toolCall.rawInput) ? toolCall.rawInput : null;
-  if (input && Object.hasOwn(input, "CommandLine")) return false;
+  if (kind === "file-change" || (input && Object.hasOwn(input, "CommandLine"))) return false;
   if (inputNamesServer && input && Object.hasOwn(input, "ServerName"))
     return thread.dynamicTools.some(
       (namespace) =>
         namespace.name === input.ServerName && namespace.tools.some((tool) => tool.name === input.ToolName),
     );
-  if (!titleNamesTool) return false;
+  if (kind !== "permissions") return false;
   const title = toolCall.title?.trim().replace(/\?$/u, "");
   return thread.dynamicTools.some((namespace) =>
     namespace.tools.some(

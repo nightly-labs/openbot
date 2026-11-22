@@ -47,6 +47,12 @@ const OTHER_CALLS = [
     rawInput: { CommandLine: "Run mcp_openbot_send_message" },
   },
   {
+    toolCallId: "server-name-edit",
+    title: "Edit notes.md",
+    kind: "edit",
+    rawInput: { TargetFile: "/tmp/notes.md", ServerName: "openbot", ToolName: "send_message" },
+  },
+  {
     toolCallId: "server-name-command-line",
     title: "MCP Tool send_message",
     kind: "execute",
