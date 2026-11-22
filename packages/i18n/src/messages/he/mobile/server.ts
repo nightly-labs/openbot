@@ -1178,7 +1178,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkNumber": "קישור מספר",
   "mobile.server.connectors.whatsapp.ownNumberNote": "הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לפנות ל-OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "האנשים שאישרת יכולים לפנות ל-OpenBot. אנשים אחרים מקבלים קוד למסור לך.",
+    "הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לפנות ל-OpenBot. אנשים אחרים מקבלים קוד למסור לך.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp הסיר את השרת הזה ממכשירים מקושרים. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.helpError":

@@ -889,7 +889,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "mobile.server.connectors.whatsapp.helpError":

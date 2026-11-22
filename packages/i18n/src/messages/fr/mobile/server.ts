@@ -925,7 +925,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Votre discussion « Message à vous-même » et les personnes que vous autorisez joignent OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "Les personnes que vous autorisez joignent OpenBot. Les autres reçoivent un code à vous transmettre.",
+    "Votre discussion « Message à vous-même » et les personnes que vous autorisez joignent OpenBot. Les autres reçoivent un code à vous transmettre.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp a retiré ce serveur des appareils connectés. Associez à nouveau le numéro.",
   "mobile.server.connectors.whatsapp.helpError":
