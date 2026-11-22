@@ -91,6 +91,7 @@ export const messages = {
   "mcp.panel.signIn": "登录",
   "mcp.panel.signOut": "退出登录",
   "mcp.panel.cancelSignIn": "取消登录",
+  "mcp.panel.useAddress": "使用此地址",
   "mcp.panel.signInTo": "登录 {name}",
   "mcp.panel.signInWaiting": {
     one: "请在浏览器中完成登录。OpenBot 将在 {count} 分钟后停止等待。",

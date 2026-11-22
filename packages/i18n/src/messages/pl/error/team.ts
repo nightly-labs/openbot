@@ -91,6 +91,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "To połączenie nie może zatrzymać uruchomienia rutyny.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.libraryFoldersUnsupported": "To połączenie nie obsługuje folderów Biblioteki.",
+  "error.team.workflowFoldersUnsupported": "To połączenie nie obsługuje folderów przepływów pracy.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.sidebarPinsUnsupported":
@@ -130,6 +131,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "To połączenie nie obsługuje miejsc docelowych rutyn.",
   "error.team.agentMemoryLimitUnsupported": "To połączenie nie obsługuje limitu wspomnień agentów.",
   "error.team.agentFoldersUnsupported": "To połączenie nie obsługuje folderów agentów.",
+  "error.team.channelFoldersUnsupported": "To połączenie nie obsługuje folderów kanałów.",
   "error.team.folderUnavailable": "Ten folder nie jest dostępny na komputerze hosta.",
   "error.team.memoryReviewUnsupported": "To połączenie nie obsługuje przeglądu wspomnień.",
   "error.team.skillLearningUnsupported": "To połączenie nie obsługuje uczenia się umiejętności.",
@@ -151,6 +153,8 @@ export const messages = {
   "error.team.mcpUnsupported": "To połączenie nie obsługuje serwerów MCP.",
   "error.team.mcpServerListNeedsUpdate":
     "Zaktualizuj OpenBot na tym urządzeniu, aby używać na tym serwerze więcej niż {limit} serwerów MCP.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Zaktualizuj OpenBot na tym urządzeniu, aby używać na tym serwerze więcej niż {limit} kont jednego dostawcy.",
   "error.team.storageUnsupported": "To połączenie nie obsługuje pamięci dyskowej.",
   "error.team.machineResourcesUnsupported": "To połączenie nie obsługuje użycia maszyny.",
   "error.team.machineAlertMemberInvalid":

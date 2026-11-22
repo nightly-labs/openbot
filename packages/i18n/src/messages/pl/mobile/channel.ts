@@ -82,6 +82,9 @@ export const messages = {
   "mobile.channel.form.deselectAll": "Odznacz wszystko",
   "mobile.channel.form.memories": "Wspomnienia",
   "mobile.channel.form.routines": "Rutyny",
+  "mobile.channel.folders.description":
+    "Wszyscy członkowie kanału {channel} mogą zmieniać pliki i uruchamiać polecenia w tych folderach.",
+  "mobile.channel.folders.removeBody": "Członkowie kanału {channel} nie mogą już zmieniać plików w {folder}",
   "mobile.channel.form.deleteTitle": "Usunąć kanał?",
   "mobile.channel.form.deleteBody":
     "To zatrzyma kanał. Jego historia zostanie w sekcji „Usunięte kanały” tylko do podglądu. Można go stamtąd przywrócić. Agenci należący do kanału zostaną zachowani.",

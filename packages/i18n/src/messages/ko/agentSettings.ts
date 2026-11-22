@@ -218,6 +218,9 @@ export const messages = {
     "채팅이 길어지면 에이전트가 새 채팅을 시작하도록 허용해요. 먼저 메모를 저장해요.",
   "agentSettings.quickAcknowledgement.title": "긴 작업 전에 계획 표시",
   "agentSettings.quickAcknowledgement.description": "긴 작업 전에 에이전트가 계획을 보여줘요.",
+  "agentSettings.builtinMemory.title": "OpenBot 메모리",
+  "agentSettings.builtinMemory.description":
+    "에이전트가 자신의 메모리를 저장하고 읽어요. Mem0 같은 메모리 앱만 쓰려면 끄세요. 저장된 메모리는 그대로 남아요.",
   "agentSettings.browserProfile.label": "브라우저 프로필",
   "agentSettings.browserProfile.shared": "공유",
   "agentSettings.browserProfile.agent": "이 에이전트만",

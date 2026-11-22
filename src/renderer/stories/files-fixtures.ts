@@ -411,3 +411,23 @@ export const FILES_LONG_NAME_ROWS: StoredFileRow[] = [
     name: "autumn-campaign-hero-image-generated-variant-with-warmer-light-and-logo.png",
   },
 ];
+
+const WORKFLOW_FOLDER_SOCIAL = { id: "workflow-folder-social", name: "Social media" };
+
+const WORKFLOWS_OF_FILES = [
+  { id: "workflow-weekly-posts", name: "Weekly posts", folder: WORKFLOW_FOLDER_SOCIAL },
+  { id: "workflow-story-covers", name: "Story covers", folder: WORKFLOW_FOLDER_SOCIAL },
+  { id: "workflow-product-shots", name: "Product shots", folder: null },
+];
+
+export const FILES_WORKFLOW_ROWS: StoredFileRow[] = FILES_ROWS.filter((file) => file.kind === "image")
+  .slice(0, 9)
+  .map((file, index) => ({
+    ...file,
+    id: `workflow-${file.id}`,
+    source: "generated",
+    agentId: null,
+    conversation: null,
+    messageId: null,
+    workflow: requireFixture(WORKFLOWS_OF_FILES[index % WORKFLOWS_OF_FILES.length], `Workflow ${index}`),
+  }));

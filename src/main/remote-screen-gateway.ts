@@ -95,6 +95,7 @@ export interface RemoteScreenRuntime {
   selectDisplay: SunshineMoonlightRuntime["selectDisplay"];
   stop: SunshineMoonlightRuntime["stop"];
   screenCaptureDenied?(): boolean;
+  windowsCaptureDenied?(): boolean;
   checkSetup?: SunshineMoonlightRuntime["checkSetup"];
   test?: SunshineMoonlightRuntime["test"];
 }
@@ -1103,6 +1104,8 @@ export class RemoteScreenGateway {
       stage === "sunshine" ? "sunshine" : "moonlight",
       `OpenBot: the remote desktop runtime did not start (${stage ?? "runtime"}): ${describeCause(cause)}\n`,
     );
+    if (stage === "sunshine" && this.#runtime?.windowsCaptureDenied?.())
+      return new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsCaptureDenied"));
     return new RemoteScreenError(
       503,
       "host_unavailable",

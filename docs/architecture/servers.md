@@ -504,6 +504,12 @@ no route. A client shows the connected pictures on the Agent card only on a host
 because a host before v0.72.0 does not send these files to the agent. A v0.72.0 to v0.74.x host sends
 them without the note and does not advertise the capability, so its Agent card shows no pictures.
 
+`workflows-answers-v1` says that the host runs typed answers: the `answer` field of an agent, a model
+step and a webhook trigger, the `check` field of a condition, and `{{name}}` in a step's text (see
+[Workflows](agents.md#workflows)). The capability adds no route: the fields are text in the graph,
+and a host before it keeps them but does not use them. A client shows the editors and the problems
+only on a host that advertises it.
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
@@ -592,6 +598,36 @@ Slack triggers and outputs (`apps/mobile/src/features/workflows/components/workf
 The chats, workspaces and channels come from the routine-results options, so the fields are the same
 as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
 sends the Discord roles.
+
+### Workflow folders
+
+The optional `workflow-folders-v1` capability (`team-protocol/workflow-folders-v1.ts`, protocol 10)
+adds `POST /v1/workflow-folders` and `POST /v1/workflow-folders/actions` for the folders of the
+Workflows page. The folders are one flat list for the server, and a workflow is in one folder or in
+none. The folders are a layout only: a change moves, copies and deletes no workflow. The host keeps
+them in `openbot-workflow-folders-v1.json` in its user data (`src/backend/workflow-folders-store.ts`,
+a versioned JSON file), and `src/main/workflow-folders-service.ts` applies each action (create,
+rename, delete, place) for the `workflows:folders` and `workflows:folder-action` IPC of this computer
+and for the route, so a joined server uses the same rules (`applyWorkflowFolderAction` in
+`@openbot/contracts/ipc-workflow-folders`). The placement shows only the workflows that the member
+can see, with the same filter as the workflow list. A member who may use workflows reads each empty
+folder and each folder with a workflow that the member can see; a folder with only hidden workflows
+does not show. Each member who may use workflows creates folders. To rename or delete a folder, to
+place a workflow, or to create a folder with workflows, the member needs `manage` access to each
+workflow that the action changes or that the folder holds, and gets 403 without it and 404 for a
+workflow that they cannot see. A refused change is
+404 for a folder or a workflow that the host does not have, and 400 for each other rule. Each route
+answers the full snapshot that the member can see. The service reads the workflow ids from the
+workflow list and removes the entries of deleted workflows on each read and before each change, so
+a workflow that an agent, a transfer or a restore deletes also leaves its folder. A stale entry
+stays in the file until the next saved change.
+
+After each saved change, the host sends the optional event `workflow-folders-changed`, with no data,
+only to the connections that advertise `workflow-folders-v1`; `application-services.ts` emits it
+through `AgentService`, so this computer's windows get it too. The desktop with a joined server and
+the web client hide the folders while the host does not have the capability, and read the folders
+again after the event and after a reconnect, with the workflow list. The phone does not show workflow folders. The instance
+transfer does not carry the folders.
 
 ### CRM
 
@@ -971,10 +1007,12 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-task-limit-v1` | Agent task limit: how many tasks run at the same time, 1 to 4, or the host default | `agentAdmin` |
 | `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | `agentAdmin` |
 | `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
+| `agent-builtin-memory-v1` | Whether the agent uses OpenBot memory (`/v1/admin/agents/builtin-memory`, `/update`). When it is off, the agent gets no saved memories, its memory tools refuse, and the memory review saves no memories; saved memories stay. A user can then connect a memory app such as Mem0. Protocol 10 only | `agentAdmin` |
 | `agent-defaults-v1` | Server Settings › Agents of the host: the defaults of local scripts, the agent's own new chats and the plan card, the plan start time, the local script limit for each hour, the commit co-author line and "Steer agents while they work", and the own value of each visible agent. An update changes only the fields it sends; a choice sets `default`, `on` or `off` for a list of agents. Owners and admins only. Before it, these defaults were a local choice of the host. Protocol 9 only | `agentAdmin` |
 | `agent-fast-mode-v1` | Whether the agent asks for the fast service tier, and the host models that have one with the tier id (the released model list drops it). A member reads it with view access to the agent and changes it with manage access, as the model and effort. Protocol 9 only | `agentAdmin` |
 | `agent-speed-v1` | The speed of the agent: standard, fast or ultrafast. Its model list adds the Ultrafast tier ids and the Claude models, which `agent-fast-mode-v1` leaves out. A client that advertises it asks the user to confirm the price before it turns on a faster speed for a Claude agent. The access is that of `agent-fast-mode-v1`. A client uses it in place of `agent-fast-mode-v1` when the host has both. Protocol 9 only | `agentAdmin` |
 | `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone or the desktop app of a member can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
+| `channel-folders-v1` | The folders of a group chat, which all its member agents can change: read, add, remove, and a list of the folders in one host folder, as `agent-folders-v1` gives. The host checks each folder as the desktop folder picker does (`src/main/channel-folders.ts`). Owner and admin only. Protocol 10 only | `channelFolders` |
 | `agent-instructions-v1` | Read and save the instruction file at the root of an agent's workspace (`AGENTS.md`, or `CLAUDE.md` in an older workspace). A save sends the text that the edit started from; the host refuses it with 409 when the file changed. The workspace path does not cross the wire, and a client cannot show the file in its file manager. Protocol 9 only | `agentInstructions` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
 | `browser-proxies-v1` | Saved proxies of the host's named browser profiles: list, save, delete, and the proxy of each named profile (`/v1/admin/browser-proxies`, `/save`, `/delete`, `/v1/admin/browser-profiles/proxy`). The list also has the computers of members, and `/computer` adds the computer of the member who sends it; no member can add the computer of another. A password goes to the host only in a save request and never comes back. Advertised when the host has `browserProfiles` | `agentAdmin` |

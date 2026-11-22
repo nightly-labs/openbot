@@ -21,7 +21,6 @@ import {
 import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
-import { formatMessageTime } from "../../../app-message-projection";
 import { groupAgentMessageMarkers, markOpenAgentMessages, teammateTurnAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
@@ -53,6 +52,7 @@ interface ScrollStickyState {
   setStickToLatest: (value: boolean) => void;
   getCurrentUnreadCount: () => number;
   followLatest: (element: HTMLDivElement) => void;
+  followReaderScroll: (element: HTMLDivElement) => void;
 }
 
 export interface ScrollStoreDeps {
@@ -64,6 +64,7 @@ export interface ScrollStoreDeps {
   handedOverRowKeys: () => ReadonlyMap<string, string>;
   elements: ScrollElements;
   sticky: ScrollStickyState;
+  drawLatestFirst: () => boolean;
 }
 
 export function createScrollStore(deps: ScrollStoreDeps) {
@@ -111,10 +112,13 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const channel = deps.props.channel;
     if (!channel) return narrationRows(thinking, deps.props.agent?.provider);
     const answeredAt = thinking.turnId ? channelAnswerTimes().get(thinking.turnId) : undefined;
-    return narrationRows(thinking, channel.author(thinking).agent?.provider).filter(
-      (row) => !answeredAt || !row.createdAt || row.createdAt <= answeredAt,
-    );
+    return turnNarration(thinking).filter((row) => !answeredAt || !row.createdAt || row.createdAt <= answeredAt);
   };
+  const turnNarration = (thinking: AgentMessage): AgentMessage[] =>
+    narrationRows(
+      thinking,
+      deps.props.channel ? deps.props.channel.author(thinking).agent?.provider : deps.props.agent?.provider,
+    );
   const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
   const [endingTurnIds, setEndingTurnIds] = createSignal<ReadonlySet<string>>(new Set<string>());
   const endingTimers = new Set<ReturnType<typeof setTimeout>>();
@@ -168,8 +172,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       ? placeTurnRowsByTime(listed, turnRowsList)
       : placeUpdatesAfterSteers(listed, turnRowsList);
     const complete = progressUpdates ? shown.filter((message) => !held(message)) : shown;
-    const questionTurnId = deps.props.channel ? undefined : deps.props.prompt?.turnId;
-    return summarizeHostedSiteMessages(withQuestionContext(complete, deps.props.messages, questionTurnId));
+    return summarizeHostedSiteMessages(
+      withQuestionContext(complete, deps.props.messages, deps.props.prompt?.turnId, turnNarration),
+    );
   });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
   const userRowSeenAt = new Map<string, number>();
@@ -363,6 +368,8 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     scrollMargin: virtualScrollMargin,
     stickToLatest: deps.sticky.getStickToLatest,
     followLatest: deps.sticky.followLatest,
+    drawLatestFirst: deps.drawLatestFirst,
+    onRowsDrawn: deps.sticky.followReaderScroll,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
       if (!first) return;
@@ -373,9 +380,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   function updateHistoryBoundary(element = deps.elements.scrollElement()): boolean {
     const followsLatest = deps.sticky.getStickToLatest();
+    const firstRow = Math.max(firstRenderedIndex, messageVirtualizer.firstDrawnIndex());
     const reached =
-      chatHistoryBoundaryReached(element, firstRenderedIndex, followsLatest) &&
-      (!followsLatest || currentRowsRendered(element));
+      chatHistoryBoundaryReached(element, firstRow, followsLatest) && (!followsLatest || currentRowsRendered(element));
     setAtHistoryBoundary(reached);
     return reached;
   }
@@ -522,39 +529,37 @@ function heldWhileWritten(message: AgentMessage): boolean {
   );
 }
 
-const THINKING_ITEM_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
-
 export function withQuestionContext(
   shown: AgentMessage[],
   messages: readonly AgentMessage[],
-  turnId: string | undefined,
+  waitingTurnId: string | undefined,
+  narration: (thinking: AgentMessage) => AgentMessage[],
 ): AgentMessage[] {
-  if (!turnId) return shown;
-  const thinking = messages.find((message) => message.kind === "thinking" && message.turnId === turnId);
-  const context = thinking ? lastNarration(thinking) : null;
-  if (!context || shown.some((message) => message.id === context.id)) return shown;
-  const turnEnd = shown.findLastIndex((message) => message.turnId === turnId) + 1;
-  const at = turnEnd > 0 ? turnEnd : shown.length;
-  return [...shown.slice(0, at), context, ...shown.slice(at)];
-}
-
-function lastNarration(thinking: AgentMessage): AgentMessage | null {
-  const items = thinking.items ?? [];
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const id = thinking.itemIds?.[index];
-    const body = items[index] ?? "";
-    if (!id || !body.trim() || THINKING_ITEM_ID.test(id)) continue;
-    const createdAt = thinking.itemCreatedAt?.[index];
-    return {
-      id,
-      ...(thinking.turnId === undefined ? {} : { turnId: thinking.turnId }),
-      author: "agent",
-      body,
-      time: createdAt ? formatMessageTime(createdAt) : thinking.time,
-      ...(createdAt ? { createdAt } : {}),
-      itemType: "commentary",
-      kind: "text",
-    };
-  }
-  return null;
+  const thinkingByTurn = new Map(
+    messages.flatMap((message) =>
+      message.kind === "thinking" && message.turnId ? [[message.turnId, message] as const] : [],
+    ),
+  );
+  const placed = new Set(shown.map((message) => message.id));
+  const contextOf = (turnId: string | undefined, askedAt?: string): AgentMessage | undefined => {
+    const thinking = turnId ? thinkingByTurn.get(turnId) : undefined;
+    const rows = thinking ? narration(thinking) : [];
+    const context =
+      askedAt === undefined ? rows.at(-1) : rows.findLast((row) => row.createdAt && row.createdAt <= askedAt);
+    if (!context || placed.has(context.id)) return undefined;
+    placed.add(context.id);
+    return context;
+  };
+  const rows = shown.flatMap((message) => {
+    const context =
+      message.questionPrompt?.resolution && message.createdAt
+        ? contextOf(message.turnId, message.createdAt)
+        : undefined;
+    return context ? [context, message] : [message];
+  });
+  const waiting = contextOf(waitingTurnId);
+  if (!waiting) return rows;
+  const turnEnd = rows.findLastIndex((message) => message.turnId === waitingTurnId) + 1;
+  const at = turnEnd > 0 ? turnEnd : rows.length;
+  return [...rows.slice(0, at), waiting, ...rows.slice(at)];
 }

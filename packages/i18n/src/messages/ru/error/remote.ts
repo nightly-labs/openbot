@@ -23,6 +23,8 @@ export const messages = {
     "Хост не разрешил OpenBot записывать экран. Разрешите запись экрана на хосте и повторите попытку.",
   "error.remote.windowsSessionDisconnected":
     "Сеанс Windows на хосте отключён, поэтому нет экрана для показа. Войдите в Windows на экране хоста и повторите попытку.",
+  "error.remote.windowsCaptureDenied":
+    "Windows на хосте не разрешает OpenBot записывать экран. Разблокируйте Windows на экране хоста, закройте все запросы администратора и повторите попытку. Если проблема не исчезнет, перезапустите хост.",
   "error.remote.macScreenLocked":
     "Mac заблокирован, поэтому не может показать свой экран. Разблокируйте Mac на его экране и повторите попытку.",
   "error.remote.streamTooSlowLowerQuality":

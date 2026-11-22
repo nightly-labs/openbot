@@ -92,6 +92,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Bu bağlantı bir rutin çalıştırmasını durduramaz.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.libraryFoldersUnsupported": "Kitaplık klasörleri bu bağlantı tarafından desteklenmiyor.",
+  "error.team.workflowFoldersUnsupported": "Bu bağlantı iş akışı klasörlerini desteklemiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
   "error.team.sidebarPinsUnsupported":
@@ -131,6 +132,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Bu bağlantı rutin hedeflerini desteklemiyor.",
   "error.team.agentMemoryLimitUnsupported": "Bu bağlantı ajanların bellek sınırını desteklemiyor.",
   "error.team.agentFoldersUnsupported": "Bu bağlantı ajanların klasörlerini desteklemiyor.",
+  "error.team.channelFoldersUnsupported": "Bu bağlantı kanalların klasörlerini desteklemiyor.",
   "error.team.folderUnavailable": "Bu klasör ana bilgisayarda kullanılamıyor.",
   "error.team.memoryReviewUnsupported": "Bu bağlantı bellek incelemesini desteklemiyor.",
   "error.team.skillLearningUnsupported": "Bu bağlantı beceri öğrenmeyi desteklemiyor.",
@@ -151,6 +153,8 @@ export const messages = {
   "error.team.mcpUnsupported": "MCP sunucuları bu bağlantı tarafından desteklenmiyor.",
   "error.team.mcpServerListNeedsUpdate":
     "Bu sunucuda {limit} sayısından fazla MCP sunucusu kullanmak için bu cihazdaki OpenBot'u güncelleyin.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Bu sunucuda bir sağlayıcının {limit} sayısından fazla hesabını kullanmak için bu cihazdaki OpenBot'u güncelleyin.",
   "error.team.storageUnsupported": "Depolama bu bağlantı tarafından desteklenmiyor.",
   "error.team.machineResourcesUnsupported": "Makine kullanımı bu bağlantı tarafından desteklenmiyor.",
   "error.team.machineAlertMemberInvalid": "Makine uyarılarını yalnızca bu sunucunun sahibi veya yöneticisi alabilir.",

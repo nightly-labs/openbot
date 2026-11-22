@@ -248,7 +248,7 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
   );
 }
 
-const MAX_RING_PLACES = 5;
+const START_RING_PLACES = 5;
 const RAIL_MIN_FREE = 12;
 
 export interface CustomAgentUsageRailRow {
@@ -521,7 +521,7 @@ export function PageRail(props: PageRailProps) {
       .filter((row) => !owner(row))
       .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
   });
-  const [ringSlots, setRingSlots] = createSignal(MAX_RING_PLACES);
+  const [ringSlots, setRingSlots] = createSignal(START_RING_PLACES);
   const ringLayout = createMemo(() => {
     const all = rings();
     if (all.length <= ringSlots()) return { shown: all, more: [] };
@@ -547,7 +547,7 @@ export function PageRail(props: PageRailProps) {
         pagesBox.getBoundingClientRect().bottom -
         endWithoutRings -
         RAIL_MIN_FREE;
-      setRingSlots(Math.max(1, Math.min(MAX_RING_PLACES, Math.floor(free / slot))));
+      setRingSlots(Math.max(1, Math.floor(free / slot)));
     };
     let frame = 0;
     const observer = new ResizeObserver(() => {

@@ -1,4 +1,5 @@
 import {
+  decodeWorkflowFoldersSnapshot,
   isWorkflowDetail,
   isWorkflowGitHubCatalog,
   isWorkflowGitHubHistory,
@@ -16,6 +17,7 @@ import {
   isWorkflowSummary,
   isWorkflowVersion,
   isWorkflowWebhookSecret,
+  type WorkflowFoldersSnapshot,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 
@@ -47,4 +49,8 @@ export const decodeWorkflowMediaProviders = guardedDecoder(
 export function decodeWorkflowPictureId(value: unknown): string {
   if (typeof value !== "string" || !value) throw new Error("Invalid workflow picture response.");
   return value;
+}
+
+export function decodeWorkflowFoldersSnapshotFromMain(value: unknown): WorkflowFoldersSnapshot {
+  return decodeWorkflowFoldersSnapshot(value);
 }

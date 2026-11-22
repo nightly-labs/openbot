@@ -5,6 +5,8 @@ import {
   WORKFLOW_PICTURE_TYPES,
   WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
+  type WorkflowFolderAction,
+  type WorkflowFoldersSnapshot,
   type WorkflowGraph,
   type WorkflowNodeKind,
   type WorkflowSummary,
@@ -35,6 +37,7 @@ import {
   Lock,
   LockOpen,
   MousePointer2,
+  Network,
   Pencil,
   Play,
   Plus,
@@ -43,6 +46,7 @@ import {
   Scan,
   Search,
   SendToBack,
+  Spinner,
   Trash2,
   Type,
   Undo2,
@@ -97,12 +101,20 @@ import { type PickerGroup, PickerMenu } from "./WorkflowPicker";
 import { PromptNode } from "./WorkflowPromptNode";
 import { WorkflowSearch } from "./WorkflowSearch";
 import { SHAPES, ShapeIcon, ShapeNode, ShapeSurface, shapeSize } from "./WorkflowShapeNode";
-import { type SwitcherAction, type SwitcherWorkflow, WorkflowSwitcher } from "./WorkflowSwitcher";
+import {
+  type CornerEdit,
+  type FolderMenuAction,
+  type SwitcherAction,
+  type SwitcherWorkflow,
+  WorkflowCorner,
+  WorkflowSwitcher,
+} from "./WorkflowSwitcher";
 import { nextWorkflowAfterDelete, WorkflowsEmpty } from "./WorkflowsEmpty";
+import { type WorkflowCanvasTabs, type WorkflowTab, WorkflowTabs } from "./WorkflowTabs";
 import { TextNode } from "./WorkflowTextNode";
 import { TriggerNode } from "./WorkflowTriggerNode";
 import { WorkflowVersionBar } from "./WorkflowVersionBar";
-import { WorkflowZoomMenu } from "./WorkflowZoomMenu";
+import { TIDY_KEYS, WorkflowZoomMenu } from "./WorkflowZoomMenu";
 import {
   BoardProvider,
   createBoard,
@@ -112,6 +124,7 @@ import {
   MOD_KEY,
   type PortRef,
   resizeCursor,
+  showsStrip,
   takesKeys,
   type WfnAnchor,
   type WfnEdge,
@@ -168,6 +181,7 @@ import {
   union,
 } from "./workflow-ink";
 import { workflowLoops } from "./workflow-loops";
+import { mediaTakes } from "./workflow-media-step";
 import { mergeWorkflowGraphs } from "./workflow-merge";
 import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
 import {
@@ -193,6 +207,7 @@ import {
   type WorkflowPresence,
 } from "./workflow-presence";
 import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./workflow-run-view";
+import { type TidyUnit, tidyLayout } from "./workflow-tidy";
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
 export interface WorkflowCanvasProps {
@@ -205,6 +220,7 @@ export interface WorkflowCanvasProps {
   versions: readonly WorkflowVersion[];
   versionPreview?: { versionId: string; graph: WorkflowGraph } | undefined;
   library: readonly WorkflowSummary[];
+  opening?: boolean | undefined;
   readOnly?: boolean | undefined;
   presence?: WorkflowPresence | undefined;
   build?: WorkflowBuild | undefined;
@@ -212,7 +228,7 @@ export interface WorkflowCanvasProps {
   agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
   onGraphChange: (graph: WorkflowGraph) => void;
   onRun: (input: { fromNodeId?: string }) => void;
-  onRunStep: (nodeId: string) => void;
+  onRunStep: (nodeId: string, takes?: number) => void;
   onStopStep: (stepId: string) => void;
   onStopRun: (runId: string) => void;
   onRetry: (stepId: string) => void;
@@ -225,6 +241,9 @@ export interface WorkflowCanvasProps {
   onCreate: (input: { title: string; graph?: WorkflowGraph }) => void;
   onRename: (workflowId: string, title: string) => void;
   onDelete: (workflowId: string) => Promise<unknown>;
+  tabs?: WorkflowCanvasTabs | undefined;
+  folders?: WorkflowFoldersSnapshot | undefined;
+  onFolderAction?: ((action: WorkflowFolderAction) => void) | undefined;
 }
 
 type MenuTarget =
@@ -320,6 +339,10 @@ const DUPLICATE_OFFSET = 32;
 const NEW_NODE = { width: 300, height: 240 };
 const PICTURE_ROW = 4;
 const PLACE_STEP = 40;
+const TIDY_LABELS: ReadonlySet<WorkflowNodeKind> = new Set(["text", "note", "shape"]);
+const TIDY_REACH = 160;
+const TIDY_CLEAR_GAP = 24;
+const TIDY_MOTION_MS = 320;
 const SEARCH_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   trigger: [],
   prompt: ["text"],
@@ -541,6 +564,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const canvas = createBoard({
     focus: () => focusAsset(),
     catalogs: () => props.catalogs,
+    graph: () => graph(),
     buildState: (id) => buildState(id),
     github: () => props.github,
     features: () => props.features,
@@ -567,7 +591,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const at = positions[id];
       const rendered = slotSizes[id];
       if (!at || !rendered) return undefined;
-      const strip = board.results(id).length > 1 ? STRIP_ROOM / camera.scale : 0;
+      const strip = showsStrip(board, id) ? STRIP_ROOM / camera.scale : 0;
       return { ...at, width: rendered.width, height: rendered.height + strip };
     },
     loops: () => loops(),
@@ -583,15 +607,17 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
     error: (id) => runIndex().get(id)?.error,
     resultsOf: (id) => runIndex().get(id)?.results ?? [],
+    pendingOf: (id) => (kindOf(id) === "image" ? (runIndex().get(id)?.pending ?? []) : []),
     duplicate: (id) => duplicateNodes([id]),
     resetSize: (id) => resetSize(id),
     beforeChange: () => commit(),
-    canChange: () => !frozen() && !deleted(),
+    canChange: () => !editsBlocked() && !deleted(),
     root: () => root,
     retry: (id) => {
       const step = stepOf(id);
       if (step) props.onRetry(step);
     },
+    retryResult: (result) => props.onRetry(result),
     runFrom: (id) => props.onRun({ fromNodeId: id }),
     schedule: (id) => nodes().find((node) => node.id === id)?.schedule,
     setSchedule: (id, schedule) => {
@@ -605,10 +631,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       scheduleEdit = undefined;
     },
     rotateWebhookSecret: untrack(() => props.onRotateWebhookSecret),
-    runStep: (id) => props.onRunStep(id),
+    runStep: (id) => runNode(id),
     stopStep: (id) => {
-      const step = stepOf(id);
-      if (step) props.onStopStep(step);
+      const pending = runIndex().get(id)?.pending ?? [];
+      if (pending.length === 0) {
+        const step = stepOf(id);
+        if (step) props.onStopStep(step);
+        return;
+      }
+      for (const take of pending) props.onStopStep(take.id);
     },
     running,
     toolbarBelow: (id, bar) => toolbarBelow(id, bar),
@@ -654,9 +685,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   });
   const [sketchPoints, setSketchPoints] = createSignal<readonly WfnPoint[]>([], { equals: false });
 
+  let tidyGoals: ReadonlyMap<string, WfnPoint> | undefined;
+  let tidyFrame = 0;
   const capture = (): CanvasSnapshot => ({
     nodes: nodes(),
-    positions: Object.fromEntries(Object.entries(positions).map(([id, at]) => [id, { ...at }])),
+    positions: Object.fromEntries(Object.entries(positions).map(([id, at]) => [id, { ...(tidyGoals?.get(id) ?? at) }])),
     sizes: Object.fromEntries(Object.entries(sizes).map(([id, size]) => [id, { ...size }])),
     board: canvas.snapshot(),
     strokes: strokes(),
@@ -672,6 +705,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
   const apply = (saved: CanvasSnapshot) => {
+    endTidy(false);
     scheduleEdit = undefined;
     const ids = new Set(saved.nodes.map((node) => node.id));
     const later = nodes().filter((node) => !ids.has(node.id));
@@ -688,7 +722,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       scheduleEdit = undefined;
     },
   });
-  const { steps, commit } = edits;
+  const { steps } = edits;
+  const commit = () => {
+    edits.commit();
+    endTidy(true);
+  };
 
   const frames = new Map<number, () => void>();
   const afterLayout = (run: () => void, drop: () => void = () => {}) => {
@@ -721,6 +759,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   let liveCanvas: CanvasSnapshot | undefined;
   const previewing = () => props.versionPreview !== undefined;
   const frozen = () => previewing() || props.readOnly === true;
+  const editsBlocked = () => frozen() || props.opening === true;
   const versionList = () =>
     props.versions.map((version) => ({
       id: version.id,
@@ -965,7 +1004,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     untrack(() => props.onGraphChange(next));
   };
   createEffect(
-    () => (frozen() || deleted() ? undefined : graph()),
+    () => (editsBlocked() || deleted() ? undefined : graph()),
     (next) => {
       if (next) send(next);
     },
@@ -973,6 +1012,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const reset = (next: WorkflowGraph, same: boolean) => {
     const before = same ? (liveCanvas ?? capture()) : undefined;
+    endTidy(false);
     const snapshot = snapshotFromGraph(next);
     baseGraph = graphFromSnapshot(snapshot);
     savedGraph = stableJson(baseGraph);
@@ -1069,7 +1109,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     }
     const merged = asSaved(mergeWorkflowGraphs(before, graphFromSnapshot(capture()), theirs));
     mergeIn(merged);
-    if (!frozen() && !deleted() && !gesturing()) send(merged);
+    if (!editsBlocked() && !deleted() && !gesturing()) send(merged);
   };
   createEffect(
     () => [resetToken(), props.workflow.graph] as const,
@@ -1109,6 +1149,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     else if (action !== `open:${openId()}`) props.onSelect(action.slice("open:".length));
   };
   const startRename = () => {
+    setFolderEdit(undefined);
     nameBefore = name();
     setRenaming(true);
   };
@@ -1121,6 +1162,102 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (next !== nameBefore) props.onRename(openId(), next);
     requestAnimationFrame(() => workflowMenu?.focus());
   };
+  const renameTab = (workflowId: string, title: string) => {
+    if (workflowId === openId()) {
+      setRenaming(false);
+      setName(title);
+    }
+    props.onRename(workflowId, title);
+  };
+  const tabItems = (): readonly WorkflowTab[] => {
+    const known = new Map(props.library.map((workflow) => [workflow.id, workflow]));
+    const ids = props.tabs?.ids.includes(openId()) ? props.tabs.ids : [...(props.tabs?.ids ?? []), openId()];
+    return ids.flatMap((id) => {
+      if (id === openId())
+        return [{ id, title: name(), updatedAt: props.workflow.summary.updatedAt, running: running() }];
+      const workflow = known.get(id);
+      return workflow
+        ? [
+            {
+              id,
+              title: workflow.title,
+              updatedAt: workflow.updatedAt,
+              running: workflow.lastRun?.status === "running",
+            },
+          ]
+        : [];
+    });
+  };
+  const [folderEdit, setFolderEdit] = createSignal<{ folderId: string; value: string; before: string }>();
+  const startFolderEdit = (folderId: string, value: string) => {
+    endRename(true);
+    setFolderEdit({ folderId, value, before: value });
+  };
+  const endFolderEdit = (keep: boolean) => {
+    const edit = folderEdit();
+    if (!edit) return;
+    setFolderEdit(undefined);
+    const trimmed = edit.value.trim();
+    if (keep && trimmed && trimmed !== edit.before)
+      props.onFolderAction?.({ type: "rename", folderId: edit.folderId, name: trimmed });
+    requestAnimationFrame(() => workflowMenu?.focus());
+  };
+  const onFolderMenu = (action: FolderMenuAction) => {
+    const act = props.onFolderAction;
+    if (!act) return;
+    if (action.type === "place") act({ type: "place", workflowIds: [openId()], folderId: action.folderId });
+    else if (action.type === "delete") act({ type: "delete", folderId: action.folderId });
+    else if (action.type === "new") {
+      const id = crypto.randomUUID();
+      const folderName = t("workflow.canvas.folder.new");
+      act({ type: "create", id, name: folderName, workflowIds: [openId()] });
+      startFolderEdit(id, folderName);
+    } else {
+      const folder = props.folders?.folders.find((entry) => entry.id === action.folderId);
+      if (folder) startFolderEdit(folder.id, folder.name);
+    }
+  };
+  const cornerEdit = (): CornerEdit | undefined => {
+    if (renaming()) return { label: t("workflow.canvas.switcher.name"), value: name() };
+    const edit = folderEdit();
+    return edit && { label: t("workflow.canvas.folder.name"), value: edit.value };
+  };
+  const onCornerEdit = (value: string) => {
+    if (renaming()) setName(value);
+    else setFolderEdit((edit) => edit && { ...edit, value });
+  };
+  const onEndCornerEdit = (keep: boolean) => {
+    if (renaming()) endRename(keep);
+    else endFolderEdit(keep);
+  };
+  const switcherFolders = () =>
+    props.folders && props.onFolderAction
+      ? { folders: props.folders.folders, placement: props.folders.placement }
+      : undefined;
+  const corner = () => (
+    <WorkflowCorner
+      count={listed().length}
+      edit={cornerEdit()}
+      menuRef={(element) => {
+        workflowMenu = element;
+      }}
+      menu={
+        <WorkflowSwitcher
+          workflows={listed()}
+          current={openId()}
+          versions={versionList()}
+          viewing={props.versionPreview?.versionId}
+          versionsDisabled={running()}
+          readOnly={props.readOnly === true}
+          folders={switcherFolders()}
+          onAction={onSwitcher}
+          onFolder={onFolderMenu}
+        />
+      }
+      onEdit={onCornerEdit}
+      onEndEdit={onEndCornerEdit}
+    />
+  );
 
   const clampScale = (scale: number) => Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
   const view = () => ({ width: viewport?.clientWidth ?? 0, height: viewport?.clientHeight ?? 0 });
@@ -1213,6 +1350,149 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     if (byUser) glideTo(next, "flight");
     else moveCamera(next, false);
+  };
+
+  const endTidy = (land: boolean) => {
+    const goals = tidyGoals;
+    if (!goals) return;
+    tidyGoals = undefined;
+    cancelAnimationFrame(tidyFrame);
+    if (land)
+      setPositions((draft) => {
+        for (const [id, at] of goals) if (draft[id]) draft[id] = { ...at };
+      });
+    setGesturing(false);
+  };
+  onCleanup(() => cancelAnimationFrame(tidyFrame));
+  const glidePlaces = (goals: ReadonlyMap<string, WfnPoint>) => {
+    const starts = new Map([...goals.keys()].flatMap((id) => (positions[id] ? [[id, { ...positions[id] }]] : [])));
+    tidyGoals = goals;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      endTidy(true);
+      fitView(true);
+      return;
+    }
+    setGesturing(true);
+    const begin = performance.now();
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - begin) / TIDY_MOTION_MS);
+      if (progress >= 1) {
+        endTidy(true);
+        fitView(true);
+        return;
+      }
+      const eased = 1 - (1 - progress) ** 3;
+      setPositions((draft) => {
+        for (const [id, goal] of goals) {
+          const start = starts.get(id);
+          if (start && draft[id])
+            draft[id] = { x: start.x + (goal.x - start.x) * eased, y: start.y + (goal.y - start.y) * eased };
+        }
+      });
+      tidyFrame = requestAnimationFrame(step);
+    };
+    tidyFrame = requestAnimationFrame(step);
+  };
+  const tidyPlaces = (): Map<string, WfnPoint> => {
+    const edges = canvas.edges().filter((edge) => !board.isRemoved(edge.from) && !board.isRemoved(edge.to));
+    const linked = new Set(edges.flatMap((edge) => [edge.from, edge.to]));
+    const members = new Map<string, readonly string[]>();
+    const units: TidyUnit[] = [];
+    const labels: { id: string; box: Box }[] = [];
+    for (const entry of nodeGroups()) {
+      const box = frameOf(entry);
+      if (!box || entry.members.some((id) => board.isLocked(id))) continue;
+      units.push({ id: entry.id, box });
+      members.set(entry.id, entry.members);
+    }
+    for (const node of live()) {
+      const box = boxOf(node.id);
+      if (!box || groupIndex().has(node.id) || board.isLocked(node.id)) continue;
+      if (TIDY_LABELS.has(node.kind) && !linked.has(node.id)) labels.push({ id: node.id, box });
+      else {
+        units.push({ id: node.id, box });
+        members.set(node.id, [node.id]);
+      }
+    }
+    const unitOf = (id: string) => groupIndex().get(id)?.id ?? id;
+    const layout = tidyLayout(
+      units,
+      edges.map((edge) => ({ from: unitOf(edge.from), to: unitOf(edge.to) })),
+    );
+    const labelIds = new Set(labels.map((label) => label.id));
+    const moving = new Set([...members.values()].flat());
+    const fixed = live().flatMap((node) => {
+      const box = boxOf(node.id);
+      return box && !moving.has(node.id) && !labelIds.has(node.id) ? [box] : [];
+    });
+    const below = (hit: Box) => Math.ceil((hit.y + hit.height + TIDY_CLEAR_GAP) / SNAP) * SNAP;
+    const placed = units.flatMap((unit) => {
+      const at = layout.get(unit.id);
+      return at ? [{ unit, box: { ...unit.box, ...snapPoint(at) } }] : [];
+    });
+    const dropPast = (drop: number) => {
+      for (const { box } of placed) {
+        const hit = fixed.find((other) => overlaps({ ...box, y: box.y + drop }, other));
+        if (hit) return below(hit) - box.y;
+      }
+      return undefined;
+    };
+    let drop = 0;
+    for (let next = dropPast(drop); next !== undefined; next = dropPast(drop)) drop = next;
+    const shifts = new Map(
+      placed.map(({ unit, box }) => [unit.id, { x: box.x - unit.box.x, y: box.y + drop - unit.box.y }]),
+    );
+    const goals = new Map<string, WfnPoint>();
+    const move = (id: string, shift: WfnPoint) => {
+      const at = positions[id];
+      if (at) goals.set(id, { x: at.x + shift.x, y: at.y + shift.y });
+    };
+    for (const unit of units) {
+      const shift = shifts.get(unit.id);
+      if (shift) for (const id of members.get(unit.id) ?? []) move(id, shift);
+    }
+    const gap = (one: Box, other: Box) =>
+      Math.hypot(
+        Math.max(0, one.x - (other.x + other.width), other.x - (one.x + one.width)),
+        Math.max(0, one.y - (other.y + other.height), other.y - (one.y + one.height)),
+      );
+    const shifted = (box: Box, shift: WfnPoint): Box => ({ ...box, x: box.x + shift.x, y: box.y + shift.y });
+    const taken: Box[] = [...units.map((unit) => shifted(unit.box, shifts.get(unit.id) ?? { x: 0, y: 0 })), ...fixed];
+    const clearSpot = (box: Box): Box => {
+      let spot = box;
+      for (
+        let hit = taken.find((other) => overlaps(spot, other));
+        hit;
+        hit = taken.find((other) => overlaps(spot, other))
+      )
+        spot = { ...spot, y: below(hit) };
+      return spot;
+    };
+    for (const label of [...labels].sort((one, other) => one.box.y - other.box.y)) {
+      const nearest = units
+        .map((unit) => ({ unit, distance: gap(label.box, unit.box) }))
+        .filter((entry) => entry.distance <= TIDY_REACH)
+        .sort((one, other) => one.distance - other.distance)[0];
+      const follow = nearest && shifts.get(nearest.unit.id);
+      const spot = clearSpot(follow ? { ...label.box, ...snapPoint(shifted(label.box, follow)) } : label.box);
+      taken.push(spot);
+      if (spot.x !== label.box.x || spot.y !== label.box.y) goals.set(label.id, { x: spot.x, y: spot.y });
+    }
+    return goals;
+  };
+  const canTidy = () => !editsBlocked() && !deleted() && live().length > 1;
+  const tidyUp = () => {
+    if (!canTidy() || tidyGoals) return;
+    stopGesture();
+    dropFrames();
+    const goals = tidyPlaces();
+    const moved = [...goals].some(([id, at]) => positions[id]?.x !== at.x || positions[id]?.y !== at.y);
+    if (!moved) {
+      fitView(true);
+      return;
+    }
+    commit();
+    glidePlaces(goals);
   };
 
   const canRun = () => !props.readOnly && live().some((node) => isWorkflowStepKind(node.kind));
@@ -1902,7 +2182,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const blocked = (area: Box) =>
       area.y < top || area.y + area.height > bottom || hud.some((other) => overlaps(area, other));
     const above = zone(box.y - (TOOLBAR_GAP / camera.scale + height));
-    const room = board.results(id).length > 1 ? STRIP_ROOM : TOOLBAR_GAP;
+    const room = showsStrip(board, id) ? STRIP_ROOM : TOOLBAR_GAP;
     const below = zone(box.y + box.height + room / camera.scale);
     if (blocked(above)) return !blocked(below);
     if (!onNode(above)) return false;
@@ -2049,7 +2329,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     copying = ids;
     const written = document.execCommand("copy");
     copying = undefined;
-    if (!written) setCopied({ key: "", clip });
+    if (!written) setCopied({ key: "", clip, from: openId() });
   };
 
   const pasteNodes = (point?: WfnPoint) => {
@@ -2057,14 +2337,24 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const clip = held?.clip;
     const box = clip ? union(clip.nodes.map((node) => ({ ...node.at, width: 0, height: 0 }))) : undefined;
     if (!held || !clip || !box) return;
+    const center = () => {
+      const middle = toWorld({ x: view().width / 2, y: view().height / 2 });
+      return { x: middle.x - box.width / 2, y: middle.y - box.height / 2 };
+    };
     const at = point && snapPoint(point);
     const again = at && pastedAt && at.x === pastedAt.x && at.y === pastedAt.y;
-    const target = at && !again ? at : snapPoint({ x: box.x + DUPLICATE_OFFSET, y: box.y + DUPLICATE_OFFSET });
+    const target =
+      at && !again
+        ? at
+        : held.from === openId()
+          ? snapPoint({ x: box.x + DUPLICATE_OFFSET, y: box.y + DUPLICATE_OFFSET })
+          : snapPoint(center());
     pastedAt = at;
     const shift = { x: target.x - box.x, y: target.y - box.y };
     place(clip, shift, "paste");
     setCopied({
       key: held.key,
+      from: openId(),
       clip: {
         ...clip,
         nodes: clip.nodes.map((node) => ({ ...node, at: { x: node.at.x + shift.x, y: node.at.y + shift.y } })),
@@ -2088,8 +2378,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   const runNode = (id: string) => {
     if (kindOf(id) === "trigger") props.onRun({ fromNodeId: id });
-    else props.onRunStep(id);
+    else props.onRunStep(id, takesOf(id));
   };
+  const takesOf = (id: string) => (kindOf(id) === "image" ? mediaTakes(board.field(id, "batch")) : 1);
 
   const showNode = (id: string) => {
     const entry = groupIndex().get(id);
@@ -2808,7 +3099,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       event.preventDefault();
       const key = crypto.randomUUID();
       event.clipboardData.setData(CLIP_TYPE, key);
-      setCopied({ key, clip });
+      setCopied({ key, clip, from: openId() });
       pastedAt = undefined;
       if (event.type === "cut") canvas.deleteNodes(ids);
     };
@@ -2826,7 +3117,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const takesFiles = (event: DragEvent) =>
       event.dataTransfer?.types.includes("Files") === true &&
       !deleted() &&
-      !frozen() &&
+      !editsBlocked() &&
       allows("asset") &&
       props.features.uploads === true &&
       !(event.target instanceof Element && event.target.closest("[data-node-id], [data-wfn-portal], .wfn-hud"));
@@ -2844,7 +3135,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     const onPaste = (event: ClipboardEvent) => {
       const key = event.clipboardData?.getData(CLIP_TYPE);
-      if (deleted() || frozen()) return;
+      if (deleted() || editsBlocked()) return;
       if (!key || copied()?.key !== key) {
         pastePictures(event);
         return;
@@ -2883,7 +3174,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const node = active instanceof HTMLElement ? active.closest<HTMLElement>("[data-node-id]") : null;
       const arrow = ARROWS[event.key];
       const action = (() => {
-        if (frozen()) {
+        if (editsBlocked()) {
           if (inMenu) return undefined;
           if (event.key === "Escape" && following()) return stopFollow;
           if (event.key === "Escape") return previewing() ? closeVersion : undefined;
@@ -2920,6 +3211,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
               )
               ?.focus();
         if (event.shiftKey && event.code === "Digit1") return () => fitView(true);
+        if (event.shiftKey && event.code === "KeyT") return tidyUp;
         if (event.key === "Escape" && ui.search) return closeSearch;
         if (event.key === "Escape" && (ui.tool === "draw" || placing()) && !inMenu) return () => setTool("select");
         if (event.key === "Escape" && following() && !inMenu) return stopFollow;
@@ -3006,6 +3298,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         aria-label={t("workflow.canvas.label", { name: name() })}
         onPointerDown={(event) => {
           if (deleted()) return;
+          const outside = document.activeElement;
+          const pressedInView = event.target instanceof Node && viewport?.contains(event.target) === true;
+          if (
+            pressedInView &&
+            outside instanceof HTMLElement &&
+            !viewport?.contains(outside) &&
+            !outside.closest("[data-wfn-portal]")
+          )
+            outside.blur();
           if (builder() || unbuilt().size > 0) endBuild();
           if (drop() && !(event.target instanceof Element && event.target.closest(".wfn-drop-menu"))) closeDrop();
           pressing = true;
@@ -3293,7 +3594,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 {(id) => (
                   <>
                     <Show when={runnable(id())}>
-                      <ContextMenu.Item onSelect={() => runNode(id())}>
+                      <ContextMenu.Item onSelect={() => board.runStep(id())}>
                         <Play aria-hidden="true" />
                         <span class="wfn-menu-text">
                           {kindOf(id()) === "trigger"
@@ -3435,6 +3736,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                       keys={["⇧", "1"]}
                       onSelect={() => fitView(true)}
                     />
+                    <Show when={canTidy()}>
+                      <MenuItem
+                        icon={<Network />}
+                        label={t("workflow.canvas.action.tidy")}
+                        keys={TIDY_KEYS}
+                        onSelect={tidyUp}
+                      />
+                    </Show>
                     <MenuItem
                       icon={ui.hidden ? <Eye /> : <EyeOff />}
                       label={ui.hidden ? t("workflow.canvas.hud.show") : t("workflow.canvas.hud.hide")}
@@ -3465,7 +3774,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           )}
         </Show>
         <Show when={followedPeer()}>{(peer) => <FollowFrame peer={peer()} />}</Show>
-        <Show when={live().length === 0 && !frozen() && allows("trigger")}>
+        <Show when={props.opening}>
+          <div class="wfn-opening">
+            <Spinner label={t("workflow.canvas.opening")} />
+          </div>
+        </Show>
+        <Show when={live().length === 0 && !frozen() && !props.opening && allows("trigger")}>
           <div class="wfn-empty">
             <span class="wfn-menu-icon wfn-empty-icon" data-kind="trigger" aria-hidden="true">
               <Zap />
@@ -3477,6 +3791,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             </Button>
           </div>
         </Show>
+        <Show when={props.frame === "window"}>{corner()}</Show>
         <Show when={deleted()}>
           <WorkflowsEmpty
             next={nextWorkflowAfterDelete(listed(), openId())}
@@ -3487,24 +3802,19 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
         <WorkflowCanvasHeader
           frame={props.frame}
-          name={name()}
-          renaming={renaming()}
-          menuRef={(element) => {
-            workflowMenu = element;
-          }}
-          switcher={
-            <WorkflowSwitcher
-              workflows={listed()}
-              current={openId()}
-              versions={versionList()}
-              viewing={props.versionPreview?.versionId}
-              versionsDisabled={running()}
-              readOnly={props.readOnly === true}
-              onAction={onSwitcher}
-            />
+          title={
+            <Show when={props.frame === "window"} fallback={corner()}>
+              <WorkflowTabs
+                tabs={tabItems()}
+                current={openId()}
+                readOnly={props.readOnly === true}
+                control={props.tabs}
+                onOpen={(workflowId) => onSwitcher(`open:${workflowId}`)}
+                onNew={() => onSwitcher("new")}
+                onRename={renameTab}
+              />
+            </Show>
           }
-          onName={setName}
-          onEndRename={endRename}
           previewing={previewing()}
           viewing={board.viewing()}
           onView={board.view}
@@ -3722,6 +4032,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           minScale={MIN_SCALE}
           maxScale={MAX_SCALE}
           minimap={ui.minimap}
+          canTidy={canTidy()}
+          onTidy={tidyUp}
           onZoom={(action) => {
             if (action === "in") zoomBy(ZOOM_STEP);
             else if (action === "out") zoomBy(1 / ZOOM_STEP);

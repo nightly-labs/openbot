@@ -1,19 +1,28 @@
-import type {
-  BrowserBounds,
-  BrowserControlAction,
-  BrowserControlDetailAction,
-  BrowserControlSession,
-  BrowserControlState,
-  BrowserDisplayState,
-  BrowserEnvironment,
-  BrowserLiveViewEvent,
-  BrowserLocalSignInEnd,
-  BrowserLocalSignInResult,
-  BrowserPictureInPictureEvent,
-  BrowserPreview,
-  BrowserTab,
-  BrowserTeachStep,
-  BrowserViewport,
+import {
+  AVATAR_HUES,
+  type AvatarHue,
+  BROWSER_CONTROL_ACTIONS,
+  BROWSER_CONTROL_DETAIL_ACTIONS,
+  type BrowserBounds,
+  type BrowserControlSession,
+  type BrowserControlState,
+  type BrowserDisplayState,
+  type BrowserEnvironment,
+  type BrowserLiveViewEvent,
+  type BrowserLocalSignInEnd,
+  type BrowserLocalSignInResult,
+  type BrowserPictureInPictureEvent,
+  type BrowserPreview,
+  type BrowserTab,
+  type BrowserTabAgent,
+  type BrowserTabLabel,
+  type BrowserTeachStep,
+  type BrowserViewport,
+  type BrowserWindowAction,
+  type BrowserWindowEvent,
+  type BrowserWindowModel,
+  type BrowserWindowTabDetails,
+  isAvatarColor,
 } from "@openbot/contracts/ipc";
 import {
   decodeList,
@@ -25,35 +34,6 @@ import {
 } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
-const CONTROL_ACTIONS: readonly BrowserControlAction[] = [
-  "open",
-  "list-tabs",
-  "snapshot",
-  "click",
-  "type",
-  "key",
-  "scroll",
-  "back",
-  "forward",
-  "reload",
-  "screenshot",
-  "close-tab",
-];
-const CONTROL_DETAIL_ACTIONS: readonly BrowserControlDetailAction[] = [
-  "status",
-  "navigate",
-  "press",
-  "hover",
-  "select-option",
-  "set-checked",
-  "drag",
-  "upload-files",
-  "wait-for",
-  "evaluate",
-  "set-environment",
-  "recording-start",
-  "recording-stop",
-];
 const CONTROL_PHASES = ["acting", "waiting"] as const;
 const VIEWPORT_MODES = ["fill", "custom"] as const;
 const VIEWPORT_PRESETS = ["desktop", "tablet", "mobile"] as const;
@@ -134,6 +114,128 @@ export function decodeBrowserPictureInPictureEvent(value: unknown): BrowserPictu
     default:
       throw new Error("Invalid picture-in-picture event type.");
   }
+}
+
+export function decodeBrowserWindowModel(value: unknown): BrowserWindowModel | null {
+  if (value === null) return null;
+  const model = decodeRecord(value, "browser window model");
+  const { shortcuts } = model;
+  if (shortcuts !== null && shortcuts !== "mac" && shortcuts !== "pc") throw new Error("Invalid shortcuts.");
+  return {
+    tabs: decodeBrowserTabs(model.tabs),
+    activeTabId: nullableString(model, "activeTabId"),
+    details: decodeList(model.details, "browser tab details", windowTabDetails),
+    history: decodeList(model.history, "browser history", (entry) => ({
+      url: requiredString(entry, "url"),
+      title: requiredString(entry, "title"),
+      visits: requiredNumber(entry, "visits"),
+    })),
+    canReopen: requiredBoolean(model, "canReopen"),
+    canCloseTabs: requiredBoolean(model, "canCloseTabs"),
+    liveViewTabId: nullableString(model, "liveViewTabId"),
+    liveViewClipboard: requiredBoolean(model, "liveViewClipboard"),
+    shortcuts,
+  };
+}
+
+export function decodeBrowserWindowModelUpdate(value: unknown): BrowserWindowModel {
+  const model = decodeBrowserWindowModel(value);
+  if (!model) throw new Error("Invalid browser window model.");
+  return model;
+}
+
+export function decodeBrowserWindowEvent(value: unknown): BrowserWindowEvent {
+  const event = decodeRecord(value, "browser window event");
+  switch (event.type) {
+    case "bounds-changed":
+      return { type: "bounds-changed", bounds: decodeBrowserBounds(event.bounds) };
+    case "dock":
+    case "hide":
+      return { type: event.type };
+    case "action":
+      return { type: "action", action: windowAction(decodeRecord(event.action, "browser window action")) };
+    default:
+      throw new Error("Invalid browser window event type.");
+  }
+}
+
+function windowAction(action: DynamicRecord): BrowserWindowAction {
+  switch (action.type) {
+    case "activate":
+    case "duplicate":
+    case "reload":
+    case "stop":
+      return { type: action.type, tabId: requiredString(action, "tabId") };
+    case "close":
+      if (!Array.isArray(action.tabIds) || !action.tabIds.every(isString)) throw new Error("Invalid tabIds.");
+      return { type: "close", tabIds: action.tabIds };
+    case "new-tab":
+      return action.afterId === undefined
+        ? { type: "new-tab" }
+        : { type: "new-tab", afterId: requiredString(action, "afterId") };
+    case "move":
+      return { type: "move", tabId: requiredString(action, "tabId"), index: requiredNumber(action, "index") };
+    case "reopen":
+      return { type: "reopen" };
+    case "navigate": {
+      const { direction } = action;
+      if (direction !== "back" && direction !== "forward") throw new Error("Invalid direction.");
+      return { type: "navigate", tabId: requiredString(action, "tabId"), direction };
+    }
+    case "open-address": {
+      const url = requiredString(action, "url");
+      return action.tabId === undefined
+        ? { type: "open-address", url }
+        : { type: "open-address", url, tabId: requiredString(action, "tabId") };
+    }
+    default:
+      throw new Error("Invalid browser window action.");
+  }
+}
+
+function windowTabDetails(details: DynamicRecord): BrowserWindowTabDetails {
+  return {
+    tabId: requiredString(details, "tabId"),
+    ...(details.control === undefined
+      ? {}
+      : { control: controlSession(decodeRecord(details.control, "browser control session")) }),
+    ...(details.controller === undefined
+      ? {}
+      : { controller: tabAgent(decodeRecord(details.controller, "browser tab agent")) }),
+    ...(details.owner === undefined ? {} : { owner: tabAgent(decodeRecord(details.owner, "browser tab agent")) }),
+    ...(details.profile === undefined
+      ? {}
+      : { profile: tabLabel(decodeRecord(details.profile, "browser tab profile")) }),
+  };
+}
+
+function tabAgent(agent: DynamicRecord): BrowserTabAgent {
+  const { avatarColor } = agent;
+  if (avatarColor !== undefined && avatarColor !== null && !isAvatarColor(avatarColor)) {
+    throw new Error("Invalid avatarColor.");
+  }
+  return {
+    id: requiredString(agent, "id"),
+    name: requiredString(agent, "name"),
+    avatarSeed: requiredString(agent, "avatarSeed"),
+    avatarHue: avatarHue(agent.avatarHue),
+    ...(avatarColor === undefined ? {} : { avatarColor }),
+    avatarUrl: nullableString(agent, "avatarUrl"),
+  };
+}
+
+function tabLabel(profile: DynamicRecord): BrowserTabLabel {
+  return {
+    tabId: requiredString(profile, "tabId"),
+    name: nullableString(profile, "name"),
+    hue: avatarHue(profile.hue),
+    ...(profile.proxy === undefined ? {} : { proxy: requiredString(profile, "proxy") }),
+  };
+}
+
+function avatarHue(value: unknown): AvatarHue | null {
+  if (value === null || isOneOf(AVATAR_HUES, value)) return value;
+  throw new Error("Invalid avatar hue.");
 }
 
 export function decodeBrowserTeachSteps(value: unknown): BrowserTeachStep[] {
@@ -219,8 +321,8 @@ function popupFailureOf(value: unknown): { id: string; message: string } {
 
 function controlSession(session: DynamicRecord): BrowserControlSession {
   const { action, detailAction, phase } = session;
-  if (!isOneOf(CONTROL_ACTIONS, action)) throw new Error("Invalid action.");
-  if (detailAction !== undefined && !isOneOf(CONTROL_DETAIL_ACTIONS, detailAction)) {
+  if (!isOneOf(BROWSER_CONTROL_ACTIONS, action)) throw new Error("Invalid action.");
+  if (detailAction !== undefined && !isOneOf(BROWSER_CONTROL_DETAIL_ACTIONS, detailAction)) {
     throw new Error("Invalid detailAction.");
   }
   if (!isOneOf(CONTROL_PHASES, phase)) throw new Error("Invalid phase.");

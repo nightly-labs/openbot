@@ -283,6 +283,10 @@
   max-width: min(480px, 100%);
 }
 
+.message-entry .ui-bubble:has(.message-attachment[data-player="video"]) > .ui-bubble-content {
+  width: 100%;
+}
+
 .message-attachment[data-player="video"]:not([data-download]) > :not(.attachment-media-player) {
   display: none;
 }
@@ -301,6 +305,7 @@
 }
 
 .message-attachment[data-player="video"] .attachment-media-player {
-  max-width: calc(480px * (var(--media-generation-ratio)));
+  width: min(480px, calc(480px * (var(--media-generation-ratio))));
+  max-width: 100%;
   border-radius: var(--openbot-radius-lg);
 }

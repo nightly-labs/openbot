@@ -1704,6 +1704,26 @@ a client's own quota changes, `ProviderRuntime.#noteCredits` sends `usage-credit
 with no data that only `usage-credits-v1` peers get, and the client reads the usage again. A host
 without the capability gives no flag, and the client shows **Usage limit reached** as before.
 
+### How many accounts a provider keeps
+
+A provider keeps up to 20 accounts, the default account included (`MAX_PROVIDER_ACCOUNTS`).
+`ProviderAccountStore` refuses the next account with `error.provider.accountLimit`. The released
+codecs of `provider-accounts-v1`, `provider-account-models-v1`, `provider-account-pool-v1` and
+`provider-usage-reset-v1` read at most 10 accounts of one provider, and they are frozen. The protocol 10
+capability `provider-many-accounts-v1`
+([`provider-many-accounts-v1.ts`](../../packages/contracts/src/team-protocol/provider-many-accounts-v1.ts))
+lets these lists, and the `leftOut` list of a pool update, hold 20 accounts when both peers send it. The rows
+keep their frozen shapes.
+
+| Peer | Rule |
+| --- | --- |
+| Client with the capability | Reads and sends lists of up to 20 accounts of one provider. Settings allows 20 accounts. |
+| Client without it | Works while each provider has 10 accounts or fewer. When a list would hold more, or a sign-in, a code sign-in, a key, a saved Claude API key or a relay sign-in would add the 11th account, the host refuses it with 409 `error.team.providerAccountListNeedsUpdate` before it changes anything (`requireProviderAccountsFit` in [`route-provider-accounts.ts`](../../src/main/team-api/route-provider-accounts.ts)). |
+| Current client, host without it | Settings allows 10 accounts, and the host keeps its own limit of 10. |
+| Older app on the same computer | Does not delete or change an account file with more than 10 accounts: its store reads the `accounts` list without a limit, and opens the file read-only if a pool leaves out more than 10 accounts. But its preload decoder refuses an agent status with more than 10 accounts of one provider ("Invalid agent status response."), so that app cannot show agent status until it is updated again. |
+
+Run `bun run test:provider-many-accounts` to check the limits through the Team API and the account store.
+
 ### Account code sign-in
 
 An account after the first of Codex, Grok or Claude can also sign in with a code (`accountCodeSignIn` in the

@@ -401,6 +401,9 @@ export const messages = {
   "mobile.agent.planCard.label": "הצגת התוכנית לפני משימות ארוכות",
   "mobile.agent.planCard.footer":
     "לפני משימה ארוכה הסוכן מציג את התוכנית שלו. היא מתחילה אחרי 10 שניות, או כשלוחצים על התחלה.",
+  "mobile.agent.builtinMemory.label": "הזיכרון של OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "הסוכן שומר וקורא את הזיכרונות שלו. כבו כדי להשתמש רק באפליקציית זיכרון, כמו Mem0. הזיכרונות השמורים נשארים.",
   "mobile.agent.workspace.title": "תיקיית סביבת עבודה",
   "mobile.agent.workspace.footer": "התיקייה של הסוכן הזה במחשב המארח.",
   "mobile.agent.advanced.behavior": "התנהגות",

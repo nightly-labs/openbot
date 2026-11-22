@@ -61,6 +61,8 @@ const meta = {
 } satisfies Meta;
 
 export default meta;
+
+const secondsAgo = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
 type Story = StoryObj<typeof meta>;
 
 export const Example: Story = {
@@ -84,6 +86,11 @@ export const ExampleWithCollaborators: Story = {
 export const InApp: Story = {
   name: "In app",
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
+};
+
+export const InAppOpening: Story = {
+  name: "In app, opening",
+  render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} opening />,
 };
 
 export const HiggsfieldVideo: Story = {
@@ -355,6 +362,29 @@ export const VideoCustomLength: Story = {
   ),
 };
 
+const STORY_CLIP = new URL("../../../packages/ui/src/assets/plush/fishing.webm", import.meta.url).href;
+
+export const VideoWithClip: Story = {
+  name: "Video, with a clip",
+  render: () => (
+    <NodeGallery
+      selected="clip"
+      catalogs={{
+        ...STORY_CATALOGS,
+        imageModels: [RANGE_VIDEO_MODEL, ...STORY_CATALOGS.imageModels],
+        media: (value, kind) => (kind === "video" && value === "plush-clip" ? STORY_CLIP : undefined),
+      }}
+      fields={{
+        empty: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 6 },
+        clip: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 6 },
+      }}
+    >
+      <ImageNode id="empty" prompt="A plush toy fishing from a small wooden pier at sunset" />
+      <ImageNode id="clip" image="plush-clip" prompt="A plush toy fishing from a small wooden pier at sunset" />
+    </NodeGallery>
+  ),
+};
+
 export const ImageManyResults: Story = {
   name: "Image, many results",
   render: () => (
@@ -366,6 +396,33 @@ export const ImageManyResults: Story = {
           at: todayAt(9, index * 4),
           value: STORY_IMAGES[index % STORY_IMAGES.length]?.name ?? "",
         })),
+      }}
+    >
+      <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+export const ImageBatchFailedTake: Story = {
+  name: "Image, batch with a failed take",
+  render: () => (
+    <NodeGallery
+      selected="filled"
+      results={{
+        filled: [
+          ...Array.from({ length: 11 }, (_, index) => ({
+            id: `image-result-${index + 1}`,
+            at: todayAt(9, index * 4),
+            value: STORY_IMAGES[index % STORY_IMAGES.length]?.name ?? "",
+          })),
+          { id: "image-result-failed", at: todayAt(9, 50), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+      pending={{
+        filled: [
+          { id: "image-take-first", at: secondsAgo(25) },
+          { id: "image-take-second", at: secondsAgo(25) },
+        ],
       }}
     >
       <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />

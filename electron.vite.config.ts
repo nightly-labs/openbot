@@ -97,6 +97,7 @@ export default defineConfig({
           helper: resolve("src/renderer/helper.html"),
           browserPip: resolve("src/renderer/browser-pip.html"),
           browserPipControls: resolve("src/renderer/browser-pip-controls.html"),
+          browserWindow: resolve("src/renderer/browser-window.html"),
           teamWebrtc: resolve("src/renderer/team-webrtc.html"),
           serverSetup: resolve("src/renderer/server-setup.html"),
         },

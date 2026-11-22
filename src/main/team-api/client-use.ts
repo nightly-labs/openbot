@@ -2,6 +2,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACTIVE_QUEUES_ROUTES } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
@@ -32,6 +33,7 @@ import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browse
 import { BROWSER_USER_CONTROL_ROUTES } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CACHE_EXPIRY_COMPACTION_ROUTES } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import { CHANNEL_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CLAUDE_COMPACT_WINDOW_ROUTES } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
@@ -94,6 +96,7 @@ import { VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { WHATSAPP_STATUS_REACTIONS_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
+import { WORKFLOW_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import { WORKFLOWS_HIGGSFIELD_ROUTES } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_CATALOG_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_CATALOG_V2_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
@@ -174,6 +177,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_TASK_LIMIT_ROUTES.settings,
   AGENT_NEW_CHAT_ROUTES.settings,
   AGENT_PLAN_CARD_ROUTES.settings,
+  AGENT_BUILTIN_MEMORY_ROUTES.settings,
   AGENT_DEFAULTS_ROUTES.settings,
   AGENT_FAST_MODE_ROUTES.settings,
   AGENT_FAST_MODE_ROUTES.models,
@@ -190,8 +194,11 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
   WORKFLOWS_STEP_SETTINGS_ROUTES.read,
+  WORKFLOW_FOLDERS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.browse,
+  CHANNEL_FOLDERS_ROUTES.read,
+  CHANNEL_FOLDERS_ROUTES.browse,
   BROWSER_PROFILES_ROUTES.list,
   BROWSER_PROFILES_ROUTES.agent,
   BROWSER_PROFILES_ROUTES.tabs,

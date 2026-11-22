@@ -419,6 +419,7 @@
         "@discordjs/rest": "2.6.3",
         "@discordjs/ws": "2.0.4",
         "@openbot/contracts": "workspace:*",
+        "@openbot/i18n": "workspace:*",
         "discord-api-types": "0.38.57",
         "effect": "catalog:",
         "elysia": "1.4.30",
@@ -466,7 +467,7 @@
     "@kobalte/core": "2.0.0-alpha.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
-    "@norbert_bodziony/bloub": "0.6.8",
+    "@norbert_bodziony/bloub": "0.7.0",
     "@openpanel/web": "1.4.2",
     "@paper-design/shaders": "0.0.80",
     "@solidjs/signals": "2.0.0",
@@ -1160,7 +1161,7 @@
 
     "@node-datachannel/win32-x64-msvc": ["@node-datachannel/win32-x64-msvc@0.33.6", "", { "os": "win32", "cpu": "x64" }, "sha512-N5GW6XH11Iuu+kyHLTiCMcCHdwWwpKqvtYril0LzQm6xBgmGQN3JXxFmgi4g4usw1nLy6WhBWADjbhSXJiiEMA=="],
 
-    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.8", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-s8aqBfEEmfqFUKX9qgeYhitJhODpyrJK7DlEK2sTWE9pY7AgPJK0WqoAKf41Bkuc3Ci1LgQiqZdAKIie37fgMw=="],
+    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.7.0", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-/41poHd8KMzclDDH2bUJi1XpwScZ2GoLxLR8XO7k9tAMjs+XLeR6VBWm95TncdDQqfYp83B6GVDc5r3bX9w80Q=="],
 
     "@nothing-but/utils": ["@nothing-but/utils@0.17.0", "", {}, "sha512-TuCHcHLOqDL0SnaAxACfuRHBNRgNJcNn9X0GiH5H3YSDBVquCr3qEIG3FOQAuMyZCbu9w8nk2CHhOsn7IvhIwQ=="],
 

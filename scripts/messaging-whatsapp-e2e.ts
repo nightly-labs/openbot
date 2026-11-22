@@ -16,6 +16,7 @@ import {
 import {
   type AnyMessageContent,
   type BaileysEventMap,
+  type BinaryNode,
   type GroupMetadata,
   type MiscMessageGenerationOptions,
   proto,
@@ -40,7 +41,9 @@ import {
   backoffDelay,
   closeDecision,
   MESSAGE_ACK,
+  NODE_HANDLING,
   type WhatsAppAck,
+  WhatsAppSession,
   type WhatsAppSocket,
 } from "../src/backend/messaging/whatsapp/whatsapp-session";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -118,8 +121,7 @@ interface Sent {
 
 class FakeSocket implements WhatsAppSocket {
   readonly #events = new EventEmitter();
-  readonly #frames = new Set<() => void>();
-  readonly #acks = new Set<(node: WhatsAppAck) => void>();
+  readonly #ws = new EventEmitter();
   readonly #phone: FakePhone;
   readonly config: UserFacingSocketConfig;
   ended = false;
@@ -129,12 +131,7 @@ class FakeSocket implements WhatsAppSocket {
       this.#events.on(event, listener);
     },
   };
-  readonly ws: WhatsAppSocket["ws"] = {
-    on: (event: string, listener: (node: WhatsAppAck) => void) => {
-      if (event === MESSAGE_ACK) this.#acks.add(listener);
-      else this.#frames.add(() => listener({ attrs: {} }));
-    },
-  };
+  readonly ws: WhatsAppSocket["ws"] = this.#ws;
   readonly signalRepository = {
     lidMapping: {
       getPNForLID: async (lid: string) =>
@@ -150,8 +147,17 @@ class FakeSocket implements WhatsAppSocket {
 
   emit<T extends keyof BaileysEventMap>(event: T, arg: BaileysEventMap[T]): void {
     if (this.ended) return;
-    for (const frame of this.#frames) frame();
+    this.#ws.emit("frame");
     this.#events.emit(event, arg);
+  }
+
+  keepAlive(): void {
+    if (!this.ended) this.#ws.emit("frame");
+  }
+
+  stallNode(): void {
+    if (!this.ended)
+      this.#ws.emit(NODE_HANDLING, { tag: "message", attrs: { id: "STALLED" } } satisfies BinaryNode, true);
   }
 
   boot(): void {
@@ -196,9 +202,10 @@ class FakeSocket implements WhatsAppSocket {
     }
     this.#phone.sent.push({ jid, content, id, quotedId: options?.quoted?.key.id ?? null });
     const error = this.#phone.refused.get(jid);
-    setTimeout(() => {
-      for (const ack of this.#acks) ack({ attrs: { id, ...(error ? { error } : {}) } });
-    }, 0);
+    if (!this.#phone.holdAcks)
+      setTimeout(() => {
+        this.#ws.emit(MESSAGE_ACK, { attrs: { id, ...(error ? { error } : {}) } } satisfies WhatsAppAck);
+      }, 0);
     const text = "text" in content && typeof content.text === "string" ? content.text : "";
     const message: WAMessage = {
       key: { remoteJid: jid, id, fromMe: true },
@@ -254,6 +261,7 @@ class FakePhone {
   readonly sent: Sent[] = [];
   readonly refused = new Map<string, string>();
   dropNext: string | null = null;
+  holdAcks = false;
   readonly lost: Sent[] = [];
   logouts = 0;
   offline = false;
@@ -409,6 +417,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     agents: {
       listAgents: () => agents.listAgents(),
       respondToApproval: (input) => agents.respondToApproval(input),
+      approvalExecutionThreadId: (requestId) => agents.approvalExecutionThreadId(requestId),
       onEvent: () => () => {},
       createAgentProfile: (input) => agents.createAgentProfile(input),
       createMemory: (input) => agents.createMemory(input),
@@ -1917,6 +1926,75 @@ try {
       return { disconnected: true };
     });
   });
+
+  await step(
+    "a socket that stops handling messages reconnects by itself, and stops after three stalls in an hour",
+    async () => {
+      let clock = Date.now();
+      const store = WhatsAppAuthStore.open({ path: join(root, "stall.db"), key: newStoreKey(), now: () => clock });
+      store.creds.me = { id: `${OWNER}:7@s.whatsapp.net` };
+      store.saveCreds();
+      const session = new WhatsAppSession({
+        store,
+        createSocket: phone.create,
+        makeSignalRepository: () => {
+          throw new Error("Not used by the fake socket.");
+        },
+        fetchVersion: async () => null,
+        now: () => clock,
+      });
+      const advance = (ms: number) => {
+        clock += ms;
+        phone.current().keepAlive();
+      };
+      const stall = async (label: string) => {
+        const socket = phone.current();
+        socket.stallNode();
+        advance(5 * 60_000);
+        await until(() => socket.ended, label, 20_000);
+      };
+      try {
+        session.start();
+        await until(() => session.state === "open", "the first socket open");
+        await stall("a stalled node ends its socket");
+        await until(() => session.state === "open", "a new socket after the first stall");
+
+        phone.holdAcks = true;
+        const unconfirmed = phone.current();
+        const posted = await runCauseEffect(session.send(OWNER_JID, { text: "not confirmed" }));
+        phone.holdAcks = false;
+        assert.ok(posted.key.id, "The unconfirmed post failed.");
+        await until(() => unconfirmed.ended && session.state === "open", "a new socket after an unconfirmed post");
+
+        await stall("a second stalled node ends its socket");
+        await until(() => session.state === "open", "a new socket after the second stall");
+        await stall("a third stalled node ends its socket");
+        await until(() => session.state === "failing", "Needs attention after three stalls in an hour");
+
+        session.reconnect();
+        await until(() => session.state === "open", "connected after a wake");
+        await stall("a stall after the wake ends its socket");
+        await until(() => session.state === "open", "a new socket after a stall that follows the wake");
+
+        await runCauseEffect(session.stop());
+        session.start();
+        await until(() => session.state === "open", "connected after Reconnect");
+        return {
+          states: [
+            "open after a stall",
+            "open after an unconfirmed post, which does not count",
+            "open after the second stall",
+            "failing after the third stall",
+            "open after a wake, and after one more stall",
+            "open after Reconnect",
+          ],
+        };
+      } finally {
+        await runCauseEffect(session.stop());
+        store.close();
+      }
+    },
+  );
 
   report.passed = true;
 } finally {

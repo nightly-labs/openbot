@@ -93,6 +93,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Это подключение не может остановить запуск регулярной задачи.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.libraryFoldersUnsupported": "Это подключение не поддерживает папки Библиотеки.",
+  "error.team.workflowFoldersUnsupported": "Это подключение не поддерживает папки рабочих процессов.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
   "error.team.sidebarPinsUnsupported":
@@ -132,6 +133,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Это подключение не поддерживает места отправки рутин.",
   "error.team.agentMemoryLimitUnsupported": "Это подключение не поддерживает лимит памяти агентов.",
   "error.team.agentFoldersUnsupported": "Это подключение не поддерживает папки агентов.",
+  "error.team.channelFoldersUnsupported": "Это подключение не поддерживает папки каналов.",
   "error.team.folderUnavailable": "Эта папка недоступна на компьютере хоста.",
   "error.team.memoryReviewUnsupported": "Это подключение не поддерживает проверку памяти.",
   "error.team.skillLearningUnsupported": "Это подключение не поддерживает обучение навыкам.",
@@ -152,6 +154,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Это подключение не поддерживает серверы MCP.",
   "error.team.mcpServerListNeedsUpdate":
     "Обновите OpenBot на этом устройстве, чтобы использовать на этом сервере больше {limit} серверов MCP.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Обновите OpenBot на этом устройстве, чтобы использовать на этом сервере больше {limit} аккаунтов одного провайдера.",
   "error.team.storageUnsupported": "Это подключение не поддерживает хранилище.",
   "error.team.machineResourcesUnsupported": "Это подключение не поддерживает данные о машине.",
   "error.team.machineAlertMemberInvalid":

@@ -38,6 +38,7 @@ import {
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
@@ -46,6 +47,7 @@ import {
   SKILL_LEARNING_CAPABILITY,
   withSkillSuggestionNames,
 } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-workflow-files-v1";
 import {
   addUiBlockAutoAnswers,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -756,6 +758,7 @@ export class TeamWebRtcHostPeer {
                       channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
                       channelPicture: peerCapabilities.has(CHANNEL_PICTURE_CAPABILITY),
                       channelBrowser: peerCapabilities.has(CHANNEL_BROWSER_CAPABILITY),
+                      providerManyAccounts: peerCapabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY),
                     }),
                   );
                 const decoded = decodeRequest(input.method, input.path, input.body, {
@@ -834,7 +837,9 @@ export class TeamWebRtcHostPeer {
             channelSeenSubtasks: peerCapabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
             channelTaskWaits: peerCapabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
             mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
+            providerManyAccounts: peerCapabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY),
             routineResultsWhatsApp: peerCapabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
+            storageWorkflowFiles: peerCapabilities.has(STORAGE_WORKFLOW_FILES_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),

@@ -61,6 +61,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
   const fixtureVersion = (workflowId: string, versionId: string) =>
     fixtures.get(workflowId)?.versions?.find(({ version }) => version.id === versionId);
   const listeners = new Set<(workflowId: string | null) => void>();
+  const folderListeners = new Set<() => void>();
   const now = Date.now();
   const api = mockWorkflows(
     workflows.map(({ id, title, graph }, index) => ({
@@ -71,6 +72,9 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     })),
     (workflowId) => {
       for (const listener of listeners) listener(workflowId);
+    },
+    () => {
+      for (const listener of folderListeners) listener();
     },
   );
   return {
@@ -144,7 +148,15 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     mediaTransparentSupported: () => true,
     mediaSizeSupported: () => true,
     agentFilesSupported: () => true,
+    answersSupported: () => true,
     stepSettingsSupported: () => true,
+    foldersSupported: () => true,
+    folders: () => api.folders(),
+    folderAction: (action) => api.folderAction(action),
+    onFoldersChanged(changed) {
+      folderListeners.add(changed);
+      return () => folderListeners.delete(changed);
+    },
     pictures: async () => [],
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
     mediaUrl: () => null,
@@ -253,7 +265,11 @@ function WorkflowAppWindow(props: { children: JSX.Element }) {
   );
 }
 
-export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[]; features?: WorkflowFeatures }) {
+export function WorkflowInAppStory(props: {
+  workflows: readonly StoryWorkflow[];
+  features?: WorkflowFeatures;
+  opening?: boolean;
+}) {
   const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
   const features = () => props.features ?? WORKFLOW_FEATURES_V1;
   return (
@@ -267,6 +283,7 @@ export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[];
             github={story.github}
             frame="window"
             {...story.props}
+            opening={props.opening === true || story.props.opening}
           />
         )}
       </Show>

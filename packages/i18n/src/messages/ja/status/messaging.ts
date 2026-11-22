@@ -40,6 +40,8 @@ export const messages = {
     "ここで回答できるエージェントはまだいません。OpenBot で マーケットプレイス > アプリ > Telegram を開き、エージェントを追加 をクリックしてください。",
   "status.messaging.telegramLinked":
     "OpenBot はこのチャットに接続されています。エージェントに依頼するには、{bot} をメンションするか、OpenBot のメッセージに返信してください。",
+  "status.messaging.telegramNotLinked":
+    "OpenBot はこのチャットに接続されていません。接続するには、OpenBot アプリを開き、マーケットプレイス → アプリ → Telegram で「グループに追加」または「ダイレクトチャットを開く」を選択してください。",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Telegram で回答し、チームに依頼します",
   "status.messaging.whatsappNoAgent":

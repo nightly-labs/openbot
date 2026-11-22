@@ -60,7 +60,7 @@ interface SpokenPart {
 
 export interface UpcomingReading {
   text: string;
-  language: SpeechLanguage;
+  language: SpeechLanguage | null;
   first?: Promise<SpeechAudio>;
 }
 
@@ -214,7 +214,7 @@ export function setUpcomingReading(next: UpcomingReading | undefined): void {
 function prepareUpcoming(): void {
   const next = upcoming;
   if (!next || next.first) return;
-  const first = new SpeechParts(next.text, next.language).next();
+  const first = new SpeechParts(next.text, next.language ?? undefined).next();
   if (first === undefined) return;
   next.first = speechPort().voice.speak({ text: first, language: next.language });
   next.first.catch(() => undefined);
@@ -244,14 +244,14 @@ export interface ReadAloudResult {
 
 export async function readAloud(
   text: string,
-  language: SpeechLanguage,
+  language: SpeechLanguage | null,
   source: SpeechSource | null = null,
   prepared?: UpcomingReading,
 ): Promise<ReadAloudResult> {
   const calledAt = performance.now();
   const result: ReadAloudResult = { completed: false, firstAudioMs: null, seconds: 0 };
   stopSpeech();
-  const parts = new SpeechParts(text, language, replyRate);
+  const parts = new SpeechParts(text, language ?? undefined, replyRate);
   const first = parts.next();
   if (first === undefined) return result;
   const own = newReading(true, source);

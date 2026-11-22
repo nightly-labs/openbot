@@ -55,6 +55,8 @@ export const messages = {
   "browser.pip.close": "브라우저 팝업 닫기",
   "browser.pip.reattachFailed": "OpenBot이 브라우저를 다시 붙이지 못했어요.",
   "browser.pip.closeFailed": "OpenBot이 브라우저 팝업을 닫지 못했어요.",
+  "browser.window.open": "새 창에서 브라우저 열기",
+  "browser.window.openFailed": "OpenBot이 브라우저 창을 열지 못했어요.",
   "browser.popupBlocked.title": "팝업 차단됨",
   "browser.popupBlocked.dismiss": "팝업 메시지 닫기",
   "browser.liveView.label": "서버에 있는 페이지의 실시간 화면",

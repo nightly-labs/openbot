@@ -267,6 +267,9 @@ export const messages = {
     "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "agentSettings.quickAcknowledgement.title": "Pokaż plan przed długimi zadaniami",
   "agentSettings.quickAcknowledgement.description": "Przed długim zadaniem agent pokazuje swój plan.",
+  "agentSettings.builtinMemory.title": "Pamięć OpenBot",
+  "agentSettings.builtinMemory.description":
+    "Agent zapisuje i czyta własne wspomnienia. Wyłącz, aby używać tylko aplikacji pamięci, takiej jak Mem0. Zapisane wspomnienia zostają.",
   "agentSettings.browserProfile.label": "Profil przeglądarki",
   "agentSettings.browserProfile.shared": "Wspólny",
   "agentSettings.browserProfile.agent": "Tylko ten agent",

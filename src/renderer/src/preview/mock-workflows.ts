@@ -1,12 +1,16 @@
 import {
+  applyWorkflowFolderAction,
+  EMPTY_WORKFLOW_FOLDERS,
   isWorkflowStepKind,
   nodeAgentId,
   type OpenBotDesktopApi,
+  prunedWorkflowFolders,
   type StartWorkflowRunInput,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
   WORKFLOW_MAX_VERSIONS,
   WORKFLOW_MEDIA_MODELS,
   type WorkflowDetail,
+  type WorkflowFoldersSnapshot,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubDelivery,
   type WorkflowGitHubItem,
@@ -189,6 +193,7 @@ const PREVIEW_MEDIA_ACCOUNTS: readonly WorkflowMediaAccountCredits[] = [
 export function mockWorkflows(
   seeds: readonly MockWorkflowSeed[],
   emit: (workflowId: string) => void,
+  emitFolders: () => void = () => undefined,
 ): OpenBotDesktopApi["workflows"] {
   const records = new Map<string, MockWorkflowRecord>();
   const stamp = () => new Date().toISOString();
@@ -472,7 +477,17 @@ export function mockWorkflows(
     return node;
   };
 
+  let folders: WorkflowFoldersSnapshot = structuredClone(EMPTY_WORKFLOW_FOLDERS);
+  const currentFolders = () => prunedWorkflowFolders(folders, new Set(records.keys()));
   return {
+    folders: async () => structuredClone(currentFolders()),
+    folderAction: async (action) => {
+      const current = currentFolders();
+      const next = applyWorkflowFolderAction(current, action, { workflowIds: new Set(records.keys()) });
+      folders = next;
+      if (next !== current) emitFolders();
+      return structuredClone(next);
+    },
     list: async () =>
       structuredClone([...records.values()].map((entry) => entry.detail.summary)).sort((left, right) =>
         right.updatedAt.localeCompare(left.updatedAt),

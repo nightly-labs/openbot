@@ -25,6 +25,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "設定 → 音声 で音声合成モデルをダウンロードしてください。",
   "error.voice.speech.timedOut": "返信の読み上げがタイムアウトしました。",
   "error.voice.speech.failed": "OpenBot は返信を読み上げられませんでした。",
+  "error.voice.speech.providerRefused": "{provider} が音声の作成を拒否しました: {reason}",
   "error.voice.recordingNotKept": "OpenBot は音声録音を保存できませんでした。",
   "error.voice.live.timedOut": "Codex ライブ音声が時間内に開始しませんでした。もう一度お試しください。",
   "error.voice.live.failed": "ライブ音声が停止しました: {reason}",

@@ -238,6 +238,7 @@ export const messages = defineMessages("error.provider", {
     "OpenCode Go refused the request. A new API key does not fix this. Your OpenCode Go plan may not be active, or OpenCode Go may block your network: some services block VPNs, proxies or some countries. Make sure that your plan is active in OpenCode Console, or turn off the VPN, then try again. You can also choose a different model.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
+  "error.provider.opencodeStillStarting": "OpenCode did not finish loading in time. OpenBot will try again.",
   "error.provider.opencodeRateLimited":
     "The model provider refused the request because of its rate limit. Wait a few minutes or choose another model, then try again.\n{detail}",
   "error.provider.opencodeBilling":
@@ -277,6 +278,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cpuUnsupported": "The processor of this computer cannot run this provider. Use a different provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode could not open its database because a newer OpenCode version changed it. Update OpenCode to version 2 or later, then try again.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok did not start because the allowed_models setting in its config does not include its default model. Add the default model to allowed_models, or remove allowed_models, then try again.",
   "error.provider.opencodeNoAnswer":
     "The OpenCode model ended the turn with no answer. Try again, or choose another model.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -410,6 +413,8 @@ export const messages = defineMessages("error.provider", {
     "This chat became too large to send to the model. Images in the chat often cause this. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.opencodeSessionRejected":
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
+  "error.provider.opencodeInputRefused":
+    "The model refused the content of this chat and did not give the cause. A file in the chat, such as a PDF or an image, can cause this. OpenBot started a new OpenCode session with the chat history. Send your message again without the file, or select a different model.",
   "error.provider.opencodeCompactionFailed":
     "The model could not summarize this long chat to make room in its context window. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a stronger model.",
   "error.provider.museMcpStartupFault":
@@ -521,6 +526,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.nativeVersionUnreadable": "The {provider} CLI version could not be read.",
   "error.provider.piSessionBusy": "Wait for the current Pi turn to finish.",
   "error.provider.acpSessionBusy": "{provider} still finishes a stopped turn. Try again in a moment.",
+  "error.provider.acpSessionStale":
+    "{provider} could not load the latest version of this chat. Send your message again.",
   "error.provider.acpModelNotOffered":
     "{provider} does not offer {model} now. Choose another model for this agent, then try again.",
   "error.provider.piStopped": "Pi is not running. Connect Pi and try again.",

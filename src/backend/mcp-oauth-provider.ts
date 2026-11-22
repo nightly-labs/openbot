@@ -27,12 +27,14 @@ import {
   type OAuthTokens,
   OAuthTokensSchema,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import { checkResourceAllowed, resourceUrlFromServerUrl } from "@modelcontextprotocol/sdk/shared/auth-utils.js";
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { MCP_SIGN_IN_TIMEOUT_MS } from "@openbot/contracts/ipc";
 import { mcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Result, Scope } from "effect";
+import { getDomain } from "tldts";
 import { z } from "zod";
 import { runCauseEffect } from "./effect-boundary";
 import { readLimitedBody } from "./limited-body";
@@ -164,6 +166,7 @@ export interface McpSignIn {
   registrationFailed: () => boolean;
   registrationUnsupported: () => boolean;
   signInServerMissing: () => boolean;
+  otherAddress: () => string | null;
   registrationStatus: () => number | null;
   registrationRedirectRefused: () => boolean;
   watchRegistration: (fetch: FetchLike) => FetchLike;
@@ -176,6 +179,7 @@ export type McpSignInOpener = (url: string) => Promise<void>;
 export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   refreshAccessToken: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
+  endRefusedSignIn: (url: string, rejected: string) => Effect.Effect<boolean, McpOperationError>;
   signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   cancelSignIn: (url: string) => boolean;
   signInLink: (url: string) => string | null;
@@ -240,6 +244,15 @@ export class McpOAuth implements McpOAuthAuthority {
     if ((yield* this.#refresh(key)) === "unusable") return yield* this.#end(key, rejected);
     const next = yield* mcpSync(() => this.#options.storage.read(key)?.tokens?.access_token ?? null);
     return next === rejected ? null : next;
+  }).bind(this);
+
+  readonly endRefusedSignIn = Effect.fn("McpOAuth.endRefusedSignIn")(function* (
+    this: McpOAuth,
+    url: string,
+    rejected: string,
+  ): Effect.fn.Return<boolean, McpOperationError> {
+    const key = mcpOAuthAccountKey(url);
+    return key !== null && (yield* this.#end(key, rejected)) === null;
   }).bind(this);
 
   readonly #end = Effect.fn("McpOAuth.end")(function* (this: McpOAuth, key: string, rejected: string) {
@@ -402,6 +415,7 @@ export class McpOAuth implements McpOAuthAuthority {
       registrationFailed: () => provider.registrationPending,
       registrationUnsupported: () => provider.registrationUnsupported,
       signInServerMissing: () => provider.signInServerMissing,
+      otherAddress: () => provider.otherAddress,
       registrationStatus: () => provider.registrationStatus,
       registrationRedirectRefused: () => provider.redirectRefused,
       watchRegistration: (fetch) => provider.watchRegistration(fetch),
@@ -825,6 +839,22 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     );
   }
 
+  get otherAddress(): string | null {
+    const resource = this.#discoveryState?.resourceMetadata?.resource;
+    if (!resource || !URL.canParse(resource)) return null;
+    const requested = resourceUrlFromServerUrl(this.#options.resource);
+    if (checkResourceAllowed({ requestedResource: requested, configuredResource: resource })) return null;
+    const address = new URL(resource);
+    const site = getDomain(address.hostname, { allowPrivateDomains: true });
+    if (address.protocol !== "https:" || !site || site !== getDomain(requested.hostname, { allowPrivateDomains: true }))
+      return null;
+    const base = address.pathname.endsWith("/") ? address.pathname : `${address.pathname}/`;
+    if (`${requested.pathname}/`.startsWith(base)) address.pathname = requested.pathname;
+    address.search = "";
+    address.hash = "";
+    return address.href;
+  }
+
   get registrationStatus(): number | null {
     return this.#registrationStatus;
   }
@@ -840,12 +870,19 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         init?.method === "POST" && registrationUrl !== null && new URL(String(input)).href === registrationUrl;
       if (!registering) return fetch(input, init);
       const request = this.#withOfflineAccessRegistration(init);
+      let sent = request;
       let response = await fetch(input, request);
       for (const retry of this.#withOtherRedirectNames(request)) {
         if (!(await refusesRedirectAddress(response))) break;
+        sent = retry;
         response = await fetch(input, retry);
       }
-      const callback = response.status === 401 || response.status === 403 ? this.#withCallbackPath(request) : null;
+      const callback =
+        response.status === 401 || response.status === 403
+          ? this.#withCallbackPath(request)
+          : (await replacesRedirectAddress(response, sent))
+            ? this.#withCallbackPath(sent)
+            : null;
       const retried = callback ? await fetch(input, callback) : null;
       if (retried?.ok) response = retried;
       this.#registrationStatus = response.status;
@@ -1310,6 +1347,22 @@ const registrationBodySchema = z.looseObject({
 });
 
 const registrationErrorSchema = z.looseObject({ error: z.string() });
+
+const registeredClientSchema = z.looseObject({ redirect_uris: z.array(z.string()) });
+
+async function replacesRedirectAddress(response: Response, sent: RequestInit): Promise<boolean> {
+  if (!response.ok || typeof sent.body !== "string") return false;
+  const asked = registrationBodySchema.parse(JSON.parse(sent.body)).redirect_uris;
+  const address = asked?.length === 1 ? asked[0] : undefined;
+  if (!address) return false;
+  const client = registeredClientSchema.safeParse(
+    await response
+      .clone()
+      .json()
+      .catch(() => null),
+  );
+  return client.success && !registersAddress(client.data.redirect_uris, address);
+}
 
 async function refusesRedirectAddress(response: Response): Promise<boolean> {
   const error = await registrationErrorCode(response);

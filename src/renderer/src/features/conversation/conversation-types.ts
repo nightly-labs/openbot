@@ -82,6 +82,7 @@ export interface ConversationChannelSource {
   ownMessage: (message: AgentMessage) => boolean;
   workers: () => ChannelWorker[];
   memberThreadIds: () => ReadonlySet<string>;
+  memberAgentIds: () => ReadonlySet<string>;
   browserOwner: () => { agentId: string; threadId: string } | null;
   workingTurns: () => readonly string[];
   interactionAgentName: () => string | undefined;
@@ -221,6 +222,7 @@ export interface ConversationProps {
   agentAutoApproves?: boolean | undefined;
   remoteBackupModelsLoaded?: boolean | undefined;
   remotePlanCardLoaded?: boolean | undefined;
+  remoteBuiltinMemoryLoaded?: boolean | undefined;
   remoteComputerUseLoaded?: boolean | undefined;
   remoteNewChatLoaded?: boolean | undefined;
   remoteBusyMessageModeLoaded?: boolean | undefined;

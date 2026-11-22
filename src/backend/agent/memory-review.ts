@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   type AgentModelOption,
   type AgentSummary,
+  agentMemoryEnabled,
   type ConversationMessage,
   isContextResetMarker,
   SKILL_SUGGESTION_NAME_CHARACTERS,
@@ -362,6 +363,8 @@ export class MemoryReview {
       if (!excerpt.some((message) => message.author === "user")) return yield* this.#saveCursor(conversation);
       const agent = options.listAgents().find((candidate) => candidate.id === agentId);
       if (!agent || options.stopping()) return;
+      const memoryEnabled = agentMemoryEnabled(agent);
+      if (!memoryEnabled && !this.#skillLearningOn()) return yield* this.#saveCursor(conversation);
       const model = backgroundModel(agent, yield* options.models(agent));
       if (options.stopping()) return;
       if (!model) return yield* this.#saveCursor(conversation);
@@ -382,10 +385,11 @@ export class MemoryReview {
           .map((entry) => entry.memory.id),
       );
       const skillInput = yield* this.#skillInput(agentId, messages);
-      const browsing = options.browsing ? yield* options.browsing.pending(agentId) : [];
+      if (!memoryEnabled && !skillInput) return yield* this.#saveCursor(conversation);
+      const browsing = options.browsing && memoryEnabled ? yield* options.browsing.pending(agentId) : [];
       const prompt = memoryReviewPrompt(
         agent,
-        { ...base, memories: redacted },
+        { ...base, memories: memoryEnabled ? redacted : [] },
         excerpt.map((message) => redactedMessage(message, options.redact)),
         skillInput ?? undefined,
         browsing.map((step) => redactedStep(step, options.redact)),
@@ -404,9 +408,9 @@ export class MemoryReview {
       const result = yield* Schema.decodeUnknownEffect(MemoryReviewResult)(json);
       const lastStep = browsing.at(-1);
       if (lastStep) yield* options.browsing?.reviewed(agentId, lastStep.at) ?? Effect.void;
-      const operations = result.operations.filter(
-        (operation) => operation.type === "add" || !hidden.has(operation.memoryId),
-      );
+      const operations = memoryEnabled
+        ? result.operations.filter((operation) => operation.type === "add" || !hidden.has(operation.memoryId))
+        : [];
       const suggestion = skillInput
         ? yield* Schema.decodeUnknownEffect(SkillReviewResult)(json).pipe(
             Effect.map(({ skill }) => acceptedSuggestion(skill, skillInput.skills)),
@@ -445,10 +449,14 @@ export class MemoryReview {
     Effect.mapError((failure) => new MemoryReviewFailed({ cause: failure })),
   ).bind(this);
 
+  #skillLearningOn(): boolean {
+    return this.#options.skills !== undefined && (this.#options.skillLearning?.() ?? "ask") !== "off";
+  }
+
   #skillInput(agentId: string, messages: readonly ConversationMessage[]): Effect.Effect<SkillReviewInput | null> {
     const { skills, redact, skillLearner } = this.#options;
     const mode = this.#options.skillLearning?.() ?? "ask";
-    if (!skills || mode === "off") return Effect.succeed(null);
+    if (!skills || !this.#skillLearningOn()) return Effect.succeed(null);
     return Effect.suspend(() => skills(agentId)).pipe(
       Effect.map(
         (list): SkillReviewInput => ({

@@ -222,6 +222,8 @@ export interface McpServerToolCall {
   approve(reason: string, cwd?: string | null): Effect.Effect<boolean, ToolOperationFailed>;
   keysFromPerson(values: readonly string[]): Effect.Effect<boolean>;
   requestSignIn(config: McpServerConfig): Effect.Effect<void, ToolOperationFailed>;
+  added(config: McpServerConfig): Effect.Effect<void>;
+  removed(mcpServerId: string): Effect.Effect<void>;
 }
 
 export const handleMcpServerTool = (servers: AgentMcpServers, call: McpServerToolCall) =>
@@ -353,8 +355,14 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       );
       if (!(yield* call.approve(reason, config.transport === "stdio" ? config.workingDirectory || null : null)))
         return openBotToolFailure(sourceText("error.agent.mcpServerDeclined"));
-      if (!config.enabled) {
+      const save = Effect.fnUntraced(function* () {
+        const before = new Set(servers.list().map((candidate) => candidate.id));
         yield* servers.save(config);
+        const added = servers.list().find((candidate) => !before.has(candidate.id) && candidate.name === config.name);
+        if (added) yield* call.added(added);
+      });
+      if (!config.enabled) {
+        yield* save();
         const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
         return openBotToolResult({
           status: "disabled",
@@ -370,7 +378,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
             config,
           ),
         );
-      yield* servers.save(config);
+      yield* save();
       return yield* report(servers, call, config, outcome, true);
     }
     case "set_mcp_server_enabled": {
@@ -388,6 +396,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       if (!(yield* call.approve(sourceText("status.agent.mcpServerRemove", { name: config.name }))))
         return openBotToolFailure(sourceText("error.agent.mcpServerDeclined"));
       yield* servers.remove(config.id);
+      yield* call.removed(config.id);
       return openBotToolResult({ name: config.name, removed: true, appliesFrom: "the next turn of each agent" });
     }
   }

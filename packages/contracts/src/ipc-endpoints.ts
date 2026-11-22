@@ -5,6 +5,7 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
+import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -25,6 +26,7 @@ import type {
   AddedAgent,
   AgentAdminSettings,
   AgentBackupModelSettings,
+  AgentBuiltinMemorySettings,
   AgentDefaultsOverview,
   AgentFastModeSettings,
   AgentHostSettings,
@@ -33,6 +35,7 @@ import type {
   SetAgentDefaultChoiceInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
+  UpdateAgentBuiltinMemoryInput,
   UpdateAgentDefaultsInput,
   UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
@@ -44,6 +47,7 @@ import type {
   AgentDockAction,
   AgentDockDisplayInfo,
   AgentDockDragPhase,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockOffset,
   AgentDockPresentation,
@@ -230,6 +234,9 @@ import type {
   BrowserTeachStep,
   BrowserTeachStopInput,
   BrowserVisibilityInput,
+  BrowserWindowAction,
+  BrowserWindowEvent,
+  BrowserWindowModel,
 } from "./ipc-browser";
 import type { BrowserDockAction, BrowserDockFrame, BrowserDockPresentation } from "./ipc-browser-dock";
 import type {
@@ -251,6 +258,12 @@ import type {
 } from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
 import type { CacheExpiryCompactionSetting } from "./ipc-cache-expiry-compaction";
+import type {
+  BrowseChannelFoldersInput,
+  ChannelFolderChange,
+  ChannelFolderInput,
+  ChannelFolderList,
+} from "./ipc-channel-folders";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -619,6 +632,7 @@ import type {
   VoiceTranscriptionInput,
   VoiceTranscriptionResult,
 } from "./ipc-voice";
+import type { WorkflowFolderAction, WorkflowFoldersSnapshot } from "./ipc-workflow-folders";
 import type {
   WorkflowGitHubCatalog,
   WorkflowGitHubHistory,
@@ -918,6 +932,7 @@ export const IPC_ENDPOINTS = {
     action: event<AgentDockAction>()("agent-dock:action"),
     setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
     setInputRegion: request<AgentDockInputRect[], void>()("agent-dock:set-input-region"),
+    setExtent: request<AgentDockExtent | null, void>()("agent-dock:set-extent"),
     setXWayland: request<SetAgentDockXWaylandInput, void>()("agent-dock:set-xwayland"),
     closeChat: event<undefined>()("agent-dock:close-chat"),
     listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
@@ -1374,6 +1389,9 @@ export const IPC_ENDPOINTS = {
     plans: request<undefined, HostedServerCatalog>()("hosted-servers:plans"),
     create: request<CreateHostedServerInput, HostedServerSummary>()("hosted-servers:create"),
     openCheckout: request<string, HostedServerSummary>()("hosted-servers:open-checkout"),
+    openCustomCheckout: request<CustomServerCheckoutRequest, CustomServerCheckoutResult>()(
+      "hosted-servers:open-custom-checkout",
+    ),
     delete: request<DeleteHostedServerInput, void>()("hosted-servers:delete"),
     lifecycle: request<HostedServerLifecycleInput, void>()("hosted-servers:lifecycle"),
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),
@@ -1447,6 +1465,7 @@ export const IPC_ENDPOINTS = {
     cancelScheduledRestart: request<undefined, UpdateStatus>()("update:cancel-scheduled-restart"),
     restartWhenIdle: request<IdleRestartTarget, UpdateStatus>()("update:restart-when-idle"),
     cancelIdleRestart: request<undefined, UpdateStatus>()("update:cancel-idle-restart"),
+    restartNow: request<undefined, UpdateStatus>()("update:restart-now"),
     event: event<UpdateStatus>()("update:event"),
     preference: event<UpdatePreference>()("update:preference-event"),
   },
@@ -1600,6 +1619,13 @@ export const IPC_ENDPOINTS = {
     deleteChannelMemory: scopedRequest<DeleteChannelMemoryInput, void>()("agent:channel-memories:delete"),
     clearChannelMemories: scopedRequest<string, void>()("agent:channel-memories:clear"),
   },
+  channelFolders: {
+    listChannelFolders: scopedRequest<string, ChannelFolderList>()("agent:channel-folders:list"),
+    chooseChannelFolder: request<string, ChannelFolderChange>()("agent:channel-folders:choose"),
+    addChannelFolder: scopedRequest<ChannelFolderInput, ChannelFolderChange>()("agent:channel-folders:add"),
+    removeChannelFolder: scopedRequest<ChannelFolderInput, ChannelFolderChange>()("agent:channel-folders:remove"),
+    browseChannelFolders: scopedRequest<BrowseChannelFoldersInput, AgentFolderBrowse>()("agent:channel-folders:browse"),
+  },
   channelRoutines: {
     listChannelRoutines: scopedRequest<string, ChannelRoutine[]>()("agent:channel-routines:list"),
     createChannelRoutine: scopedRequest<CreateChannelRoutineInput, ChannelRoutine>()("agent:channel-routines:create"),
@@ -1645,6 +1671,8 @@ export const IPC_ENDPOINTS = {
     mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
     mediaCatalog: scopedQuery<WorkflowMediaCatalog>()("workflows:media-catalog"),
     mediaPrice: scopedRequest<WorkflowMediaPriceRequest, WorkflowMediaPrice>()("workflows:media-price"),
+    folders: scopedQuery<WorkflowFoldersSnapshot>()("workflows:folders"),
+    folderAction: scopedRequest<WorkflowFolderAction, WorkflowFoldersSnapshot>()("workflows:folder-action"),
   },
   crm: {
     overview: scopedQuery<CrmOverview>()("crm:overview"),
@@ -1733,6 +1761,15 @@ export const IPC_ENDPOINTS = {
     dockPictureInPicture: request<undefined, void>()("browser:picture-in-picture-dock"),
     hidePictureInPicture: request<undefined, void>()("browser:picture-in-picture-hide"),
     pictureInPictureEvent: event<BrowserPictureInPictureEvent>()("browser:picture-in-picture-event"),
+    openWindow: request<BrowserBounds | undefined, BrowserBounds>()("browser:window-open"),
+    closeWindow: request<undefined, void>()("browser:window-close"),
+    focusWindow: request<undefined, void>()("browser:window-focus"),
+    dockWindow: request<undefined, void>()("browser:window-dock"),
+    publishWindowModel: request<BrowserWindowModel, void>()("browser:window-model-publish"),
+    getWindowModel: request<undefined, BrowserWindowModel | null>()("browser:window-model-get"),
+    sendWindowAction: request<BrowserWindowAction, void>()("browser:window-action"),
+    windowModel: event<BrowserWindowModel>()("browser:window-model-event"),
+    windowEvent: event<BrowserWindowEvent>()("browser:window-event"),
     openLocalSignIn: request<BrowserLocalSignInInput, BrowserLocalSignInEnd>()("browser:local-sign-in-open"),
     finishLocalSignIn: request<BrowserLocalSignInFinish, BrowserLocalSignInResult | null>()(
       "browser:local-sign-in-finish",
@@ -1799,6 +1836,10 @@ export const IPC_ENDPOINTS = {
     getAgentPlanCard: scopedRequest<string, AgentPlanCardSettings>()("agent:admin:get-plan-card"),
     updateAgentPlanCard: scopedRequest<UpdateAgentPlanCardInput, AgentPlanCardSettings>()(
       "agent:admin:update-plan-card",
+    ),
+    getAgentBuiltinMemory: scopedRequest<string, AgentBuiltinMemorySettings>()("agent:admin:get-builtin-memory"),
+    updateAgentBuiltinMemory: scopedRequest<UpdateAgentBuiltinMemoryInput, AgentBuiltinMemorySettings>()(
+      "agent:admin:update-builtin-memory",
     ),
     getAgentFastMode: scopedRequest<string, AgentFastModeSettings>()("agent:admin:get-fast-mode"),
     updateAgentFastMode: scopedRequest<UpdateAgentFastModeInput, AgentFastModeSettings>()(
@@ -2023,6 +2064,7 @@ export const IPC_GROUP_PATHS = {
   agentRoutines: "agent",
   channelMemories: "agent",
   channelRoutines: "agent",
+  channelFolders: "agent",
   agentAttachments: "agent",
   agentFolders: "agent",
   agentInstructions: "agent",

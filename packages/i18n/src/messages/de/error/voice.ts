@@ -26,6 +26,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Lade das Sprachausgabemodell unter Einstellungen → Diktat herunter.",
   "error.voice.speech.timedOut": "Das Vorlesen der Antwort hat zu lange gedauert.",
   "error.voice.speech.failed": "OpenBot konnte die Antwort nicht vorlesen.",
+  "error.voice.speech.providerRefused": "{provider} hat die Audioausgabe abgelehnt: {reason}",
   "error.voice.recordingNotKept": "OpenBot konnte die Sprachaufnahme nicht speichern.",
   "error.voice.live.timedOut": "Codex-Live-Sprache ist nicht rechtzeitig gestartet. Versuche es erneut.",
   "error.voice.live.failed": "Live-Sprache wurde beendet: {reason}",

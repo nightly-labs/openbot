@@ -24,6 +24,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "설정 → 음성에서 음성 읽기 모델을 다운로드해 주세요.",
   "error.voice.speech.timedOut": "답변을 소리 내어 읽는 시간이 초과되었어요.",
   "error.voice.speech.failed": "OpenBot이 답변을 소리 내어 읽지 못했어요.",
+  "error.voice.speech.providerRefused": "{provider}가 오디오 생성을 거부했어요: {reason}",
   "error.voice.recordingNotKept": "OpenBot이 음성 녹음을 보관하지 못했어요.",
   "error.voice.live.timedOut": "Codex 라이브 음성이 제시간에 시작되지 않았어요. 다시 시도하세요.",
   "error.voice.live.failed": "라이브 음성이 중지되었어요: {reason}",

@@ -17,6 +17,8 @@ export const messages = {
   "error.workflow.agentStepEnded": "该步骤的助手消息在助手回答之前已被移除。",
   "error.workflow.agentStepStopped": "助手在回答该步骤之前已停止，请再次运行该步骤。",
   "error.workflow.conditionUnclear": "模型没有回答“是”或“否”。",
+  "error.workflow.answerInvalid": "回答缺少此步骤要求的字段：{fields}。请再次运行该步骤。",
+  "error.workflow.checkInvalid": "此步骤的检查条件无效。请修正后再次运行该步骤。",
   "error.workflow.modelFailed": "模型无法回答，请再次运行该步骤。",
   "error.workflow.modelTimedOut": "模型未能及时回答。请为该步骤选择更低的强度或更快的模型，然后再次运行。",
   "error.workflow.modelToolUse": "模型尝试使用工具，但该步骤只能用文本回答。请再次运行该步骤，或为它选择其他模型。",

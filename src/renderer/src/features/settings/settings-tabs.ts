@@ -5,6 +5,7 @@ import {
   CircleArrowDown,
   CreditCard,
   Gift,
+  Keyboard,
   Mic,
   MousePointer2,
   Palette,
@@ -16,6 +17,7 @@ import {
   Smartphone,
   UserRound,
 } from "@openbot/ui";
+import { SHORTCUT_COMMANDS, SHORTCUT_TITLES } from "@openbot/ui/features/settings/keyboard-shortcuts";
 
 export type SettingsTab =
   | "general"
@@ -23,6 +25,7 @@ export type SettingsTab =
   | "app-behavior"
   | "notifications"
   | "voice"
+  | "keyboard"
   | "dynamic-island"
   | "agent-dock"
   | "computer-use"
@@ -131,6 +134,13 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
         descriptionKey: "settings.voice.speech.codexLive.description",
       },
     ],
+  },
+  {
+    value: "keyboard",
+    titleKey: "settings.tab.keyboard.title",
+    descriptionKey: "settings.tab.keyboard.description",
+    icon: Keyboard,
+    rows: SHORTCUT_COMMANDS.map((command) => ({ titleKey: SHORTCUT_TITLES[command] })),
   },
   {
     value: "profile",

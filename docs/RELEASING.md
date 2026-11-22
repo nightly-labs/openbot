@@ -879,8 +879,9 @@ MAIN="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 
 It prints a table per platform and for servers, and writes `.openbot-build/release-health/report.json`.
 The metrics are finished starts, crashes, startup crashes, quit hangs, and update arrivals: the share
-of the computers that started an update install and then started the new release. The thresholds are
-in the script header.
+of the computers that started an update install and then started a version other than the one that
+installed it, before the end of the window. An install of an older release that a computer downloaded
+earlier counts for the window in which it started. The thresholds are in the script header.
 
 - Exit code 0: no metric is clearly worse. Raise the rollout.
 - Exit code 1: a metric is clearly worse. Keep the rollout where it is, find the cause, and publish a
@@ -903,7 +904,9 @@ Before creating the first tag or any later release:
 
 0. run the Team API compatibility matrix for every protocol that remains in the adapter registry. The matrix must cover an older client with the new host, the new client with an older host, matching versions, no shared protocol, capability omission, unknown optional events, and malformed known events. Do not reduce this matrix because a protocol is old or because many application versions separate the peers. Confirm that each supported protocol still has unchanged client and host fixtures;
 
-1. run `bun run release:preflight` and resolve every reported release-secret or repository gate;
+1. run `bun run release:preflight` and resolve every reported release-secret or repository gate.
+   It also stops when the live Marketplace does not have the catalog of `main`: publish it as
+   [the catalog README](../marketplace/production-catalog/README.md#prepare-and-publish) says;
 2. confirm the `release` environment contains all eight macOS secrets above; Windows signs through
    the Azure federated credential and needs no secret; Linux remains unsigned;
 3. confirm the production `/join` page and Apple association file pass the deployment checks in CI;

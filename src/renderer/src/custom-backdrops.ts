@@ -4,7 +4,7 @@ import { customBackdropId } from "@openbot/ui/features/conversation/chat-backdro
 import { createSignal } from "solid-js";
 import { useChatBackdrop } from "./chat-backdrop-preference";
 
-export type CustomBackdropKind = "image" | "page";
+export type CustomBackdropKind = "image" | "video" | "page";
 
 export interface CustomBackdropSummary {
   id: string;
@@ -18,15 +18,13 @@ export interface CustomBackdrop extends CustomBackdropSummary {
   blob: Blob;
 }
 
-export const CUSTOM_BACKDROP_IMAGE_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "image/avif",
-] as const;
+const CUSTOM_BACKDROP_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"] as const;
+const CUSTOM_BACKDROP_VIDEO_TYPES = ["video/mp4", "video/webm"] as const;
+export const CUSTOM_BACKDROP_UPLOAD_TYPES = [...CUSTOM_BACKDROP_IMAGE_TYPES, ...CUSTOM_BACKDROP_VIDEO_TYPES] as const;
 const IMAGE_MIME_TYPES = new Set<string>(CUSTOM_BACKDROP_IMAGE_TYPES);
+const VIDEO_MIME_TYPES = new Set<string>(CUSTOM_BACKDROP_VIDEO_TYPES);
 const CUSTOM_BACKDROP_IMAGE_LIMIT = 20 * 1_024 * 1_024;
+const CUSTOM_BACKDROP_VIDEO_LIMIT = 100 * 1_024 * 1_024;
 const CUSTOM_BACKDROP_CAPACITY = 12;
 const NAME_LIMIT = 80;
 
@@ -37,6 +35,7 @@ const CHANGED_CHANNEL = "openbot:custom-backdrops";
 export function customBackdropKind(mimeType: string, size: number): CustomBackdropKind | null {
   const type = (mimeType.split(";", 1)[0] ?? "").trim().toLowerCase();
   if (IMAGE_MIME_TYPES.has(type)) return size <= CUSTOM_BACKDROP_IMAGE_LIMIT ? "image" : null;
+  if (VIDEO_MIME_TYPES.has(type)) return size <= CUSTOM_BACKDROP_VIDEO_LIMIT ? "video" : null;
   if (isChatVisualMimeType(type) && type !== "image/svg+xml") return size <= CHAT_VISUAL_PAGE_LIMIT ? "page" : null;
   return null;
 }
@@ -75,7 +74,7 @@ function isCustomBackdrop(value: unknown): value is CustomBackdrop {
   return (
     typeof record.id === "string" &&
     typeof record.name === "string" &&
-    (record.kind === "image" || record.kind === "page") &&
+    (record.kind === "image" || record.kind === "video" || record.kind === "page") &&
     typeof record.mimeType === "string" &&
     record.blob instanceof Blob &&
     typeof record.createdAt === "number"

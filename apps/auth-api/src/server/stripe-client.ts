@@ -2,6 +2,7 @@ import {
   BILLING_CURRENCIES,
   BILLING_METADATA,
   type BillingCurrency,
+  type BillingInterval,
   type BillingStorageTier,
   parseStorageTierPrice,
 } from "@openbot/contracts/billing";
@@ -15,7 +16,7 @@ export const STRIPE_API_VERSION = "2025-03-31.basil";
 const STRIPE_API_ORIGIN = "https://api.stripe.com";
 const STRIPE_TIMEOUT_MS = 10_000;
 const SIGNATURE_TOLERANCE_SECONDS = 300;
-const CHECKOUT_LIFETIME_SECONDS = 35 * 60;
+export const CHECKOUT_LIFETIME_SECONDS = 35 * 60;
 
 export type StripeFetch = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -106,6 +107,26 @@ const checkoutSessionListSchema = Schema.Struct({
   data: Schema.Array(Schema.Struct({ ...checkoutSessionSchema.fields, created: Schema.Int })),
 });
 export type StripeOpenCheckoutSession = (typeof checkoutSessionListSchema.Type)["data"][number];
+
+interface CheckoutInlinePrice {
+  productName: string;
+  amount: number;
+  interval: BillingInterval;
+}
+
+type CheckoutLine = { priceId: string } | { inlinePrice: CheckoutInlinePrice };
+
+function checkoutLineFields(line: CheckoutLine, currency: BillingCurrency): Record<string, string> {
+  if ("priceId" in line) return { "line_items[0][price]": line.priceId };
+  return {
+    "line_items[0][price_data][currency]": currency,
+    "line_items[0][price_data][unit_amount]": String(line.inlinePrice.amount),
+    "line_items[0][price_data][recurring][interval]": line.inlinePrice.interval,
+    "line_items[0][price_data][tax_behavior]": "exclusive",
+    "line_items[0][price_data][product_data][name]": line.inlinePrice.productName,
+  };
+}
+
 const priceSchema = Schema.Struct({
   id: Schema.String,
   lookup_key: Schema.NullOr(Schema.String),
@@ -127,6 +148,7 @@ const subscriptionSchema = Schema.Struct({
   canceled_at: Schema.optional(Schema.NullOr(Schema.Int)),
   metadata: Metadata,
   current_period_end: Schema.optional(Schema.Int),
+  start_date: Schema.optional(Schema.Int),
   trial_end: Schema.optional(Schema.NullOr(Schema.Int)),
   discounts: Schema.optional(Schema.NullOr(Schema.Array(expandable))),
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
@@ -469,9 +491,8 @@ export class StripeClient {
 
   readonly createCheckoutSession = Effect.fn("StripeClient.createCheckoutSession")(function* (
     this: StripeClient,
-    input: {
+    input: CheckoutLine & {
       customerId: string;
-      priceId: string;
       currency: BillingCurrency;
       userId: string;
       serverId?: string;
@@ -491,10 +512,10 @@ export class StripeClient {
     const body = new URLSearchParams({
       mode: "subscription",
       customer: input.customerId,
-      "line_items[0][price]": input.priceId,
+      ...checkoutLineFields(input, input.currency),
       "line_items[0][quantity]": String(input.quantity ?? 1),
       currency: input.currency,
-      allow_promotion_codes: "true",
+      allow_promotion_codes: "priceId" in input ? "true" : "false",
       ui_mode: "hosted",
       origin_context: "web",
       submit_type: "auto",
@@ -964,6 +985,10 @@ export function subscriptionPaymentMethodId(subscription: StripeSubscription): s
   const method = subscription.default_payment_method;
   if (!method) return null;
   return typeof method === "string" ? method : method.id;
+}
+
+export function subscriptionStartedAt(subscription: StripeSubscription): number | null {
+  return subscription.start_date === undefined ? null : subscription.start_date * 1_000;
 }
 
 export function subscriptionLatestInvoiceId(subscription: StripeSubscription): string | null {

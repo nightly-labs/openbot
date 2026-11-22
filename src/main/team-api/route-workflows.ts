@@ -1,7 +1,4 @@
 import {
-  type AgentAccessLevel,
-  canAdministerServer,
-  graphAgentIds,
   WORKFLOW_GROUP_FIELDS,
   WORKFLOW_MEDIA_CATALOG_V1_ASPECTS,
   WORKFLOW_STEP_NAME_FIELD,
@@ -51,10 +48,6 @@ import {
   WORKFLOWS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { RoutineInputError } from "@openbot/team-client/routine-schedule";
-import type { Effect } from "effect";
-import { runCauseEffect } from "../../backend/effect-boundary";
-import { WorkflowStoreError } from "../../backend/workflows/workflow-store";
 import {
   parseCreateWorkflow,
   parseDecideWorkflowStep,
@@ -72,10 +65,10 @@ import {
 } from "../ipc/workflow-inputs";
 import type { TeamApiAgents, TeamApiWorkflows } from "./dependencies";
 import { HttpError } from "./http-error";
-import { isPeerHiddenProvider } from "./provider-visibility";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireAgentLevel, stringField, WEBRTC_FRAME_BODY_BUDGET } from "./request-helpers";
 import { runEventsEffect } from "./route-events";
+import { runWorkflowEffect as run, workflowMissing, workflowVisibility } from "./workflow-visibility";
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
 const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
@@ -96,25 +89,11 @@ function catalogV1(catalog: WorkflowMediaCatalog): WorkflowMediaCatalog {
   };
 }
 
-function workflowMissing(): never {
-  throw new HttpError(404, sourceText("error.workflow.missing"));
-}
-
 function parse<A>(decode: (value: unknown) => A, body: unknown): A {
   try {
     return decode(body);
   } catch (error) {
     throw new HttpError(400, error instanceof Error ? error.message : "Invalid workflow request.");
-  }
-}
-
-async function run<A>(operation: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> {
-  try {
-    return await runCauseEffect(operation);
-  } catch (error) {
-    if (error instanceof WorkflowStoreError) throw new HttpError(error.code === "missing" ? 404 : 400, error.message);
-    if (error instanceof RoutineInputError) throw new HttpError(400, error.message);
-    throw error;
   }
 }
 
@@ -178,7 +157,7 @@ export async function routeWorkflows(
   agents: Pick<TeamApiAgents, "listAgents">,
   hiddenAgentIds: ReadonlySet<string>,
 ): Promise<RouteOutcome> {
-  const { method, url, capabilities, member, request, json, protocol } = context;
+  const { method, url, capabilities, member, request, json } = context;
   const path = url.pathname;
   const githubPath = WORKFLOW_GITHUB_PATHS.has(path);
   const mediaPath = WORKFLOW_MEDIA_PATHS.has(path);
@@ -223,18 +202,12 @@ export async function routeWorkflows(
   if (settingsPath && !capabilities.has(WORKFLOWS_STEP_SETTINGS_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const body = await readJson(request);
-  const admin = canAdministerServer(member.role);
-  const listed = () => new Set(agents.listAgents().map((agent) => agent.id));
-
-  const visibleAgents = (agentIds: readonly string[], known: ReadonlySet<string>) =>
-    agentIds.every((agentId) => !hiddenAgentIds.has(agentId) && (admin || known.has(agentId)));
-  const visibleGraph = (graph: WorkflowGraph, known: ReadonlySet<string>) =>
-    visibleAgents(graphAgentIds(graph), known) &&
-    graph.nodes.every((node) => !isPeerHiddenProvider(node.fields.provider, protocol));
-  const requireUsable = (graph: WorkflowGraph, level: Exclude<AgentAccessLevel, "none">) => {
-    if (!visibleGraph(graph, listed())) workflowMissing();
-    for (const agentId of graphAgentIds(graph)) requireAgentLevel(context, agentId, level);
-  };
+  const { admin, listed, visibleAgents, visibleGraph, requireUsable, visibleDetail, usableDetail } = workflowVisibility(
+    context,
+    workflows,
+    agents,
+    hiddenAgentIds,
+  );
   const requireChange = (before: WorkflowGraph, after: WorkflowGraph) => {
     requireUsable(before, "manage");
     requireUsable(after, "manage");
@@ -242,16 +215,6 @@ export async function routeWorkflows(
     for (const [nodeId, place] of placeOutputs(after)) if (old.get(nodeId) !== place) requireAdmin(member);
     const oldAdmin = adminNodes(before);
     for (const [nodeId, settings] of adminNodes(after)) if (oldAdmin.get(nodeId) !== settings) requireAdmin(member);
-  };
-  const visibleDetail = async (workflowId: string) => {
-    const detail = await run(workflows.get(workflowId));
-    if (!visibleGraph(detail.graph, listed())) workflowMissing();
-    return detail;
-  };
-  const usableDetail = async (workflowId: string, level: Exclude<AgentAccessLevel, "none">) => {
-    const detail = await visibleDetail(workflowId);
-    requireUsable(detail.graph, level);
-    return detail;
   };
   const usableRunOf = async (ref: { runId: string } | { stepId: string }) => {
     const missing = () =>

@@ -11,7 +11,7 @@ export class SpeechParts {
   readonly #growth: number;
   #last: string | undefined;
 
-  constructor(text: string, locale: string, speed = 1) {
+  constructor(text: string, locale: string | undefined, speed = 1) {
     const segmenter = new Intl.Segmenter(locale, { granularity: "sentence" });
     this.#sentences = Array.from(segmenter.segment(text), ({ segment }) => segment.trim()).filter(Boolean);
     this.#growth = PART_GROWTH / Math.max(1, speed);

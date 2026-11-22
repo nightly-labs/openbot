@@ -170,7 +170,12 @@ export function parseVoiceLiveStop(input: unknown): VoiceLiveStop {
 }
 
 export function parseSpeechInput(input: unknown): SpeechInput {
-  if (!isObject(input) || typeof input.text !== "string" || !input.text.trim() || !isSpeechLanguage(input.language))
+  if (
+    !isObject(input) ||
+    typeof input.text !== "string" ||
+    !input.text.trim() ||
+    !(input.language === null || isSpeechLanguage(input.language))
+  )
     throw new Error("Speech needs text and a known language.");
   if (input.text.length > SPEECH_LIMITS.maximumTextLength) throw new Error("The speech text is too long.");
   return { text: input.text, language: input.language };

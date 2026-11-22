@@ -40,6 +40,7 @@ import {
   SettingsNavGroupLabel,
   type SettingsPagePlacement,
 } from "@openbot/ui/features/settings/SettingsDialogShell";
+import type { MobileInstallRequest } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -59,6 +60,7 @@ import { renderProfileShareImage } from "./profile-share-image";
 import { type AgentDockSettingsModel, SettingsAgentDockTab } from "./SettingsAgentDockTab";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
+import { SettingsKeyboardTab } from "./SettingsKeyboardTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
 import { SettingsVoiceTab } from "./SettingsVoiceTab";
 import { dynamicIslandSettingsShown, navItem, navItems, type SettingsTab, settingsTabShown } from "./settings-tabs";
@@ -84,6 +86,7 @@ export interface SettingsModalProps {
   onCancelScheduledRestart?: () => Promise<void>;
   onRestartWhenIdle?: () => Promise<void>;
   onCancelIdleRestart?: () => Promise<void>;
+  onRestartNow?: () => Promise<void>;
   account: CentralAuthUser;
   onUpdateAccountName: (name: string) => Promise<void>;
   onUpdateAccountAvatar: (image: AvatarImageInput | null) => Promise<void>;
@@ -111,6 +114,8 @@ export interface SettingsModalProps {
   liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   onConnectCodex?: (() => void) | undefined;
   hostedServerDeleteRequest?: { serverId: string; nonce: number } | null;
+  mobileInstallRequest?: MobileInstallRequest | null;
+  onMobileInstallRequestHandled?: (() => void) | undefined;
   onTestNotification?: () => void | Promise<void>;
   onOpenNotificationSettings?: () => void | Promise<void>;
   restoreFocusTarget?: HTMLElement | null;
@@ -196,6 +201,7 @@ export function SettingsModal(props: SettingsModalProps) {
         value === "app-behavior" ||
         value === "notifications" ||
         value === "voice" ||
+        value === "keyboard" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
         (value === "agent-dock" && agentDockShown()) ||
         value === "computer-use" ||
@@ -355,6 +361,10 @@ export function SettingsModal(props: SettingsModalProps) {
           />
         </Tabs.Content>
 
+        <Tabs.Content value="keyboard" class="settings-modal-tab-panel" data-tab="keyboard">
+          <SettingsKeyboardTab />
+        </Tabs.Content>
+
         <Show when={dynamicIslandShown()}>
           <Tabs.Content value="dynamic-island" class="settings-modal-tab-panel" data-tab="dynamic-island">
             {preferencesLoadError()}
@@ -422,6 +432,8 @@ export function SettingsModal(props: SettingsModalProps) {
             canManageLink={Boolean(props.onCreateMobileConnectLink && props.onRevokeMobileConnectLink)}
             canRevokeDevice={Boolean(props.onRevokeMobileConnectedDevice)}
             canSetRoute={Boolean(props.onSetRemoteNetworkRoute)}
+            installRequest={props.open ? props.mobileInstallRequest : null}
+            onInstallRequestHandled={props.onMobileInstallRequestHandled}
           />
         </Tabs.Content>
 

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { access, writeFile } from "node:fs/promises";
+import { access, open, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
@@ -119,6 +119,10 @@ const PiSessionUsage = Schema.Struct({
     cacheWrite: Schema.Number,
   }),
 });
+
+const PiSessionHeader = Schema.Struct({ type: Schema.Literal("session"), cwd: Schema.optional(Schema.String) });
+
+const PI_SESSION_HEADER_BYTES = 65_536;
 
 const PiSessionCost = Schema.Struct({ cost: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)) });
 
@@ -271,6 +275,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     this.#disarmIdle(thread);
     yield* Effect.gen(function* () {
       yield* thread.rpc.stop();
+      yield* keepEmptySession(thread.id);
       thread.mcp.close();
       yield* thread.extension.close();
     }).pipe(Effect.ensuring(thread.keyExtension ? thread.keyExtension.close().pipe(Effect.orDie) : Effect.void));
@@ -656,7 +661,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         if (thread?.turn) this.#background(this.#finish(thread, "failed", error.message, "provider_exited"));
         this.emit("exit", error);
       });
-      const args = keyExtension ? ["--extension", keyExtension.path] : [];
+      const startsOnSession = resume && requestedId && (yield* piSessionOpensAtStart(requestedId));
+      const switchesSession = resume && requestedId && !startsOnSession;
+      const args = [
+        ...(startsOnSession && requestedId ? ["--session", requestedId] : []),
+        ...(keyExtension ? ["--extension", keyExtension.path] : []),
+      ];
       const withExtensions = modelKey !== undefined && extensionModels.has(modelKey);
       args.push(
         ...(this.options.profileGeneration
@@ -674,12 +684,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       if (!this.#running) return yield* providerFailure(new Error(sourceText("error.provider.piStopped")));
       const environment = { ...extension?.environment, ...keyExtension?.environment };
       yield* providerSync(() => this.#spawn(rpc, cwd, args, environment));
-      if (resume && requestedId) {
+      if (switchesSession) {
         const loaded = yield* rpc.request({ type: "switch_session", sessionPath: requestedId }, PI_START_TIMEOUT_MS);
         if (loaded.cancelled === true)
           return yield* providerFailure(new Error(sourceText("error.provider.piResumeCancelled")));
       }
-      const state = yield* rpc.request({ type: "get_state" }, resume && requestedId ? undefined : PI_START_TIMEOUT_MS);
+      const state = yield* rpc.request({ type: "get_state" }, switchesSession ? undefined : PI_START_TIMEOUT_MS);
       const id = getString(state, "sessionFile");
       if (!id || (resume && id !== requestedId))
         return yield* providerFailure(new Error(sourceText("error.provider.piSessionIdentity")));
@@ -691,23 +701,6 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         if (!known) {
           extensionModels.add(modelKey);
           return null;
-        }
-      }
-      if (!resume) {
-        const created = yield* providerCall(async () => {
-          try {
-            await writeFile(id, "", { flag: "wx", mode: 0o600 });
-            return true;
-          } catch (cause) {
-            if (cause instanceof Error && "code" in cause && cause.code === "EEXIST") return false;
-            throw cause;
-          }
-        });
-        if (created) {
-          const loaded = yield* rpc.request({ type: "switch_session", sessionPath: id });
-          const persisted = yield* rpc.request({ type: "get_state" });
-          if (loaded.cancelled === true || getString(persisted, "sessionFile") !== id)
-            return yield* providerFailure(new Error(sourceText("error.provider.piResumeCancelled")));
         }
       }
       mcp.setThreadId(id);
@@ -1098,7 +1091,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       ),
       Effect.catch(() => Effect.void),
     );
-    const append = this.options.history?.append;
+    const keepsHistory = !isRecord(thread.params) || thread.params.persistSession !== false;
+    const append = keepsHistory ? this.options.history?.append : undefined;
     if (append) {
       const saved = yield* Effect.exit(
         append(thread.id, {
@@ -1298,6 +1292,38 @@ function requireSessionFile(sessionFile: string): Effect.Effect<void, ProviderCl
       ),
     ),
   );
+}
+
+function piSessionOpensAtStart(sessionFile: string): Effect.Effect<boolean> {
+  return providerCall(async () => {
+    const handle = await open(sessionFile, "r");
+    try {
+      const { buffer, bytesRead } = await handle.read(
+        Buffer.alloc(PI_SESSION_HEADER_BYTES),
+        0,
+        PI_SESSION_HEADER_BYTES,
+        0,
+      );
+      if (bytesRead === 0) return true;
+      const text = buffer.toString("utf8", 0, bytesRead);
+      const end = text.indexOf("\n");
+      if (end < 0) return false;
+      const header = Schema.decodeUnknownOption(Schema.fromJsonString(PiSessionHeader))(text.slice(0, end));
+      if (Option.isNone(header)) return false;
+      const cwd = header.value.cwd;
+      if (!cwd) return true;
+      return access(cwd).then(
+        () => true,
+        () => false,
+      );
+    } finally {
+      await handle.close();
+    }
+  }).pipe(Effect.orElseSucceed(() => false));
+}
+
+function keepEmptySession(sessionFile: string): Effect.Effect<void> {
+  return providerCall(() => writeFile(sessionFile, "", { flag: "wx", mode: 0o600 })).pipe(Effect.ignore);
 }
 
 function isNamespace(value: unknown): value is DynamicToolNamespace {
