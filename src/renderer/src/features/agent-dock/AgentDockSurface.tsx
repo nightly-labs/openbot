@@ -38,6 +38,19 @@ const EDGE_STRIP = 4;
 const SHAPED_WINDOW = currentDevicePlatform() === "linux" || currentDevicePlatform() === "win32";
 const FITTED_WINDOW = currentDevicePlatform() === "darwin";
 const POINTER_ZONE_WHILE_MOVING = currentDevicePlatform() === "win32";
+const WIDEN_WAIT_MS = 250;
+
+function nextResize(): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      window.removeEventListener("resize", done);
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(done, WIDEN_WAIT_MS);
+    window.addEventListener("resize", done);
+  });
+}
 
 export function AgentDockSurface() {
   const { t, errorMessage } = useText();
@@ -55,6 +68,8 @@ export function AgentDockSurface() {
   let received = false;
   let chatOpen = false;
   let pointerIn = false;
+  let pressed = false;
+  let widening: Promise<void> | null = null;
   let dragging = false;
   let shelfShown = false;
   let autoHide = false;
@@ -132,7 +147,7 @@ export function AgentDockSurface() {
   function syncExtent() {
     const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
     const extent =
-      dockShape === null || pointerIn || menuOpen()
+      dockShape === null || pressed || menuOpen()
         ? null
         : windowExtent(
             isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
@@ -140,6 +155,13 @@ export function AgentDockSurface() {
           );
     const key = JSON.stringify(extent);
     if (key === sentExtent) return;
+    if (extent === null && sentExtent !== "" && sentExtent !== "null") {
+      const resized = nextResize();
+      widening = resized;
+      void resized.then(() => {
+        if (widening === resized) widening = null;
+      });
+    }
     sentExtent = key;
     void agentDockPort()
       .agentDock.setExtent(extent)
@@ -167,7 +189,7 @@ export function AgentDockSurface() {
   const sync = () => {
     updateTuck();
     if (FITTED_WINDOW) syncExtent();
-    const next = { interactive: pointerIn, keyboard: chatOpen || menuOpen() };
+    const next = { interactive: pointerIn || pressed, keyboard: chatOpen || menuOpen() };
     if (next.interactive === sent?.interactive && next.keyboard === sent.keyboard) return;
     sent = next;
     void agentDockPort()
@@ -196,11 +218,48 @@ export function AgentDockSurface() {
         target !== document.documentElement &&
         target !== document.body &&
         target.id !== "root";
+      if (event.type === "mousemove" && !pointerIn) pressed = false;
       sync();
     };
     const onLeave = () => {
       pointerIn = false;
+      pressed = false;
       sync();
+    };
+    const onPress = (event: PointerEvent) => {
+      if (!FITTED_WINDOW || !event.isTrusted || !pointerIn) return;
+      pressed = true;
+      sync();
+    };
+    const onContextMenu = (event: MouseEvent) => {
+      const resized = widening;
+      const target = event.target;
+      if (!resized || !event.isTrusted || !(target instanceof Element)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const before = agentDockBody()?.getBoundingClientRect();
+      void resized.then(() => {
+        if (!target.isConnected) return;
+        const after = agentDockBody()?.getBoundingClientRect();
+        target.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window,
+            button: event.button,
+            buttons: event.buttons,
+            screenX: event.screenX,
+            screenY: event.screenY,
+            clientX: event.clientX + (before && after ? after.left - before.left : 0),
+            clientY: event.clientY + (before && after ? after.top - before.top : 0),
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey,
+            altKey: event.altKey,
+            metaKey: event.metaKey,
+          }),
+        );
+      });
     };
     const onBlur = () => setBlurRequest((value) => value + 1);
     const menus = new MutationObserver(() => {
@@ -211,6 +270,8 @@ export function AgentDockSurface() {
     document.addEventListener("mouseover", onPointer);
     document.addEventListener("mousemove", onPointer);
     document.documentElement.addEventListener("mouseleave", onLeave);
+    window.addEventListener("pointerdown", onPress, true);
+    window.addEventListener("contextmenu", onContextMenu, true);
     window.addEventListener("blur", onBlur);
     return () => {
       unsubscribe();
@@ -219,6 +280,8 @@ export function AgentDockSurface() {
       document.removeEventListener("mouseover", onPointer);
       document.removeEventListener("mousemove", onPointer);
       document.documentElement.removeEventListener("mouseleave", onLeave);
+      window.removeEventListener("pointerdown", onPress, true);
+      window.removeEventListener("contextmenu", onContextMenu, true);
       window.removeEventListener("blur", onBlur);
       stopTuckTimer();
     };
