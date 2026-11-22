@@ -21,6 +21,9 @@ import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } fr
 const AUTH_API_ROOT = resolve(import.meta.dirname, "..");
 const WRANGLER = join(AUTH_API_ROOT, "..", "..", "node_modules", ".bin", "wrangler");
 const CLIP_RESOLUTION = "720p";
+const USD_PER_PROVIDER_CREDIT = 0.016;
+const LOWEST_NET_USD_PER_CREDIT = 0.0428;
+const MARGIN_FLOOR = 0.3;
 
 type Target = "local" | "test" | "production";
 
@@ -40,6 +43,7 @@ interface UpstreamModel {
   kind: CreditMediaGenerationKind;
   capabilities: DynamicRecord;
   defaults: DynamicRecord;
+  params: Record<string, string>;
   usd: Map<string, number>;
   usdAudio: Map<string, number>;
   usdFlat: number | null;
@@ -60,6 +64,7 @@ interface SeedModel {
   variant: string | null;
   position: number;
   specs: DynamicRecord;
+  params: Record<string, string>;
   prices: SeedPrice[];
 }
 
@@ -204,17 +209,31 @@ function usdNumber(value: unknown): number | null {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
+function providerCreditUsd(value: unknown): number | null {
+  const credits = usdNumber(value);
+  return credits === null ? null : credits * USD_PER_PROVIDER_CREDIT;
+}
+
+function keepHigher(prices: Map<string, number>, key: string, amount: number): void {
+  prices.set(key, Math.max(amount, prices.get(key) ?? 0));
+}
+
 function readUpstreamModel(value: unknown): UpstreamModel | null {
   if (!isDynamicRecord(value) || !isString(value.id) || !isString(value.name)) return null;
   if (value.modality !== "image" && value.modality !== "video") return null;
   if (!isDynamicRecord(value.capabilities) || !isDynamicRecord(value.pricing)) return null;
+  const defaults = isDynamicRecord(value.defaults) ? value.defaults : {};
+  const options = (Array.isArray(value.pricing.usd_options) ? value.pricing.usd_options : []).filter(isDynamicRecord);
+  const quality =
+    options.some((option) => isString(option.quality)) && isString(defaults.quality) ? defaults.quality : null;
   const usd = new Map<string, number>();
   const usdAudio = new Map<string, number>();
-  const options = Array.isArray(value.pricing.usd_options) ? value.pricing.usd_options : [];
+  let usdFlat: number | null = null;
   for (const option of options) {
-    const amount = isDynamicRecord(option) ? usdNumber(option.usd) : null;
-    if (!isDynamicRecord(option) || !isString(option.resolution) || amount === null) continue;
-    (option.audio === true ? usdAudio : usd).set(option.resolution, amount);
+    const amount = usdNumber(option.usd);
+    if (amount === null || (quality !== null && option.quality !== quality)) continue;
+    if (isString(option.resolution)) keepHigher(option.audio === true ? usdAudio : usd, option.resolution, amount);
+    else usdFlat = Math.max(amount, usdFlat ?? 0);
   }
   const perResolution = value.pricing.usd_per_second_by_resolution;
   if (isDynamicRecord(perResolution)) {
@@ -223,15 +242,28 @@ function readUpstreamModel(value: unknown): UpstreamModel | null {
       if (parsed !== null && !usd.has(resolution)) usd.set(resolution, parsed);
     }
   }
+  const creditsPerResolution = value.pricing.credits_per_second_by_resolution;
+  if (isDynamicRecord(creditsPerResolution)) {
+    for (const [resolution, credits] of Object.entries(creditsPerResolution)) {
+      const parsed = providerCreditUsd(credits);
+      if (parsed !== null && !usd.has(resolution)) usd.set(resolution, parsed);
+    }
+  }
   return {
     id: value.id,
     name: value.name,
     kind: value.modality,
     capabilities: value.capabilities,
-    defaults: isDynamicRecord(value.defaults) ? value.defaults : {},
+    defaults,
+    params: quality === null ? {} : { quality },
     usd,
     usdAudio,
-    usdFlat: usdNumber(value.pricing.usd_per_image) ?? usdNumber(value.pricing.usd_per_second),
+    usdFlat:
+      usdFlat ??
+      usdNumber(value.pricing.usd_per_image) ??
+      usdNumber(value.pricing.usd_per_second) ??
+      providerCreditUsd(value.pricing.credits_per_image) ??
+      providerCreditUsd(value.pricing.credits_per_second),
   };
 }
 
@@ -331,19 +363,30 @@ function pricesOf(upstream: UpstreamModel, page: CreditModelCost, specs: Dynamic
     const silentUsd = upstream.usd.get(resolution);
     if (!silentUsd || !baseUsd) return [];
     const audioUsd = audio ? Math.max(silentUsd, upstream.usdAudio.get(resolution) ?? silentUsd) : silentUsd;
-    const credits = creditUnitRate((perUnit * audioUsd) / baseUsd);
-    const silentCredits = creditUnitRate((perUnit * silentUsd) / baseUsd);
+    const credits = flooredCredits((perUnit * audioUsd) / baseUsd, audioUsd);
+    const silentCredits = flooredCredits((perUnit * silentUsd) / baseUsd, silentUsd);
     return [{ resolution, credits, silentCredits: silentCredits < credits ? silentCredits : null }];
   });
   if (priced.length > 0) return priced;
-  if (audio && upstream.usdAudio.size > 0) throw new Error(`${upstream.id} has audio prices with no resolution.`);
-  return [{ resolution: "", credits: creditUnitRate(perUnit), silentCredits: null }];
+  if (upstream.usd.size > 0 || upstream.usdAudio.size > 0 || upstream.usdFlat === null) return [];
+  return [{ resolution: "", credits: flooredCredits(perUnit, upstream.usdFlat), silentCredits: null }];
+}
+
+function flooredCredits(credits: number, costUsd: number): number {
+  return Math.max(creditUnitRate(credits), creditUnitRate(costUsd / (LOWEST_NET_USD_PER_CREDIT * (1 - MARGIN_FLOOR))));
 }
 
 function pageKind(page: CreditModelCost): CreditMediaGenerationKind | null {
   if (page.kind === "image") return "image";
   if (page.kind === "video") return "video";
   return null;
+}
+
+function pricedSpecs(specs: DynamicRecord, prices: readonly SeedPrice[]): DynamicRecord {
+  if (prices.some((price) => price.resolution === "")) return specs;
+  const priced = new Set(prices.map((price) => price.resolution));
+  const resolutions = specValues(specs.resolutions).filter((resolution) => priced.has(resolution));
+  return { ...specs, resolutions, defaultResolution: chooseDefault(resolutions, specs.defaultResolution) };
 }
 
 function seedModels(upstream: readonly UpstreamModel[]): { models: SeedModel[]; skipped: string[] } {
@@ -358,7 +401,8 @@ function seedModels(upstream: readonly UpstreamModel[]): { models: SeedModel[]; 
       .flatMap((name) => upstream.filter((model) => normalizedName(model.name) === name))
       .find((model) => model.kind === kind);
     const specs = match ? specsOf(match) : null;
-    if (!match || !specs || !isCreditMediaModelId(page.modelId)) {
+    const prices = match && specs ? pricesOf(match, page, specs) : [];
+    if (!match || !specs || prices.length === 0 || !isCreditMediaModelId(page.modelId)) {
       skipped.push(page.modelId);
       return;
     }
@@ -370,8 +414,9 @@ function seedModels(upstream: readonly UpstreamModel[]): { models: SeedModel[]; 
       maker: CREDIT_MODEL_MAKERS[page.maker],
       variant: page.variant ?? null,
       position,
-      specs,
-      prices: pricesOf(match, page, specs),
+      specs: pricedSpecs(specs, prices),
+      params: match.params,
+      prices,
     });
   });
   return { models, skipped };
@@ -385,10 +430,10 @@ function seedStatements(models: readonly SeedModel[], reprice: boolean, now: num
       : "DO NOTHING";
     return [
       `INSERT INTO credit_media_models(model_id, upstream_id, kind, name, maker, variant, position, enabled, specs, upstream_params, updated_at)
-       VALUES (${sql(model.id)}, ${sql(model.upstreamId)}, ${sql(model.kind)}, ${sql(model.name)}, ${sql(model.maker)}, ${sql(model.variant)}, ${model.position}, 0, ${sql(JSON.stringify(model.specs))}, '{}', ${now})
+       VALUES (${sql(model.id)}, ${sql(model.upstreamId)}, ${sql(model.kind)}, ${sql(model.name)}, ${sql(model.maker)}, ${sql(model.variant)}, ${model.position}, 0, ${sql(JSON.stringify(model.specs))}, ${sql(JSON.stringify(model.params))}, ${now})
        ON CONFLICT(model_id) DO UPDATE SET upstream_id = excluded.upstream_id, kind = excluded.kind, name = excluded.name,
          maker = excluded.maker, variant = excluded.variant, position = excluded.position, specs = excluded.specs,
-         updated_at = excluded.updated_at;`,
+         upstream_params = excluded.upstream_params, updated_at = excluded.updated_at;`,
       ...(reprice ? [`DELETE FROM credit_media_prices WHERE model_id = ${sql(model.id)};`] : []),
       ...model.prices.map(
         (price) =>

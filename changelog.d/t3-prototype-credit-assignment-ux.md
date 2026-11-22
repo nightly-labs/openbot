@@ -21,7 +21,7 @@
   credits pay for, with no other sign-in. The model list shows the price of each step in credits. On a
   server, the server's credits pay. On a computer that hosts a server, that server's credits pay too.
   Elsewhere, the credits of your account pay. A charge is exact to 0.1 credit, and you can
-  move tenths of a credit. A failed or refused generation uses no credits. A generation that was sent
+  move tenths of a credit. A failed or refused generation, or one that takes too long, uses no credits. A generation that was sent
   always gives its file: it continues when you stop the run, and after the app closes or restarts.
   When the network fails, the step shows the error at once. Retry then gets the same generation, so
   you do not pay again, unless you changed the step. When a server signs in to an account during a
