@@ -4453,6 +4453,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const accountName = account?.label || (email ? account?.email : null);
       return accountName ? `${accountName} · ${model}` : model;
     };
+    const now = Date.now();
     const note = (email: boolean) =>
       spent && left
         ? sourceText("status.agent.modelSwitchedForSpentBalance", {
@@ -4460,7 +4461,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             model: name(joined, email),
           })
         : ((reason === "provider-error" && left
-            ? this.#providerErrorNote(agent, left, name(left, email), name(joined, email))
+            ? this.#providerErrorNote(agent, left, name(left, email), name(joined, email), now)
             : null) ?? sourceText(MODEL_SWITCH_TEXT[reason], { model: name(joined, email) }));
     const text = note(true);
     try {
@@ -4490,16 +4491,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   }
 
-  #providerErrorNote(agent: AgentSummary, left: AgentModelChoice, previous: string, model: string): string | null {
+  #providerErrorNote(
+    agent: AgentSummary,
+    left: AgentModelChoice,
+    previous: string,
+    model: string,
+    now: number,
+  ): string | null {
     const failure = this.#usageLimits.failureNote(usageLimitOf(left));
     if (failure?.kind === "not-offered")
       return sourceText("status.agent.modelSwitchedForNotOffered", { previous, model });
     const returnTo = agent.usageLimitReturn;
     if (!failure || !returnTo || !sameAgentModelChoice(returnTo, left)) return null;
-    const count = Math.ceil((failure.endsAt - Date.now()) / 60_000);
+    const count = Math.ceil((failure.endsAt - now) / 60_000);
     if (count < 1 || count > PROVIDER_ERROR_NOTE_MAX_MINUTES) return null;
     return sourceText(
-      failure.kind === "rate-limit"
+      failure.kind === "rate-limit" && count <= SHORT_RATE_LIMIT_NOTE_MAX_MINUTES
         ? "status.agent.modelSwitchedForRateLimit"
         : "status.agent.modelSwitchedForErrorUntilReturn",
       { previous, model, count },
@@ -7155,6 +7162,8 @@ export class AgentLifecycleFailed extends Schema.TaggedError<AgentLifecycleFaile
 const POOL_READ_INTERVAL_MS = 4 * 60_000;
 
 const PROVIDER_ERROR_NOTE_MAX_MINUTES = 60;
+
+const SHORT_RATE_LIMIT_NOTE_MAX_MINUTES = 11;
 
 type ModelMove = "return" | "provider-error" | "next-turn" | "pool";
 
