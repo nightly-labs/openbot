@@ -74,29 +74,10 @@
   vertical-align: -0.125em;
 }
 
-.credit-coin {
+.credit-star {
   width: 100%;
   height: 100%;
-}
-
-.credit-coin-basic {
-  stop-color: var(--openbot-credit-basic);
-}
-
-.credit-coin-plus {
-  stop-color: var(--openbot-credit-plus);
-}
-
-.credit-coin-max {
-  stop-color: var(--openbot-credit-max);
-}
-
-.credit-coin-ring {
-  stroke: color-mix(in srgb, var(--openbot-credit-mark) 35%, var(--openbot-transparent));
-}
-
-.credit-coin-spark {
-  fill: color-mix(in srgb, var(--openbot-credit-mark) 95%, var(--openbot-transparent));
+  fill: var(--openbot-credit-star);
 }
 
 .credit-amount {

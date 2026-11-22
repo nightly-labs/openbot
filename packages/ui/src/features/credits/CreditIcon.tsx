@@ -1,26 +1,15 @@
 import type { JSX } from "@solidjs/web";
-import { createUniqueId } from "solid-js";
 import { cx } from "../../utils";
 import "./credits.css";
 
-const SPARK =
-  "M12 5.6c.55 3.75 2.65 5.85 6.4 6.4-3.75.55-5.85 2.65-6.4 6.4-.55-3.75-2.65-5.85-6.4-6.4 3.75-.55 5.85-2.65 6.4-6.4Z";
+const STAR =
+  "M12 2.5c.9 0 1.3.8 1.6 1.9.8 3.1 2.9 5.2 6 6 1.1.3 1.9.7 1.9 1.6s-.8 1.3-1.9 1.6c-3.1.8-5.2 2.9-6 6-.3 1.1-.7 1.9-1.6 1.9s-1.3-.8-1.6-1.9c-.8-3.1-2.9-5.2-6-6C3.3 13.3 2.5 12.9 2.5 12s.8-1.3 1.9-1.6c3.1-.8 5.2-2.9 6-6 .3-1.1.7-1.9 1.6-1.9Z";
 
 export function CreditIcon(props: { class?: string | undefined }): JSX.Element {
-  const id = `credit-coin-${createUniqueId()}`;
   return (
     <span class={cx("credit-icon", props.class)}>
-      <svg class="credit-coin" viewBox="0 0 24 24" aria-hidden="true">
-        <defs>
-          <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" class="credit-coin-basic" />
-            <stop offset="0.55" class="credit-coin-plus" />
-            <stop offset="1" class="credit-coin-max" />
-          </linearGradient>
-        </defs>
-        <circle cx="12" cy="12" r="11" fill={`url(#${id})`} />
-        <circle class="credit-coin-ring" cx="12" cy="12" r="8.6" fill="none" stroke-width="1" />
-        <path class="credit-coin-spark" d={SPARK} />
+      <svg class="credit-star" viewBox="0 0 24 24" aria-hidden="true">
+        <path d={STAR} />
       </svg>
     </span>
   );
