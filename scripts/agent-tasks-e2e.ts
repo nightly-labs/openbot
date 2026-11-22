@@ -187,6 +187,7 @@ try {
       third: taskIn(switchWaits, third.id).state,
       thirdHold: taskIn(switchWaits, third.id).hold,
     };
+    assert.equal(report.switchHold.first, "running", "The third task waits while the first task still runs.");
     assert.equal(report.switchHold.third, "queued", "No new turn starts on the old provider while a switch waits.");
     await page.evaluate(
       ({ id, provider, model }) => window.openbot.agent.updateAgent({ agentId: id, provider, model }),

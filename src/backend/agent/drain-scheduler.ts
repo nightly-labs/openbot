@@ -106,6 +106,7 @@ export interface DrainHooks {
   followUsageLimit(agentId: string): boolean;
   followPendingRuntime(agentId: string): boolean;
   pendingRuntimeWaits(agentId: string): boolean;
+  settleStaleTaskTurns(agentId: string): void;
   turnEnded(turnId: string): boolean;
   staleTurnSettlement(agentId: string, threadId: string, turnId: string): Effect.Effect<void> | null;
   orphanedDeliveryRecovery(agentId: string): Effect.Effect<void> | null;
@@ -560,6 +561,7 @@ export class DrainScheduler {
       (this.#heldByMachine(lane) && "machine");
     if (hold) this.#reportHold(lane, hold);
     if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+    if (hold === "pending-runtime") this.#hooks.settleStaleTaskTurns(lane.agentId);
     if (hold === "machine") this.#recoverIdleLane(lane);
     if (followUsageLimit && hold === "sign-in" && this.#hooks.followPendingRuntime(lane.agentId)) return true;
     if (followUsageLimit && (!hold || hold === "usage-limit") && this.#hooks.followUsageLimit(lane.agentId))
@@ -672,6 +674,7 @@ export class DrainScheduler {
     if (hold) {
       this.#reportHold(lane, hold);
       if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+      if (hold === "pending-runtime") this.#hooks.settleStaleTaskTurns(agentId);
       if (hold === "machine") this.#recoverIdleLane(lane);
       return;
     }
