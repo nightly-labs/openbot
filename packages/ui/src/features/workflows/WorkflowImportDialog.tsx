@@ -5,12 +5,12 @@ import {
   type WorkflowFileReferenceKind,
   type WorkflowGraph,
   workflowFileAssetBytes,
-  workflowFileStepName,
   workflowFromFile,
 } from "@openbot/contracts/ipc";
 import { ConfirmDialog, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Upload } from "@openbot/ui";
-import { createSignal, createStore, For, Show } from "solid-js";
+import { createSignal, createStore, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { workflowAppLabel, workflowStepLabel } from "./workflow-file-text";
 
 export interface WorkflowImportCandidate {
   id: string;
@@ -47,9 +47,11 @@ function candidateLabel(candidate: WorkflowImportCandidate): string {
 
 export function WorkflowImportDialog(props: WorkflowImportDialogProps) {
   const { t, errorMessage } = useText();
-  const file = props.file;
-  const candidates = { agent: [...props.agents], channel: [...props.channels] };
-  const later: WorkflowImportCandidate = { id: "", name: t("workflow.file.import.choose") };
+  const { file, candidates } = untrack(() => ({
+    file: props.file,
+    candidates: { agent: [...props.agents], channel: [...props.channels] },
+  }));
+  const later: WorkflowImportCandidate = { id: "", name: "" };
   const options = { agent: [later, ...candidates.agent], channel: [later, ...candidates.channel] };
   const rows: ReferenceRow[] = Object.entries(file.references).map(([key, reference]) => ({
     key,
@@ -59,10 +61,14 @@ export function WorkflowImportDialog(props: WorkflowImportDialogProps) {
   const [choices, setChoices] = createStore<Record<string, string>>(
     Object.fromEntries(matchWorkflowFileReferences(file, candidates)),
   );
-  const steps = new Map(file.graph.nodes.map((node) => [node.id, workflowFileStepName(node)]));
-  const links = file.links.map((link) => ({ step: steps.get(link.node) ?? link.node, app: link.app }));
   const assets = Object.entries(file.assets);
   const [error, setError] = createSignal<string>();
+  const optionLabel = (candidate: WorkflowImportCandidate) =>
+    candidate.id ? candidateLabel(candidate) : t("workflow.file.import.choose");
+  const stepLabel = (id: string) => {
+    const node = file.graph.nodes.find((candidate) => candidate.id === id);
+    return node ? workflowStepLabel(t, node) : id;
+  };
 
   const build = async () => {
     const uploaded = new Map<string, { id: string; name: string }>();
@@ -116,6 +122,7 @@ export function WorkflowImportDialog(props: WorkflowImportDialogProps) {
                       options={options[row.kind]}
                       optionValue="id"
                       optionTextValue="name"
+                      placeholder={t("workflow.file.import.choose")}
                       value={options[row.kind].find((option) => option.id === (choices[row.key] ?? ""))}
                       onChange={(choice) => {
                         const id = choice?.id ?? "";
@@ -125,14 +132,13 @@ export function WorkflowImportDialog(props: WorkflowImportDialogProps) {
                           });
                       }}
                       itemComponent={(item) => (
-                        <SelectItem item={item.item}>{candidateLabel(item.item.rawValue)}</SelectItem>
+                        <SelectItem item={item.item}>{optionLabel(item.item.rawValue)}</SelectItem>
                       )}
                     >
                       <SelectTrigger class="wfi-trigger" aria-label={row.name}>
                         <SelectValue<WorkflowImportCandidate>>
                           {(state) => {
-                            const selected = state.selectedOption();
-                            return selected ? candidateLabel(selected) : later.name;
+                            return optionLabel(state.selectedOption() ?? later);
                           }}
                         </SelectValue>
                       </SelectTrigger>
@@ -145,11 +151,17 @@ export function WorkflowImportDialog(props: WorkflowImportDialogProps) {
           </Show>
         )}
       </For>
-      <Show when={links.length > 0}>
+      <Show when={file.links.length > 0}>
         <section class="wfi-section">
           <h3 class="wfi-heading">{t("workflow.file.import.links")}</h3>
           <ul>
-            <For each={links}>{(link) => <li>{t("workflow.file.import.link", link)}</li>}</For>
+            <For each={file.links}>
+              {(link) => (
+                <li>
+                  {t("workflow.file.import.link", { step: stepLabel(link.node), app: workflowAppLabel(t, link.app) })}
+                </li>
+              )}
+            </For>
           </ul>
         </section>
       </Show>
