@@ -818,7 +818,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.awaitsResultTurn = false;
       this.#emitBackgroundWork(runtime, true);
     }
-    if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
+    if (runtime.consume) yield* Fiber.await(runtime.consume);
     if (turn && runtime.activeTurn === turn) {
       for (const [toolCallId, { name }] of turn.toolCalls) this.#emitToolCall(runtime, toolCallId, name, true);
       turn.toolCalls.clear();
