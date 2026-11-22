@@ -63,8 +63,10 @@ export function createRemoteFileSender<E, R>(
     if (pending.size !== 0) return yield* busy();
     const transferId = createId();
     const opened = Deferred.makeUnsafe<void, FileTransferError>();
+    const delivered = Deferred.makeUnsafe<void, FileTransferError>();
     const reject = (error: Error) => {
       Deferred.doneUnsafe(opened, Effect.fail(fileTransferError(error)));
+      Deferred.doneUnsafe(delivered, Effect.fail(fileTransferError(error)));
     };
     const stall = () => {
       transfer.error = new Error(sourceText("error.remote.uploadTimeout"));
@@ -79,6 +81,7 @@ export function createRemoteFileSender<E, R>(
         receivedByHost = receivedThrough;
         clearTimeout(timer);
         timer = setTimeout(stall, UPLOAD_IDLE_MS);
+        if (receivedThrough >= source.size) Deferred.doneUnsafe(delivered, Effect.void);
       },
       reject,
       error: null,
@@ -119,6 +122,7 @@ export function createRemoteFileSender<E, R>(
       }
       if (transfer.error) return yield* fileTransferError(transfer.error);
       yield* sendFrame(encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId }));
+      yield* Deferred.await(delivered);
       return transferId;
     }).pipe(
       Effect.ensuring(
