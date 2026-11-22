@@ -1279,6 +1279,85 @@ try {
     return { placeholder: "note, locked", edges: 0, run: "manual/stopped", save: save.status };
   });
 
+  await step(
+    "registry values: an unknown setting value shows read-only; an unknown trigger type needs an admin",
+    async () => {
+      const shownWith = (node: WorkflowNode) =>
+        answer(
+          WORKFLOWS_ROUTES.get,
+          {
+            summary: { id: "w", title: "Values", steps: 2, updatedAt: "2026-11-22T00:00:00.000Z", lastRun: null },
+            graph: { nodes: [promptNode, node], edges: [], strokes: [] },
+            revision: 1,
+            triggers: [],
+          },
+          decodeRemoteWorkflowDetail,
+        ).needsNewerApp;
+      const node = (kind: WorkflowNode["kind"], fields: WorkflowNode["fields"]): WorkflowNode => ({
+        id: "step",
+        kind,
+        at: at(300),
+        fields,
+      });
+      const unknown = {
+        effort: node("llm", { provider: "codex", effort: "turbo" }),
+        conditionEffort: node("condition", { rule: "x", effort: "turbo" }),
+        action: node("output", { target: "discord", action: "edit" }),
+        emoji: node("output", { target: "slack", action: "react", emoji: "🚀" }),
+        reason: node("output", { target: "github", action: "close", reason: "duplicate" }),
+        media: node("image", { media: "audio" }),
+        aspect: node("image", { media: "image", aspect: "2:1" }),
+        voice: node("image", { media: "video", voice: "zed" }),
+        event: node("trigger", { trigger: "github", event: "release.published" }),
+        filter: node("trigger", { trigger: "github", event: "issue.opened", filters: "notBot\nnewFilter" }),
+      };
+      for (const [name, value] of Object.entries(unknown))
+        assert.equal(shownWith(value), true, `An unknown ${name} value was not shown read-only.`);
+      const known = {
+        effort: node("llm", { provider: "codex", effort: "ultra" }),
+        emptyEffort: node("llm", { provider: "codex", effort: "" }),
+        telegramEmoji: node("output", { target: "telegram", action: "react", emoji: "👌" }),
+        discordEmoji: node("output", { target: "discord", action: "react", emoji: "❌" }),
+        githubAction: node("output", { target: "github", action: "label.add", labelsFrom: "agent", item: "input" }),
+        reason: node("output", { target: "github", action: "close", reason: "notPlanned" }),
+        aspect: node("image", { media: "image", aspect: "custom", width: 512, height: 512, background: "transparent" }),
+        voice: node("image", { media: "video", voice: "eve" }),
+        filters: node("trigger", { trigger: "github", event: "pr.merged", filters: "notBot\ntitle\nbranch" }),
+        mention: node("trigger", { trigger: "slack", event: "mention" }),
+        chatChannel: node("output", { target: "chat-channel", channelId: "channel-e2e" }),
+      };
+      for (const [name, value] of Object.entries(known))
+        assert.equal(shownWith(value), undefined, `A known ${name} value was shown read-only.`);
+      const created = await ok(WORKFLOWS_ROUTES.create, ownerToken, { title: "Registry", graph: agentGraph(open) });
+      const workflowId = text(record(created.summary, "summary").id, "workflow id");
+      const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId })).revision);
+      const newer: WorkflowGraph = {
+        nodes: [
+          { id: "newer-trigger", kind: "trigger", at: at(0), fields: { trigger: "newchat", event: "mention" } },
+          agentNode("agent", open),
+        ],
+        edges: [{ id: "edge", from: "newer-trigger", to: "agent", type: "text" }],
+        strokes: [],
+      };
+      const denied = await refused(
+        WORKFLOWS_ROUTES.saveGraph,
+        member,
+        { workflowId, baseRevision: before, graph: newer },
+        403,
+        "error.team.adminRequired",
+      );
+      const owner = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+        workflowId,
+        baseRevision: before,
+        graph: newer,
+      });
+      assert.equal(owner.ok, true);
+      const memberView = await ok(WORKFLOWS_ROUTES.get, member, { workflowId });
+      assert.equal(decodeRemoteWorkflowDetail(memberView).needsNewerApp, true);
+      return { unknown: Object.keys(unknown).length, known: Object.keys(known).length, memberNewTrigger: denied };
+    },
+  );
+
   await step("webhook: the URL goes to the owner only, and only the owner makes a new secret", async () => {
     const graph: WorkflowGraph = {
       nodes: [{ id: "hook", kind: "trigger", at: at(0), fields: { trigger: "webhook" } }, agentNode("agent", open)],

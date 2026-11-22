@@ -681,6 +681,26 @@ try {
     !badMedia.ok && JSON.stringify(badMedia.value).includes("video"),
     badMedia.value,
   );
+  const badEffort = await call("failure-effort", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "llm", fields: { prompt: "Say hi.", effort: "turbo" } }],
+  });
+  check(
+    "an unknown registry value is refused with the values to use",
+    !badEffort.ok &&
+      JSON.stringify(badEffort.value).includes("Set effort to one of: ") &&
+      JSON.stringify(badEffort.value).includes("high"),
+    badEffort.value,
+  );
+  const badAction = await call("failure-action", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "output", fields: { target: "discord", action: "edit" } }],
+  });
+  check(
+    "an unknown output action is refused",
+    !badAction.ok && JSON.stringify(badAction.value).includes("Set action to one of: "),
+    badAction.value,
+  );
   const media = await call("media", "edit_workflow", {
     workflowId,
     ops: [

@@ -24,7 +24,6 @@ import {
   WORKFLOW_MEDIA_CATALOG_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
   WORKFLOW_NODE_KINDS,
-  WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_PORT_TYPES,
   WORKFLOW_RUN_SOURCES,
   WORKFLOW_RUN_STATUSES,
@@ -40,6 +39,7 @@ import {
   type WorkflowMediaProviders,
   type WorkflowMediaServiceAccount,
   type WorkflowStepSettings,
+  workflowNodeHasUnknownValue,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -80,19 +80,12 @@ const version = onRecord((record) => withKnown(record, "kind", WORKFLOW_VERSION_
 
 const trigger = onRecord((record) => withKnown(record, "type", WORKFLOW_TRIGGER_TYPES, "manual"));
 
-function hasUnknownSetting(node: Json): boolean {
-  const fields = isDynamicRecord(node.fields) ? node.fields : {};
-  if (node.kind === "trigger") return isUnknownName(WORKFLOW_TRIGGER_TYPES, fields.trigger);
-  if (node.kind === "output") return isUnknownName(WORKFLOW_OUTPUT_TARGETS, fields.target);
-  return false;
-}
-
 const detail = onRecord((record) => {
   const base = mapList({ ...record, summary: summary(record.summary) }, "triggers", trigger);
   const graph = base.graph;
   if (!isDynamicRecord(graph) || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return base;
   const placeholders = new Set<unknown>();
-  const settings = graph.nodes.some((node) => isDynamicRecord(node) && hasUnknownSetting(node));
+  const settings = graph.nodes.some(workflowNodeHasUnknownValue);
   const nodes = graph.nodes.map(
     onRecord((node) => {
       if (!isUnknownName(WORKFLOW_NODE_KINDS, node.kind)) return node;

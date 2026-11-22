@@ -430,6 +430,14 @@ Node kinds, port types, statuses, run sources, trigger types and version kinds c
 so a newer host can add one. A client shows a workflow with a node kind or a port type that it does
 not know as read-only (`needsNewerApp`), and keeps the node when it saves.
 
+One registry (`packages/contracts/src/ipc-workflow-nodes.ts`) lists the fields of each node kind:
+which fields the host reads at run time, which take `{{name}}` values, the values that a field can
+have, the values that need an admin, and the fields that hold an ID. A client also shows a workflow
+as read-only when a field has a value that is not in the registry. The host asks for an admin when a
+trigger type or an output target is not in the registry. The agent `edit_workflow` tool refuses a
+value that is not in the registry. To add a node kind or a value, add it to the registry and keep
+every released value.
+
 `workflows-media-v1` lets the host run the `image` and `asset` nodes of `workflows-v1`. An image
 step makes a picture or a video with the subscription of the model's provider and keeps it as a
 generated attachment; a client fetches it through `GET /v1/attachments/:id`. An asset step names a

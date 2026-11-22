@@ -106,6 +106,7 @@ export * from "./ipc-workflow-answers";
 export * from "./ipc-workflow-discord";
 export * from "./ipc-workflow-folders";
 export * from "./ipc-workflow-github";
+export * from "./ipc-workflow-nodes";
 export * from "./ipc-workflow-slack";
 export * from "./ipc-workflow-telegram";
 export * from "./ipc-workflows";

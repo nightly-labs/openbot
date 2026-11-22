@@ -1,3 +1,4 @@
+import { WORKFLOW_TEMPLATE_FIELDS } from "./ipc-workflow-nodes";
 import type { WorkflowGraph, WorkflowNode, WorkflowNodeKind } from "./ipc-workflows";
 import { type DynamicRecord, isDynamicRecord } from "./runtime-values";
 
@@ -269,12 +270,6 @@ export function fillWorkflowTemplate(text: string, values: ReadonlyMap<string, s
   if (!text.includes("{{")) return text;
   return text.replace(TEMPLATE, (whole, name: string) => values.get(name) ?? whole);
 }
-
-export const WORKFLOW_TEMPLATE_FIELDS: Readonly<Partial<Record<WorkflowNodeKind, readonly string[]>>> = {
-  agent: ["task"],
-  llm: ["prompt", "system"],
-  approval: ["question"],
-};
 
 export const WORKFLOW_CHECK_OPERATORS = ["=", "!=", ">", ">=", "<", "<=", "contains", "set", "unset"] as const;
 export type WorkflowCheckOperator = (typeof WORKFLOW_CHECK_OPERATORS)[number];
