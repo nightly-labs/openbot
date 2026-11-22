@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -11,6 +12,8 @@ const CURRENT_PERIOD_USAGE_PATH = "/aiserver.v1.DashboardService/GetCurrentPerio
 const PLAN_INFO_PATH = "/aiserver.v1.DashboardService/GetPlanInfo";
 const CURSOR_USAGE_TIMEOUT_MS = 10_000;
 const KEYCHAIN_TIMEOUT_MS = 3_000;
+const SECRET_TOOL_PATHS = ["/usr/bin/secret-tool", "/usr/local/bin/secret-tool"];
+const SECRET_SERVICE_ATTRIBUTES = ["service", "cursor-credentials", "account", "cursor-user"];
 
 const execFileAsync = promisify(execFile);
 
@@ -31,7 +34,52 @@ export function cursorAuthFile(env: NodeJS.ProcessEnv = process.env, home = home
   }
 }
 
-const CursorAuth = Schema.Struct({ accessToken: Schema.NonEmptyString });
+const CursorAuth = Schema.Struct({
+  accessToken: Schema.optional(Schema.String),
+  storedIn: Schema.optional(Schema.String),
+});
+const decodeCursorAuth = Schema.decodeUnknownOption(Schema.fromJsonString(CursorAuth));
+
+function secretServiceEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  if (env.DBUS_SESSION_BUS_ADDRESS || !env.XDG_RUNTIME_DIR) return env;
+  return { ...env, DBUS_SESSION_BUS_ADDRESS: `unix:path=${join(env.XDG_RUNTIME_DIR, "bus")}` };
+}
+
+function exitedWithCode(cause: unknown): boolean {
+  return typeof cause === "object" && cause !== null && "code" in cause && typeof cause.code === "number";
+}
+
+let secretServiceRead: { authFile: string; modifiedMs: number; accessToken: string | null } | null = null;
+
+const readSecretServiceAccessToken = Effect.fn("Cursor.readSecretServiceAccessToken")(function* (authFile: string) {
+  const modified = yield* Effect.tryPromise({
+    try: () => stat(authFile),
+    catch: (cause) => new CursorUsageFailed({ cause }),
+  }).pipe(Effect.option);
+  if (Option.isNone(modified)) return null;
+  const modifiedMs = modified.value.mtimeMs;
+  if (secretServiceRead?.authFile === authFile && secretServiceRead.modifiedMs === modifiedMs) {
+    return secretServiceRead.accessToken;
+  }
+  const output = yield* Effect.tryPromise({
+    try: () =>
+      execFileAsync(
+        SECRET_TOOL_PATHS.find((path) => existsSync(path)) ?? "secret-tool",
+        ["search", ...SECRET_SERVICE_ATTRIBUTES],
+        { timeout: CURSOR_USAGE_TIMEOUT_MS, env: secretServiceEnvironment() },
+      ),
+    catch: (cause) => new CursorUsageFailed({ cause }),
+  }).pipe(
+    Effect.map(({ stdout }) => stdout),
+    Effect.catch((failure) => Effect.succeed(exitedWithCode(failure.cause) ? "" : null)),
+  );
+  if (output === null) return null;
+  const secret = /^secret = (.*)$/mu.exec(output)?.[1];
+  const auth = secret === undefined ? Option.none() : decodeCursorAuth(secret);
+  const accessToken = Option.isSome(auth) && auth.value.accessToken ? auth.value.accessToken : null;
+  secretServiceRead = { authFile, modifiedMs, accessToken };
+  return accessToken;
+});
 
 const readAccessToken = Effect.fn("Cursor.readAccessToken")(function* () {
   if (platform() === "darwin") {
@@ -47,13 +95,17 @@ const readAccessToken = Effect.fn("Cursor.readAccessToken")(function* () {
     const token = Option.isSome(keychain) ? keychain.value.stdout.trim() : "";
     if (token) return token;
   }
+  const authFile = cursorAuthFile();
   const text = yield* Effect.tryPromise({
-    try: () => readFile(cursorAuthFile(), "utf8"),
+    try: () => readFile(authFile, "utf8"),
     catch: (cause) => new CursorUsageFailed({ cause }),
   }).pipe(Effect.option);
   if (Option.isNone(text)) return null;
-  const auth = Schema.decodeUnknownOption(Schema.fromJsonString(CursorAuth))(text.value);
-  return Option.isSome(auth) ? auth.value.accessToken : null;
+  const auth = decodeCursorAuth(text.value);
+  if (Option.isNone(auth)) return null;
+  if (auth.value.accessToken) return auth.value.accessToken;
+  if (auth.value.storedIn !== "os-secret-store" || platform() !== "linux") return null;
+  return yield* readSecretServiceAccessToken(authFile);
 });
 
 const postDashboard = Effect.fn("Cursor.postDashboard")(function* (
