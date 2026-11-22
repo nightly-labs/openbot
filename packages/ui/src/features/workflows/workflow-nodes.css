@@ -1453,15 +1453,17 @@ fieldset.wfn-picker-group {
   pointer-events: none;
 }
 
-.wfn-name-chip {
+.wfn-name-field > .wfn-name-chip {
+  display: inline;
   height: auto;
   margin-inline: 1px;
-  padding-block: 0;
-  vertical-align: baseline;
+  padding: 1px var(--openbot-space-1);
+  font-size: inherit;
   line-height: inherit;
+  vertical-align: baseline;
 }
 
-.wfn-name-chip[data-problem] {
+.wfn-name-field > .wfn-name-chip[data-problem] {
   background: var(--openbot-warning-soft);
   color: var(--openbot-warning-text);
 }
