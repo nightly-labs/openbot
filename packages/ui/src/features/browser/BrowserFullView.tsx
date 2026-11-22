@@ -4,7 +4,7 @@ import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
 import { createEffect, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
 import { BrowserAddressRow } from "./BrowserAddressRow";
-import { BrowserHttpSignInBar } from "./BrowserHttpSignInBar";
+import { BrowserHttpSignInPopover } from "./BrowserHttpSignInPopover";
 import BrowserLiveView from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
 import { BrowserTabSwitcher } from "./BrowserTabSwitcher";
@@ -242,6 +242,23 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
               ref={(element) => {
                 address = element;
               }}
+              popover={
+                <Show when={httpSignInKey()} keyed>
+                  {(key) => {
+                    const [tabId = "", origin = ""] = key.split("\n");
+                    const answer = (value: { username: string; password: string } | null) =>
+                      props.onHttpSignIn?.(tabId, value) ?? Promise.resolve();
+                    return (
+                      <BrowserHttpSignInPopover
+                        site={httpSignInSite(origin)}
+                        refused={props.activeTab?.httpSignIn?.refused === true}
+                        onSubmit={(username, password) => answer({ username, password })}
+                        onCancel={() => answer(null)}
+                      />
+                    );
+                  }}
+                </Show>
+              }
             />
           </BrowserPageCover>
           <Show when={popupFailure() && !dismissedPopupFailures().has(popupFailure()?.id ?? "")}>
@@ -263,21 +280,6 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
                 <CloseIcon />
               </Button>
             </Alert>
-          </Show>
-          <Show when={httpSignInKey()} keyed>
-            {(key) => {
-              const [tabId = "", origin = ""] = key.split("\n");
-              const answer = (value: { username: string; password: string } | null) =>
-                props.onHttpSignIn?.(tabId, value) ?? Promise.resolve();
-              return (
-                <BrowserHttpSignInBar
-                  site={httpSignInSite(origin)}
-                  refused={props.activeTab?.httpSignIn?.refused === true}
-                  onSubmit={(username, password) => answer({ username, password })}
-                  onCancel={() => answer(null)}
-                />
-              );
-            }}
           </Show>
           <Show when={props.teach}>
             {(teach) => (

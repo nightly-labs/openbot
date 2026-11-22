@@ -921,8 +921,8 @@ both answer with `{ tabs: [{ tabId, origin, refused }] }`, and each change sends
 `browser-http-sign-in-changed` with the same list, filtered like the page state. The host keeps an
 answer in memory for one try at the same origin and realm, loads the tab again, and forgets it at the
 next commit. A second prompt after that try shows `refused: true`. A navigation to another page
-closes the prompt, and a cancel keeps the page. The desktop and the web client show the sign-in above
-the page in the browser view and in the browser window, and mobile shows it above the live view, only
+closes the prompt, and a cancel keeps the page. The desktop and the web client show the sign-in in a
+popover under the address bar of the browser view and of the browser window, and mobile shows it above the live view, only
 when the host has the capability. The host never sends the answer back or records it.
 
 `browser-vault-skip-v1` (protocol 9 only) adds `vaultSkip` beside the frozen takeover projection, in
