@@ -12,6 +12,9 @@ export const messages = {
   "error.voice.prepareRequired":
     "Lokale spraaktranscriptie is niet beschikbaar. Voer `bun run voice:prepare` uit en start OpenBot opnieuw.",
   "error.voice.transcriptionFailed": "OpenBot kon deze opname niet transcriberen.",
+  "error.voice.videoModelMissing": "Er is geen spraakherkenningsmodel voor opnamen ingesteld in Instellingen → Spraak.",
+  "error.voice.videoModelMissingServer":
+    "Er is geen spraakherkenningsmodel ingesteld op deze server. Een eigenaar of beheerder kan een model instellen in de serverinstellingen, bij Spraakherkenning.",
   "error.voice.cloud.keyRequired": "Voeg je {provider}-API-sleutel toe in Instellingen → Spraak.",
   "error.voice.cloud.keyRejected":
     "{provider} heeft de API-sleutel niet geaccepteerd. Controleer de sleutel in Instellingen → Spraak.",

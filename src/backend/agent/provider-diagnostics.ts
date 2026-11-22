@@ -150,6 +150,13 @@ export function isPiWarningDiagnostic(message: string): boolean {
   return PI_WARNING_RECORD.test(message);
 }
 
+const CONTEXT_TOO_SMALL =
+  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bnothing to compact \(session too small\)|\bgreater than the context length\b|\blonger than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
+
+export function isContextTooSmallFailure(message: string): boolean {
+  return CONTEXT_TOO_SMALL.test(message);
+}
+
 export const LOG_TIMESTAMP_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+/;
 
 export function isUsageLimitDiagnostic(message: string): boolean {
@@ -167,9 +174,9 @@ export function isUsageLimitDiagnostic(message: string): boolean {
 }
 
 export function isPlanLimitDiagnostic(message: string): boolean {
-  if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
+  if (isBalanceDiagnostic(message) && !/\b(?:try again at|limit · resets)\b/iu.test(message)) return false;
   return (
-    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|\d+-hour) )*limit\b/iu.test(message) ||
+    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|fable|\d+-hour) )*limit\b/iu.test(message) ||
     /\b(?:hit|reached) your (?:session|weekly|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit\b/iu.test(
       message,
     ) ||
@@ -201,6 +208,10 @@ export function providerResetDelayMs(message: string): number | null {
 
 export function isBalanceDiagnostic(message: string): boolean {
   return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
+}
+
+export function isSpentBalanceDiagnostic(message: string): boolean {
+  return isBalanceDiagnostic(message) && !isPlanLimitDiagnostic(message);
 }
 
 export function isImageTooSmallDiagnostic(message: string): boolean {

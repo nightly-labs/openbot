@@ -54,6 +54,7 @@ import {
   isAgentTaskReadState,
   isAgentTasksSnapshot,
   isAgentTaskWindow,
+  isArchivedAgentTasksPage,
   isAttachmentSummary,
   isChannelFolderChange,
   isChannelFolderList,
@@ -87,6 +88,7 @@ export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
   "agent notification levels response",
 );
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
+export const decodeRemoteArchivedAgentTasks = guardedDecoder(isArchivedAgentTasksPage, "remote archived threads");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues, "remote thread queues");

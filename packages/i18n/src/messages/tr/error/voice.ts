@@ -12,6 +12,9 @@ export const messages = {
   "error.voice.prepareRequired":
     "Yerel ses dökümü kullanılamıyor. `bun run voice:prepare` komutunu çalıştırın ve OpenBot'u yeniden başlatın.",
   "error.voice.transcriptionFailed": "OpenBot bu kaydın dökümünü çıkaramadı.",
+  "error.voice.videoModelMissing": "Ayarlar → Ses bölümünde kayıtlar için bir konuşma tanıma modeli ayarlanmamış.",
+  "error.voice.videoModelMissingServer":
+    "Bu sunucuda bir konuşma tanıma modeli ayarlanmamış. Bir sahip veya yönetici, sunucu ayarlarındaki Konuşma tanıma bölümünden bir model ayarlayabilir.",
   "error.voice.cloud.keyRequired": "{provider} API anahtarınızı Ayarlar → Ses bölümünde ekleyin.",
   "error.voice.cloud.keyRejected":
     "{provider} API anahtarını kabul etmedi. Anahtarı Ayarlar → Ses bölümünde kontrol edin.",

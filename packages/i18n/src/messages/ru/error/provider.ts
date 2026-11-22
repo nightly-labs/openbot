@@ -141,6 +141,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "Ключ провайдера содержит пробел или символ, который не может быть в ключе.",
   "error.provider.noModel": "У выбранного провайдера нет доступной модели.",
   "error.provider.noModelNamed": "У {provider} нет доступной модели.",
+  "error.provider.acpModelsNotLoaded": "{provider} не смог загрузить свои модели. Отправьте сообщение ещё раз.",
   "error.provider.acpNoModels":
     "ACP CLI не сообщил ни одной модели ACP. OpenBot не будет подбирать запасную модель наугад.",
   "error.provider.endpointRemoveBusy":
@@ -530,6 +531,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Этот параметр недоступен в текущей сессии провайдера.",
   "error.provider.sessionSettingInvalid": "Это значение недоступно для параметра.",
   "error.provider.sessionSettingsBusy": "Дождитесь окончания текущего хода, прежде чем менять параметр сессии.",
+  "error.provider.sessionSettingsTimedOut": "Сессия агента не ответила вовремя. Попробуйте ещё раз.",
   "error.provider.piOutdated":
     "Pi {version} слишком старый. Установите Pi 1.1.0 или новее для поддержки нативного RPC и MCP.",
   "error.provider.nativeMissing": "CLI {provider} не установлен. Скачайте его в настройках.",

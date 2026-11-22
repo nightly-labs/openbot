@@ -231,8 +231,11 @@ export interface WfnBoard {
   resetSize?: ((id: string) => void) | undefined;
   results: (id: string) => readonly WfnResult[];
   pending: (id: string) => readonly WfnPending[];
+  creditsShort: (id: string) => boolean;
+  markCreditsShort: (id: string, short: boolean) => void;
   shown: (id: string) => WfnResult | undefined;
   newest: (id: string) => WfnResult | undefined;
+  picked: (id: string) => string | undefined;
   pick: (id: string, result: string) => void;
   record: (id: string, value: string, run?: number) => void;
   recordFailure: (id: string, message: string, run?: number) => void;
@@ -438,9 +441,29 @@ const NO_PENDING: readonly WfnPending[] = [];
 
 export const showsStrip = (board: WfnBoard, id: string) => board.results(id).length + board.pending(id).length > 1;
 
+export const makingTake = (board: WfnBoard, id: string): WfnPending | undefined => {
+  const takes = board.pending(id);
+  const [first] = takes;
+  if (first === undefined) return undefined;
+  const picked = board.picked(id);
+  if (picked !== undefined) return takes.find((take) => take.id === picked);
+  const shown = board.shown(id);
+  return shown === undefined || (shown.id === board.newest(id)?.id && shown.at < first.at) ? first : undefined;
+};
+
 export function createBoard(options: BoardOptions) {
   const { t } = useText();
   const nameOf = (element: Element | null | undefined) => nodeName(element, t("workflow.board.stepFallback"));
+  const [creditsShort, setCreditsShort] = createSignal<ReadonlySet<string>>(new Set());
+  const markCreditsShort = (id: string, short: boolean) => {
+    setCreditsShort((current) => {
+      if (current.has(id) === short) return current;
+      const next = new Set(current);
+      if (short) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
   const [state, setState] = createStore<BoardState>({
     selection: untrack(() => (options.selected ? [options.selected] : [])),
     removed: [],
@@ -910,6 +933,8 @@ export function createBoard(options: BoardOptions) {
     resetSize: options.resetSize,
     results: (id) => resultsOf(id),
     pending: (id) => options.pendingOf?.(id) ?? NO_PENDING,
+    creditsShort: (id) => creditsShort().has(id),
+    markCreditsShort,
     shown: (id) => {
       const latest = latestOf(id);
       const picked = state.picked[id];
@@ -918,6 +943,10 @@ export function createBoard(options: BoardOptions) {
       return resultsOf(id).find((result) => result.id === picked.result) ?? latest;
     },
     newest: latestOf,
+    picked: (id) => {
+      const picked = state.picked[id];
+      return picked !== undefined && latestOf(id)?.id === picked.newest ? picked.result : undefined;
+    },
     pick: (id, result) => {
       const newest = latestOf(id)?.id;
       setState((draft) => {

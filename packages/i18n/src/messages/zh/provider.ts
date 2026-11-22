@@ -306,10 +306,14 @@ export const messages = {
   "provider.settings.diagnostics": "诊断",
   "provider.settings.cache": "缓存",
   "provider.settings.promptCache": "提示缓存",
-  "provider.settings.promptCacheDescription": "Claude 在两轮对话之间把助手的上下文保留在缓存中的时长。",
+  "provider.settings.promptCacheDescription": "Claude 和 Pi 在两轮之间将智能体上下文保留在缓存中的时间。",
   "provider.settings.promptCacheHour": "1 小时",
-  "provider.settings.promptCacheDefault": "Claude Code 默认",
+  "provider.settings.promptCacheDefault": "提供商默认值",
   "provider.settings.promptCacheLoadFailed": "无法加载该服务器的提示缓存时长。",
+  "provider.settings.cacheExpiryCompaction": "在缓存过期前压缩",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "当上下文达到 20 万个令牌或更多的聊天在 1 小时缓存下处于空闲状态时，智能体会在缓存过期前压缩上下文。这样下一条消息就不会在没有缓存的情况下重新读取完整上下文。",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "无法加载此服务器的压缩设置。",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "使用我的 Claude Code 配置",
   "provider.settings.claudeUserSetupDescription":

@@ -17,6 +17,7 @@ import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
+import { awaitingReplyEnded } from "@openbot/ui/features/conversation/AwaitingReplies";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
@@ -463,14 +464,16 @@ export function createConversationViewScope(props: ConversationProps) {
   const awaitingReplies = channel
     ? createMemo(() => {
         const hidden = hiddenAwaitingReplyIds();
-        return channel
-          .awaitingReplies()
-          .filter((row) => !(hidden.has(row.id) && (row.state === "replied" || row.state === "failed")));
+        return channel.awaitingReplies().filter((row) => !(hidden.has(row.id) && awaitingReplyEnded(row.state)));
       })
     : queue.awaitingReplies;
   const dismissAwaitingReplies = () => {
     setHiddenAwaitingReplyIds((ids) => new Set([...ids, ...awaitingReplies().map((row) => row.id)]));
     setComposerFocusRequest((value) => value + 1);
+  };
+  const stopAwaitingReply = (rowId: string) => {
+    const row = awaitingReplies().find((item) => item.id === rowId);
+    if (row?.agent && row.deliveryId) props.onCancelQueuedMessage(row.deliveryId, row.agent.id);
   };
   const activity = createActivityStore({
     props,
@@ -2522,6 +2525,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
+    stopAwaitingReply,
     clearComposerError,
     setComposerErrorForTarget,
     clearChatErrors,

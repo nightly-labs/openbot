@@ -1,3 +1,4 @@
+import { isCreditAmount } from "./credits";
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { isRoutineSchedule, type RoutineSchedule } from "./ipc-routines";
@@ -88,7 +89,7 @@ export interface WorkflowMediaSize {
   height: number;
 }
 
-export type WorkflowMediaProvider = "codex" | "grok" | "sunra" | "higgsfield";
+export type WorkflowMediaProvider = "codex" | "grok" | "sunra" | "higgsfield" | "openbot";
 
 export interface WorkflowMediaModel {
   id: string;
@@ -102,10 +103,12 @@ export interface WorkflowMediaModel {
   voices: boolean;
   aspects?: readonly WorkflowMediaAspect[];
   durations?: readonly number[];
+  defaultDuration?: number;
   resolutions?: readonly string[];
   transparent?: boolean;
   options?: readonly WorkflowMediaOption[];
   inputs?: readonly WorkflowMediaInput[];
+  frameCount?: number;
   modes?: readonly WorkflowMediaMode[];
 }
 
@@ -269,7 +272,10 @@ export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
   return fields.media === "video" ? "video" : "image";
 }
 
-type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent" | "options">;
+type WorkflowMediaRange = Pick<
+  WorkflowMediaModel,
+  "aspects" | "durations" | "defaultDuration" | "resolutions" | "transparent" | "options"
+>;
 
 export function workflowMediaAspects(
   model: WorkflowMediaRange | null | undefined,
@@ -379,7 +385,8 @@ export function workflowMediaSpecs(
     ? nearestAspect(aspects, size)
     : (aspects.find((value) => value === fields.aspect) ?? aspects[0] ?? "1:1");
   const durations = workflowVideoDurations(model);
-  const asked = typeof fields.duration === "number" ? fields.duration : WORKFLOW_VIDEO_DURATIONS[0];
+  const asked =
+    typeof fields.duration === "number" ? fields.duration : (model?.defaultDuration ?? WORKFLOW_VIDEO_DURATIONS[0]);
   const duration = durations.reduce(
     (best, value) => (Math.abs(value - asked) < Math.abs(best - asked) ? value : best),
     durations[0] ?? WORKFLOW_VIDEO_DURATIONS[0],
@@ -1145,6 +1152,7 @@ export interface WorkflowMediaProviders {
   sunra: boolean;
   higgsfield: boolean;
   accounts: readonly WorkflowMediaServiceAccount[] | null;
+  openbot?: boolean;
 }
 
 export const WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX = 32;
@@ -1173,7 +1181,8 @@ export function isWorkflowMediaProviders(value: unknown): value is WorkflowMedia
     isDynamicRecord(value) &&
     isBoolean(value.sunra) &&
     isBoolean(value.higgsfield) &&
-    isNullableListOf(value.accounts, isWorkflowMediaServiceAccount)
+    isNullableListOf(value.accounts, isWorkflowMediaServiceAccount) &&
+    (value.openbot === undefined || isBoolean(value.openbot))
   );
 }
 
@@ -1186,6 +1195,7 @@ export interface WorkflowMediaCredits {
   sunra: WorkflowMediaCreditBalance | null;
   higgsfield: WorkflowMediaCreditBalance | null;
   accounts: readonly WorkflowMediaAccountCredits[] | null;
+  openbot?: WorkflowMediaCreditBalance | null;
 }
 
 export interface WorkflowMediaAccountCredits extends WorkflowMediaServiceAccount {
@@ -1201,12 +1211,19 @@ export function isWorkflowMediaCreditBalance(value: unknown): value is WorkflowM
   );
 }
 
+function isOpenBotCreditBalance(value: unknown): value is WorkflowMediaCreditBalance {
+  return (
+    isDynamicRecord(value) && isCreditAmount(value.available) && (value.quota === null || isCreditAmount(value.quota))
+  );
+}
+
 export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCredits {
   return (
     isDynamicRecord(value) &&
     (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra)) &&
     (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield)) &&
-    isNullableListOf(value.accounts, isWorkflowMediaAccountCredits)
+    isNullableListOf(value.accounts, isWorkflowMediaAccountCredits) &&
+    (value.openbot === undefined || value.openbot === null || isOpenBotCreditBalance(value.openbot))
   );
 }
 
@@ -1220,29 +1237,39 @@ export function isWorkflowMediaAccountCredits(value: unknown): value is Workflow
 
 export type WorkflowCatalogProvider = "sunra" | "higgsfield";
 export const WORKFLOW_CATALOG_PROVIDERS: readonly WorkflowCatalogProvider[] = ["sunra", "higgsfield"];
+export type WorkflowCatalogSource = WorkflowCatalogProvider | "openbot";
+export const WORKFLOW_CATALOG_SOURCES: readonly WorkflowCatalogSource[] = [...WORKFLOW_CATALOG_PROVIDERS, "openbot"];
 export const WORKFLOW_MEDIA_CATALOG_MAX = 1000;
+export const WORKFLOW_CREDIT_MODEL_PREFIX = "openbot-";
 
 export const workflowCatalogProvider = (id: string): WorkflowCatalogProvider | null =>
   id.startsWith("sunra-") ? "sunra" : id.startsWith("higgsfield-") ? "higgsfield" : null;
+
+export const workflowCatalogSource = (id: string): WorkflowCatalogSource | null =>
+  id.startsWith(WORKFLOW_CREDIT_MODEL_PREFIX) ? "openbot" : workflowCatalogProvider(id);
 const WORKFLOW_MEDIA_NAME_MAX = 160;
 const WORKFLOW_MEDIA_MAKER_MAX = 120;
 const WORKFLOW_MEDIA_RESOLUTION_MAX = 16;
 
 export interface WorkflowMediaCatalogModel {
   id: string;
-  provider: WorkflowCatalogProvider;
+  provider: WorkflowCatalogSource;
   providerModel: string;
   name: string;
   maker: string;
   kinds: readonly WorkflowMediaKind[];
   aspects: readonly WorkflowMediaAspect[];
   durations: readonly number[];
+  defaultDuration?: number;
   resolutions: readonly string[];
   transparent: boolean;
   options?: readonly WorkflowMediaOption[];
   inputs?: readonly WorkflowMediaInput[];
+  frameCount?: number;
   modes?: readonly WorkflowMediaMode[];
 }
+
+export const WORKFLOW_MEDIA_FRAME_COUNT_MAX = 2;
 
 export interface WorkflowMediaCatalog {
   models: readonly WorkflowMediaCatalogModel[];
@@ -1255,7 +1282,7 @@ export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMe
   return (
     isDynamicRecord(value) &&
     isIdentifier(value.id) &&
-    isOneOf(WORKFLOW_CATALOG_PROVIDERS, value.provider) &&
+    isOneOf(WORKFLOW_CATALOG_SOURCES, value.provider) &&
     isIdentifier(value.providerModel) &&
     isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
     isBoundedString(value.maker, WORKFLOW_MEDIA_MAKER_MAX) &&
@@ -1264,6 +1291,9 @@ export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMe
       isOneOf(WORKFLOW_MEDIA_ASPECTS, entry),
     ) &&
     isListOf(value.durations, WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX, isCreditCount) &&
+    (value.defaultDuration === undefined || isCreditCount(value.defaultDuration)) &&
+    (value.frameCount === undefined ||
+      (isCreditCount(value.frameCount) && value.frameCount <= WORKFLOW_MEDIA_FRAME_COUNT_MAX)) &&
     isListOf(value.resolutions, 16, (entry): entry is string =>
       isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
     ) &&
@@ -1305,6 +1335,12 @@ export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCa
   return isDynamicRecord(value) && isListOf(value.models, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaCatalogModel);
 }
 
+const WORKFLOW_CATALOG_SOURCE_NAMES: Readonly<Record<WorkflowCatalogSource, string>> = {
+  sunra: "Sunra",
+  higgsfield: "Higgsfield",
+  openbot: "OpenBot",
+};
+
 export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): WorkflowMediaModel | null {
   const kind = entry.kinds[0];
   if (kind === undefined || entry.aspects.length === 0) return null;
@@ -1315,16 +1351,20 @@ export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): Wor
     providerModel: entry.providerModel,
     name: entry.name,
     maker: entry.maker,
-    subscription: entry.provider === "sunra" ? "Sunra" : "Higgsfield",
+    subscription: WORKFLOW_CATALOG_SOURCE_NAMES[entry.provider],
     credits: true,
     kinds: [kind],
     voices: false,
     aspects: entry.aspects,
     ...(kind === "video" ? { durations: entry.durations } : {}),
+    ...(kind === "video" && entry.defaultDuration !== undefined && entry.durations.includes(entry.defaultDuration)
+      ? { defaultDuration: entry.defaultDuration }
+      : {}),
     resolutions: entry.resolutions,
     transparent: kind === "image" && entry.transparent,
     ...(entry.options?.length ? { options: entry.options } : {}),
     ...(kind === "video" && entry.inputs ? { inputs: entry.inputs } : {}),
+    ...(kind === "video" && entry.frameCount !== undefined ? { frameCount: entry.frameCount } : {}),
     ...(kind === "video" && entry.modes?.length ? { modes: entry.modes } : {}),
   };
 }

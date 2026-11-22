@@ -194,6 +194,11 @@ export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: Wor
   return { higgsfield: remoteCreditBalance(value.higgsfield) };
 }
 
+export function decodeRemoteCreditMediaCredits(value: unknown): { openbot: WorkflowMediaCreditBalance | null } {
+  if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
+  return { openbot: remoteCreditBalance(value.openbot) };
+}
+
 function remoteAccountList<T>(value: unknown, item: (entry: unknown) => entry is T): T[] {
   if (
     !isDynamicRecord(value) ||

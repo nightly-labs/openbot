@@ -145,6 +145,8 @@ export const messages = {
     "La chiave del provider contiene uno spazio o un carattere che una chiave non può contenere.",
   "error.provider.noModel": "Il provider selezionato non ha modelli disponibili.",
   "error.provider.noModelNamed": "{provider} non ha modelli disponibili.",
+  "error.provider.acpModelsNotLoaded":
+    "{provider} non è riuscito a caricare i suoi modelli. Invia di nuovo il messaggio.",
   "error.provider.acpNoModels":
     "La CLI ACP non ha annunciato nessun modello ACP. OpenBot non sceglierà un modello di ripiego a caso.",
   "error.provider.endpointRemoveBusy":
@@ -542,6 +544,7 @@ export const messages = {
   "error.provider.sessionSettingInvalid": "Questo valore non è disponibile per l'impostazione.",
   "error.provider.sessionSettingsBusy":
     "Attendi che il turno attuale finisca prima di cambiare un'impostazione della sessione.",
+  "error.provider.sessionSettingsTimedOut": "La sessione dell'agente non ha risposto in tempo. Riprova.",
   "error.provider.piOutdated":
     "Pi {version} è troppo vecchio. Installa Pi 1.1.0 o successivo per il supporto nativo a RPC e MCP.",
   "error.provider.nativeMissing": "La CLI di {provider} non è installata. Scaricala in Impostazioni.",

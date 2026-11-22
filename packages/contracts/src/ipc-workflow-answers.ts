@@ -508,10 +508,19 @@ export type WorkflowAnswerProblem =
   | { nodeId: string; code: "repeated"; name: string };
 
 export function workflowAnswerProblems(graph: WorkflowGraph): WorkflowAnswerProblem[] {
-  return graph.nodes.flatMap((node) => nodeAnswerProblems(graph, node));
+  const forward = workflowForwardEdges(graph);
+  return graph.nodes.flatMap((node) => answerProblemsOf(graph, node, forward));
 }
 
-export function nodeAnswerProblems(graph: WorkflowGraph, node: WorkflowNode): WorkflowAnswerProblem[] {
+export function nodeAnswerProblemsWithoutPaths(graph: WorkflowGraph, node: WorkflowNode): WorkflowAnswerProblem[] {
+  return answerProblemsOf(graph, node, null);
+}
+
+function answerProblemsOf(
+  graph: WorkflowGraph,
+  node: WorkflowNode,
+  forward: readonly WorkflowEdge[] | null,
+): WorkflowAnswerProblem[] {
   const problems: WorkflowAnswerProblem[] = [];
   const spec = fieldString(node, WORKFLOW_ANSWER_FIELD);
   if (spec.trim() && canGiveWorkflowAnswer(node))
@@ -556,7 +565,7 @@ export function nodeAnswerProblems(graph: WorkflowGraph, node: WorkflowNode): Wo
   const reached = [...new Set([...names.map(({ name }) => name), ...tests.map(({ name }) => name)])].filter(
     (name) => available.has(name) && !conflicts.has(name),
   );
-  const forward = workflowForwardEdges(graph);
+  if (!forward) return problems;
   const sources = workflowAnswerSources(graph, node.id, forward);
   const required = new Set(reached.filter((name) => available.get(name)?.some((field) => !field.optional)));
   for (const { name, code } of workflowNamePathProblems(graph, node.id, forward, sources, reached, required))

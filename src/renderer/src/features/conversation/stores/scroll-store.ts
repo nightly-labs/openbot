@@ -37,6 +37,7 @@ import {
 } from "../routine-run-timeline";
 import { groupSkillInstallMarkers } from "../skill-install-timeline";
 import { isTurnAnswer } from "../turn-steps";
+import { createTurnStreamHold, heldWhileWritten } from "../turn-stream-hold";
 import { conversationOwnerId } from "./composer-store";
 
 const PROMPT_SEND_HOLD_MS = 2000;
@@ -120,33 +121,11 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       deps.props.channel ? deps.props.channel.author(thinking).agent?.provider : deps.props.agent?.provider,
     );
   const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
-  const [endingTurnIds, setEndingTurnIds] = createSignal<ReadonlySet<string>>(new Set<string>());
-  const endingTimers = new Set<ReturnType<typeof setTimeout>>();
-  let lastTurnId = untrack(() => deps.props.activeTurnId) ?? undefined;
-  createEffect(
-    () => deps.props.activeTurnId,
-    (turnId) => {
-      const ended = lastTurnId;
-      lastTurnId = turnId ?? undefined;
-      if (!ended || ended === turnId) return;
-      setEndingTurnIds((ids) => new Set(ids).add(ended));
-      const timer = setTimeout(() => {
-        endingTimers.delete(timer);
-        setEndingTurnIds((ids) => new Set([...ids].filter((id) => id !== ended)));
-      }, STALE_STREAM_MS);
-      endingTimers.add(timer);
-    },
-  );
-  onCleanup(() => {
-    for (const timer of endingTimers) clearTimeout(timer);
-  });
+  const turnHeld = createTurnStreamHold(() => deps.props.activeTurnId);
   const held = (message: AgentMessage): boolean =>
-    heldWhileWritten(message) &&
-    (deps.props.channel
-      ? message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
-      : message.turnId === undefined
-        ? Boolean(deps.props.activeTurnId) || endingTurnIds().size > 0
-        : message.turnId === deps.props.activeTurnId || endingTurnIds().has(message.turnId));
+    deps.props.channel
+      ? heldWhileWritten(message) && message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
+      : turnHeld(message);
   const updateAnswers = createMemo(() => teammateTurnAnswers(deps.props.messages));
   const foldedAnswerIds = createMemo(
     () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
@@ -515,18 +494,6 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     jumpToUnreadMessages,
     jumpToLatestMessage,
   };
-}
-
-const STALE_STREAM_MS = 3_000;
-
-function heldWhileWritten(message: AgentMessage): boolean {
-  return (
-    message.author === "agent" &&
-    message.streaming === true &&
-    message.kind === "text" &&
-    !message.imageGeneration &&
-    !message.videoGeneration
-  );
 }
 
 export function withQuestionContext(

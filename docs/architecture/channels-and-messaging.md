@@ -794,7 +794,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
   `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactPostText`
-  (the secret rules of `redactText`; an email address that the agent wrote stays).
+  (key formats: private keys, Bearer and Authorization values, link passwords, webhook links, known
+  key prefixes and JWTs; a registered secret only as a whole token, so a saved value inside a word,
+  an email address or a domain stays, because a match inside a word hides normal text; labeled
+  passwords that are not registered and email addresses stay).
   A `messaging_history` call that names a connection and a place goes the same way
   (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
   `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a

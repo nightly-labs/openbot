@@ -5,7 +5,7 @@ export const messages = {
   "error.mcp.redirectByName": "No se puede acceder a esta dirección por nombre.",
   "error.mcp.redirectNotSignIn": "Esta dirección no forma parte de un inicio de sesión.",
   "error.mcp.redirectRefused": "Se rechazó el inicio de sesión. Vuelve a OpenBot e inténtalo de nuevo.",
-  "error.mcp.redirectNoSignIn": "Ningún inicio de sesión está esperando esto. Es posible que haya terminado.",
+  "error.mcp.redirectNoSignIn": "Este inicio de sesión ya no está activo. Vuelve a OpenBot e inicia sesión de nuevo.",
   "error.mcp.redirectSignedIn": "OpenBot ha iniciado sesión. Puedes cerrar esta ventana.",
   "error.mcp.redirectNotSaved": "El inicio de sesión no terminó. Vuelve a OpenBot para ver el motivo.",
   "error.mcp.signInFileUnreadable": "El archivo de inicio de sesión de MCP no se puede leer.",

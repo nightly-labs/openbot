@@ -8,7 +8,7 @@ import type {
   SetAgentSessionSettingInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Schema } from "effect";
+import { Effect, Fiber, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { DrainScheduler } from "./drain-scheduler";
@@ -28,8 +28,13 @@ export class SessionSettingsFailed extends Schema.TaggedError<SessionSettingsFai
 }) {}
 const settingsStep = <A>(run: () => A) =>
   Effect.try({ try: run, catch: (cause) => new SessionSettingsFailed({ cause }) });
-const settingsFailure = (key: "error.provider.sessionSettingUnavailable" | "error.provider.sessionSettingInvalid") =>
-  new SessionSettingsFailed({ cause: new Error(sourceText(key)) });
+const settingsFailure = (
+  key:
+    | "error.provider.sessionSettingUnavailable"
+    | "error.provider.sessionSettingInvalid"
+    | "error.provider.sessionSettingsTimedOut",
+) => new SessionSettingsFailed({ cause: new Error(sourceText(key)) });
+const SESSION_SETTINGS_HOLD_LIMIT_MS = 5 * 60_000;
 
 export interface SessionSettingsOptions {
   store: AgentStore;
@@ -94,18 +99,30 @@ export class SessionSettings {
     agentId: string,
     operation: Effect.Effect<A, SessionSettingsFailed>,
   ) {
+    const held = Effect.gen({ self: this }, function* () {
+      yield* this.options.drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void;
+      const agent = yield* settingsStep(() => this.#agent(agentId));
+      if (!this.options.busy(agentId) && !this.options.threads.providerContextBusy(agent)) {
+        yield* this.options.providers
+          .ensureAgentClient(agent)
+          .pipe(Effect.mapError((failure) => new SessionSettingsFailed({ cause: failure.cause })));
+      }
+      return yield* this.options.exclusive(() => operation);
+    });
     return yield* Effect.acquireUseRelease(
       Effect.sync(() => this.options.drain.holdSessionSettings(agentId)),
       () =>
-        Effect.gen({ self: this }, function* () {
-          yield* this.options.drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void;
-          const agent = yield* settingsStep(() => this.#agent(agentId));
-          if (!this.options.busy(agentId) && !this.options.threads.providerContextBusy(agent)) {
-            yield* this.options.providers
-              .ensureAgentClient(agent)
-              .pipe(Effect.mapError((failure) => new SessionSettingsFailed({ cause: failure.cause })));
-          }
-          return yield* this.options.exclusive(() => operation);
+        Effect.gen(function* () {
+          const work = yield* Effect.forkDetach(held, { startImmediately: true });
+          const stop = Effect.forkDetach(Fiber.interrupt(work));
+          return yield* Fiber.join(work).pipe(
+            Effect.timeoutOrElse({
+              duration: SESSION_SETTINGS_HOLD_LIMIT_MS,
+              orElse: () =>
+                stop.pipe(Effect.andThen(Effect.fail(settingsFailure("error.provider.sessionSettingsTimedOut")))),
+            }),
+            Effect.onInterrupt(() => stop),
+          );
         }),
       (release) => Effect.sync(release),
     );
