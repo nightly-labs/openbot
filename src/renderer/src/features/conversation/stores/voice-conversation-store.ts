@@ -225,14 +225,15 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   function planDownloads(
     speechModel: SpeechModelStatus | null,
-    dictationModelId: VoiceModelId,
+    dictationModelId: VoiceModelId | null,
     dictationStatuses: VoiceModelStatus[] | null,
   ): void {
+    downloads.length = 0;
     if (speechModel?.modelId === SPEECH_MODEL.id && speechModel.phase !== "ready")
       downloads.push({ modelId: speechModel.modelId, bytes: SPEECH_MODEL.bytes, share: 0 });
     const dictation = VOICE_MODELS.find((candidate) => candidate.id === dictationModelId);
-    const dictationReady = dictationStatuses?.find((status) => status.modelId === dictationModelId)?.phase === "ready";
-    if (dictation?.kind === "local" && !dictationReady)
+    const dictationStatus = dictationStatuses?.find((status) => status.modelId === dictationModelId);
+    if (dictation?.kind === "local" && dictationStatus && dictationStatus.phase !== "ready")
       downloads.push({ modelId: dictation.id, bytes: dictation.bytes, share: 0 });
   }
 
@@ -255,7 +256,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     try {
       const speech = speechPort().voice;
       downloadListeners.push(speech.onSpeechModelStatus(showDownload), deps.voice.onModelStatus(showDownload));
-      const [server, turnPauseMs, settings, dictationStatuses] = await Promise.all([
+      const [server, turnPauseMs, plannedSettings, dictationStatuses] = await Promise.all([
         speech.getServer(),
         speech.getSpeechSettings().then(
           (speechSettings) => speechSettings.turnPauseMs,
@@ -266,7 +267,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       ]);
       turnEndSilenceMs = turnPauseMs;
       const speechModel = server?.routes.speech ? null : await speech.getSpeechModelStatus();
-      planDownloads(speechModel, settings.modelId, dictationStatuses);
+      planDownloads(speechModel, server?.routes.dictation ? null : plannedSettings.modelId, dictationStatuses);
       if (speechModel && speechModel.phase !== "ready") {
         const downloadAt = performance.now();
         const status = await speech.downloadSpeechModel().catch((error: unknown) => {
@@ -290,7 +291,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         });
         if (status.phase !== "ready") throw new Error(status.message ?? currentText().t("conversation.voice.error"));
       }
-      const model = await deps.voice.prepareModel();
+      const [settings, model] = await Promise.all([deps.voice.getSettings(), deps.voice.prepareModel()]);
       if (own !== generation || disposed) return;
       if (model.phase !== "ready")
         throw new Error(currentText().errorMessage(model.message, currentText().t("composer.voice.prepareFailed")));
