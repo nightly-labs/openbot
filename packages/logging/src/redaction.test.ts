@@ -444,6 +444,12 @@ describe("registerSecretValue", () => {
     expect(redactPostText("git clone https://mt4f9a2c7e1b3d5f60@git.example.com/repo.git")).toBe(
       "git clone https://[redacted]@git.example.com/repo.git",
     );
+    expect(redactPostText("https://mt4f9a2c7e1b3d5f60:pw12345@git.example.com")).toBe(
+      "https://[redacted]:[redacted]@git.example.com",
+    );
+    expect(redactPostText("https://hooks.slack.com/services/mt4f9a2c7e1b3d5f60/B000/XXXXXXXX")).toBe(
+      "https://hooks.slack.com/services/[redacted]",
+    );
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {

@@ -107,7 +107,7 @@ export function redactSecrets(value: string): string {
 }
 
 export function redactPostText(value: string): string {
-  return applyKeyFormatRules(maskWholeRegisteredSecrets(value));
+  return maskWholeRegisteredSecrets(applyKeyFormatRules(value));
 }
 
 const POST_TOKEN_CHARACTER = /[\p{L}\p{N}._~+@%-]/u;
