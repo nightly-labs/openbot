@@ -256,6 +256,7 @@ export interface TurnHooks {
   turnModel(agentId: string, turnId: string): string | null;
   mayFailOver(agentId: string): boolean;
   backupReadyAt(agentId: string): number | null;
+  backupsAtLimit(agentId: string): boolean;
   poolHasOtherAccount(agentId: string): boolean;
   mayContinueOnBackup(agentId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
@@ -1693,7 +1694,7 @@ export class TurnLifecycle {
           notification.method === "error" &&
           context.causeCode === "usage_limit" &&
           agentId !== undefined &&
-          this.#hooks.backupReadyAt(agentId) !== null;
+          this.#hooks.backupsAtLimit(agentId);
         if (backupsAtLimit)
           logger.warn("A usage limit stopped an agent, and no backup model can take over.", {
             agentId,
