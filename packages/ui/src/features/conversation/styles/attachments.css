@@ -283,6 +283,10 @@
   max-width: min(480px, 100%);
 }
 
+.message-entry .ui-bubble:has(.message-attachment[data-player="video"]) > .ui-bubble-content {
+  width: 100%;
+}
+
 .message-attachment[data-player="video"]:not([data-download]) > :not(.attachment-media-player) {
   display: none;
 }
