@@ -85,6 +85,7 @@ export type TasksVoiceAdapter = TasksVoice & {
 interface TasksViewProps {
   serverId: string;
   hostName: string;
+  failureText?: ((error: string) => string) | undefined;
   onBack?: (() => void) | undefined;
   source: TasksSource;
   agents: AgentProfile[];
@@ -789,6 +790,7 @@ export function TasksView(props: TasksViewProps) {
               draft={state.drafts[taskId] ?? ""}
               draftAttachments={filesOf(taskId)}
               rowAttachments={rowFilesOf(taskId)}
+              failureText={props.failureText}
               pendingImages={pendingImagesOf(taskId)}
               onRemoveAttachment={filesAccepted() ? (attachment) => removeFile(taskId, attachment) : undefined}
               onPasteFiles={

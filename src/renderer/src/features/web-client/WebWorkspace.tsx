@@ -3495,6 +3495,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       hostName={target().name}
                       onBack={closeHostPage}
                       source={tasksSource}
+                      failureText={remoteAgentError}
                       mediaSource={runtime.attachmentMedia}
                       files={{
                         accepted: () => workspace.state.capabilities.includes(AGENT_THREAD_FILES_CAPABILITY),

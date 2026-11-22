@@ -17,6 +17,7 @@ import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut, deviceSendShortcut } from "../../send-shortcut-preference";
+import { remoteAgentError } from "../agents/agent-error-text";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
@@ -258,6 +259,7 @@ export function ConversationThread() {
           </Show>
           <AgentThreadView
             scrollRef={setThreadScrollElement}
+            failureText={props.server && props.server.kind !== "local" ? remoteAgentError : undefined}
             showFullMessage={(message) =>
               threadSearchOpen() && chatSearchOpensMessage(message.body, threadSearchQuery())
             }
