@@ -1079,7 +1079,12 @@ export function configureApplicationMenu(
           { role: "reload" },
           { role: "forceReload" },
           { role: "toggleDevTools" },
-          { accelerator: "F12", visible: false, click: closeFocusedDevTools },
+          {
+            label: translate("menu.closeDeveloperTools"),
+            accelerator: "F12",
+            visible: false,
+            click: closeFocusedDevTools,
+          },
           { type: "separator" },
           {
             label: translate("menu.actualSize"),
