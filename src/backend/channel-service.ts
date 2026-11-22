@@ -2601,7 +2601,9 @@ export class ChannelService {
       this.capture(this.store.database.readConversation(context.id, context.threadId));
       return;
     }
-    const turnId = own.findLast((assignment) => assignment.turnId !== null)?.turnId;
+    const turnId = this.store.database.readLatestTurnId(
+      own.flatMap((assignment) => (assignment.turnId === null ? [] : [assignment.turnId])),
+    );
     if (turnId) this.capture(this.store.database.readTurnConversation(context.id, context.threadId, turnId), turnId);
   }
 

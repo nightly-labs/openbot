@@ -94,6 +94,20 @@ export class ConversationQueries {
     );
   }
 
+  readLatestTurnId(turnIds: string[]): string | null {
+    if (turnIds.length === 0) return null;
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          `SELECT turn_id FROM projection_turns
+           WHERE turn_id IN (SELECT value FROM json_each(?))
+           ORDER BY started_at DESC, last_event_sequence DESC LIMIT 1`,
+        )
+        .get(JSON.stringify(turnIds)),
+    );
+    return row ? requiredStringColumn(row, "turn_id") : null;
+  }
+
   #snapshot(agentId: string, threadId: string, rows: DynamicRecord[]): ConversationSnapshot {
     const thread = decodeConversationThreadRow(
       this.#core.connection
