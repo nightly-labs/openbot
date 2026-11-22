@@ -46,7 +46,7 @@ import {
   withWhatsAppWorkingMessages,
   withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
@@ -640,7 +640,10 @@ type HostRequestActions = Pick<
 function decodeHostFile(value: unknown): RemoteFileUpload {
   if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
     throw new Error("The host returned an invalid file.");
-  return { name: value.name, mimeType: value.mimeType, base64: value.base64 };
+  const file = value.file;
+  const saved =
+    isDynamicRecord(file) && isString(file.ref) && isNumber(file.size) ? { ref: file.ref, size: file.size } : null;
+  return { name: value.name, mimeType: value.mimeType, base64: value.base64, ...(saved ? { file: saved } : {}) };
 }
 
 function hidesAgentsOnHost(capabilities: readonly string[] | undefined): boolean {

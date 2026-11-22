@@ -13,6 +13,13 @@ function transferFailure(message: string): FileTransferError {
   return new FileTransferError({ message });
 }
 
+const SAVED_PART_BYTES = 960 * 1024;
+
+export interface DownloadTarget {
+  ref: string;
+  write: (base64: string, append: boolean) => Effect.Effect<void, FileTransferError>;
+}
+
 interface Download {
   name: string;
   mimeType: string;
@@ -20,16 +27,29 @@ interface Download {
   received: number;
   hash: ReturnType<typeof sha256.create>;
   base64: string[];
+  buffered: number;
   carry: Uint8Array;
+  target: DownloadTarget | undefined;
+  saved: boolean;
   digest: string;
   complete: boolean;
   allowed: boolean;
   timer: ReturnType<typeof setTimeout>;
 }
 
+type ReceivedFile =
+  | { name: string; mimeType: string; base64: string }
+  | { name: string; mimeType: string; base64: string; file: { ref: string; size: number } };
+
+function receivedFile(entry: Download): ReceivedFile {
+  if (!entry.target) return { name: entry.name, mimeType: entry.mimeType, base64: entry.base64.join("") };
+  return { name: entry.name, mimeType: entry.mimeType, base64: "", file: { ref: entry.target.ref, size: entry.size } };
+}
+
 interface DownloadAllowance {
   maxBytes: number;
   mimeType: string | undefined;
+  target: DownloadTarget | undefined;
   taken: boolean;
 }
 
@@ -87,6 +107,30 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     }
   }
   const sendFrame = (data: string) => send(data).pipe(Effect.mapError(fileTransferError));
+  const save = Effect.fn("RemoteFileReceiver.save")(function* (id: string, entry: Download) {
+    if (!entry.target) return true;
+    const base64 = entry.base64.join("");
+    entry.base64 = [];
+    entry.buffered = 0;
+    const saved = yield* entry.target.write(base64, entry.saved).pipe(
+      Effect.as(true),
+      Effect.catch(() => Effect.succeed(false)),
+    );
+    if (saved) {
+      entry.saved = true;
+      return true;
+    }
+    fail(id, sourceText("error.remote.downloadIncompleteRetry"));
+    yield* sendFrame(
+      encodeTeamProtocolV2Frame({
+        version: 2,
+        type: "file-cancel",
+        transferId: id,
+        reason: "The device could not save the attachment.",
+      }),
+    );
+    return false;
+  });
   const take = Effect.fn("RemoteFileReceiver.take")(function* (id: string) {
     const reason = ended.get(id);
     if (reason !== undefined) {
@@ -113,7 +157,7 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     const entry = downloads.get(id);
     if (!entry?.complete) return yield* transferFailure(sourceText("error.remote.downloadIncompleteRetry"));
     remove(id);
-    return { name: entry.name, mimeType: entry.mimeType, base64: entry.base64.join("") };
+    return receivedFile(entry);
   });
   const receive = Effect.fn("RemoteFileReceiver.receive")(function* (data: string | ArrayBuffer) {
     if (typeof data !== "string") {
@@ -142,7 +186,9 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
       }
       const whole = pending.length - (pending.length % 3);
       entry.base64.push(bytesToBase64(pending.subarray(0, whole)));
+      entry.buffered += whole;
       entry.carry = pending.slice(whole);
+      if (entry.buffered >= SAVED_PART_BYTES && !(yield* save(chunk.transferId, entry))) return true;
       if (chunk.bytes.length > 0) touch(chunk.transferId);
       report(chunk.transferId, entry.received, entry.size);
       yield* sendFrame(
@@ -202,7 +248,10 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
         received: 0,
         hash: sha256.create(),
         base64: [],
+        buffered: 0,
         carry: new Uint8Array(0),
+        target: allowance?.target,
+        saved: false,
         digest: frame.sha256,
         complete: false,
         allowed: allowance !== undefined,
@@ -233,6 +282,7 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
       }
       if (entry.carry.length > 0) entry.base64.push(bytesToBase64(entry.carry));
       entry.carry = new Uint8Array(0);
+      if (!(yield* save(frame.transferId, entry))) return true;
       entry.complete = true;
       touch(frame.transferId);
       const waiter = waiters.get(frame.transferId);
@@ -250,8 +300,8 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     return false;
   });
   return {
-    allow(maxBytes: number, mimeType?: string) {
-      const allowance: DownloadAllowance = { maxBytes, mimeType, taken: false };
+    allow(maxBytes: number, mimeType?: string, target?: DownloadTarget) {
+      const allowance: DownloadAllowance = { maxBytes, mimeType, target, taken: false };
       allowances.add(allowance);
       return () => {
         allowances.delete(allowance);
