@@ -1,7 +1,6 @@
 import { Effect } from "effect";
 import { type ReportStorage, TelemetryFailure, telemetryIO } from "./queue";
 
-/** Each application surface has one queue in its own origin. */
 export function indexedReportStorage(name: string): ReportStorage {
   const transaction = (mode: "read" | "write" | "clear", value?: unknown) =>
     new Promise<unknown>((resolve, reject) => {

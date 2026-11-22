@@ -10,11 +10,12 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
-import { Button } from "@openbot/ui";
+import { Button, CopyButton, toast } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type {
   AgentMessage,
   AgentProfile,
+  ChatActionMarkerModel,
   ComposerBrowserTab,
   ComposerMcpServer,
   ComposerThread,
@@ -24,15 +25,17 @@ import {
   type AgentStep,
   AgentStepsDisclosure,
   type AgentStepsFacts,
+  type AgentStepsTrace,
 } from "@openbot/ui/features/conversation/AgentSteps";
 import {
   AttachmentCards,
   type AttachmentDownloads,
   type AttachmentMediaSource,
 } from "@openbot/ui/features/conversation/AttachmentCards";
+import { AwaitingReplies, type AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
-import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
+import { type ChangeMarkerActions, ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import {
@@ -48,8 +51,15 @@ import {
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
+import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
+import {
+  preferredMessageScrollBehavior,
+  ScrollToLatestButton,
+} from "@openbot/ui/features/conversation/MessageNavigation";
 import {
   DeleteMessageDialog,
   MessageActions,
@@ -57,6 +67,7 @@ import {
   MessageMenuItems,
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
+import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
 import {
   MessageSelectionActions,
@@ -67,6 +78,7 @@ import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/con
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { children, createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createComposerRowsResize } from "../createComposerRowsResize";
 import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
 import { MAIN_THREAD_ID } from "./thread-types";
 
@@ -76,15 +88,24 @@ const HOLD_TEXT = {
   "server-busy": "conversation.threads.hold.serverBusy",
   "agent-busy": "conversation.threads.hold.agentBusy",
   "one-turn": "conversation.threads.hold.oneTurn",
+  "sign-in": "conversation.threads.hold.signIn",
 } as const satisfies Record<Exclude<AgentTaskHold, "task-limit">, AppTextKey>;
 
-/** The list stays at its end while new text comes in, when the user has not scrolled up. */
 const STICK_DISTANCE = 48;
 
-/**
- * Whether the thread shows this message as a row. A stopped turn can leave an agent message with no
- * text and nothing else in it. The thinking and the memory changes of a turn show in its steps.
- */
+const MARKER_ROW_KINDS: ReadonlySet<ChatActionMarkerModel["kind"]> = new Set([
+  "skill-lifecycle",
+  "instructions-change",
+  "plan-continuation",
+  "model-switch",
+  "channel-change",
+  "vault-change",
+  "context-reset",
+  "sign-in-failure",
+]);
+const NEAR_SCROLL_VIEWS = 2;
+const OLDER_PRELOAD_VIEWS = 1;
+
 function shownInThread(message: AgentMessage): boolean {
   if (message.kind === "thinking" || message.kind === "memory-changes") return false;
   return (
@@ -93,98 +114,68 @@ function shownInThread(message: AgentMessage): boolean {
     message.body.trim().length > 0 ||
     (message.attachments?.length ?? 0) > 0 ||
     message.imageGeneration !== undefined ||
+    message.videoGeneration !== undefined ||
     message.questionPrompt !== undefined ||
     message.plan !== undefined ||
     message.actionMarker !== undefined
   );
 }
 
-/** Why the next message of a queued thread waits. */
 export function agentThreadHoldText(task: AgentTask, limit: number, t: TextValue["t"]): string | null {
-  if (task.state !== "queued") return null;
-  if (task.hold === "task-limit" || task.hold === null)
-    return t("conversation.threads.hold.threadLimit", { count: limit });
+  if (task.state !== "queued" || task.hold === null) return null;
+  if (task.hold === "task-limit") return t("conversation.threads.hold.threadLimit", { count: limit });
   return t(HOLD_TEXT[task.hold]);
 }
 
-/** Dictation into the thread's message box, as in the agent's own chat. */
 export interface AgentThreadVoice {
-  /** The phase of this thread's recording; "idle" when it has none. */
   phase: VoicePhase;
-  /** Another message box records, so this one cannot start. */
   blocked: boolean;
-  /** What was said so far. */
   liveText: string;
   levels: readonly number[];
   elapsedSeconds: number;
-  /** The download progress of the speech model, in percent, while it is prepared. */
   modelProgress: number | null;
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
-  /** Stops the recording and sends the message with its text. */
   onSend: () => void;
 }
 
-/** A thread's messages before the loaded ones, which it reads page by page. */
 export interface AgentThreadOlderMessages {
-  /** A page read is in progress. */
   loading: boolean;
   onLoad: () => void;
 }
 
-/** The queue of a thread, with the actions of the queue in the agent's own chat. */
 export interface AgentThreadQueue {
-  /** The messages that wait to start in the thread, in queue order. */
   deliveries: QueueDelivery[];
-  /** The queued message that the message box edits now, or null. */
   editingDeliveryId: string | null;
-  /** A save or a cancel of the edit is in progress. */
   editBusy: boolean;
-  /** Steers a queued message into the running turn. Missing where the provider cannot steer. */
   onSteer?: ((deliveryId: string) => void) | undefined;
   onCancel: (deliveryId: string) => void;
-  /** Puts a queued message in the message box. Send saves it in its place. */
   onEdit: (delivery: QueueDelivery) => void;
   onCancelEdit: () => void;
   onReorder: (deliveryIds: string[]) => void;
 }
 
 export interface AgentThreadViewProps {
-  /** Null for a new thread: its first message starts it. */
   task: AgentTask | null;
-  /** How many threads of the agent can run at the same time. */
   limit: number;
   agent: AgentProfile;
   agents: AgentProfile[];
   messages: readonly AgentMessage[];
-  /** The agent's skills, for the `$` picker and the skill tags in messages. */
   skills?: InstalledSkill[] | undefined;
-  /** The last skill list request failed, so an empty picker says so instead of "no skills". */
   skillsLoadFailed?: boolean | undefined;
-  /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: ComposerMcpServer[] | undefined;
-  /** The agent's browser tabs, for the `@` picker. */
   browserTabs?: ComposerBrowserTab[] | undefined;
-  /** The agent's side threads, newest first, for the `@` picker. The view leaves out its own thread. */
   threads?: ComposerThread[] | undefined;
-  /** Shows the browser tab, or opens the thread by its task id, that a tag names. */
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
-  /** The unsent text of this thread's message box. The host keeps it for each thread. */
   draft: string;
-  /** The files that the draft names. */
   draftAttachments?: DraftAttachment[] | undefined;
-  /** The images of the draft that show in the thumbnail row. A send takes them with the text. */
   rowAttachments?: readonly DraftAttachment[] | undefined;
-  /** The pasted images that still import, with their local previews. */
   pendingImages?: readonly ComposerPendingImage[] | undefined;
   onRemoveAttachment?: ((attachment: DraftAttachment) => void) | undefined;
-  /** Loads the images of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
-  /** The download state of attachments from a joined server. */
   downloads?: AttachmentDownloads | undefined;
   onDraftChange: (text: string) => void;
-  /** Receives pasted files and long text pastes, as `ComposerEditor` says. Without it, a file paste does nothing here. */
   onPasteFiles?:
     | ((
         files: File[],
@@ -193,119 +184,70 @@ export interface AgentThreadViewProps {
       ) => undefined | Promise<ComposerPasteResult | undefined>)
     | undefined;
   onOpenDraftAttachment?: ((attachment: DraftAttachment) => void) | undefined;
-  /** Opens the file picker. Without it, the "+" menu has no image or context item. */
   onAttachFiles?: (() => void) | undefined;
-  /** Opens the agent's side question with the draft. Without it, the "+" menu has no side question. */
   onSideQuestion?: (() => void) | undefined;
-  /** Without it, the message box has no microphone. */
   voice?: AgentThreadVoice | undefined;
-  /** Each increase moves the caret to the end of the text, as after a dictation. */
   focusRequest?: number | undefined;
-  /** Sends a message. The host clears the text when the message went; when it did not, the text stays. */
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
   onOpenLink: (url: string) => void;
-  /**
-   * Opens an agent's chat, or one of its threads by tab id. With it, a message to or from another agent
-   * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
-   */
+  onOpenFile?:
+    | ((kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) => void)
+    | undefined;
   onSelectAgent?: ((agentId: string, tabId?: string) => void) | undefined;
+  changeMarkerActions?: ChangeMarkerActions | undefined;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
-  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
   macWindowControls?: boolean | undefined;
-  /** The approval that the thread's running turn waits for. */
   approval?: AgentApproval | undefined;
   onRespondApproval: (decision: "accept" | "decline") => Promise<boolean>;
-  /** How full the thread's context is, when its provider reported it. */
   context?: ContextUsageView | undefined;
-  /** Compacts the thread's context now. Missing when the host cannot. */
   onCompactContext?: (() => Promise<void>) | undefined;
-  /** Whether the thread's running turn waits for the person: a question or a browser takeover. */
   waitsForAnswer?: boolean | undefined;
-  /** Another card that the thread shows, such as a question or a browser takeover. The app builds it. */
   attention?: JSX.Element | undefined;
-  /**
-   * The thread has messages before the loaded ones. Missing when it has none, when it is not known yet,
-   * or when the server cannot read them.
-   */
   olderMessages?: AgentThreadOlderMessages | undefined;
-  /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
-  messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
-  /**
-   * The steps of the finished turn above an answer, or on the thinking row of a finished turn with no
-   * answer. Undefined for a message that has none.
-   */
+  newerMessages?: AgentThreadOlderMessages | undefined;
+  messageCard?:
+    | ((message: AgentMessage, quote: (messageId: string, text: string) => void) => JSX.Element | undefined)
+    | undefined;
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
-  /** The time that the turn of an answer took, and how many of its steps failed. */
   factsAbove?: ((messageId: string) => AgentStepsFacts | undefined) | undefined;
-  /** The steps of the running turn, for its activity row. */
+  traceAbove?: ((messageId: string) => AgentStepsTrace) | undefined;
   activeSteps?: readonly AgentStep[] | undefined;
-  /** The "Show agent steps" setting: the steps are open at first. */
+  backgroundWorkSince?: number | undefined;
   stepsOpenByDefault?: boolean | undefined;
-  /** Receives the message list, where the app searches the thread. */
   scrollRef?: ((element: HTMLElement) => void) | undefined;
-  /** Whether a long message draws in full, with no fold: the app searches the drawn text of the thread. */
   showFullMessage?: ((message: AgentMessage) => boolean) | undefined;
-  /** The user's send shortcut. Enter when absent. */
   sendShortcut?: SendShortcut | undefined;
-  /** Copies a message. Without it, the messages have no action row and no right-click menu. */
   onCopyMessage?: ((message: AgentMessage) => void) | undefined;
-  /** The message that the copy action copied a moment ago. The full action row shows it. */
   copiedMessageId?: string | null | undefined;
-  /**
-   * True (the default) shows Reply and a More button in the action row. False shows Reply, Copy and
-   * Branch in the row, as before.
-   */
   compactMessageActions?: boolean | undefined;
-  /**
-   * Copies the thread through an answer into a new thread. Only the last answer of each finished turn
-   * offers it. Missing where the host cannot branch.
-   */
+  bubbleStyle?: ChatBubbleStyle | undefined;
   onBranch?: ((messageId: string) => void) | undefined;
-  /**
-   * Deletes a message of the thread, after the reader confirms. Missing where the host cannot delete
-   * messages. `canDeleteMessage` says which messages offer it.
-   */
   onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
-  /** Whether the reader can delete a message. Without it, every message that is not streaming can. */
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
-  /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
+  backdropAction?: ((message: AgentMessage) => (() => void) | undefined) | undefined;
   branchSource?: AgentThreadBranchSource | undefined;
-  /** Makes the draft a reply to a message of the thread. Missing where the host cannot take a reply in a thread. */
   onReply?: ((message: AgentMessage) => void) | undefined;
-  /** The message that the draft replies to. It shows above the message box. */
   replyTo?: AgentMessage | undefined;
-  /** Removes the reply from the draft. */
   onCancelReply?: (() => void) | undefined;
-  /** A message to scroll to and mark once, when it shows. Each new request has a new nonce. */
   focusMessage?: { messageId: string; nonce: number } | undefined;
-  /**
-   * The queue of the thread, as the agent's own chat shows its queue. Without it the thread lists the
-   * start of each queued message: a joined server sends no more on `agent-tasks-v1`.
-   */
+  messagePins?:
+    | { isPinned: (messageId: string) => boolean; onToggle: (messageId: string, pinned: boolean) => void }
+    | undefined;
   queue?: AgentThreadQueue | undefined;
-  /**
-   * The actions for text selected in the thread. Quote puts the text in this message box, and a send
-   * goes to this thread. Without it, selected text has no actions.
-   */
+  awaiting?: readonly AwaitingReplyItem[] | undefined;
+  onOpenWaitingAgent?: ((agentId: string) => void) | undefined;
   selectionActions?: AgentThreadSelectionActions | undefined;
 }
 
 export interface AgentThreadSelectionActions {
-  /** Sends the instruction about a selected passage of a message to this thread. */
   onSend: (messageId: string, body: string) => Promise<boolean>;
   quoteShortcut: QuoteShortcutModifier;
 }
 
-/**
- * A side thread of an agent, in the place of its chat: the messages, why the thread waits, and a
- * message box. While a turn runs, a message waits in the thread, or steers the turn as the
- * busy-message mode says.
- */
 export function AgentThreadView(props: AgentThreadViewProps) {
-  const { t } = useText();
-  // Resolved once, so the card is built one time for the check and the row.
+  const { t, format, errorMessage } = useText();
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
   const [addMenuOpen, setAddMenuOpen] = createSignal(false);
@@ -313,23 +255,41 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const [selectionScope, setSelectionScope] = createSignal<HTMLElement>();
   const [quoteRequest, setQuoteRequest] = createSignal<QuoteRequest>();
   const quoteSelection = (messageId: string, text: string) =>
-    // A passage past the message limit would make the editor drop it with the text after it.
     setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: limitedQuoteText(text) }));
-  /* A thread does not tag itself. */
   const otherThreads = createMemo(() => props.threads?.filter((thread) => thread.id !== props.task?.id));
   let scroller: HTMLElement | undefined;
+  let messageList: HTMLDivElement | undefined;
   let atEnd = true;
-  /**
-   * The place of the reader when they asked for older messages: the first message then, and where its
-   * row was. The page goes in above, and the view keeps that row in its place.
-   */
-  let olderAnchor: { firstId: string | undefined; row: Element; top: number } | undefined;
+  let olderAnchor: { firstId: string | undefined; content: HTMLElement; top: number } | undefined;
+  let autoLoadedFirstId: string | undefined | null = null;
+  function firstVisibleRow(element: HTMLElement): HTMLElement | undefined {
+    const viewTop = element.getBoundingClientRect().top;
+    const rows = element.querySelectorAll<HTMLElement>(".virtual-chat-row");
+    for (const row of rows) if (row.getBoundingClientRect().bottom > viewTop) return row;
+    return rows[0];
+  }
+  function contentTop(content: HTMLElement, element: HTMLElement): number {
+    return content.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+  }
   function loadOlder(older: AgentThreadOlderMessages): void {
-    const row = scroller?.querySelector(".virtual-chat-row");
-    if (row) olderAnchor = { firstId: props.messages[0]?.id, row, top: row.getBoundingClientRect().top };
+    const row = scroller && firstVisibleRow(scroller);
+    const content = row?.lastElementChild instanceof HTMLElement ? row.lastElementChild : row;
+    if (scroller && content)
+      olderAnchor = { firstId: props.messages[0]?.id, content, top: contentTop(content, scroller) };
     older.onLoad();
   }
-  // A read that ends with no new messages leaves no place to keep.
+  function loadOlderNearTop(element: HTMLElement): void {
+    const older = untrack(() => props.olderMessages);
+    if (!older || older.loading) return;
+    if (element.scrollTop > element.clientHeight * OLDER_PRELOAD_VIEWS) {
+      autoLoadedFirstId = null;
+      return;
+    }
+    const firstId = untrack(() => props.messages[0]?.id);
+    if (firstId === autoLoadedFirstId) return;
+    autoLoadedFirstId = firstId;
+    loadOlder(older);
+  }
   createEffect(
     () => props.olderMessages?.loading === true,
     (loading) => {
@@ -337,46 +297,55 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         olderAnchor = undefined;
     },
   );
+  createEffect(
+    () => props.newerMessages?.loading === true,
+    (loading) => {
+      if (loading) atEnd = true;
+    },
+  );
+  function loadLatest(newer: AgentThreadOlderMessages): void {
+    atEnd = true;
+    newer.onLoad();
+  }
   let shownTaskId = untrack(() => props.task?.id);
   const activityLabel = nextAgentActivityLabel();
   const fades = createScrollFades();
-  // The view stays when another thread opens in its place, so each thread opens at its latest message.
-  // The effect can run again with the same thread, which must not move the reader.
   createEffect(
     () => props.task?.id,
     (taskId) => {
       if (taskId === shownTaskId) return;
       shownTaskId = taskId;
       atEnd = true;
+      olderAnchor = undefined;
+      autoLoadedFirstId = null;
       if (scroller) scroller.scrollTop = scroller.scrollHeight;
     },
   );
   onSettled(() => {
     const element = scroller;
-    const list = element?.firstElementChild;
+    const list = messageList;
     if (!element || !list) return fades.stop;
     let lastTop = element.scrollTop;
     let lastHeight = element.scrollHeight;
-    // The scroll event of the view's own follow can come after more text, far from the new end (#5002).
-    // That follow moves the view down, so only a move up, with no shorter content, stops the follow.
     const onScroll = () => {
       const { scrollTop, scrollHeight } = element;
       if (scrollHeight - scrollTop - element.clientHeight < STICK_DISTANCE) atEnd = true;
       else if (scrollTop < lastTop && scrollHeight >= lastHeight) atEnd = false;
       lastTop = scrollTop;
       lastHeight = scrollHeight;
+      loadOlderNearTop(element);
     };
     const follow = new ResizeObserver(() => {
       const anchor = olderAnchor;
       if (anchor && untrack(() => props.messages[0]?.id) !== anchor.firstId) {
         olderAnchor = undefined;
-        element.scrollTop += anchor.row.getBoundingClientRect().top - anchor.top;
-        return;
-      }
-      if (atEnd) element.scrollTop = element.scrollHeight;
+        if (anchor.content.isConnected) element.scrollTop += contentTop(anchor.content, element) - anchor.top;
+      } else if (atEnd) element.scrollTop = element.scrollHeight;
+      loadOlderNearTop(element);
     });
     follow.observe(list);
-    element.scrollTop = element.scrollHeight;
+    if (atEnd) element.scrollTop = element.scrollHeight;
+    loadOlderNearTop(element);
     element.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       follow.disconnect();
@@ -384,14 +353,16 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       fades.stop();
     };
   });
-  /** Scrolls to the row of a message and marks it, as a click on a quote does. False when the row does not show. */
   function showMessage(messageId: string): boolean {
     const message = scroller?.querySelector<HTMLElement>(`[data-chat-search-message="${CSS.escape(messageId)}"]`);
     const row = message?.closest<HTMLElement>(".virtual-chat-row");
-    if (!row) return false;
+    if (!row || !scroller) return false;
     atEnd = false;
-    row.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
-    // The row lights up, then fades.
+    const view = scroller.getBoundingClientRect();
+    const bounds = row.getBoundingClientRect();
+    const distance = Math.abs(bounds.top + bounds.height / 2 - (view.top + view.height / 2));
+    const behavior = distance <= view.height * NEAR_SCROLL_VIEWS ? preferredMessageScrollBehavior() : "auto";
+    row.scrollIntoView({ behavior, block: "center", inline: "nearest" });
     delete row.dataset.replyFlash;
     void row.offsetWidth;
     row.dataset.replyFlash = "";
@@ -404,21 +375,24 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     return true;
   }
   let focusedNonce: number | undefined;
-  // The thread scrolls to a message once, when its row shows, for example its source after "Branched from".
   createEffect(
-    () => ({ focus: props.focusMessage, count: props.messages.length, taskId: props.task?.id }),
+    () => ({
+      focus: props.focusMessage,
+      count: props.messages.length,
+      first: props.messages[0]?.id,
+      last: props.messages.at(-1)?.id,
+      taskId: props.task?.id,
+    }),
     ({ focus }) => {
       if (!focus || focus.nonce === focusedNonce) return;
       if (showMessage(focus.messageId)) focusedNonce = focus.nonce;
     },
   );
   const messagesById = createMemo(() => new Map(props.messages.map((message) => [message.id, message])));
-  /** The message that a reply quotes, when the thread has it. */
   const referenced = (message: AgentMessage) => {
     const id = message.replyToMessageId;
     return id ? messagesById().get(id) : undefined;
   };
-  /** Each Reply moves the caret to the message box, as in the agent's own chat. */
   const [replyFocus, setReplyFocus] = createSignal(0);
   const replyAction = (message: AgentMessage) => {
     const onReply = props.onReply;
@@ -429,16 +403,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     };
   };
   const active = () => (props.task ? isAgentTaskActive(props.task) : false);
-  /** The answers that end a finished turn: each offers a branch. */
   const branchPoints = createMemo(() => branchPointIds(props.messages, props.task?.activeTurnId));
-  /** A turn runs, so a branch waits: the backend copies only a thread that does not run. */
   const branchBusy = () => props.task?.activeTurnId != null;
   const branchAction = (message: AgentMessage) => {
     const onBranch = props.onBranch;
     if (!onBranch || !branchPoints().has(message.id)) return undefined;
     return () => onBranch(message.id);
   };
-  /** The message that the delete dialog asks about. */
   const [deleteTargetId, setDeleteTargetId] = createSignal<string | null>(null);
   const deleteAction = (message: AgentMessage) => {
     if (!props.onDeleteMessage || message.streaming) return undefined;
@@ -449,14 +420,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
-      ? t("conversation.threads.view.placeholder", { name: props.agent.name, title: props.task.title })
+      ? // The tab already names the thread, and a title can be a whole message.
+        t("conversation.threads.view.placeholder", { name: props.agent.name })
       : t("conversation.threads.view.newPlaceholder", { name: props.agent.name });
   const voicePhase = () => props.voice?.phase ?? "idle";
   const recording = () => voicePhase() === "recording";
-  /** As in the agent's own chat, nothing sends while the microphone opens or the speech becomes text. */
   const voiceBusy = () => voicePhase() !== "idle" && !recording();
   const send = async () => {
-    // As in the agent's own chat, a send while recording sends what was said.
     if (recording()) {
       props.voice?.onSend();
       return;
@@ -470,9 +440,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       setSending(false);
     }
   };
-  // An answer from another agent to a request of this thread shows with the name of that agent.
   const author = (message: AgentMessage): ChatMessageAuthor => {
-    if (message.author === "you") return { kind: "you", name: t("chat.message.you") };
+    if (message.author === "you")
+      return ownMessageAuthor({
+        name: t("chat.message.you"),
+        style: props.bubbleStyle ?? "classic",
+        agent: props.agent,
+        chatColor: undefined,
+      });
     const senderId = message.senderAgentId;
     if (senderId === undefined || senderId === props.agent.id)
       return { kind: "agent", name: props.agent.name, agent: props.agent };
@@ -484,7 +459,6 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       avatarSeed: senderId,
     };
   };
-  /* The exchange ids of the agent messages whose text shows under their marker. */
   const [openAgentMessages, setOpenAgentMessages] = createSignal<ReadonlySet<string>>(new Set());
   const toggleAgentMessage = (messageId: string) =>
     setOpenAgentMessages((open) => {
@@ -492,14 +466,26 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (!next.delete(messageId)) next.add(messageId);
       return next;
     });
-  /** The marker of a message to or from another agent. A message with no text gets no toggle. */
   const agentMessageMarker = (message: AgentMessage) => {
     const marker = message.actionMarker;
     if (marker?.kind !== "agent-message" || !props.onSelectAgent) return undefined;
     if (message.body.trim() === "") return marker;
     return { ...marker, expanded: openAgentMessages().has(marker.messageId) };
   };
-  /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
+  const changeMarker = (message: AgentMessage) => {
+    const marker = message.actionMarker;
+    return marker && MARKER_ROW_KINDS.has(marker.kind) ? marker : undefined;
+  };
+  const sharedFileOpener = (agentId: string | undefined) => {
+    const open = props.onOpenFile;
+    return open ? (path: string, asWritten?: string) => open("shared", agentId, path, asWritten) : undefined;
+  };
+  const workspaceFileOpener = (agentId: string | undefined) => {
+    const open = props.onOpenFile;
+    return open && agentId
+      ? (path: string, asWritten?: string) => open("workspace", agentId, path, asWritten)
+      : undefined;
+  };
   const agentMessageText = (messageId: string) => {
     const message = () => props.messages.find((candidate) => candidate.exchange?.messageId === messageId);
     return (
@@ -519,7 +505,6 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             showTime
             agents={props.agents}
             skills={props.skills}
-            // The sender's name opens the thread that sent the message, or else the sender's own chat, as in the chat.
             onSelectAgent={(agentId) =>
               agentId === current().exchange?.senderAgentId
                 ? props.onSelectAgent?.(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
@@ -529,13 +514,20 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             onOpenLink={props.onOpenLink}
             onPreview={props.onPreview}
             onAttachmentAction={props.onAttachmentAction}
+            onOpenSharedFile={sharedFileOpener(current().exchange?.senderAgentId)}
+            onOpenWorkspaceFile={workspaceFileOpener(current().exchange?.senderAgentId)}
             macWindowControls={props.macWindowControls}
           />
         )}
       </Show>
     );
   };
-  /** The items of a message's menu: Reply, Copy, Branch on the last answer of a finished turn, and Delete. */
+  function pinAction(message: AgentMessage) {
+    const pins = props.messagePins;
+    if (!pins || message.streaming) return undefined;
+    const pinned = pins.isPinned(message.id);
+    return { pinned, onToggle: () => pins.onToggle(message.id, !pinned) };
+  }
   function menuItems(message: AgentMessage, onCopy: (message: AgentMessage) => void): MessageMenuItemsProps {
     return {
       message,
@@ -545,16 +537,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       onCopy: () => onCopy(message),
       onBranch: branchAction(message),
       branchDisabled: branchBusy(),
+      pin: pinAction(message),
+      onUseAsBackdrop: props.backdropAction?.(message),
       onDelete: deleteAction(message),
     };
   }
-  /**
-   * The action row of a message. The compact row has Reply, and More with the items of the right-click
-   * menu. The full row has Reply, Copy, and Branch on the last answer of a finished turn.
-   */
   function messageActions(message: AgentMessage): JSX.Element | undefined {
     const onCopy = props.onCopyMessage;
-    if (!onCopy || message.streaming) return undefined;
+    if (!onCopy || message.streaming || message.itemType === "commentary") return undefined;
     return (
       <Show
         when={props.compactMessageActions !== false}
@@ -591,24 +581,64 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       </Show>
     );
   }
-  /** The right-click menu of a message, with the items of its More button. */
   function messageMenu(message: AgentMessage): (() => JSX.Element) | undefined {
     const onCopy = props.onCopyMessage;
-    if (!onCopy || message.streaming) return undefined;
+    if (!onCopy || message.streaming || message.itemType === "commentary") return undefined;
     return () => <MessageMenu {...menuItems(message, onCopy)} authorName={author(message).name} />;
   }
-  /** A finished turn with no answer shows its steps on its thinking row, with no message under them. */
   const shownRow = (message: AgentMessage) =>
     shownInThread(message) || (message.kind === "thinking" && props.stepsAbove?.(message.id) !== undefined);
-  /**
-   * The row that the branch line follows: the last message that the branch copied. That message can be
-   * one that the thread does not show as a row, such as a thought in the steps of a turn. Then the line
-   * follows the last shown message from before the branch was made: the copies keep their times.
-   */
+  const shownRows = createMemo(() => props.messages.filter(shownRow));
+  const holdsSenderRun = (message: AgentMessage) =>
+    message.kind !== "thinking" &&
+    message.kind !== "plan" &&
+    message.kind !== "subagents" &&
+    message.kind !== "memory-changes" &&
+    message.questionPrompt === undefined &&
+    !agentMessageMarker(message) &&
+    !changeMarker(message);
+  const senderRunRow = (message: AgentMessage) => ({
+    author: message.author === "agent" ? `agent:${message.senderAgentId ?? props.agent.id}` : message.author,
+    ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt }),
+    ...(message.turnId === undefined ? {} : { turnId: message.turnId }),
+  });
+  const timeMarkers = createMemo(() => {
+    const labels = new Map<string, string>();
+    const gap = props.compactMessageActions === false ? {} : { gapMs: CHAT_TIME_GAP_MS };
+    let previous: AgentMessage | undefined;
+    for (const message of shownRows()) {
+      const label =
+        message.createdAt === undefined
+          ? previous === undefined
+            ? (message.time ?? t("chat.day.now"))
+            : null
+          : dayMarkerLabel(previous?.createdAt, message.createdAt, { t, format, ...gap });
+      if (label !== null) labels.set(message.id, label);
+      previous = message;
+    }
+    return labels;
+  });
+  const continuesRunIds = createMemo(() => {
+    const ids = new Set<string>();
+    const markers = timeMarkers();
+    let previous: AgentMessage | undefined;
+    for (const message of shownRows()) {
+      if (
+        holdsSenderRun(message) &&
+        continuesSenderRun(previous && senderRunRow(previous), senderRunRow(message), {
+          previousDrawsTime: previous !== undefined && holdsSenderRun(previous),
+          startsDay: markers.has(message.id),
+        })
+      )
+        ids.add(message.id);
+      previous = message;
+    }
+    return ids;
+  });
   const branchDividerId = createMemo(() => {
     const source = props.branchSource;
     if (!source) return undefined;
-    const shown = props.messages.filter(shownRow);
+    const shown = shownRows();
     if (shown.some((message) => message.id === source.throughMessageId)) return source.throughMessageId;
     const branchedAt = props.task ? Date.parse(props.task.createdAt) : Number.NaN;
     if (Number.isNaN(branchedAt)) return undefined;
@@ -619,18 +649,21 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     return branchDividerId() === messageId ? props.branchSource : undefined;
   }
   const failed = () => (props.task?.state === "idle" && props.task.outcome === "failed" ? props.task : undefined);
+  const failure = (error: string | null) => {
+    const reason = error?.trim() ?? "";
+    if (!reason) return { body: t("conversation.threads.view.failedBody"), details: null };
+    const fallback = t("agent.error.continueFailed");
+    const body = errorMessage(reason, fallback);
+    return { body, details: body === fallback ? reason : null };
+  };
   const running = () =>
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
+  const backgroundWorkSince = () => (props.task?.state === "running" ? undefined : props.backgroundWorkSince);
   const hold = () => (props.task ? agentThreadHoldText(props.task, props.limit, t) : null);
   const editingQueued = () => Boolean(props.queue?.editingDeliveryId);
   const sendLabel = () =>
     t(recording() ? "composer.send.voice" : editingQueued() ? "composer.send.saveQueued" : "composer.send.message");
-  /*
-   * The rows that the queue panel shows. When the last message goes, the slot closes at once and keeps
-   * these rows, so the whole panel goes down behind the input in one move, as in the agent's own chat.
-   * Another thread does not get the rows of the one before.
-   */
   const [queueRows, setQueueRows] = createSignal<{ taskId: string | undefined; deliveries: QueueDelivery[] }>({
     taskId: undefined,
     deliveries: [],
@@ -643,8 +676,6 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (next.deliveries.length > 0 || next.taskId !== shown.taskId) {
         if (queueExitTimer !== undefined) window.clearTimeout(queueExitTimer);
         queueExitTimer = undefined;
-        // Each change of the thread sends its queue again. A row that did not change keeps its object,
-        // so the panel does not draw it again and the pointer and the focus stay on it.
         const previous = new Map(shown.deliveries.map((delivery) => [delivery.id, delivery]));
         const deliveries = next.deliveries.map((delivery) => {
           const known = previous.get(delivery.id);
@@ -653,8 +684,6 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         setQueueRows({ taskId: next.taskId, deliveries });
         return;
       }
-      // Each change of the thread sends the empty queue again. The panel closes at the end of its
-      // first exit, not after the thread is quiet.
       if (shown.deliveries.length === 0 || queueExitTimer !== undefined) return;
       queueExitTimer = window.setTimeout(() => {
         queueExitTimer = undefined;
@@ -667,11 +696,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   });
   const queuePanelOwner = () => (queueRows().deliveries.length > 0 ? queueRows().taskId : undefined);
   const queueOpen = () => (props.queue?.deliveries.length ?? 0) > 0 && queueRows().taskId === props.task?.id;
+  const draftRows = createComposerRowsResize(() => props.task?.id ?? "");
   const hasRow = () =>
     Boolean(props.onRemoveAttachment) &&
     ((props.rowAttachments?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0);
   const draftEmpty = () => props.draft.trim().length === 0 && (props.rowAttachments?.length ?? 0) === 0;
-  /** As in the agent's own chat: Send, Send what was said while a recording runs, or Stop while the thread works. */
   const sendButton = () => (
     <ComposerSendControl
       stop={active() && draftEmpty() && !recording()}
@@ -688,7 +717,6 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           <MessageSelectionActions
             scope={selectionScope()}
             contextKey={props.task?.id}
-            // As the message box: a quote waits in a locked box, and could go to the next thread.
             disabled={!props.task || sending() || voicePhase() === "transcribing"}
             onSend={(messageId, body) => actions().onSend(messageId, body)}
             onQuote={quoteSelection}
@@ -708,7 +736,16 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         aria-label={t("conversation.threads.view.label", { title: title() })}
         onScroll={fades.measure}
       >
-        <div class="virtual-chat-list virtual-chat-list-static" ref={fades.watch}>
+        <Show when={props.newerMessages}>
+          {(newer) => <ScrollToLatestButton onClick={() => loadLatest(newer())} />}
+        </Show>
+        <div
+          class="virtual-chat-list virtual-chat-list-static"
+          ref={(element: HTMLDivElement) => {
+            messageList = element;
+            fades.watch(element);
+          }}
+        >
           <Show when={props.olderMessages}>
             {(older) => (
               <div class="conversation-history-status">
@@ -724,26 +761,49 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               </div>
             )}
           </Show>
-          {/* The start of the thread shows once its first message is loaded. */}
           <Show when={props.task?.origin === "agent" && !props.olderMessages}>
             <p class="agent-thread-origin">
               {t("conversation.threads.view.startedByAgent", { name: props.agent.name })}
             </p>
           </Show>
-          <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
+          <For each={shownRows()} keyed={(message) => message.id}>
             {(message) => {
-              const card = createMemo(() => props.messageCard?.(message()));
+              const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
+              const stepsInRow = () =>
+                props.traceAbove !== undefined &&
+                !props.stepsOpenByDefault &&
+                message().kind !== "thinking" &&
+                message().questionPrompt === undefined &&
+                !agentMessageMarker(message()) &&
+                !changeMarker(message()) &&
+                !card() &&
+                author(message()).kind === "agent";
+              const stepsDisclosure = () => (
+                <Show when={props.stepsAbove?.(message().id)}>
+                  {(steps) => (
+                    <AgentStepsDisclosure
+                      steps={steps()}
+                      defaultOpen={props.stepsOpenByDefault ?? false}
+                      list={!stepsInRow()}
+                      trace={message().kind === "thinking" ? undefined : props.traceAbove?.(message().id)}
+                      facts={props.factsAbove?.(message().id)}
+                    />
+                  )}
+                </Show>
+              );
               return (
-                <div class="virtual-chat-row">
-                  <Show when={props.stepsAbove?.(message().id)}>
-                    {(steps) => (
-                      <AgentStepsDisclosure
-                        steps={steps()}
-                        defaultOpen={props.stepsOpenByDefault ?? false}
-                        facts={props.factsAbove?.(message().id)}
-                      />
+                <div
+                  class="virtual-chat-row"
+                  data-grouped={!card() && continuesRunIds().has(message().id) ? "sender" : undefined}
+                >
+                  <Show when={timeMarkers().get(message().id)}>
+                    {(label) => (
+                      <div class="time-marker">
+                        <span>{label()}</span>
+                      </div>
                     )}
                   </Show>
+                  <Show when={!stepsInRow()}>{stepsDisclosure()}</Show>
                   <Show when={message().kind !== "thinking" && agentMessageMarker(message())}>
                     {(marker) => (
                       <article data-chat-search-message={message().id}>
@@ -768,7 +828,22 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       </article>
                     )}
                   </Show>
-                  <Show when={message().kind !== "thinking" && !agentMessageMarker(message())}>
+                  <Show when={message().kind !== "thinking" && changeMarker(message())}>
+                    {(marker) => (
+                      <article data-chat-search-message={message().id}>
+                        <ChatActionMarker
+                          marker={marker()}
+                          agents={props.agents}
+                          onSelectAgent={(agentId, tabId) => props.onSelectAgent?.(agentId, tabId)}
+                          onOpenSkill={props.changeMarkerActions?.onOpenSkill}
+                          onOpenInstructions={props.changeMarkerActions?.onOpenInstructions}
+                        />
+                      </article>
+                    )}
+                  </Show>
+                  <Show
+                    when={message().kind !== "thinking" && !agentMessageMarker(message()) && !changeMarker(message())}
+                  >
                     <Show
                       when={card()}
                       fallback={
@@ -783,6 +858,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           onOpenLink={props.onOpenLink}
                           onPreview={props.onPreview}
                           onAttachmentAction={props.onAttachmentAction}
+                          onOpenSharedFile={sharedFileOpener(props.agent.id)}
+                          onOpenWorkspaceFile={workspaceFileOpener(props.agent.id)}
                           mediaSource={props.mediaSource}
                           downloads={props.downloads}
                           onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
@@ -793,6 +870,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                             if (id) showMessage(id);
                           }}
                           actions={messageActions(message())}
+                          steps={stepsInRow() ? stepsDisclosure() : undefined}
+                          actionTime={props.compactMessageActions === false}
+                          actionsBeside={stepsInRow() || author(message()).kind === "you"}
                           menu={messageMenu(message())}
                           data-chat-search-message={message().id}
                         />
@@ -808,13 +888,25 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </For>
           <Show when={running()}>
             {(task) => (
-              <div class="virtual-chat-row">
+              <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
                   label={activityLabel}
                   detail={task().progress}
                   steps={props.activeSteps}
                   stepsOpenByDefault={props.stepsOpenByDefault}
+                />
+              </div>
+            )}
+          </Show>
+          <Show when={backgroundWorkSince()}>
+            {(since) => (
+              <div class="virtual-chat-row virtual-chat-row-activity">
+                <AgentActivityIndicator
+                  agent={props.agent}
+                  label={activityLabel}
+                  detail={t("chat.activity.backgroundWork")}
+                  since={since()}
                 />
               </div>
             )}
@@ -855,74 +947,99 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         </div>
       </section>
       <div class="composer-wrap">
-        <Show when={failed()}>
-          {(task) => (
-            <ComposerNotice
-              tone="danger"
-              title={t("conversation.threads.view.failed")}
-              body={task().error || t("conversation.threads.view.failedBody")}
-            />
-          )}
-        </Show>
-        <Show when={props.replyTo}>
-          {(message) => (
-            <ComposerReplyPreview
-              message={message()}
-              agents={props.agents}
-              skills={props.skills}
-              disabled={sending() || voicePhase() === "transcribing"}
-              onCancel={() => props.onCancelReply?.()}
-            />
-          )}
-        </Show>
-        <Show when={props.queue}>
-          {(queue) => (
-            <div class="composer-stack">
-              <div
-                class="agent-queue-slot"
-                data-open={queueOpen() ? "true" : "false"}
-                aria-hidden={queueOpen() ? undefined : "true"}
-                inert={queueOpen() ? undefined : true}
-              >
-                <div class="agent-queue-slot-inner">
-                  {/* Each thread gets its own panel, so its rows do not animate in from the thread before. */}
-                  <Show when={queuePanelOwner()} keyed>
-                    {(_taskId) => (
-                      <QueuePanel
-                        deliveries={queueRows().deliveries}
-                        agents={props.agents}
-                        skills={props.skills}
-                        editingDeliveryId={queue().editingDeliveryId}
-                        canSteer={Boolean(props.task?.activeTurnId)}
-                        onSteer={queue().onSteer}
-                        onCancel={(deliveryId) => queue().onCancel(deliveryId)}
-                        onEdit={(delivery) => queue().onEdit(delivery)}
-                        onReorder={(deliveryIds) => queue().onReorder(deliveryIds)}
-                      />
-                    )}
-                  </Show>
-                </div>
-              </div>
-              <Show when={queue().editingDeliveryId}>
+        <div class="composer-stack">
+          <ComposerStackCard when={failed()}>
+            {(task) => {
+              const shown = () => failure(task().error);
+              return (
                 <ComposerNotice
-                  body={t("composer.queueEdit.body")}
+                  tone="danger"
+                  title={t("conversation.threads.view.failed")}
+                  body={shown().body}
                   action={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      disabled={queue().editBusy}
-                      onClick={() => queue().onCancelEdit()}
-                    >
-                      {t("composer.queueEdit.cancel")}
-                    </Button>
+                    <Show when={shown().details}>
+                      {(details) => (
+                        <CopyButton
+                          value={details()}
+                          variant="outline"
+                          size="sm"
+                          label={t("agent.error.copyDetails")}
+                          onCopyError={() => toast.error(t("app.clipboard.copyFailed"))}
+                        />
+                      )}
+                    </Show>
                   }
                 />
-              </Show>
-            </div>
-          )}
-        </Show>
+              );
+            }}
+          </ComposerStackCard>
+          <ComposerStackCard when={props.awaiting?.length ? props.awaiting : undefined}>
+            {(items) => (
+              <AwaitingReplies items={items()} onOpenAgent={props.onOpenWaitingAgent ?? props.onSelectAgent} />
+            )}
+          </ComposerStackCard>
+          <Show when={props.queue}>
+            {(queue) => (
+              <>
+                <div
+                  class="agent-queue-slot"
+                  data-open={queueOpen() ? "true" : "false"}
+                  aria-hidden={queueOpen() ? undefined : "true"}
+                  inert={queueOpen() ? undefined : true}
+                >
+                  <div class="agent-queue-slot-inner">
+                    <Show when={queuePanelOwner()} keyed>
+                      {(_taskId) => (
+                        <QueuePanel
+                          deliveries={queueRows().deliveries}
+                          agents={props.agents}
+                          skills={props.skills}
+                          editingDeliveryId={queue().editingDeliveryId}
+                          canSteer={Boolean(props.task?.activeTurnId)}
+                          onSteer={queue().onSteer}
+                          onCancel={(deliveryId) => queue().onCancel(deliveryId)}
+                          onEdit={(delivery) => queue().onEdit(delivery)}
+                          onReorder={(deliveryIds) => queue().onReorder(deliveryIds)}
+                        />
+                      )}
+                    </Show>
+                  </div>
+                </div>
+                <ComposerStackCard when={queue().editingDeliveryId}>
+                  {() => (
+                    <ComposerNotice
+                      body={t("composer.queueEdit.body")}
+                      action={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          disabled={queue().editBusy}
+                          onClick={() => queue().onCancelEdit()}
+                        >
+                          {t("composer.queueEdit.cancel")}
+                        </Button>
+                      }
+                    />
+                  )}
+                </ComposerStackCard>
+              </>
+            )}
+          </Show>
+          <ComposerStackCard when={props.replyTo}>
+            {(message) => (
+              <ComposerReplyPreview
+                message={message()}
+                agents={props.agents}
+                skills={props.skills}
+                disabled={sending() || voicePhase() === "transcribing"}
+                onCancel={() => props.onCancelReply?.()}
+              />
+            )}
+          </ComposerStackCard>
+        </div>
         <form
+          ref={draftRows.form}
           class="composer agent-thread-composer"
           data-compact={hasRow() ? undefined : "true"}
           data-has-attachments={hasRow() ? "" : undefined}
@@ -942,7 +1059,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               />
             )}
           </Show>
-          <div class="composer-input-label">
+          <div class="composer-input-label" ref={draftRows.label}>
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}
@@ -978,7 +1095,6 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               onSideQuestion={props.onSideQuestion}
             />
             <div class="composer-primary-actions">
-              {/* One meter for each thread: a pending Compact or an open popover stays with its thread. */}
               <Show when={props.task?.id} keyed>
                 {(_taskId) => (
                   <Show when={props.context}>
@@ -997,6 +1113,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                     onStart={() => voice().onStart()}
                     onCancel={() => voice().onCancel()}
                     onFinish={() => voice().onFinish()}
+                    onSend={() => void send()}
                     send={sendButton()}
                   />
                 )}

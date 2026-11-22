@@ -1,3 +1,5 @@
+import { isGithubSkillId } from "@openbot/contracts/ipc";
+import { GITHUB_SKILLS_CAPABILITY } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -7,10 +9,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireVisibleBodyAgent, stringField } from "./request-helpers";
 
-/**
- * The skills of one agent on this computer, managed from a joined server. The host downloads a
- * marketplace skill with its own account, so the client sends only ids. Frozen by `skills-admin-v1`.
- */
 export async function routeSkillsAdmin(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -27,20 +25,22 @@ export async function routeSkillsAdmin(
   if (!skills || !capabilities.has(SKILLS_ADMIN_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.skillsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the skills-admin wire codec.
   const body = await readJson(request);
   requireVisibleBodyAgent(body, hiddenAgentIds);
   try {
     if (list) return json(200, await runCauseEffect(skills.listInstalled(stringField(body, "agentId"))));
-    if (install) return json(200, await runCauseEffect(skills.install(parseInstallSkill(body))));
+    if (install) {
+      const input = parseInstallSkill(body);
+      if (isGithubSkillId(input.skillId) && !capabilities.has(GITHUB_SKILLS_CAPABILITY))
+        throw new HttpError(400, sourceText("error.skill.githubHostTooOld"));
+      return json(200, await runCauseEffect(skills.install(input)));
+    }
     if (uninstall) {
       await runCauseEffect(skills.uninstall(parseUninstallSkill(body)));
       return json(200, {});
     }
     return json(200, await runCauseEffect(skills.setEnabled(parseSetEnabledSkill(body))));
   } catch (error) {
-    // The skill service throws only sentences written for the person who manages the agent, such
-    // as a missing marketplace sign-in or a skill with local changes, so the admin reads the reason.
     if (error instanceof Error && !(error instanceof HttpError)) throw new HttpError(409, error.message);
     throw error;
   }

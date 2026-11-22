@@ -24,6 +24,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Baixe o modelo de voz em Configurações → Voz.",
   "error.voice.speech.timedOut": "A leitura da resposta em voz alta expirou.",
   "error.voice.speech.failed": "O OpenBot não conseguiu ler a resposta em voz alta.",
+  "error.voice.speech.providerRefused": "{provider} recusou-se a criar o áudio: {reason}",
   "error.voice.recordingNotKept": "O OpenBot não conseguiu guardar a gravação de voz.",
   "error.voice.live.timedOut": "A voz ao vivo do Codex não começou a tempo. Tente novamente.",
   "error.voice.live.failed": "A voz ao vivo parou: {reason}",
@@ -31,7 +32,11 @@ export const messages = {
   "error.voice.live.hostFailed":
     "O Codex no servidor não conseguiu iniciar a voz ao vivo. Peça ao proprietário para atualizar o Codex nesse computador e entrar com o ChatGPT, e tente novamente.",
   "error.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
+  "error.voice.live.chooseAccount":
+    "Esta conta ChatGPT não pode usar a voz ao vivo. Em Definições → Voz, escolha uma conta cujo plano inclua voz.",
   "error.voice.live.unavailable":
     "A OpenAI não conseguiu iniciar a voz ao vivo. O problema é da OpenAI. Tente novamente mais tarde.",
+  "error.voice.live.refused":
+    "A OpenAI recusou iniciar a voz ao vivo. Tente novamente mais tarde ou desative a voz ao vivo em Definições para falar por voz.",
   "error.voice.live.off": "A voz ao vivo do Codex está desativada. Ative-a em Definições → Voz.",
 } as const satisfies PartialTranslation<typeof source>;

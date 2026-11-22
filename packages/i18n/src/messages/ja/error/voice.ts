@@ -25,6 +25,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "設定 → 音声 で音声合成モデルをダウンロードしてください。",
   "error.voice.speech.timedOut": "返信の読み上げがタイムアウトしました。",
   "error.voice.speech.failed": "OpenBot は返信を読み上げられませんでした。",
+  "error.voice.speech.providerRefused": "{provider} が音声の作成を拒否しました: {reason}",
   "error.voice.recordingNotKept": "OpenBot は音声録音を保存できませんでした。",
   "error.voice.live.timedOut": "Codex ライブ音声が時間内に開始しませんでした。もう一度お試しください。",
   "error.voice.live.failed": "ライブ音声が停止しました: {reason}",
@@ -32,7 +33,11 @@ export const messages = {
   "error.voice.live.hostFailed":
     "サーバーの Codex がライブ音声を開始できませんでした。オーナーに、そのコンピューターの Codex を更新して ChatGPT でサインインするよう依頼してから、もう一度お試しください。",
   "error.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
+  "error.voice.live.chooseAccount":
+    "この ChatGPT アカウントではライブ音声を使えません。設定 → 音声で、プランに音声が含まれるアカウントを選んでください。",
   "error.voice.live.unavailable":
     "OpenAI がライブ音声を開始できませんでした。OpenAI 側の問題です。しばらくしてからもう一度お試しください。",
+  "error.voice.live.refused":
+    "OpenAI がライブ音声の開始を拒否しました。しばらくしてからもう一度お試しいただくか、設定 でライブ音声をオフにして音声で話してください。",
   "error.voice.live.off": "Codex ライブ音声はオフです。設定 → 音声 でオンにしてください。",
 } as const satisfies PartialTranslation<typeof source>;

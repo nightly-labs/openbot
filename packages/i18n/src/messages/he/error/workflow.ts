@@ -15,9 +15,30 @@ export const messages = {
   "error.workflow.agentMissing": "יש לבחור סוכן לשלב הזה.",
   "error.workflow.handoffFailed": "OpenBot לא הצליח לשלוח את השלב הזה לסוכן שלו.",
   "error.workflow.agentStepEnded": "ההודעה של הסוכן לשלב הזה הוסרה לפני שהוא ענה.",
+  "error.workflow.agentStepStopped": "הסוכן נעצר לפני שענה על השלב הזה. יש להריץ את השלב שוב.",
   "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
+  "error.workflow.answerInvalid": "התשובה לא כללה את השדות שהשלב הזה מבקש: {fields}. יש להריץ את השלב שוב.",
+  "error.workflow.checkInvalid": "הבדיקה של השלב הזה לא תקינה. יש לתקן אותה ולהריץ את השלב שוב.",
   "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
+  "error.workflow.modelTimedOut":
+    "המודל לא ענה בזמן. יש לבחור רמת מאמץ נמוכה יותר או מודל מהיר יותר לשלב הזה, ואז להריץ אותו שוב.",
+  "error.workflow.modelToolUse":
+    "המודל ניסה להשתמש בכלי, אבל השלב הזה יכול לענות רק בטקסט. יש להריץ את השלב שוב, או לבחור לו מודל אחר.",
+  "error.workflow.modelImageUnsupported":
+    "המודל של השלב הזה לא יכול לקרוא תמונות. בחר מודל שיכול, או הסר את חיבור התמונה.",
+  "error.workflow.modelImageType": "שלב מודל יכול לקרוא רק תמונות PNG,‏ JPEG,‏ GIF ו-WebP. חבר תמונה מאחד הסוגים האלה.",
+  "error.workflow.modelUnavailable": "המודל של השלב הזה לא זמין. יש לבחור מודל אחר לשלב הזה.",
+  "error.workflow.providerBusy": "הספק עמוס. יש להמתין כמה דקות ואז להריץ את השלב שוב.",
+  "error.workflow.providerOffline": "ל-OpenBot אין גישה לספק. יש לבדוק את החיבור לאינטרנט ואז להריץ את השלב שוב.",
   "error.workflow.modelBusy": "בקשה אחרת למודל רצה כעת. יש להריץ את השלב שוב בעוד רגע.",
+  "error.workflow.mediaFailed": "המודל לא הצליח ליצור את התמונה או את הווידאו. יש להריץ את השלב שוב.",
+  "error.workflow.mediaNotMade": "המודל לא יצר את התמונה או את הווידאו. תשובתו: {answer}",
+  "error.workflow.pictureMissing": "התמונה כבר לא בשרת. יש לשלוח אותה שוב.",
+  "error.workflow.pictureType": "יש להשתמש בתמונה בפורמט PNG,‏ JPEG או WebP.",
+  "error.workflow.mediaInputMissing": "תמונה משלב קודם אינה זמינה. יש להריץ את השלב הזה שוב.",
+  "error.workflow.mediaEmptyRequest": "יש לכתוב תיאור, או להריץ את השלבים שלפני השלב הזה כדי שיגיע טקסט או תמונה.",
+  "error.workflow.mediaInputNotImage": "שלב זה מקבל רק תמונות, לא סרטונים. יש להסיר את החיבור מהסרטון.",
+  "error.workflow.mediaInputNotClip": "הקלט הזה מקבל רק סרטונים וקובצי שמע. יש להסיר את החיבור מהקובץ.",
   "error.workflow.stepMissing": "השלב הזה כבר לא קיים.",
   "error.workflow.nodeMissing": "השלב הזה אינו בתהליך העבודה.",
   "error.workflow.runMissing": "ההרצה הזו כבר לא קיימת.",
@@ -58,4 +79,24 @@ export const messages = {
   "error.workflow.githubUncertain":
     "השינוי נעצר באמצע. ייתכן שהוא נמצא ב-GitHub. יש לבדוק שם לפני שמריצים את השלב שוב.",
   "error.workflow.githubNoEvent": "ב-GitHub אין issue או pull request שהטריגר הזה מתחיל מהם.",
+  "error.workflow.sunraSignIn": "כדי להשתמש במודלים של Sunra, צריך להתחבר ל-Sunra באפליקציות.",
+  "error.workflow.sunraNoCredits":
+    "אין מספיק קרדיטים בחשבון Sunra שלך. אפשר להוסיף קרדיטים ב-sunra.ai/pricing ואז להריץ את השלב שוב.",
+  "error.workflow.sunraNeedsPlan":
+    "המודל הזה של Sunra דורש תוכנית Sunra. אפשר לבחור תוכנית ב-sunra.ai/pricing או לבחור מודל אחר.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra משתמש בתמונות קלט רק עם חשבון אישי. צריך לבחור את החשבון האישי ב-Sunra או להסיר את חיבורי התמונות.",
+  "error.workflow.sunraFailed": "Sunra לא הצליח ליצור את הקובץ: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra לא סיים את הקובץ בזמן. כדאי לבדוק את הפרויקט OpenBot ב-sunra.ai לפני שמריצים את השלב שוב.",
+  "error.workflow.higgsfieldSignIn": "יש להתחבר ל-Higgsfield ב״אפליקציות״ כדי להשתמש במודלים של Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "בחשבון Higgsfield אין מספיק קרדיטים. אפשר להוסיף קרדיטים ב-higgsfield.ai/pricing ואז להריץ את השלב שוב.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "מודל Higgsfield זה דורש תוכנית Higgsfield. אפשר לבחור תוכנית ב-higgsfield.ai/pricing או לבחור מודל אחר.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield לא יצר את הקובץ כי בדיקת התוכן עצרה אותו. יש לשנות את ההנחיה או את תמונות הקלט ואז להריץ את השלב שוב.",
+  "error.workflow.higgsfieldFailed": "Higgsfield לא הצליח ליצור את הקובץ: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield לא סיים את הקובץ בזמן. כדאי לבדוק את ההיסטוריה ב-higgsfield.ai לפני שמריצים את השלב שוב.",
 } as const satisfies PartialTranslation<typeof source>;

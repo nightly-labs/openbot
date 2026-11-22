@@ -1,9 +1,12 @@
 import type { ChatWindowTarget } from "@openbot/contracts/ipc";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
+import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { sidebarChannelWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
@@ -17,6 +20,8 @@ import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
+import type { ThreadWaits } from "../agent-threads/conversation-threads";
+import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import { useAgentActions } from "../agents/agent-actions";
 import { createAgentActivity } from "../agents/agent-activity";
 import { useAgents } from "../agents/agents-context";
@@ -32,33 +37,23 @@ import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
 import { SidebarUpdateIsland } from "../updates/SidebarUpdateIsland";
+import { useWindowPage } from "../window/window-page-context";
 import { createCommunityCardVisibility } from "./community-card";
+import { DevWorktreeLabel } from "./DevWorktreeLabel";
 import { createSidebarAlertCards, SidebarAlertCards } from "./SidebarAlertCards";
 import { ServerUpgradeOffer } from "./server-upgrade-offer";
 import { useSidebar } from "./sidebar-context";
 
-/** Dismissing the mobile app card is a choice of this computer, like the sidebar width. The key is
- * new with the Android release, so a computer that dismissed the iPhone-only card sees it once more. */
 const MOBILE_APP_DISMISSED_STORAGE_KEY = "openbot:mobile-app-card-dismissed";
 
-/**
- * The list of Agents and people. It reads the most domains of any pane, and every
- * one of them for the same reason: a sidebar row shows who exists, who is
- * working, who has replied and who is pinned, which is four domains before any
- * of the actions on the row context menu.
- *
- * `peopleEnabled` arrives as a prop because the shell already computes it to
- * decide which pane renders. Deriving it a second time here would let the two
- * answers disagree for a frame.
- */
 export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { t } = useText();
   const layout = useLayout();
   const platform = usePlatform();
   const channels = useChannels();
+  const windowPage = useWindowPage();
   const serverScope = useServerScope();
   const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
-  // The chats that main shows in a window of their own. Main sends the list on each change.
   const [chatWindows, setChatWindows] = createSignal<ChatWindowTarget[]>([]);
   onSettled(() => {
     const unsubscribe = appPort().onChatWindows(setChatWindows);
@@ -73,7 +68,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   );
   const { openServerSettings, serverSettingsOpen } = useServerSettings();
   const serverActions = useServerActions();
-  const { openAppSettings, setSkillsMarketplaceOpen } = useSettings();
+  const { openMobileInstall, setSkillsMarketplaceOpen } = useSettings();
   const {
     agentList,
     agentListConnecting,
@@ -84,10 +79,20 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     openAgentSetup,
     userHiddenAgents,
     userHiddenAgentIds,
+    userPausedAgentIds,
+    userHiddenAgentsWork,
+    mutedAgentIds,
   } = useAgents();
-  const { editAgent, duplicateAgent, duplicateSection, duplicatingSectionIds, deleteAgent, setAgentHiddenByUser } =
-    useAgentActions();
-  // The host refuses a member: a hidden agent stops for every member, as a deleted one does.
+  const {
+    editAgent,
+    duplicateAgent,
+    duplicateSection,
+    duplicatingSectionIds,
+    deleteAgent,
+    setAgentHiddenByUser,
+    setAgentMuted,
+  } = useAgentActions();
+  const muteSupported = () => activeServerSupportsCapability(AGENT_NOTIFICATION_LEVELS_CAPABILITY);
   const hideAllowed = () =>
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
   const { pendingPrompts, approvals } = useTurns();
@@ -97,26 +102,20 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { selectAgent, selectDirectMember, setGlobalSearchVisibility, chatHistory } = useNavigation();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
-  // The agent menu offers Mark read for these. The count also holds the side threads, as the badge does.
   const unreadAgentIds = createMemo(
     () => new Set(agentList().flatMap((agent) => ((agentUnreadReplies()[agent.id] ?? 0) > 0 ? [agent.id] : []))),
   );
-  /**
-   * Opens the agent's chat with a new thread. A host without threads has no such item, and neither has a
-   * chat window: another agent opens in a window of its own, which does not get the new thread.
-   */
   const newAgentThread = () =>
     agentTasks.available() && !platform.chatWindow
       ? (agentId: string) => {
           if (selectAgent(agentId)) agentThreads.startNew(agentId);
         }
       : undefined;
-  /** What Back opens: the list of an open settings detail page, or else the previous chat. */
   const backTarget = (): { name: string } | null => {
     const pageBack = chatHistory.pageBack();
-    return pageBack ? { name: pageBack.name } : chatName(chatHistory.previous());
+    if (pageBack) return { name: pageBack.name };
+    return chatName(chatHistory.chatUnderPage() ?? chatHistory.previous());
   };
-  /** The name of a chat as its sidebar row shows it. */
   const chatName = (entry: ChatHistoryEntry | undefined): { name: string } | null => {
     if (!entry) return null;
     if (entry.kind === "agent") return { name: agentList().find((agent) => agent.id === entry.id)?.name ?? "" };
@@ -141,51 +140,53 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const [mobileAppDismissed, setMobileAppDismissed] = createSignal(
     window.localStorage.getItem(MOBILE_APP_DISMISSED_STORAGE_KEY) === "true",
   );
+  const mobileAppCrew = createMemo(() =>
+    sidebarAgentOrder(agentList(), {
+      layout: sidebarLayout(),
+      pinnedItems: pinnedSidebarItems(),
+      hiddenAgentIds: userHiddenAgentIds(),
+    }).filter((agent) => !userHiddenAgentIds().has(agent.id)),
+  );
   const communityCard = createCommunityCardVisibility();
   const alertCards = createSidebarAlertCards(activeServer);
-  // A clear in Server settings frees space and can change an alert level, so both cards read
-  // again when settings close.
   createEffect(serverSettingsOpen, (open, wasOpen) => {
     if (!open && wasOpen) alertCards.refresh();
   });
 
-  /* Channels reach the sidebar as data, not as a list of their own: they sit in the layout's
-   * sections beside the agents, so the sidebar has to be able to order and group them. The Routines
-   * view lists only agents: a channel has no routine canvas. */
-  const channelsListed = () => channels.supported() && layout.sidebarView() !== "routines";
-  /* Until a joined server lists channels, the frame's rows hold their place, so the agents below stay. */
+  const channelsListed = () => channels.supported();
   const sidebarChannels = () =>
-    !channels.state.listed &&
-    layout.sidebarView() !== "routines" &&
-    (!serverScope.loaded() || channels.supported()) &&
-    serverScope.frameChannels().length > 0
+    !channels.state.listed && (!serverScope.loaded() || channels.supported()) && serverScope.frameChannels().length > 0
       ? serverScope.frameChannels()
       : channelsListed()
         ? channels.state.channels
         : [];
   const visibleChannels = createMemo(() => sidebarChannels().filter((channel) => !channel.archived));
-  /* A channel can open while the Routines view is on: from search, a notification, or a selection
-   * restored at start. Its row must be in the list, so the list goes back to the agents view. */
-  createEffect(
-    () => layout.sidebarView() === "routines" && channels.state.selectedId !== null,
-    (channelOpenInRoutines) => {
-      if (channelOpenInRoutines) layout.setSidebarView("agents");
-    },
-  );
 
   const { agentStates: sidebarAgentStates, agentMoods } = createAgentActivity();
 
-  /* A wait in a channel thread goes to the channel instead. Selecting the channel opens the view
-   * that answers it. */
-  const channelWaits = createMemo(() => {
+  const waits = createMemo((): ThreadWaits => {
     const prompts = Object.values(pendingPrompts());
-    return sidebarChannelWaits({
-      channels: visibleChannels(),
+    return {
       prompts: prompts.flatMap((event) => (event?.type === "prompt" ? [event] : [])),
       takeovers: prompts.flatMap((event) => (event?.type === "browser-takeover-requested" ? [event.request] : [])),
       approvals: approvals(),
-    });
+    };
   });
+  const channelWaits = createMemo(() => sidebarChannelWaits({ channels: visibleChannels(), ...waits() }));
+  const activeAgentId = () => (activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? ""));
+  const agentChatShown = (agentId: string) => agentId === activeAgentId() && !windowPage.conversationCovered();
+  const sideThreads = createMemo(() =>
+    platform.chatWindow
+      ? undefined
+      : sidebarAgentThreads({
+          tasks: agentTasks,
+          tabs: agentThreads,
+          activeAgentId,
+          waits,
+          openThread: (agentId, threadId) => void selectAgent(agentId, threadId),
+          onNew: newAgentThread(),
+        }),
+  );
 
   return (
     <>
@@ -206,10 +207,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         }}
         hasUnread={
           agentList().some(
-            (agent) => !userHiddenAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
+            (agent) => !userPausedAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
           ) || channels.hasUnread()
         }
-        view={layout.sidebarView()}
         serverName={activeServer()?.name ?? t("sidebar.topbar.localServer")}
         onOpenServerSettings={(trigger) => {
           const server = activeServer();
@@ -218,7 +218,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         chatHistory={{
           back: backTarget(),
           forward: chatName(chatHistory.next()),
-          keys: chatHistoryKeys(platform.appInfo()?.platform === "darwin"),
+          keys: chatHistoryKeys(t),
           onBack: chatHistory.goBack,
           onForward: chatHistory.goForward,
         }}
@@ -227,6 +227,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           const badge = server ? serverUpdateBadge(server.id) : null;
           return server && badge ? { ...badge, onOpen: () => void showServerUpdate(server.id) } : undefined;
         })()}
+        topbarDetail={<DevWorktreeLabel />}
         serverMenu={
           platform.appInfo()
             ? {
@@ -244,7 +245,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             : undefined
         }
         agents={agentList()}
-        activeAgentId={activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? "")}
+        activeAgentId={activeAgentId()}
         showPeople={props.peopleEnabled}
         people={directPeople()}
         directThreads={directThreads()}
@@ -272,7 +273,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onUnpin={unpinSidebarItem}
         onReorderPinned={reorderPinnedSidebarItems}
         onReorderPeople={reorderSidebarPeople}
-        onSelectAgent={selectAgent}
+        onSelectAgent={(agentId) => selectAgent(agentId, agentChatShown(agentId) ? MAIN_THREAD_ID : undefined)}
         onSelectPerson={(memberId) => void selectDirectMember(memberId)}
         onPreloadDirectConversation={props.peopleEnabled ? () => void DirectConversation.preload() : undefined}
         onCreateAgent={() => {
@@ -285,6 +286,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onDuplicateAgent={duplicateAgent}
         onDeleteAgent={deleteAgent}
         userHiddenAgents={userHiddenAgents()}
+        userHiddenAgentsWork={userHiddenAgentsWork()}
         unreadAgentIds={unreadAgentIds()}
         onMarkAgentRead={(agentId) => void markAgentChatRead(agentId)}
         onMarkAgentUnread={
@@ -292,9 +294,12 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             ? (agentId) => void markAgentChatUnread(agentId)
             : undefined
         }
+        mutedAgentIds={muteSupported() ? mutedAgentIds() : undefined}
+        onSetAgentMuted={muteSupported() ? (agentId, muted) => void setAgentMuted(agentId, muted) : undefined}
         onHideAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, true) : undefined}
         onRestoreAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, false) : undefined}
         onNewAgentThread={newAgentThread()}
+        agentThreads={sideThreads()}
         onOpenAgentWindow={
           platform.landingPreview
             ? undefined
@@ -303,11 +308,10 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         windowAgentIds={windowAgentIds()}
         compact={layout.leftPanelCompact()}
         onExpand={layout.expandSidebar}
+        onCollapse={() => layout.setSidebarClosed(true)}
         onOpenSearch={() => setGlobalSearchVisibility(true)}
         footer={
           <>
-            {/* One card at a time. A machine over its alert level comes first, then a disk that is
-             * almost full; the community card waits until the mobile app card is dismissed. */}
             <SidebarAlertCards
               cards={alertCards}
               serverName={activeServer()?.name ?? ""}
@@ -316,7 +320,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             />
             <Show when={!platform.landingPreview && !alertCards.shown() && !mobileAppDismissed()}>
               <SidebarMobileAppCard
-                onOpenInstall={() => openAppSettings(null, "mobile-connect")}
+                agents={mobileAppCrew()}
+                onInstall={(phone) => openMobileInstall(phone)}
                 onDismiss={() => {
                   window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
                   setMobileAppDismissed(true);
@@ -354,8 +359,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             : undefined
         }
       />
-      {/* A compact sidebar hides the footer card, so the offer is outside the footer. */}
       <ServerUpgradeOffer
+        billing={appPort().billing}
         card={alertCards.storageCard.card()}
         server={activeServer()}
         blocked={serverSettingsOpen()}

@@ -16,7 +16,6 @@ import type { SkillMarketplaceService } from "./skill-marketplace-service";
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
-/** Stores the local day of the last inventory event. A malformed file counts as sent today. */
 export function analyticsInventoryDayStore(path: string): AnalyticsInventoryDayStore {
   return {
     read: () =>
@@ -41,11 +40,8 @@ const BUILTIN_SERVER_NAMES = new Set<string>([...RESERVED_MCP_SERVER_NAMES, COMP
 
 export interface AnalyticsInventorySources {
   agents: () => AgentSummary[];
-  /** The agent's routines with a schedule. */
   routines: (agentId: string) => Routine[];
-  /** How many of the agent's webhook routines are on. */
   enabledWebhookRoutineCount: (agentId: string) => number;
-  /** The webhook addresses of all agents, channels and workflows. */
   webhookRouteCount: () => number;
   workflowCount: () => number;
   skills: SkillMarketplaceService["listInstalledForChatTags"];
@@ -54,10 +50,6 @@ export interface AnalyticsInventorySources {
   computerUseEnabled: () => boolean;
 }
 
-/**
- * Counts what this computer has set up. Only OpenBot's own catalog names leave this function:
- * a custom server, a community listing or a local skill is a count, never a name.
- */
 export const collectAnalyticsInventory = Effect.fn("Analytics.collectInventory")(function* (
   sources: AnalyticsInventorySources,
 ) {
@@ -80,7 +72,6 @@ export const collectAnalyticsInventory = Effect.fn("Analytics.collectInventory")
     enabledWebhookRoutineCount += sources.enabledWebhookRoutineCount(agent.id);
     const skills = yield* sources.skills(agent.id).pipe(Effect.catch(() => Effect.succeed([])));
     for (const skill of skills) {
-      // A home skill is the host user's and the same for every agent, so it is not counted per agent.
       if (skill.enabled === false || isHomeSkillId(skill.skillId)) continue;
       if (skill.skillId.startsWith(CURATED_SKILL_PREFIX))
         curatedSkills.add(skill.skillId.slice(CURATED_SKILL_PREFIX.length));

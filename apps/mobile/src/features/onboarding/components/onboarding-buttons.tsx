@@ -11,15 +11,9 @@ import { swapEntering, swapExiting, useOnboardingMotion } from "@/features/onboa
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
-// Every control beside the main action has its height, so the row reads as one set.
 const LARGE = 52;
 const REGULAR = 44;
 
-/**
- * Android buttons for the first-run flow: Material shapes and a ripple. The main action is a full
- * pill in the agent's colour (the theme's action colour before there is an agent), the others are
- * tonal; a chosen pill takes the agent's colour.
- */
 export function OnboardingPrimaryButton({ label, onPress, disabled = false, color }: OnboardingPrimaryButtonProps) {
   const motion = useOnboardingMotion();
   return (
@@ -32,7 +26,6 @@ export function OnboardingPrimaryButton({ label, onPress, disabled = false, colo
       accessibilityLabel={label}
       onPress={onPress}
     >
-      {/* A new label fades in where the old one fades out. */}
       <LayoutAnimationConfig skipEntering>
         <Animated.View
           key={label}

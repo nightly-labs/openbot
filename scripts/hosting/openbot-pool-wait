@@ -1,0 +1,101 @@
+#!/bin/bash
+set -euo pipefail
+export LC_ALL=C
+umask 077
+
+STATE=/etc/openbot-pool
+INSTALL=/opt/OpenBot/hosted
+WORK=${RUNTIME_DIRECTORY:-/run/openbot-pool}
+INTERVAL=10
+MOVE=$(dirname "$(readlink -f "$0")")/move-from-boat.sh
+REPORT_TRIES=90
+
+fail() {
+  echo "$*" >&2
+  exit 1
+}
+
+finish() {
+  rm -f "$STATE/token"
+  systemctl disable --quiet openbot-pool-wait.service || true
+  echo "$*"
+  exit 0
+}
+
+[ "$(id -u)" -eq 0 ] || fail "Run this as root."
+[ -s "$STATE/token" ] || finish "This machine has no offer."
+host=$(sed -n '1p' "$STATE/host" 2>/dev/null || true)
+[[ $host =~ ^leaseweb:[0-9]{1,20}$ ]] || fail "$STATE/host has no machine ID."
+token=$(sed -n '1p' "$STATE/token")
+[[ $token =~ ^[A-Za-z0-9_-]{32,128}$ ]] || fail "$STATE/token is not a token."
+user=$(cat "$INSTALL/service-user" 2>/dev/null || true)
+home=$(getent passwd "$user" | cut -d: -f6 || true)
+[ -n "$user" ] && [ "$user" != root ] && [ -d "$home" ] || fail "This machine has no service user. Prepare it first."
+url=$(sed -n 's/^OPENBOT_AUTH_API_URL=//p' "$INSTALL/openbot.env" 2>/dev/null | head -n 1)
+[[ $url =~ ^https://[A-Za-z0-9.-]+$ ]] || fail "$INSTALL/openbot.env has no account service."
+
+install -d -m 0700 "$WORK"
+request=$WORK/request
+answer=$WORK/answer
+restore_version=""
+if [ -f "$MOVE" ] && command -v age >/dev/null; then restore_version=',"restoreVersion":1'; fi
+printf '{"hostId":"%s","token":"%s"%s}' "$host" "$token" "$restore_version" >"$request"
+
+echo "Machine $host waits for a server."
+while :; do
+  : >"$answer"
+  status=$(curl --silent --max-time 30 --proto '=https' --header 'content-type: application/json' \
+    --data-binary "@$request" --output "$answer" --write-out '%{http_code}' \
+    "$url/v2/hosting/pool/assignment" || true)
+  if [ "$status" = 401 ]; then
+    finish "The account service does not know the token of this machine. The offer is over."
+  fi
+  if [ "$status" = 200 ] && grep -q '"state":"assigned"' "$answer"; then
+    server=$(sed -n 's/.*"serverId":"\([0-9a-fA-F-]\{36\}\)".*/\1/p' "$answer" | head -n 1)
+    claim=$(sed -n 's/.*"claim":"\([A-Za-z0-9_-]\{16,512\}\)".*/\1/p' "$answer" | head -n 1)
+    archive_url="" key="" sum=""
+    if grep -q '"restore":{' "$answer"; then
+      archive_url=$(sed -n 's/.*"url":"\(https:\/\/[^"]*\)".*/\1/p' "$answer" | head -n 1)
+      key=$(sed -n 's/.*"key":"\(AGE-SECRET-KEY-1[0-9A-Z]\{58\}\)".*/\1/p' "$answer" | head -n 1)
+      sum=$(sed -n 's/.*"sha256":"\([0-9a-f]\{64\}\)".*/\1/p' "$answer" | head -n 1)
+      [ -n "$restore_version" ] && [ -n "$archive_url" ] && [ -n "$key" ] && [ -n "$sum" ] || server=""
+    fi
+    rm -f "$answer"
+    if [ -n "$server" ] && [ -n "$claim" ]; then break; fi
+    echo "The answer has no server ID, no claim or no complete restore. Ask again." >&2
+  fi
+  sleep "$INTERVAL"
+done
+
+report_restore() {
+  local report=$WORK/report status
+  printf '{"hostId":"%s","token":"%s","restoreVersion":1,"restored":"%s"}' "$host" "$token" "$server" >"$report"
+  for _ in $(seq "$REPORT_TRIES"); do
+    : >"$answer"
+    status=$(curl --silent --max-time 30 --proto '=https' --header 'content-type: application/json' \
+      --data-binary "@$report" --output "$answer" --write-out '%{http_code}' \
+      "$url/v2/hosting/pool/assignment" || true)
+    if [ "$status" = 200 ] && grep -q '"state":"restored"' "$answer"; then return 0; fi
+    if [ "$status" = 401 ]; then
+      fail "The account service took server $server back. Its data is on this machine. Do not start OpenBot."
+    fi
+    sleep "$INTERVAL"
+  done
+  fail "The account service did not get the restore of server $server. Its data is on this machine."
+}
+
+if [ -n "$key" ]; then
+  echo "Restore server $server from its archive."
+  printf '%s\n%s\n' "$key" "$archive_url" | OPENBOT_POOL_RESTORE=1 bash "$MOVE" restore "$sum"
+  unset key archive_url
+fi
+OPENBOT_HOSTED_HOST_ID=$server OPENBOT_HOSTED_CLAIM=$claim HOME=$home \
+  setpriv --reuid "$user" --regid "$(id -gn "$user")" --init-groups "$INSTALL/openbot-hosted-env"
+unset claim
+if [ -n "$sum" ]; then
+  report_restore
+  bash "$MOVE" start
+  finish "Server $server is restored and starts on machine $host."
+fi
+systemctl enable --now openbot.service
+finish "Server $server starts on machine $host."

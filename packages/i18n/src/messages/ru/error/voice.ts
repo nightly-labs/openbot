@@ -24,6 +24,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Скачайте модель синтеза речи в разделе «Настройки» → «Голос».",
   "error.voice.speech.timedOut": "Время чтения ответа вслух истекло.",
   "error.voice.speech.failed": "OpenBot не смог прочитать ответ вслух.",
+  "error.voice.speech.providerRefused": "{provider} отказался создать аудио: {reason}",
   "error.voice.recordingNotKept": "OpenBot не смог сохранить голосовую запись.",
   "error.voice.live.timedOut": "Живой голос Codex не запустился вовремя. Попробуйте ещё раз.",
   "error.voice.live.failed": "Живой голос остановлен: {reason}",
@@ -31,7 +32,11 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex на сервере не смог запустить живой голос. Попросите владельца обновить Codex на этом компьютере и войти через ChatGPT, затем попробуйте снова.",
   "error.voice.live.signIn": "Войдите в Codex с аккаунтом ChatGPT, чтобы использовать живой голос.",
+  "error.voice.live.chooseAccount":
+    "Этот аккаунт ChatGPT не может использовать живой голос. В разделе Настройки → Голос выберите аккаунт, тариф которого включает голос.",
   "error.voice.live.unavailable":
     "OpenAI не удалось запустить живой голос. Проблема на стороне OpenAI. Повторите попытку позже.",
+  "error.voice.live.refused":
+    "Запуск живого голоса отклонён на стороне OpenAI. Повторите попытку позже или выключите живой голос в Настройках, чтобы говорить голосом.",
   "error.voice.live.off": "Живой голос Codex выключен. Включите его в Настройки → Голос.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "入力が必要です",
   "prompt.question.label": "エージェントからの質問",
   "prompt.question.cancelled": "質問はキャンセルされました",
   "prompt.question.expired": "質問の期限が切れました",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "次へ",
   "prompt.question.cancel": "質問をキャンセル",
   "prompt.question.privatePlaceholder": "非公開の回答を入力してください",
-  "prompt.customPlaceholder": "自分の回答を入力してください",
   "prompt.question.customAnswerFor": "独自の回答: {question}",
   "prompt.question.skip": "スキップ",
   "prompt.question.chooseAll": "当てはまるものをすべて選んでください。",
   "prompt.question.somethingElse": "その他",
   "prompt.question.emptyTitle": "待機中の質問はありません。",
   "prompt.question.emptyBody": "別の判断が必要になると、エージェントが続行します。",
-  "prompt.choice.hint": "合うものを選ぶか、自分で入力してください。",
-  "prompt.choice.customLabel": "独自の回答",
   "prompt.approval.answerFailed": "この承認に応答できませんでした。もう一度お試しください。",
   "prompt.approval.grantFailed": "常時承認を保存できませんでした。もう一度お試しください。",
   "prompt.approval.label": "エージェントの承認",
@@ -29,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "許可",
   "prompt.approval.alwaysAllow": "常に許可",
   "prompt.approval.deny": "拒否",
+  "prompt.approval.cut":
+    "このカードにはリクエストの冒頭だけが表示されているため、拒否のみ選べます。「許可」がすぐに表示されない場合は、サーバーの OpenBot を更新してください。",
   "prompt.approval.report.bugHeadline": "バグを見つけましたか？直しましょう。",
   "prompt.approval.report.ideaHeadline": "アイデアがありますか？形にしましょう。",
   "prompt.approval.report.dontSend": "今はしない",
   "prompt.approval.report.send": "OpenBot チームに送信",
+  "prompt.approval.report.phoneOnly":
+    "OpenBot のスマートフォンアプリでこのチャットを開き、そこからレポートを送信してください。スマートフォンがバージョン、システム情報、サポートログを追加します。スマートフォンが接続できない場合は、スマートフォンアプリの「設定」>「サポート」を開き、GitHub で問題を報告してください。",
   "prompt.approval.title.command": "コマンドを実行",
   "prompt.approval.title.fileChange": "ファイルを変更",
   "prompt.approval.title.permissions": "権限を付与",
@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "{host} で手順を完了してください",
   "prompt.browser.cancelled": "キャンセル済み",
   "prompt.browser.reload":
-    "サインインを完了し、ブラウザーのページを再読み込みしてから「完了しました」を選んでください。ページが再読み込みされるまで、ページの検査はブロックされます。",
+    "OpenBot はパスワードまたはコードの入力を完了できませんでした。ページを確認し、足りない部分を入力してください。サインインを完了し、ブラウザーのページを再読み込みしてから「完了しました」を選んでください。ページが再読み込みされるまで、ページの検査はブロックされます。",
   "prompt.browser.continuing": "{name} が続行しています。",
   "prompt.browser.cancelledBody": "ブラウザーの手順はキャンセルされました。",
   "prompt.browser.pendingBody":
     "ページを開いて、サインイン、確認、または同意を完了してください。その後、{name} に続行させてください。",
   "prompt.browser.openPage": "{title} を開く",
+  "prompt.browser.openFailed": "メインウィンドウでページを開けませんでした。もう一度お試しください。",
   "prompt.browser.done": "完了しました",
   "prompt.browser.pageFallback": "ブラウザーのページ",
   "prompt.browser.hostFallback": "ブラウザー",
@@ -58,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} へのサインインはキャンセルされました",
   "prompt.browser.signInBlocked.body":
     "このコンピュータでサインインしてください。OpenBot は {host} のサインインだけを {server} に送信し、{name} が続行します。",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} はサーバーからのサインインを受け付けません。お使いのコンピューターの OpenBot デスクトップアプリでこのチャットを開き、そこでサインインしてください。その後、{name} が続行します。",
   "prompt.browser.signInBlocked.cancelledBody": "サインインはキャンセルされました。",
   "prompt.browser.signInBlocked.waiting": "サインインを待っています",
   "prompt.browser.signInBlocked.waitingButton": "サインインを待っています…",

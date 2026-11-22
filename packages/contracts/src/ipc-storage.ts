@@ -1,22 +1,8 @@
-/**
- * Storage and files: how much disk space a host uses, where it goes, and the files it keeps. The
- * Server settings Storage tab, the agent Files detail and the chat Files panel all read one
- * `StorageUsage`, cut to their scope.
- *
- * A file row is an `AttachmentSummary` with its place and state added, so an attachment converts to
- * a row without a second shape. Rows never carry a path: the host resolves a file from its id.
- */
-
 import { MANAGED_RUNTIME_PROVIDERS, type ManagedProviderId } from "./agent-providers";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
-/**
- * Additive, optional Team API behaviour: a host that does not advertise this string has no storage
- * routes, and the Storage tab says so. The string is permanent - evolving it means a second
- * capability, never an edit.
- */
 export const STORAGE_CAPABILITY = "storage-v1";
 
 export const STORAGE_CATEGORIES = [
@@ -30,29 +16,20 @@ export const STORAGE_CATEGORIES = [
   "logs",
 ] as const;
 
-/** One row per storage location the host can measure. */
 export type StorageCategory = (typeof STORAGE_CATEGORIES)[number];
 
-/** The categories the user can clear without losing a chat, a file they sent, or agent work. */
 export const CLEARABLE_STORAGE_CATEGORIES = ["caches", "logs"] as const;
 export type ClearableStorageCategory = (typeof CLEARABLE_STORAGE_CATEGORIES)[number];
 
 export const STORED_FILE_SOURCES = ["attachment", "generated", "workspace", "download"] as const;
-/** Where the file came from. Each value maps to one storage location on the host. */
 export type StoredFileSource = (typeof STORED_FILE_SOURCES)[number];
 
 export const STORED_FILE_STATUSES = ["available", "missing", "remote", "failed"] as const;
-/**
- * `missing`: the record exists but the file is gone from the disk.
- * `remote`: the file is on the server and not yet on this computer.
- * `failed`: the upload or download did not complete.
- */
 export type StoredFileStatus = (typeof STORED_FILE_STATUSES)[number];
 
-export const STORAGE_SCOPES = ["host", "agent", "conversation"] as const;
+export const STORAGE_SCOPES = ["host", "agent", "conversation", "channel"] as const;
 export type StorageScope = (typeof STORAGE_SCOPES)[number];
 
-/** A host with more rows than this sends the largest ones and sets `truncated`. */
 export const STORAGE_LIMITS = {
   files: 2_000,
   conversations: 200,
@@ -63,7 +40,6 @@ export const STORAGE_LIMITS = {
 export interface StorageBreakdown {
   category: StorageCategory;
   bytes: number;
-  /** The user can clear it without losing a chat, a file they sent, or agent work. */
   removable: boolean;
 }
 
@@ -88,45 +64,53 @@ export interface StoredFileConversation {
   title: string;
 }
 
+export interface StoredFileWorkflowFolder {
+  id: string;
+  name: string;
+}
+
+export interface StoredFileWorkflow {
+  id: string;
+  name: string;
+  folder: StoredFileWorkflowFolder | null;
+}
+
 export interface StoredFileRow extends AttachmentSummary {
   source: StoredFileSource;
   agentId: string | null;
   conversation: StoredFileConversation | null;
-  /** The chat message that carries the file. Null when the file is in no message the host can name. */
   messageId: string | null;
-  /** ISO time the file was added. */
   createdAt: string;
   status: StoredFileStatus;
-  /** The host can delete this file. False for workspace files and downloads, which the agent owns. */
   deletable: boolean;
+  workflow?: StoredFileWorkflow;
 }
 
 export interface StorageUsage {
   scope: StorageScope;
   agentId: string | null;
   conversationId: string | null;
+  channelId?: string;
   scannedAt: string;
-  /** Free space on the disk that holds the host data. Null when the host cannot tell. */
   freeBytes: number | null;
   breakdown: StorageBreakdown[];
   agents: AgentStorageRow[];
   conversations: ConversationStorageRow[];
   files: StoredFileRow[];
-  /** A list was cut at `STORAGE_LIMITS`. The breakdown still counts every byte. */
   truncated: boolean;
 }
 
-/** The disk that holds the host data. Each value is null when the host cannot tell. */
 export interface StorageDisk {
   freeBytes: number | null;
   totalBytes: number | null;
+  userBytes?: number | null;
 }
 
 export interface GetStorageUsageInput {
   scope: StorageScope;
   agentId?: string;
   conversationId?: string;
-  /** Measure again, even when a recent result is cached. */
+  channelId?: string;
   force?: boolean;
 }
 
@@ -140,27 +124,16 @@ export interface ClearStorageInput {
 
 export interface OpenStoredFileInput {
   fileId: string;
-  /**
-   * `save` puts the file in the Downloads folder with no dialog, so the Library can download many files
-   * at once. A file there keeps its name; the new file gets a number after its name.
-   */
   action: "open" | "reveal" | "download" | "save";
 }
 
-/**
- * The provider CLI downloads on this computer that OpenBot can remove now: the versions that no
- * OpenBot app uses any more, and the whole download of each provider in `providers`.
- */
 export interface RemovableRuntimes {
   bytes: number;
-  /** The providers that are off, or that run the CLI the user installed. No agent runs their download. */
   providers: ManagedProviderId[];
 }
 
-/** The downloaded versions of one provider CLI that OpenBot can remove now. */
 export interface ProviderRuntimeDownload {
   bytes: number;
-  /** How many versions of the CLI those bytes hold. */
   versions: number;
 }
 
@@ -202,12 +175,15 @@ export function parseGetStorageUsageInput(value: unknown): GetStorageUsageInput 
   if (input.force !== undefined && !isBoolean(input.force)) invalid("storage refresh flag");
   const agentId = optionalIdentifier(input.agentId, "storage agent");
   const conversationId = optionalIdentifier(input.conversationId, "storage conversation");
+  const channelId = optionalIdentifier(input.channelId, "storage channel");
   if (input.scope === "agent" && !agentId) invalid("storage agent");
   if (input.scope === "conversation" && !conversationId) invalid("storage conversation");
+  if ((input.scope === "channel") !== (channelId !== undefined)) invalid("storage channel");
   return {
     scope: input.scope,
     ...(agentId === undefined ? {} : { agentId }),
     ...(conversationId === undefined ? {} : { conversationId }),
+    ...(channelId === undefined ? {} : { channelId }),
     ...(input.force === undefined ? {} : { force: input.force }),
   };
 }
@@ -282,6 +258,24 @@ function decodeConversationRow(value: unknown): ConversationStorageRow {
   };
 }
 
+function decodeFileWorkflowFolder(value: unknown): StoredFileWorkflowFolder | null {
+  if (value === null) return null;
+  const folder = record(value, "stored file workflow folder");
+  return {
+    id: identifier(folder.id, "stored file workflow folder"),
+    name: title(folder.name, "stored file workflow folder"),
+  };
+}
+
+function decodeFileWorkflow(value: unknown): StoredFileWorkflow {
+  const workflow = record(value, "stored file workflow");
+  return {
+    id: identifier(workflow.id, "stored file workflow"),
+    name: title(workflow.name, "stored file workflow"),
+    folder: decodeFileWorkflowFolder(workflow.folder),
+  };
+}
+
 function decodeFileRow(value: unknown): StoredFileRow {
   const row = record(value, "stored file");
   if (!isAttachmentSummary(row)) invalid("stored file");
@@ -310,6 +304,7 @@ function decodeFileRow(value: unknown): StoredFileRow {
     createdAt: row.createdAt,
     status: row.status,
     deletable: row.deletable,
+    ...(row.workflow === undefined ? {} : { workflow: decodeFileWorkflow(row.workflow) }),
   };
 }
 
@@ -318,11 +313,13 @@ export function decodeStorageUsage(value: unknown): StorageUsage {
   if (!isOneOf(STORAGE_SCOPES, usage.scope)) invalid("storage scope");
   if (!isNullableBoundedString(usage.agentId, 128) || !isNullableBoundedString(usage.conversationId, 128))
     invalid("storage scope");
+  if (usage.channelId !== undefined && !isNullableBoundedString(usage.channelId, 128)) invalid("storage scope");
   if (!isString(usage.scannedAt) || !isBoolean(usage.truncated)) invalid("storage usage");
   return {
     scope: usage.scope,
     agentId: usage.agentId,
     conversationId: usage.conversationId,
+    ...(isString(usage.channelId) ? { channelId: usage.channelId } : {}),
     scannedAt: usage.scannedAt,
     freeBytes: usage.freeBytes === null ? null : byteCount(usage.freeBytes, "free space"),
     breakdown: list(usage.breakdown, STORAGE_CATEGORIES.length, decodeBreakdown, "storage breakdown"),
@@ -333,7 +330,6 @@ export function decodeStorageUsage(value: unknown): StorageUsage {
   };
 }
 
-/** A remote host without `storage-v1` answers null, and the surface says the host needs an update. */
 export function decodeOptionalStorageUsage(value: unknown): StorageUsage | null {
   return value === null ? null : decodeStorageUsage(value);
 }
@@ -343,20 +339,41 @@ export function decodeStorageDisk(value: unknown): StorageDisk {
   return {
     freeBytes: disk.freeBytes === null ? null : byteCount(disk.freeBytes, "free space"),
     totalBytes: disk.totalBytes === null ? null : byteCount(disk.totalBytes, "disk size"),
+    ...(disk.userBytes === undefined
+      ? {}
+      : { userBytes: disk.userBytes === null ? null : byteCount(disk.userBytes, "user files") }),
   };
 }
 
-/** A remote host without `storage-disk-v1` answers null, and the sidebar shows no storage card. */
+export function decodeChannelStorageUsage(value: unknown): StorageUsage {
+  const usage = record(value, "channel storage");
+  if (!isIdentifier(usage.channelId)) invalid("storage channel");
+  if (!isString(usage.scannedAt) || !isBoolean(usage.truncated)) invalid("storage usage");
+  return {
+    scope: "channel",
+    agentId: null,
+    conversationId: null,
+    channelId: usage.channelId,
+    scannedAt: usage.scannedAt,
+    freeBytes: null,
+    breakdown: [],
+    agents: [],
+    conversations: [],
+    files: list(usage.files, STORAGE_LIMITS.files, decodeFileRow, "stored files"),
+    truncated: usage.truncated,
+  };
+}
+
 export function decodeOptionalStorageDisk(value: unknown): StorageDisk | null {
   return value === null ? null : decodeStorageDisk(value);
 }
 
-/** A host must answer the scope it was asked for, or a panel shows another agent's files. */
 export function assertStorageUsageScope(result: StorageUsage, input: GetStorageUsageInput): StorageUsage {
   if (
     result.scope !== input.scope ||
     result.agentId !== (input.agentId ?? null) ||
-    result.conversationId !== (input.conversationId ?? null)
+    result.conversationId !== (input.conversationId ?? null) ||
+    (result.channelId ?? null) !== (input.channelId ?? null)
   )
     throw new Error("Storage response does not match the request.");
   return result;

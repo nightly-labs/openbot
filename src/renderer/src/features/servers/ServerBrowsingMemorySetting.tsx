@@ -3,19 +3,14 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle, Switch } fr
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 
-/** The browsing memory calls of one server's host. The desktop reaches them through main. */
 export type HostBrowsingMemoryCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getBrowsingMemory" | "setBrowsingMemory">;
 
 export interface ServerBrowsingMemoryOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostBrowsingMemoryCalls;
 }
 
-/**
- * Server Settings > General: whether the host records what a person does in an agent tab they hold,
- * so that the memory review learns how those sites work (`browsing-memory-v1`). The host checks the
- * role again.
- */
+const lastSettings = new Map<string, HostBrowsingMemory>();
+
 export function ServerBrowsingMemorySetting(
   props: ServerBrowsingMemoryOptions & {
     serverId: string;
@@ -27,24 +22,28 @@ export function ServerBrowsingMemorySetting(
   const calls = (): HostBrowsingMemoryCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostBrowsingMemory | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  /** Bumped for each server, so an answer for an earlier one is dropped. */
   let generation = 0;
 
   createEffect(
     () => props.serverId,
     (serverId) => {
       const current = ++generation;
-      setSettings(null);
+      setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       untrack(calls)
         .getBrowsingMemory(serverId)
         .then(
           (next) => {
-            if (current === generation) setSettings(next);
+            if (current !== generation) return;
+            lastSettings.set(serverId, next);
+            setSettings(next);
           },
           (error: unknown) => {
-            if (current === generation)
+            if (current === generation) {
+              lastSettings.delete(serverId);
+              setSettings(null);
               setLoadError(errorMessage(error, t("server.settings.browsingMemoryLoadFailed")));
+            }
           },
         );
     },
@@ -54,9 +53,10 @@ export function ServerBrowsingMemorySetting(
     const current = settings();
     if (!current || enabled === current.enabled) return;
     const serverId = props.serverId;
-    const request = generation;
+    const request = ++generation;
     void props.run("browsingMemory", async () => {
       const next = await calls().setBrowsingMemory(enabled, serverId);
+      lastSettings.set(serverId, next);
       if (request === generation) setSettings(next);
     });
   }

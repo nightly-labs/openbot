@@ -2,7 +2,6 @@ import { isBrowserSecretRequest } from "../ipc-browser-secret";
 import { isDynamicRecord } from "../runtime-values";
 import type { TeamProtocolV4BaseJsonValue } from "./v4-base";
 
-/** Add only validated public metadata beside the frozen takeover projection. */
 export function restoreBrowserSecretMetadata(
   projected: TeamProtocolV4BaseJsonValue,
   source: unknown,
@@ -10,10 +9,6 @@ export function restoreBrowserSecretMetadata(
   return mapBrowserTakeoverRequests(projected, source, restoreRequest);
 }
 
-/**
- * Applies `restore` to each takeover request of a `browser-takeover-requested` event or a
- * `runtime-snapshot`, with the request of `source` that has the same id.
- */
 export function mapBrowserTakeoverRequests(
   projected: TeamProtocolV4BaseJsonValue,
   source: unknown,

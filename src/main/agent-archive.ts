@@ -1,6 +1,3 @@
-// Reading and writing `.zip` archives that carry agents: the Grok Bot agent import and the
-// OpenBot instance transfer share these checks, so both refuse the same unsafe entries.
-
 import { createHash } from "node:crypto";
 import { type FileHandle, mkdir, open, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, isAbsolute, resolve } from "node:path";
@@ -16,41 +13,27 @@ import { isPathInside } from "../backend/path-containment";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveResult, archiveSync } from "./archive-effects";
 import { inspectArchive, isUnsafeArchivePath, MAX_BYTES as SKILL_MAX_BYTES } from "./skill-package";
 
-/** The most an archive may hold. */
 export interface ArchiveLimits {
   files: number;
-  /** The most the file, and its expanded entries, may hold. A local import has no byte limit. */
   bytes?: { limit: number; tooLarge: string };
-  /** The error when there are more files, or more expanded bytes, than the limits allow. */
   expandedTooLarge: string;
   invalid: string;
 }
 
-/** A file entry, as the central directory of the archive describes it. */
 export interface ArchiveEntry {
-  /** The name in the archive, with `/` between folders. */
   name: string;
-  /** Expanded size. */
   size: number;
   compressedSize: number;
-  /** 0 is stored and 8 is deflated; the reader refuses other methods. */
   method: number;
   crc: number;
   localHeaderOffset: number;
-  /** A Unix or macOS zip tool saved the file with an execute bit. */
   executable: boolean;
 }
 
-/**
- * A checked `.zip` on disk. Only its central directory is read into memory: each entry is inflated
- * when it is used, so the size of an archive is limited by the disk, not by memory.
- */
 export interface ArchiveFile {
   path: string;
   entries: Map<string, ArchiveEntry>;
-  /** The SHA-256 of the file size and the central directory. Any changed entry changes its CRC here. */
   fingerprint: string;
-  /** Files in `.git` and `node_modules` folders, which are left out. */
   skipped: number;
 }
 
@@ -63,14 +46,11 @@ const ZIP64_END_BYTES = 56;
 const CENTRAL = 0x02014b50;
 const LOCAL = 0x04034b50;
 const ZIP64_EXTRA = 0x0001;
-/** The end record can follow a comment of up to 65,535 bytes. */
 const TAIL_BYTES = ZIP64_LOCATOR_BYTES + END_BYTES + 0xffff;
 const READ_CHUNK_BYTES = 1024 * 1024;
 const SKIPPED_FOLDERS = new Set([".git", "node_modules"]);
-/** A central directory is about 100 bytes for each entry; more than this is not an export. */
 const MAX_DIRECTORY_BYTES = 256 * 1024 * 1024;
 
-/** Reads and checks the central directory of the archive at `path`, without inflating anything. */
 export const readArchiveEffect = Effect.fn("Archive.readArchive")(function* (
   path: string,
   limits: ArchiveLimits,
@@ -78,7 +58,6 @@ export const readArchiveEffect = Effect.fn("Archive.readArchive")(function* (
   const info = yield* archiveCall(() => stat(path));
   if (!info.isFile()) return yield* archiveFailure(new Error(sourceText("error.import.chooseZip")));
   if (limits.bytes && info.size > limits.bytes.limit) return yield* archiveFailure(new Error(limits.bytes.tooLarge));
-  // A zip that Grok Bot is still writing has no central directory yet, so it reads as invalid.
   if (info.size < END_BYTES) return yield* archiveFailure(new Error(limits.invalid));
   return yield* withArchive(path, (handle) =>
     Effect.gen(function* () {
@@ -102,10 +81,6 @@ export const readArchiveEffect = Effect.fn("Archive.readArchive")(function* (
   );
 });
 
-/**
- * Inflates the named entries into memory. Use it for small entries: a manifest, an avatar, a skill.
- * An entry larger than `maxBytes` is left out of the result, as a missing entry is.
- */
 export const readEntriesEffect = Effect.fn("Archive.readEntries")(function* (
   archive: ArchiveFile,
   names: Iterable<string>,
@@ -135,13 +110,8 @@ export const readEntriesEffect = Effect.fn("Archive.readEntries")(function* (
   );
 });
 
-/** The most a manifest can be. A manifest with 100 agents and all their memories is a few MB. */
 export const MANIFEST_MAX_BYTES = 64 * 1024 * 1024;
 
-/**
- * Reads one skill folder into memory and checks it, before its agent exists. A folder larger than a
- * skill can be is refused before it is read.
- */
 export const readSkillEffect = Effect.fn("Archive.readSkill")(function* (
   archive: ArchiveFile,
   files: ReadonlyArray<readonly [string, ArchiveEntry]>,
@@ -158,7 +128,6 @@ export const readSkillEffect = Effect.fn("Archive.readSkill")(function* (
   return { files: read, slug };
 });
 
-/** Opens the archive once for a group of reads, and closes it after them. */
 export function withArchive<A>(
   path: string,
   use: (handle: FileHandle) => Effect.Effect<A, ArchiveOperationError>,
@@ -170,10 +139,6 @@ export function withArchive<A>(
   );
 }
 
-/**
- * Streams one entry into a new file at `target`. `wx` refuses to replace a file, so the `EEXIST`
- * failure leaves what is there. A file that this call made and could not finish is removed.
- */
 export const extractEntryEffect = Effect.fn("Archive.extractEntry")(function* (
   handle: FileHandle,
   entry: ArchiveEntry,
@@ -184,7 +149,6 @@ export const extractEntryEffect = Effect.fn("Archive.extractEntry")(function* (
   const stream = output.createWriteStream();
   const written = yield* Effect.exit(inflateEntryEffect(handle, entry, stream));
   if (Exit.isFailure(written)) {
-    // The entry can fail before the stream is piped, so it is closed here before the file is removed.
     yield* archiveCall(
       () =>
         new Promise<void>((done) => {
@@ -211,8 +175,6 @@ const readDirectoryEffect = Effect.fn("Archive.readDirectory")(function* (
   if (end < 0) return yield* invalid();
   let directoryBytes = tail.readUInt32LE(end + 12);
   let directoryOffset = tail.readUInt32LE(end + 16);
-  // ZIP64 puts the real values in a second end record, which a locator before the first one names.
-  // An archive over 4 GB, or with more than 65,535 entries, has one.
   const locator = end - ZIP64_LOCATOR_BYTES;
   if (locator >= 0 && tail.readUInt32LE(locator) === ZIP64_LOCATOR) {
     const recordOffset = uint64(tail, locator + 8);
@@ -228,12 +190,6 @@ const readDirectoryEffect = Effect.fn("Archive.readDirectory")(function* (
   return yield* readAtEffect(handle, directoryOffset, directoryBytes, limits.invalid);
 });
 
-/**
- * The checked file entries of a central directory. A folder entry holds no data and is left out.
- * A tool makes `.git` and `node_modules` again, so their files are counted and left out too. The
- * whole directory is read, not the count in the end record: some tools write only the low 16 bits
- * of a count over 65,535 and no ZIP64 record.
- */
 function directoryEntries(
   directory: Buffer,
   limits: ArchiveLimits,
@@ -250,7 +206,6 @@ function directoryEntries(
     const commentBytes = directory.readUInt16LE(offset + 32);
     const next = offset + 46 + nameBytes + extraBytes + commentBytes;
     if (next > directory.length) throw new Error("Invalid.");
-    // Bit 11 marks a UTF-8 name; other names are read as fflate reads them.
     const name = strFromU8(directory.subarray(offset + 46, offset + 46 + nameBytes), (flags & 0x800) === 0).replaceAll(
       "\\",
       "/",
@@ -261,7 +216,6 @@ function directoryEntries(
       directory.readUInt32LE(offset + 20),
       directory.readUInt32LE(offset + 42),
     );
-    // The high byte of "version made by" is the system: 3 is Unix and 19 is macOS.
     const system = directory.readUInt8(offset + 5);
     const mode = directory.readUInt32LE(offset + 38) >>> 16;
     const method = directory.readUInt16LE(offset + 10);
@@ -273,7 +227,6 @@ function directoryEntries(
       continue;
     }
     if (isUnsafeEntry(name)) throw new UnsafeEntry(name);
-    // Bit 0 marks an encrypted entry.
     if ((flags & 1) !== 0 || (method !== 0 && method !== 8)) throw new Error("Invalid.");
     expanded += sizes.size;
     if (entries.size >= limits.files || (limits.bytes && expanded > limits.bytes.limit)) throw new UnsafeEntry(null);
@@ -289,7 +242,6 @@ function directoryEntries(
   return { entries, skipped };
 }
 
-/** Each value that is `0xffffffff` in the directory comes, in this order, from the ZIP64 extra field. */
 function zip64Sizes(
   extra: Buffer,
   size: number,
@@ -326,7 +278,6 @@ function uint64(buffer: Buffer, offset: number): number | null {
   return value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
 }
 
-/** Inflates one entry into `sink`, and fails when it has another size or CRC than the directory says. */
 const inflateEntryEffect = Effect.fn("Archive.inflateEntry")(function* (
   handle: FileHandle,
   entry: ArchiveEntry,
@@ -342,7 +293,6 @@ const inflateEntryEffect = Effect.fn("Archive.inflateEntry")(function* (
     transform(chunk: Buffer, _encoding, callback) {
       crc = crc32(chunk, crc);
       bytes += chunk.length;
-      // An entry that expands past its stated size stops here, so it cannot fill the disk.
       callback(bytes > entry.size ? new Error(sourceText("error.import.entryDamaged")) : null, chunk);
     },
   });
@@ -353,7 +303,6 @@ const inflateEntryEffect = Effect.fn("Archive.inflateEntry")(function* (
     yield* archiveCall(() =>
       (entry.method === 8 ? pipeline(input, createInflateRaw(), check, sink) : pipeline(input, check, sink)).catch(
         (error: unknown) => {
-          // zlib names a damaged deflate stream with a `Z_` code and English text.
           throw isZlibError(error) ? new Error(sourceText("error.import.entryDamaged")) : error;
         },
       ),
@@ -362,11 +311,9 @@ const inflateEntryEffect = Effect.fn("Archive.inflateEntry")(function* (
   if (bytes !== entry.size || crc >>> 0 !== entry.crc) return yield* damaged();
 });
 
-/** Reads `length` bytes from `start` in chunks. A stream from the handle would add a listener to it for each entry. */
 async function* readRange(handle: FileHandle, start: number, length: number): AsyncGenerator<Buffer> {
   for (let offset = 0; offset < length; ) {
     const size = Math.min(READ_CHUNK_BYTES, length - offset);
-    // Only the bytes read are used, so the buffer does not need to be zero-filled.
     const { bytesRead, buffer } = await handle.read(Buffer.allocUnsafe(size), 0, size, start + offset);
     if (bytesRead === 0) throw new Error(sourceText("error.import.entryDamaged"));
     offset += bytesRead;
@@ -374,7 +321,7 @@ async function* readRange(handle: FileHandle, start: number, length: number): As
   }
 }
 
-const readAtEffect = Effect.fn("Archive.readAt")(function* (
+export const readAtEffect = Effect.fn("Archive.readAt")(function* (
   handle: FileHandle,
   position: number,
   length: number,
@@ -386,7 +333,6 @@ const readAtEffect = Effect.fn("Archive.readAt")(function* (
   return buffer;
 });
 
-/** A segment such as `D:` names another Windows drive, so `resolve` would leave the target folder. */
 export function isUnsafeEntry(name: string): boolean {
   return isUnsafeArchivePath(name) || name.split("/").some((part) => /^[a-z]:/iu.test(part));
 }
@@ -412,18 +358,10 @@ export const writeTreeEffect = Effect.fn("Archive.writeTree")(function* (
     if (isAbsolute(name) || isUnsafeEntry(name) || target === base || !isPathInside(base, target))
       return yield* archiveFailure(new Error(sourceText("error.import.unsafeFile", { name })));
     yield* archiveCall(() => mkdir(dirname(target), { recursive: true })).pipe(Effect.uninterruptible);
-    // `wx` refuses to replace a file, so an entry can never overwrite what is already there.
     yield* archiveCall(() => writeFile(target, data, { flag: "wx" })).pipe(Effect.uninterruptible);
   }
 });
 
-/**
- * Streams the workspace files of one agent from the archive and never replaces a file. When a file
- * is already there, for example `README.md` and `readme.md` on a disk that ignores case, the entry is
- * saved beside it as `README (2).md`. A file that still cannot be written is skipped. Each case adds
- * a warning. With `keepExecutable`, an entry saved with an execute bit gets the execute bits that the
- * umask allows, and never setuid or setgid.
- */
 export const writeImportedFilesEffect = Effect.fn("Archive.writeImportedFiles")(function* (
   root: string,
   archive: ArchiveFile,
@@ -478,7 +416,6 @@ export const writeImportedFilesEffect = Effect.fn("Archive.writeImportedFiles")(
   );
 });
 
-/** `notes/plan.md` becomes `notes/plan (2).md`. */
 function copyName(path: string, copy: number): string {
   const extension = extname(path);
   return `${path.slice(0, path.length - extension.length)} (${copy})${extension}`;

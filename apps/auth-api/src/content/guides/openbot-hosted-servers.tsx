@@ -16,7 +16,12 @@ export function OpenBotHostedServers() {
       <p>
         An OpenBot hosted server is a Linux machine where your team’s OpenBot runs. OpenBot sets it up for you, so you
         don’t need to prepare your own computer or VPS. Your agents’ workspaces, conversations, and files stay on the
-        server, and you can connect to your team from another device. Hosted servers run in the EU.
+        server, and you can connect to your team from another device.
+      </p>
+      <p>
+        A new hosted server can start on a virtual server that OpenBot rents from Leaseweb. The privacy notice names two
+        locations: Amsterdam, and near Washington, D.C. for a purchase in US dollars or Brazilian reais, with Amsterdam
+        as the fallback. When no Leaseweb server is free, the server starts in a boat sandbox, as before.
       </p>
       <p>
         The server provides a place for OpenBot to run; it doesn’t include AI model access. You connect a provider
@@ -33,31 +38,31 @@ export function OpenBotHostedServers() {
         server runs—not in the number of agents you can create.
       </p>
       <p>
-        Starter is for one person, with 12 GB of storage and base speed. It could suit a founder or a freelancer who
+        Starter is for one person, with 25 GB of storage and base speed. It could suit a founder or a freelancer who
         wants agents to keep working on research, routine admin, or client work while the laptop is closed.
       </p>
       <p>
-        Standard supports up to 5 members, with 50 GB of storage and twice the speed of Starter. Think of a small
+        Standard supports up to 5 members, with 75 GB of storage and twice the speed of Starter. Think of a small
         software consultancy working across several client projects: its team might use agents for code review,
         research, and preparing project notes.
       </p>
       <p>
-        Pro supports up to 10 members, with 100 GB of storage and four times the base speed. It’s aimed at larger teams
+        Pro supports up to 10 members, with 150 GB of storage and four times the base speed. It’s aimed at larger teams
         or heavier workloads, especially those involving more browser-based work.
       </p>
       <p>You can pay monthly or yearly. The yearly option saves 20%.</p>
+      <ArticleImage
+        src={pricing}
+        alt="Starter, Standard, and Pro plans with monthly prices in US dollars, billed yearly."
+        width={1078}
+        height={574}
+        caption="Prices are in US dollars and billed yearly. Starter has 25 GB of storage, Standard has 75 GB, and Pro has 150 GB."
+      />
       <p>
         Work at a company also needs a commercial license. A Starter license for one user costs €10 a month, and a Team
         license costs €25 a month for two users and €15 for each extra user, up to 10 users. With a hosted server, the
         license costs 10% less, and you can buy both with one payment. Yearly billing also takes 20% off the license.
       </p>
-      <ArticleImage
-        src={pricing}
-        alt="OpenBot hosted server pricing with Starter, Standard, and Pro plans. The yearly billing option is selected, showing member limits, storage, and speed for each plan."
-        width={1528}
-        height={1232}
-        caption="The hosted server plans differ in team size, storage, and speed. Yearly billing saves 20%."
-      />
 
       <h2>Getting Started with a Hosted Server</h2>
       <p>
@@ -72,14 +77,16 @@ export function OpenBotHostedServers() {
 
       <h2>What Happens When You’re Not Using the Server?</h2>
       <p>
-        A hosted server doesn’t need to stay active when nobody is using it. After a period of inactivity, it stops but
-        keeps its data. It starts again when someone connects, and it can wake shortly before a scheduled routine so the
-        routine runs at the right time.
+        A Leaseweb server runs all the time: it does not stop after the last use. When no Leaseweb machine is free, the
+        server starts in a boat sandbox, as before. That sandbox does not need to stay active when nobody is using it.
+        After a period of inactivity, it stops but keeps its data. It starts again when someone connects, and it can
+        wake shortly before a scheduled routine so the routine runs at the right time.
       </p>
       <p>
-        If you connect Slack, the server stays awake while Slack is connected. That lets your team send requests to
-        OpenBot in Slack and get responses from its agents. Without an active connection like this, the server goes idle
-        when it’s not being used.
+        Messages and webhooks wake the sandbox too. When someone mentions OpenBot or messages it in Slack, Discord or
+        Telegram, the sandbox starts and answers once it is back online. A webhook routine works the same way: the first
+        delivery gets a “try again later” answer and starts the sandbox, which takes a few minutes. A later try reaches
+        it. Most webhook senders, such as Shopify and Stripe, try again on their own for hours.
       </p>
 
       <h2>Hosted Server or Self-Hosting?</h2>

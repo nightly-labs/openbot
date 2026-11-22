@@ -13,16 +13,13 @@ import type { MessagingSlackMention, MessagingSlackSend } from "../messaging/mes
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
 import { withoutEvents } from "./github-output";
 
-/** The message of a Slack trigger, as the run payload keeps it. */
 interface SlackTriggerMessage {
   connectionId: string;
   channelId: string;
   messageId: string;
-  /** The thread that a reply goes to: the mention's thread, or the mention itself at the top level. */
   threadId: string;
 }
 
-/** Slack adds a reaction by its name, not by its character. */
 const EMOJI_NAMES: Record<WorkflowSlackEmoji, string> = {
   "✅": "white_check_mark",
   "👀": "eyes",
@@ -35,7 +32,6 @@ function text(node: WorkflowNode, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** Whether `node` is a Slack trigger that starts on this mention. */
 export function slackTriggerMatches(node: WorkflowNode, mention: MessagingSlackMention): boolean {
   if (node.kind !== "trigger" || node.fields.trigger !== "slack") return false;
   if (!isOneOf(WORKFLOW_SLACK_EVENTS, node.fields.event)) return false;
@@ -46,10 +42,6 @@ export function slackTriggerMatches(node: WorkflowNode, mention: MessagingSlackM
   return !contains || mention.text.toLocaleLowerCase().includes(contains);
 }
 
-/**
- * The run payload of a mention: the trigger's answer, which the next nodes read. The text came from a
- * person in the workspace, so the frame tells an agent to read it as data.
- */
 export function workflowSlackPayload(nodeId: string, mention: MessagingSlackMention): string {
   return [
     EXTERNAL_EVENT_START,
@@ -70,7 +62,6 @@ export function workflowSlackPayload(nodeId: string, mention: MessagingSlackMent
         authorId: mention.authorId,
         author: mention.authorName,
         text: mention.text,
-        // Only the names: a Slack file address needs the bot's token, which stays on this computer.
         attachments: mention.files.map((file) => ({ name: file.name, contentType: file.mimeType, size: file.size })),
       },
     }),
@@ -78,7 +69,6 @@ export function workflowSlackPayload(nodeId: string, mention: MessagingSlackMent
   ].join("\n");
 }
 
-/** The data of the Slack mention in a run payload, or null when a Slack mention did not start the run. */
 function slackEventData(payload: string | null): DynamicRecord | null {
   if (!payload?.startsWith(EXTERNAL_EVENT_START)) return null;
   const [, , json] = payload.split("\n");
@@ -91,7 +81,6 @@ function slackEventData(payload: string | null): DynamicRecord | null {
   return isDynamicRecord(event) && event.type === "slack.mention" && isDynamicRecord(event.data) ? event.data : null;
 }
 
-/** The message that started a run, from its payload, or null when a Slack mention did not start it. */
 export function slackTriggerMessage(payload: string | null): SlackTriggerMessage | null {
   const data = slackEventData(payload);
   if (!data) return null;
@@ -101,13 +90,8 @@ export function slackTriggerMessage(payload: string | null): SlackTriggerMessage
     : null;
 }
 
-/** What a Slack output sends, or the error text of a node that cannot send. */
 export type SlackOutputPlan = { connectionId: string; send: MessagingSlackSend } | { error: string };
 
-/**
- * The post or reaction of a Slack output. `trigger` is the message of the run's mention, if any. A reply
- * and a reaction act on that message, so they need it and its workspace.
- */
 export function slackOutputPlan(
   node: WorkflowNode,
   input: string,
@@ -119,8 +103,6 @@ export function slackOutputPlan(
   const chosen = text(node, "connectionId") || WORKFLOW_SLACK_TRIGGER_WORKSPACE;
   const connectionId = chosen === WORKFLOW_SLACK_TRIGGER_WORKSPACE ? (trigger?.connectionId ?? "") : chosen;
   if (!connectionId) return { error: sourceText("error.workflow.slackNoMessage") };
-  // The event of a trigger is data for an agent: the workspace does not see it as a post. The GitHub
-  // text names no service, so a Slack output uses it too. Empty text posts nothing.
   const body = withoutEvents(input).trim();
   const onlyEvent = !body && Boolean(input.trim());
   const eventOnly = { error: sourceText("error.workflow.githubEventText") };

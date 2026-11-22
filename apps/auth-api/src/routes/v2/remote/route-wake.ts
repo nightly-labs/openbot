@@ -1,4 +1,5 @@
 import { TELEGRAM_BOT_ID_PATTERN, TELEGRAM_CHAT_ID_PATTERN } from "@openbot/contracts/signal-protocol/telegram-route";
+import { WEBHOOK_ROUTE_ID_PATTERN } from "@openbot/contracts/signal-protocol/webhook-route";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -25,13 +26,11 @@ const routeWakeSchema = z.object({
       botId: z.string().regex(TELEGRAM_BOT_ID_PATTERN),
       chatId: z.string().regex(TELEGRAM_CHAT_ID_PATTERN),
     }),
+    z.object({ platform: z.literal("webhook"), routeId: z.string().regex(WEBHOOK_ROUTE_ID_PATTERN) }),
   ]),
   wake: z.boolean(),
 });
 
-// Signal has a Slack, Discord or Telegram event for a route whose host has no socket. A hosted server
-// that sleeps starts with `wake`, and the answer tells Signal whether to keep the event until the host
-// connects.
 export const Route = createFileRoute("/v2/remote/route-wake")({
   server: {
     handlers: {
@@ -54,7 +53,6 @@ export const Route = createFileRoute("/v2/remote/route-wake")({
             const hosting = requestHostedServerService();
             const state = yield* hosting.routeState(hostId);
             if (!parsed.data.wake || (state !== "sleeping" && state !== "starting")) return json({ hostId, state });
-            // Slack waits at most 3 seconds, and a resume can take longer: the start runs after the answer.
             schedule(hosting.startForRoute(hostId));
             return json({ hostId, state: "starting" });
           }),

@@ -1,6 +1,5 @@
 import { Effect, Schema } from "effect";
 
-/** Preserves remote desktop failures at the existing Promise interfaces. */
 export class RemoteDesktopOperationError extends Schema.TaggedError<RemoteDesktopOperationError>()(
   "RemoteDesktopOperationError",
   {

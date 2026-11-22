@@ -3,6 +3,7 @@ import {
   type PropsWithChildren,
   useContext,
   useLayoutEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -11,10 +12,6 @@ import type { MobileWorkspaceActions, MobileWorkspaceContextValue } from "@/feat
 const MobileWorkspaceContext = createContext<MobileWorkspaceContextValue | null>(null);
 const MobileWorkspaceActionsContext = createContext<MobileWorkspaceActions | null>(null);
 
-/**
- * The same value as the context, for components that read one part of it. A list row reads its
- * own agent's state, so a message for another agent does not render every row again.
- */
 interface WorkspaceValueStore {
   get: () => MobileWorkspaceContextValue;
   subscribe: (listener: () => void) => () => void;
@@ -40,14 +37,12 @@ function createWorkspaceValueStore(initial: MobileWorkspaceContextValue): Worksp
   };
 }
 
-/** Gives the workspace to the app in each of its three forms: the whole value, its store, and its actions. */
 export function WorkspaceContexts({
   value,
   actions,
   children,
 }: PropsWithChildren<{ value: MobileWorkspaceContextValue; actions: MobileWorkspaceActions }>) {
   const [valueStore] = useState(() => createWorkspaceValueStore(value));
-  // Before paint, so a row that reads the store does not show a frame older than the screen.
   useLayoutEffect(() => valueStore.publish(value), [valueStore, value]);
   return (
     <MobileWorkspaceContext.Provider value={value}>
@@ -58,17 +53,12 @@ export function WorkspaceContexts({
   );
 }
 
-/**
- * The whole workspace. The component renders again on every change; prefer the selector in lists,
- * and `useMobileWorkspaceActions` for a component that only sends commands.
- */
 export function useMobileWorkspace(): MobileWorkspaceContextValue {
   const value = useContext(MobileWorkspaceContext);
   if (!value) throw new Error("useMobileWorkspace must be used within MobileWorkspaceProvider.");
   return value;
 }
 
-/** The workspace commands. They do not change in the session, so the component does not render again for them. */
 export function useMobileWorkspaceActions(): MobileWorkspaceActions {
   const actions = useContext(MobileWorkspaceActionsContext);
   if (!actions) throw new Error("useMobileWorkspaceActions must be used within MobileWorkspaceProvider.");
@@ -81,17 +71,22 @@ function useWorkspaceValueStore(): WorkspaceValueStore {
   return store;
 }
 
-/**
- * One part of the workspace. The component renders again only when that part changes (`Object.is`),
- * so `select` returns a primitive or a value that the workspace holds, never a new object or array.
- * For a command, use `useMobileWorkspaceActions` instead.
- */
-export function useMobileWorkspaceSelector<T>(select: (workspace: MobileWorkspaceContextValue) => T): T {
+export function useMobileWorkspaceSelector<T>(
+  select: (workspace: MobileWorkspaceContextValue) => T,
+  isEqual?: (previous: T, next: T) => boolean,
+): T {
   const store = useWorkspaceValueStore();
-  return useSyncExternalStore(store.subscribe, () => select(store.get()));
+  const kept = useRef<{ value: T } | null>(null);
+  return useSyncExternalStore(store.subscribe, () => {
+    const next = select(store.get());
+    if (!isEqual) return next;
+    const previous = kept.current;
+    if (previous && (Object.is(previous.value, next) || isEqual(previous.value, next))) return previous.value;
+    kept.current = { value: next };
+    return next;
+  });
 }
 
-/** Reads the latest workspace when an event occurs. The component does not render again for changes. */
 export function useMobileWorkspaceReader(): () => MobileWorkspaceContextValue {
   return useWorkspaceValueStore().get;
 }

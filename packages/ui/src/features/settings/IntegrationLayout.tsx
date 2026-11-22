@@ -1,9 +1,3 @@
-/**
- * The parts that every integration page shares: the page shell, the logo on its tile, the status pill,
- * the page header, the danger zone, and the connect dialog with OpenBot and the other app side by side.
- * The connectors and the Marketplace app pages use them.
- */
-
 import { AppLogo } from "@openbot/brand";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -37,10 +31,8 @@ import { createSignal, For, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 
-/** An agent as an integration page shows it: its face and its name. */
 export type IntegrationAgent = Pick<AgentProfile, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
 
-/** A logo on a quiet square. `size` "lg" is the page header. */
 export function LogoTile(props: { children: JSX.Element; size?: "md" | "lg" }) {
   return (
     <span class="integration-logo-tile" data-size={props.size ?? "md"}>
@@ -49,7 +41,6 @@ export function LogoTile(props: { children: JSX.Element; size?: "md" | "lg" }) {
   );
 }
 
-/** `connecting` is a sign-in that waits for the user, in a browser or another app. */
 export type IntegrationStatus = "connected" | "attention" | "connecting" | "idle" | "unavailable";
 
 const STATUS_VARIANT = {
@@ -69,16 +60,11 @@ export function StatusPill(props: { status: IntegrationStatus; label: string }) 
   );
 }
 
-/**
- * The status of a connection that OpenBot could not read. It is not "Not set up": the connection can
- * be there. The page says why the read failed and has Retry.
- */
 export const UNKNOWN_STATUS = {
   status: "attention",
   label: "connector.statusUnknown",
 } as const satisfies { status: IntegrationStatus; label: AppTextKey };
 
-/** A read of a connection that failed: why, and Retry. `message` is the reason in the reader's language. */
 export function ReadFailedAlert(props: { message: string; onRetry?: (() => void) | undefined }) {
   const { t } = useText();
   const title = () => t("connector.readFailed");
@@ -106,7 +92,6 @@ export function ReadFailedAlert(props: { message: string; onRetry?: (() => void)
   );
 }
 
-/** An action that failed: what failed, and why. `message` is a source text from the main process. */
 export function ActionFailedAlert(props: { title: string; message: string }) {
   const { sourceText } = useText();
   return (
@@ -125,64 +110,33 @@ export function ActionFailedAlert(props: { title: string; message: string }) {
 export interface DetailHeaderProps {
   logo: JSX.Element;
   name: string;
-  /** A mark after the name, inside the heading, such as the Marketplace's verified shield. */
   nameMark?: JSX.Element;
   status: IntegrationStatus;
   statusLabel: string;
   subtitle: JSX.Element;
-  /** The next step of the connection, as small buttons. The connect flow that it opens stays in the page. */
   actions?: JSX.Element;
 }
 
-/** What the page that shows an integration adds to it. The Marketplace adds its try card and description, and the information. */
 export interface IntegrationPageSlots {
-  /**
-   * The one line under the name, in place of the page's own description. The Marketplace gives the listing's
-   * tagline here, and shows the description in its information.
-   */
   tagline?: string | undefined;
-  /** After the alerts, before the integration's own content. */
   intro?: JSX.Element;
-  /** After the integration's own content, before the danger zone. */
   details?: JSX.Element;
 }
 
-/**
- * The shell of an integration page. Each integration gives its header, its alerts and its own content: the connect
- * steps, the accounts, the chats. The shell puts them in one order on every page: the header, why the state could
- * not be read, the action that failed, the host's intro, the content, the host's details, and the danger zone.
- *
- * Every page follows these rules, so that all app pages look the same:
- * 1. The header has the name, the status pill, what the app gives, and one small page action (Connect, Reconnect).
- * 2. The alerts come next: the read error, the failed action, then the integration's warning with its fix.
- * 3. `intro` is only for special content, such as the plugin's try card.
- * 4. Each other block is a `SettingsSection`: a heading, an optional description, an optional small outline action.
- *    Its body is one filled card. No text, link or form sits on the page background.
- * 5. In a card, rows are `Item.settings-modal-row`. Other content (a form, a list, information) is in one
- *    `.integration-card-body`. A note is the last line of the card, in `.integration-card-note`, not under the card.
- * 6. A row action is a small outline button. A row that removes one item uses a small `destructive-ghost` button.
- * 7. The danger zone is last, when the app can be disconnected.
- */
 export function IntegrationPage(
   props: DetailHeaderProps &
     IntegrationPageSlots & {
-      /** The integration's own class, for the rules of its content. */
       class: string;
-      /** Why the state could not be read. The content then offers no action that depends on the state. */
       readError?: string | null | undefined;
       onRetry?: (() => void) | undefined;
-      /** The last action that failed. */
       failure?: { title: string; message: string } | null | undefined;
-      /** An alert of the integration, such as an expired sign-in, after the failure. */
       alert?: JSX.Element;
-      /** The DangerZone, when the integration has something to remove. */
       danger?: JSX.Element;
       children?: JSX.Element;
     },
 ) {
   return (
     <div class={`integration-page ${props.class}`}>
-      {/* Each prop stays a getter: the header reads it when it renders, not when the page is set up. */}
       <DetailHeader
         logo={props.logo}
         name={props.name}
@@ -203,7 +157,6 @@ export function IntegrationPage(
   );
 }
 
-/** The top of an integration page: the logo, the name with its status, what it gives, and its action. */
 export function DetailHeader(props: DetailHeaderProps) {
   return (
     <div class="integration-detail-header">
@@ -232,7 +185,6 @@ export function DangerZone(props: {
   description: string;
   action: string;
   busy?: boolean;
-  /** Ask before the action, in a dialog with the same title, description and action. */
   confirm?: boolean;
   onAction: () => void;
 }) {
@@ -277,7 +229,6 @@ export function DangerZone(props: {
   );
 }
 
-/** Numbered steps. Only the numbers show: the dialog title names the step, and readers hear each label. */
 export function Stepper(props: { steps: readonly string[]; current: number; label: string }) {
   return (
     <ol class="integration-stepper" aria-label={props.label}>
@@ -300,7 +251,6 @@ export function Stepper(props: { steps: readonly string[]; current: number; labe
   );
 }
 
-/** The line between OpenBot and the other app: moving while connecting, solid when done, broken on an error. */
 export type WizardLink = "connecting" | "connected" | "broken";
 
 export interface WizardProps {
@@ -311,11 +261,9 @@ export interface WizardProps {
   stepper?: JSX.Element;
   children?: JSX.Element;
   footer: JSX.Element;
-  /** Makes the body and the footer one form, so Enter in a field submits it. */
   onSubmit?: () => void;
 }
 
-/** The body of a connect dialog. `heading` is the title element, so a dialog can give its own. */
 export function WizardContent(props: WizardProps & { heading: JSX.Element }) {
   return (
     <>
@@ -336,7 +284,6 @@ export function WizardContent(props: WizardProps & { heading: JSX.Element }) {
       <Show when={props.onSubmit} fallback={<WizardParts footer={props.footer}>{props.children}</WizardParts>}>
         <form
           class="integration-wizard-form"
-          // A missing value is reported under its field. The browser bubble would block the submit.
           novalidate
           onSubmit={(event) => {
             event.preventDefault();
@@ -350,7 +297,6 @@ export function WizardContent(props: WizardProps & { heading: JSX.Element }) {
   );
 }
 
-/** The content and the buttons, in a form or not. */
 function WizardParts(props: { footer: JSX.Element; children?: JSX.Element }) {
   return (
     <>
@@ -362,11 +308,6 @@ function WizardParts(props: { footer: JSX.Element; children?: JSX.Element }) {
   );
 }
 
-/**
- * A connect dialog over the settings window. With `dismissible` false, a click outside does not close
- * it: the user may come back from the browser while a flow runs, and that click must not stop the flow.
- * `nested` puts it over the Marketplace and its menus. `wide` makes room for a page drawn in the dialog.
- */
 export function WizardDialog(
   props: WizardProps & {
     open: boolean;
@@ -397,8 +338,6 @@ export function WizardDialog(
             content = element;
           }}
           onOpenAutoFocus={(event) => {
-            // A form opens on what it asks for: its first field, or its submit when it asks for nothing.
-            // The first button in the order is Cancel, and Enter must not cancel.
             const form = content?.querySelector("form.integration-wizard-form");
             const target = form?.querySelector<HTMLElement>(
               "input:not(:disabled), textarea:not(:disabled), button[type=submit]:not(:disabled)",

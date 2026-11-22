@@ -33,10 +33,6 @@ export function FeaturedArticle(props: FeaturedArticleProps) {
         </ButtonLink>
       </div>
 
-      {/* Not a link itself, and it takes no pointer. The heading's link is stretched
-          over the whole block by CSS and passes under this frame, so the artwork —
-          the biggest target on the page — goes to the article without a screen
-          reader hearing the same destination three times. */}
       <div class="post-featured-art" data-enter="post-art">
         <ArticleGradient
           title={props.article.title}

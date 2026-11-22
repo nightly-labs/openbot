@@ -1,28 +1,33 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
-/**
- * What the browser domain reaches in main: the tabs, the display and control state, and the
- * picture-in-picture window. The picture-in-picture window has no provider tree, so this is a module.
- */
 export interface BrowserPort {
   browser: Pick<
     OpenBotDesktopApi["browser"],
     | "activate"
     | "close"
     | "dockPictureInPicture"
+    | "dockWindow"
     | "getControlState"
     | "getDisplayState"
+    | "getWindowModel"
     | "hidePictureInPicture"
+    | "navigate"
     | "onDisplayState"
     | "onLiveViewEvent"
+    | "onWindowEvent"
+    | "onWindowModel"
+    | "open"
+    | "publishWindowModel"
+    | "reload"
     | "sendLiveViewInput"
+    | "sendWindowAction"
     | "setVisible"
     | "startLiveView"
+    | "stop"
     | "stopLiveView"
   >;
 }
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function browserPort(): BrowserPort {
   return window.openbot;
 }

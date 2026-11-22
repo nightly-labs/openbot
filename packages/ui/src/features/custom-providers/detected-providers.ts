@@ -1,26 +1,23 @@
-// Local model servers and ACP agents that the host found without the user's help. The host owns the
-// scan, the saves and the hidden list; these types only describe what it reports and what it does.
-
 import {
   CUSTOM_PROVIDER_LIMITS,
   type CustomProviderHarness,
   type CustomProviderRestart,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import type { AppFormat } from "@openbot/i18n";
 import type { AcpAgentCheck, CustomAcpAgentDraft } from "./custom-acp-agent-form";
 import {
   type CustomProviderDraft,
   type CustomProviderEndpoint,
   type DiscoveredModel,
   savedHeaderDrafts,
+  tokenCountText,
 } from "./custom-provider-form";
 
 interface DetectedBase {
-  /** The detection key that Hide stores: `models:<endpoint key>` or `agent:<command path>`. */
   key: string;
   id: string;
   name: string;
-  /** Already saved, so the row offers Edit instead of Add. */
   added?: boolean | undefined;
 }
 
@@ -28,34 +25,24 @@ export type DetectedProvider =
   | (DetectedBase & {
       kind: "models";
       baseUrl: string;
-      /** The list the server gave when the host asked it, so the form opens with them. */
       models: readonly DiscoveredModel[];
-      /** For a saved endpoint: the models the user chose, which Edit opens with. */
       savedModels?: readonly DiscoveredModel[] | undefined;
-      /** For a saved endpoint: main holds a key, which a blank key field keeps. */
       keyStored?: boolean | undefined;
-      /** For a saved endpoint: the names of its saved headers, whose values an empty field keeps. */
       savedHeaderNames?: readonly string[] | undefined;
-      /** For a saved endpoint: the provider that runs it, which Edit opens with. */
       harness?: CustomProviderHarness | undefined;
     })
   | (DetectedBase & {
       kind: "agent";
-      /** The full path that the host found, so the saved agent does not depend on PATH. */
       command: string;
       args: string;
       version?: string | undefined;
-      /** For a saved agent: the names of its values, which Edit keeps unless the user types new ones. */
       envNames?: readonly string[] | undefined;
-      /** For a saved agent: its usage prompt, which Edit keeps. */
       usagePrompt?: string | null | undefined;
     });
 
-/** `found` can grow while `scanning` is true. */
 export interface ProviderDetection {
   scanning: boolean;
   found: readonly DetectedProvider[];
-  /** Found, but hidden by the user. The host does not put them in `found`. */
   hidden?: number | undefined;
 }
 
@@ -63,23 +50,15 @@ export type DetectedProviderValue =
   | { kind: "models"; value: SaveCustomProviderInput }
   | { kind: "agent"; value: CustomAcpAgentDraft };
 
-/** What a host does with a detected provider. Each call leaves the renderer. */
 export interface DetectedProviderApi {
-  /**
-   * Rejects with the reason, so the form stays open with what the user typed. A model server save
-   * resolves with the restart state of the agents that use it.
-   */
   save: (provider: DetectedProvider, value: DetectedProviderValue) => Promise<CustomProviderRestart | undefined>;
   hide: (provider: DetectedProvider) => void;
   showHidden: () => void;
-  /** Without it there is no scan-again control, as on a first run that scans once. */
   scan?: (() => void) | undefined;
   discoverModels?: ((endpoint: CustomProviderEndpoint) => Promise<readonly DiscoveredModel[]>) | undefined;
-  /** `savedAgentId` names the saved agent whose kept values the check uses. */
   checkAgent?: ((value: CustomAcpAgentDraft, savedAgentId?: string) => Promise<AcpAgentCheck>) | undefined;
 }
 
-/** Where the provider is: a host and port for a server, the command for an agent. */
 export function detectedLocation(provider: DetectedProvider): string {
   if (provider.kind === "agent") return provider.command;
   try {
@@ -89,17 +68,16 @@ export function detectedLocation(provider: DetectedProvider): string {
   }
 }
 
-/**
- * The endpoint form for a server. A new server opens with the models it lists, up to the number an
- * endpoint can hold; a saved one opens with the models the user chose.
- */
-export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: "models" }>): CustomProviderDraft {
+export function detectedModelsDraft(
+  provider: Extract<DetectedProvider, { kind: "models" }>,
+  format: Pick<AppFormat, "number">,
+): CustomProviderDraft {
   const source = provider.added && provider.savedModels ? provider.savedModels : provider.models;
   const models = source.slice(0, CUSTOM_PROVIDER_LIMITS.models).map((model) => ({
     id: model.id,
     name: model.name ?? "",
-    contextWindow: model.contextWindow?.toString() ?? "",
-    maxOutput: model.maxOutput?.toString() ?? "",
+    contextWindow: model.contextWindow === undefined ? "" : tokenCountText(model.contextWindow, format),
+    maxOutput: model.maxOutput === undefined ? "" : tokenCountText(model.maxOutput, format),
     ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
     ...(model.inputs ? { inputs: [...model.inputs] } : {}),
   }));
@@ -114,7 +92,6 @@ export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: 
   };
 }
 
-/** A saved agent opens with its value names, each kept until the user types a new value. */
 export function detectedAgentDraft(provider: Extract<DetectedProvider, { kind: "agent" }>): CustomAcpAgentDraft {
   const names = provider.added ? (provider.envNames ?? []) : [];
   return {

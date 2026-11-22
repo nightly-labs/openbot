@@ -1,12 +1,3 @@
-// Checks what OpenBot sends to the provider at each turn start, so that turns repeat less context.
-// Runs the real agent service on a temporary profile with a fake Codex app-server that logs each
-// `turn/start` input:
-// (a) messages that the person sends while a turn runs start one next turn together, in their order;
-// (b) a Discord conversation gets the messaging guidance and the saved facts of its server in its
-//     first turn only. The next turn on the same provider session names them, and a changed fact
-//     sends them again. Every turn keeps the framing of external input.
-// No provider, account or network is used. `bun run test:turn-input`.
-// Writes .openbot-build/turn-input-e2e/report.json with the characters of each turn input.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -25,7 +16,6 @@ const logPath = join(root, "protocol.jsonl");
 const controlPath = join(root, "control.json");
 const fakeCodex = join(root, "codex");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -39,10 +29,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/**
- * A Codex app-server with the methods that the service calls. A turn runs for `turnMs` of
- * `control.json`, and reports a small part of the context window, so no compaction starts.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -113,7 +99,6 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-/** One `turn/start` that OpenBot sent: its provider thread and the text of its input. */
 interface TurnStart {
   threadId: string;
   text: string;
@@ -136,6 +121,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -171,7 +157,6 @@ function turnStarts(): TurnStart[] {
   });
 }
 
-/** Waits for a state of the service or of the fake Codex. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -202,7 +187,6 @@ const settled = (deliveryId: string) => {
 try {
   await runCauseEffect(agents.initialize());
 
-  // (a) The first turn runs long enough for three more messages to wait behind it.
   await writeFile(controlPath, JSON.stringify({ turnMs: 1_500 }));
   const agent = await runCauseEffect(
     agents.createAgent({
@@ -245,7 +229,6 @@ try {
   assert.ok(report.queuedMessages.sharedTurnId, "the queued messages ran in different turns");
   report.queuedMessages.passed = true;
 
-  // (b) Three Discord messages in one conversation, with a new saved fact before the third.
   const threads = agents.messaging;
   const connection = threads.store.ensureConnection("discord", "guild-1", "Test server");
   threads.store.updateConnection(connection.connectionId, { enabled: true });

@@ -31,10 +31,6 @@ export type RemoteAgent = Pick<
     >
   > & { foreignProvider?: ForeignProviderId | undefined };
 
-/**
- * The agent as the phone shows it. `avatarColor` comes from the `agent-colors-v1` route, because the
- * released agent routes do not carry it.
- */
 export function projectAgent(serverId: string, agent: RemoteAgent, avatarColor: AvatarColor | null): MobileAgent {
   return {
     id: agent.id,
@@ -44,6 +40,7 @@ export function projectAgent(serverId: string, agent: RemoteAgent, avatarColor: 
     description: agent.description,
     preview: agent.preview,
     updatedLabel: formatUpdatedAt(agent.updatedAt),
+    updatedAt: agent.updatedAt,
     provider: agent.provider,
     foreignProvider: agent.foreignProvider,
     model: agent.model,
@@ -60,7 +57,6 @@ export function projectAgent(serverId: string, agent: RemoteAgent, avatarColor: 
   };
 }
 
-/** An agent of a host event. A provider that this build does not know moves to `foreignProvider`. */
 export function remoteAgentOf(agent: ClientAgentSummary): RemoteAgent {
   const { provider, ...rest } = agent;
   return isKnownAgentProvider(provider)
@@ -90,7 +86,6 @@ export function decodeAgent(value: unknown): RemoteAgent {
     preview: value.preview,
     updatedAt: value.updatedAt,
     provider: isAgentProvider(value.provider) ? value.provider : undefined,
-    // A provider of a newer host stays on the agent: the host still runs it.
     foreignProvider: isAgentProviderRef(value.provider) ? foreignProvider(value.provider) : undefined,
     model: isAgentModel(value.model) ? value.model : undefined,
     reasoningEffort: isReasoningEffort(value.reasoningEffort) ? value.reasoningEffort : undefined,
@@ -99,7 +94,6 @@ export function decodeAgent(value: unknown): RemoteAgent {
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     avatarSeed: value.avatarSeed,
     avatarHue: value.avatarHue,
-    // An older host sends no listing; a malformed one is left out rather than failing the agent list.
     marketplaceSource: isAgentMarketplaceSource(value.marketplaceSource) ? value.marketplaceSource : undefined,
   };
 }
@@ -109,10 +103,8 @@ export function decodeAgentSummaries(value: unknown): RemoteAgent[] {
   return value.map(decodeAgent);
 }
 
-/** The host read state of one agent chat that the phone keeps. */
 export interface MobileConversationRead {
   unreadCount: number;
-  /** The first unread message, where the chat shows its NEW line. */
   firstUnreadMessageId: string | null;
 }
 
@@ -128,7 +120,6 @@ export function decodeConversationReads(value: unknown): Record<string, MobileCo
     ) {
       throw new Error("The server returned an invalid read state.");
     }
-    // Only the line reads it, so a value the phone cannot use shows no line rather than refuse the state.
     const firstUnreadMessageId = isString(readState.firstUnreadMessageId) ? readState.firstUnreadMessageId : null;
     reads[agentId] = { unreadCount: readState.unreadCount, firstUnreadMessageId };
   }

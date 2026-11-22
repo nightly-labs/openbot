@@ -36,21 +36,14 @@ export interface FirstAgentDraft {
   purpose: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
-  /** The exact colour, which wins over `avatarHue`. Absent or null: `avatarHue` is the colour. */
   avatarColor?: AvatarColor | null | undefined;
   suggestionId: string | null;
   provider: AgentProviderId;
   model: AgentModelId;
-  /** The reasoning level the user chose. Absent, the agent starts on the model's default level. */
   reasoningEffort?: AgentReasoningEffort | undefined;
-  /** The account of `provider` the agent starts on. Absent, the provider's own sign-in. */
   providerAccountId?: string | undefined;
 }
 
-/**
- * A suggested agent. The name, description and purpose are catalog keys: selecting the suggestion
- * copies their text in the interface language into the draft, so the created agent gets that text.
- */
 export interface FirstAgentSuggestion {
   id: string;
   nameKey: AppTextKey;
@@ -67,33 +60,23 @@ export interface FirstAgentSetupProps {
   mode?: "first" | "additional";
   submitting?: boolean;
   error?: string | null;
-  /** The live catalog behind the model picker. Absent, the form keeps no model choice. */
   modelOptions?: ClientAgentModelOption[] | undefined;
   agentStatus?: AgentStatus | undefined;
-  /** Lets the model picker choose an account of a provider with more than one. */
   accountChoice?: boolean | undefined;
-  /** The plan readings that mark the spent models of each account in the picker. */
   accountUsage?: AccountUsage | null | undefined;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   customProviders?: readonly CustomProviderSummary[] | undefined;
-  /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
   customAgents?: readonly CustomAgentSummary[] | undefined;
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onAddCustomProvider?: ((trigger: HTMLElement) => void) | undefined;
-  /** Opens the provider settings from a plus button in the model picker. */
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
   onChange: (value: FirstAgentDraft) => void;
   onSubmit: (value: FirstAgentDraft) => void | Promise<void>;
   onCancel?: (() => void) | undefined;
 }
 
-/**
- * The faces a new agent can start with. Each has open eyes, and only a few are wide. The eyes set
- * the automatic color, so the order puts a different color next to each face. The suggestions take
- * faces 2-7 and set their own color.
- */
 const FIRST_AGENT_FACES: ReadonlyArray<{ shape: SupportedAvatarSilhouetteId; expression: ExpressionId }> = [
   { shape: "cercle", expression: "attentif" },
   { shape: "squircle", expression: "curieux" },
@@ -116,13 +99,8 @@ const SUGGESTION_MOMENTUM_MINIMUM = 0.01;
 const SUGGESTION_MOMENTUM_MAXIMUM = 1.75;
 const SUGGESTION_DRAG_THRESHOLD = 8;
 const MOTION_FRAME_DURATION = 1000 / 60;
-/** The face choices are 24px. At the default eye size their eyes are too small to compare. */
 const FACE_CHOICE_EYE_SCALE = 1.25;
 
-/**
- * A new draft. Its name is the default name in the interface language when the draft is made: the
- * name is the user's value from then on, and becomes the created agent's name.
- */
 export function createFirstAgentDraft(random: () => number = Math.random): FirstAgentDraft {
   const index = Math.min(FIRST_AGENT_AVATAR_SEEDS.length - 1, Math.floor(random() * FIRST_AGENT_AVATAR_SEEDS.length));
   return {
@@ -271,8 +249,8 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
       props.onCancel();
     };
     const list = suggestionList;
-    // A vertical mouse wheel scrolls the row. At the end of the row, the wheel scrolls the page again.
     const scrollOnWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
       if (!list || props.submitting || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       const rightToLeft = getComputedStyle(list).direction === "rtl";
       const position = rightToLeft ? -list.scrollLeft : list.scrollLeft;
@@ -374,14 +352,9 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
 
   const modelOption = (provider: AgentProviderId, model: AgentModelId) =>
     props.modelOptions?.find((option) => option.provider === provider && option.id === model);
-  /** The level the agent starts on: the user's choice, else the model's default. */
   const reasoningEffort = () =>
     props.value.reasoningEffort ?? modelOption(props.value.provider, props.value.model)?.defaultReasoningEffort;
 
-  /**
-   * A new model keeps the chosen level when it supports it, and else starts on its own default. The
-   * picker sends an account only for a provider with more than one; any other choice is the own sign-in.
-   */
   function selectModel(
     model: AgentModelId,
     provider: AgentProviderId,

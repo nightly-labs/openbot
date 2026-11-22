@@ -1,39 +1,23 @@
 import { Deferred, Effect, type Scope } from "effect";
 import type { ProviderClientOperationError } from "./provider-client-effects";
 
-/** What a pool holds of a thread. The client owns the turn; the pool owns the timer and the time. */
 export interface IdleThread {
   readonly id: string;
   activeTurn: object | null;
   idleRelease: ReturnType<typeof setTimeout> | null;
-  /**
-   * When the thread last became idle, so the longest idle thread is the first to go. `0` for a
-   * thread that is open for a turn that has not started yet: only the timeout closes it.
-   */
   idleSince: number;
 }
 
 export interface IdleThreadPoolOptions<Thread extends IdleThread, Released> {
-  /** How long a thread with no turn stays open. */
   releaseAfterMs: number;
   scope(): Scope.Scope;
-  /** How many idle threads stay open before the timeout. */
   idleLimit: number;
-  /** Whether the thread can be closed and opened again. One that cannot would lose its session. */
   canRelease(thread: Thread): boolean;
-  /** What opening the thread again needs, kept while it is closed. */
   snapshot(thread: Thread): Released;
-  /** Ends the process or session of a thread that the pool no longer holds. */
   dispose(thread: Thread): Effect.Effect<void, ProviderClientOperationError>;
-  /** Opens a released thread again. It must `add` the thread before it settles. */
   reopen(threadId: string, released: Released): Effect.Effect<unknown, ProviderClientOperationError>;
 }
 
-/**
- * The open threads of one provider client, and the idle ones it closed to free their processes and
- * MCP servers. A closed thread keeps a snapshot, and its next turn opens it again from its session.
- * It never closes a thread in a turn, or one whose turn is starting.
- */
 export class IdleThreadPool<Thread extends IdleThread, Released> {
   readonly #options: IdleThreadPoolOptions<Thread, Released>;
   readonly #threads = new Map<string, Thread>();
@@ -61,30 +45,24 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     return this.#released.get(threadId);
   }
 
-  /** Whether the thread was closed for being idle and is not open again yet. */
   isReleased(threadId: string): boolean {
     return this.#released.has(threadId) && !this.#threads.has(threadId);
   }
 
-  /** Holds a thread that was just opened, and starts its idle timer. */
   add(thread: Thread): void {
     this.#threads.set(thread.id, thread);
     this.#released.delete(thread.id);
     this.#arm(thread);
   }
 
-  /** Drops the snapshot of a released thread, so its next turn cannot open it again. */
   forget(threadId: string): void {
     this.#released.delete(threadId);
   }
 
-  /** Removes a thread and its timer. The caller must release its resources. */
   detach(thread: Thread): void {
     this.#threads.delete(thread.id);
     this.#disarm(thread);
   }
-
-  /** Stops holding the thread and ends it. No snapshot is kept. */
 
   readonly close = Effect.fn("IdleThreadPool.close")(function* (
     this: IdleThreadPool<Thread, Released>,
@@ -94,7 +72,6 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     yield* this.#options.dispose(thread);
   }, Effect.uninterruptible);
 
-  /** Stops every timer and forgets every thread. The caller ends the threads it gets back. */
   clear(): Thread[] {
     const threads = [...this.#threads.values()];
     for (const thread of threads) this.#disarm(thread);
@@ -102,11 +79,6 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     this.#released.clear();
     return threads;
   }
-
-  /**
-   * Runs `open` with the thread marked as starting a turn. Opening the thread again yields, and
-   * another thread going idle in that gap must not close this one.
-   */
 
   readonly startTurn = Effect.fn("IdleThreadPool.startTurn")(function* <T>(
     this: IdleThreadPool<Thread, Released>,
@@ -125,12 +97,15 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     );
   }, Effect.uninterruptible);
 
-  /** Stops the idle timer of a thread whose turn has begun. */
   holdForTurn(thread: Thread): void {
     this.#disarm(thread);
   }
 
-  /** Marks a thread with no turn as idle, and closes the longest idle threads over the limit. */
+  awaitOwnTurn(thread: Thread): void {
+    thread.idleSince = 0;
+    this.#arm(thread);
+  }
+
   readonly markIdle = Effect.fn("IdleThreadPool.markIdle")(function* (
     this: IdleThreadPool<Thread, Released>,
     thread: Thread,
@@ -139,8 +114,6 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     this.#arm(thread);
     yield* this.#releaseIdleOver(this.#options.idleLimit);
   });
-
-  /** Opens a released thread again. One reopen per thread, however many callers ask for it. */
 
   readonly wake = Effect.fn("IdleThreadPool.wake")(function* (
     this: IdleThreadPool<Thread, Released>,
@@ -156,7 +129,6 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     yield* this.opening(threadId, () => this.#options.reopen(threadId, released));
   }, Effect.uninterruptible);
 
-  /** Waits for an open of the thread that is in flight, whether it succeeds or not. */
   readonly opened = Effect.fn("IdleThreadPool.opened")(function* (
     this: IdleThreadPool<Thread, Released>,
     threadId: string,
@@ -165,7 +137,6 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     if (opening) yield* Deferred.await(opening).pipe(Effect.ignore);
   });
 
-  /** Joins one in-flight open without creating another provider session. */
   readonly opening = Effect.fn("IdleThreadPool.opening")(function* (
     this: IdleThreadPool<Thread, Released>,
     threadId: string,
@@ -201,19 +172,10 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     return this.#threads.get(thread.id) === thread && !thread.activeTurn && !this.#startingTurns.has(thread.id);
   }
 
-  /**
-   * Closes each idle thread that can open again, before its timeout, to free its processes when the
-   * machine is low on memory. Its next turn opens it again from its session.
-   */
   releaseIdle(): Effect.Effect<void, ProviderClientOperationError> {
     return this.#releaseIdleOver(0);
   }
 
-  /**
-   * Closes each thread with no turn that `stale` names, also one that `canRelease` keeps from the
-   * timer. The caller owns that choice. Its next turn opens it again from its session. Returns the
-   * closed threads.
-   */
   readonly releaseWhere = Effect.fn("IdleThreadPool.releaseWhere")(function* (
     this: IdleThreadPool<Thread, Released>,
     stale: (thread: Thread) => boolean,
@@ -223,7 +185,6 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     return closed;
   });
 
-  /** Closes the thread now, also during a turn, and keeps its snapshot so that its next turn opens it again. */
   readonly releaseNow = Effect.fn("IdleThreadPool.releaseNow")(function* (
     this: IdleThreadPool<Thread, Released>,
     thread: Thread,
@@ -231,7 +192,6 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     if (this.#threads.get(thread.id) === thread) yield* this.#release(thread);
   });
 
-  /** An armed release timer marks a thread that is idle and can be opened again. */
   readonly #releaseIdleOver = Effect.fn("IdleThreadPool.releaseIdleOver")(function* (
     this: IdleThreadPool<Thread, Released>,
     limit: number,

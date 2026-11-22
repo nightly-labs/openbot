@@ -76,7 +76,6 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
         },
       ]
     : [];
-  // As on the desktop, a new folder from this menu takes the chat.
   const createFolder = () => {
     if (!disabled) router.push({ pathname: "/section-form", params: { serverId, agentId: chatId } });
   };

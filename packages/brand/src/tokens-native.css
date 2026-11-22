@@ -1,23 +1,3 @@
-/*
- * The mobile theme layer. Only apps/mobile imports this file. The desktop app and
- * the web client have their own light layer, tokens-light.css, which a root
- * attribute turns on; the public site is always dark.
- *
- * It cannot be folded into tokens.css. `@variant light` is not a Tailwind v4
- * variant at all; uniwind registers it as a custom variant, so desktop and web
- * would fail to compile the block. And `@variant dark` in stock Tailwind means
- * `prefers-color-scheme: dark`, which would turn the public site light for anyone
- * running a light system.
- *
- * The dark block repeats the base values from tokens.css instead of inheriting
- * them, which looks like something to tidy up. It is not. uniwind hard-codes its
- * theme list to ['light', 'dark'] and discovers a theme's variables only by
- * reading `@variant` at-rules, so a name present in one block and absent from the
- * other is a theme that cannot resolve it. uniwind notices, but only writes a red
- * line to the console - it does not fail the build. Keep every value here equal to
- * the base, so that mobile dark does not drift away from desktop.
- */
-
 :root {
   @variant light {
     --openbot-bg-canvas: #f5f5f7;
@@ -59,10 +39,6 @@
     --openbot-shadow-card: 0 1px 2px rgba(20, 20, 20, 0.05);
     --openbot-shadow-overlay: 0 12px 32px rgba(20, 20, 20, 0.12);
 
-    /* Not a colour, and identical in both themes. uniwind only ever learns a
-     * variable from a @variant block, so a token @theme inline reaches through
-     * var() has to be declared here or the utility resolves to nothing on native.
-     * These two back tracking-openbot-tight and tracking-openbot-wide. */
     --openbot-tracking-tight: -0.1px;
     --openbot-tracking-wide: 0.02em;
     --openbot-bg-sheet: #fcfcfc;
@@ -72,8 +48,6 @@
     --openbot-radius-grouped: 16px;
     --openbot-bg-chrome-glass: rgba(250, 250, 252, 0.94);
     --openbot-border-chrome-glass: rgba(20, 20, 20, 0.1);
-    --openbot-bg-chrome-blur: rgba(255, 255, 255, 0.55);
-    /* File references: the same hues as dark, darker so the name reads on a light surface. */
     --openbot-file-blue: #1f6fd1;
     --openbot-file-blue-soft: rgba(31, 111, 209, 0.12);
     --openbot-file-yellow: #865700;
@@ -90,7 +64,6 @@
     --openbot-file-pink-soft: rgba(163, 71, 143, 0.12);
     --openbot-file-default: #5b52df;
     --openbot-file-default-soft: rgba(91, 82, 223, 0.12);
-    /* Markdown tables: the desktop values, so a table looks the same on the phone. */
     --openbot-data-table-header-text: #6b6b70;
     --openbot-data-table-text: #1c1c1e;
   }
@@ -144,7 +117,6 @@
     --openbot-radius-grouped: 16px;
     --openbot-bg-chrome-glass: rgba(38, 38, 40, 0.96);
     --openbot-border-chrome-glass: rgba(255, 255, 255, 0.08);
-    --openbot-bg-chrome-blur: rgba(26, 26, 28, 0.62);
     --openbot-file-blue: #74b9ff;
     --openbot-file-blue-soft: rgba(116, 185, 255, 0.14);
     --openbot-file-yellow: #ff9412;

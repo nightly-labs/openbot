@@ -1,10 +1,5 @@
 const SENTENCE_END = /[.!?…。！？]$/u;
 
-/**
- * The words of a Markdown reply that a listener needs. Code blocks, tables, images and addresses are
- * not read; a link reads as its text, and a mention as its name. Each line ends as a sentence, so a
- * list item does not run into the next one. Desktop and mobile read replies aloud with it.
- */
 export function speechTextFromMarkdown(markdown: string): string {
   const lines = markdown
     .replace(/```[\s\S]*?(```|$)/gu, "\n")
@@ -16,7 +11,6 @@ export function speechTextFromMarkdown(markdown: string): string {
     .split("\n");
   const sentences: string[] = [];
   for (const raw of lines) {
-    // A table row and its divider are not read.
     if (/^\s*\|/u.test(raw)) continue;
     const line = raw
       .replace(/^\s{0,3}(#{1,6}|>+|[-*+]|\d+[.)])\s+/u, "")

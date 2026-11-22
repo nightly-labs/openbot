@@ -9,18 +9,16 @@ import {
 import { passwordManagerConnectorStatus } from "@/features/servers/model/password-managers";
 import { useServerConnectors } from "@/features/servers/model/use-server-connectors";
 
-/** The status of one connector. A connector that the server cannot run has no row. */
 export interface ConnectorRow {
   id: MobileConnectorId;
   status: ConnectorStatus;
 }
 
-/**
- * The connectors of a joined server with the status of each, for an owner or admin: the Apps of the
- * Marketplace show them. A host without `bitwarden-connector-v1` connects Bitwarden only on its own
- * computer, so its row is `unavailable`.
- */
 export function useConnectorRows(serverId: string): ConnectorRow[] {
+  return useConnectorRowState(serverId).rows;
+}
+
+export function useConnectorRowState(serverId: string): { rows: ConnectorRow[]; loading: MobileConnectorId[] } {
   const {
     agents,
     connectors,
@@ -44,10 +42,13 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
   const { data: bitwardenData, isError: bitwardenError } = bitwarden;
   const { data: passwordManagersData, isError: passwordManagersError } = passwordManagers;
 
-  // The query data keeps its reference while it does not change, so the Marketplace listings stay cached.
   return useMemo(() => {
-    const failed = (id: MobileConnectorId, isError: boolean): ConnectorRow[] =>
-      isError ? [{ id, status: "unknown" }] : [];
+    const loading: MobileConnectorId[] = [];
+    const failed = (id: MobileConnectorId, isError: boolean): ConnectorRow[] => {
+      if (isError) return [{ id, status: "unknown" }];
+      loading.push(id);
+      return [];
+    };
     const row = (id: MobileConnectorId): ConnectorRow[] => {
       if (id === "bitwarden") {
         if (!bitwardenAvailable) return [{ id, status: "unavailable" }];
@@ -56,7 +57,6 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
         return [{ id, status: status.connecting ? "connecting" : status.connected ? "connected" : "idle" }];
       }
       if (id === "protonpass") {
-        // A host lists only the managers that it can connect, so a manager that it does not list has no row.
         if (!passwordManagersAvailable) return [];
         if (!passwordManagersData) return failed(id, passwordManagersError);
         const status = passwordManagersData.find((candidate) => candidate.manager === id);
@@ -72,7 +72,6 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
         if (!connectors) return [];
         const status = githubData;
         if (!status) return failed(id, githubError);
-        // A host with no GitHub App cannot connect GitHub. The desktop hides it too.
         if (!status.available) return [];
         const state: ConnectorStatus =
           status.state === "connected"
@@ -103,7 +102,7 @@ export function useConnectorRows(serverId: string): ConnectorRow[] {
       if (!connections) return failed(id, isError);
       return [{ id, status: messagingStatus(id, connections, agents) }];
     };
-    return MOBILE_CONNECTOR_IDS.flatMap(row);
+    return { rows: MOBILE_CONNECTOR_IDS.flatMap(row), loading };
   }, [
     agents,
     connectors,

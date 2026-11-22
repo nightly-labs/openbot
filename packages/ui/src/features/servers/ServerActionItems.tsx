@@ -4,7 +4,6 @@ import { Bell, BellOff, ChevronRight, type ContextMenu, EyeOff, LogOut, RotateCc
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 
-// The same choices as Discord's server menu. No duration mutes until the user unmutes.
 export const SERVER_MUTE_CHOICES: readonly { label: AppTextKey; durationMs?: number }[] = [
   { label: "server.mute.for15Minutes", durationMs: 15 * 60_000 },
   { label: "server.mute.for1Hour", durationMs: 60 * 60_000 },
@@ -20,7 +19,6 @@ export const SERVER_NOTIFICATION_LEVEL_LABELS = {
   nothing: "server.notificationLevel.nothing",
 } as const satisfies Record<ServerNotificationLevel, AppTextKey>;
 
-/** "Muted until 14:30", with the weekday when the mute ends on another day. */
 export function serverMuteDescription(
   server: Pick<ServerSummary, "notificationsMutedUntil">,
   t: AppTranslate,
@@ -38,10 +36,6 @@ export function serverMuteDescription(
   return t("server.mute.mutedUntil", { time });
 }
 
-/**
- * The menu parts the actions use. The context menu and the dropdown menu are the same Kobalte menu,
- * so the rail's context menu and the server menu on the sidebar title render one set of items.
- */
 export type ServerActionMenu = Pick<
   typeof ContextMenu,
   "Item" | "Sub" | "SubTrigger" | "SubContent" | "Portal" | "RadioGroup" | "RadioItem" | "Separator"
@@ -49,39 +43,30 @@ export type ServerActionMenu = Pick<
 
 export interface ServerActionCallbacks {
   onSetMuted?: ((serverId: string, muted: boolean, durationMs?: number) => void) | undefined;
-  /** Opens the notification settings, where the user changes the level of the server and its agents. */
   onOpenNotificationSettings?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   onOpenSettings?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
-  /** Asks to leave a joined server. The menu shows it for a remote server that the user does not own. */
   onLeave?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
-  /** Asks to delete a hosted server. The menu shows it only when `canDelete` accepts the server. */
   onDelete?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   onRemove?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   canRemove?: ((serverId: string) => boolean) | undefined;
   canDelete?: ((serverId: string) => boolean) | undefined;
-  /**
-   * Asks to restart a hosted server. The menu shows it to the owner and the admins of a server that the
-   * account server marks as hosted, or that `canRestart` accepts.
-   */
   onRestart?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   canRestart?: ((serverId: string) => boolean) | undefined;
-  /** Hides the server on this computer from the list. The menu shows it only when `canHide` accepts the server. */
   onHide?: ((serverId: string) => void) | undefined;
   canHide?: ((serverId: string) => boolean) | undefined;
+  planDeletesAt?: ((serverId: string) => number | null) | undefined;
+  onRenewPlan?: ((serverId: string) => Promise<void>) | undefined;
 }
 
-/** Mute, notification settings, server settings, restart, leave or delete, and hide for one server. */
 export function ServerActionItems(
   props: ServerActionCallbacks & {
     menu: ServerActionMenu;
     server: ServerSummary;
-    /** The element that focus and the settings page return to. */
     trigger: () => HTMLElement | null;
   },
 ) {
   const { t, format } = useText();
   const muteDescription = () => serverMuteDescription(props.server, t, format);
-  // The owner cannot leave. The local server is this computer, so it has neither action.
   const canLeave = () => Boolean(props.onLeave) && props.server.kind === "remote" && props.server.role !== "owner";
   const canDelete = () =>
     Boolean(props.onDelete) && props.server.kind === "remote" && Boolean(props.canDelete?.(props.server.id));
@@ -90,17 +75,15 @@ export function ServerActionItems(
     props.server.kind === "remote" &&
     props.server.role === "owner" &&
     Boolean(props.canRemove?.(props.server.id));
-  // A restart while the machine starts would stop it and begin the start again. A running machine whose
-  // OpenBot does not answer can restart.
   const canRestart = () =>
     Boolean(props.onRestart) &&
     props.server.kind === "remote" &&
     canAdministerServer(props.server.role) &&
+    props.server.restartAvailable !== false &&
     !(props.server.hostedSleep === "waking" && props.server.hostedStart?.step !== "openbot") &&
     (props.server.hosted === true || Boolean(props.canRestart?.(props.server.id)));
   const canHide = () =>
     Boolean(props.onHide) && props.server.kind === "local" && Boolean(props.canHide?.(props.server.id));
-  // A component, so the JSX below can use it as a tag. The menu does not change after render.
   const Menu = props.menu;
   return (
     <>
@@ -206,7 +189,6 @@ export function ServerActionItems(
   );
 }
 
-/** Two stacked server units. */
 function ServerSettingsGlyph() {
   return (
     <svg

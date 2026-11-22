@@ -17,12 +17,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
 
-/**
- * The phone of the calling member gives or removes its push token and the events it wants. The host
- * sends notifications only for what this member can see. Frozen by `push-notifications-v1` for an
- * iPhone and by `push-notifications-android-v1` for an Android phone. A phone of either platform says
- * through `push-notification-threads-v1` whether it takes the notifications of side thread turns.
- */
 export async function routePushNotifications(
   context: TeamApiRequestContext,
   notifications: PushNotificationService | undefined,
@@ -32,8 +26,6 @@ export async function routePushNotifications(
     if (!notifications || !capabilities.has(PUSH_NOTIFICATION_THREADS_CAPABILITY)) {
       throw new HttpError(400, sourceText("error.team.pushNotificationsUnsupported"));
     }
-    // `readJson` has already run the body through the push-notification-threads wire codec, which
-    // takes only a body with a boolean `replies`.
     const choice = await readJson(request);
     notifications.setThreadReplies(sessionId, choice.replies === true);
     return json(200, {});
@@ -43,7 +35,6 @@ export async function routePushNotifications(
   if (!notifications || !capabilities.has(route.capability)) {
     throw new HttpError(400, sourceText("error.team.pushNotificationsUnsupported"));
   }
-  // `readJson` has already run the body through the push-notifications wire codec.
   const body = await readJson(request);
   if (route.remove) {
     notifications.remove(sessionId);

@@ -1,16 +1,3 @@
-// Checks that a member's phone stays quiet while the computer of the member's desktop app has input,
-// also in another app, and notifies again when the computer has had no input for the away time.
-// Before computer-activity-v1, only a send, an answer or typing in the desktop app kept the phone
-// quiet, so a member who worked in another app on the same computer got each event on the phone too.
-//
-// A real `TeamApiServer` on loopback serves `computer-activity-v1` with a real phone notification
-// service, wired as `HostService` wires it, with an away time of 2 seconds as `OPENBOT_DEV_AWAY_SECONDS`
-// sets it. A real `ComputerActivityReport` reads a synthetic idle time and sends over HTTP through the
-// frozen wire codec. The host clock and the idle time are synthetic, so no step waits for time. Two
-// phones are registered: the owner's, and one of another member as the witness that an event was
-// handled. Phone sends are recorded; nothing leaves the computer.
-// Run it with `bun scripts/computer-activity-e2e.ts`.
-// Writes .openbot-build/computer-activity-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -56,7 +43,6 @@ const WITNESS = "witness-member";
 const WITNESS_PHONE = "witness-phone-session";
 const logger = createOpenBotLogger("computer-activity-e2e");
 
-// The main process imports Electron. No check here opens a window.
 plugin({
   name: "computer-activity-electron-boundary",
   setup(build) {
@@ -116,12 +102,10 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   steps: [],
 };
 
-/** Runs one check. `summarize` keeps live objects out of the report. */
 async function step<T>(name: string, run: () => Promise<T>, summarize: (value: T) => unknown = (value) => value) {
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -143,6 +127,7 @@ const userData = join(root, "user-data");
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -169,8 +154,11 @@ const teamBrowser: TeamApiBrowser = {
   reload: unused,
   stop: unused,
   takeUserControl: unused,
+  startTeach: unused,
+  stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
+  releaseUserControlRefused: () => {},
   close: unused,
   capturePreview: unused,
   setVisible: unused,
@@ -192,14 +180,11 @@ let agents: AgentService | undefined;
 let server: InstanceType<typeof TeamApiServer> | undefined;
 let phones: InstanceType<typeof PushNotificationService> | undefined;
 
-/** The clock of the host's phone service, and the clock and idle time of the desktop. */
 let hostNow = Date.now();
 let desktopNow = hostNow;
 let idleSeconds = 0;
-/** Phone sends, by session, in order. */
 const sent: string[] = [];
 const sentWaiters = new Set<() => void>();
-/** The activity requests of the desktop that have not answered yet. */
 const pending = new Set<Promise<void>>();
 const answers: boolean[] = [];
 
@@ -217,7 +202,6 @@ function nextSendTo(sessionId: string): Promise<number> {
   });
 }
 
-/** One HTTP request of a protocol 9 peer that advertises the current capabilities. */
 async function wire(
   port: number,
   input: { method: string; path: string; body?: unknown; token?: string },
@@ -261,7 +245,6 @@ function registerPhone(sessionId: string, memberId: string): void {
   );
 }
 
-/** A turn that failed: an event that notifies at each level, with no answer to read. */
 function failedTurn(agentId: string, threadId: string, turnId: string): AgentEvent {
   return { type: "turn-completed", agentId, threadId, turnId, status: "failed" };
 }
@@ -269,7 +252,6 @@ function failedTurn(agentId: string, threadId: string, turnId: string): AgentEve
 try {
   const setup = await step("Start the host with phone notifications, and sign in the desktop", async () => {
     await runCauseEffect(sidebar.initialize());
-    // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
     await runCauseEffect(agentStore.initialize());
     await runCauseEffect(mailbox.initialize());
     await runCauseEffect(team.initialize());
@@ -286,7 +268,6 @@ try {
     const ownerId = team.getOwnerMemberId();
     assert.ok(ownerId, "The host has no owner.");
     const service = agents;
-    // As `HostService` wires it, with the away time of `OPENBOT_DEV_AWAY_SECONDS=2`.
     phones = new PushNotificationService({
       agents: service,
       store: { list: () => [], replace: () => Effect.void },
@@ -322,7 +303,6 @@ try {
     const login = await wire(port, { method: "POST", path: "/v1/auth/login", body: OWNER });
     assert.equal(login.status, 200, `Login failed: ${JSON.stringify(login.body)}`);
     assert.ok(isDynamicRecord(login.body) && typeof login.body.sessionToken === "string");
-    // A new agent has no thread yet; a failed turn notifies the same in any thread.
     return { port, token: login.body.sessionToken, agentId: agent.id, threadId: agent.threadId ?? "activity-thread" };
   });
   const { port, token, agentId, threadId } = setup;
@@ -330,9 +310,6 @@ try {
   assert.ok(agents && phones && server);
   const service = agents;
 
-  // Sends the owner's phone and the witness phone the next event, and tells which got it. The
-  // phone service handles the phones of one event in one pass, so a send to the witness after the
-  // owner's phone means that the owner's phone got no send for that event.
   async function phonesFor(turnId: string): Promise<{ owner: boolean }> {
     const from = sent.length;
     const witness = nextSendTo(WITNESS_PHONE);
@@ -341,7 +318,6 @@ try {
     return { owner: sent.slice(from, index).includes(OWNER_PHONE) };
   }
 
-  // A server stops being a target, as when the window loses focus with desktop notifications off.
   let targets = ["fixture-server"];
   const activity = new ComputerActivityReport({
     awayAfterMs: AWAY_AFTER_MS,
@@ -352,7 +328,6 @@ try {
         const body = { idleSeconds: idle };
         const codec = COMPUTER_ACTIVITY_CODECS.get(COMPUTER_ACTIVITY_ROUTES.report);
         assert.ok(codec, "The route has no codec.");
-        // The client encodes through the frozen codec, as the remote transport does.
         codec.request(body);
         const response = await wire(port, { method: "POST", path: COMPUTER_ACTIVITY_ROUTES.report, body, token });
         assert.equal(response.status, 200, `Activity failed: ${JSON.stringify(response.body)}`);
@@ -367,7 +342,6 @@ try {
     },
     now: () => desktopNow,
   });
-  /** Reads the idle time once, as the timer does, and waits for the sends that it started. */
   async function checkActivity(): Promise<number> {
     const before = answers.length;
     activity.check();

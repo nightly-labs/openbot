@@ -1,6 +1,3 @@
-// The payloads of the workflow endpoints. Only a malformed payload fails here, so the text stays
-// English; a graph that is too large is the one exception that a person can cause.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type CreateWorkflowInput,
@@ -14,6 +11,7 @@ import {
   isStartWorkflowRunInput,
   isWorkflowGitHubLastEventInput,
   isWorkflowGitHubRepositoryInput,
+  isWorkflowMediaPriceRequest,
   isWorkflowRunsInput,
   isWorkflowTriggerInput,
   isWorkflowVersionInput,
@@ -26,6 +24,7 @@ import {
   type WorkflowGitHubLastEventInput,
   type WorkflowGitHubRepositoryInput,
   type WorkflowGraph,
+  type WorkflowMediaPriceRequest,
   type WorkflowNode,
   type WorkflowNodeSize,
   type WorkflowPoint,
@@ -68,10 +67,6 @@ function knownEdge(edge: WorkflowEdge): WorkflowEdge {
   };
 }
 
-/**
- * The graph with only the keys that the contract names, so the strokes and the run versions that the
- * host keeps as JSON hold no other data. A graph larger than one frame can carry is refused.
- */
 function knownGraph(graph: WorkflowGraph): WorkflowGraph {
   const known: WorkflowGraph = {
     nodes: graph.nodes.map(knownNode),
@@ -91,6 +86,10 @@ function knownGraph(graph: WorkflowGraph): WorkflowGraph {
 
 export function parseWorkflowId(value: unknown): string {
   return requireString(value, "workflowId", INPUT_LIMITS.identifier);
+}
+
+export function parseWorkflowDraftId(value: unknown): string {
+  return requireString(value, "draftId", INPUT_LIMITS.identifier);
 }
 
 export function parseWorkflowStepId(value: unknown): string {
@@ -167,4 +166,17 @@ export function parseWorkflowGitHubRepository(value: unknown): WorkflowGitHubRep
 export function parseWorkflowGitHubLastEvent(value: unknown): WorkflowGitHubLastEventInput {
   if (!isWorkflowGitHubLastEventInput(value)) throw new Error("Invalid GitHub trigger run.");
   return { workflowId: value.workflowId, nodeId: value.nodeId, requestId: value.requestId };
+}
+
+export function parseWorkflowMediaPrice(value: unknown): WorkflowMediaPriceRequest {
+  if (!isWorkflowMediaPriceRequest(value)) throw new Error("Invalid media price request.");
+  return {
+    model: value.model,
+    kind: value.kind,
+    aspect: value.aspect,
+    duration: value.duration,
+    resolution: value.resolution,
+    transparent: value.transparent,
+    ...(value.options ? { options: value.options.map(({ name, value }) => ({ name, value })) } : {}),
+  };
 }

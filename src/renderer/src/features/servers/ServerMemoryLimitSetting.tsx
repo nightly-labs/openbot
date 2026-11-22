@@ -14,18 +14,14 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 
-/** The memory limit calls of one server's host. The desktop reaches them through main. */
 export type HostMemoryLimitCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getAgentMemoryLimit" | "setAgentMemoryLimit">;
 
 export interface ServerMemoryLimitOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostMemoryLimitCalls;
 }
 
-/**
- * Server Settings > General: how many memories each agent of this computer or a joined server can
- * keep (`agent-memory-limit-v1`). The values come from the host. The host checks the role again.
- */
+const lastSettings = new Map<string, HostAgentMemoryLimit>();
+
 export function ServerMemoryLimitSetting(
   props: ServerMemoryLimitOptions & {
     serverId: string;
@@ -38,23 +34,28 @@ export function ServerMemoryLimitSetting(
   const calls = (): HostMemoryLimitCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostAgentMemoryLimit | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  /** Bumped for each server, so an answer for an earlier one is dropped. */
   let generation = 0;
 
   createEffect(
     () => props.serverId,
     (serverId) => {
       const current = ++generation;
-      setSettings(null);
+      setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       untrack(calls)
         .getAgentMemoryLimit(serverId)
         .then(
           (next) => {
-            if (current === generation) setSettings(next);
+            if (current !== generation) return;
+            lastSettings.set(serverId, next);
+            setSettings(next);
           },
           (error: unknown) => {
-            if (current === generation) setLoadError(errorMessage(error, t("server.settings.memoryLimitLoadFailed")));
+            if (current === generation) {
+              lastSettings.delete(serverId);
+              setSettings(null);
+              setLoadError(errorMessage(error, t("server.settings.memoryLimitLoadFailed")));
+            }
           },
         );
     },
@@ -64,9 +65,10 @@ export function ServerMemoryLimitSetting(
     const current = settings();
     if (limit === null || !current || limit === current.limit) return;
     const serverId = props.serverId;
-    const request = generation;
+    const request = ++generation;
     void props.run("memoryLimit", async () => {
       const next = await calls().setAgentMemoryLimit(limit, serverId);
+      lastSettings.set(serverId, next);
       if (request === generation) setSettings(next);
     });
   }
@@ -81,7 +83,7 @@ export function ServerMemoryLimitSetting(
         {(current) => (
           <ItemActions>
             <Select<number>
-              // A host that no longer permits its stored value still shows it.
+              class="settings-modal-select"
               options={
                 current().choices.includes(current().limit)
                   ? current().choices

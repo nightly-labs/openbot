@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "このホストは OpenBot のオーナーアカウントにリンクされていません。",
   "error.team.ownerEmailRequired": "このホストを作成した OpenBot のメールアドレスでサインインしてください。",
   "error.team.hostNotConfigured": "チームのホストが設定されていません。",
@@ -53,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "サインインの試行回数が多すぎます。しばらくしてから再試行してください。",
   "error.team.clientUpdateRequired": "このホストに接続する前に、この OpenBot クライアントを更新してください。",
   "error.team.hostUpdateRequired": "接続する前に、ホストの OpenBot を更新してください。",
+  "error.team.serverSafeMode": "このサーバーでは OpenBot が起動しないため、セーフモードになっています。",
+  "error.team.serverSafeModeNewerDatabase":
+    "このサーバーの OpenBot {version} はデータを開けません。より新しいバージョンの OpenBot がデータを保存したためです。サーバーに新しい OpenBot リリースを入れると解決します。",
+  "error.team.serverSafeModeStartFailed":
+    "このサーバーの OpenBot {version} は、起動に何度も失敗したため停止しました。サーバーに新しい OpenBot リリースを入れると解決します。",
   "error.team.sidebarLayoutUnavailable": "サイドバーのレイアウトを利用できません。",
   "error.team.providersUnsupported": "この接続ではプロバイダーの設定を利用できません。",
   "error.team.providerNotManaged": "OpenBot はこのプロバイダーの CLI を管理していません。",
@@ -72,13 +76,21 @@ export const messages = {
   "error.team.agentColorsUnsupported": "この接続ではエージェントの色を使用できません。",
   "error.team.chatColorsUnsupported": "この接続ではチャットの色を使用できません。",
   "error.team.routineRunPlaceUnsupported": "この接続ではルーティンの実行場所を変更できません。",
+  "error.team.routinePauseReasonsUnsupported": "この接続ではルーティンが一時停止された理由を表示できません。",
+  "error.team.activeQueuesUnsupported": "この接続では、すべてのエージェントのキューを表示できません。",
   "error.team.routinesOnceUnsupported": "この接続では 1 回のみ実行するルーティンを保存できません。",
   "error.team.routineRunCommandUnsupported": "この接続ではルーティンの実行コマンドを取得できません。",
   "error.team.threadQueueUnsupported": "この接続ではサイドスレッドのキューを表示できません。",
+  "error.team.threadRequestsUnsupported": "この接続ではサイドスレッドから他のエージェントへの依頼を表示できません。",
+  "error.team.hostTurnLimitsUnsupported": "この接続ではサーバーのスレッド上限を表示または変更できません。",
   "error.team.usageLimitUnsupported": "この接続ではエージェントの使用量の上限を表示または変更できません。",
   "error.team.hermesImportUnsupported": "この接続ではサーバーから Hermes のプロファイルを取り込めません。",
   "error.team.providerDetectionUnsupported": "この接続ではサーバーのモデルサーバーとエージェントを検出できません。",
+  "error.team.providerModelSourceUnsupported": "この接続ではプロバイダーのモデルの取得元を表示できません。",
+  "error.team.routineFlowStopUnsupported": "この接続ではルーティンの実行を停止できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
+  "error.team.libraryFoldersUnsupported": "この接続ではライブラリのフォルダーを使用できません。",
+  "error.team.workflowFoldersUnsupported": "この接続はワークフローのフォルダーに対応していません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
   "error.team.sidebarPinsUnsupported":
@@ -111,11 +123,14 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
+  "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
+  "error.team.ownerTransferUnsupported": "このサーバーは所有権の移転に対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
   "error.team.localServersUnsupported": "この接続はこのコンピュータ上のサーバーに対応していません。",
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",
   "error.team.agentMemoryLimitUnsupported": "この接続はエージェントのメモリー上限に対応していません。",
   "error.team.agentFoldersUnsupported": "この接続はエージェントのフォルダーに対応していません。",
+  "error.team.channelFoldersUnsupported": "この接続はチャンネルのフォルダーに対応していません。",
   "error.team.folderUnavailable": "このフォルダーはホストのコンピューターで使用できません。",
   "error.team.memoryReviewUnsupported": "この接続はメモリーの見直しに対応していません。",
   "error.team.skillLearningUnsupported": "この接続はスキル学習に対応していません。",
@@ -123,6 +138,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
   "error.team.claudeUserSetupUnsupported": "この接続は Claude Code 設定のスイッチに対応していません。",
   "error.team.claudeCompactWindowUnsupported": "この接続は Claude の圧縮サイズに対応していません。",
+  "error.team.providerEnvironmentUnsupported": "この接続はプロバイダーの変数に対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",
   "error.team.attachmentNameRequired": "安全な添付ファイル名が必要です。",
@@ -134,6 +150,8 @@ export const messages = {
   "error.team.mcpUnsupported": "この接続では MCP サーバーを利用できません。",
   "error.team.mcpServerListNeedsUpdate":
     "このサーバーで {limit} 個を超える MCP サーバーを使うには、このデバイスの OpenBot を更新してください。",
+  "error.team.providerAccountListNeedsUpdate":
+    "このサーバーで 1 つのプロバイダーのアカウントを {limit} 個より多く使うには、このデバイスの OpenBot を更新してください。",
   "error.team.storageUnsupported": "この接続ではストレージを利用できません。",
   "error.team.machineResourcesUnsupported": "この接続ではマシンの使用状況を利用できません。",
   "error.team.machineAlertMemberInvalid":
@@ -159,6 +177,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "このクライアントは安全な認証に対応していません。",
   "error.team.agentSettingsUnsupported": "この接続ではエージェントの設定を利用できません。",
   "error.team.adminRequired": "管理者のアクセス権が必要です。",
+  "error.team.mcpAccessStale": "他の人がこの MCP サーバーへのアクセスを変更しました。もう一度変更してください。",
   "error.team.mcpServerNotYours": "この MCP サーバーを変更できるのは、追加した人か管理者だけです。",
   "error.team.ownerRequired": "この操作ができるのはこのサーバーのオーナーだけです。",
   "error.team.requestTooLarge": "リクエストの本文が大きすぎます。",
@@ -175,6 +194,10 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "このサーバーのエージェントはこのサインインリンクを表示していません。",
   "error.team.hostPersonalityUnsupported": "この接続はサーバーのパーソナリティに対応していません。",
   "error.team.agentWaitsUnsupported": "この接続では未完了の待機を使用できません。",
+  "error.team.pendingApprovalUnsupported": "この接続では承認リクエスト全体を読み込めません。",
+  "error.team.pendingPromptsUnsupported": "この接続では未回答の質問を読み込めません。",
+  "error.team.phoneFeedbackUnsupported": "この接続ではスマートフォンアプリからレポートを送信できません。",
+  "error.team.messagePinsUnsupported": "この接続はピン留めしたメッセージに対応していません。",
   "error.team.queuedMessageThreadUnsupported":
     "この接続では、キュー内のメッセージを新しいスレッドとして実行できません。",
   "error.team.backgroundProcessesUnsupported": "この接続ではバックグラウンドプロセスを使用できません。",

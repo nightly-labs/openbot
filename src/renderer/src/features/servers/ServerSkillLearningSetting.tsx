@@ -14,19 +14,14 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 
-/** The skill learning calls of one server's host. The desktop reaches them through main. */
 export type HostSkillLearningCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getSkillLearning" | "setSkillLearning">;
 
 export interface ServerSkillLearningOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostSkillLearningCalls;
 }
 
-/**
- * Server Settings > General: whether the memory review of the agents of this computer or a joined
- * server saves the skills it learns, asks first, or does not look for skills (`skill-learning-v1`).
- * The values come from the host. The host checks the role again.
- */
+const lastSettings = new Map<string, HostSkillLearning>();
+
 export function ServerSkillLearningSetting(
   props: ServerSkillLearningOptions & {
     serverId: string;
@@ -39,29 +34,33 @@ export function ServerSkillLearningSetting(
   const calls = (): HostSkillLearningCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostSkillLearning | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  /** Bumped for each server, so an answer for an earlier one is dropped. */
   let generation = 0;
 
   createEffect(
     () => props.serverId,
     (serverId) => {
       const current = ++generation;
-      setSettings(null);
+      setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       untrack(calls)
         .getSkillLearning(serverId)
         .then(
           (next) => {
-            if (current === generation) setSettings(next);
+            if (current !== generation) return;
+            lastSettings.set(serverId, next);
+            setSettings(next);
           },
           (error: unknown) => {
-            if (current === generation) setLoadError(errorMessage(error, t("server.settings.skillLearningLoadFailed")));
+            if (current === generation) {
+              lastSettings.delete(serverId);
+              setSettings(null);
+              setLoadError(errorMessage(error, t("server.settings.skillLearningLoadFailed")));
+            }
           },
         );
     },
   );
 
-  /** A newer host can send a mode that this client does not know; it shows the raw value. */
   function label(mode: string | null): string {
     if (mode === null) return "";
     if (!isSkillLearningMode(mode)) return mode;
@@ -74,9 +73,10 @@ export function ServerSkillLearningSetting(
     const current = settings();
     if (mode === null || !current || mode === current.mode) return;
     const serverId = props.serverId;
-    const request = generation;
+    const request = ++generation;
     void props.run("skillLearning", async () => {
       const next = await calls().setSkillLearning(mode, serverId);
+      lastSettings.set(serverId, next);
       if (request === generation) setSettings(next);
     });
   }
@@ -91,7 +91,7 @@ export function ServerSkillLearningSetting(
         {(current) => (
           <ItemActions>
             <Select<string>
-              // A host that no longer permits its stored value still shows it.
+              class="settings-modal-select"
               options={
                 current().choices.includes(current().mode) ? current().choices : [current().mode, ...current().choices]
               }

@@ -9,9 +9,17 @@ export const messages = {
   "error.provider.codexUnresponsive": "توقف Codex عن الاستجابة، لذا أنهى OpenBot عمليته.",
   "error.provider.acpUnresponsive": "لم يستجب {provider} في الوقت المحدد، لذا أنهى OpenBot عمليته.",
   "error.provider.acpSignInLost": "فقد {provider} تسجيل دخوله، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpRefusedUntilRestart": "رفض {provider} رسالة، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpServerLost": "فقد {provider} اتصاله. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpServerLostEnded": "فقد {provider} اتصاله، لذا أنهى OpenBot عمليته.",
+  "error.provider.acpSettingsTimedOut": "لم يستجب {provider} في الوقت المحدد. حاول مرة أخرى بعد قليل.",
   "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":
     "لم يحمّل {provider} أدوات OpenBot، لذا لا يمكن لهذا الوكيل استخدامها أو الوصول إلى زملائه. قد تحظر سياسة فريق {provider} خوادم MCP المحلية. اطلب من مسؤول فريقك السماح بها، ثم أعد المحاولة.",
+  "error.provider.acpToolsNotLoaded":
+    "شغّل {provider} هذه الرسالة بدون أدوات OpenBot، لذا لم يتمكن الوكيل من الوصول إلى زملائه أو استخدام المتصفح أو إرفاق الملفات. أعد المحاولة.",
+  "error.provider.acpOwnMcpServerFailed":
+    "تعذّر على {provider} تشغيل خادم MCP {name}، لذا توقّف الرد. هذا الخادم موجود في إعدادات {provider} الخاصة بك، وليس في OpenBot. أزِل الخادم من هناك أو أصلحه، ثم ابدأ محادثة جديدة.",
   "error.provider.endpointsReadOnly":
     "كُتبت نقاط النهاية المحفوظة بإصدار أحدث من OpenBot، أو تتعذّر قراءة الملف. حدّث OpenBot لتغييرها.",
   "error.provider.endpointNoSecureStorage":
@@ -36,6 +44,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "عدد العناوين أو المجلدات كبير جدًا.",
   "error.provider.credentialFileUnreadable": "تتعذّر قراءة ملف بيانات اعتماد المزوّد.",
   "error.provider.credentialFileTooLarge": "ملف بيانات اعتماد المزوّد كبير جدًا.",
+  "error.provider.environmentNameInvalid": "{name} ليس اسم متغير صالحًا. استخدم الحروف والأرقام و_ ولا تبدأ برقم.",
+  "error.provider.environmentNameReserved": "يضبط OpenBot المتغير {name} لهذا المزوّد. أزل هذا المتغير.",
+  "error.provider.environmentNameDuplicate": "يرد {name} في القائمة أكثر من مرة.",
+  "error.provider.environmentValueTooLong": "قيمة {name} طويلة جدًا.",
+  "error.provider.environmentTooMany": "يمكن أن يكون للمزوّد {limit} متغيرًا كحد أقصى.",
+  "error.provider.environmentSecretsTooLarge": "القيم الحساسة طويلة جدًا مجتمعة. احفظ قيمًا أقصر أو أقل عددًا.",
   "error.provider.archiveSpecialFile": "يحتوي أرشيف بيئة التشغيل على رابط أو ملف خاص.",
   "error.provider.archiveUnsafePath": "يحتوي أرشيف بيئة التشغيل على مسار غير آمن.",
   "error.provider.runtimeSpecialFile": "تحتوي بيئة التشغيل على رابط أو ملف خاص.",
@@ -69,6 +83,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "لم يكتمل تحديث بيئة التشغيل.",
   "error.provider.downloadHttp": "فشل تنزيل بيئة التشغيل برمز HTTP {status}.",
   "error.provider.downloadNoData": "لم يُرجع تنزيل بيئة التشغيل أي بيانات.",
+  "error.provider.downloadStalled":
+    "توقف التنزيل لأنه لم تصل أي بيانات لمدة دقيقة. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
   "error.provider.downloadSize": "حجم تنزيل بيئة التشغيل غير متوقع.",
   "error.provider.downloadIntegrity": "فشل تنزيل بيئة التشغيل في فحص السلامة.",
   "error.provider.runtimeReplacing": "تعذّر تثبيت بيئة التشغيل لأن نسخة أخرى تستبدلها.",
@@ -148,10 +164,19 @@ export const messages = {
   "error.provider.cliTimedOut": "لم يستجب {provider} في الوقت المحدد. قد يكون الحاسوب مشغولًا. سيعيد OpenBot المحاولة.",
   "error.provider.cliTimedOutRefresh":
     "لم يستجب {provider} في الوقت المحدد. قد يكون الحاسوب مشغولًا. حدّث المزوّدين لإعادة المحاولة.",
+  "error.provider.stoppedBeforeStart": "توقف {provider} قبل أن تبدأ هذه الرسالة. أرسل الرسالة مرة أخرى.",
+  "error.provider.sessionStartTimedOut":
+    "لم يفتح {provider} محادثة جديدة في الوقت المحدد، لذلك لم تبدأ هذه الرسالة. على الكمبيوتر الذي يشغّل OpenBot، افتح المزوّدون، واختر {provider}، وانقر إعادة التشغيل. ثم حاول مرة أخرى.",
+  "error.provider.serviceUnreachable":
+    "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت. سيعيد OpenBot المحاولة.",
+  "error.provider.serviceUnreachableRefresh":
+    "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت، ثم حدّث المزوّدين.",
   "error.provider.acpStartTimedOut": "لم يكتمل تشغيل {provider} خلال {seconds} ث. قد يكون الحاسوب مشغولًا.",
   "error.provider.acpModelsTimedOut": "لم يعرض {provider} نماذجه خلال {seconds} ث. قد يكون الحاسوب مشغولًا.",
   "error.provider.startStopped":
     "فشل تشغيل {provider} عدة مرات متتالية، لذا توقف OpenBot عن المحاولة. حدّث المزوّدين لإعادة المحاولة.",
+  "error.provider.startPaused":
+    "فشل تشغيل {provider} عدة مرات متتالية. سيحاول OpenBot مرة أخرى مع الرسالة أو المهمة الدورية التالية. للمحاولة الآن، حدّث المزوّدين.",
   "error.provider.tempDiskSpace":
     "يحتاج {provider} إلى 1 GB على الأقل من مساحة القرص الفارغة ليعمل. حرّر مساحة، ثم حدّث المزوّدين.",
   "error.provider.noCodeSignIn": "لا يمكن تسجيل الدخول إلى {provider} برمز.",
@@ -162,11 +187,15 @@ export const messages = {
   "error.provider.codeLoginRefused": "لم يقبل المزوّد الرمز. ابدأ تسجيل الدخول مرة أخرى.",
   "error.provider.codeLoginUnsupported":
     "لا يمكن لهذا الخادم تسجيل الدخول برمز ملصوق. سجّل الدخول على حاسوب الخادم، في متصفحه.",
+  "error.provider.claudeLoginNotSaved":
+    "تعذّر على Claude حفظ تسجيل الدخول على جهاز Mac. أعد تشغيل جهاز Mac الذي يشغّل OpenBot، ثم اربط Claude مرة أخرى.",
   "error.provider.cliBusyRetry": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم أعد المحاولة.",
   "error.provider.cliSigningIn": "تُجري واجهة {provider} CLI تسجيل الدخول. أكمل تسجيل الدخول أو ألغه، ثم حدّث.",
   "error.provider.cliBusyUpdate": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم حدّث.",
   "error.provider.cliSelectFailed": "تعذّر على OpenBot اختيار واجهة CLI المُدارة المثبتة.",
   "error.provider.noAuthenticatedAccount": "لم يُرجع {provider} حسابًا مصادقًا عليه.",
+  "error.provider.codexModelProvider":
+    "يستخدم Codex على هذا الكمبيوتر مزوّد نماذج آخر، وهذا المزوّد لا يستخدم تسجيل الدخول إلى ChatGPT أو مفتاح OpenAI API. يمكن لوكلاء ChatGPT استخدام هذا المزوّد الآن. لاستخدام حساب ChatGPT، أعد مزوّد النماذج في Codex إلى OpenAI.",
   "error.provider.signInExpired": "انتهت صلاحية تسجيل دخولك إلى {provider}. سجّل الدخول مرة أخرى للمتابعة.",
   "error.provider.cliActivateFailed": "تعذّر على OpenBot تفعيل واجهة CLI المُدارة.",
   "error.provider.noMainlandChinaSignIn": "لا يوفر {provider} تسجيل دخول للصين القارية.",
@@ -179,14 +208,27 @@ export const messages = {
     "لا يملك OpenCode تسجيل دخول لمزوّد النموذج «{provider}». اختر نموذجًا يحمل التسمية Free، أو اربط المزوّد: الصق مفتاح OpenCode Go في إعدادات OpenCode، أو شغّل `opencode auth login` في نافذة طرفية. ثم أعد المحاولة.",
   "error.provider.opencodeAuthRequiredUnknown":
     "لا يملك OpenCode تسجيل دخول لمزوّد هذا النموذج. اختر نموذجًا يحمل التسمية Free، أو اربط المزوّد: الصق مفتاح OpenCode Go في إعدادات OpenCode، أو شغّل `opencode auth login` في نافذة طرفية. ثم أعد المحاولة.",
+  "error.provider.opencodeProviderRefused":
+    'رفض مزوّد النموذج "{provider}" الطلب. لدى OpenCode مفتاح لهذا المزوّد، لذا قد تكون الشبكة هي السبب: بعض المزوّدين يحظرون شبكات VPN أو الوكلاء أو بعض الدول. أوقف VPN أو استخدم شبكة أخرى، ثم أعد المحاولة. إذا استمر الخطأ، فقد يكون المفتاح غير صحيح: شغّل `opencode auth login` في نافذة طرفية وأدخل المفتاح مرة أخرى.',
+  "error.provider.opencodeFreeModelRefused":
+    "رفض OpenCode هذا النموذج المجاني. بعض النماذج المجانية غير متاحة في كل البلدان. اختر نموذجًا آخر يحمل التسمية Free، أو الصق مفتاح OpenCode Go في إعدادات OpenCode واختر نموذج OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "رفضت نقطة النهاية «{provider}» مفتاح API أو الترويسات. أدخلها مرة أخرى في إعدادات الخادم ← المزوّدون، ثم أعد المحاولة.",
+  "error.provider.customEndpointAccessRefused":
+    "رفضت نقطة النهاية «{provider}» الطلب. قد يكون مفتاح API أو الترويسات غير صحيحة، أو لا يمكن لحسابها استخدام هذا النموذج. تحقّق منها في إعدادات الخادم ← المزوّدون، أو اختر نموذجًا آخر. ثم أعد المحاولة.",
   "error.provider.customEndpointKeyMissing":
     "تحتاج نقطة النهاية «{provider}» إلى مفتاح API. أضف المفتاح في إعدادات الخادم ← المزوّدون، ثم أعد المحاولة.",
+  "error.provider.customEndpointEffortRefused":
+    "رفضت نقطة النهاية «{provider}» جهد التفكير لهذا النموذج. في إعدادات الخادم ← المزوّدون، عدّل «{provider}». في جهد التفكير، أبقِ فقط المستويات التي يقبلها هذا النموذج، أو اختر بدون تفكير. ثم أعد المحاولة.",
   "error.provider.opencodeKeyExpired":
     "انتهت صلاحية مفتاح OpenCode API الخاص بك. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
+  "error.provider.opencodeKeyRefused":
+    "رفض OpenCode Go مفتاح API المحفوظ. ربما انتهت صلاحية المفتاح. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
+  "error.provider.opencodeGoRequestRefused":
+    "رفض OpenCode Go الطلب. لا يحل مفتاح API جديد هذه المشكلة. قد لا تكون خطة OpenCode Go نشطة، أو قد يحظر OpenCode Go شبكتك: بعض الخدمات تحظر شبكات VPN أو الخوادم الوكيلة أو بعض البلدان. تأكد من أن خطتك نشطة في OpenCode Console، أو أوقف VPN، ثم حاول مرة أخرى. يمكنك أيضًا اختيار نموذج آخر.",
   "error.provider.opencodeServiceFailure":
     "تعذّر على OpenCode إكمال هذا الدور لأن خدمته المحلية فشلت. أعد المحاولة. إذا استمر الخطأ، أعد ربط OpenCode في الإعدادات.",
+  "error.provider.opencodeStillStarting": "لم ينتهِ OpenCode من التحميل في الوقت المحدد. سيحاول OpenBot مرة أخرى.",
   "error.provider.opencodeRateLimited":
     "رفض مزوّد النموذج الطلب بسبب حد المعدل. انتظر بضع دقائق أو اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.opencodeBilling":
@@ -194,22 +236,47 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "أبلغ مزوّد نموذج OpenCode عن طلب رفع غير صالح. اختر نموذجًا آخر وتابع. تحقق من المهام الدورية المحفوظة قبل إنشائها مرة أخرى.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "لا يستطيع هذا النموذج قراءة ملف أو صورة في هذه الدردشة. اختر نموذجًا يمكنه قراءة الملفات، ثم أرسل رسالتك مرة أخرى.",
+    "لا يستطيع هذا النموذج قراءة ملف أو صورة في هذه الدردشة. بدأ OpenBot جلسة OpenCode جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى بدون الملف، أو اختر نموذجًا يمكنه قراءة الملفات. إذا أضفت هذا النموذج إلى مزوّد مخصص، فألغِ تحديد «الصور» في «يقبل» في إعداداته.",
+  "error.provider.opencodeOutOfMemory":
+    "نفدت ذاكرة خادم النموذج لهذه المحادثة. ابدأ محادثة جديدة، أو حمّل النموذج بطول سياق أصغر وأدخل النافذة نفسها في إعدادات مزوده في OpenBot.",
+  "error.provider.opencodeContextTooSmall":
+    "هذه المحادثة لا تتسع في نافذة سياق النموذج. في Ollama أو LM Studio، حمّل النموذج بطول سياق أكبر، وأدخل النافذة نفسها في إعدادات مزوده في OpenBot. أو اختر نموذجًا أكبر.",
   "error.provider.opencodeFreeLimit":
     "بلغت نماذج OpenCode المجانية حد الاستخدام. تشترك جميع النماذج المجانية في هذا الحد. للمتابعة، الصق مفتاح OpenCode Go في إعدادات OpenCode، أو اختر نموذجًا من مزوّد آخر.",
   "error.provider.opencodeProviderFailed":
     "فشل مزوّد النموذج من جهته. اتصالك ليس السبب. أعد المحاولة لاحقًا أو اختر نموذجًا آخر.\n{detail}",
+  "error.provider.opencodeModelUnavailable": "هذا النموذج غير متاح لك. اختر نموذجًا آخر لهذا الوكيل.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "انقطع رد النموذج أو لم يكن صالحًا. أرسل رسالتك مرة أخرى أو اختر نموذجًا آخر.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "كان رد النموذج أطول من حد الإخراج ثلاث مرات، فتوقف الدور. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "كان رد النموذج أطول من حد الإخراج ثلاث مرات، فتوقف الدور. في الإعدادات، افتح مزوّد مخصص، وانقر تعديل على نقطة النهاية هذه، واضبط أقصى إخراج أكبر لهذا النموذج. أو اختر جهدًا أقل أو نموذجًا آخر.",
+  "error.provider.opencodeReasoningOverlap":
+    "تعذّر على OpenCode قراءة تفكير هذا النموذج بهذا المستوى من الجهد. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeModelNotServed":
+    "لا يوفّر مزوّد النموذج هذا النموذج لحسابك الآن. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.opencodeNetwork":
     "تعذّر على OpenCode الاتصال بمزوّد النموذج. تحقق من اتصال الشبكة للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.\n{detail}",
   "error.provider.codexStateBusy": "لا يزال ChatGPT يجهّز سجله المحلي بعد تشغيل سابق. انتظر بضع دقائق، ثم أعد المحاولة.",
+  "error.provider.codexThreadInUse":
+    "تطبيق Codex آخر يفتح هذه الدردشة، مثل تطبيق Codex لسطح المكتب أو Codex CLI أو إضافة IDE. يمكن لتطبيق واحد فقط في كل مرة أن يكتب في دردشة Codex. أغلق الدردشة في ذلك التطبيق، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.realtimeLimitZero":
     "أوقف Linux المزوّد لأن حد وقت المعالج في الوقت الحقيقي لدى OpenBot هو 0. يأتي هذا الحد من نظامك. ثبّت rtkit وشغّله (`rtkit-daemon`)، ثم نفّذ `systemctl --user restart xdg-desktop-portal`، ثم أعد تشغيل OpenBot. إعادة تشغيل xdg-desktop-portal وحدها لا تكفي ما دام rtkit غير مثبّت.",
+  "error.provider.cpuUnsupported": "لا يمكن لمعالج هذا الكمبيوتر تشغيل هذا المزوّد. استخدم مزوّدًا آخر.",
   "error.provider.opencodeDatabaseNewer":
     "تعذّر على OpenCode فتح قاعدة بياناته لأن إصدارًا أحدث من OpenCode غيّرها. حدّث OpenCode إلى الإصدار 2 أو أحدث، ثم أعد المحاولة.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "لم يبدأ Grok لأن الإعداد allowed_models في ملف إعداداته لا يتضمن نموذجه الافتراضي. أضف النموذج الافتراضي إلى allowed_models، أو احذف allowed_models، ثم أعد المحاولة.",
   "error.provider.opencodeNoAnswer": "أنهى نموذج OpenCode الدور بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "أنهى نموذج OpenCode الدور بعد الاستدلال، بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
+  "error.provider.noAnswerAfterSteps":
+    "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
+  "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",
+  "error.provider.channelNoAnswer":
+    "أنهى {provider} الدور بدون إجابة. في القناة، انقر على «متابعة» لتشغيل المهمة مرة أخرى، أو على «إعادة الإسناد» لإعطائها لعضو آخر.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",
@@ -225,6 +292,8 @@ export const messages = {
     "خادم Gemini في OPENBOT_ANTIGRAVITY_PATH غير موجود أو غير قابل للتنفيذ. صحّح المسار أو احذف المتغير، ثم أعد تشغيل OpenBot.",
   "error.provider.antigravityVersionUnreadable": "تتعذّر قراءة إصدار خادم Gemini.",
   "error.provider.antigravitySignIn": "سجّل الدخول باستخدام Google لاستخدام Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "لا تتوفر لدى Google سعة متاحة لنموذج Gemini هذا الآن. حصة خطتك ليست السبب. أعد المحاولة بعد بضع دقائق، أو اختر نموذجًا آخر.\n{detail}",
   "error.provider.antigravityRateLimited":
     "رفض Gemini الطلب لبلوغ حد المعدل أو حصة الخطة. انتظر بضع دقائق أو اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -233,7 +302,23 @@ export const messages = {
     "لا يستطيع Gemini استخدام هذا النموذج الآن. اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "لم تقبل Google تسجيل الدخول إلى Gemini لهذا الطلب. أرسل رسالتك مرة أخرى. إذا استمر الخطأ، أعد ربط Gemini في الإعدادات.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "رفض Gemini هذا الطلب. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى. إذا فشل مرة أخرى، فابدأ دردشة جديدة.\n{detail}",
+  "error.provider.antigravityNetwork": "فقد Gemini الاتصال بـ Google. أرسل رسالتك مرة أخرى. ({cause})",
+  "error.provider.antigravitySessionRejected":
+    "رفض Gemini هذا الطلب ولم يذكر السبب. قد يسبب هذا عنصر في سجل الدردشة، مثل صورة فتحها الوكيل. بدأ OpenBot جلسة Gemini جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا آخر.",
+  "error.provider.antigravityHistoryUnreadable":
+    "تعذّر على Gemini قراءة السجل المحفوظ لهذه الدردشة. بدأ OpenBot جلسة Gemini جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpTurnStuck":
+    "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
+  "error.provider.antigravityLocationUnsupported":
+    "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
+  "error.provider.grokServiceFailure": "خدمة Grok مشغولة أو بها خطأ. أعد المحاولة بعد بضع دقائق، أو اختر نموذجًا آخر.",
+  "error.provider.grokConnectionFailed":
+    "لا يستطيع Grok الاتصال بخدمته. تحقق من اتصالك بالإنترنت، ثم أرسل الرسالة مرة أخرى.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "على مضيف Windows، يفتح Gemini صفحة Google على المضيف نفسه. اربط Gemini على الكمبيوتر المضيف.",
   "error.provider.cursorArchivePath": "يحتوي أرشيف Cursor على ملف غير متوقع.",
@@ -243,6 +328,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "عُثر على وكيل Cursor، لكن تتعذّر قراءة إصداره.",
   "error.provider.cursorVersionUnreadable": "تتعذّر قراءة إصدار وكيل Cursor.",
   "error.provider.cursorSignIn": "سجّل الدخول باستخدام Cursor أو عيّن CURSOR_API_KEY لاستخدام Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "تعذّر على Cursor الاتصال بخادمه باستخدام تسجيل دخولك. تحقّق من اتصالك بالإنترنت، ثم سجّل الدخول إلى Cursor مرة أخرى.",
   "error.provider.clineArchivePath": "يحتوي أرشيف Cline على مسار غير متوقع.",
   "error.provider.clinePackageMismatch": "لا تطابق حزمة Cline كتالوج بيئات التشغيل.",
   "error.provider.clineChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cline.",
@@ -268,17 +355,53 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "تتعذّر قراءة إصدار Hermes Agent.",
   "error.provider.hermesSignIn":
     "سجّل الدخول باستخدام Nous Portal، أو شغّل `hermes setup` في نافذة طرفية، لاستخدام Hermes.",
+  "error.provider.hermesTurnFailed":
+    "لم يتمكن Hermes من إنهاء هذا الدور. إذا ذكر ردّه سببًا، فاتبع ما يقوله. وإلا فقد يكون أحد خوادم MCP لهذا الوكيل غير متاح: تحقق منه في المتجر، التطبيقات، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.hermesRefused":
+    "رفض Hermes هذه الرسالة قبل أن تبدأ. أرسلها مرة أخرى. إذا رفض Hermes كل رسالة، فأعد تشغيل OpenBot على الكمبيوتر الذي يشغّل هذا الوكيل.",
+  "error.provider.hermesConnectionLost":
+    "فقد Hermes اتصاله أثناء هذه الرسالة، لذا لا يعرف ما إذا كان العمل قد اكتمل. تحقق مما فعله الوكيل قبل أن ترسل الرسالة مرة أخرى.",
+  "error.provider.copilotThinkingRejected":
+    "تعذّر على GitHub Copilot استخدام هذا النموذج: لم يقبل النموذج إعداد التفكير. اختر نموذجًا آخر لهذا الوكيل، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
+  "error.provider.claudeContextFull":
+    "أصبحت هذه الدردشة طويلة جدًا على Claude. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.claudeApiKeyNoCredit":
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
+  "error.provider.claudeAccountNoCredit":
+    "رصيد حسابك على Claude منخفض جدًا. بعض الطلبات، مثل الوضع السريع، تستخدم أرصدة الاستخدام حتى إذا بقي استخدام في خطة Claude. أضف أرصدة استخدام في حسابك على Claude، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.",
+  "error.provider.claudeServiceBlocked":
+    "حظرت خدمة Claude هذا الطلب. عادةً تكون هذه مشكلة قصيرة من جهة Claude، وليست مشكلة في حسابك. أرسل الرسالة مرة أخرى بعد بضع دقائق.",
   "error.provider.foreignReasoning":
     "لم يقبل {provider} الاستدلال السابق في هذه الدردشة، لأن حسابًا أو مفتاح API مختلفًا استلمه. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.blankHistoryText":
+    "لم يقبل النموذج هذه الدردشة، لأن سجلها المحفوظ يحتوي على رسالة فارغة. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.codexHistoryItemMissing":
+    "لم يتمكن Codex من متابعة هذه الدردشة، لأن عنصرًا في سجله المحفوظ مفقود. بدأ OpenBot جلسة Codex جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.codexRequestRefused":
+    "رفض {provider} طلب هذه الدردشة ولم يذكر السبب. قد يحدث هذا في دردشة طويلة تحتوي على صور كثيرة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.codexSafetyBlocked":
+    "حظر {provider} هذه الرسالة بسبب قواعد الأمان الخاصة به: {reason} لم يعد الوكيل يرى هذه الرسالة، لذلك لن تمنع رسائلك التالية. أرسل طلبك مرة أخرى بكلمات مختلفة.",
+  "error.provider.codexSafetyBlockedKept":
+    "حظر {provider} هذه الرسالة بسبب قواعد الأمان الخاصة به: {reason} إذا حظر {provider} رسائلك التالية أيضًا، فابدأ دردشة جديدة.",
+  "error.provider.codexAudioRefused":
+    "لا يستطيع هذا النموذج الاستماع إلى الصوت، لذلك لم يقبل الصوت في هذه الدردشة. بدأ OpenBot جلسة Codex جديدة مع سجل الدردشة. للمتابعة، أرسل طلبك مرة أخرى واطلب من الوكيل أن يعمل بدون الصوت. لفحص الصوت، اختر في قائمة نموذج الوكيل نموذجًا يستطيع الاستماع إلى الصوت.",
   "error.provider.imageTooSmall":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooLarge":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة كبيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.imageCountLimit":
+    "لم يقبل النموذج هذه الدردشة لأن فيها صورًا كثيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.imageUnreadable":
+    "لم يتمكن النموذج من قراءة صورة في هذه الدردشة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى. إذا أرسلت صورة، فأرسل صورة أخرى.",
+  "error.provider.requestTooLarge":
+    "أصبحت هذه الدردشة كبيرة جدًا بحيث لا يمكن إرسالها إلى النموذج. غالبًا ما تسبب الصور في الدردشة ذلك. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.opencodeSessionRejected":
     "رفض OpenCode الطلب ولم يذكر السبب. قد يحدث هذا في دردشة طويلة أو بعد تغيير النموذج. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا مختلفًا أو مستوى جهد أقل.",
+  "error.provider.opencodeInputRefused":
+    "رفض النموذج محتوى هذه الدردشة ولم يذكر السبب. قد يسبب ذلك ملف في الدردشة، مثل ملف PDF أو صورة. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أرسل رسالتك مرة أخرى بدون الملف، أو اختر نموذجًا مختلفًا.",
+  "error.provider.opencodeCompactionFailed":
+    "لم يتمكن النموذج من تلخيص هذه الدردشة الطويلة لإفساح المجال في نافذة السياق. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا أقوى.",
   "error.provider.museMcpStartupFault":
     "تعذّر على Muse تشغيل خادم MCP فحظر MCP في هذه الجلسة. بدأ OpenBot جلسة Muse جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، أوقف التحكم في الحاسوب أو خادم MCP الفاشل لهذا الوكيل.",
   "error.provider.claudeSessionMissing":
@@ -292,6 +415,8 @@ export const messages = {
     "تعذّر على Gemini فتح صفحة تسجيل الدخول في متصفحك. تحقق من متصفحك الافتراضي، ثم اتصل مرة أخرى.",
   "error.provider.acpSignInFailed": "لم يكتمل تسجيل الدخول.",
   "error.provider.acpSignInFailedReason": "لم يكتمل تسجيل الدخول: {reason}",
+  "error.provider.acpSignInNetwork":
+    "تعذّر على تسجيل الدخول الوصول إلى خادم المزوّد. تحقّق من اتصال الشبكة وإعدادات DNS في الكمبيوتر الذي يشغّل OpenBot، ثم حاول مرة أخرى.",
   "error.provider.acpSignOutFailed": "لم يكتمل تسجيل الخروج.",
   "error.provider.acpSignOutFailedReason": "لم يكتمل تسجيل الخروج: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -299,12 +424,26 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "لا يمكن فتح سوى روابط تسجيل الدخول HTTPS في المتصفح.",
   "error.provider.geminiKeyRefused":
     "رفض Gemini مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم اتصل مرة أخرى.",
+  "error.provider.geminiKeyRateLimited":
+    "رفض Gemini الطلب لأن مفتاح Gemini API المحفوظ بلغ حد المعدل أو حصته. يُستخدم المفتاح بدلًا من خطة Google. انتظر بضع دقائق أو اختر نموذجًا آخر، ثم أعد المحاولة. لاستخدام خطة Google، أزل المفتاح في الإعدادات.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "ليس لمفتاح Gemini API المحفوظ حصة لهذا النموذج. يُستخدم المفتاح بدلًا من خطة Google. اختر نموذجًا آخر، أو أزل المفتاح في الإعدادات لاستخدام خطة Google.\n{detail}",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "لا يستطيع Gemini فتح ملف إعدادات هذا الحساب، لذا لا يمكنه تسجيل الدخول. أزل هذا الحساب ثم أضفه مرة أخرى.",
+  "error.provider.geminiSettingsUnreadable":
+    "لا يستطيع Gemini فتح ملف إعداداته على هذا الكمبيوتر، لذا لا يمكنه تسجيل الدخول. أغلق التطبيقات الأخرى التي تستخدم Gemini، ثم أغلق OpenBot وافتحه مرة أخرى.",
   "error.provider.geminiVerificationRequired":
     "يجب أن يتحقق Google من حسابك قبل أن يتمكن Gemini من الرد. تحقق من حساب Google في متصفح، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.keyProviderRefused":
     "رفض {provider} مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم أعد المحاولة.",
   "error.provider.keyProviderNoBalance":
     "لا يوجد رصيد في حساب {provider} الخاص بمفتاح API المحفوظ. أضف رصيدًا إلى الحساب، ثم أعد المحاولة.",
+  "error.provider.keyProviderLowCredit":
+    "لا يكفي رصيد حساب {provider} الخاص بمفتاح API المحفوظ لردّ من هذا النموذج. أضف رصيدًا إلى الحساب، أو اختر نموذجًا آخر، ثم أعد المحاولة.",
+  "error.provider.modelServiceRefused":
+    "رفضت خدمة النموذج الطلب. اختر نموذجًا آخر، أو تحقق من صلاحية وصولك إلى هذا النموذج لدى الخدمة.",
+  "error.provider.modelServiceRefusedReason":
+    "رفضت خدمة النموذج الطلب: {reason}. اختر نموذجًا آخر، أو تحقق من صلاحية وصولك إلى هذا النموذج لدى الخدمة.",
   "error.provider.messageTooLarge": "أوقف OpenBot {provider} لأنه أرسل رسالة أكبر من {limit} MB.",
   "error.provider.customAgentIdInvalid":
     "يجب أن يتكوّن معرّف الوكيل من أحرف صغيرة أو أرقام أو `-`، ولا يمكن أن يكون معرّف مزوّد مدمج.",
@@ -350,6 +489,12 @@ export const messages = {
   "error.provider.accountDefault": "لا يمكن إزالة حساب {provider} الأول.",
   "error.provider.accountUsesKey":
     "يستخدم حساب {provider} هذا مفتاح API المحفوظ وليس له تسجيل دخول. غيّر المفتاح في إعدادات الخادم ← المزوّدون.",
+  "error.provider.accountNeedsKey":
+    "يحتاج حساب {provider} الجديد إلى مفتاح API. حدّث OpenBot على هذا الجهاز، ثم أضف الحساب مرة أخرى.",
+  "error.provider.accountKeyRefused": "لم يقبل {provider} مفتاح API هذا. تحقّق من المفتاح، ثم أعد المحاولة.",
+  "error.provider.accountKeyUnreachable":
+    "تعذّر على OpenBot الوصول إلى {provider} للتحقق من مفتاح API. تحقّق من اتصال الإنترنت، ثم أعد المحاولة.",
+  "error.provider.accountKeySignedOut": "لم يعد {provider} يقبل مفتاح API لهذا الحساب. أدخل مفتاحًا جديدًا للحساب.",
   "error.provider.accountInUse": "يعمل وكيل على هذا الحساب. أعد المحاولة عندما يتوقف الوكيل.",
   "error.provider.accountsReadOnly": "تتعذّر قراءة حسابات المزوّد المحفوظة. حدّث OpenBot قبل تغييرها.",
   "error.provider.accountSignedOut": "تم تسجيل الخروج من حساب {provider} هذا. سجّل الدخول مرة أخرى.",
@@ -361,10 +506,17 @@ export const messages = {
   "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
+  "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",
+  "error.provider.acpSessionStale": "تعذّر على {provider} تحميل أحدث نسخة من هذه المحادثة. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpModelNotOffered":
+    "لا يوفّر {provider} النموذج {model} الآن. اختر نموذجًا آخر لهذا الوكيل، ثم حاول مرة أخرى.",
   "error.provider.piStopped": "Pi لا يعمل. اربط Pi وأعد المحاولة.",
   "error.provider.piSessionMissing": "ملف جلسة Pi غير متاح على هذا الحاسوب.",
   "error.provider.piResumeCancelled": "ألغى Pi استئناف الجلسة. أعد المحاولة.",
   "error.provider.piSessionIdentity": "أرجع Pi جلسة مختلفة. لم تُستبدل الجلسة المحفوظة.",
+  "error.provider.piExtensionFailed":
+    "توقف Pi لأنه لم يتمكن من تحميل إضافة. أزل هذه الإضافة أو حدّثها، ثم حاول مرة أخرى. {detail}",
+  "error.provider.piThreadStopped": "توقف Pi بشكل غير متوقع قبل أن ينهي هذا الدور. أرسل رسالة للمتابعة.",
   "error.provider.piModelInvalid": "اختر نموذج Pi يتضمن مزوّده.",
   "error.provider.piToolInvalid": "أرجعت الأداة نتيجة غير صالحة.",
   "error.provider.piSignIn": "استخدم /login في Pi على الحاسوب المضيف. أغلق Pi عند اكتمال تسجيل الدخول.",

@@ -3,9 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: migration 13 leaves a workspace root at `OpenBot/Bots` while it renames the leaf, misses the
-// Windows or the JSON-escaped form of a path, changes a path that only looks like the root (`Botsy`, a user's own
-// `Projects/OpenBot/Bots`), or keeps a partial rewrite after a failure.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -27,7 +24,6 @@ const windowsUuid = "6fa459ea-ee8a-4ca4-894e-db77e160355e";
 const posixWorkspace = `/Users/user/OpenBot/Bots/bot-${posixUuid}`;
 const windowsWorkspace = `C:\\Users\\user\\OpenBot\\Bots\\bot-${windowsUuid}`;
 
-// A message that quotes each kind of path. Only the first two are under a root that this database stored.
 const quotedPaths = [
   `${posixWorkspace}/notes.md`,
   `${windowsWorkspace}\\plan.md`,
@@ -47,7 +43,6 @@ function seed(db: DatabaseSync): void {
     1,
     JSON.stringify({ id: `bot-${windowsUuid}`, workspacePath: windowsWorkspace }),
   );
-  // An id that the app did not generate keeps its spelling.
   agent.run(
     "chief",
     "openbot-thread-chief",
@@ -62,7 +57,6 @@ function seed(db: DatabaseSync): void {
        ordinal, message_json, last_event_sequence)
      VALUES ('openbot-thread-chief', 'message-1', NULL, 'user', 'completed', NULL, '2026-03-01T09:00:00.000Z', 0, ?, 1)`,
   ).run(JSON.stringify({ id: "message-1", text: quotedPaths.join("\n") }));
-  // A raw column, which holds the Windows separator once.
   db.prepare(
     `INSERT INTO projection_attachments
        (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
@@ -102,8 +96,6 @@ describe("agent workspace root migration", () => {
     expect(workspacePaths(db)).toEqual([
       { agent_id: posixAgent, path: `/Users/user/OpenBot/Agents/${posixAgent}` },
       { agent_id: windowsAgent, path: `C:\\Users\\user\\OpenBot\\Agents\\${windowsAgent}` },
-      // The root is a text substitution over the whole database, so it also moves an agent that keeps its id.
-      // `AgentStore` then moves that directory at start-up.
       { agent_id: "chief", path: "/Users/user/OpenBot/Agents/chief" },
     ]);
     const message = db
@@ -119,7 +111,7 @@ describe("agent workspace root migration", () => {
       { owner_id: windowsAgent, path: `C:\\Users\\user\\OpenBot\\Agents\\${windowsAgent}\\plan.md` },
     ]);
     expect(contents(db).outbox).toEqual([{ path: `/Users/user/OpenBot/Agents/${posixAgent}/old.md` }]);
-    expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 60 });
+    expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 67 });
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });

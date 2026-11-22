@@ -65,22 +65,22 @@ export interface AppServerRequest {
   method: string;
   id: RequestId;
   params: unknown;
-  /**
-   * In process only, never on the wire. Aborts when the provider stops waiting for the answer, such
-   * as an MCP client whose tool call timed out. An answer after that reaches nobody.
-   */
   signal?: AbortSignal;
+  detachAfterMs?: number;
+  subagent?: true;
+  answerBeforeMs?: number;
 }
 
-/** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */
+export const PROVIDER_STOPPED_WAITING = "provider-stopped-waiting";
+
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
-/**
- * Whether Codex can run on a login of this type: a ChatGPT plan, or an OpenAI API key that Codex
- * keeps in its own home (`codex login --with-api-key`). Turns on a key use API credits.
- */
+export const CLAUDE_CLI_API_KEY_ACCOUNT_TYPE = "claude-cli-api-key";
+
+export const CODEX_MODEL_PROVIDER_ACCOUNT_TYPE = "codex-model-provider";
+
 export function isCodexLoginType(type: string | undefined): boolean {
-  return type === "chatgpt" || type === "apiKey";
+  return type === "chatgpt" || type === "apiKey" || type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE;
 }
 
 export interface AccountReadResult {
@@ -88,10 +88,6 @@ export interface AccountReadResult {
     type: string;
     email?: string | null | undefined;
     planType?: string | null | undefined;
-    /**
-     * The organization or workspace of the login, when the CLI gives one: the Claude `orgId` or the
-     * Codex `workspaceName`. One email can sign in to a team and to a personal account.
-     */
     organization?: string | null | undefined;
   };
   requiresOpenaiAuth: boolean;
@@ -103,13 +99,6 @@ export interface AccountLoginStartResult {
   authUrl: string;
 }
 
-/**
- * The device-code form of the same login.
- *
- * The user types the code on a phone or another browser, so the reply carries a code and the page
- * to type it on instead of a URL this computer is expected to open. The code authorises nothing on
- * its own and is meant to be read out; the token it is later traded for never appears here.
- */
 export interface AccountDeviceCodeLoginStartResult {
   type: "chatgptDeviceCode";
   loginId: string;
@@ -129,10 +118,6 @@ export interface AccountRateLimitWindowResult {
   resetsAt?: number | null | undefined;
 }
 
-/**
- * The weekly or the monthly window, whichever is closer to its limit, since that is the one that stops
- * a turn first. When both are spent, the one that resets later, since turns stay stopped until then.
- */
 export function bindingWindow<T extends { usedPercent: number; resetsAt?: number | null | undefined }>(
   weekly: T,
   monthly: T,
@@ -151,9 +136,9 @@ export interface AccountRateLimitResult {
   normalModelSlug?: string | null | undefined;
   primary?: AccountRateLimitWindowResult | null | undefined;
   secondary?: AccountRateLimitWindowResult | null | undefined;
+  credits?: { available: boolean } | null | undefined;
 }
 
-/** One named quota of the plan and the model names it covers. Antigravity only. */
 export interface AccountRateLimitGroupResult {
   name: string;
   models: string[];
@@ -163,17 +148,10 @@ export interface AccountRateLimitGroupResult {
 
 export interface AccountRateLimitsReadResult {
   rateLimits?: AccountRateLimitResult | null | undefined;
-  /** Antigravity only: every quota group of the plan. `rateLimits` is one of them. */
   groups?: AccountRateLimitGroupResult[] | undefined;
-  /**
-   * OpenCode and Kimi: the weekly or monthly window that `rateLimits.secondary` does not hold. Cursor:
-   * the total of a plan split into Cursor's own models and the others.
-   */
   tertiary?: AccountRateLimitWindowResult | undefined;
-  /** Cursor only: the provider whose plan quota this reading also counts, such as Grok on a merged plan. */
   sharedQuotaWith?: AgentProviderId | undefined;
   rateLimitsByLimitId?: Record<string, AccountRateLimitResult | undefined> | null | undefined;
-  /** Codex only: the usage reset credits of the account. Null when Codex could not count them. */
   rateLimitResetCredits?: { availableCount: number } | null | undefined;
 }
 
@@ -214,6 +192,7 @@ export type ResponseDecoder<T> = (value: unknown) => T;
 
 export interface ModelListResponse {
   nextCursor?: string;
+  steersTurns?: boolean;
   data: Array<{
     model?: string;
     displayName?: string;
@@ -221,23 +200,25 @@ export interface ModelListResponse {
     supportedReasoningEfforts?: Array<{ reasoningEffort?: string }>;
     reasoningEffortConfigurable?: boolean;
     hidden?: boolean;
-    /** Codex: the service tiers of the model, such as `{ id: "priority", name: "Fast" }`. */
     serviceTiers?: Array<{ id: string; name?: string }>;
-    /** Codex: the older, deprecated form of `serviceTiers`, such as `["fast"]`. */
     additionalSpeedTiers?: string[];
+    steersTurns?: boolean;
   }>;
 }
 
 export function decodeModelListResponse(value: unknown): ModelListResponse {
   const data = getArray(value, "data");
   const nextCursor = getString(value, "nextCursor");
+  const steersTurns = isRecord(value) && value.steersTurns === true;
   return {
     ...(nextCursor ? { nextCursor } : {}),
+    ...(steersTurns ? { steersTurns } : {}),
     data: data.filter(isRecord).map((item) => ({
       ...(isString(item.model) ? { model: item.model } : {}),
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),
       ...(isString(item.defaultReasoningEffort) ? { defaultReasoningEffort: item.defaultReasoningEffort } : {}),
       ...(isBoolean(item.hidden) ? { hidden: item.hidden } : {}),
+      ...(item.steersTurns === true ? { steersTurns: true } : {}),
       ...(isBoolean(item.reasoningEffortConfigurable)
         ? { reasoningEffortConfigurable: item.reasoningEffortConfigurable }
         : {}),
@@ -283,7 +264,6 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
   const accountRecord = decodeRecord(account, "account");
   const email = optionalString(accountRecord, "email");
   const planType = optionalString(accountRecord, "planType");
-  // The Claude client gives `organization`; the Codex app server gives `workspaceName`.
   const organization = optionalString(accountRecord, "organization") ?? optionalString(accountRecord, "workspaceName");
   return {
     account: {
@@ -294,6 +274,12 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
     },
     requiresOpenaiAuth: requiresOpenaiAuth === undefined ? false : recordBoolean(record, "requiresOpenaiAuth"),
   };
+}
+
+export function decodeCodexAccountReadResult(value: unknown): AccountReadResult {
+  const result = decodeAccountReadResult(value);
+  if (result.account || decodeRecord(value, "account response").requiresOpenaiAuth !== false) return result;
+  return { account: { type: CODEX_MODEL_PROVIDER_ACCOUNT_TYPE, email: null }, requiresOpenaiAuth: false };
 }
 
 export function decodeAccountLoginStartResult(value: unknown): AccountLoginStartResult {
@@ -308,8 +294,6 @@ export function decodeAccountLoginStartResult(value: unknown): AccountLoginStart
 export function decodeAccountDeviceCodeLoginStartResult(value: unknown): AccountDeviceCodeLoginStartResult {
   const record = decodeRecord(value, "account device login response");
   if (requiredString(record, "type") !== "chatgptDeviceCode") throw new Error("Unexpected Codex login type.");
-  // Held to the same rule as the browser login's URL: this is the address OpenBot shows the user
-  // and offers to open, so a downgrade to plain HTTP is refused before it reaches the screen.
   const url = new URL(requiredString(record, "verificationUrl"));
   if (url.protocol !== "https:") throw new Error("Codex returned an unsafe login URL.");
   return {
@@ -357,7 +341,6 @@ export function decodeRateLimitResetCreditConsumeResult(value: unknown): Provide
   return outcome;
 }
 
-/** A sparse `account/rateLimits/updated` push: only the windows it holds changed. */
 export function decodeAccountRateLimitsUpdated(value: unknown): AccountRateLimitResult {
   const rateLimit = decodeRateLimit(decodeRecord(value, "rate limits update").rateLimits);
   if (!rateLimit) throw new Error("Invalid rate limits update.");
@@ -424,7 +407,6 @@ export function decodeThreadItem(value: unknown): ThreadItem {
   return item;
 }
 
-/** Prefer the readable summary when a provider also includes raw reasoning content. */
 export function reasoningText(item: unknown): string {
   const summary = getArray(item, "summary").filter(isString);
   const content = getArray(item, "content").filter(isString);
@@ -451,13 +433,22 @@ function decodeRateLimit(value: unknown): AccountRateLimitResult | null | undefi
   const normalModelSlug = optionalString(record, "normalModelSlug");
   const primary = decodeRateLimitWindow(record.primary);
   const secondary = decodeRateLimitWindow(record.secondary);
+  const credits = decodeRateLimitCredits(record.credits);
   return {
     ...(limitId === undefined ? {} : { limitId }),
     ...(limitName === undefined ? {} : { limitName }),
     ...(normalModelSlug === undefined ? {} : { normalModelSlug }),
     ...(primary === undefined ? {} : { primary }),
     ...(secondary === undefined ? {} : { secondary }),
+    ...(credits === undefined ? {} : { credits }),
   };
+}
+
+function decodeRateLimitCredits(value: unknown): AccountRateLimitResult["credits"] {
+  if (value === undefined) return value;
+  if (!isDynamicRecord(value) || typeof value.hasCredits !== "boolean" || typeof value.unlimited !== "boolean")
+    return null;
+  return { available: value.hasCredits || value.unlimited };
 }
 
 function decodeRateLimitGroups(value: unknown): AccountRateLimitGroupResult[] | undefined {
@@ -490,10 +481,6 @@ function decodeRateLimitWindow(value: unknown): AccountRateLimitWindowResult | n
   };
 }
 
-/**
- * Only the count: the credit rows are display text that OpenBot does not show. A count it cannot
- * read is unknown, so the usage reading that carries it still decodes.
- */
 function decodeRateLimitResetCredits(value: unknown): AccountRateLimitsReadResult["rateLimitResetCredits"] {
   if (value === undefined) return value;
   const availableCount = isDynamicRecord(value) ? value.availableCount : undefined;
@@ -553,12 +540,18 @@ export function getRecord(record: unknown, key: string): DynamicRecord | null {
   return isRecord(record) && isRecord(record[key]) ? record[key] : null;
 }
 
-/** The qualified name that a `tool_call` bridge item asks for. The model writes it, so check it before use. */
 export function bridgedToolName(item: ThreadItem): string | null {
   const tool = getString(item, "tool") ?? getString(item, "name");
   if (tool !== "tool_call" && tool !== "mcp__openbot__tool_call") return null;
   const args = getRecord(item, "arguments");
-  return getString(args, "name") ?? getString(args, "tool");
+  const name = getString(args, "name") ?? getString(args, "tool");
+  return name === null ? null : qualifiedToolName(name);
+}
+
+export function qualifiedToolName(name: string): string {
+  const trimmed = name.trim();
+  const mcp = /^(?:mcp__)?([A-Za-z0-9_-]+?)__([A-Za-z0-9_-]+)$/.exec(trimmed);
+  return mcp ? `${mcp[1]}.${mcp[2]}` : trimmed;
 }
 
 export function getArray(record: unknown, key: string): unknown[] {

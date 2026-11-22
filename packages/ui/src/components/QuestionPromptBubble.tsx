@@ -11,11 +11,8 @@ import { createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js"
 import { MarkdownInlineText, markdownPlainText } from "../features/conversation/MarkdownMessageText";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
 
-/** Lets the chat composer answer the open question with its text, as the custom answer field does. */
 export interface QuestionPromptComposerAnswer {
-  /** Whether the current question takes a typed answer from the composer now. */
   available: () => boolean;
-  /** Answers the current question with `text`. False when the form cannot take it. */
   answer: (text: string) => boolean;
 }
 
@@ -25,30 +22,17 @@ export interface QuestionPromptBubbleProps {
   readOnly?: boolean;
   resolution?: AgentPromptResolution | null;
   elementRef?: (element: HTMLDivElement | undefined) => void;
-  /**
-   * Which chord submits a custom answer. Enter keeps the current behavior; in the modifier mode
-   * plain Enter does not submit and the single-line field adds no line. The renderer resolves
-   * the platform and passes it.
-   */
   sendShortcut?: SendShortcut | undefined;
   onSubmit: (answers: Record<string, string[]>) => Promise<boolean>;
   onResolutionPresented?: () => void;
-  /** Opens a Markdown link of a question. */
   onOpenLink: (url: string) => void;
-  /** Gives the composer answer of this form to the composer. The returned function takes it back. */
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
 }
 
-/** The time a single pick stays on screen before the next question moves in. */
 const PICK_HOLD_MS = 180;
 
 const queuedStageFits: Array<() => (() => void) | undefined> = [];
 
-/**
- * Fits the stages of the bubbles that mount together. All read their page heights before any of
- * them writes: a write before the next read lays out the page again, and a chat can open with many
- * question cards.
- */
 function queueStageFit(measure: () => (() => void) | undefined): void {
   if (queuedStageFits.length === 0) {
     queueMicrotask(() => {
@@ -59,17 +43,12 @@ function queueStageFit(measure: () => (() => void) | undefined): void {
   queuedStageFits.push(measure);
 }
 
-/**
- * A private answer has its own masked field, never the composer. A plugin consent takes only one of
- * its options, so a typed answer would cancel it.
- */
 function acceptsComposerAnswer(question: AgentPromptQuestion): boolean {
   return !question.isSecret && question.id !== MCP_ELICITATION_DECISION_QUESTION_ID;
 }
 
 const optionLetter = (index: number) => String.fromCharCode(65 + index);
 
-/** The letter of an answer: the letter of its option, or the letter of the typed row. */
 function answerLetter(question: AgentPromptQuestion, answer: string): string {
   const options = question.options ?? [];
   const index = options.findIndex((option) => option.label === answer);
@@ -98,7 +77,6 @@ function summaryResolution(questions: AgentPromptQuestion[], answers: Record<str
   };
 }
 
-/** The question text. An agent can write Markdown in it, such as a link. */
 function QuestionText(props: { question: string; onOpenLink: (url: string) => void }) {
   return (
     <MarkdownInlineText body={props.question} agents={[]} onSelectAgent={() => {}} onOpenLink={props.onOpenLink} />
@@ -108,16 +86,11 @@ function QuestionText(props: { question: string; onOpenLink: (url: string) => vo
 type PagePosition = "prev" | "current" | "next";
 
 interface PromptState {
-  /** The open page. The page after the last question is the summary. */
   step: number;
-  /** The ticked options of each question. A single-select question has one at most. */
   picks: Record<string, string[]>;
-  /** The typed answer of each question. */
   drafts: Record<string, string>;
   submitting: boolean;
-  /** The question that a screen reader announces when the page changes with no focus in the bubble. */
   announced: string;
-  /** The answers that this bubble sent, or the cancellation. */
   sent: AgentPromptResolution | null;
 }
 
@@ -134,6 +107,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   });
   const animateEntrance = untrack(() => !props.resolution);
   let stage: HTMLDivElement | undefined;
+  let card: HTMLDivElement | undefined;
   let holdTimer: number | undefined;
   let presentTimer: number | undefined;
   let resolutionPresentationPending = false;
@@ -147,7 +121,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     return page < step ? "prev" : page === step ? "current" : "next";
   };
 
-  /** The answer of a question: the ticked options in the order the question lists them, then the typed one. */
   function answerOf(question: AgentPromptQuestion): string[] {
     const typed = state.drafts[question.id]?.trim() ?? "";
     const picked = state.picks[question.id] ?? [];
@@ -169,7 +142,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     props.elementRef?.(undefined);
   });
 
-  /** Reads the height of the open page and returns the write that gives it to the stage. */
   function measureStage(step = resolved() ? total() : state.step): (() => void) | undefined {
     const target = stage;
     const page = target?.children[step];
@@ -180,7 +152,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     };
   }
 
-  /** The stage takes the height of the open page, so the bubble grows and shrinks with it. */
   function fitStage(step?: number) {
     measureStage(step)?.();
   }
@@ -197,22 +168,31 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     window.clearTimeout(holdTimer);
     const next = Math.max(0, Math.min(total(), step));
     const keepFocus = stage?.closest(".question-prompt-bubble")?.contains(document.activeElement) ?? false;
+    const toOption = keepFocus && document.activeElement?.matches(":focus-visible") === true;
     const question = props.questions[next];
     setState((draft) => {
       draft.step = next;
-      // Focus moves into the new page and reads it; an answer from the composer leaves focus there.
       draft.announced = keepFocus || !question ? "" : markdownPlainText(question.question);
     });
     fitStage(next);
-    if (!keepFocus) return;
-    queueMicrotask(() => {
-      const page = stage?.children[next];
-      const target =
-        next < total()
-          ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
-          : null;
-      (target ?? stage)?.focus({ preventScroll: true });
-    });
+    if (keepFocus) {
+      queueMicrotask(() => {
+        const page = stage?.children[next];
+        const target =
+          next < total() && toOption
+            ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
+            : null;
+        (target ?? stage)?.focus({ preventScroll: true });
+      });
+    }
+    if (next < total()) queueMicrotask(revealCardTop);
+  }
+
+  function revealCardTop(): void {
+    const scroller = card && scrollingAncestor(card);
+    if (card && scroller && card.getBoundingClientRect().top < scroller.getBoundingClientRect().top) {
+      card.scrollIntoView({ block: "start" });
+    }
   }
 
   function presentResolution(): void {
@@ -244,7 +224,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     presentTimer = window.setTimeout(presentResolution, duration);
   }
 
-  /** Goes to the next question, or sends the answers after the last one. `values` replaces the answer of `page`. */
   function goOn(page: number, values?: string[]): void {
     window.clearTimeout(holdTimer);
     if (busy()) return;
@@ -265,7 +244,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   function choose(question: AgentPromptQuestion, page: number, label: string): void {
     if (busy()) return;
     if (question.multiSelect) {
-      // The draft has the writes that the store does not show until the next flush.
       setState((draft) => {
         const picked = draft.picks[question.id];
         if (!picked) {
@@ -287,11 +265,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   }
 
   function type(question: AgentPromptQuestion, value: string): void {
-    // A typed answer stops the move that a pick started.
     window.clearTimeout(holdTimer);
     setState((draft) => {
       draft.drafts[question.id] = value;
-      // A typed answer replaces the pick of a single-select question.
       if (!question.multiSelect && value.trim()) draft.picks[question.id] = [];
     });
   }
@@ -311,10 +287,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     return Boolean(question && state.step < total() && acceptsComposerAnswer(question) && !busy());
   }
 
-  /**
-   * The text goes in the custom answer field, so it stays there when the send fails. The store does
-   * not show the new value until the next flush, so the answer goes to `goOn` too.
-   */
   function answerFromComposer(text: string): boolean {
     const page = index();
     const question = props.questions[page];
@@ -335,7 +307,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     const target = event.target;
     if (target instanceof HTMLTextAreaElement) return;
     if (target instanceof HTMLInputElement && target.type !== "radio" && target.type !== "checkbox") return;
-    // A link in the question text keeps its own keys.
     if (target instanceof Element && target.closest("a, button")) return;
     const options = question.options ?? [];
     if (event.key === "Enter") {
@@ -357,11 +328,8 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   }
 
   function handleCustomKey(event: KeyboardEvent, question: AgentPromptQuestion, page: number): void {
-    // The browser owns the key that commits an IME composition. Safari sends it after
-    // `compositionend` without `isComposing`; keyCode 229 marks it.
     if (event.isComposing || event.keyCode === 229) return;
     const sendShortcut = props.sendShortcut ?? "enter";
-    // Enter to send keeps the previous chord: every Enter sends.
     if (sendShortcut === "enter") {
       if (event.key !== "Enter") return;
     } else if (!isSendShortcutKey(event, sendShortcut)) return;
@@ -451,7 +419,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     );
   }
 
-  /** The answers of a question in the summary, or null for a skipped question. */
   function summaryRows(question: AgentPromptQuestion): Array<{ letter: string; text: string }> | null {
     const current = resolution();
     if (current?.status !== "answered") return null;
@@ -534,7 +501,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
 
   return (
     <Bubble
-      ref={(element) => props.elementRef?.(element)}
+      ref={(element) => {
+        card = element;
+        props.elementRef?.(element);
+      }}
       variant="muted"
       class="question-prompt-bubble"
       data-state={resolved() ? "done" : busy() ? "pending" : "idle"}
@@ -631,4 +601,11 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       </BubbleContent>
     </Bubble>
   );
+}
+
+function scrollingAncestor(element: HTMLElement): HTMLElement | undefined {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (/auto|scroll/.test(getComputedStyle(node).overflowY)) return node;
+  }
+  return undefined;
 }

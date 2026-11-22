@@ -1,32 +1,24 @@
-/*
- * Settings modal rules for markup that only the renderer draws: the provider section, the Dynamic
- * Island tab and the voice key row. The shared modal frame and its panels are in `@openbot/ui/features/settings/settings-modal.css`, which `styles.css` imports
- * immediately before this file.
- */
-
 .settings-provider-section {
   display: grid;
   gap: var(--openbot-space-2);
 }
 
 .settings-dynamic-island-size > .ui-slider-field,
-.settings-dynamic-island-preview {
+.settings-dynamic-island-preview,
+.settings-agent-dock-size {
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-/* A server logo in the island server list, at the size of the billing server rows. */
 .settings-dynamic-island-server-mark {
-  --server-gradient-logo-size: 32px;
-  --server-gradient-logo-radius: var(--openbot-radius-md);
+  --server-plush-logo-size: 32px;
 }
 
-.settings-dynamic-island-server-mark > img {
+.settings-dynamic-island-server-mark > .server-rail-logo {
   width: 32px;
   height: 32px;
   border-radius: var(--openbot-radius-md);
 }
 
-/* An agent in the agent dock list, at the size of the server marks. */
 .settings-agent-dock-avatar {
   width: 32px;
   height: 32px;
@@ -45,8 +37,6 @@
   margin: 0;
 }
 
-/* The top edge of a screen: the island hangs from it as it does from the real menu bar. The strip
-   clips the island, so a width past the strip shows as cut off rather than as a wider card. */
 .settings-dynamic-island-preview-bar {
   height: 64px;
   display: flex;
@@ -58,8 +48,6 @@
 }
 
 .settings-dynamic-island-preview-fit {
-  /* The island hangs below the 1px frame edge, so the edge runs over it and the notch shoulders
-     curve out of it, as they do out of the top edge of a display. */
   margin-top: 1px;
   display: flex;
   justify-content: center;
@@ -75,7 +63,6 @@
   text-align: center;
 }
 
-/* The Model and key rows of the Voice tab: the buttons stay before the menu or the key field. */
 .settings-voice-model-actions {
   display: flex;
   align-items: center;
@@ -86,7 +73,6 @@
   width: 100%;
 }
 
-/* A cloud model needs a key: the text says so in the warning color, with no outline or fill. */
 .settings-modal-row .settings-voice-needs-key {
   color: var(--openbot-warning-text);
 }
@@ -106,12 +92,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The voice server dialog is wider than the provider dialog, so each route fits on one line. */
 .custom-provider-dialog.voice-server-dialog {
   width: min(640px, 100%);
 }
 
-/* One route on one line: name, model, voice, and its switch. The card draws the line between routes. */
 .voice-server-dialog .voice-server-line {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) minmax(0, 2fr) auto;
@@ -131,7 +115,6 @@
   min-width: 0;
 }
 
-/* Dictation has no voice, so its model takes the voice column too. */
 .voice-server-dialog .voice-server-wide {
   grid-column: 2 / 4;
 }

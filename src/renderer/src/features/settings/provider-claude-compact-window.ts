@@ -3,14 +3,12 @@ import type { ProviderClaudeCompactWindow } from "@openbot/ui/features/settings/
 import { useText } from "@openbot/ui/text";
 import { createHostSetting } from "./host-setting-state";
 
-/** The Claude compaction size calls of one server's host. The desktop reaches them through main. */
 export type HostClaudeCompactWindowCalls = Pick<
   OpenBotDesktopApi["hostAdmin"],
   "getClaudeCompactWindow" | "setClaudeCompactWindow"
 >;
 
 export interface HostClaudeCompactWindowOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostClaudeCompactWindowCalls;
 }
 
@@ -18,12 +16,6 @@ export interface ProviderClaudeCompactWindowSource extends HostClaudeCompactWind
   serverId: string;
 }
 
-/**
- * The Claude page's compaction size of this computer or a joined server (`claude-compact-window-v1`).
- * The host checks the role again. Undefined while `source` is.
- *
- * Each new value of `status` reads the size again: the host sends a status event after a change.
- */
 export function createProviderClaudeCompactWindow(
   source: () => ProviderClaudeCompactWindowSource | undefined,
   status: () => unknown,

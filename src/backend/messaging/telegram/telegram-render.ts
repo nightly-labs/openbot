@@ -1,17 +1,9 @@
 import { slackChunks } from "../slack/slack-render";
 
-/** Telegram refuses a message over 4,096 characters of text. This leaves space for the markup it removes. */
 const TELEGRAM_CHUNK_CHARACTERS = 3_800;
 
 const FENCE = "```";
 
-/**
- * Markdown as Telegram HTML (`parse_mode: "HTML"`). `&`, `<` and `>` are escaped everywhere, so the
- * text cannot add markup. A link keeps only an `http` or `https` address. Without `mentionName`,
- * `@name` gets a word joiner after `@`, so the text cannot mention or notify anyone. With it, as for
- * an answer, `@username` outside code and links stays a mention, and `@<user id>` becomes a link to
- * that user with the name that `mentionName` gives. Both notify the person.
- */
 export function telegramHtml(markdown: string, mentionName?: (userId: string) => string): string {
   const out: string[] = [];
   let fence: string[] | null = null;
@@ -50,17 +42,14 @@ export function telegramHtml(markdown: string, mentionName?: (userId: string) =>
   return out.join("\n");
 }
 
-/** Markdown in posts that fit one Telegram message each. A cut code block is closed and opened again. */
 export function telegramChunks(markdown: string): string[] {
   return slackChunks(markdown, TELEGRAM_CHUNK_CHARACTERS);
 }
 
-/** An answer as plain text, for a post that Telegram refused as HTML. It mentions nobody. */
 export function telegramPlainText(markdown: string): string {
   return inertMentions(markdown);
 }
 
-/** If an answer notifies a person: `@username` or `@<user id>` outside code and link labels. */
 export function hasTelegramMention(markdown: string): boolean {
   let fence = false;
   return markdown.split("\n").some((line) => {
@@ -72,12 +61,10 @@ export function hasTelegramMention(markdown: string): boolean {
   });
 }
 
-/** The language after an opening fence, such as `python` in "```python". Other text gives none. */
 function codeLanguage(fenceLine: string): string {
   return /^\s*```([\w+#.-]+)\s*$/u.exec(fenceLine)?.[1] ?? "";
 }
 
-/** A code block. Telegram colors the code when it gets a language. */
 function preHtml(lines: string[], language: string): string {
   const code = lines.join("\n");
   return language ? `<pre><code class="language-${language}">${code}</code></pre>` : `<pre>${code}</pre>`;
@@ -96,7 +83,6 @@ function blockHtml(line: string, mentionName: ((userId: string) => string) | und
 }
 
 function inlineHtml(line: string, mentionName: ((userId: string) => string) | undefined): string {
-  // Code spans keep their text; everything else is converted between them.
   return line
     .split(/(`[^`]+`)/u)
     .map((part) => {
@@ -107,30 +93,52 @@ function inlineHtml(line: string, mentionName: ((userId: string) => string) | un
         links.push(`<a href="${escapeHtml(url).replaceAll('"', "&quot;")}">${escapeHtml(inertMentions(label))}</a>`);
         return `${links.length - 1}`;
       });
-      // A user id becomes a link like the others, so the escape and the markup below leave it whole.
       const mentioned = mentionName
         ? text.replace(/(?<![\w@])@([0-9]{5,20})\b/gu, (_match, userId: string) => {
             links.push(`<a href="tg://user?id=${userId}">${escapeHtml(mentionName(userId))}</a>`);
             return `\uE002${links.length - 1}\uE002`;
           })
         : inertMentions(text);
-      return escapeHtml(mentioned)
-        .replace(
-          /\*\*(.+?)\*\*|__(.+?)__/gu,
-          (_match, a: string | undefined, b: string | undefined) => `<b>${a ?? b}</b>`,
-        )
-        .replace(/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/gu, "<i>$1</i>")
-        .replace(/(?<![\p{L}\p{N}\p{M}_])_(?!\s)(.+?)(?<!\s)_(?![\p{L}\p{N}\p{M}_])/gu, "<i>$1</i>")
-        .replace(/~~(.+?)~~/gu, "<s>$1</s>")
-        .replace(/(\d+)/gu, (_match, index: string) => links[Number(index)] ?? "");
+      return nestedStyleTags(
+        escapeHtml(mentioned)
+          .replace(
+            /\*\*(.+?)\*\*|__(.+?)__/gu,
+            (_match, a: string | undefined, b: string | undefined) => `<b>${a ?? b}</b>`,
+          )
+          .replace(/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/gu, "<i>$1</i>")
+          .replace(/(?<![\p{L}\p{N}\p{M}_])_(?!\s)(.+?)(?<!\s)_(?![\p{L}\p{N}\p{M}_])/gu, "<i>$1</i>")
+          .replace(/~~(.+?)~~/gu, "<s>$1</s>"),
+      ).replace(/(\d+)/gu, (_match, index: string) => links[Number(index)] ?? "");
     })
     .join("");
 }
 
-/** `@username` (5 to 32 characters) or `@<user id>` (5 to 20 digits), not in an email address. */
+const EMPTY_STYLE_TAG = /<([bis])><\/\1>/gu;
+
+function nestedStyleTags(html: string): string {
+  const open: string[] = [];
+  let nested = html.replace(/<(\/?)([bis])>/gu, (tag, closing: string, name: string) => {
+    if (!closing) {
+      open.push(name);
+      return tag;
+    }
+    const index = open.lastIndexOf(name);
+    if (index === -1) return tag;
+    const inner = open.splice(index).slice(1);
+    open.push(...inner);
+    const closeInner = inner.toReversed().map((innerName) => `</${innerName}>`);
+    const reopenInner = inner.map((innerName) => `<${innerName}>`);
+    return `${closeInner.join("")}${tag}${reopenInner.join("")}`;
+  });
+  for (let previous = ""; previous !== nested; ) {
+    previous = nested;
+    nested = nested.replace(EMPTY_STYLE_TAG, "");
+  }
+  return nested;
+}
+
 const TELEGRAM_MENTION = /(?<![\w@])@(?:[0-9]{5,20}\b|[A-Za-z][A-Za-z0-9_]{4,31}\b)/u;
 
-/** `@name` with a word joiner after `@`: Telegram then sees no mention. */
 function inertMentions(text: string): string {
   return text.replace(/@(?=[A-Za-z0-9_])/gu, "@⁠");
 }

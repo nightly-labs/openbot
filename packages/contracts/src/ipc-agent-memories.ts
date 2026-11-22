@@ -3,11 +3,6 @@ import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export type AgentMemoryOrigin = "automatic" | "manual";
 
-/**
- * The part of a memory that does not name its owner. One store and one panel serve both an agent
- * and a channel, and this is the shape they share; `AgentMemory` and `ChannelMemory` only add the
- * owner id. Neither of those two names changes shape.
- */
 export interface MemoryEntry {
   id: string;
   text: string;
@@ -15,14 +10,9 @@ export interface MemoryEntry {
   sourceTurnId: string | null;
   createdAt: string;
   updatedAt: string;
-  /**
-   * The site the memory is about: a lowercase host name without "www.". The browser shows the memory
-   * when the agent opens a page of that site or of a subdomain. Only agent memories have a site.
-   */
   site?: string;
 }
 
-/** The longest host name that DNS permits, and the database CHECK on the site column. */
 export const MEMORY_SITE_MAX_LENGTH = 253;
 
 export interface AgentMemory extends MemoryEntry {
@@ -76,33 +66,18 @@ export interface DeleteAgentMemoryInput {
   memoryId: string;
 }
 
-/**
- * The choices for how many memories one agent can hold on this computer. The first was the only cap
- * before the setting existed. A lower cap never deletes memories: an agent over it keeps them and
- * only cannot add another.
- */
 export const AGENT_MEMORY_LIMITS = [INPUT_LIMITS.agentMemories, 128, 256, 512] as const;
 export type AgentMemoryLimit = (typeof AGENT_MEMORY_LIMITS)[number];
-/**
- * Background reviews add memories without a request, so the default leaves room for many small ones.
- * Only essential memories enter each prompt, within their own budget; the rest cost a search.
- */
 export const DEFAULT_AGENT_MEMORY_LIMIT: AgentMemoryLimit = 256;
 
 export function isAgentMemoryLimit(value: unknown): value is AgentMemoryLimit {
   return isOneOf(AGENT_MEMORY_LIMITS, value);
 }
 
-/** The app setting, as it is stored and as it crosses IPC. */
 export interface AgentMemoryLimitPreference {
   limit: AgentMemoryLimit;
 }
 
-/**
- * The choices for how many completed turns of one conversation pass between two background memory
- * reviews on this computer. `0` turns the reviews off, also after a pause, a cleared chat and a
- * closed side thread. The default is 20.
- */
 export const MEMORY_REVIEW_INTERVALS = [0, 10, 20, 40] as const;
 export type MemoryReviewInterval = (typeof MEMORY_REVIEW_INTERVALS)[number];
 export const DEFAULT_MEMORY_REVIEW_INTERVAL: MemoryReviewInterval = 20;
@@ -111,15 +86,10 @@ export function isMemoryReviewInterval(value: unknown): value is MemoryReviewInt
   return isOneOf(MEMORY_REVIEW_INTERVALS, value);
 }
 
-/** The app setting, as it is stored. */
 export interface MemoryReviewPreference {
   interval: MemoryReviewInterval;
 }
 
-/**
- * The review cadence of one server's agents (`memory-review-v1`) and the values that host permits.
- * A newer host can permit other values, so they are numbers here, not `MemoryReviewInterval`.
- */
 export interface HostMemoryReview {
   interval: number;
   choices: number[];
@@ -129,7 +99,6 @@ export function hostMemoryReview({ interval }: MemoryReviewPreference): HostMemo
   return { interval, choices: [...MEMORY_REVIEW_INTERVALS] };
 }
 
-/** On the wire the route codec has already checked the fields; this fails closed on anything else. */
 export function decodeHostMemoryReview(value: unknown): HostMemoryReview {
   const count = (item: unknown): item is number => typeof item === "number" && Number.isSafeInteger(item) && item >= 0;
   if (!isDynamicRecord(value) || !count(value.interval) || !Array.isArray(value.choices) || !value.choices.every(count))
@@ -137,10 +106,6 @@ export function decodeHostMemoryReview(value: unknown): HostMemoryReview {
   return { interval: value.interval, choices: [...value.choices] };
 }
 
-/**
- * The limit of one server's agents (`agent-memory-limit-v1`) and the values that host permits. A
- * newer host can permit other values, so they are numbers here, not `AgentMemoryLimit`.
- */
 export interface HostAgentMemoryLimit {
   limit: number;
   choices: number[];
@@ -150,7 +115,6 @@ export function hostAgentMemoryLimit({ limit }: AgentMemoryLimitPreference): Hos
   return { limit, choices: [...AGENT_MEMORY_LIMITS] };
 }
 
-/** On the wire the route codec has already checked the fields; this fails closed on anything else. */
 export function decodeHostAgentMemoryLimit(value: unknown): HostAgentMemoryLimit {
   const count = (item: unknown): item is number => typeof item === "number" && Number.isSafeInteger(item) && item > 0;
   if (!isDynamicRecord(value) || !count(value.limit) || !Array.isArray(value.choices) || !value.choices.every(count))
@@ -158,7 +122,6 @@ export function decodeHostAgentMemoryLimit(value: unknown): HostAgentMemoryLimit
   return { limit: value.limit, choices: [...value.choices] };
 }
 
-/** Selection metadata stays separate from the released memory shape. */
 export interface AgentMemorySelection {
   memoryId: string;
   inclusion: "essential" | "searchable";
@@ -211,18 +174,12 @@ export function isAgentMemorySelectionState(value: unknown): value is AgentMemor
   );
 }
 
-/**
- * "Learn from my browsing": while a person holds a tab of an agent (takeover or Take control), the
- * host records which pages loaded and which controls they clicked, and the memory review learns how
- * those sites work. It never records typed text. The default is off.
- */
 export interface BrowsingMemoryPreference {
   enabled: boolean;
 }
 
 export const DEFAULT_BROWSING_MEMORY_PREFERENCE: BrowsingMemoryPreference = { enabled: false };
 
-/** The setting of one server's agents (`browsing-memory-v1`). */
 export interface HostBrowsingMemory {
   enabled: boolean;
 }
@@ -231,7 +188,6 @@ export function hostBrowsingMemory({ enabled }: BrowsingMemoryPreference): HostB
   return { enabled };
 }
 
-/** On the wire the route codec has already checked the fields; this fails closed on anything else. */
 export function decodeHostBrowsingMemory(value: unknown): HostBrowsingMemory {
   if (!isDynamicRecord(value) || typeof value.enabled !== "boolean")
     throw new Error("Invalid browsing memory setting.");

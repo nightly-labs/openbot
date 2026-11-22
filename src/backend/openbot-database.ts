@@ -10,6 +10,7 @@ import type {
   ConversationSearchPage,
   ConversationSnapshot,
   HostedSiteConversationEventStatus,
+  MessagePinner,
   SentMessageStats,
 } from "@openbot/contracts/ipc";
 import { AgentHistoryQueries, type AgentHistorySelection } from "./database/agent-history-queries";
@@ -17,7 +18,7 @@ import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
 import { AgentUsage } from "./database/agent-usage";
 import { type ConversationMarkerExclusions, ConversationQueries } from "./database/conversation-queries";
 import { ConversationWriter } from "./database/conversation-writer";
-import { DatabaseCore, type OrchestrationEventInput } from "./database/database-core";
+import { DatabaseCore, type DatabaseCoreOptions, type OrchestrationEventInput } from "./database/database-core";
 import { deletedThreadMessageIds, threadMessageIds } from "./database/deleted-thread-messages";
 import {
   type ActiveHostedSiteConversationEvent,
@@ -30,6 +31,16 @@ import {
   type MailboxProjectionState,
 } from "./database/mailbox-projection";
 import {
+  type PinnedThreadMessage,
+  pinnedThreadMessageCount,
+  pinnedThreadMessages,
+  pinThreadMessage,
+  threadMessagePinner,
+  threadMessagesContaining,
+  unpinThreadMessage,
+} from "./database/pinned-thread-messages";
+import {
+  type ProviderHistoryCompactionBatch,
   type ProviderHistoryImportState,
   type ProviderHistorySessionInput,
   type ProviderHistoryStagedItem,
@@ -40,18 +51,18 @@ import {
   type ProviderHistoryTurnCursor,
 } from "./database/provider-history-store";
 import { type ProviderSession, ProviderSessions } from "./database/provider-sessions";
+import { withTransaction } from "./database/sqlite-transaction";
+import { ThreadEventCompaction, type ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 import { ThreadReplay } from "./database/thread-replay";
 import { type StoredThreadSummary, ThreadSummaries } from "./database/thread-summaries";
 
-// Declared in this module before the split and part of the frozen public surface, so it stays
-// reachable from here rather than only from the controller that owns it now. Structural `Pick<...>`
-// types over this class do not cover exported types.
 export type { OrchestrationEventInput } from "./database/database-core";
 export type {
   ActiveHostedSiteConversationEvent,
   PendingHostedSiteTerminalEvent,
 } from "./database/hosted-site-event-log";
 export type {
+  ProviderHistoryCompactionBatch,
   ProviderHistoryImportState,
   ProviderHistorySessionInput,
   ProviderHistoryStagedItem,
@@ -60,15 +71,23 @@ export type {
   ProviderHistoryStageResult,
   ProviderHistoryTurnCursor,
 } from "./database/provider-history-store";
+
+import { perfTimed } from "./perf-probe-hooks";
+
 export type { ProviderSession } from "./database/provider-sessions";
+export type { ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 export type { StoredThreadSummary } from "./database/thread-summaries";
 
-/**
- * The local OpenBot event log and its read projections.
- *
- * A command appends events, changes projections, and stores its receipt in one
- * SQLite transaction. Providers never receive direct access to this database.
- */
+export interface StreamingMessageWrite {
+  snapshot: ConversationSnapshot;
+  messageId: string;
+  eventType: string;
+  detail?: unknown;
+  commandId?: string;
+}
+
+export type StreamingMessageResult = { revision: number } | { error: unknown };
+
 export class OpenBotDatabase {
   readonly #core: DatabaseCore;
   readonly usage: AgentUsage;
@@ -82,9 +101,13 @@ export class OpenBotDatabase {
   readonly #agentHistory: AgentHistoryQueries;
   readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
+  readonly #threadEvents: ThreadEventCompaction;
 
-  constructor(readonly userDataPath: string) {
-    this.#core = new DatabaseCore({ userDataPath });
+  constructor(
+    readonly userDataPath: string,
+    checkIntegrity?: DatabaseCoreOptions["checkIntegrity"],
+  ) {
+    this.#core = new DatabaseCore({ userDataPath, checkIntegrity });
     this.usage = new AgentUsage(this.#core);
     this.#conversations = new ConversationQueries({ core: this.#core });
     this.#roster = new AgentRoster({ core: this.#core });
@@ -96,6 +119,7 @@ export class OpenBotDatabase {
     this.#sessions = new ProviderSessions({ core: this.#core });
     this.#providerHistory = new ProviderHistoryStore({ core: this.#core });
     this.#summaries = new ThreadSummaries({ core: this.#core });
+    this.#threadEvents = new ThreadEventCompaction({ core: this.#core });
   }
 
   get path(): string {
@@ -225,6 +249,10 @@ export class OpenBotDatabase {
     return this.#conversations.readConversationMessages(agentId, threadId, messageIds);
   }
 
+  readConversationMessagesOfItemType(agentId: string, threadId: string, itemType: string): ConversationMessage[] {
+    return this.#conversations.readConversationMessagesOfItemType(agentId, threadId, itemType);
+  }
+
   readConversationRecoveryMessages(
     agentId: string,
     threadId: string | null,
@@ -239,6 +267,10 @@ export class OpenBotDatabase {
 
   conversationCountBefore(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): number {
     return this.#conversations.conversationCountBefore(threadId, messageId, options);
+  }
+
+  conversationHasAfter(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): boolean {
+    return this.#conversations.conversationHasAfter(threadId, messageId, options);
   }
 
   readConversationPage(
@@ -283,18 +315,27 @@ export class OpenBotDatabase {
     payload: unknown = {},
     commandId = `conversation:${eventType}:${randomUUID()}`,
   ): ConversationSnapshot {
-    return this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId);
+    return perfTimed("db.persistConversation", () =>
+      this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId),
+    );
   }
 
-  /** Writes one message of a thread, for a caller that knows only that message changed. */
-  persistStreamingMessage(input: {
-    snapshot: ConversationSnapshot;
-    messageId: string;
-    eventType: string;
-    detail?: unknown;
-    commandId?: string;
-  }): number {
-    return this.#conversationWrites.persistStreamingMessage(input);
+  persistStreamingMessage(input: StreamingMessageWrite): number {
+    return perfTimed("db.persistStreamingMessage", () => this.#conversationWrites.persistStreamingMessage(input));
+  }
+
+  persistStreamingMessages(inputs: readonly StreamingMessageWrite[]): StreamingMessageResult[] {
+    const db = this.connection;
+    return withTransaction(db, () =>
+      inputs.map((input): StreamingMessageResult => {
+        try {
+          return { revision: this.#conversationWrites.persistStreamingMessage(input) };
+        } catch (error) {
+          if (!db.isTransaction) throw error;
+          return { error };
+        }
+      }),
+    );
   }
 
   appendConversationMessage(input: {
@@ -322,25 +363,45 @@ export class OpenBotDatabase {
     eventType: string;
     detail?: unknown;
     commandId?: string;
-    /** The shown messages that a person deletes. No later write or replay brings them back. */
     deletedMessageIds?: readonly string[];
   }): number {
     return this.#conversationWrites.persistConversationChanges(input);
   }
 
-  /** Deletes every shown message of a thread, for "Delete history". No later write or replay brings one back. */
   deleteThreadHistory(input: { agentId: string; threadId: string }): number {
     return this.#conversationWrites.deleteThreadHistory(input);
   }
 
-  /** The ids of the shown messages of a thread, in no order. */
   threadMessageIds(threadId: string): string[] {
     return threadMessageIds(this.connection, threadId);
   }
 
-  /** The ids of the messages that a person deleted from this thread. */
   deletedConversationMessageIds(threadId: string): Set<string> {
     return deletedThreadMessageIds(this.connection, threadId);
+  }
+
+  pinnedThreadMessages(threadIds: readonly string[], limit: number): PinnedThreadMessage[] {
+    return pinnedThreadMessages(this.connection, threadIds, limit);
+  }
+
+  pinnedThreadMessageCount(threadId: string): number {
+    return pinnedThreadMessageCount(this.connection, threadId);
+  }
+
+  threadMessagePinner(threadId: string, messageId: string): MessagePinner | null {
+    return threadMessagePinner(this.connection, threadId, messageId);
+  }
+
+  pinThreadMessage(threadId: string, messageId: string, pinnedAt: string, pinnedBy: MessagePinner): void {
+    pinThreadMessage(this.connection, threadId, messageId, pinnedAt, pinnedBy);
+  }
+
+  unpinThreadMessage(threadId: string, messageId: string): void {
+    unpinThreadMessage(this.connection, threadId, messageId);
+  }
+
+  threadMessagesContaining(threadId: string, quote: string, limit: number): ConversationMessage[] {
+    return threadMessagesContaining(this.connection, threadId, quote, limit);
   }
 
   upsertProviderHistoryMessage(input: {
@@ -355,7 +416,6 @@ export class OpenBotDatabase {
     return this.#conversationWrites.upsertProviderHistoryMessage(input);
   }
 
-  /** Commits one normalized provider-history page and its staging marker as one transaction. */
   importProviderHistoryMessages(input: {
     sessionId: string;
     turnId: string;
@@ -364,12 +424,10 @@ export class OpenBotDatabase {
     messages: readonly ConversationMessage[];
     throughItemIndex?: number;
     complete: boolean;
+    compact?: boolean;
     detail?: unknown;
   }): void {
-    const db = this.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(this.connection, () => {
       for (const message of input.messages) {
         this.upsertProviderHistoryMessage({
           agentId: input.agentId,
@@ -382,12 +440,11 @@ export class OpenBotDatabase {
       if (input.throughItemIndex !== undefined) {
         this.#providerHistory.markItemsImportedThrough(input.sessionId, input.turnId, input.throughItemIndex);
       }
-      if (input.complete) this.#providerHistory.markTurnImported(input.sessionId, input.turnId);
-      if (ownsTransaction) db.exec("COMMIT");
-    } catch (error) {
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+      if (input.complete) {
+        this.#providerHistory.markTurnImported(input.sessionId, input.turnId);
+        if (input.compact) this.#providerHistory.compactImportedTurn(input.sessionId, input.turnId);
+      }
+    });
   }
 
   persistConversationAndMailbox(
@@ -397,22 +454,15 @@ export class OpenBotDatabase {
     mailboxState: MailboxProjectionState,
     mailboxEventType: string,
   ): ConversationSnapshot {
-    const db = this.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(this.connection, () => {
       this.replaceMailboxState(`mailbox:${mailboxEventType}:${randomUUID()}`, mailboxState, mailboxEventType);
-      const persisted = this.#conversationWrites.persistConversation(
+      return this.#conversationWrites.persistConversation(
         snapshot,
         eventType,
         payload,
         `conversation:${eventType}:${randomUUID()}`,
       );
-      db.exec("COMMIT");
-      return persisted;
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   persistConversationChangesAndMailbox(
@@ -424,19 +474,14 @@ export class OpenBotDatabase {
     mailboxChanges: MailboxProjectionChanges,
     mailboxEventType: string,
   ): ConversationSnapshot {
-    const db = this.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(this.connection, () => {
       this.applyMailboxChanges(
         `mailbox:${mailboxEventType}:${randomUUID()}`,
         mailboxState,
         mailboxChanges,
         mailboxEventType,
       );
-      if (!snapshot.threadId) {
-        db.exec("COMMIT");
-        return structuredClone(snapshot);
-      }
+      if (!snapshot.threadId) return structuredClone(snapshot);
       const revision = this.#conversationWrites.persistConversationChanges({
         agentId: snapshot.agentId,
         threadId: snapshot.threadId,
@@ -446,47 +491,31 @@ export class OpenBotDatabase {
         detail: payload,
         commandId: `conversation:${eventType}:${randomUUID()}`,
       });
-      db.exec("COMMIT");
       return { ...structuredClone(snapshot), revision };
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
-  /**
-   * Writes the mailbox changes and runs `write` in one transaction, so the mailbox rows and the rows
-   * that name them commit together or not at all.
-   */
   persistMailboxChangesWith<T>(
     mailboxState: MailboxProjectionState,
     mailboxChanges: MailboxProjectionChanges,
     mailboxEventType: string,
     write: () => T,
   ): T {
-    const db = this.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(this.connection, () => {
       this.applyMailboxChanges(
         `mailbox:${mailboxEventType}:${randomUUID()}`,
         mailboxState,
         mailboxChanges,
         mailboxEventType,
       );
-      const result = write();
-      db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+      return write();
+    });
   }
 
   activeProviderSession(threadId: string, provider: AgentProviderId): ProviderSession | null {
     return this.#sessions.activeProviderSession(threadId, provider);
   }
 
-  /** Whether the thread has an event of this type. The `orchestration_events_thread_type` index answers it. */
   threadHasEvent(threadId: string, eventType: string): boolean {
     return (
       this.connection
@@ -568,6 +597,18 @@ export class OpenBotDatabase {
     pendingOnly?: boolean;
   }): ProviderHistoryStagedItem[] {
     return this.#providerHistory.readStagedItems(input);
+  }
+
+  compactImportedProviderHistory(afterRowId: number): ProviderHistoryCompactionBatch {
+    return this.#providerHistory.compactImportedItems(afterRowId);
+  }
+
+  compactThreadEvents(): ThreadEventCompactionBatch {
+    return this.#threadEvents.compactNext();
+  }
+
+  dropCompactedProviderHistoryItems(sessionId: string, turnId: string): void {
+    this.#providerHistory.dropCompactedItems(sessionId, turnId);
   }
 
   markProviderHistoryTurnImported(sessionId: string, turnId: string): void {

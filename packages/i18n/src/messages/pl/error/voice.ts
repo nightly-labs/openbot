@@ -24,6 +24,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Pobierz model syntezy mowy w Ustawienia → Głos.",
   "error.voice.speech.timedOut": "Czytanie odpowiedzi na głos trwało zbyt długo.",
   "error.voice.speech.failed": "OpenBot nie mógł przeczytać odpowiedzi na głos.",
+  "error.voice.speech.providerRefused": "{provider} odmówił utworzenia dźwięku: {reason}",
   "error.voice.recordingNotKept": "OpenBot nie mógł zachować nagrania głosowego.",
   "error.voice.live.timedOut": "Głos na żywo Codex nie uruchomił się na czas. Spróbuj ponownie.",
   "error.voice.live.failed": "Głos na żywo zatrzymał się: {reason}",
@@ -31,7 +32,11 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex na serwerze nie mógł uruchomić głosu na żywo. Poproś właściciela, aby zaktualizował Codex na tym komputerze i zalogował się przez ChatGPT, a potem spróbuj ponownie.",
   "error.voice.live.signIn": "Zaloguj się do Codex kontem ChatGPT, aby używać głosu na żywo.",
+  "error.voice.live.chooseAccount":
+    "To konto ChatGPT nie może używać głosu na żywo. W Ustawienia → Głos wybierz konto, którego plan obejmuje głos.",
   "error.voice.live.unavailable":
     "OpenAI nie mogło uruchomić głosu na żywo. Problem leży po stronie OpenAI. Spróbuj ponownie później.",
+  "error.voice.live.refused":
+    "OpenAI odmówiło uruchomienia głosu na żywo. Spróbuj ponownie później albo wyłącz głos na żywo w Ustawieniach, aby rozmawiać głosem.",
   "error.voice.live.off": "Głos na żywo Codex jest wyłączony. Włącz go w Ustawienia → Głos.",
 } as const satisfies PartialTranslation<typeof source>;
