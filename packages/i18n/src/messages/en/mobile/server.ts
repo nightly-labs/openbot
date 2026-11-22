@@ -430,6 +430,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.route.timezone": "Timezone",
   "mobile.server.route.personality": "Agent personality",
   "mobile.server.route.agents": "Agents",
+  "mobile.server.route.voiceModel": "Speech recognition",
   "mobile.server.settings.storage": "Storage",
   "mobile.server.route.storage": "Storage",
   "mobile.server.route.storageFiles": "All files",
@@ -552,6 +553,19 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.timezoneSaveFailed": "Could not save the timezone. Try again.",
   "mobile.server.settings.timezoneUnavailable": "Connect to this server as an owner or admin to change its timezone.",
   "mobile.server.settings.timezoneUnsupported": "Update OpenBot on this server to change its timezone here.",
+  "mobile.server.settings.voiceModelDescription":
+    "Agents on this server use this model to transcribe the sound of videos that have no captions.",
+  "mobile.server.settings.voiceModelLoading": "Loading speech recognition…",
+  "mobile.server.settings.voiceModelLoadFailed": "Could not load the speech recognition model of the server.",
+  "mobile.server.settings.voiceModelSaveFailed": "Could not change the speech recognition model. Try again.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Update OpenBot on this server to change its speech recognition here.",
+  "mobile.server.settings.voiceModelReady": "Ready",
+  "mobile.server.settings.voiceModelDownloading": "Downloading: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} download",
+  "mobile.server.settings.voiceModelDownload": "Download",
+  "mobile.server.settings.voiceModelCancel": "Stop download",
+  "mobile.server.settings.voiceModelRemove": "Remove",
   "mobile.server.settings.keySection": "Server key",
   "mobile.server.settings.keyChanged": "Last change",
   "mobile.server.settings.keyChange": "Change key",
@@ -1130,7 +1144,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Your “Message yourself” chat and the people you allow reach OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "The people you allow reach OpenBot. Other people get a code to give you.",
+    "Your “Message yourself” chat and the people you allow reach OpenBot. Other people get a code to give you.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp removed this server from the linked devices. Link the number again.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1377,10 +1391,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.modelsFailed": "Could not change the models. Try again.",
   "mobile.server.providers.promptCache": "Prompt cache",
   "mobile.server.providers.promptCacheHint":
-    "How long Claude keeps the context of an agent in the cache between turns. A change applies when Claude starts again.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code default",
+    "How long Claude and Pi keep the context of an agent in the cache between turns. A change applies when the provider starts again.",
+  "mobile.server.providers.promptCacheDefault": "Provider default",
   "mobile.server.providers.promptCacheHour": "1 hour",
   "mobile.server.providers.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compact before the cache expires",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "When a chat with 200K or more tokens of context is idle with a 1 hour cache, the agent compacts the context before the cache expires. Then the next message does not read the full context again with no cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Could not load the compaction setting of this server.",
   "mobile.server.providers.compactWindow": "Compact chats at",
   "mobile.server.providers.compactWindowHint":
     "Claude Code sums up the older turns of a chat when the chat reaches this size. Lower keeps turns fast and cheap. Higher keeps more detail. A model with a smaller window compacts at its own limit.",
@@ -1435,6 +1453,7 @@ export const messages = defineMessages("mobile.server", {
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "mobile.server.providers.codexKeyAlternative":
     "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "mobile.server.providers.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "mobile.server.providers.sectionUse": "Use",
   "mobile.server.providers.unused": "No agent uses it",
   "mobile.server.providers.usedByCount": { one: "1 agent uses it", other: "{count} agents use it" },

@@ -82,6 +82,8 @@ export const messages = {
   "error.backend.channelCompactNoSession": "לחברי הערוץ הזה אין עדיין שיחה לדחוס. דחסו אותו אחרי שחבר עונה בערוץ.",
   "error.backend.channelCompactNotSupported":
     "אף חבר בערוץ הזה לא יכול לדחוס לפי בקשה. חברים שתומכים בזה דוחסים את ההקשר שלהם אוטומטית כשהוא כמעט מלא.",
+  "error.backend.channelCompactProviderUnavailable":
+    "הספק של חברי הערוץ לא עובד כרגע. יש לרענן את הספקים, ואז לדחוס שוב את הערוץ.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
   "error.backend.channelArchiveRunning": "יש לעצור את העבודה הפעילה בערוץ הזה ואז למחוק אותו.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",
@@ -212,7 +214,8 @@ export const messages = {
     "לסוכן הזה כבר יש {count} המתנות פתוחות. יש לסגור המתנה עם openbot.close_wait לפני שפותחים אחרת.",
   "error.backend.agentWaitGone": "ההמתנה הזו אינה פתוחה. הסוכן סגר אותה, או שמישהו ביטל אותה.",
   "error.backend.agentWaitNoRequest": "המתנה צריכה הודעה כדי להמשיך. לתור הזה אין הודעה.",
-  "error.backend.agentWaitOwnChatOnly": "יש לפתוח המתנה רק בצ'אט שלך. משימת ערוץ או הודעות אינה יכולה להמתין.",
+  "error.backend.agentWaitOwnChatOnly":
+    "יש לפתוח המתנה בצ'אט שלך או בשרשור צדדי. שיחת ערוץ או הודעות אינה יכולה להמתין.",
   "error.backend.agentWaitNoteRequired": "יש לכתוב הערה קצרה שאומרת בשביל מה ההמתנה.",
   "error.backend.agentWaitRoutineGone": "לסוכן הזה אין שגרה עם המזהה הזה.",
   "error.backend.agentWaitNoRoutine":
@@ -252,6 +255,7 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "השרת הזה דורש התחברות. יש להתחבר אליו ב-OpenBot במחשב המארח.",
   "error.backend.mcpSignInNeedsHttps":
     "השרת הזה דורש התחברות, ו-OpenBot מתחבר רק דרך https. יש לשנות את הכתובת ל-{url}.",
+  "error.backend.mcpSignInOtherAddress": "השרת הזה מתחבר רק בכתובת {url}. יש לשנות את הכתובת לכתובת הזו ולהתחבר שוב.",
   "error.backend.mcpSignInCancelled": "ההתחברות בוטלה.",
   "error.backend.mcpSignInTimedOut": "ההתחברות לא הושלמה בדפדפן.",
   "error.backend.mcpSignInRefused": "דף ההתחברות דחה את הגישה. התחבר שוב.",
@@ -316,6 +320,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "התיקייה אינה קיימת או שכבר נמחקה.",
   "error.backend.libraryFolderOtherAgent": "אפשר להעביר קובץ רק לתיקייה של הסוכן שלו.",
   "error.backend.libraryFolderMoveInvalid": "אי אפשר להעביר את התיקייה הזו לשם.",
+  "error.backend.workflowFolderLimit": "בשרת יכולות להיות לכל היותר {limit} תיקיות של תהליכי עבודה.",
+  "error.backend.workflowFolderPlacementLimit": "יש יותר מדי תהליכי עבודה בתיקיות.",
   "error.backend.sectionNameDuplicate": "שמות החלקים חייבים להיות ייחודיים.",
   "error.backend.directMessageRequired": "יש לכתוב הודעה קודם.",
   "error.backend.directMessageTooLong": "הודעה ישירה יכולה להכיל עד {limit} תווים.",
@@ -349,6 +355,7 @@ export const messages = {
     "רק אפליקציית OpenBot לטלפון יכולה לשלוח את הדיווח הזה, כי היא מוסיפה את גרסת הטלפון ואת יומן התמיכה. יש לפתוח את הצ'אט הזה בטלפון. אם ההודעה הזו מופיעה שם, יש לעדכן את אפליקציית הטלפון.",
   "error.backend.takeoverInactive": "השתלטות הדפדפן הזו אינה פעילה עוד.",
   "error.backend.authSubmitting": "שליחת האימות כבר מתבצעת.",
+  "error.backend.apiKeyListFailed": "OpenBot לא הצליח לקרוא את מפתחות ה-API השמורים.",
   "error.backend.apiKeySaveFailed": "OpenBot לא הצליח לשמור את מפתח ה-API. יש לנסות שוב.",
   "error.backend.apiKeySaving": "מפתח ה-API כבר נשמר.",
   "error.backend.apiKeyAnswerUnreadable":

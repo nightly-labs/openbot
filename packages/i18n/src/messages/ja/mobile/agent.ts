@@ -410,6 +410,9 @@ export const messages = {
   "mobile.agent.planCard.label": "長いタスクの前に計画を表示",
   "mobile.agent.planCard.footer":
     "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
+  "mobile.agent.builtinMemory.label": "OpenBot のメモリー",
+  "mobile.agent.builtinMemory.footer":
+    "エージェントが自分のメモリーを保存して読み込みます。Mem0 などのメモリーアプリだけを使うにはオフにします。保存済みのメモリーは残ります。",
   "mobile.agent.workspace.title": "ワークスペースのフォルダー",
   "mobile.agent.workspace.footer": "ホストのコンピューター上にある、このエージェントのフォルダーです。",
   "mobile.agent.advanced.behavior": "動作",

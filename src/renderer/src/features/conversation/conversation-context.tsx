@@ -767,7 +767,7 @@ const Conversation = createSimpleContext({
         const tail = merge === "latest" && page.pageInfo.hasOlder && !trimmed;
         const keepsWindow = tail && conversation.windowMode === "around";
         const apart = tail && !keepsWindow && !currentMessages.some((message) => mappedIds.has(message.id));
-        const kept = currentMessages.filter((message) => !pageItemIds.has(message.id));
+        const kept = currentMessages.filter((message) => mappedIds.has(message.id) || !pageItemIds.has(message.id));
         conversation.messages = keepsWindow
           ? windowedSnapshotMessages(currentMessages, pageMessages, { mode: "around", capped: true }).filter(
               (message) => mappedIds.has(message.id) || !pageItemIds.has(message.id),

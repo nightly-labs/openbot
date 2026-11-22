@@ -77,6 +77,8 @@ export const messages = {
   "mobile.channel.form.deselectAll": "선택 해제",
   "mobile.channel.form.memories": "메모리",
   "mobile.channel.form.routines": "루틴",
+  "mobile.channel.folders.description": "{channel}의 모든 멤버가 이 폴더에서 파일을 변경하고 명령을 실행할 수 있어요.",
+  "mobile.channel.folders.removeBody": "이제 {channel} 멤버가 {folder}의 파일을 변경할 수 없어요",
   "mobile.channel.form.deleteTitle": "채널을 삭제할까요?",
   "mobile.channel.form.deleteBody":
     "채널이 중지돼요. 기록은 삭제된 채널에 미리보기 전용으로 남아 있고, 그곳에서 복원할 수 있어요. 멤버 에이전트는 유지돼요.",

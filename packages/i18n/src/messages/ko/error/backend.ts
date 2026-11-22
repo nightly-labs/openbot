@@ -87,6 +87,8 @@ export const messages = {
     "이 채널의 멤버에게는 아직 압축할 대화가 없습니다. 멤버가 채널에서 답한 후에 압축하세요.",
   "error.backend.channelCompactNotSupported":
     "이 채널의 어떤 멤버도 요청 시 압축할 수 없습니다. 지원하는 멤버는 컨텍스트가 거의 가득 차면 자동으로 압축합니다.",
+  "error.backend.channelCompactProviderUnavailable":
+    "채널 멤버의 제공자가 지금 작동하지 않아요. 제공자를 새로 고친 다음 채널을 다시 압축해 주세요.",
   "error.backend.channelArchived": "메시지를 보내거나 작업을 변경하려면 먼저 이 채널을 복원하세요.",
   "error.backend.channelArchiveRunning": "이 채널에서 실행 중인 작업을 중지한 다음 삭제하세요.",
   "error.backend.channelReferenceUnavailable": "참조한 채널 메시지를 사용할 수 없어요.",
@@ -219,7 +221,7 @@ export const messages = {
   "error.backend.agentWaitGone": "이 대기는 열려 있지 않아요. 에이전트가 닫았거나 누군가 취소했어요.",
   "error.backend.agentWaitNoRequest": "대기를 이어가려면 메시지가 필요한데, 이 턴에는 메시지가 없어요.",
   "error.backend.agentWaitOwnChatOnly":
-    "대기는 자신의 채팅에서만 열 수 있어요. 채널이나 메시징 작업에서는 대기할 수 없어요.",
+    "대기는 자신의 채팅이나 사이드 스레드에서 열 수 있어요. 채널이나 메시징 대화에서는 대기할 수 없어요.",
   "error.backend.agentWaitNoteRequired": "대기 목적을 알려 주는 짧은 메모를 입력하세요.",
   "error.backend.agentWaitRoutineGone": "이 에이전트에는 이 ID의 루틴이 없어요.",
   "error.backend.agentWaitNoRoutine":
@@ -261,6 +263,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "이 서버에 로그인해야 해요. 호스트 컴퓨터의 OpenBot에서 로그인하세요.",
   "error.backend.mcpSignInNeedsHttps":
     "이 서버에 로그인해야 하는데, OpenBot은 https로만 로그인해요. URL을 {url}(으)로 변경하세요.",
+  "error.backend.mcpSignInOtherAddress":
+    "이 서버는 {url}에서만 로그인할 수 있습니다. URL을 이 주소로 바꾼 다음 다시 로그인하세요.",
   "error.backend.mcpSignInCancelled": "로그인이 취소되었어요.",
   "error.backend.mcpSignInTimedOut": "브라우저에서 로그인을 마치지 않았어요.",
   "error.backend.mcpSignInRefused": "로그인 페이지에서 접근을 거부했어요. 다시 로그인하세요.",
@@ -326,6 +330,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "폴더가 없거나 이미 삭제되었어요.",
   "error.backend.libraryFolderOtherAgent": "파일은 해당 에이전트의 폴더에만 넣을 수 있어요.",
   "error.backend.libraryFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없어요.",
+  "error.backend.workflowFolderLimit": "서버 하나에는 워크플로 폴더를 최대 {limit}개까지 둘 수 있어요.",
+  "error.backend.workflowFolderPlacementLimit": "폴더에 있는 워크플로가 너무 많아요.",
   "error.backend.sectionNameDuplicate": "섹션 이름은 고유해야 해요.",
   "error.backend.directMessageRequired": "먼저 메시지를 작성하세요.",
   "error.backend.directMessageTooLong": "다이렉트 메시지는 최대 {limit}자까지 쓸 수 있어요.",
@@ -359,6 +365,7 @@ export const messages = {
     "이 신고는 OpenBot 휴대폰 앱에서만 보낼 수 있어요. 휴대폰의 버전과 지원 로그를 추가하기 때문이에요. 휴대폰에서 이 채팅을 열어 주세요. 거기서도 이 메시지가 보이면 휴대폰 앱을 업데이트해 주세요.",
   "error.backend.takeoverInactive": "이 브라우저 제어권 가져오기는 더 이상 활성 상태가 아니에요.",
   "error.backend.authSubmitting": "인증을 이미 제출하는 중이에요.",
+  "error.backend.apiKeyListFailed": "OpenBot이 저장된 API 키를 읽을 수 없었어요.",
   "error.backend.apiKeySaveFailed": "OpenBot이 API 키를 저장할 수 없었어요. 다시 시도해 주세요.",
   "error.backend.apiKeySaving": "API 키를 이미 저장하는 중이에요.",
   "error.backend.apiKeyAnswerUnreadable":

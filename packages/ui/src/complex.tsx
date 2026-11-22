@@ -25,10 +25,7 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
   let restoreTarget: HTMLElement | null = null;
   return (open) => {
     if (open) {
-      restoreTarget =
-        document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-          ? document.activeElement
-          : null;
+      restoreTarget = focusedElement();
     } else {
       const openTrigger = Array.from(
         document.querySelectorAll<HTMLElement>('[aria-haspopup][aria-expanded="true"][aria-controls]'),
@@ -60,13 +57,16 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
   };
 }
 
+function focusedElement(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+    ? document.activeElement
+    : null;
+}
+
 function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; onOpenChange?: OpenChangeHandler }) {
-  let target =
-    document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-      ? document.activeElement
-      : null;
   let content: HTMLElement | undefined;
   let open = untrack(() => props.open ?? props.defaultOpen ?? false);
+  let target = open ? focusedElement() : null;
   let epoch = 0;
   let selection: (() => void) | undefined;
   let handedOff = false;
@@ -86,10 +86,7 @@ function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; 
         epoch++;
         selection = undefined;
         handedOff = false;
-        target =
-          document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-            ? document.activeElement
-            : null;
+        target = focusedElement();
       } else {
         target =
           Array.from(

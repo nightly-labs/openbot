@@ -595,6 +595,18 @@
   white-space: pre-wrap;
 }
 
+.agent-dock-visual {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.agent-dock-visual > .agent-dock-text {
+  min-width: 0;
+  flex: 1;
+  font-weight: 500;
+}
+
 .agent-dock-markdown {
   min-width: 0;
   font-size: var(--openbot-text-md);

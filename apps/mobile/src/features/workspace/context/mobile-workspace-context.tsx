@@ -12,6 +12,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { agentColorsEvent } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
@@ -31,6 +32,7 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import {
   AGENT_HIDDEN_WORK_CAPABILITY,
@@ -51,6 +53,7 @@ import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-r
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
@@ -264,7 +267,7 @@ import {
 } from "@/features/workspace/model/task-cache";
 import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/team-events";
 import { runTeamRequest } from "@/features/workspace/model/team-request";
-import { reduceThreadWaits } from "@/features/workspace/model/thread-waits";
+import { hostAwaitsQuestion, reduceThreadWaits } from "@/features/workspace/model/thread-waits";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import { appendTurnStepLine, latestThoughtId } from "@/features/workspace/model/turn-step-lines";
 import { createWorkspaceCache } from "@/features/workspace/model/workspace-cache";
@@ -2244,20 +2247,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const activeServer = currentActiveServer();
         const agent = agentsRef.current.find((candidate) => candidate.id === agentId);
         const snapshot = conversationStore.get(agentId);
+        const waits = liveState.get().threadWaitsByServer[activeServer.id] ?? [];
         const message = snapshot?.messages.find(
           (item) =>
-            item.turnId === snapshot.activeTurnId &&
             item.questionPrompt?.requestId === input.requestId &&
-            item.questionPrompt.resolution === null,
+            item.questionPrompt.resolution === null &&
+            ((Boolean(snapshot.activeTurnId) && item.turnId === snapshot.activeTurnId) ||
+              hostAwaitsQuestion(waits, agentId, item.turnId, input.requestId)),
         );
-        if (
-          agent?.serverId !== activeServer.id ||
-          !showsOnline(activeServer) ||
-          !message?.questionPrompt ||
-          message.questionPrompt.resolution ||
-          !snapshot?.activeTurnId ||
-          message.turnId !== snapshot.activeTurnId
-        ) {
+        if (agent?.serverId !== activeServer.id || !showsOnline(activeServer) || !message?.questionPrompt) {
           throw new Error(currentText().t("mobile.workspace.error.formUnavailable"));
         }
         await request("POST", TEAM_API_ROUTES.respond.prompt, ignoreResponse, {
@@ -2482,6 +2480,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           administers(serverId, LOCAL_SERVERS_CAPABILITY),
         canRestartServerItself: (serverId) => administers(serverId, HOST_RESTART_CAPABILITY),
         canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
+        canManageServerVoiceModel: (serverId) => administers(serverId, HOST_VOICE_MODEL_CAPABILITY),
         canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
         canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
         canManageMemoryReview: (serverId) => administers(serverId, MEMORY_REVIEW_CAPABILITY),
@@ -2559,6 +2558,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
         canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
         canManageAgentFolders: (serverId) => administers(serverId, AGENT_FOLDERS_CAPABILITY),
+        canManageChannelFolders: (serverId) => administers(serverId, CHANNEL_FOLDERS_CAPABILITY),
         canNestSidebarFolders: (serverId) => hasCapability(capabilities, serverId, SIDEBAR_FOLDERS_CAPABILITY),
         canManageAgentAccess: (serverId) => administers(serverId, AGENT_ADMIN_CAPABILITY),
         canManageAgentHostSettings: (serverId) => administers(serverId, AGENT_HOST_SETTINGS_CAPABILITY),
@@ -2566,6 +2566,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
         canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
         canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
+        canManageAgentBuiltinMemory: (serverId) => administers(serverId, AGENT_BUILTIN_MEMORY_CAPABILITY),
         canManageAgentDefaults: (serverId) => administers(serverId, AGENT_DEFAULTS_CAPABILITY),
         canManageBackgroundProcesses: (serverId) => administers(serverId, BACKGROUND_PROCESSES_CAPABILITY),
         canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),

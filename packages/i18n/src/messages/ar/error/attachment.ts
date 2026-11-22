@@ -7,6 +7,7 @@ export const messages = {
   "error.attachment.namedFileTooLarge": "{name} أكبر من الحد البالغ 100 MB.",
   "error.attachment.totalTooLarge": "تتجاوز المرفقات الحد الإجمالي البالغ 250 MB.",
   "error.attachment.unavailable": "لم يعد هذا الملف متاحًا.",
+  "error.attachment.noApp": "لم يفتح أي تطبيق على هذا الكمبيوتر هذا الملف. نزّله، ثم افتحه من مدير الملفات.",
   "error.attachment.tooMany": "اختر {limit} ملفات على الأكثر.",
   "error.attachment.mediaUnsupported": "لا يدعم هذا الخادم مرفقات MP3 أو MOV. حدّث OpenBot على المضيف وأعد المحاولة.",
   "error.attachment.emlUnsupported": "لا يدعم هذا الخادم مرفقات EML. حدّث OpenBot على المضيف وأعد المحاولة.",

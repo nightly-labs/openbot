@@ -23,11 +23,15 @@ export const messages = {
     "המארח לא אישר ל-OpenBot להקליט את המסך שלו. יש לאשר הקלטת מסך במארח ולנסות שוב.",
   "error.remote.windowsSessionDisconnected":
     "הסשן של Windows במארח מנותק, ולכן אין מסך לשיתוף. יש להיכנס ל-Windows במסך של המארח ולנסות שוב.",
+  "error.remote.windowsCaptureDenied":
+    "Windows במארח לא מאפשר ל-OpenBot להקליט את המסך שלו. יש לבטל את נעילת Windows במסך של המארח, לסגור כל בקשת הרשאת מנהל ולנסות שוב. אם הבעיה נמשכת, יש להפעיל מחדש את המארח.",
   "error.remote.macScreenLocked":
     "ה-Mac נעול, ולכן אינו יכול לשתף את המסך שלו. יש לבטל את נעילת ה-Mac במסך שלו ולנסות שוב.",
   "error.remote.streamTooSlowLowerQuality":
     "החיבור למארח איטי מדי בשביל התמונה. יש לנסות שוב: החיבור הבא ישתמש באיכות נמוכה יותר.",
   "error.remote.streamTooSlow": "החיבור למארח איטי מדי בשביל התמונה. יש להשתמש ברשת מהירה יותר ולנסות שוב.",
+  "error.remote.noPictureSwitchEncoder":
+    "המארח לא שלח תמונה. יש לנסות שוב: החיבור הבא משתמש בהגדרת וידאו שעובדת ביותר מחשבים.",
   "error.remote.teamSessionExpired": "הסשן של הצוות פג.",
   "error.remote.finishTestBeforeSwitch": "יש לסיים את בדיקת שולחן העבודה המרוחק לפני החלפת תצוגות.",
   "error.remote.displayNotFound": "התצוגה המרוחקת לא נמצאה.",

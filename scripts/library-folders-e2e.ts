@@ -29,6 +29,7 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { StorageUsageScanner, StorageUsageService } = await import("../src/backend/storage-usage");
 const { LibraryFoldersService } = await import("../src/main/library-folders-service");
+type WorkflowFileOwner = import("../src/backend/workflows/workflow-file-owners").WorkflowFileOwner;
 
 const CALL_MARK = "LIBRARY-CALL";
 const PERSON = { id: "local", name: "Alex" };
@@ -228,6 +229,16 @@ const listingSchema = z.object({
       files: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
     })
     .optional(),
+  workflowFiles: z
+    .array(
+      z.object({
+        workflow: z.string(),
+        workflowFolder: z.string().nullable(),
+        fileCount: z.number(),
+        files: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
+      }),
+    )
+    .optional(),
   truncated: z.boolean(),
 });
 const refusalSchema = z.object({ error: z.string() });
@@ -257,6 +268,7 @@ async function startHost(directory: string, withFolders: boolean) {
   const foldersPath = join(directory, LIBRARY_FOLDERS_FILE);
   const libraryFolders = withFolders ? new LibraryFoldersStore(foldersPath) : null;
   if (libraryFolders) await runCauseEffect(libraryFolders.initialize());
+  const workflowOwners = new Map<string, WorkflowFileOwner>();
   const storageSources = {
     roots: {
       database: store.database.path,
@@ -269,6 +281,7 @@ async function startHost(directory: string, withFolders: boolean) {
     database: () => store.database.connection,
     mailbox,
     agents: () => agents.listAgents(),
+    workflowFiles: () => workflowOwners,
   };
   const storage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   const foldersService = libraryFolders
@@ -300,6 +313,7 @@ async function startHost(directory: string, withFolders: boolean) {
     agents,
     mailbox,
     libraryFolders,
+    workflowOwners,
     folderChanges: () => folderChanges,
     stored: () => storedSchema.parse(JSON.parse(readFileSync(foldersPath, "utf8"))),
     hasFoldersFile: () => existsSync(foldersPath),
@@ -923,6 +937,85 @@ try {
       restoredChild.parentId === undefined &&
       restoredFolders.every((folder) => depthOf(folder.id) <= LIBRARY_FOLDER_LIMITS.levels),
     JSON.stringify({ parent: depthOf(parent), child: depthOf(child), childParent: restoredChild?.parentId ?? null }),
+  );
+
+  const madeBy = async (name: string) => {
+    const made = await runCauseEffect(
+      host.mailbox.storeGeneratedAttachment({
+        bytes: new TextEncoder().encode(name),
+        kind: "image",
+        name,
+        mimeType: "image/png",
+      }),
+    );
+    return made.id;
+  };
+  const weekly = { id: "workflow-weekly", name: "Weekly posts", folder: { id: "workflow-folder", name: "Marketing" } };
+  const madeShotId = await madeBy("weekly-shot.png");
+  host.workflowOwners.set(madeShotId, { workflow: weekly, createdAt: null });
+  const strayId = await madeBy("stray.png");
+  const workflowGroup = (listing: z.infer<typeof listingSchema> | null) =>
+    listing?.workflowFiles?.find((group) => group.workflow === weekly.name);
+  const seenByMaker = await list("list shows the files that workflows made", maker.id);
+  const makerGroup = workflowGroup(seenByMaker.listing);
+  pass(
+    "list_library_folders shows a workflow file by workflow and workflow folder, and not a generated file with no workflow",
+    makerGroup?.workflowFolder === "Marketing" &&
+      makerGroup.fileCount === 1 &&
+      makerGroup.files[0]?.id === madeShotId &&
+      !seenByMaker.text.includes(strayId),
+    seenByMaker.text,
+  );
+  for (const fill of fills.slice(6, 8))
+    await runCauseEffect(store.mutate({ type: "delete", folderId: fill.id }, context));
+  await organize("create a folder for workflow files", maker.id, { action: "create", folder: "Workflow picks" });
+  const picked = await organize("place a workflow file", maker.id, {
+    action: "place",
+    to: "Workflow picks",
+    files: [madeShotId],
+  });
+  const picks = storedFolder(maker.id, "Workflow picks");
+  const afterPick = await list("list after the workflow file is placed", maker.id);
+  pass(
+    "organize_library place moves a workflow file into a folder of the agent",
+    picked.success &&
+      picked.value?.filesPlaced === 1 &&
+      host.stored().placement[madeShotId] === picks?.id &&
+      afterPick.listing?.folders.some(
+        (folder) => folder.path === "Workflow picks" && folder.files.some((file) => file.id === madeShotId),
+      ) === true &&
+      workflowGroup(afterPick.listing) === undefined,
+    picked.text,
+  );
+  const seenByOther = await list("a different agent lists after the workflow file is placed", other.id);
+  pass(
+    "A workflow file in a folder of one agent is not listed for a different agent",
+    seenByOther.success && !seenByOther.text.includes(madeShotId),
+    seenByOther.text,
+  );
+  await refused(
+    "a different agent takes a workflow file from a folder of the agent",
+    other.id,
+    { action: "place", files: [madeShotId] },
+    "in a Library folder of another agent",
+  );
+  await refused(
+    "place a generated file with no workflow",
+    maker.id,
+    { action: "place", to: "Workflow picks", files: [strayId] },
+    "is not one of your Library files",
+  );
+  const unpicked = await organize("take a workflow file out of the folder", maker.id, {
+    action: "place",
+    files: [madeShotId],
+  });
+  const afterUnpick = await list("list after the workflow file is taken out", other.id);
+  pass(
+    "place with no to takes a workflow file out, and each agent sees it under its workflow again",
+    unpicked.success &&
+      host.stored().placement[madeShotId] === undefined &&
+      workflowGroup(afterUnpick.listing)?.files.some((file) => file.id === madeShotId) === true,
+    unpicked.text,
   );
 
   const bare = await startHost(join(root, "user-data-bare"), false);

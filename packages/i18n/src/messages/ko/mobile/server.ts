@@ -326,6 +326,7 @@ export const messages = {
   "mobile.server.route.timezone": "시간대",
   "mobile.server.route.personality": "에이전트 성격",
   "mobile.server.route.agents": "에이전트",
+  "mobile.server.route.voiceModel": "음성 인식",
   "mobile.server.settings.storage": "저장 공간",
   "mobile.server.route.storage": "저장 공간",
   "mobile.server.route.storageFiles": "모든 파일",
@@ -447,6 +448,19 @@ export const messages = {
   "mobile.server.settings.timezoneSaveFailed": "시간대를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.timezoneUnavailable": "시간대를 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.settings.timezoneUnsupported": "여기에서 시간대를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.voiceModelDescription":
+    "이 서버의 에이전트는 자막이 없는 동영상의 소리를 이 모델로 받아 적어요.",
+  "mobile.server.settings.voiceModelLoading": "음성 인식을 불러오는 중…",
+  "mobile.server.settings.voiceModelLoadFailed": "서버의 음성 인식 모델을 불러오지 못했어요.",
+  "mobile.server.settings.voiceModelSaveFailed": "음성 인식 모델을 변경하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "여기에서 음성 인식을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.voiceModelReady": "준비됨",
+  "mobile.server.settings.voiceModelDownloading": "다운로드 중: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} 다운로드",
+  "mobile.server.settings.voiceModelDownload": "다운로드",
+  "mobile.server.settings.voiceModelCancel": "다운로드 중지",
+  "mobile.server.settings.voiceModelRemove": "제거",
   "mobile.server.settings.keySection": "서버 키",
   "mobile.server.settings.keyChanged": "마지막 변경",
   "mobile.server.settings.keyChange": "키 변경",
@@ -858,7 +872,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1092,10 +1106,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "모델을 변경할 수 없습니다. 다시 시도하세요.",
   "mobile.server.providers.promptCache": "프롬프트 캐시",
   "mobile.server.providers.promptCacheHint":
-    "턴 사이에 Claude가 에이전트의 컨텍스트를 캐시에 보관하는 시간입니다. 변경 사항은 Claude가 다시 시작할 때 적용됩니다.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code 기본값",
+    "턴 사이에 Claude와 Pi가 에이전트의 컨텍스트를 캐시에 보관하는 시간이에요. 변경 사항은 공급자가 다시 시작할 때 적용돼요.",
+  "mobile.server.providers.promptCacheDefault": "공급자 기본값",
   "mobile.server.providers.promptCacheHour": "1시간",
   "mobile.server.providers.promptCacheLoadFailed": "이 서버의 프롬프트 캐시 시간을 불러올 수 없습니다.",
+  "mobile.server.providers.cacheExpiryCompaction": "캐시가 만료되기 전에 압축",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "컨텍스트가 20만 토큰 이상인 채팅이 1시간 캐시로 유휴 상태이면, 에이전트가 캐시가 만료되기 전에 컨텍스트를 압축해요. 그러면 다음 메시지가 캐시 없이 전체 컨텍스트를 다시 읽지 않아요.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "이 서버의 압축 설정을 불러올 수 없어요.",
   "mobile.server.providers.compactWindow": "채팅 압축 크기",
   "mobile.server.providers.compactWindowHint":
     "채팅이 이 크기에 도달하면 Claude Code가 이전 턴을 요약해요. 낮으면 턴이 빠르고 저렴해요. 높으면 더 많은 세부 정보가 남아요. 창이 더 작은 모델은 자체 한도에서 압축해요.",
@@ -1150,6 +1168,7 @@ export const messages = {
     "ChatGPT는 ChatGPT 요금제가 아니라 이 키를 사용해요. OpenAI는 요청마다 키에 요금을 청구해요. 요금제 사용량은 표시되지 않아요.",
   "mobile.server.providers.codexKeyAlternative":
     "또는 OpenAI API 키로 로그인하세요. OpenAI는 요청마다 키에 요금을 청구해요.",
+  "mobile.server.providers.museKeyInUse": "Muse는 로그인이 아닌 이 키를 사용해요. 로그인을 사용하려면 키를 제거하세요.",
   "mobile.server.providers.sectionUse": "사용",
   "mobile.server.providers.unused": "사용하는 에이전트 없음",
   "mobile.server.providers.usedByCount": { other: "에이전트 {count}개가 사용 중" },

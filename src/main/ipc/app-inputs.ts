@@ -3,6 +3,7 @@ import type {
   AgentDefaults,
   AgentDockAction,
   AgentDockDragPhase,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockPresentation,
   AgentMemoryLimitPreference,
@@ -62,6 +63,7 @@ import {
   isAgentDefaults,
   isAgentDockAction,
   isAgentDockDragPhase,
+  isAgentDockExtent,
   isAgentDockInputRegion,
   isAgentDockInteractive,
   isAgentDockPresentation,
@@ -370,6 +372,11 @@ export function parseAgentDockXWayland(input: unknown): SetAgentDockXWaylandInpu
 export function parseAgentDockInputRegion(input: unknown): AgentDockInputRect[] {
   if (isAgentDockInputRegion(input)) return input;
   throw new Error("Agent dock input region is invalid.");
+}
+
+export function parseAgentDockExtent(input: unknown): AgentDockExtent | null {
+  if (isAgentDockExtent(input)) return input;
+  throw new Error("Agent dock extent is invalid.");
 }
 
 export function parseDynamicIslandXWayland(input: unknown): SetAgentDockXWaylandInput {

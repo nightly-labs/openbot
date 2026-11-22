@@ -156,6 +156,21 @@ const buildLiteralPrefixesXlsx = (): Uint8Array =>
     ),
   });
 
+const WORD_NAMESPACE = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+
+const buildDocx = (): Uint8Array =>
+  zipSync({
+    "word/document.xml": strToU8(
+      `<?xml version="1.0"?><w:document ${WORD_NAMESPACE}><w:body><w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>Launch review</w:t></w:r></w:p><w:p><w:r><w:t xml:space="preserve">The release is </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>ready</w:t></w:r><w:r><w:t xml:space="preserve"> after the </w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>final checks</w:t></w:r><w:r><w:t>.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Open items</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Confirm the store listing</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Send the partner email</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Steps</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr><w:r><w:t>Tag the build</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr><w:r><w:t>Publish the notes</w:t></w:r></w:p><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>Area</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Owner</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>Desktop</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Builder</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:rPr><w:strike/></w:rPr><w:t>Mobile moved to next week</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>`,
+    ),
+    "word/styles.xml": strToU8(
+      `<?xml version="1.0"?><w:styles ${WORD_NAMESPACE}><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/></w:style></w:styles>`,
+    ),
+    "word/numbering.xml": strToU8(
+      `<?xml version="1.0"?><w:numbering ${WORD_NAMESPACE}><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>`,
+    ),
+  });
+
 export const MARKDOWN_PREVIEW = filePreview("RELEASE-NOTES.md", "text/markdown", "markdown", MARKDOWN);
 
 export const MARKDOWN_SHORT_PREVIEW = filePreview(
@@ -201,6 +216,16 @@ export const XLSX_LITERAL_PREFIXES_PREVIEW: FilePreview = {
   bytes: literalPrefixesBytes,
 };
 
+const docxBytes = buildDocx();
+
+export const DOCX_PREVIEW: FilePreview = {
+  name: "launch-review.docx",
+  size: docxBytes.byteLength,
+  mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  previewKind: "document",
+  bytes: docxBytes,
+};
+
 const HTML_PREVIEW = filePreview("weekly-signups.html", "text/html", "text", INLINE_SVG_CHART);
 
 export const UNSUPPORTED_PREVIEW: FilePreview = {
@@ -220,6 +245,7 @@ export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   PDF_PREVIEW,
   AUDIO_PREVIEW,
   XLSX_PREVIEW,
+  DOCX_PREVIEW,
   HTML_PREVIEW,
 ];
 

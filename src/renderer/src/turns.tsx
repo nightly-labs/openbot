@@ -397,13 +397,13 @@ const Turns = createSimpleContext({
       }
     }
 
-    function cancelQueuedMessage(deliveryId: string) {
+    function cancelQueuedMessage(deliveryId: string, recipientAgentId?: string) {
       const agent = activeAgent();
       if (!agent) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
       void turnsPort()
-        .agent.cancelQueuedMessage({ agentId: agent.id, deliveryId })
+        .agent.cancelQueuedMessage({ agentId: recipientAgentId ?? agent.id, deliveryId })
         .then(() => analytics.track("queue_action", { action: "cancel", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "cancel", result: "failed", failure_code: "cancel_failed" });

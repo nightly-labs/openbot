@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Puedes seleccionar otro servidor mientras este se carga.",
   "server.connection.cachedHint":
     "El contenido cargado y los borradores se conservan. Las acciones del servidor se reanudarán tras la reconexión.",
+  "server.connection.computerOffline":
+    "{name} está sin conexión. Comprueba que su equipo esté encendido, que OpenBot esté abierto y que Publicar este servidor esté activado en Ajustes del servidor > Miembros.",
   "server.connection.conversationFailed": "No se pudo cargar la conversación. Inténtalo de nuevo.",
   "server.connection.panelsFailed": "Algunos paneles del espacio de trabajo no se pudieron cargar. Inténtalo de nuevo.",
   "server.connection.retry": "Reintentar",
@@ -236,7 +238,7 @@ export const messages = {
   "server.plan.deletedOn": "Se elimina el {date}",
   "server.plan.dialogTitle": "No dejes ir a tus agentes",
   "server.plan.dialogDescription":
-    "{name} se detuvo porque no se pagó su plan. El {date}, OpenBot elimina sus agentes con todos sus chats y archivos.",
+    "{name} se detuvo porque su plan terminó. El {date}, OpenBot elimina sus agentes con todos sus chats y archivos.",
   "server.plan.dialogDaysLeft": {
     one: "Queda {count} día",
     other: "Quedan {count} días",
@@ -245,6 +247,24 @@ export const messages = {
   "server.plan.keepAgents": "Conservar agentes",
   "server.plan.ownerRenews":
     "Los agentes de {name} no están disponibles hasta que el propietario del servidor renueve el plan.",
+  "server.paywall.ready": "{name} está listo",
+  "server.paywall.wakeUp": "Tus agentes despiertan cuando te suscribes.",
+  "server.paywall.yourPlan": "Tu plan",
+  "server.paywall.vcpu": "{value} vCPU",
+  "server.paywall.memory": "{value} GB de memoria",
+  "server.paywall.storage": "{value} GB de almacenamiento",
+  "server.paywall.support": "Soporte personalizado",
+  "server.paywall.perYear": "al año",
+  "server.paywall.subscribe": "Suscribirse",
+  "server.paywall.checkoutFailed": "No se abrió el pago",
+  "server.paywall.checkoutTitle": "Termina el pago en tu navegador",
+  "server.paywall.checkoutDescription": "Tus agentes se están preparando.",
+  "server.paywall.openCheckoutAgain": "Abrir el pago de nuevo",
+  "server.paywall.active": "{name} está activo",
+  "server.paywall.activeDescription": "Gracias. Tus agentes están despiertos.",
+  "server.paywall.open": "Abrir {name}",
+  "server.paywall.almostReady": "{name} está casi listo",
+  "server.paywall.ownerSubscribes": "El propietario de {name} debe suscribirse para que tus agentes puedan empezar.",
   "server.select.failedTitle": "No se pudo seleccionar el servidor",
   "server.select.failedDescription": "No se pudo cambiar de servidor. Inténtalo de nuevo.",
   "server.select.openAgentFailed": "No se pudo abrir {name}. Búscalo en la barra lateral.",
@@ -374,6 +394,12 @@ export const messages = {
     "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente. En un servidor, el navegador también la usa después del próximo reinicio.",
   "server.settings.timezoneAutomatic": "Automática ({zone})",
   "server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
+  "server.settings.voiceModel.section": "Reconocimiento de voz",
+  "server.settings.voiceModel.description":
+    "Los agentes de este servidor usan este modelo para transcribir el sonido de los vídeos que no tienen subtítulos.",
+  "server.settings.voiceModel.loadFailed": "No se pudo cargar el modelo de reconocimiento de voz del servidor.",
+  "server.settings.voiceModel.group": "En este servidor",
+  "server.settings.voiceModel.removeLabel": "Quitar {name} de este servidor",
   "server.settings.turnLimit": "Hilos a la vez",
   "server.settings.turnLimitDescription":
     "Cuántos hilos de agentes pueden ejecutarse a la vez en este servidor. Más hilos usan más memoria.",
@@ -536,6 +562,7 @@ export const messages = {
     "No hay una contraseña aparte para el escritorio remoto. Los ajustes de abajo eligen quién puede controlar este equipo.",
   "server.desktop.componentInstalled": "Componente del host instalado",
   "server.desktop.componentNotInstalled": "Componente del host sin instalar",
+  "server.desktop.needsX11Session": "Requiere sesión X11",
   "server.desktop.sessions": "Acceso desatendido: {unattended} · Sesiones activas: {active}/{max}",
   "server.desktop.unattendedEnabled": "activado",
   "server.desktop.unattendedUnavailable": "no disponible",

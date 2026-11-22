@@ -9,7 +9,11 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
-import { attachmentFilePreview } from "../conversation/attachment-preview";
+import {
+  attachmentFilePreview,
+  openedAttachmentUrl,
+  remoteAttachmentUrlWith,
+} from "../conversation/attachment-preview";
 import { type AgentLevelsSource, createAgentLevels } from "../conversation/message-delete-access";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import type { FilesPort } from "./files-port";
@@ -27,18 +31,9 @@ const FilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
 const VIEWER_WIDTH = 4000;
 
-const REMOTE_ATTACHMENT_PROTOCOL = "openbot-remote-attachment:";
-
 function thumbnailUrl(file: StoredFileRow): string | null {
   if (file.previewUrl === null || file.previewKind !== "image") return file.previewUrl;
-  try {
-    const url = new URL(file.previewUrl);
-    if (url.protocol !== REMOTE_ATTACHMENT_PROTOCOL) return file.previewUrl;
-    url.searchParams.set("preview", "1");
-    return url.toString();
-  } catch {
-    return file.previewUrl;
-  }
+  return remoteAttachmentUrlWith(file.previewUrl, "preview");
 }
 
 interface Viewing {
@@ -218,7 +213,7 @@ function LibraryViewer(props: {
           macWindowControls={platform.appInfo()?.platform === "darwin"}
           preview={props.viewing.preview}
           agents={props.agents}
-          sourceUrl={file().previewUrl ?? null}
+          sourceUrl={openedAttachmentUrl(file().previewUrl)}
           maxWidth={() => VIEWER_WIDTH}
           onWidthChange={() => undefined}
           onOpenLink={props.onOpenUrl}

@@ -29,6 +29,7 @@ export interface UiConfirmBlockProps extends Omit<UiBlockProps<UiConfirmSpec>, "
   onRespond: (response: UiBlockResponse, preview?: string) => void;
   renderPreview?: ((markdown: string) => JSX.Element) | undefined;
   canEditPreview?: boolean | undefined;
+  onDraftChange?: ((draft: string | undefined) => void) | undefined;
 }
 
 function actionStyle(action: UiAction): UiActionStyle {
@@ -172,8 +173,13 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       ? String(state().response?.values?.[select])
       : (selected()[select] ?? options[0] ?? "");
 
+  function changeDraft(value: string | undefined): void {
+    setDraft(value);
+    props.onDraftChange?.(value);
+  }
+
   function startEditing(): void {
-    setDraft(props.spec.preview);
+    changeDraft(props.spec.preview);
     flush();
     editor?.focus();
   }
@@ -304,7 +310,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
           maxlength={UI_BLOCK_LIMITS.preview}
           aria-label={t("uiBlock.confirm.previewLabel")}
           disabled={locked()}
-          onValueChange={(value) => setDraft(value)}
+          onValueChange={changeDraft}
         />
       </Show>
       <Show when={!frozen() && confirming()}>

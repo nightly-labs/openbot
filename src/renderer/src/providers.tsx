@@ -24,6 +24,11 @@ import {
   providerAccountRelay,
 } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_FROZEN_ACCOUNTS_LIMIT,
+  PROVIDER_MANY_ACCOUNTS_CAPABILITY,
+  PROVIDER_MANY_ACCOUNTS_LIMIT,
+} from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
@@ -336,6 +341,9 @@ const Providers = createSimpleContext({
             changed(providerAdmin().renameAccount({ provider, accountId, label }, hostServerId)),
           remove: (provider, accountId) =>
             changed(providerAdmin().removeAccount({ provider, accountId }, hostServerId)),
+          maxAccounts: serverSupportsCapability(activeServer(), PROVIDER_MANY_ACCOUNTS_CAPABILITY)
+            ? PROVIDER_MANY_ACCOUNTS_LIMIT
+            : PROVIDER_FROZEN_ACCOUNTS_LIMIT,
           ...(usageResetServerId() === hostServerId
             ? {
                 usageResets: (provider: AgentProviderId) => providerAdmin().usageResets(provider, hostServerId),

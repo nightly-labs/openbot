@@ -93,6 +93,8 @@ export const messages = {
     "Die Mitglieder dieses Kanals haben noch keine Unterhaltung zum Komprimieren. Komprimiere ihn, nachdem ein Mitglied im Kanal geantwortet hat.",
   "error.backend.channelCompactNotSupported":
     "Kein Mitglied dieses Kanals kann auf Anfrage komprimieren. Mitglieder, die es unterstützen, komprimieren ihren Kontext automatisch, wenn er fast voll ist.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Der Anbieter der Kanalmitglieder funktioniert gerade nicht. Aktualisiere die Anbieter und komprimiere den Kanal dann erneut.",
   "error.backend.channelArchived":
     "Stelle diesen Kanal wieder her, bevor du Nachrichten sendest oder Aufgaben änderst.",
   "error.backend.channelArchiveRunning": "Stoppe die laufende Arbeit in diesem Kanal und lösche ihn dann.",
@@ -246,7 +248,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Ein Wartevorgang braucht eine Nachricht, um fortzufahren. Dieser Durchlauf hat keine Nachricht.",
   "error.backend.agentWaitOwnChatOnly":
-    "Öffne einen Wartevorgang nur in deinem eigenen Chat. Eine Kanal- oder Messaging-Aufgabe kann nicht warten.",
+    "Öffne einen Wartevorgang in deinem eigenen Chat oder in einem Nebenthread. Eine Kanal- oder Messaging-Unterhaltung kann nicht warten.",
   "error.backend.agentWaitNoteRequired": "Gib eine kurze Notiz an, wofür der Wartevorgang ist.",
   "error.backend.agentWaitRoutineGone": "Dieser Agent hat keine Routine mit dieser ID.",
   "error.backend.agentWaitNoRoutine":
@@ -291,6 +293,8 @@ export const messages = {
     "Dieser Server verlangt eine Anmeldung. Melde dich in OpenBot auf dem Host-Computer bei ihm an.",
   "error.backend.mcpSignInNeedsHttps":
     "Dieser Server verlangt eine Anmeldung, und OpenBot meldet sich nur über https an. Ändere die URL in {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Dieser Server meldet sich nur unter {url} an. Ändere die URL in diese Adresse und melde dich dann erneut an.",
   "error.backend.mcpSignInCancelled": "Die Anmeldung wurde abgebrochen.",
   "error.backend.mcpSignInTimedOut": "Die Anmeldung wurde im Browser nicht abgeschlossen.",
   "error.backend.mcpSignInRefused": "Die Anmeldeseite hat den Zugriff abgelehnt. Melde dich erneut an.",
@@ -360,6 +364,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Der Ordner existiert nicht oder wurde bereits gelöscht.",
   "error.backend.libraryFolderOtherAgent": "Eine Datei kann nur in einen Ordner ihres Agenten verschoben werden.",
   "error.backend.libraryFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
+  "error.backend.workflowFolderLimit": "Ein Server kann bis zu {limit} Workflow-Ordner haben.",
+  "error.backend.workflowFolderPlacementLimit": "In den Ordnern sind zu viele Workflows.",
   "error.backend.sectionNameDuplicate": "Abschnittsnamen müssen eindeutig sein.",
   "error.backend.directMessageRequired": "Schreibe zuerst eine Nachricht.",
   "error.backend.directMessageTooLong": "Eine Direktnachricht kann bis zu {limit} Zeichen haben.",
@@ -395,6 +401,7 @@ export const messages = {
     "Nur die OpenBot-Telefon-App kann diesen Bericht senden, weil sie Version und Supportprotokoll des Telefons hinzufügt. Öffne diesen Chat auf dem Telefon. Wenn du diese Meldung dort siehst, aktualisiere die Telefon-App.",
   "error.backend.takeoverInactive": "Diese Browserübernahme ist nicht mehr aktiv.",
   "error.backend.authSubmitting": "Die Authentifizierung wird bereits übermittelt.",
+  "error.backend.apiKeyListFailed": "OpenBot konnte die gespeicherten API-Schlüssel nicht lesen.",
   "error.backend.apiKeySaveFailed": "OpenBot konnte den API-Schlüssel nicht speichern. Versuche es erneut.",
   "error.backend.apiKeySaving": "Der API-Schlüssel wird bereits gespeichert.",
   "error.backend.apiKeyAnswerUnreadable":

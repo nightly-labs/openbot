@@ -61,6 +61,7 @@ const viewerStateSchema = z.object({
   state: z.enum(["connecting", "connected", "error"]),
   transport: z.enum(["p2p", "relay"]).optional(),
   message: z.string().max(1_000).optional(),
+  noPicture: z.boolean().optional(),
 });
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -95,6 +96,9 @@ export interface RemoteScreenRuntime {
   selectDisplay: SunshineMoonlightRuntime["selectDisplay"];
   stop: SunshineMoonlightRuntime["stop"];
   screenCaptureDenied?(): boolean;
+  windowsCaptureDenied?(): boolean;
+  canSwitchToSoftwareEncoder?(): boolean;
+  noPictureReceived?: SunshineMoonlightRuntime["noPictureReceived"];
   checkSetup?: SunshineMoonlightRuntime["checkSetup"];
   test?: SunshineMoonlightRuntime["test"];
 }
@@ -187,6 +191,10 @@ export class RemoteScreenGateway {
 
   screenRecordingDenied(): boolean {
     return this.#screenRecordingDenied;
+  }
+
+  needsX11Session(): boolean {
+    return this.#linuxWithoutX11;
   }
 
   readonly recheckScreenRecording = Effect.fn("RemoteScreenGateway.recheckScreenRecording")(
@@ -740,6 +748,18 @@ export class RemoteScreenGateway {
           this.#audit(session, "transport");
         }
         if (update.state === "connected" || update.state === "error") this.#finishStreamStart(session.snapshot.id);
+        if (update.state === "error" && update.noPicture && this.#sessions.size === 1) {
+          yield* (this.#runtime?.noPictureReceived?.() ?? Effect.void).pipe(
+            Effect.catch(({ cause }: RemoteDesktopOperationError) =>
+              Effect.sync(() =>
+                this.#options.onDiagnostic?.(
+                  "sunshine",
+                  `OpenBot: the encoder choice was not saved: ${describeCause(cause)}\n`,
+                ),
+              ),
+            ),
+          );
+        }
         response.writeHead(204, { "Cache-Control": "no-store" });
         response.end();
         return;
@@ -1103,6 +1123,8 @@ export class RemoteScreenGateway {
       stage === "sunshine" ? "sunshine" : "moonlight",
       `OpenBot: the remote desktop runtime did not start (${stage ?? "runtime"}): ${describeCause(cause)}\n`,
     );
+    if (stage === "sunshine" && this.#runtime?.windowsCaptureDenied?.())
+      return new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsCaptureDenied"));
     return new RemoteScreenError(
       503,
       "host_unavailable",
@@ -1158,7 +1180,10 @@ export class RemoteScreenGateway {
     if (upstreamPath === PASTE_SCRIPT_PATH) {
       response.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
       response.end(
-        remoteDesktopStreamWatchScript(session.snapshot.serverId) +
+        remoteDesktopStreamWatchScript(
+          session.snapshot.serverId,
+          this.#sessions.size === 1 && this.#runtime?.canSwitchToSoftwareEncoder?.() === true,
+        ) +
           (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : "") +
           remoteDesktopKeyboardScript(),
       );

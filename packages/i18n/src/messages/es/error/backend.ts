@@ -93,6 +93,8 @@ export const messages = {
     "Los miembros de este canal aún no tienen una conversación que compactar. Compáctalo después de que un miembro responda en el canal.",
   "error.backend.channelCompactNotSupported":
     "Ningún miembro de este canal puede compactar a petición. Los miembros que lo admiten compactan su contexto automáticamente cuando está casi lleno.",
+  "error.backend.channelCompactProviderUnavailable":
+    "El proveedor de los miembros del canal no funciona ahora. Actualiza los proveedores y vuelve a compactar el canal.",
   "error.backend.channelArchived": "Restaura este canal antes de enviar mensajes o cambiar tareas.",
   "error.backend.channelArchiveRunning": "Detén el trabajo en curso en este canal y luego elimínalo.",
   "error.backend.channelReferenceUnavailable": "El mensaje del canal al que se hace referencia no está disponible.",
@@ -236,7 +238,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Una espera necesita un mensaje para continuar. Este turno no tiene ningún mensaje.",
   "error.backend.agentWaitOwnChatOnly":
-    "Abre una espera solo en tu propio chat. Una tarea de canal o de mensajería no puede esperar.",
+    "Abre una espera en tu propio chat o en un hilo lateral. Una conversación de canal o de mensajería no puede esperar.",
   "error.backend.agentWaitNoteRequired": "Escribe una nota breve que diga para qué es la espera.",
   "error.backend.agentWaitRoutineGone": "Este agente no tiene ninguna rutina con este id.",
   "error.backend.agentWaitNoRoutine":
@@ -280,6 +282,8 @@ export const messages = {
     "Este servidor pide un inicio de sesión. Inicia sesión en él desde OpenBot en el equipo host.",
   "error.backend.mcpSignInNeedsHttps":
     "Este servidor pide un inicio de sesión, y OpenBot solo inicia sesión por https. Cambia la URL a {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Este servidor solo inicia sesión en {url}. Cambia la URL a esta dirección y vuelve a iniciar sesión.",
   "error.backend.mcpSignInCancelled": "Se canceló el inicio de sesión.",
   "error.backend.mcpSignInTimedOut": "El inicio de sesión no se completó en el navegador.",
   "error.backend.mcpSignInRefused": "La página de inicio de sesión rechazó el acceso. Inicia sesión de nuevo.",
@@ -347,6 +351,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "La carpeta no existe o ya se eliminó.",
   "error.backend.libraryFolderOtherAgent": "Un archivo solo puede ir a una carpeta de su agente.",
   "error.backend.libraryFolderMoveInvalid": "Esta carpeta no se puede mover ahí.",
+  "error.backend.workflowFolderLimit": "Un servidor puede tener hasta {limit} carpetas de flujos de trabajo.",
+  "error.backend.workflowFolderPlacementLimit": "Hay demasiados flujos de trabajo en las carpetas.",
   "error.backend.sectionNameDuplicate": "Los nombres de las secciones deben ser únicos.",
   "error.backend.directMessageRequired": "Escribe un mensaje primero.",
   "error.backend.directMessageTooLong": "Un mensaje directo puede tener hasta {limit} caracteres.",
@@ -379,6 +385,7 @@ export const messages = {
     "Solo la app de OpenBot del teléfono puede enviar este informe, porque añade la versión y el registro de soporte del teléfono. Abre este chat en el teléfono. Si ves este mensaje allí, actualiza la app del teléfono.",
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
+  "error.backend.apiKeyListFailed": "OpenBot no pudo leer las claves de API guardadas.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
   "error.backend.apiKeySaving": "La clave de API ya se está guardando.",
   "error.backend.apiKeyAnswerUnreadable":

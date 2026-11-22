@@ -225,6 +225,9 @@ export const messages = {
     "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "agentSettings.quickAcknowledgement.title": "Uzun görevlerden önce planı göster",
   "agentSettings.quickAcknowledgement.description": "Uzun bir görevden önce ajan planını gösterir.",
+  "agentSettings.builtinMemory.title": "OpenBot belleği",
+  "agentSettings.builtinMemory.description":
+    "Ajan kendi belleklerini kaydeder ve okur. Yalnızca Mem0 gibi bir bellek uygulaması kullanmak için kapatın. Kayıtlı bellekler kalır.",
   "agentSettings.browserProfile.label": "Tarayıcı profili",
   "agentSettings.browserProfile.shared": "Paylaşılan",
   "agentSettings.browserProfile.agent": "Yalnızca bu ajan",

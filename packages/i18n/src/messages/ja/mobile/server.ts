@@ -332,6 +332,7 @@ export const messages = {
   "mobile.server.route.timezone": "タイムゾーン",
   "mobile.server.route.personality": "エージェントの性格",
   "mobile.server.route.agents": "エージェント",
+  "mobile.server.route.voiceModel": "音声認識",
   "mobile.server.settings.storage": "ストレージ",
   "mobile.server.route.storage": "ストレージ",
   "mobile.server.route.storageFiles": "すべてのファイル",
@@ -457,6 +458,19 @@ export const messages = {
     "タイムゾーンを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.settings.timezoneUnsupported":
     "ここでタイムゾーンを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.voiceModelDescription":
+    "このサーバーのエージェントは、字幕のない動画の音声をこのモデルで文字起こしします。",
+  "mobile.server.settings.voiceModelLoading": "音声認識を読み込み中…",
+  "mobile.server.settings.voiceModelLoadFailed": "サーバーの音声認識モデルを読み込めませんでした。",
+  "mobile.server.settings.voiceModelSaveFailed": "音声認識モデルを変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.voiceModelUnsupported":
+    "ここで音声認識を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.voiceModelReady": "準備完了",
+  "mobile.server.settings.voiceModelDownloading": "ダウンロード中: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} のダウンロード",
+  "mobile.server.settings.voiceModelDownload": "ダウンロード",
+  "mobile.server.settings.voiceModelCancel": "ダウンロードを停止",
+  "mobile.server.settings.voiceModelRemove": "削除",
   "mobile.server.settings.keySection": "サーバーキー",
   "mobile.server.settings.keyChanged": "最終変更",
   "mobile.server.settings.keyChange": "キーを変更",
@@ -875,7 +889,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1116,10 +1130,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "モデルを変更できませんでした。もう一度お試しください。",
   "mobile.server.providers.promptCache": "プロンプトキャッシュ",
   "mobile.server.providers.promptCacheHint":
-    "ターンの間に Claude がエージェントのコンテキストをキャッシュに保持する時間です。変更は Claude の次回起動時に適用されます。",
-  "mobile.server.providers.promptCacheDefault": "Claude Code のデフォルト",
+    "ターンの間に Claude と Pi がエージェントのコンテキストをキャッシュに保持する時間です。変更はプロバイダーの次回起動時に適用されます。",
+  "mobile.server.providers.promptCacheDefault": "プロバイダーの既定",
   "mobile.server.providers.promptCacheHour": "1 時間",
   "mobile.server.providers.promptCacheLoadFailed": "このサーバーのプロンプトキャッシュ時間を読み込めませんでした。",
+  "mobile.server.providers.cacheExpiryCompaction": "キャッシュの期限切れ前に圧縮",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "20 万トークン以上のコンテキストを持つチャットが 1 時間のキャッシュでアイドル状態のとき、エージェントはキャッシュの期限切れ前にコンテキストを圧縮します。これにより、次のメッセージはキャッシュなしでコンテキスト全体を読み直しません。",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "このサーバーの圧縮設定を読み込めませんでした。",
   "mobile.server.providers.compactWindow": "チャットを圧縮するサイズ",
   "mobile.server.providers.compactWindowHint":
     "チャットがこのサイズに達すると、Claude Code は古いターンを要約します。小さくするとターンが速く安くなります。大きくすると詳細が多く残ります。ウィンドウが小さいモデルは、その上限で圧縮します。",
@@ -1174,6 +1192,8 @@ export const messages = {
     "ChatGPT は ChatGPT のプランではなく、このキーを使います。OpenAI は各リクエストをキーに課金します。プランの使用量は表示されません。",
   "mobile.server.providers.codexKeyAlternative":
     "または OpenAI の API キーでログインします。OpenAI は各リクエストをキーに課金します。",
+  "mobile.server.providers.museKeyInUse":
+    "Muse はサインインではなく、このキーを使います。サインインを使うには、キーを削除してください。",
   "mobile.server.providers.sectionUse": "使用",
   "mobile.server.providers.unused": "使用しているエージェントはありません",
   "mobile.server.providers.usedByCount": { other: "{count} 個のエージェントが使用中" },

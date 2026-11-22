@@ -94,7 +94,7 @@ import {
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import type { AcceptedOwnerTransfer, OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ACTIVE_QUEUES_ROUTES,
   type AgentActiveQueues,
@@ -402,7 +402,7 @@ export interface WebWorkspaceRuntime {
   download(attachmentId: string): Promise<WebFile>;
   downloadPreview(attachmentId: string): Promise<WebFile>;
   sharedFile(path: string): Promise<WebFile>;
-  workspaceFile(agentId: string, path: string): Promise<WebFile>;
+  workspaceFile(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<WebFile>;
   workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
@@ -450,6 +450,7 @@ export interface WebRuntimeEvents {
   accessDenied?(hostId: string, error: WebHostConnectionError): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
+  serversChanged?(): Promise<void>;
   hostState?(hostId: string, state: WebHostState): void;
   hostSessionRevoked?(): void;
   hostTaken?(hostId: string): void;
@@ -604,6 +605,7 @@ export function createWebWorkspaceRuntime(
     onHostStreamData: (data) => browserView.receive(data),
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
+    onAccountServersChanged: async () => events.serversChanged?.(),
   };
   const hostProtocols = {
     get: (id: string) => savedHostProtocol(accountId, id),
@@ -1575,8 +1577,9 @@ export function createWebWorkspaceRuntime(
         await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
       );
     },
-    async workspaceFile(agentId, path) {
+    async workspaceFile(agentId, path, options) {
       const query = new URLSearchParams({ botId: agentId, path });
+      if (options?.exactPath) query.set(WORKSPACE_FILE_EXACT_PATH_QUERY, "1");
       return decodeWebFile(
         await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
       );

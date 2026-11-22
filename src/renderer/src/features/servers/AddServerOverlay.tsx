@@ -305,6 +305,9 @@ function AddServerSession(
       case "starting":
       case "waking":
         return "starting";
+      case "stopping":
+      case "stopped":
+        return state.paid && (server.error === null || server.error === "plan_ended") ? "starting" : "error";
       case "running": {
         const entry = onRail(server.serverId);
         if (!entry) return "connecting";

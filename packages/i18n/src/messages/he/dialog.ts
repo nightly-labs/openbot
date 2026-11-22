@@ -4,6 +4,7 @@ import type { messages as source } from "../en/dialog";
 export const messages = {
   "dialog.chooseSiteDirectory": "בחירת תיקייה של אתר סטטי",
   "dialog.chooseAgentFolder": "בחירת תיקייה עבור {agent}",
+  "dialog.chooseChannelFolder": "בחירת תיקייה עבור {channel}",
   "dialog.chooseAgentExclusion": "בחירת תיקייה ש-{agent} אינו רשאי לשנות",
   "dialog.chooseSkill": "בחירת תיקיית מיומנות או קובץ ZIP",
   "dialog.filter.skillPackages": "חבילות מיומנויות",

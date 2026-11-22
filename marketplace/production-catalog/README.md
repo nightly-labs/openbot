@@ -1,6 +1,6 @@
 # OpenBot team launch catalog
 
-Version v5 contains 41 Skills and 28 Agents. The `pstack` Skill installs 52 skills `pstack-<name>` with it. Four Skills and four Agents are featured on first publication. All entries show the public OpenBot logo as their creator badge, use the publisher **OpenBot**, and start with zero installs. An Agent's `routines` in `catalog.json` use the Marketplace routine shape, and the build checks them as the account service does. The schedules use the installer's timezone.
+Version v6 contains 41 Skills and 28 Agents. The `pstack` Skill installs 58 skills `pstack-<name>` with it. Four Skills and four Agents are featured on first publication. All entries show the public OpenBot logo as their creator badge, use the publisher **OpenBot**, and start with zero installs. An Agent's `routines` in `catalog.json` use the Marketplace routine shape, and the build checks them as the account service does. The schedules use the installer's timezone.
 
 Each Agent has one job and a named result, in its title. Its instructions name two input paths (a tool such as the browser, an installed plugin or the repository; else pasted or uploaded material), one approval gate, the evidence each claim needs, a fixed rubric for judgment work, and the adjacent work that belongs to another Agent. Agents with a routine install it active. A routine first reads its saved setup. With no setup, the first run sends one short setup request and later runs stay quiet; a run with nothing new calls `routine_no_update` and sends no message. The two healthchecks of Dr. Eggbot and of dr eggbot v2 still install paused. State that an Agent keeps, such as a saved site address or a care log, goes in a shared data table named for what it holds, on the user's computer.
 
@@ -23,13 +23,15 @@ bun run marketplace:build
 bun run marketplace:publish:production
 ```
 
-The build writes deterministic ZIP bundles, one SVG icon per Skill, manifests, notices, and checksums to `out/marketplace-production/v5`. A Skill icon is the artwork of its category, so a listing reads as a set; the mark uses paths, not emoji, because a reader's computer may not carry the font. The publish command without flags is an offline dry run. Review the catalog and ensure the account database has migrations through `0019_marketplace_presentation.sql` before production publication.
+The build writes deterministic ZIP bundles, one SVG icon per Skill, manifests, notices, and checksums to `out/marketplace-production/v6`. A Skill icon is the artwork of its category, so a listing reads as a set; the mark uses paths, not emoji, because a reader's computer may not carry the font. The publish command without flags is an offline dry run. Review the catalog and ensure the account database has migrations through `0019_marketplace_presentation.sql` before production publication.
 
 To publish after review, authenticate Wrangler for the production account and provide `SKILLS_ADMIN_TOKEN` through the environment, then run:
 
 ```sh
 bun run marketplace:publish:production -- --apply --confirm-production
 ```
+
+Publish before the release that announces the change. `bun run release:preflight` builds the catalog and stops when the live Marketplace misses an entry, lists a retired Agent, or has an older version of an entry.
 
 The publisher verifies the production admin credential before writing, uploads immutable bundle and icon keys, then inserts approved Skills and Agents with their exact skill-version dependencies. It does not go through community submission limits or pending review. `--local --apply` targets only local storage; mixing local and production flags is rejected.
 
@@ -124,7 +126,7 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 | [routine-healthcheck](skills/routine-healthcheck/SKILL.md) | automation | openbot |
 | [agent-chat-healthcheck](skills/agent-chat-healthcheck/SKILL.md) | automation | openbot |
 | [working-with-teammate-agents](skills/working-with-teammate-agents/SKILL.md) | automation | openbot |
-| `pstack`, with the 52 skills `pstack-<name>` of [bundles/pstack/skills](bundles/pstack/skills) | coding | cursor |
+| `pstack`, with the 58 skills `pstack-<name>` of [bundles/pstack/skills](bundles/pstack/skills) | coding | cursor |
 
 ★ Featured on first publication. Existing Featured settings are preserved on reruns.
 
@@ -132,4 +134,4 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 
 The 35 original OpenBot team Skills use the repository PolyForm Noncommercial 1.0.0 license. The five existing adapted Skills retain their pinned OpenAI or Anthropic source attribution and Apache-2.0 license. Each generated bundle contains the applicable LICENSE.txt and NOTICE.txt; the build also produces UPSTREAM_NOTICES.md.
 
-`bundles/pstack/` is an unchanged copy of the `skills/` and `agents/` of the pstack plugin by Lauren Tan from the pinned `cursor/plugins` commit, under the MIT License. It is a pack in `catalog.json`: the build publishes it as the one Skill `pstack`. Its archive holds an index `SKILL.md`, the `LICENSE`, a `NOTICE.md`, and each folder of `skills/` as `skills/pstack-<folder>/`. The app installs each of those as a skill folder of its own, beside `pstack`, under one lock entry: one download and one install receipt. In Markdown, the build renames links, `/<name>` commands and `<name>` mentions of other pstack skills to `pstack-<name>`, removes `disable-model-invocation` so `$pstack-<name>` works with every provider, copies `agents/` into each skill that names a subagent, and adds a closing `pstack in OpenBot` section. Links to files that no skill installs go to the pinned commit. To update it, copy the new upstream `skills/` and `agents/`, update the pinned commit in `catalog.json` and `NOTICE.md`, and increase `catalogVersion`.
+`bundles/pstack/` is an unchanged copy of the `skills/` and `agents/` of the pstack plugin by Lauren Tan from the pinned `cursor/plugins` commit, under the MIT License, without `skills/statechart/scripts/test/`. The app and the account service refuse a skill archive with more than 200 files, and that test suite alone has 377. It is a pack in `catalog.json`: the build publishes it as the one Skill `pstack`. Its archive holds an index `SKILL.md`, the `LICENSE`, a `NOTICE.md`, and each folder of `skills/` as `skills/pstack-<folder>/`. The app installs each of those as a skill folder of its own, beside `pstack`, under one lock entry: one download and one install receipt. In Markdown, the build renames links, `/<name>` commands and `<name>` mentions of other pstack skills to `pstack-<name>`, removes `disable-model-invocation` so `$pstack-<name>` works with every provider, copies `agents/` into each skill that names a subagent, and adds a closing `pstack in OpenBot` section. Links to files that no skill installs go to the pinned commit. To update it, copy the new upstream `skills/` and `agents/`, remove `skills/statechart/scripts/test/`, update the pinned commit in `catalog.json` and `NOTICE.md`, and increase `catalogVersion`.

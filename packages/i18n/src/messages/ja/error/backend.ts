@@ -91,6 +91,8 @@ export const messages = {
     "このチャンネルのメンバーには、まだ圧縮する会話がありません。メンバーがチャンネルで回答した後に圧縮してください。",
   "error.backend.channelCompactNotSupported":
     "このチャンネルのどのメンバーも、要求に応じて圧縮できません。対応しているメンバーは、コンテキストがほぼいっぱいになると自動で圧縮します。",
+  "error.backend.channelCompactProviderUnavailable":
+    "チャンネルメンバーのプロバイダーが現在動作していません。プロバイダーを更新してから、もう一度チャンネルを圧縮してください。",
   "error.backend.channelArchived":
     "メッセージを送信したりタスクを変更したりする前に、このチャンネルを復元してください。",
   "error.backend.channelArchiveRunning": "このチャンネルで実行中の作業を停止してから削除してください。",
@@ -237,7 +239,7 @@ export const messages = {
   "error.backend.agentWaitGone": "この待機は開いていません。エージェントが閉じたか、誰かがキャンセルしました。",
   "error.backend.agentWaitNoRequest": "待機を続行するにはメッセージが必要です。このターンにはメッセージがありません。",
   "error.backend.agentWaitOwnChatOnly":
-    "待機は自分のチャットでのみ開いてください。チャンネルやメッセージングのタスクは待機できません。",
+    "待機は自分のチャットかサイドスレッドで開いてください。チャンネルやメッセージングの会話は待機できません。",
   "error.backend.agentWaitNoteRequired": "待機の目的を示す短いメモを入力してください。",
   "error.backend.agentWaitRoutineGone": "このエージェントにはこの ID のルーティンがありません。",
   "error.backend.agentWaitNoRoutine":
@@ -281,6 +283,8 @@ export const messages = {
     "このサーバーはサインインを求めています。ホストコンピューターの OpenBot でサインインしてください。",
   "error.backend.mcpSignInNeedsHttps":
     "このサーバーはサインインを求めていますが、OpenBot は https でのみサインインします。URL を {url} に変更してください。",
+  "error.backend.mcpSignInOtherAddress":
+    "このサーバーは {url} でのみサインインできます。URL をこのアドレスに変更してから、もう一度サインインしてください。",
   "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
   "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
   "error.backend.mcpSignInRefused": "サインインページでアクセスが拒否されました。もう一度サインインしてください。",
@@ -349,6 +353,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "フォルダーが存在しないか、すでに削除されています。",
   "error.backend.libraryFolderOtherAgent": "ファイルは、そのエージェントのフォルダーにのみ入れられます。",
   "error.backend.libraryFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
+  "error.backend.workflowFolderLimit": "1 つのサーバーに置けるワークフローのフォルダーは {limit} 個までです。",
+  "error.backend.workflowFolderPlacementLimit": "フォルダー内のワークフローが多すぎます。",
   "error.backend.sectionNameDuplicate": "セクション名は重複しないようにしてください。",
   "error.backend.directMessageRequired": "先にメッセージを入力してください。",
   "error.backend.directMessageTooLong": "ダイレクトメッセージは {limit} 文字までです。",
@@ -381,6 +387,7 @@ export const messages = {
     "このレポートを送信できるのは OpenBot のスマートフォンアプリだけです。スマートフォンのバージョンとサポートログを追加するためです。スマートフォンでこのチャットを開いてください。そこでもこのメッセージが表示される場合は、スマートフォンアプリを更新してください。",
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
+  "error.backend.apiKeyListFailed": "保存された API キーを読み込めませんでした。",
   "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",
   "error.backend.apiKeySaving": "API キーはすでに保存中です。",
   "error.backend.apiKeyAnswerUnreadable":

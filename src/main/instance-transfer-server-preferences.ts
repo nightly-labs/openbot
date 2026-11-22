@@ -45,6 +45,7 @@ export interface TransferServerPreferencePort {
   ownerNotificationLevel: Preference<ServerNotificationLevel | null>;
   browsingMemory: Preference<{ enabled: boolean }>;
   claudeUserSetup: Preference<boolean>;
+  cacheExpiryCompaction: Preference<boolean>;
   claudeCompactWindow: Preference<number | null>;
   machineAlerts: Preference<MachineAlertSettings>;
   modelVisibility: Preference<HiddenModels>;
@@ -132,6 +133,7 @@ function savers(
     ownerNotificationLevel: (value) => save(port.ownerNotificationLevel, parseNotificationLevel, value),
     browsingMemory: (value) => save(port.browsingMemory, parseBrowsingMemory, value),
     claudeUserSetup: (value) => save(port.claudeUserSetup, parseBoolean, value),
+    cacheExpiryCompaction: (value) => save(port.cacheExpiryCompaction, parseBoolean, value),
     claudeCompactWindow: (value) => save(port.claudeCompactWindow, parseCompactWindow, value),
     machineAlerts: (value) => save(port.machineAlerts, parseMachineAlerts, value),
     modelVisibility: (value) => save(port.modelVisibility, parseHiddenModels, value),
@@ -151,6 +153,7 @@ const KEYS: readonly (keyof TransferServerPreferencePort)[] = [
   "ownerNotificationLevel",
   "browsingMemory",
   "claudeUserSetup",
+  "cacheExpiryCompaction",
   "claudeCompactWindow",
   "machineAlerts",
   "modelVisibility",
@@ -169,6 +172,7 @@ export function readServerPreferences(port: TransferServerPreferencePort, owner:
     promptCacheTtl: port.promptCacheTtl.get(),
     browsingMemory: port.browsingMemory.get(),
     claudeUserSetup: port.claudeUserSetup.get(),
+    cacheExpiryCompaction: port.cacheExpiryCompaction.get(),
     claudeCompactWindow: port.claudeCompactWindow.get(),
     machineAlerts: { ...port.machineAlerts.get(), responsibleMemberId: null },
     modelVisibility: port.modelVisibility.get(),

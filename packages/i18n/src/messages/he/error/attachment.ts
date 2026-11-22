@@ -7,6 +7,7 @@ export const messages = {
   "error.attachment.namedFileTooLarge": "{name} חורג ממגבלת 100 MB.",
   "error.attachment.totalTooLarge": "הקבצים המצורפים חורגים ממגבלת הסך הכול של 250 MB.",
   "error.attachment.unavailable": "הקובץ הזה כבר אינו זמין.",
+  "error.attachment.noApp": "אף אפליקציה במחשב הזה לא פתחה את הקובץ. הורידו אותו ואז פתחו אותו ממנהל הקבצים.",
   "error.attachment.tooMany": "אפשר לבחור עד {limit} קבצים.",
   "error.attachment.mediaUnsupported":
     "השרת הזה אינו תומך בקבצים מצורפים מסוג MP3 או MOV. יש לעדכן את OpenBot במארח ולנסות שוב.",

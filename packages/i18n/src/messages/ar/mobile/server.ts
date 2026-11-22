@@ -408,6 +408,7 @@ export const messages = {
   "mobile.server.route.timezone": "المنطقة الزمنية",
   "mobile.server.route.personality": "شخصية الوكيل",
   "mobile.server.route.agents": "الوكلاء",
+  "mobile.server.route.voiceModel": "التعرّف على الكلام",
   "mobile.server.settings.storage": "التخزين",
   "mobile.server.route.storage": "التخزين",
   "mobile.server.route.storageFiles": "كل الملفات",
@@ -543,6 +544,18 @@ export const messages = {
   "mobile.server.settings.timezoneSaveFailed": "تعذّر حفظ المنطقة الزمنية. أعد المحاولة.",
   "mobile.server.settings.timezoneUnavailable": "اتصل بهذا الخادم بصفتك مالكًا أو مسؤولًا لتغيير منطقته الزمنية.",
   "mobile.server.settings.timezoneUnsupported": "حدّث OpenBot على هذا الخادم لتغيير منطقته الزمنية من هنا.",
+  "mobile.server.settings.voiceModelDescription":
+    "يستخدم الوكلاء على هذا الخادم هذا النموذج لتفريغ صوت مقاطع الفيديو التي لا تحتوي على ترجمة نصية.",
+  "mobile.server.settings.voiceModelLoading": "جارٍ تحميل التعرّف على الكلام…",
+  "mobile.server.settings.voiceModelLoadFailed": "تعذّر تحميل نموذج التعرّف على الكلام الخاص بالخادم.",
+  "mobile.server.settings.voiceModelSaveFailed": "تعذّر تغيير نموذج التعرّف على الكلام. حاول مرة أخرى.",
+  "mobile.server.settings.voiceModelUnsupported": "حدّث OpenBot على هذا الخادم لتغيير التعرّف على الكلام من هنا.",
+  "mobile.server.settings.voiceModelReady": "جاهز",
+  "mobile.server.settings.voiceModelDownloading": "جارٍ التنزيل: {percent}",
+  "mobile.server.settings.voiceModelSize": "تنزيل بحجم {size}",
+  "mobile.server.settings.voiceModelDownload": "تنزيل",
+  "mobile.server.settings.voiceModelCancel": "إيقاف التنزيل",
+  "mobile.server.settings.voiceModelRemove": "إزالة",
   "mobile.server.settings.keySection": "مفتاح الخادم",
   "mobile.server.settings.keyChanged": "آخر تغيير",
   "mobile.server.settings.keyChange": "تغيير المفتاح",
@@ -1201,7 +1214,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkNumber": "ربط رقم",
   "mobile.server.connectors.whatsapp.ownNumberNote": "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "يصل الأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
+    "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1451,10 +1464,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "تعذّر تغيير النماذج. حاول مرة أخرى.",
   "mobile.server.providers.promptCache": "ذاكرة التخزين المؤقت للمطالبات",
   "mobile.server.providers.promptCacheHint":
-    "المدة التي يحتفظ فيها Claude بسياق الوكيل في ذاكرة التخزين المؤقت بين الأدوار. يُطبَّق التغيير عند إعادة تشغيل Claude.",
-  "mobile.server.providers.promptCacheDefault": "الافتراضي في Claude Code",
+    "المدة التي يحتفظ فيها Claude وPi بسياق الوكيل في ذاكرة التخزين المؤقت بين الأدوار. يُطبَّق التغيير عند بدء المزوّد مجددًا.",
+  "mobile.server.providers.promptCacheDefault": "الإعداد الافتراضي للمزوّد",
   "mobile.server.providers.promptCacheHour": "ساعة واحدة",
   "mobile.server.providers.promptCacheLoadFailed": "تعذّر تحميل مدة ذاكرة التخزين المؤقت للمطالبات لهذا الخادم.",
+  "mobile.server.providers.cacheExpiryCompaction": "الضغط قبل انتهاء ذاكرة التخزين المؤقت",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "عندما تكون محادثة ذات سياق من 200 ألف رمز أو أكثر خاملة مع ذاكرة تخزين مؤقت لمدة ساعة، يضغط الوكيل السياق قبل انتهاء ذاكرة التخزين المؤقت. عندها لا تقرأ الرسالة التالية السياق الكامل مرة أخرى بدون ذاكرة تخزين مؤقت.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "تعذّر تحميل إعداد الضغط لهذا الخادم.",
   "mobile.server.providers.compactWindow": "ضغط المحادثات عند",
   "mobile.server.providers.compactWindowHint":
     "يلخّص Claude Code الأدوار الأقدم في المحادثة عندما تصل إلى هذا الحجم. القيمة الأقل تبقي الأدوار سريعة ورخيصة. القيمة الأعلى تحتفظ بتفاصيل أكثر. النموذج ذو النافذة الأصغر يضغط عند حده الخاص.",
@@ -1507,6 +1524,8 @@ export const messages = {
   "mobile.server.providers.codexKeyInUse":
     "يستخدم ChatGPT هذا المفتاح، لا خطة ChatGPT. تحتسب OpenAI كل طلب على المفتاح. لا يُعرض استخدام الخطة.",
   "mobile.server.providers.codexKeyAlternative": "أو سجّل الدخول بمفتاح OpenAI API. تحتسب OpenAI كل طلب على المفتاح.",
+  "mobile.server.providers.museKeyInUse":
+    "يستخدم Muse هذا المفتاح، لا تسجيل دخولك. لاستخدام تسجيل الدخول، أزل المفتاح.",
   "mobile.server.providers.sectionUse": "الاستخدام",
   "mobile.server.providers.unused": "لا يستخدمه أي وكيل",
   "mobile.server.providers.usedByCount": {

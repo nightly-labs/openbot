@@ -12,6 +12,10 @@ export const messages = {
   "error.voice.prepareRequired":
     "La transcripción de voz local no está disponible. Ejecuta `bun run voice:prepare` y reinicia OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot no pudo transcribir esta grabación.",
+  "error.voice.videoModelMissing":
+    "No hay ningún modelo de reconocimiento de voz para grabaciones configurado en Ajustes → Voz.",
+  "error.voice.videoModelMissingServer":
+    "No hay ningún modelo de reconocimiento de voz configurado en este servidor. Un propietario o un administrador puede configurar un modelo en los ajustes del servidor, en Reconocimiento de voz.",
   "error.voice.cloud.keyRequired": "Añade tu clave de API de {provider} en Ajustes → Voz.",
   "error.voice.cloud.keyRejected": "{provider} no aceptó la clave de API. Revisa la clave en Ajustes → Voz.",
   "error.voice.cloud.quotaExceeded": "Tu cuota de {provider} se ha agotado.",
@@ -25,6 +29,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Descarga el modelo de voz en Ajustes → Voz.",
   "error.voice.speech.timedOut": "Se agotó el tiempo al leer la respuesta en voz alta.",
   "error.voice.speech.failed": "OpenBot no pudo leer la respuesta en voz alta.",
+  "error.voice.speech.providerRefused": "{provider} se negó a crear el audio: {reason}",
   "error.voice.recordingNotKept": "OpenBot no pudo guardar la grabación de voz.",
   "error.voice.live.timedOut": "La voz en directo de Codex no se inició a tiempo. Inténtalo de nuevo.",
   "error.voice.live.failed": "La voz en directo se detuvo: {reason}",

@@ -109,6 +109,10 @@ interface MuseThread {
   replayed: Set<string>;
 }
 
+const MUSE_MODEL_UNAVAILABLE = /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu;
+const MUSE_CREDENTIAL_FAILURE =
+  /\b(?:40[123]|unauthori[sz]ed|forbidden|payment required|billing|invalid[ _-]?(?:api[ _-]?)?key|api[ _-]?key)\b/iu;
+
 export class MuseAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "muse";
@@ -434,6 +438,13 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
   #redact(value: string): string {
     return redactMcpValues(redactText(value), this.#redactionValues());
   }
+  #turnFailureText(message: string, unexplained: boolean): string {
+    if (MUSE_MODEL_UNAVAILABLE.test(message))
+      return sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) });
+    if (this.#options.apiKey() && (unexplained || MUSE_CREDENTIAL_FAILURE.test(message)))
+      return sourceText("error.provider.museSavedKeyFailed", { detail: message });
+    return message;
+  }
   #fail(_error: unknown): void {
     if (!this.#running) return;
     this.#running = false;
@@ -522,16 +533,21 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       }
       this.#options.reportMcpDrops?.(this.provider, handoff.dropped);
       const mcpServers = Object.fromEntries(
-        [...handoff.servers, ...bridge.servers].map((server) => [
+        [
+          ...handoff.servers.map((server) => ({ server, mode: "optional" })),
+          ...bridge.servers.map((server) => ({ server, mode: "required" })),
+        ].map(({ server, mode }) => [
           server.name,
           "url" in server
             ? {
                 transport: "streamableHttp",
+                mode,
                 url: server.url,
                 headers: Object.fromEntries(server.headers.map((header) => [header.name, header.value])),
               }
             : {
                 transport: "stdio",
+                mode,
                 command: server.command,
                 args: server.args,
                 env: Object.fromEntries(server.env.map((entry) => [entry.name, entry.value])),
@@ -890,11 +906,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         this.#emit("error", {
           threadId: thread.id,
           turnId: terminal.turnId,
-          error: {
-            message: /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu.test(message)
-              ? sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) })
-              : message,
-          },
+          error: { message: this.#turnFailureText(message, !terminal.error && !terminal.reason) },
           willRetry: false,
         });
       }

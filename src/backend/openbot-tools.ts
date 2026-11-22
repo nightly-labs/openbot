@@ -82,7 +82,7 @@ import {
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
 } from "./routine-tool-schema";
-import { WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
+import { WORKFLOW_ANSWER_TOOL_DEFINITION, WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
 
 interface OpenBotToolDefinition {
   name: string;
@@ -284,6 +284,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   ...ROUTINE_FLOW_TOOL_DEFINITIONS,
   ...WORKFLOW_TOOL_DEFINITIONS,
+  WORKFLOW_ANSWER_TOOL_DEFINITION,
   ...CRM_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {
@@ -332,7 +333,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_library_folders",
     description:
-      "List your Library folders by path, with the id, name and stored path of each file in them, and your files in no folder. Pass folder to list one folder and the folders in it. Change folders and move files with organize_library.",
+      "List your Library folders by path, with the id, name and stored path of each file in them, your files in no folder, and workflow files. Pass folder to list one folder. Change folders and move files with organize_library.",
     shape: listLibraryFoldersToolSchema.shape,
   },
   {
@@ -513,7 +514,10 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "list_routines",
     description:
       "List routines for this agent, or for another local agent when agentId is provided. Use this before updating or deleting a routine. routines has the schedule routines; webhookRoutines has the webhook routines with their event type, filters and URL.",
-    shape: { agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional() },
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      routineId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+    },
   },
   {
     name: "create_routine",
@@ -579,9 +583,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
       name: z.string().min(1).max(INPUT_LIMITS.routineName).optional(),
       instruction: routineInstructionZodSchema.optional(),
-      schedule: routineScheduleZodSchema
-        .describe("Routine schedule. Must not run more often than every 3 minutes.")
-        .optional(),
+      schedule: routineScheduleZodSchema.describe("Routine schedule.").optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
       missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
@@ -608,7 +610,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: ROUTINE_NO_UPDATE_TOOL,
     description:
-      "Only when nothing is for the user: a scheduled, script or webhook routine run with nothing to report, or a teammate's update that wants no answer. OpenBot collapses your text answers in the chat and sends no notification. A requested reminder or message is a report, unless the task's notification conditions say to send nothing. A manual Test run shows your answer.",
+      "Only when nothing is for the user: a scheduled, script or webhook routine run with nothing to report, or a teammate's update that wants no answer. Write no text before or with it; OpenBot sends no notification. A requested reminder or message is a report, unless the task's notification conditions say to send nothing. A manual Test run shows your answer.",
     shape: {},
   },
   {
@@ -696,6 +698,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
               )
               .max(INPUT_LIMITS.promptOptions)
               .optional(),
+            multiSelect: z.boolean().optional(),
           }),
         )
         .min(1)

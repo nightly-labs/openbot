@@ -239,12 +239,15 @@ export function createRendererForwarders({
     if (level() !== "all" || newChannelReplies(previous, next).length === 0) return;
     const agentLookup = notificationAgents(serverId);
     const agents = agentLookup instanceof Promise ? await agentLookup : agentLookup;
+    const levelLookup = agentNotificationLevels(serverId);
+    const agentLevels = levelLookup instanceof Promise ? await levelLookup : levelLookup;
     const current = level();
     if (!current) return;
     const replies = channelReplyNotifications(previous, next, {
       agents,
       translate: getTranslate(),
       level: current,
+      agentLevels,
       redact: notificationPreviewEnabled() ? redactText : null,
     });
     for (const reply of replies) {

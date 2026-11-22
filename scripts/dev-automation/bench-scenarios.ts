@@ -40,7 +40,7 @@ export interface Scenario {
 type BenchProvider = "claude" | "opencode" | "grok" | "codex";
 
 const PREFERRED_MODELS: Record<BenchProvider, string> = {
-  claude: "claude-sonnet-5",
+  claude: "claude-sonnet-5-5",
   opencode: "opencode-go/muse-spark-1.3-contributor",
   grok: "grok-4.6",
   codex: "gpt-5.5",
@@ -677,6 +677,29 @@ type WindowLag = { p99: number; max: number };
 const STREAM_DELTA_MS = 25;
 const STREAM_DELTAS = 1_200;
 const LONG_STREAM_DELTAS = 6_000;
+const MARKDOWN_SWITCH_AGENTS = 4;
+const MARKDOWN_SWITCH_DELTAS = 1_500;
+const SWITCH_LONG_TASKS_START = `(() => {
+  const state = { count: 0, ms: 0 };
+  const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      state.count += 1;
+      state.ms += entry.duration;
+    }
+  });
+  observer.observe({ type: "longtask" });
+  window.__openbotSwitchLongTasks = { state, observer };
+})()`;
+const SWITCH_LONG_TASKS_STOP = `(() => {
+  const probe = window.__openbotSwitchLongTasks;
+  if (!probe) return { count: 0, ms: 0 };
+  for (const entry of probe.observer.takeRecords()) {
+    probe.state.count += 1;
+    probe.state.ms += entry.duration;
+  }
+  probe.observer.disconnect();
+  return probe.state;
+})()`;
 
 interface FakeStreamPlan {
   id: string;
@@ -994,6 +1017,32 @@ export const SCENARIOS: Scenario[] = [
     corpus: "markdown",
     reasoning: true,
     commands: true,
+  }),
+  fakeStream({
+    id: "s16-switch-md",
+    description: `${MARKDOWN_SWITCH_AGENTS} agents stream ${MARKDOWN_SWITCH_DELTAS} Markdown deltas each, then ${SWITCH_COUNT} chat switches; probes cover the switches only`,
+    agents: MARKDOWN_SWITCH_AGENTS,
+    seed: scaled(`agents:${MARKDOWN_SWITCH_AGENTS},messages:20`),
+    deltas: MARKDOWN_SWITCH_DELTAS,
+    corpus: "markdown",
+    after: async (context, agents) => {
+      await context.wait(2 * SECOND);
+      await context.evaluate("window.__openbotPerfProbes?.reset()");
+      if (context.inspector) await context.inspector.evaluate("globalThis.__openbotPerfProbes?.reset()");
+      await context.evaluate(SWITCH_LONG_TASKS_START);
+      const started = Date.now();
+      for (let index = 0; index < SWITCH_COUNT; index += 1) {
+        await openAgent(context, agents[(index + 1) % agents.length] ?? "chief");
+        await context.wait(SECOND);
+      }
+      const longTasks = await context.evaluate<{ count: number; ms: number }>(SWITCH_LONG_TASKS_STOP);
+      context.record({
+        "switch.count": SWITCH_COUNT,
+        "switch.ms": Date.now() - started,
+        "switch.longTasks": longTasks.count,
+        "switch.longTaskMs": Math.round(longTasks.ms),
+      });
+    },
   }),
   fakeStream({
     id: "s15-stream-hidden",
