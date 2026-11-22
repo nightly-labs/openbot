@@ -1495,7 +1495,6 @@ export class BrowserHost {
     const protection = { origin: url.origin, submitted: false, replaced: false, running: false };
     tab.secret = protection;
     stopCookieBanners(tab.contents);
-    this.#invalidateViews(tab);
     this.#syncAttachedView();
     return yield* Effect.gen({ self: this }, function* () {
       const entry = yield* this.#enqueue(
@@ -2187,9 +2186,20 @@ export class BrowserHost {
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
     yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser view"));
-    const generation = tab.captureGeneration;
+    let generation = tab.captureGeneration;
     let invalidated = false;
+    let stopped = false;
+    let stopStream: (() => Effect.Effect<void>) | undefined;
+    let resume: Deferred.Deferred<void> | undefined;
+    let paused: Fiber.Fiber<void> | undefined;
+    let sequence = 0;
     let lastCursor: BrowserViewCursor | null = null;
+    const showsPage = (streamGeneration: number) =>
+      streamGeneration === generation &&
+      !tab.secret?.submitted &&
+      !tab.filledCard &&
+      !tab.secretShown &&
+      tab.captureGeneration === streamGeneration;
     const cursorChanged = (_event: unknown, type: string) => {
       if (tab.secret?.submitted || tab.captureGeneration !== generation) return;
       const cursor = browserViewCursor(type);
@@ -2200,16 +2210,16 @@ export class BrowserHost {
     const stopCursor = () => {
       if (onCursor && !tab.contents.isDestroyed()) tab.contents.off("cursor-changed", cursorChanged);
     };
-    const invalidate = () => {
+    const end = (reason: string) => {
       invalidated = true;
       tab.viewInvalidations.delete(invalidate);
       stopCursor();
-      onEnded?.("Authentication changed the browser view. Open a new view to continue.");
+      onEnded?.(reason);
     };
-    tab.viewInvalidations.add(invalidate);
-    if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
-    return yield* Effect.gen({ self: this }, function* () {
-      const stop = yield* tab.engine.startScreencast(
+    const endForAuthentication = () => end("Authentication changed the browser view. Open a new view to continue.");
+    const tabGone = () => tab.closing || tab.contents.isDestroyed() || this.#tabs.get(tab.id) !== tab;
+    const openStream = (streamGeneration: number) =>
+      tab.engine.startScreencast(
         {
           quality: VIEW_FRAME_QUALITY,
           maxWidth: VIEW_FRAME_MAX_WIDTH,
@@ -2218,37 +2228,71 @@ export class BrowserHost {
           ...(onPageCopy
             ? {
                 onPageCopy: (text: string) => {
-                  if (
-                    !tab.secret?.submitted &&
-                    !tab.filledCard &&
-                    !tab.secretShown &&
-                    tab.captureGeneration === generation
-                  )
-                    onPageCopy(text);
+                  if (showsPage(streamGeneration)) onPageCopy(text);
                 },
               }
             : {}),
         },
         (frame) => {
-          if (!tab.secret?.submitted && !tab.filledCard && !tab.secretShown && tab.captureGeneration === generation)
-            onFrame(frame);
+          if (!showsPage(streamGeneration)) return;
+          sequence += 1;
+          onFrame({ ...frame, sequence });
         },
         (error) => {
+          if (streamGeneration !== generation) return;
           tab.viewInvalidations.delete(invalidate);
           stopCursor();
           logger.warn("The live browser view stopped.", { error: toLogValue(error) });
           onEnded?.("The live browser view stopped. Open a new view to continue.");
         },
       );
-      let stopped = false;
+    const pauseUntilProtectionEnds = (previous: () => Effect.Effect<void>) => {
+      const protectionEnded = Deferred.makeUnsafe<void>();
+      const stopListening = this.onChanged(() => {
+        if (tabGone() || !tab.secret?.submitted) Deferred.doneUnsafe(protectionEnded, Effect.void);
+      });
+      resume = protectionEnded;
+      paused = Effect.runFork(
+        Effect.gen(function* () {
+          yield* previous();
+          yield* Deferred.await(protectionEnded);
+          stopListening();
+          if (stopped) return;
+          if (tabGone() || tab.filledCard || tab.secretShown) return endForAuthentication();
+          const streamGeneration = tab.captureGeneration;
+          generation = streamGeneration;
+          stopStream = yield* openStream(streamGeneration);
+        }).pipe(
+          Effect.catch(() => Effect.sync(endForAuthentication)),
+          Effect.ensuring(
+            Effect.sync(() => {
+              stopListening();
+              resume = undefined;
+              paused = undefined;
+            }),
+          ),
+        ),
+      );
+    };
+    const invalidate = () => {
+      if (paused) return;
+      if (!stopStream || stopped || !tab.secret?.submitted || tab.filledCard) return endForAuthentication();
+      pauseUntilProtectionEnds(stopStream);
+    };
+    tab.viewInvalidations.add(invalidate);
+    if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
+    return yield* Effect.gen({ self: this }, function* () {
+      stopStream = yield* openStream(generation);
       const stopOnce = () =>
         Effect.gen({ self: this }, function* () {
           tab.viewInvalidations.delete(invalidate);
           stopCursor();
           if (stopped) return;
           stopped = true;
+          if (resume) Deferred.doneUnsafe(resume, Effect.void);
+          if (paused) yield* Fiber.await(paused);
           tab.engine.releaseViewButton();
-          yield* stop();
+          if (stopStream) yield* stopStream();
         });
       if (invalidated) yield* stopOnce();
       return stopOnce;
