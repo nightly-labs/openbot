@@ -360,6 +360,7 @@ export class CuaDriverRuntime {
     yield* this.#stopOrphanedDaemon(socketPath);
     yield* this.#removeSocket();
     this.#command = yield* this.#linkCommandAlias(executable);
+    const tapListening = yield* this.#startTap(socketPath);
     const child = yield* cuaSync(() =>
       this.#spawn(executable, ["serve", "--socket", socketPath, "--no-overlay"], {
         cwd: dirname(executable),
@@ -371,7 +372,7 @@ export class CuaDriverRuntime {
           ...CUA_DRIVER_VENDOR_CALLS_OFF,
           [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
           ...waylandEnvironment(this.#options.platform),
-          ...displayAwakeEnvironment(this.#options.platform),
+          ...(tapListening ? displayAwakeEnvironment(this.#options.platform) : {}),
         },
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
@@ -405,13 +406,12 @@ export class CuaDriverRuntime {
       yield* this.#stop();
       return yield* ready.failure;
     }
-    yield* this.#startTap(socketPath);
   });
 
   #startTap = Effect.fn("CuaDriver.startTap")(function* (
     this: CuaDriverRuntime,
     socketPath: string,
-  ): Effect.fn.Return<void, CuaDriverFailure> {
+  ): Effect.fn.Return<boolean, CuaDriverFailure> {
     const endpoint = this.#options.endpoint;
     const address =
       endpoint.kind === "windows-pipe" ? `${endpoint.name}-tap` : join(endpoint.directory, TAP_SOCKET_FILE);
@@ -422,6 +422,7 @@ export class CuaDriverRuntime {
       this.#options.onDiagnostic?.(
         `OpenBot: the Computer Use tap could not listen. ${describe(listening.failure.cause)}\n`,
       );
+    return Result.isSuccess(listening);
   });
 
   #stopOrphanedDaemon = Effect.fn("CuaDriver.stopOrphanedDaemon")(function* (

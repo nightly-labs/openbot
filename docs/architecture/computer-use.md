@@ -142,7 +142,9 @@ min-jerk glide, or a wide swoop for a move over 900 points. The tap does not del
 cursor shows where an action went, from 180 ms to about 1.1 s after the driver acts.
 
 On macOS the daemon gets `CUA_DRIVER_KEEP_DISPLAY_AWAKE=0`, and OpenBot keeps the display awake
-itself. The driver's own guard holds `PreventUserIdleDisplaySleep` until 600 s after the last tool
+itself. The tap starts before the daemon, and the daemon gets the variable only when the tap listens:
+without the tap, provider calls go to the daemon directly and OpenBot cannot see them, so the
+driver's guard stays on. The driver's own guard holds `PreventUserIdleDisplaySleep` until 600 s after the last tool
 call, and `end_session` counts as a call, so the display stayed on for up to 10 minutes after the
 agent stopped, against the user's display sleep setting. The tap reports each provider tool call.
 `ComputerUseDisplayAwake` (`computer-use-display-awake.ts`) then holds Electron's
