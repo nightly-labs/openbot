@@ -87,6 +87,8 @@ export const messages = defineMessages("error.backend", {
     "The members of this channel have no conversation to compact yet. Compact it after a member answers in the channel.",
   "error.backend.channelCompactNotSupported":
     "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
+  "error.backend.channelCompactProviderUnavailable":
+    "The provider of the channel members does not work now. Refresh the providers, then compact the channel again.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelArchiveRunning": "Stop the running work in this channel, then delete it.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",

@@ -82,6 +82,8 @@ export const messages = {
   "error.backend.channelCompactNoSession": "לחברי הערוץ הזה אין עדיין שיחה לדחוס. דחסו אותו אחרי שחבר עונה בערוץ.",
   "error.backend.channelCompactNotSupported":
     "אף חבר בערוץ הזה לא יכול לדחוס לפי בקשה. חברים שתומכים בזה דוחסים את ההקשר שלהם אוטומטית כשהוא כמעט מלא.",
+  "error.backend.channelCompactProviderUnavailable":
+    "הספק של חברי הערוץ לא עובד כרגע. יש לרענן את הספקים, ואז לדחוס שוב את הערוץ.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
   "error.backend.channelArchiveRunning": "יש לעצור את העבודה הפעילה בערוץ הזה ואז למחוק אותו.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",

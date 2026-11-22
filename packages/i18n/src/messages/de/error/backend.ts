@@ -93,6 +93,8 @@ export const messages = {
     "Die Mitglieder dieses Kanals haben noch keine Unterhaltung zum Komprimieren. Komprimiere ihn, nachdem ein Mitglied im Kanal geantwortet hat.",
   "error.backend.channelCompactNotSupported":
     "Kein Mitglied dieses Kanals kann auf Anfrage komprimieren. Mitglieder, die es unterstützen, komprimieren ihren Kontext automatisch, wenn er fast voll ist.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Der Anbieter der Kanalmitglieder funktioniert gerade nicht. Aktualisiere die Anbieter und komprimiere den Kanal dann erneut.",
   "error.backend.channelArchived":
     "Stelle diesen Kanal wieder her, bevor du Nachrichten sendest oder Aufgaben änderst.",
   "error.backend.channelArchiveRunning": "Stoppe die laufende Arbeit in diesem Kanal und lösche ihn dann.",

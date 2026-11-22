@@ -91,6 +91,8 @@ export const messages = {
     "Członkowie tego kanału nie mają jeszcze rozmowy do skompaktowania. Skompaktuj go, gdy członek odpowie w kanale.",
   "error.backend.channelCompactNotSupported":
     "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Dostawca członków kanału teraz nie działa. Odśwież dostawców, a potem ponownie kompaktuj kanał.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
   "error.backend.channelArchiveRunning": "Zatrzymaj trwającą pracę w tym kanale, a potem go usuń.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
