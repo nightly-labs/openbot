@@ -388,6 +388,7 @@ export const messages = {
     "Só o app do OpenBot para celular pode enviar este relato, porque ele adiciona a versão e o registro de suporte do celular. Abra este chat no celular. Se você vir esta mensagem lá, atualize o app do celular.",
   "error.backend.takeoverInactive": "Este controle manual do navegador não está mais ativo.",
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
+  "error.backend.apiKeyListFailed": "O OpenBot não conseguiu ler as chaves de API salvas.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",
   "error.backend.apiKeySaving": "A chave de API já está sendo salva.",
   "error.backend.apiKeyAnswerUnreadable":

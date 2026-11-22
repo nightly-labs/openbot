@@ -80,7 +80,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, maskIdentifiers, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import { z } from "zod";
-import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
+import { type AgentApiKeys, apiKeyFailureLog, type SavedApiKey } from "../agent-api-keys";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentTables } from "../agent-data/agent-tables";
 import type { AgentStore } from "../agent-store";
@@ -1108,7 +1108,12 @@ export class OpenBotToolRouter {
     if (params.tool === "list_api_keys")
       return yield* apiKeys.list(agentId).pipe(
         Effect.map((keys) => openBotToolResult({ keys })),
-        Effect.catch(failed),
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Unable to list the saved API keys of an agent", { error: apiKeyFailureLog(failure) });
+            return openBotToolFailure(sourceText("error.backend.apiKeyListFailed"));
+          }),
+        ),
       );
     if (params.tool === "remove_api_key") {
       const parsed = removeApiKeyToolSchema.safeParse(params.arguments);

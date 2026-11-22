@@ -381,6 +381,7 @@ export const messages = {
     "Solo la app de OpenBot del teléfono puede enviar este informe, porque añade la versión y el registro de soporte del teléfono. Abre este chat en el teléfono. Si ves este mensaje allí, actualiza la app del teléfono.",
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
+  "error.backend.apiKeyListFailed": "OpenBot no pudo leer las claves de API guardadas.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
   "error.backend.apiKeySaving": "La clave de API ya se está guardando.",
   "error.backend.apiKeyAnswerUnreadable":
