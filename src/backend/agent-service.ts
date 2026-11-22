@@ -1165,7 +1165,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       browser: this.#browser,
       hostedSites: this.#hostedSites,
       routines: this.#routines,
-      ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
+      ...(approvalAutomation === undefined ? {} : { approvalAutomation }),
       workspaceSandboxed: (agentId) => {
         const agent = store.get(agentId);
         return agent !== undefined && workspaceAccessEnforced(agent);
@@ -2014,7 +2014,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(this.#localSkillTools === undefined ? {} : { localSkillTools: this.#localSkillTools }),
       ...(this.#routineFlowTools === undefined ? {} : { routineFlowTools: this.#routineFlowTools }),
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
-      ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
+      ...(approvalAutomation === undefined ? {} : { approvalAutomation }),
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
