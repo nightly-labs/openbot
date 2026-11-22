@@ -27,7 +27,7 @@ const BrowserTabs = createSimpleContext({
     const [browserTabs, setBrowserTabs] = createSignal<BrowserTab[]>([]);
     const [activeBrowserTabId, setActiveBrowserTabId] = createSignal<string | null>(null);
     const [browserControlState, setBrowserControlState] = createSignal<BrowserControlState>({ sessions: [] });
-    const [noticedBrowserTabIds, setNoticedBrowserTabIds] = createSignal<ReadonlySet<string>>(new Set());
+    const [noticedBrowserTabIds, setNoticedBrowserTabIds] = createSignal<ReadonlySet<string> | null>(null);
     const browserTabActivationOperations = new Map<string, Promise<void>>();
     let browserChangeRevision = 0;
 
@@ -48,16 +48,17 @@ const BrowserTabs = createSimpleContext({
     function beginBrowserLoad(): (state: BrowserDisplayState) => void {
       const requestedAtRevision = browserChangeRevision;
       return (state) => {
+        if (!noticedBrowserTabIds()) setNoticedBrowserTabIds(new Set(state.tabs.map((tab) => tab.id)));
         if (browserChangeRevision !== requestedAtRevision) return;
         setBrowserTabs(state.tabs);
         setActiveBrowserTabId(activeTabAfterLoad(state));
-        setNoticedBrowserTabIds(new Set(state.tabs.map((tab) => tab.id)));
       };
     }
 
     function noticeBrowserTabs(tabIds: readonly string[]): void {
-      if (tabIds.every((tabId) => noticedBrowserTabIds().has(tabId))) return;
-      setNoticedBrowserTabIds((noticed) => new Set([...noticed, ...tabIds]));
+      const noticed = noticedBrowserTabIds();
+      if (!noticed || tabIds.every((tabId) => noticed.has(tabId))) return;
+      setNoticedBrowserTabIds(new Set([...noticed, ...tabIds]));
     }
 
     function applyBrowserChange(tabs: BrowserTab[], activeTabId: string | null): void {

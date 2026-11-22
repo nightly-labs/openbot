@@ -2241,9 +2241,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes("browser-control") &&
       workspace.state.capabilities.includes("browser-view"),
   );
-  const noticedBrowserTabIds = createMemo(() =>
-    browserEnabled() ? new Set(workspace.state.noticedBrowserTabIds) : undefined,
-  );
+  const noticedBrowserTabIds = createMemo(() => {
+    const noticed = workspace.state.noticedBrowserTabIds;
+    return browserEnabled() && noticed ? new Set(noticed) : undefined;
+  });
   const clearSelectedAgentContext = createMemo(() => {
     const agent = workspace.selected();
     if (!agent || !workspace.runtime.admin || !workspace.state.capabilities.includes(CONTEXT_RESET_CAPABILITY))

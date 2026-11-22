@@ -541,6 +541,7 @@
     "./features/browser/browser-suggestions": "./src/features/browser/browser-suggestions.ts",
     "./features/browser/browser-view-shortcuts": "./src/features/browser/browser-view-shortcuts.ts",
     "./features/browser/BrowserDock": "./src/features/browser/BrowserDock.tsx",
+    "./features/browser/BrowserTabIcon": "./src/features/browser/BrowserTabIcon.tsx",
     "./features/browser/browser-action-labels": "./src/features/browser/browser-action-labels.ts",
     "./features/vault/VaultPanel": "./src/features/vault/VaultPanel.tsx",
     "./features/vault/VaultLinkAccount": "./src/features/vault/VaultLinkAccount.tsx",

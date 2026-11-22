@@ -516,6 +516,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserAddress,
     setBrowserAddress,
     setComposerError: setScopedComposerError,
+    browserWindowOpen,
     takeoverPageRequest: controller.browserTakeoverPageRequest,
     setTakeoverPageRequest: controller.setBrowserTakeoverPageRequest,
     panels: {

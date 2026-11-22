@@ -1,5 +1,6 @@
 import type { BrowserTab } from "@openbot/contracts/ipc";
 import { Button } from "@openbot/ui";
+import { useBrowserTabTitle } from "@openbot/ui/features/browser/BrowserTabIcon";
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { useText } from "@openbot/ui/text";
@@ -10,6 +11,7 @@ import { openBrowserTabInMainWindow } from "./open-browser-tab-in-main-window";
 export function ConversationBrowserTabNotice() {
   const { props, browserTabNotice, noticeBrowserTabs, openBrowserTakeoverTab } = useConversationViewScope();
   const { t } = useText();
+  const tabTitle = useBrowserTabTitle();
   const platform = usePlatform();
   const agentName = () => props.agent?.name ?? t("chat.message.agentFallback");
   const openPage = (tab: BrowserTab) => {
@@ -26,7 +28,7 @@ export function ConversationBrowserTabNotice() {
           body={
             notice().count > 1
               ? t("composer.browserTab.openedMany", { name: agentName(), count: notice().count })
-              : t("composer.browserTab.opened", { name: agentName(), title: notice().tab.title })
+              : t("composer.browserTab.opened", { name: agentName(), title: tabTitle(notice().tab) })
           }
           action={
             <>

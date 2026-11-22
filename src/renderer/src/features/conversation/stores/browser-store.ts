@@ -85,6 +85,7 @@ export interface BrowserStoreDeps {
   takeoverPageRequest: () => { agentId: string; tabId: string } | null;
   setTakeoverPageRequest: (request: null) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget, cause?: unknown) => void;
+  browserWindowOpen: () => boolean;
   panels: BrowserPanels;
 }
 
@@ -127,10 +128,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       const agentId = untrack(viewId);
       for (const [requestKey, request] of deps.browserOpenRequests) {
         if (request.serverId !== serverId || request.agentId !== agentId) continue;
-        const tabAppeared = tabs.some(
+        const appearedTab = tabs.find(
           (tab) => canonicalBrowserUrl(tab.url) === request.url && !request.existingTabIds.has(tab.id),
         );
-        if (tabAppeared) deps.browserOpenRequests.delete(requestKey);
+        if (!appearedTab) continue;
+        deps.browserOpenRequests.delete(requestKey);
+        deps.props.onNoticeBrowserTabs?.([appearedTab.id]);
       }
     },
   );
@@ -310,16 +313,23 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const tabIds = untrack(unseenBrowserTabs).map((tab) => tab.id);
     if (tabIds.length > 0) deps.props.onNoticeBrowserTabs?.(tabIds);
   }
+  const browserShown = () => screenOpen() || (deps.browserWindowOpen() && deps.props.browserEnabled !== false);
   createEffect(
-    () => (screenOpen() ? unseenBrowserTabs().length : 0),
+    () => (browserShown() ? unseenBrowserTabs().length : 0),
     (unseenShown) => {
       if (unseenShown > 0) noticeBrowserTabs();
+    },
+  );
+  createEffect(
+    () => deps.props.browserTakeover?.tabId,
+    (tabId) => {
+      if (tabId) deps.props.onNoticeBrowserTabs?.([tabId]);
     },
   );
   const browserTabNotice = createMemo(() => {
     const tabs = unseenBrowserTabs();
     const newest = tabs.at(-1);
-    if (!newest || screenOpen() || deps.props.browserTakeover) return undefined;
+    if (!newest || browserShown() || deps.props.browserTakeover) return undefined;
     return { tab: newest, count: tabs.length };
   });
 
