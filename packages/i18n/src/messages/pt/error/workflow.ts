@@ -21,6 +21,10 @@ export const messages = {
   "error.workflow.conditionUnclear": "O modelo não respondeu sim ou não.",
   "error.workflow.answerInvalid":
     "A resposta não tinha os campos que esta etapa pede: {fields}. Execute a etapa novamente.",
+  "error.workflow.answerSetup":
+    "Os campos de resposta deste fluxo de trabalho têm um problema aqui: {fields}. Corrija o fluxo de trabalho e execute a etapa novamente.",
+  "error.workflow.answerSourceEnded":
+    "Estes campos não têm valor, porque a etapa que os fornece não terminou: {fields}. Execute essa etapa novamente primeiro.",
   "error.workflow.checkInvalid": "A verificação desta etapa não é válida. Corrija-a e execute a etapa novamente.",
   "error.workflow.modelFailed": "O modelo não conseguiu responder. Execute a etapa novamente.",
   "error.workflow.modelTimedOut":

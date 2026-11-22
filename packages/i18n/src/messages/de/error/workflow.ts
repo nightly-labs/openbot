@@ -22,6 +22,10 @@ export const messages = {
   "error.workflow.conditionUnclear": "Das Modell hat nicht mit Ja oder Nein geantwortet.",
   "error.workflow.answerInvalid":
     "Die Antwort hatte nicht die Felder, die dieser Schritt verlangt: {fields}. Führe den Schritt erneut aus.",
+  "error.workflow.answerSetup":
+    "Die Antwortfelder dieses Workflows passen hier nicht: {fields}. Korrigiere den Workflow und führe den Schritt dann erneut aus.",
+  "error.workflow.answerSourceEnded":
+    "Diese Felder haben keinen Wert, weil der Schritt, der sie liefert, nicht abgeschlossen wurde: {fields}. Führe zuerst diesen Schritt erneut aus.",
   "error.workflow.checkInvalid":
     "Die Prüfung dieses Schritts ist ungültig. Korrigiere sie und führe den Schritt erneut aus.",
   "error.workflow.modelFailed": "Das Modell konnte nicht antworten. Führe den Schritt erneut aus.",

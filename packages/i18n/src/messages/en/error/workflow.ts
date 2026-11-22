@@ -18,6 +18,10 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
   "error.workflow.answerInvalid":
     "The answer did not have the fields that this step asks for: {fields}. Run the step again.",
+  "error.workflow.answerSetup":
+    "The answer fields of this workflow have a problem here: {fields}. Correct the workflow, then run the step again.",
+  "error.workflow.answerSourceEnded":
+    "These fields have no value, because the step that gives them did not finish: {fields}. Run that step again first.",
   "error.workflow.checkInvalid": "The check of this step is not valid. Correct it, then run the step again.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
   "error.workflow.modelTimedOut":

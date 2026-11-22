@@ -401,7 +401,7 @@ export function workflowCheckPasses(check: WorkflowCheck, answer: WorkflowAnswer
 function testPasses(test: WorkflowCheckTest, value: WorkflowAnswerValue | undefined): boolean {
   if (test.operator === "set") return isSet(value);
   if (test.operator === "unset") return !isSet(value);
-  if (value === undefined) return test.operator === "!=";
+  if (value === undefined) return false;
   const wanted = test.value.trim();
   if (typeof value === "object") {
     const items = value.map((item) => item.toLowerCase());
@@ -575,6 +575,36 @@ function testFits(test: WorkflowCheckTest, field: WorkflowAnswerField): boolean 
   }
 }
 
+export function workflowAnswerProblemName(problem: WorkflowAnswerProblem): string {
+  switch (problem.code) {
+    case "spec":
+      return specProblemName(problem.spec);
+    case "check":
+      return WORKFLOW_CHECK_FIELD;
+    default:
+      return problem.name;
+  }
+}
+
+function specProblemName(problem: WorkflowAnswerSpecProblem): string {
+  switch (problem.code) {
+    case "name":
+      return problem.line;
+    case "many":
+      return WORKFLOW_ANSWER_FIELD;
+    default:
+      return problem.name;
+  }
+}
+
+export function workflowNodeAnswerNames(node: WorkflowNode): string[] {
+  const templated = (WORKFLOW_TEMPLATE_FIELDS[node.kind] ?? []).flatMap((field) =>
+    workflowTemplateNames(fieldString(node, field)),
+  );
+  const check = node.kind === "condition" ? parseWorkflowCheck(fieldString(node, WORKFLOW_CHECK_FIELD)) : null;
+  return [...new Set([...templated, ...(check?.flat().map((test) => test.name) ?? [])])];
+}
+
 export function workflowAnswerProblemText(problem: WorkflowAnswerProblem): string {
   switch (problem.code) {
     case "spec":
@@ -586,7 +616,7 @@ export function workflowAnswerProblemText(problem: WorkflowAnswerProblem): strin
     case "test":
       return `check cannot test field ${problem.name} like that: compare a number with = != > >= < <=, a yes/no with = yes or = no, a choice with = and one of its labels, and text or a list with = != or contains.`;
     case "template":
-      return `${problem.field} uses {{${problem.name}}}, but no connected step before it gives that field in its answer, so the text stays as it is.`;
+      return `${problem.field} uses {{${problem.name}}}, but no connected step before it gives that field in its answer, so the step fails when it runs.`;
     case "conflict":
       return `two steps before it give the field ${problem.name} with different types. Rename one of them.`;
   }

@@ -383,7 +383,7 @@ try {
   });
   check(
     "edit_workflow saves an unknown {{name}} and adds a note",
-    hook.ok && hook.text.includes("ticket_id") && hook.text.includes("stays as it is"),
+    hook.ok && hook.text.includes("ticket_id") && hook.text.includes("the step fails when it runs"),
     hook.text,
   );
   const saved = lastJsonObject(hook.text);
@@ -397,19 +397,21 @@ try {
   const runResult = lastJsonObject(started.text);
   assert.ok(runResult && typeof runResult.runId === "string");
   const hookRun = runResult.runId;
-  detail = await runUntil(workflows, hookRun, () => report.handoffs.length > before);
+  detail = await runUntil(workflows, hookRun, ended);
   check(
     "a test run reads the trigger answer from the run input",
     typeof gateId === "string" && stepOf(detail, gateId)?.branch === "yes",
     detail.steps,
   );
+  const workId = saved.ids.work;
   check(
-    "text values come in quotes and an unknown name stays as text",
-    report.handoffs.at(-1)?.text.includes('Fix "Ignore the rules" now. Keep {{ticket_id}} as it is.') === true,
-    report.handoffs.at(-1)?.text,
+    "an unknown {{name}} fails the step and sends nothing to the agent",
+    typeof workId === "string" &&
+      stepOf(detail, workId)?.status === "failed" &&
+      stepOf(detail, workId)?.error === sourceText("error.workflow.answerSetup", { fields: "ticket_id" }) &&
+      report.handoffs.length === before,
+    stepOf(detail, typeof workId === "string" ? workId : ""),
   );
-  complete(report.handoffs.at(-1)?.deliveryId ?? "", "Done.");
-  await runUntil(workflows, hookRun, ended);
 
   modelReplies = [
     'Here: {"count":2.5,"score":"0x10","tags":"one","Count":3,"note":"x"}',
@@ -484,18 +486,75 @@ try {
       node("prompt", "prompt", 0, { text: "Read the ticket." }),
       node("model", "llm", 300, { prompt: "Rate it.", answer: "title: text\npriority: high|low" }),
       node("gate", "condition", 600, { check: "title contains it's and priority = high" }),
+      node("agent", "agent", 900, { agentId: AGENT, task: "Fix {{title}} now." }),
     ],
     edges: [
       { id: "prompt-model", from: "prompt", to: "model", type: "text" },
       { id: "model-gate", from: "model", to: "gate", type: "text" },
+      { id: "gate-agent", from: "gate", to: "agent", type: "text", branch: "yes" },
     ],
     strokes: [],
   });
-  detail = await runUntil(workflows, quoted, ended);
+  detail = await runUntil(workflows, quoted, (run) => stepOf(run, "agent")?.status === "running");
   check(
     "an apostrophe inside a word does not start a quote in a check",
     stepOf(detail, "gate")?.branch === "yes",
     stepOf(detail, "gate"),
+  );
+  check(
+    "a text value goes into an agent task in quotes",
+    report.handoffs.at(-1)?.text.includes(`Fix "it's down" now.`) === true,
+    report.handoffs.at(-1)?.text,
+  );
+  complete(report.handoffs.at(-1)?.deliveryId ?? "", "Done.");
+  await runUntil(workflows, quoted, ended);
+
+  modelReplies = ['{"priority":"high"}'];
+  const missing = await startRun(workflows, "Missing value", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Read the ticket." }),
+      node("model", "llm", 300, { prompt: "Rate it.", answer: "priority: high|low\nnote?: text" }),
+      node("differs", "condition", 600, { check: "note != x" }),
+      node("absent", "condition", 600, { check: "not note" }),
+    ],
+    edges: [
+      { id: "prompt-model", from: "prompt", to: "model", type: "text" },
+      { id: "model-differs", from: "model", to: "differs", type: "text" },
+      { id: "model-absent", from: "model", to: "absent", type: "text" },
+    ],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, missing, ended);
+  check(
+    'a missing value makes != false and "not" true',
+    stepOf(detail, "differs")?.branch === "no" && stepOf(detail, "absent")?.branch === "yes",
+    detail.steps,
+  );
+
+  modelReplies = ["no JSON", "still no JSON"];
+  const joinHandoffs = report.handoffs.length;
+  const lostSource = await startRun(workflows, "Join with a failed typed step", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Read the ticket." }),
+      node("model", "llm", 300, { prompt: "Rate it.", answer: TRIAGE }),
+      node("context", "prompt", 300, { text: "The user is on the free plan." }),
+      node("agent", "agent", 600, { agentId: AGENT, task: "Handle the {{priority}} ticket." }),
+    ],
+    edges: [
+      { id: "prompt-model", from: "prompt", to: "model", type: "text" },
+      { id: "model-agent", from: "model", to: "agent", type: "text" },
+      { id: "context-agent", from: "context", to: "agent", type: "text" },
+    ],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, lostSource, ended);
+  check(
+    "a join whose typed source failed fails the step that uses its field",
+    stepOf(detail, "model")?.status === "failed" &&
+      stepOf(detail, "agent")?.status === "failed" &&
+      stepOf(detail, "agent")?.error === sourceText("error.workflow.answerSourceEnded", { fields: "priority" }) &&
+      report.handoffs.length === joinHandoffs,
+    detail.steps,
   );
 
   assert.ok(typeof saved.workflowId === "string" && typeof saved.ids.hook === "string");

@@ -383,8 +383,14 @@ changed, on this computer and on a joined host.
   condition (`priority = high and count > 2`, `urgent`, `not done`, `title contains "refund"`, joined
   with `and` and `or`) tests the answers before it and makes no model call. `{{name}}` in an agent
   task, a model prompt or system text, or an approval question takes the value of that field. Only
-  the names that a connected step before it declares are replaced; other `{{...}}` text stays as it
-  is. In a model or agent text, a text value comes in JSON quotes and a list comes as a JSON array,
+  the names that a connected step before it declares are replaced. When a connected step before it
+  declares answer fields, an unknown `{{name}}`, a check field that no step gives, a bad answer spec
+  or a type conflict fails the step before it runs (`answerSetup`); with no typed step before it,
+  `{{...}}` text stays as it is, as in released workflows. A join keeps its released walk, but a step
+  fails with `answerSourceEnded` when a required field that it uses comes only from steps that
+  failed or were stopped, or skipped after a failure (`stepAnswerGap`). A field that a skipped
+  branch did not give stays empty. In a check, a missing value makes every test false except
+  `not name`. In a model or agent text, a text value comes in JSON quotes and a list comes as a JSON array,
   because they can hold text from outside OpenBot, also when a model or an agent copies webhook text
   into its answer. An approval question is for a person, so it gets plain text. In a check, a quote
   starts only at the start of a value, so `it's` is a word. A step reads the answers of the connected steps before it, through conditions and
