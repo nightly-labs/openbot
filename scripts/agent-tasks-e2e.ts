@@ -44,6 +44,7 @@ interface Report {
     pendingProvider?: string | null;
     pendingModel?: string | null;
   };
+  switchHold?: { first: string; third: string; thirdHold: string | null; thirdAfterRevert?: string };
   errorField?: { present: boolean };
   restored?: { taskLimit: number | null };
   passed: boolean;
@@ -175,10 +176,27 @@ try {
     assert.equal(outcome.provider, before.provider, "The running provider stays until the task ends.");
     assert.equal(outcome.pendingProvider, target.provider);
     assert.equal(outcome.pendingModel, target.id);
+    await setTaskLimit(3);
+    const third = await startTask(SHORT_PROMPT);
+    const switchWaits = await waitForTasks(
+      "a new task waits for the queued switch",
+      (snapshot) => taskIn(snapshot, third.id).hold === "agent-busy",
+    );
+    report.switchHold = {
+      first: taskIn(switchWaits, first.id).state,
+      third: taskIn(switchWaits, third.id).state,
+      thirdHold: taskIn(switchWaits, third.id).hold,
+    };
+    assert.equal(report.switchHold.third, "queued", "No new turn starts on the old provider while a switch waits.");
     await page.evaluate(
       ({ id, provider, model }) => window.openbot.agent.updateAgent({ agentId: id, provider, model }),
       { id: agentId, provider: before.provider, model: before.model },
     );
+    const reverted = await waitForTasks(
+      "the new task starts when the queued switch is removed",
+      (snapshot) => taskIn(snapshot, third.id).state !== "queued",
+    );
+    report.switchHold.thirdAfterRevert = taskIn(reverted, third.id).state;
   } else {
     report.providerSwitch = { refused: false, target: null };
   }

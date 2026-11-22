@@ -846,8 +846,10 @@ workspace, and OpenBot does not lock files; the `start_task` guidance warns the 
 
 A provider, account or custom-agent change that a user or an agent asks for while a turn, a task or
 a queued message waits is stored on the agent as `pendingRuntime`. The running work keeps its
-sessions. When the drain is about to start the next message and no work has started,
-`AgentService` applies the queued runtime first (the `next-turn` move), then retires the provider
+sessions. While the change waits and a turn of the agent still runs, no chat, task or channel lane
+starts a new turn (the `pending-runtime` drain hold, shown on a queued task as "Waiting for other work
+of this agent to finish."), so a queued message cannot keep the old runtime busy. When the drain is
+about to start the next message and no work has started, `AgentService` applies the queued runtime first (the `next-turn` move), then retires the provider
 sessions of the chat and of each task thread, so each one gets a handoff on the new provider. A
 queued change that fails on an idle agent, such as for a provider that is now off, is removed. A
 joined server's client queues the same change on `agent-pending-runtime-v1` (see

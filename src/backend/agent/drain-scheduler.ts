@@ -105,6 +105,7 @@ export interface DrainHooks {
   mayFailOver(agentId: string): boolean;
   followUsageLimit(agentId: string): boolean;
   followPendingRuntime(agentId: string): boolean;
+  pendingRuntimeWaits(agentId: string): boolean;
   turnEnded(turnId: string): boolean;
   staleTurnSettlement(agentId: string, threadId: string, turnId: string): Effect.Effect<void> | null;
   orphanedDeliveryRecovery(agentId: string): Effect.Effect<void> | null;
@@ -409,6 +410,7 @@ export class DrainScheduler {
     if (this.#compactionHolds(lane)) return "compaction";
     if (!this.#routines.mayDrain(agentId)) return "routine";
     if (!this.#usageLimits.mayDrain(agentId) && !this.#usageLimits.mayTry(agentId)) return "usage-limit";
+    if (this.#hooks.pendingRuntimeWaits(agentId)) return "pending-runtime";
     return null;
   }
 
