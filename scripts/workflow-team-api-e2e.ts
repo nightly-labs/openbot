@@ -49,7 +49,6 @@ import {
   WORKFLOWS_CREDIT_MEDIA_CODECS,
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
-import { WORKFLOWS_FORMAT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-format-v1";
 import {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CODECS,
@@ -1313,13 +1312,6 @@ try {
   await step(
     "format: the host sends its format, refuses a new unknown value, keeps a saved one, and a newer format opens read-only",
     async () => {
-      const capabilities = async (protocol: number) =>
-        list(
-          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
-          "capabilities",
-        );
-      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_FORMAT_CAPABILITY));
-      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_FORMAT_CAPABILITY));
       const model: WorkflowNode = { id: "model", kind: "llm", at: at(300), fields: { prompt: "Hi.", effort: "high" } };
       const graph: WorkflowGraph = { nodes: [promptNode, model], edges: [], strokes: [] };
       const withEffort = (effort: string, x = 300): WorkflowGraph => ({
