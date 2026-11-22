@@ -1104,9 +1104,10 @@ try {
     JSON.stringify({ graph: newer?.graph, warnings: result.warnings }),
   );
   pass(
-    "the user is told which workflows need a newer OpenBot",
-    result.warnings.some((warning) => warning.startsWith("Newer steps:") && warning.includes("newer version")) &&
-      result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("newer version")),
+    "the user is told which workflows need a newer OpenBot, and only a workflow with locked notes is told about notes",
+    result.warnings.some((warning) => warning.startsWith("Newer steps:") && warning.includes("locked notes")) &&
+      result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("newer version")) &&
+      !result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("locked notes")),
     JSON.stringify(result.warnings),
   );
   const linked = movedWorkflows.find((item) => item.summary.title === "Linked media");

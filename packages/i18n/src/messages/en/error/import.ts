@@ -116,6 +116,8 @@ export const messages = defineMessages("error.import", {
     "{name}: choose the Slack, Discord, or Telegram connection of the workflow again after you connect it here.",
   "error.import.transferWorkflowNewer":
     "{name}: some steps need a newer version of OpenBot. They are kept as locked notes.",
+  "error.import.transferWorkflowNewerSettings":
+    "{name}: some settings need a newer version of OpenBot. Open the workflow and examine its steps.",
   "error.import.transferWorkflowPaused": "The imported workflows are paused. Examine each workflow, then resume it.",
   "error.import.transferHistorySkipped": "{name}: the chat history in the file is invalid, so it is not imported.",
   "error.import.transferChatsSkipped": {

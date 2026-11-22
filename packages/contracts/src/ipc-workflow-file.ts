@@ -376,11 +376,22 @@ export function fillWorkflowFileText(
     filled[source.key] = { ...asset, data: base64(bytes) };
   }
   if (total > ATTACHMENT_LIMITS.totalBytes) return { ok: false, problem: { kind: "too-large" } };
-  return {
-    ok: true,
-    text: `${JSON.stringify({ ...value, assets: { ...assets, ...filled } }, null, 2)}\n`,
-    name: workflowFileName(typeof value.title === "string" ? value.title : ""),
-  };
+  const filledText = `${JSON.stringify({ ...value, assets: { ...assets, ...filled } }, null, 2)}\n`;
+  if (filledText.length > WORKFLOW_FILE_MAX_BYTES) return { ok: false, problem: { kind: "too-large" } };
+  return { ok: true, text: filledText, name: workflowFileName(typeof value.title === "string" ? value.title : "") };
+}
+
+export async function fillWorkflowFileExport(
+  source: WorkflowFileHostExport,
+  bytes: (fileId: string) => Promise<Uint8Array | null>,
+): Promise<WorkflowFileFill> {
+  if (source.problem || source.text === null) return { ok: false, problem: source.problem ?? { kind: "too-large" } };
+  const data = new Map<string, Uint8Array>();
+  for (const asset of source.assets) {
+    const found = await bytes(asset.fileId);
+    if (found) data.set(asset.key, found);
+  }
+  return fillWorkflowFileText(source.text, source.assets, data);
 }
 
 function isFileField(value: unknown): value is WorkflowFileField {

@@ -81,7 +81,10 @@ export const importWorkflows = Effect.fn("InstanceTransfer.importWorkflows")(fun
       continue;
     }
     created += 1;
-    if (workflow.newer) warnings.push(sourceText("error.import.transferWorkflowNewer", { name: workflow.title }));
+    if (workflow.newer === "steps")
+      warnings.push(sourceText("error.import.transferWorkflowNewer", { name: workflow.title }));
+    if (workflow.newer === "settings")
+      warnings.push(sourceText("error.import.transferWorkflowNewerSettings", { name: workflow.title }));
     if (graph.nodes.some((node) => node.kind === "trigger" && node.fields.trigger === "webhook"))
       warnings.push(sourceText("error.import.transferWorkflowWebhook", { name: workflow.title }));
     if (workflow.relink) warnings.push(sourceText("error.import.transferWorkflowConnection", { name: workflow.title }));
@@ -136,9 +139,11 @@ function knownEdge(edge: unknown, placeholders: ReadonlySet<unknown>): boolean {
   );
 }
 
-function withPlaceholders(graph: unknown): { graph: unknown; newer: boolean } {
+type NewerWorkflow = "steps" | "settings" | null;
+
+function withPlaceholders(graph: unknown): { graph: unknown; newer: NewerWorkflow } {
   if (!isDynamicRecord(graph) || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges))
-    return { graph, newer: false };
+    return { graph, newer: null };
   const placeholders = new Set<unknown>();
   const nodes = graph.nodes.map((node: unknown) => {
     if (!isDynamicRecord(node) || isOneOf(WORKFLOW_NODE_KINDS, node.kind)) return node;
@@ -148,15 +153,15 @@ function withPlaceholders(graph: unknown): { graph: unknown; newer: boolean } {
     return { ...rest, kind: "note", locked: true, fields: { ...fields, text: placeholderText(node, fields) } };
   });
   const edges = graph.edges.filter((edge: unknown) => knownEdge(edge, placeholders));
-  const newer =
-    placeholders.size > 0 ||
+  const newerSettings =
     edges.length < graph.edges.length ||
     workflowGraphHasUnknownKey(graph) ||
     graph.nodes.some(workflowNodeHasUnknownValue);
+  const newer: NewerWorkflow = placeholders.size > 0 ? "steps" : newerSettings ? "settings" : null;
   return { graph: { ...graph, nodes, edges }, newer };
 }
 
-function decodeWorkflow(value: unknown): (TransferWorkflow & { newer: boolean }) | null {
+function decodeWorkflow(value: unknown): (TransferWorkflow & { newer: NewerWorkflow }) | null {
   if (!isDynamicRecord(value)) return null;
   const { title } = value;
   if (typeof title !== "string" || !title.trim() || title.length > TITLE_LIMIT) return null;
@@ -165,7 +170,7 @@ function decodeWorkflow(value: unknown): (TransferWorkflow & { newer: boolean })
   return {
     title,
     graph: kept.graph,
-    newer: kept.newer || workflowFormatIsNewer(value.format),
+    newer: kept.newer ?? (workflowFormatIsNewer(value.format) ? "settings" : null),
     ...(value.relink === true ? { relink: true } : {}),
   };
 }

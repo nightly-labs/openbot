@@ -1,9 +1,8 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  fillWorkflowFileText,
+  fillWorkflowFileExport,
   parseWorkflowFolderAction,
-  WORKFLOW_FILE_EXTENSION,
   WORKFLOW_MEDIA_CATALOG_MAX,
   type WorkflowFileHostExport,
   type WorkflowFileSaveResult,
@@ -193,7 +192,7 @@ export function workflowIpcHandlers({
     const options: SaveDialogOptions = {
       title: translate("dialog.saveWorkflow"),
       defaultPath: join(app.getPath("downloads"), name),
-      filters: [{ name: translate("dialog.filter.workflow"), extensions: [WORKFLOW_FILE_EXTENSION] }],
+      filters: [{ name: translate("dialog.filter.workflow"), extensions: ["json"] }],
       showsTagField: false,
     };
     const result = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
@@ -203,14 +202,7 @@ export function workflowIpcHandlers({
     source: WorkflowFileHostExport,
     bytes: (fileId: string) => Promise<Uint8Array | null>,
   ): Promise<WorkflowFileSaveResult> {
-    if (source.problem || source.text === null)
-      return { saved: false, problem: source.problem ?? { kind: "too-large" } };
-    const data = new Map<string, Uint8Array>();
-    for (const asset of source.assets) {
-      const found = await bytes(asset.fileId);
-      if (found) data.set(asset.key, found);
-    }
-    const filled = fillWorkflowFileText(source.text, source.assets, data);
+    const filled = await fillWorkflowFileExport(source, bytes);
     if (!filled.ok) return { saved: false, problem: filled.problem };
     const path = await chooseExportPath(filled.name);
     if (!path) return { saved: false, problem: null };

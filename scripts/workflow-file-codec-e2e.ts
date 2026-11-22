@@ -7,6 +7,7 @@ import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   decodeWorkflowFile,
   encodeWorkflowFile,
+  fillWorkflowFileExport,
   fillWorkflowFileText,
   matchWorkflowFileReferences,
   serializeWorkflowFile,
@@ -201,6 +202,23 @@ try {
   check("a client fills the pictures of a file from a newer host", newerHost.ok);
   const filled = fillWorkflowFileText(hostText, exported.assets, new Map([["file-1", logo]]));
   assert.ok(filled.ok, JSON.stringify(filled));
+  const requested: string[] = [];
+  const shared = await fillWorkflowFileExport(workflowFileHostExport(exported), async (fileId) => {
+    requested.push(fileId);
+    return fileId === "file-on-host-a" ? logo : null;
+  });
+  const refused = await fillWorkflowFileExport({ text: null, assets: [], problem: { kind: "too-large" } }, async () =>
+    assert.fail("a refused export reads no file"),
+  );
+  check(
+    "both clients fill the host export the same way, and a refused export reads no file",
+    shared.ok &&
+      shared.text === filled.text &&
+      JSON.stringify(requested) === JSON.stringify(["file-on-host-a"]) &&
+      !refused.ok &&
+      refused.problem.kind === "too-large",
+    { requested, refused },
+  );
   const filledFile = decodeWorkflowFile(filled.text);
   assert.ok(filledFile.ok, JSON.stringify(filledFile));
   const file = filledFile.file;

@@ -10,7 +10,7 @@ import {
 import { redactSecrets } from "@openbot/logging";
 import { Effect } from "effect";
 
-export interface WorkflowFileAttachment {
+interface WorkflowFileAttachment {
   path: string;
   mimeType: string;
   name: string;

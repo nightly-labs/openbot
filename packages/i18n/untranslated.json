@@ -1448,6 +1448,22 @@
     "tr",
     "zh"
   ],
+  "error.import.transferWorkflowNewerSettings": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.import.transferWorkflowPaused": [
     "ar",
     "de",

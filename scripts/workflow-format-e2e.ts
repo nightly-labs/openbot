@@ -95,6 +95,7 @@ interface Fixture {
   graph: WorkflowGraph;
   replies?: string[];
   steps: Record<string, string> | "refused";
+  posts?: string[];
 }
 
 const TRIGGER = node("start", "trigger", 0, { trigger: "manual" });
@@ -213,6 +214,7 @@ const FIXTURES: Fixture[] = [
     ),
     replies: ["Hello."],
     steps: { answer: "done", discord: "done", telegram: "done", slack: "done" },
+    posts: ["discord", "slack", "telegram"],
   },
   {
     title: "Condition provider, model and effort",
@@ -248,6 +250,7 @@ const FIXTURES: Fixture[] = [
       [edge("start", "post"), edge("brief", "post")],
     ),
     steps: { post: "done" },
+    posts: ["channel"],
   },
   {
     title: "Image and video steps",
@@ -558,6 +561,7 @@ try {
       continue;
     }
     const expected = fixture.steps;
+    posts.length = 0;
     const started = await runCauseEffect(start);
     const detail = await runToEnd(a, started.run.id);
     const steps = Object.fromEntries(Object.keys(expected).map((id) => [id, stepOf(detail, id)?.status ?? "none"]));
@@ -566,6 +570,8 @@ try {
       same(steps, expected),
       detail.steps.map((step) => [step.nodeId, step.status, step.error]),
     );
+    if (fixture.posts)
+      check(`${fixture.title}: each output step sends its post`, same([...posts].sort(), fixture.posts), posts);
     report.fixtures.push({
       title: fixture.title,
       pr: fixture.pr,

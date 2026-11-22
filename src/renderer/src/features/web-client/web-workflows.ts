@@ -2,7 +2,7 @@ import {
   type AgentEvent,
   type AttachmentSummary,
   decodeWorkflowFoldersSnapshot,
-  fillWorkflowFileText,
+  fillWorkflowFileExport,
   STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
   WORKFLOW_MEDIA_CATALOG_MAX,
@@ -196,17 +196,12 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const exportFile = async (workflowId: string): Promise<WorkflowFileSaveResult> => {
     if (!has(WORKFLOWS_PORTABLE_CAPABILITY)) throw tooOld();
     const source = await post(WORKFLOWS_PORTABLE_ROUTES.export, decodeRemoteWorkflowFileExport, { workflowId });
-    if (source.problem || source.text === null)
-      return { saved: false, problem: source.problem ?? { kind: "too-large" } };
-    const data = new Map<string, Uint8Array>();
-    for (const asset of source.assets) {
-      const found = await options.download(asset.fileId).then(
+    const filled = await fillWorkflowFileExport(source, (fileId) =>
+      options.download(fileId).then(
         (file) => base64ToBytes(file.base64),
         () => null,
-      );
-      if (found) data.set(asset.key, found);
-    }
-    const filled = fillWorkflowFileText(source.text, source.assets, data);
+      ),
+    );
     if (!filled.ok) return { saved: false, problem: filled.problem };
     options.saveFile({ name: filled.name, blob: new Blob([filled.text], { type: "application/json" }) });
     return { saved: true, problem: null };
