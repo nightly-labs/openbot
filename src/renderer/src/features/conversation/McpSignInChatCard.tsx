@@ -15,10 +15,24 @@ export interface McpSignInChatCardProps {
   onContinue: (body: string) => boolean | Promise<boolean>;
 }
 
+const SIGN_IN_CHECK_DEADLINE_MS = 8_000;
+
 function heldByAppWithoutSignIn(config: McpServerConfig): boolean {
   return MARKETPLACE_PLUGINS.some((plugin) =>
     plugin.apps.some((app) => !app.server.auth?.length && isPluginAppConfig(config, app)),
   );
+}
+
+async function withinDeadline(check: Promise<boolean>): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), SIGN_IN_CHECK_DEADLINE_MS);
+  });
+  try {
+    return await Promise.race([check, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function McpSignInChatCard(props: McpSignInChatCardProps) {
@@ -44,9 +58,12 @@ export function McpSignInChatCard(props: McpSignInChatCardProps) {
     if (!serverId || !test) return false;
     setChecking(true);
     try {
-      const row = await savedRow(serverId);
-      if (!row || !heldByAppWithoutSignIn(row)) return false;
-      return (await test({ config: row }, serverId)).error === null;
+      return await withinDeadline(
+        savedRow(serverId).then(async (row) => {
+          if (!row?.enabled || !heldByAppWithoutSignIn(row)) return false;
+          return (await test({ config: row }, serverId)).error === null;
+        }),
+      );
     } catch {
       return false;
     } finally {
