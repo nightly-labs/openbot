@@ -15,6 +15,7 @@ import {
   LEFT_PANEL_STORAGE_KEY,
   MAC_SERVER_RAIL_WIDTH,
   NARROW_SERVER_RAIL_WIDTH,
+  RAIL_HIDDEN_USAGE_STORAGE_KEY,
   RAIL_PINS_STORAGE_KEY,
   SERVER_RAIL_WIDTH,
   SERVER_VIEW_STORAGE_KEY,
@@ -62,6 +63,19 @@ function readRailPinChoices(): RailPinChoices {
   }
 }
 
+const railHiddenUsageSchema = z.array(z.string());
+
+function readRailHiddenUsage(): readonly string[] {
+  try {
+    const parsed = railHiddenUsageSchema.safeParse(
+      JSON.parse(window.localStorage.getItem(RAIL_HIDDEN_USAGE_STORAGE_KEY) ?? "[]"),
+    );
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
+
 function readSidebarChatOrder(): SidebarChatOrder {
   try {
     const saved = window.localStorage.getItem(SIDEBAR_CHAT_ORDER_STORAGE_KEY);
@@ -90,6 +104,7 @@ const Layout = createSimpleContext({
       const choices = railPinChoices();
       return PAGE_RAIL_PINNABLE_PAGES.filter((page) => choices[page] ?? RAIL_PINNED_BY_DEFAULT.has(page));
     });
+    const [railHiddenUsage, setRailHiddenUsageSignal] = createSignal<readonly string[]>(readRailHiddenUsage());
     const [leftPanelAutoCompact, setLeftPanelAutoCompact] = createSignal(false);
     const [sidebarClosed, setSidebarClosedSignal] = createSignal(
       window.localStorage.getItem(LEFT_PANEL_CLOSED_STORAGE_KEY) === "true",
@@ -118,6 +133,8 @@ const Layout = createSimpleContext({
 
     function readRailPinsFromStorage(event: StorageEvent): void {
       if (event.key === null || event.key === RAIL_PINS_STORAGE_KEY) setRailPinChoices(readRailPinChoices());
+      if (event.key === null || event.key === RAIL_HIDDEN_USAGE_STORAGE_KEY)
+        setRailHiddenUsageSignal(readRailHiddenUsage());
       if (event.key === null || event.key === SIDEBAR_CHAT_ORDER_STORAGE_KEY)
         setSidebarChatOrderSignal(readSidebarChatOrder());
     }
@@ -157,6 +174,21 @@ const Layout = createSimpleContext({
       } catch {}
     }
 
+    function saveRailHiddenUsage(keys: readonly string[]): void {
+      setRailHiddenUsageSignal(keys);
+      try {
+        window.localStorage.setItem(RAIL_HIDDEN_USAGE_STORAGE_KEY, JSON.stringify(keys));
+      } catch {}
+    }
+
+    function hideRailUsage(keys: readonly string[]): void {
+      saveRailHiddenUsage([...new Set([...railHiddenUsage(), ...readRailHiddenUsage(), ...keys])]);
+    }
+
+    function showRailHiddenUsage(): void {
+      saveRailHiddenUsage([]);
+    }
+
     function expandSidebar(): void {
       setSidebarClosed(false);
       setSidebarCollapsed(false);
@@ -179,6 +211,9 @@ const Layout = createSimpleContext({
       setSidebarChatOrder,
       railPinned,
       setRailPinned,
+      railHiddenUsage,
+      hideRailUsage,
+      showRailHiddenUsage,
     };
   },
 });

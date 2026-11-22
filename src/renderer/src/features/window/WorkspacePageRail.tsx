@@ -94,6 +94,9 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       pinned={layout.railPinned()}
       onPinChange={layout.setRailPinned}
       usageRows={usageRows()}
+      hiddenUsageRings={layout.railHiddenUsage()}
+      onHideUsageRings={layout.hideRailUsage}
+      onShowHiddenUsageRings={layout.showRailHiddenUsage}
       customAgentUsage={localAgentUsage()}
       mediaCredits={mediaCredits()}
       onMediaCredits={(provider) => {

@@ -10,6 +10,8 @@ import {
   ContextMenu,
   DropdownMenu,
   Ellipsis,
+  Eye,
+  EyeOff,
   GalleryVerticalEnd,
   ListChecks,
   MotionTooltip,
@@ -158,6 +160,7 @@ const RING = { size: 34, stroke: 2.25, spacing: 4.5 };
 function UsageRings(props: {
   row: AccountUsageProviderRow;
   shared: readonly AccountUsageProviderRow[];
+  menu?: readonly RailMenuItem[] | undefined;
   onOpen: (button: HTMLElement) => void;
 }) {
   const { t, format } = useText();
@@ -182,6 +185,7 @@ function UsageRings(props: {
       label={label()}
       card={() => <UsageCard rows={rows()} />}
       class="window-rail-usage"
+      menu={props.menu}
       onClick={props.onOpen}
     >
       <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
@@ -237,7 +241,11 @@ function ringLeft(ring: UsageRing): number {
   return Math.min(...[ring.row, ...ring.shared].map((row) => row.remainingPercent ?? 100));
 }
 
-function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: HTMLElement) => void }) {
+function MoreUsageRings(props: {
+  rings: readonly UsageRing[];
+  menu?: readonly RailMenuItem[] | undefined;
+  onOpen: (button: HTMLElement) => void;
+}) {
   const { t } = useText();
   const rows = () => props.rings.flatMap((ring) => [ring.row, ...ring.shared]);
   return (
@@ -245,6 +253,7 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
       label={t("app.rail.moreUsage", { count: props.rings.length })}
       card={() => <UsageCard rows={rows()} />}
       class="window-rail-usage window-rail-usage-more"
+      menu={props.menu}
       onClick={props.onOpen}
     >
       <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
@@ -261,6 +270,10 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
       </span>
     </RailButton>
   );
+}
+
+function nonEmpty(items: readonly RailMenuItem[]): readonly RailMenuItem[] | undefined {
+  return items.length > 0 ? items : undefined;
 }
 
 const START_RING_PLACES = 5;
@@ -438,6 +451,9 @@ export interface PageRailProps {
   pinned: readonly PageRailPinnablePage[];
   onPinChange: (page: PageRailPinnablePage, pinned: boolean) => void;
   usageRows: readonly AccountUsageProviderRow[];
+  hiddenUsageRings?: readonly string[] | undefined;
+  onHideUsageRings?: ((keys: readonly string[]) => void) | undefined;
+  onShowHiddenUsageRings?: (() => void) | undefined;
   customAgentUsage?: readonly CustomAgentUsageRailRow[] | undefined;
   mediaCredits?: readonly MediaCreditsRailRow[] | undefined;
   onMediaCredits?: ((provider: MediaCreditsRailRow["provider"]) => void) | undefined;
@@ -475,6 +491,7 @@ function RailMoreMenu(props: {
   current: PageRailPage | null;
   pinned: readonly PageRailPinnablePage[];
   onPinChange: (page: PageRailPinnablePage, pinned: boolean) => void;
+  actions: readonly RailMenuItem[];
 }) {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
@@ -530,6 +547,14 @@ function RailMoreMenu(props: {
               </div>
             )}
           </For>
+          <For each={props.actions}>
+            {(action) => (
+              <DropdownMenu.Item onSelectAfterClose={() => trigger && action.open(trigger)}>
+                <Dynamic component={action.icon} class="agent-context-icon size-4" aria-hidden="true" />
+                <span>{action.label}</span>
+              </DropdownMenu.Item>
+            )}
+          </For>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
@@ -561,7 +586,7 @@ function RailLogo(props: { variant: AppLogoVariant; href: string | undefined }) 
 
 export function PageRail(props: PageRailProps) {
   const { t } = useText();
-  const rings = createMemo((): UsageRing[] => {
+  const allRings = createMemo((): UsageRing[] => {
     const rows = props.usageRows.filter((row) => row.reportsUsage && (row.windows.length > 0 || row.readFailed));
     const owner = (row: AccountUsageProviderRow) =>
       rows.find((other) => other.accountId === null && other.provider === row.sharedQuotaWith);
@@ -569,6 +594,37 @@ export function PageRail(props: PageRailProps) {
       .filter((row) => !owner(row))
       .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
   });
+  const hiddenRingKeys = createMemo(() => new Set(props.hiddenUsageRings ?? []));
+  const rings = createMemo(() => allRings().filter((ring) => !hiddenRingKeys().has(accountUsageRowKey(ring.row))));
+  const hiddenRingCount = () => allRings().length - rings().length;
+  const showHiddenRings = (): RailMenuItem[] => {
+    const onShow = props.onShowHiddenUsageRings;
+    return onShow && hiddenRingCount() > 0
+      ? [{ label: t("app.rail.showHiddenUsageRings"), icon: Eye, open: () => onShow() }]
+      : [];
+  };
+  const hideAllRings = (): RailMenuItem[] => {
+    const onHide = props.onHideUsageRings;
+    return onHide
+      ? [
+          {
+            label: t("app.rail.hideAllUsageRings"),
+            icon: EyeOff,
+            open: () => onHide(rings().map((ring) => accountUsageRowKey(ring.row))),
+          },
+        ]
+      : [];
+  };
+  const ringMenu = (ring: UsageRing): RailMenuItem[] | undefined => {
+    const onHide = props.onHideUsageRings;
+    if (!onHide) return undefined;
+    const key = accountUsageRowKey(ring.row);
+    return [
+      { label: t("app.rail.hideUsageRing"), icon: EyeOff, open: () => onHide([key]) },
+      ...hideAllRings(),
+      ...showHiddenRings(),
+    ];
+  };
   const [ringSlots, setRingSlots] = createSignal(START_RING_PLACES);
   const ringLayout = createMemo(() => {
     const all = rings();
@@ -679,6 +735,7 @@ export function PageRail(props: PageRailProps) {
               current={props.current === page().id}
               menu={[
                 ...(page().menu ?? []),
+                ...(page().id === "usage" ? showHiddenRings() : []),
                 { label: t("sidebar.unpin"), icon: PinOff, open: () => props.onPinChange(page().id, false) },
               ]}
               onClick={page().open}
@@ -688,7 +745,13 @@ export function PageRail(props: PageRailProps) {
             </RailButton>
           )}
         </For>
-        <RailMoreMenu pages={pages()} current={props.current} pinned={props.pinned} onPinChange={props.onPinChange} />
+        <RailMoreMenu
+          pages={pages()}
+          current={props.current}
+          pinned={props.pinned}
+          onPinChange={props.onPinChange}
+          actions={showHiddenRings()}
+        />
       </div>
       <div
         class="window-rail-end"
@@ -703,10 +766,16 @@ export function PageRail(props: PageRailProps) {
           }}
         >
           <For each={ringLayout().shown} keyed={(ring) => accountUsageRowKey(ring.row)}>
-            {(ring) => <UsageRings row={ring().row} shared={ring().shared} onOpen={props.onUsage} />}
+            {(ring) => (
+              <UsageRings row={ring().row} shared={ring().shared} menu={ringMenu(ring())} onOpen={props.onUsage} />
+            )}
           </For>
           <Show when={ringLayout().more.length > 0}>
-            <MoreUsageRings rings={ringLayout().more} onOpen={props.onUsage} />
+            <MoreUsageRings
+              rings={ringLayout().more}
+              menu={nonEmpty([...hideAllRings(), ...showHiddenRings()])}
+              onOpen={props.onUsage}
+            />
           </Show>
           <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
             {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}

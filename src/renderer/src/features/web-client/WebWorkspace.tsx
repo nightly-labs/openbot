@@ -2849,6 +2849,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               pinned={layout.railPinned()}
               onPinChange={layout.setRailPinned}
               usageRows={usageRows()}
+              hiddenUsageRings={layout.railHiddenUsage()}
+              onHideUsageRings={layout.hideRailUsage}
+              onShowHiddenUsageRings={layout.showRailHiddenUsage}
               onAgents={showAgentsPage}
               onTasks={
                 tasksSupported()
