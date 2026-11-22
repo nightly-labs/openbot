@@ -937,7 +937,7 @@ export class DrainScheduler {
             return deliveryPromptInput(repeated ? rest : item, {
               agentNames,
               snapshot,
-              routineRun,
+              routineRun: routineRun ?? this.#routines.linkedRunForDelivery(item.delivery.id),
               skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 item.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(item.delivery.id) : null,
