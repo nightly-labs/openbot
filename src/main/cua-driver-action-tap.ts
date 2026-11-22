@@ -289,8 +289,8 @@ class CallAnswerLines extends Transform {
     if (!whole) this.push(line);
     else if (this.#answering === "list") this.push(withoutDriverCursorTools(line));
     else {
-      const screenshots = SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "");
-      this.push(screenshots ? withCopy(line, this.#readScreenshot, this.#compact) : withCopy(line));
+      const read = SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "") ? this.#readScreenshot : undefined;
+      this.push(withCopy(line, read, this.#compact));
       if (isAccessibilityRefusal(line)) this.#refused();
     }
   }
@@ -320,8 +320,8 @@ function withoutDriverCursorTools(line: Buffer): Buffer {
 
 function withCopy(
   line: Buffer,
-  read?: (answer: DynamicRecord) => void,
-  compact: CompactScreenshot | null = null,
+  read: ((answer: DynamicRecord) => void) | undefined,
+  compact: CompactScreenshot | null,
 ): Buffer {
   const pngCompact = compact && line.includes('"image/png"') ? compact : null;
   if (
