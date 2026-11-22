@@ -338,6 +338,10 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.3.0 gives an MCP server 30 s to connect, and then keeps the directory
   // without it while its settings stay the same. A team agent then had no OpenBot tools for hours (#10749).
   mcpConnectLimitMs: 30_000,
+  // OpenCode 2.2.5 answers `session/new` when it listed the MCP tools, but its tool registry reads
+  // them 100 ms after the last `ToolsChanged` event (`Stream.debounce` in core/src/tool/mcp.ts). The
+  // first request of a new session had no `openbot_*` tool, and the model wrote no tool call (#12058).
+  mcpToolsSettleMs: 500,
   // OpenCode 2.3.0 keeps a session's MCP servers for its directory after `session/close`. Each new
   // chat or subagent added more stdio servers that nothing stopped (#9254). OpenBot starts and ends them.
   relayStdioMcpServers: true,

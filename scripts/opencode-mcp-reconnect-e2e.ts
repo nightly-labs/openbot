@@ -169,19 +169,13 @@ async function startThread(client: AgentClient, cwd: string): Promise<string> {
   return id;
 }
 
-/**
- * Runs turns until the chat called OpenBot's tool. OpenCode adds a server's direct tools to its
- * registry a few milliseconds after it lists them, and a turn of the fake model can come first.
- */
+/** Runs the chat's first turn, which must call OpenBot's tool. */
 async function callWhoami(client: AgentClient, threadId: string): Promise<void> {
   const calls = report.toolResults.length;
-  const deadline = Date.now() + 60_000;
-  while (report.toolResults.length === calls) {
-    assert.ok(Date.now() < deadline, "The chat never got OpenBot's tool.");
-    const turn = await runTurn(client, threadId, { text: "Call whoami.", timeoutMs: 120_000 });
-    report.replies.push(turn.reply);
-    assert.equal(turn.error, null, `The turn failed: ${turn.error}`);
-  }
+  const turn = await runTurn(client, threadId, { text: "Call whoami.", timeoutMs: 120_000 });
+  report.replies.push(turn.reply);
+  assert.equal(turn.error, null, `The turn failed: ${turn.error}`);
+  assert.equal(report.toolResults.length, calls + 1, "The first turn of the chat must call OpenBot's tool.");
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-mcp-reconnect-"));

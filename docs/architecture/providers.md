@@ -673,10 +673,14 @@ The instructions and the tool-search note follow the same check (`AgentClient.di
 endpoint on Anthropic's, OpenAI's or Azure's own API, and OpenCode's built-in models, keep Code Mode. The
 cost: a request carries the full schemas of OpenBot's 19 visible tools (about 3.9k tokens, where the Code
 Mode catalog is capped at about 2k) and of the user's MCP tools, and `search(...)` is not available.
-OpenCode adds a server's tools to its registry a few milliseconds after it lists them, so the first
-request of the first chat of a directory can come without OpenBot's tools; Code Mode hides this, because
-`execute` finds a tool when its code runs. `scripts/opencode-direct-tools-e2e.ts` checks the mode, the
-tool list, a direct call and the mode change on a model change.
+OpenCode 2.2.5 answers `session/new` when it has listed a server's tools, but its tool registry reads
+them 100 ms after the last `ToolsChanged` event (a debounce in `core/src/tool/mcp.ts`). The first
+request of each new session then had no OpenBot tools. Code Mode hides this, because `execute` finds a
+tool when its code runs. So in direct mode, the first prompt of a session waits until 500 ms after the
+latest `tools/list` of its OpenBot servers, or after the session answer when that request made OpenCode
+list them (`mcpToolsSettleMs`, `LocalMcpSession.listedAt`). A session that joins servers listed earlier
+does not wait. `scripts/opencode-direct-tools-e2e.ts` checks the mode, the tool list of the first turn, a
+direct call and the mode change on a model change.
 
 Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only environment and `config.toml`
 switches remove a Grok feature. At each spawn, `grok-client.ts` turns off four features that an

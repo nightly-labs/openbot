@@ -368,6 +368,12 @@ export interface AcpFlavor {
    */
   mcpConnectLimitMs?: number;
   /**
+   * How long after the agent lists an MCP server's tools, or answers the session request that made it
+   * list them, its direct tools reach a model request. The first prompt of a session that gets
+   * direct MCP tools (`directToolsMode`) waits until then.
+   */
+  mcpToolsSettleMs?: number;
+  /**
    * The agent drops a stdio MCP server of `session/new` and `session/load` with no error, although
    * ACP requires stdio, or keeps it running after the session closes. OpenBot starts each one itself
    * (`startStdioMcpRelay`), sends it as http, and stops it when the session closes.

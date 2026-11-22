@@ -43,6 +43,8 @@ export interface LocalMcpSession {
   setThreadId(threadId: string): void;
   /** Whether the client sent a request to each of `servers` since the session opened. */
   reached(): boolean;
+  /** When the client last listed the tools of a server of this session, or null while it listed none. */
+  listedAt(): number | null;
   /**
    * Whether the client gave up a server of this session: it did not get the tools of a token that
    * this session was the first to send within `limitMs` of `sentAt`, the time of the session request.
@@ -244,6 +246,10 @@ export class LocalMcpBridge {
         member.threadId = nextThreadId;
       },
       reached: () => routes.every((route) => route.reached),
+      listedAt: () => {
+        const times = routes.flatMap((route) => (route.listedAt === null ? [] : [route.listedAt]));
+        return times.length === 0 ? null : Math.max(...times);
+      },
       dropped: (sentAt, limitMs) => {
         const now = Date.now();
         let dropped = false;

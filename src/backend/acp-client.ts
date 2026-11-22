@@ -387,6 +387,8 @@ interface AcpThread {
   configOptions: SessionConfigOption[];
   currentModelId: string | null;
   mcp: LocalMcpSession;
+  /** When OpenBot sent the session request that gave `mcp` its servers, and when the agent answered it. */
+  mcpOpened: { sentAt: number; answeredAt: number };
   /** Ends the session's stdio relays (`relayStdioMcpServers`) and their servers. */
   relays: Effect.Effect<void>;
   activeTurn: AcpTurn | null;
@@ -2088,12 +2090,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
             }
+            let mcpSentAt = sentAt;
             const connectLimit = this.#flavor.mcpConnectLimitMs;
             if (connectLimit !== undefined && this.#supportsSessionResume && mcp.dropped(sentAt, connectLimit)) {
               // The agent continued without OpenBot's tools and would not connect to the same token again (#10749).
               this.emit("diagnostic", `${this.#label} did not load OpenBot's tools in time. The session opens again.`);
               mcpServers = [...given, ...mcp.renew()];
               const retriedAt = Date.now();
+              mcpSentAt = retriedAt;
               const retry = this.#restoreSessionEffect(
                 connection,
                 { sessionId: id, cwd, ...directories, mcpServers, ...meta },
@@ -2120,6 +2124,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               configOptions,
               currentModelId,
               mcp,
+              mcpOpened: { sentAt: mcpSentAt, answeredAt: Date.now() },
               relays: closeRelays ?? Effect.void,
               activeTurn: null,
               needsResume: false,
@@ -2685,6 +2690,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (thread.activeTurn) return yield* providerFailure(this.#turnActiveError(thread.activeTurn));
     yield* this.#applyTurnSettings(thread, params, true);
     this.#publishSessionSettings(thread);
+    yield* this.#awaitDirectMcpTools(thread);
     const turnId = getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID();
     const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
     yield* providerSync(() => this.#requireServedModel(thread));
@@ -2722,6 +2728,25 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
     yield* Effect.forkIn(this.#watchStall(thread, turn), this.#scope);
     return { turn: { id: turn.id, status: "inProgress" } };
+  });
+
+  /**
+   * Waits until the direct MCP tools that the agent listed last can be in a model request
+   * (`AcpFlavor.mcpToolsSettleMs`). Servers that this session's request made the agent list settle
+   * from its answer: the agent connects all of them before it answers. A session that joins servers
+   * listed earlier waits only for the rest of their time.
+   */
+  readonly #awaitDirectMcpTools = Effect.fn("AcpAgentClient.awaitDirectMcpTools")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+  ) {
+    const settleMs = this.#flavor.mcpToolsSettleMs;
+    const listedAt = thread.mcp.listedAt();
+    if (settleMs === undefined || listedAt === null || !this.directMcpTools(thread.currentModelId)) return;
+    const { sentAt, answeredAt } = thread.mcpOpened;
+    const settledAt = (listedAt >= sentAt ? Math.max(listedAt, answeredAt) : listedAt) + settleMs;
+    const waitMs = settledAt - Date.now();
+    if (waitMs > 0) yield* Effect.sleep(waitMs);
   });
 
   /** The model, effort and session settings that a turn asks for. Applied again after a resume in the turn. */

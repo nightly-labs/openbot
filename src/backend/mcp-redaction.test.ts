@@ -107,6 +107,7 @@ describe("mcpSecretValues", () => {
         servers: [],
         setThreadId: () => {},
         reached: () => false,
+        listedAt: () => null,
         dropped: () => false,
         renew: () => [],
         close: () => {},

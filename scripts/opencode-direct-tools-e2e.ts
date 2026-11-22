@@ -3,7 +3,8 @@
 // gives MCP tools only as JavaScript in `execute` (Code Mode), and a small Qwen model wrote
 // `<tool_call><function=tools.openbot.ask_user>` as reply text. A session on a model of an
 // OpenAI-compatible custom endpoint must run in the `openbot-direct` mode: the request lists
-// `openbot_ask_user` as a function tool and has no `execute`, a direct call reaches OpenBot, and the
+// `openbot_ask_user` as a function tool from the first turn on and has no `execute`, a direct call
+// reaches OpenBot, and the
 // instructions name the direct tools. A model change to a built-in model must give the session its
 // own mode back, and a change back must select the direct mode again.
 // `OPENCODE_CLI=<opencode> bun scripts/opencode-direct-tools-e2e.ts`.
@@ -116,17 +117,8 @@ try {
   if (!thread) throw new Error("thread/start answers no thread id.");
   await expectMode("start on a custom model", thread, OPENCODE_DIRECT_TOOLS_MODE);
 
-  // OpenCode connects the MCP servers after the session starts, and a turn of the fake model takes
-  // milliseconds. Short turns run until a request lists an OpenBot tool.
-  const deadline = Date.now() + 60_000;
-  let warmups = 0;
-  while (!harness.requests.some((request) => request.tools.some((tool) => tool.startsWith("openbot_")))) {
-    assert.ok(Date.now() < deadline, "OpenCode gave the model no OpenBot tool.");
-    warmups += 1;
-    const warmup = await runTurn(client, thread, { text: `Say ${warmups}.`, timeoutMs: 120_000 });
-    assert.equal(warmup.error, null, `A warm-up turn failed: ${warmup.error}`);
-  }
-
+  // The first turn of the new session: OpenCode's registry reads the listed tools 100 ms after it
+  // answers `session/new`, and the prompt must wait for them.
   const turn = await runTurn(client, thread, { text: ASK, timeoutMs: 120_000 });
   report.turn = turn;
   assert.equal(turn.error, null, `The turn failed: ${turn.error}`);
