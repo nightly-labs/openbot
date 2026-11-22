@@ -16,6 +16,7 @@ import {
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Option, Schema } from "effect";
+import { type AccountAnalytics, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import {
   BillingError,
   type BillingOperationError,
@@ -62,6 +63,7 @@ export interface CreditServiceOptions {
   countryRequired: boolean;
   now: () => number;
   ensureCustomer: (user: { id: string; email: string }) => Effect.Effect<string, Failure>;
+  analytics?: AccountAnalytics;
 }
 
 export interface CreditCheckoutInput {
@@ -89,8 +91,17 @@ interface WalletRow {
 interface PurchaseRow {
   user_id: string | null;
   server_id: string | null;
+  buyer_id: string;
   credits: number;
+  currency: string;
   amount: number | null;
+}
+
+interface ExpiredPurchaseRow {
+  user_id: string;
+  server_id: string | null;
+  credits: number;
+  currency: string;
 }
 
 interface CreditTarget {
@@ -149,6 +160,7 @@ export class CreditService {
   readonly #countryRequired: boolean;
   readonly #now: () => number;
   readonly #ensureCustomer: CreditServiceOptions["ensureCustomer"];
+  readonly #analytics: AccountAnalytics;
 
   constructor(options: CreditServiceOptions) {
     this.#database = options.database;
@@ -157,6 +169,7 @@ export class CreditService {
     this.#countryRequired = options.countryRequired;
     this.#now = options.now;
     this.#ensureCustomer = options.ensureCustomer;
+    this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
   }
 
   readonly getState = Effect.fn("CreditService.getState")(function* (
@@ -271,6 +284,14 @@ export class CreditService {
         .bind(session.id, user.id, request.serverId ?? null, stop.credits, request.currency, now, now)
         .run(),
     );
+    this.#analytics.track(user.id, {
+      name: "credit_action",
+      action: "checkout_started",
+      wallet: request.serverId === undefined ? "personal" : "server",
+      credits: stop.credits,
+      currency: request.currency,
+      earlyStart: request.earlyStart === true,
+    });
     return { url: session.url };
   }).bind(this);
 
@@ -341,6 +362,13 @@ export class CreditService {
         .first<{ moved: number }>(),
     );
     if (!moved) return yield* new BillingError(409, "credits_not_enough", sourceText("error.billing.creditsNotEnough"));
+    this.#analytics.track(userId, {
+      name: "credit_action",
+      action: "moved",
+      wallet: toServer ? "server" : "personal",
+      credits: request.credits,
+      direction: request.direction,
+    });
     return yield* this.getState(userId);
   }).bind(this);
 
@@ -365,7 +393,7 @@ export class CreditService {
     const purchase = yield* billingCall(() =>
       this.#database
         .prepare(
-          `SELECT l.user_id, l.server_id, p.credits, p.amount
+          `SELECT l.user_id, l.server_id, p.user_id AS buyer_id, p.credits, p.currency, p.amount
              FROM credit_purchases p
              JOIN credit_ledger l ON l.entry_id = 'purchase:' || p.checkout_session_id
             WHERE p.payment_intent_id = ? AND p.status = 'paid'`,
@@ -382,7 +410,7 @@ export class CreditService {
         : purchased;
     const column = walletColumn(purchase.server_id);
     const now = this.#now();
-    yield* billingCall(() =>
+    const reversed = yield* billingCall(() =>
       this.#database
         .prepare(
           `INSERT OR IGNORE INTO credit_ledger(
@@ -391,7 +419,8 @@ export class CreditService {
            SELECT ?1, ?2, ?3, -MIN(?4, balance), 'reversal', NULL, ?5, ?6
              FROM (SELECT ${availableTenthsSql(column, "?7")} AS balance)
             WHERE balance > 0 AND ?4 > 0
-              AND (?2 IS NULL OR EXISTS (SELECT 1 FROM users WHERE id = ?2))`,
+              AND (?2 IS NULL OR EXISTS (SELECT 1 FROM users WHERE id = ?2))
+           RETURNING amount_tenths`,
         )
         .bind(
           `reversal:${reversal.objectId}`,
@@ -402,8 +431,17 @@ export class CreditService {
           now,
           walletId,
         )
-        .run(),
+        .all<{ amount_tenths: number }>(),
     );
+    const entry = reversed.results[0];
+    if (!entry) return;
+    this.#analytics.track(purchase.buyer_id, {
+      name: "credit_action",
+      action: "reversed",
+      wallet: purchase.server_id === null ? "personal" : "server",
+      credits: creditsFromTenths(-entry.amount_tenths),
+      ...(isBillingCurrency(purchase.currency) ? { currency: purchase.currency, amount: reversal.amount } : {}),
+    });
   }).bind(this);
 
   readonly #fulfil = Effect.fn("CreditService.fulfil")(function* (
@@ -420,7 +458,7 @@ export class CreditService {
         : null;
     const currency = session.currency?.toLowerCase() ?? "eur";
     const now = this.#now();
-    yield* billingCall(() =>
+    const [, credited] = yield* billingCall(() =>
       this.#database.batch([
         this.#database
           .prepare(
@@ -444,25 +482,46 @@ export class CreditService {
                FROM (SELECT EXISTS (
                       SELECT 1 FROM remote_memberships WHERE host_id = ?3 AND status = 'active'
                     ) AS live)
-              WHERE EXISTS (SELECT 1 FROM users WHERE id = ?2)`,
+              WHERE EXISTS (SELECT 1 FROM users WHERE id = ?2)
+             RETURNING server_id`,
           )
           .bind(`purchase:${sessionId}`, target.userId, target.serverId, creditTenths(target.credits), sessionId, now),
       ]),
     );
+    const entry = credited?.results[0];
+    if (!entry) return;
+    this.#analytics.track(target.userId, {
+      name: "credit_action",
+      action: "purchased",
+      wallet: isDynamicRecord(entry) && typeof entry.server_id === "string" ? "server" : "personal",
+      credits: target.credits,
+      ...(isBillingCurrency(currency) ? { currency, amount } : {}),
+    });
   }).bind(this);
 
   readonly #expire = Effect.fn("CreditService.expire")(function* (
     this: CreditService,
     sessionId: string,
   ): Effect.fn.Return<void, Failure> {
-    yield* billingCall(() =>
+    const expired = yield* billingCall(() =>
       this.#database
         .prepare(
-          "UPDATE credit_purchases SET status = 'expired', updated_at = ? WHERE checkout_session_id = ? AND status = 'open'",
+          `UPDATE credit_purchases SET status = 'expired', updated_at = ?
+            WHERE checkout_session_id = ? AND status = 'open'
+           RETURNING user_id, server_id, credits, currency`,
         )
         .bind(this.#now(), sessionId)
-        .run(),
+        .all<ExpiredPurchaseRow>(),
     );
+    for (const purchase of expired.results) {
+      this.#analytics.track(purchase.user_id, {
+        name: "credit_action",
+        action: "checkout_expired",
+        wallet: purchase.server_id === null ? "personal" : "server",
+        credits: purchase.credits,
+        ...(isBillingCurrency(purchase.currency) ? { currency: purchase.currency } : {}),
+      });
+    }
   }).bind(this);
 
   readonly #isMember = Effect.fn("CreditService.isMember")(function* (

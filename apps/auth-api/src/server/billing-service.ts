@@ -314,6 +314,7 @@ export class BillingService {
       countryRequired: this.#countryRequired,
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
+      analytics: this.#analytics,
     });
     this.license = new LicenseService({
       database,
@@ -1163,7 +1164,11 @@ export class BillingService {
       if (!ownerId) return null;
       const synced = yield* this.license.sync(subscription, ownerId, readAt);
       const granted = yield* Effect.exit(
-        new CreditGrants({ database: dependencies.database, now: dependencies.now }).issue(subscription.id),
+        new CreditGrants({
+          database: dependencies.database,
+          now: dependencies.now,
+          analytics: dependencies.analytics,
+        }).issue(subscription.id),
       );
       if (Exit.isFailure(granted)) console.warn("billing: license credits wait for the next sweep", { subscriptionId });
       return synced;

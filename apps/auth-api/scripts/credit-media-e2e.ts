@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { CREDIT_MEDIA_REQUEST_PART, type CreditMediaJob } from "@openbot/contracts/credit-media";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
+import { createAccountAnalytics } from "../src/server/account-analytics";
 import { BillingError, type BillingOperationError } from "../src/server/billing-errors";
 import {
   type CreditMediaPayer,
@@ -229,7 +230,25 @@ async function fakeUpstreamFlow() {
   let clock = 1_000_000;
   const upstream = fakeUpstream();
   const media = new MediaUpstream({ baseUrl: UPSTREAM, apiKey: API_KEY, fetch: upstream.fetch });
-  const service = new CreditMediaService({ database: sqliteD1(database), upstream: media, now: () => clock });
+  const tracked: DynamicRecord[] = [];
+  const sends: Promise<void>[] = [];
+  const analytics = createAccountAnalytics({
+    clientId: "openpanel-test",
+    clientSecret: "openpanel-test-secret",
+    fetch: async (_input, init) => {
+      const body = JSON.parse(String(init.body));
+      if (isDynamicRecord(body) && body.type === "track" && isDynamicRecord(body.payload)) tracked.push(body.payload);
+      return Response.json({});
+    },
+    schedule: (effect) => sends.push(Effect.runPromise(effect)),
+    database: sqliteD1(database),
+  });
+  const service = new CreditMediaService({
+    database: sqliteD1(database),
+    upstream: media,
+    now: () => clock,
+    analytics,
+  });
   const offline = new CreditMediaService({ database: sqliteD1(database), upstream: null, now: () => clock });
   const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
   const outsider: CreditMediaPayer = { wallet: "personal", userId: OUTSIDER };
@@ -648,6 +667,54 @@ async function fakeUpstreamFlow() {
     .all();
   check("no wallet has fewer credits than zero or than its holds", negative.length === 0, negative);
   check("only completed generations have a charge in the ledger", ledgerSpends().length === 3, ledgerSpends());
+  await Promise.all(sends.splice(0));
+  const sent = (profileId: string, expected: Readonly<Record<string, string | number | boolean>>) =>
+    tracked.filter(
+      (event) =>
+        event.profileId === profileId &&
+        isDynamicRecord(event.properties) &&
+        Object.entries(expected).every(
+          ([key, value]) => isDynamicRecord(event.properties) && event.properties[key] === value,
+        ),
+    );
+  check(
+    "a generation sends its model, kind, resolution, duration and audio to analytics, and a server job counts for the server owner",
+    sent(OWNER, {
+      action: "media_started",
+      wallet: "personal",
+      model_id: "video-one",
+      kind: "video",
+      credits: 155,
+      resolution: "1080p",
+      duration_seconds: 10,
+      audio: true,
+    }).length === 1 &&
+      sent(OWNER, { action: "media_released", model_id: "video-one", credits: 155, outcome: "failed" }).length === 1 &&
+      sent(OWNER, { action: "media_charged", wallet: "server", model_id: "video-one", kind: "video", credits: 35 })
+        .length === 1 &&
+      sent(OWNER, {
+        action: "media_released",
+        wallet: "server",
+        model_id: "image-one",
+        kind: "image",
+        outcome: "failed",
+      }).length === 1 &&
+      tracked.every(
+        (event) => event.name === "credit_action" && (event.profileId === OWNER || event.profileId === OUTSIDER),
+      ),
+    tracked,
+  );
+  const sentText = JSON.stringify(tracked);
+  const jobIds = database
+    .prepare("SELECT job_id, provider_job_id FROM credit_holds")
+    .all()
+    .flatMap((row) => [row.job_id, row.provider_job_id].filter((id) => typeof id === "string"));
+  check(
+    "generation analytics never send a prompt, a job, a server or an upstream address",
+    tracked.length > 0 &&
+      [SERVER_ID, "upstream.test", "lighthouse", API_KEY, ...jobIds].every((value) => !sentText.includes(value)),
+    tracked.length,
+  );
   check(
     "every upstream request carries the API key, and logs never show the key, a prompt or an upstream URL",
     upstream.submits.every((item) => item.authorized) &&

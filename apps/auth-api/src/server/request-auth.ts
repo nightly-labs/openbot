@@ -163,6 +163,7 @@ export function requestCreditMedia(): CreditMediaService {
     database: bindings.DB,
     upstream: mediaUpstreamFromBindings(bindings),
     now: () => Date.now(),
+    analytics: accountAnalytics(bindings),
   });
 }
 

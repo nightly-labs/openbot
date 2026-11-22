@@ -11,6 +11,7 @@ import {
   parseCreditTransferRequest,
 } from "@openbot/contracts/credits";
 import { Effect } from "effect";
+import { createAccountAnalytics } from "../src/server/account-analytics";
 import { BillingError, type BillingOperationError } from "../src/server/billing-errors";
 import { CreditGrants, licenseCreditSlot } from "../src/server/credit-grants";
 import type { CreditService } from "../src/server/credit-service";
@@ -92,15 +93,71 @@ function prices() {
   }));
 }
 
+interface TrackedEvent {
+  name: string;
+  profileId: string | null;
+  properties: Map<string, string | number | boolean>;
+}
+
+function trackedEvent(body: unknown): TrackedEvent | null {
+  if (typeof body !== "object" || body === null || !("type" in body) || body.type !== "track") return null;
+  if (!("payload" in body) || typeof body.payload !== "object" || body.payload === null) return null;
+  const payload = body.payload;
+  if (!("name" in payload) || typeof payload.name !== "string") return null;
+  if (!("properties" in payload) || typeof payload.properties !== "object" || payload.properties === null) return null;
+  const properties = new Map<string, string | number | boolean>();
+  for (const [key, item] of Object.entries(payload.properties)) {
+    if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") properties.set(key, item);
+  }
+  return {
+    name: payload.name,
+    profileId: "profileId" in payload && typeof payload.profileId === "string" ? payload.profileId : null,
+    properties,
+  };
+}
+
+function eventsOf(
+  events: readonly TrackedEvent[],
+  profileId: string,
+  expected: Readonly<Record<string, string | number | boolean>>,
+) {
+  return events.filter(
+    (event) =>
+      event.profileId === profileId &&
+      Object.entries(expected).every(([key, value]) => event.properties.get(key) === value),
+  );
+}
+
+function readable(events: readonly TrackedEvent[]) {
+  return events.map((event) => ({ ...event, properties: Object.fromEntries(event.properties) }));
+}
+
+function countActions(events: readonly TrackedEvent[]) {
+  const counts: Record<string, number> = {};
+  for (const event of events) {
+    const action = String(event.properties.get("action"));
+    counts[action] = (counts[action] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function keepsPrivate(events: readonly TrackedEvent[], hidden: readonly string[]) {
+  const sent = JSON.stringify(readable(events));
+  return hidden.every((value) => !sent.includes(value));
+}
+
 function fakeStripe() {
   const sessions: URLSearchParams[] = [];
   const unknown: string[] = [];
   const outside: string[] = [];
+  const tracked: TrackedEvent[] = [];
   const fetch = async (input: string, init: RequestInit) => {
     const url = new URL(input);
     const method = init.method ?? "GET";
     if (url.origin !== "https://api.stripe.com") {
       outside.push(`${method} ${url.origin}${url.pathname}`);
+      const event = typeof init.body === "string" ? trackedEvent(JSON.parse(init.body)) : null;
+      if (event) tracked.push(event);
       return Response.json({});
     }
     if (method === "GET" && url.pathname === "/v1/prices") {
@@ -124,7 +181,7 @@ function fakeStripe() {
     if (method === "GET") return Response.json({ data: [], has_more: false });
     return Response.json({ error: { type: "api_error" } }, { status: 500 });
   };
-  return { sessions, unknown, outside, fetch };
+  return { sessions, unknown, outside, tracked, fetch };
 }
 
 async function failure(effect: Effect.Effect<unknown, BillingError | BillingOperationError>) {
@@ -204,11 +261,33 @@ async function harness() {
   const state = (userId: string) => Effect.runPromise(credits.getState(userId));
   const purchaseStatus = (id: string) =>
     database.prepare("SELECT status FROM credit_purchases WHERE checkout_session_id = ?").get(id)?.status;
-  return { database, stripe, credits, deliver, session, state, purchaseStatus, sent: () => sent };
+  const analytics = createAccountAnalytics({
+    clientId: "openpanel-test",
+    clientSecret: "openpanel-test-secret",
+    fetch: stripe.fetch,
+    schedule: (effect) => work.push(Effect.runPromise(effect)),
+    database: sqliteD1(database),
+  });
+  const creditEvents = async () => {
+    await Promise.all(work.splice(0));
+    return stripe.tracked.filter((event) => event.name === "credit_action");
+  };
+  return {
+    database,
+    stripe,
+    credits,
+    deliver,
+    session,
+    state,
+    purchaseStatus,
+    analytics,
+    creditEvents,
+    sent: () => sent,
+  };
 }
 
 async function walletsAndTransfers() {
-  const { database, stripe, credits, deliver, session, state, purchaseStatus, sent } = await harness();
+  const { database, stripe, credits, deliver, session, state, purchaseStatus, creditEvents, sent } = await harness();
 
   const empty = await state(OWNER.id);
   check(
@@ -501,6 +580,40 @@ async function walletsAndTransfers() {
     { salesFacts, beforeInvoices, afterInvoices },
   );
 
+  const tracked = await creditEvents();
+  check(
+    "each checkout, purchase, expiry, move and reversal sends one credit event to the account that did it",
+    JSON.stringify(countActions(tracked)) ===
+      JSON.stringify({ checkout_started: 3, purchased: 2, checkout_expired: 1, moved: 5, reversed: 2 }) &&
+      eventsOf(tracked, OWNER.id, {
+        action: "checkout_started",
+        wallet: "personal",
+        credits: 2_000,
+        currency: "eur",
+        early_start: false,
+      }).length === 1 &&
+      eventsOf(tracked, MEMBER.id, { action: "checkout_started", wallet: "server", credits: 167, early_start: true })
+        .length === 1 &&
+      eventsOf(tracked, OWNER.id, { action: "purchased", wallet: "personal", credits: 2_000, amount: 10_000 })
+        .length === 1 &&
+      eventsOf(tracked, MEMBER.id, { action: "purchased", wallet: "server", credits: 167, currency: "eur" }).length ===
+        1 &&
+      eventsOf(tracked, OWNER.id, { action: "checkout_expired", wallet: "personal", credits: 940 }).length === 1 &&
+      eventsOf(tracked, OWNER.id, { action: "moved", wallet: "server", direction: "to_server", credits: 1_200 })
+        .length === 1 &&
+      eventsOf(tracked, OWNER.id, { action: "moved", wallet: "personal", direction: "to_personal", credits: 0.5 })
+        .length === 1 &&
+      eventsOf(tracked, OWNER.id, { action: "reversed", wallet: "personal", credits: 400, amount: 5_000 }).length ===
+        1 &&
+      eventsOf(tracked, MEMBER.id, { action: "reversed", wallet: "server", credits: 167, amount: 1_000 }).length === 1,
+    readable(tracked),
+  );
+  check(
+    "credit events name no server, email, checkout or payment",
+    keepsPrivate(tracked, [SERVER_ID, "@example.test", "cs_", "pi_", "re_", "dp_"]),
+    readable(tracked),
+  );
+
   const ledger = database
     .prepare("SELECT kind, COUNT(*) AS count FROM credit_ledger GROUP BY kind ORDER BY kind")
     .all();
@@ -650,10 +763,10 @@ async function walletsAndTransfers() {
 }
 
 async function holdsAndSpending() {
-  const { database, credits, deliver, session, state } = await harness();
+  const { database, credits, deliver, session, state, analytics, creditEvents } = await harness();
   const start = Date.now();
   let clock = start;
-  const spending = new CreditSpending({ database: sqliteD1(database), now: () => clock });
+  const spending = new CreditSpending({ database: sqliteD1(database), now: () => clock, analytics });
   const run = <A>(effect: Effect.Effect<A, BillingError | BillingOperationError>) => Effect.runPromise(effect);
   const personal = { userId: OWNER.id };
   const server = { serverId: SERVER_ID };
@@ -884,6 +997,48 @@ async function holdsAndSpending() {
     .all();
   check("no wallet has fewer credits than zero or than its holds", negative.length === 0, negative);
   check("each completed generation has one charge in the ledger", spendRows().length === 6, spendRows());
+
+  const media = (await creditEvents()).filter((event) => String(event.properties.get("action")).startsWith("media_"));
+  check(
+    "each generation sends one start, and one charge or release, with the model and the outcome",
+    JSON.stringify(countActions(media)) === JSON.stringify({ media_started: 6, media_charged: 6, media_released: 7 }) &&
+      media.every((event) => event.properties.get("model_id") === "seedance-2.5") &&
+      eventsOf(media, OWNER.id, {
+        action: "media_charged",
+        wallet: "personal",
+        credits: 300,
+        credits_held: 300,
+        outcome: "completed",
+      }).length === 1 &&
+      eventsOf(media, OWNER.id, { action: "media_charged", credits: 120, credits_held: 200 }).length === 1 &&
+      eventsOf(media, OWNER.id, { action: "media_released", credits: 100, outcome: "refused" }).length === 1 &&
+      eventsOf(media, MEMBER.id, { action: "media_released", wallet: "server", credits: 50, outcome: "abandoned" })
+        .length === 1 &&
+      eventsOf(media, MEMBER.id, { action: "media_released", outcome: "expired" }).length === 2 &&
+      eventsOf(media, MEMBER.id, { action: "media_started", wallet: "server", credits: 400 }).length === 1,
+    readable(media),
+  );
+  check(
+    "generation events name no server or job",
+    keepsPrivate(media, [SERVER_ID, "job-", "p-1", "p-a-late"]),
+    readable(media),
+  );
+
+  addOwnedServer(database, LAB_ID);
+  await run(credits.transfer(OWNER.id, { serverId: LAB_ID, direction: "to_server", credits: 100 }));
+  await run(
+    spending.hold({ jobId: "job-host", wallet: { serverId: LAB_ID }, actorUserId: null, modelId: "m", credits: 60 }),
+  );
+  await run(spending.start("job-host", "p-host"));
+  await run(spending.settle("job-host", { outcome: "completed", charged: 40 }));
+  const hostPaid = (await creditEvents()).filter((event) => event.properties.get("model_id") === "m");
+  check(
+    "a generation that the server pays with no member counts for the server owner",
+    hostPaid.length === 2 &&
+      hostPaid.every((event) => event.profileId === OWNER.id && event.properties.get("wallet") === "server") &&
+      eventsOf(hostPaid, OWNER.id, { action: "media_charged", credits: 40, credits_held: 60 }).length === 1,
+    readable(hostPaid),
+  );
 }
 
 async function holdLimits() {
@@ -981,11 +1136,11 @@ async function freeMonthlyCredits() {
       licenseCreditSlot(march31, "month", march31) === null,
     { shortMonth, yearInFebruary },
   );
-  const { database, credits, deliver, session, state } = await harness();
+  const { database, credits, deliver, session, state, analytics, creditEvents } = await harness();
   const start = Date.now();
   let clock = start;
   const d1 = sqliteD1(database);
-  const grants = new CreditGrants({ database: d1, now: () => clock });
+  const grants = new CreditGrants({ database: d1, now: () => clock, analytics });
   const spending = new CreditSpending({ database: d1, now: () => clock });
   const run = <A>(effect: Effect.Effect<A, BillingError | BillingOperationError>) => Effect.runPromise(effect);
   const teamEnd = start + 20 * DAY_MS;
@@ -1130,6 +1285,21 @@ async function freeMonthlyCredits() {
     "a renewed license gives the credits of the new month",
     renewed === 1 && renewal?.credits === 200 && renewal.expires_at === renewedEnd,
     renewal,
+  );
+
+  const grantEvents = (await creditEvents()).filter((event) =>
+    String(event.properties.get("action")).startsWith("grant"),
+  );
+  check(
+    "each free credit grant and each expiry of unused free credits sends one event, and a server's expiry counts for its owner",
+    JSON.stringify(countActions(grantEvents)) === JSON.stringify({ granted: 4, grant_expired: 3 }) &&
+      eventsOf(grantEvents, OWNER.id, { action: "granted", wallet: "personal", credits: 200 }).length === 2 &&
+      eventsOf(grantEvents, OUTSIDER.id, { action: "granted", wallet: "personal", credits: 50 }).length === 2 &&
+      eventsOf(grantEvents, OWNER.id, { action: "grant_expired", wallet: "server", credits: 30 }).length === 1 &&
+      eventsOf(grantEvents, OWNER.id, { action: "grant_expired", wallet: "personal", credits: 10 }).length === 1 &&
+      eventsOf(grantEvents, OUTSIDER.id, { action: "grant_expired", wallet: "personal", credits: 50 }).length === 1 &&
+      keepsPrivate(grantEvents, [SERVER_ID, "sub_"]),
+    readable(grantEvents),
   );
 
   await run(credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_server", credits: 40 }));

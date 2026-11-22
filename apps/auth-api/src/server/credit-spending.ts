@@ -1,7 +1,9 @@
+import { CREDIT_MEDIA_KINDS } from "@openbot/contracts/credit-media";
 import { creditsFromTenths, creditTenths } from "@openbot/contracts/credits";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit } from "effect";
+import { type AccountAnalytics, type CreditActionEvent, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { BillingError, type BillingOperationError, billingCall } from "./billing-errors";
 import { consumeGrantsSql } from "./credit-grants";
 
@@ -57,7 +59,25 @@ export interface CreditSweepResult {
 export interface CreditSpendingOptions {
   database: D1Database;
   now: () => number;
+  analytics?: AccountAnalytics;
 }
+
+export type CreditMediaDetails = Pick<CreditActionEvent, "resolution" | "duration" | "count" | "audio">;
+
+interface TrackedHoldRow {
+  account_id: string | null;
+  server_id: string | null;
+  model_id: string;
+  kind: string | null;
+  credits_tenths: number;
+  charged_tenths: number | null;
+  outcome: string | null;
+}
+
+const TRACKED_HOLD_SQL = `RETURNING server_id, model_id, credits_tenths, charged_tenths, outcome,
+  COALESCE(actor_user_id, user_id, (SELECT owner_user_id FROM remote_hosts WHERE host_id = credit_holds.server_id))
+    AS account_id,
+  (SELECT kind FROM credit_media_models WHERE model_id = credit_holds.model_id) AS kind`;
 
 interface HoldRow {
   job_id: string;
@@ -131,6 +151,28 @@ function sameRequest(hold: CreditHold, input: CreditHoldInput): boolean {
   );
 }
 
+function holdEvent(row: TrackedHoldRow): CreditActionEvent {
+  return {
+    name: "credit_action",
+    action: "media_started",
+    wallet: row.server_id === null ? "personal" : "server",
+    credits: creditsFromTenths(row.credits_tenths),
+    modelId: row.model_id,
+    kind: isOneOf(CREDIT_MEDIA_KINDS, row.kind) ? row.kind : null,
+  };
+}
+
+function settledEvent(row: TrackedHoldRow): CreditActionEvent {
+  const held = creditsFromTenths(row.credits_tenths);
+  return {
+    ...holdEvent(row),
+    action: row.charged_tenths === null ? "media_released" : "media_charged",
+    credits: row.charged_tenths === null ? held : creditsFromTenths(row.charged_tenths),
+    creditsHeld: held,
+    outcome: isOneOf(HOLD_OUTCOMES, row.outcome) ? row.outcome : null,
+  };
+}
+
 function nextCheckAt(now: number, createdAt: number): number {
   return now + Math.min(CREDIT_HOLD_MAX_CHECK_GAP_MS, Math.max(CREDIT_HOLD_FIRST_CHECK_MS, now - createdAt));
 }
@@ -144,10 +186,16 @@ function checkResult(check: CreditJobCheck): CreditJobResult | null {
 export class CreditSpending {
   readonly #database: D1Database;
   readonly #now: () => number;
+  readonly #analytics: AccountAnalytics;
 
   constructor(options: CreditSpendingOptions) {
     this.#database = options.database;
     this.#now = options.now;
+    this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
+  }
+
+  #trackSettled(rows: readonly TrackedHoldRow[]): void {
+    for (const row of rows) this.#analytics.track(row.account_id, settledEvent(row));
   }
 
   readonly hold = Effect.fn("CreditSpending.hold")(function* (
@@ -202,13 +250,20 @@ export class CreditSpending {
     this: CreditSpending,
     jobId: string,
     providerJobId: string,
+    details: CreditMediaDetails = {},
   ): Effect.fn.Return<CreditHold | null, Failure> {
-    yield* billingCall(() =>
+    const started = yield* billingCall(() =>
       this.#database
-        .prepare("UPDATE credit_holds SET provider_job_id = ?2 WHERE job_id = ?1 AND provider_job_id IS NULL")
+        .prepare(
+          `UPDATE credit_holds SET provider_job_id = ?2 WHERE job_id = ?1 AND provider_job_id IS NULL
+           ${TRACKED_HOLD_SQL}`,
+        )
         .bind(jobId, providerJobId)
-        .run(),
+        .all<TrackedHoldRow>(),
     );
+    for (const row of started.results) {
+      if (row.outcome === null) this.#analytics.track(row.account_id, { ...holdEvent(row), ...details });
+    }
     return yield* this.find(jobId);
   }).bind(this);
 
@@ -235,8 +290,8 @@ export class CreditSpending {
     const charged =
       result.outcome === "completed" && result.charged !== undefined ? creditTenths(result.charged) : null;
     const now = this.#now();
-    yield* billingCall(() =>
-      this.#database.batch([
+    const [settled] = yield* billingCall(() =>
+      this.#database.batch<TrackedHoldRow>([
         this.#database
           .prepare(
             `UPDATE credit_holds
@@ -245,7 +300,8 @@ export class CreditSpending {
                       WHEN ?2 = 'charged' THEN MAX(0, MIN(COALESCE(?4, credits_tenths), credits_tenths))
                     END,
                     settled_at = ?5
-              WHERE job_id = ?1 AND status = 'held'`,
+              WHERE job_id = ?1 AND status = 'held'
+             ${TRACKED_HOLD_SQL}`,
           )
           .bind(jobId, completed ? "charged" : "released", result.outcome, charged, now),
         this.#database
@@ -270,6 +326,7 @@ export class CreditSpending {
           .bind(jobId, now),
       ]),
     );
+    this.#trackSettled(settled?.results ?? []);
     return yield* this.find(jobId);
   }).bind(this);
 
@@ -299,11 +356,13 @@ export class CreditSpending {
       this.#database
         .prepare(
           `UPDATE credit_holds SET status = 'released', outcome = 'abandoned', settled_at = ?1
-            WHERE status = 'held' AND provider_job_id IS NULL AND submitted_at IS NULL AND created_at <= ?2`,
+            WHERE status = 'held' AND provider_job_id IS NULL AND submitted_at IS NULL AND created_at <= ?2
+           ${TRACKED_HOLD_SQL}`,
         )
         .bind(now, now - CREDIT_HOLD_START_GRACE_MS)
-        .run(),
+        .all<TrackedHoldRow>(),
     );
+    this.#trackSettled(abandoned.results);
     let settled = 0;
     let rechecked = 0;
     const runningPastLimit: string[] = [];
@@ -345,11 +404,13 @@ export class CreditSpending {
           `UPDATE credit_holds SET status = 'released', outcome = 'expired', settled_at = ?1
             WHERE status = 'held' AND expires_at <= ?1
               AND (?2 = 0 OR provider_job_id IS NULL OR expires_at <= ?3
-                OR job_id IN (SELECT value FROM json_each(?4)))`,
+                OR job_id IN (SELECT value FROM json_each(?4)))
+           ${TRACKED_HOLD_SQL}`,
         )
         .bind(now, checkJob ? 1 : 0, now - CREDIT_HOLD_LIMIT_MS, JSON.stringify(runningPastLimit))
-        .run(),
+        .all<TrackedHoldRow>(),
     );
-    return { abandoned: abandoned.meta.changes, settled, rechecked, expired: expired.meta.changes };
+    this.#trackSettled(expired.results);
+    return { abandoned: abandoned.results.length, settled, rechecked, expired: expired.results.length };
   }).bind(this);
 }

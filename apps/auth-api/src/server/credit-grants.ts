@@ -2,6 +2,7 @@ import { type CreditExpiring, creditsFromTenths, creditTenths } from "@openbot/c
 import { LICENSE_TIERS, licenseMonthlyCredits } from "@openbot/contracts/license";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
+import { type AccountAnalytics, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { type BillingError, type BillingOperationError, billingCall } from "./billing-errors";
 
 type Failure = BillingError | BillingOperationError;
@@ -13,6 +14,13 @@ const EXPIRE_BATCH = 50;
 export interface CreditGrantsOptions {
   database: D1Database;
   now: () => number;
+  analytics?: AccountAnalytics;
+}
+
+interface ExpiredGrantRow {
+  account_id: string | null;
+  server_id: string | null;
+  tenths: number;
 }
 
 export interface CreditGrantSweepResult {
@@ -129,10 +137,12 @@ export function creditExpiring(
 export class CreditGrants {
   readonly #database: D1Database;
   readonly #now: () => number;
+  readonly #analytics: AccountAnalytics;
 
   constructor(options: CreditGrantsOptions) {
     this.#database = options.database;
     this.#now = options.now;
+    this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
   }
 
   readonly issue = Effect.fn("CreditGrants.issue")(function* (
@@ -189,7 +199,14 @@ export class CreditGrants {
             .bind(grantId),
         ]),
       );
-      if (inserted?.meta.changes === 1) issued += 1;
+      if (inserted?.meta.changes !== 1) continue;
+      issued += 1;
+      this.#analytics.track(license.user_id, {
+        name: "credit_action",
+        action: "granted",
+        wallet: "personal",
+        credits: creditsFromTenths(licenseGrantTenths(license)),
+      });
     }
     return issued;
   }).bind(this);
@@ -208,8 +225,8 @@ export class CreditGrants {
     );
     let expired = 0;
     for (const row of due.results) {
-      const [, closed] = yield* billingCall(() =>
-        this.#database.batch([
+      const [lost, closed] = yield* billingCall(() =>
+        this.#database.batch<ExpiredGrantRow>([
           this.#database
             .prepare(
               `WITH wallet AS (
@@ -237,7 +254,10 @@ export class CreditGrants {
                )
                SELECT 'expiry:' || grant_id, user_id, server_id, -tenths, 'expiry', NULL, grant_id, ?2
                  FROM lost WHERE tenths > 0
-               ON CONFLICT(entry_id) DO NOTHING`,
+               ON CONFLICT(entry_id) DO NOTHING
+               RETURNING server_id, -amount_tenths AS tenths, COALESCE(
+                 user_id, (SELECT owner_user_id FROM remote_hosts WHERE host_id = credit_ledger.server_id)
+               ) AS account_id`,
             )
             .bind(row.grant_id, now),
           this.#database
@@ -245,10 +265,21 @@ export class CreditGrants {
             .bind(row.grant_id),
         ]),
       );
-      if (closed?.meta.changes === 1) expired += 1;
+      if (closed?.meta.changes !== 1) continue;
+      expired += 1;
+      for (const entry of lost?.results ?? []) this.#trackExpired(entry);
     }
     return expired;
   }).bind(this);
+
+  #trackExpired(entry: ExpiredGrantRow): void {
+    this.#analytics.track(entry.account_id, {
+      name: "credit_action",
+      action: "grant_expired",
+      wallet: entry.server_id === null ? "personal" : "server",
+      credits: creditsFromTenths(entry.tenths),
+    });
+  }
 
   readonly sweep = Effect.fn("CreditGrants.sweep")(function* (
     this: CreditGrants,

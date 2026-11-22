@@ -30,6 +30,7 @@ import {
 } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
+import type { AccountAnalytics } from "./account-analytics";
 import { BillingError, BillingOperationError, billingCall } from "./billing-errors";
 import {
   availableTenthsSql,
@@ -72,6 +73,7 @@ export interface CreditMediaServiceOptions {
   database: D1Database;
   upstream: MediaUpstream | null;
   now: () => number;
+  analytics?: AccountAnalytics;
 }
 
 interface ModelRow {
@@ -286,7 +288,11 @@ export class CreditMediaService {
   constructor(options: CreditMediaServiceOptions) {
     this.#database = options.database;
     this.#upstream = options.upstream;
-    this.#spending = new CreditSpending({ database: options.database, now: options.now });
+    this.#spending = new CreditSpending({
+      database: options.database,
+      now: options.now,
+      ...(options.analytics ? { analytics: options.analytics } : {}),
+    });
   }
 
   #models(modelId: string | null): Effect.Effect<StoredModel[], Failure> {
@@ -410,7 +416,13 @@ export class CreditMediaService {
       return yield* busy();
     }
     const job = submitted.success;
-    const started = (yield* this.#spending.start(hold.jobId, job.id)) ?? hold;
+    const details = {
+      resolution: request.resolution,
+      duration: request.duration,
+      count: request.count,
+      audio: request.audio,
+    };
+    const started = (yield* this.#spending.start(hold.jobId, job.id, details)) ?? hold;
     return this.#view(started, job.status, job.pollAfterSeconds, []);
   }).bind(this);
 

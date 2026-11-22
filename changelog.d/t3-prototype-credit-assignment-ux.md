@@ -34,3 +34,7 @@
   shows no last-frame input.
   This works on this computer, on a joined server and in the web client.
   A joined server must also be on the new version to show these models.
+- The account service records credit events in product analytics: purchases, moves, free monthly
+  credits, and the model, kind and outcome of each generation that uses credits. The events have the
+  account ID and fixed values only, with no prompt, file, job or server ID. The Privacy Policy
+  describes them.
