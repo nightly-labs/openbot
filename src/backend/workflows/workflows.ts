@@ -451,8 +451,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           step.status === "running" &&
           step.deliveryId !== null &&
           dependencies.delivery(step.deliveryId)?.status === "queued";
-        const shownStep = (step: StoredWorkflowStep): WorkflowStep =>
-          waitsInQueue(step) ? { ...publicStep(step), waiting: true } : publicStep(step);
+        const shownStep = (step: StoredWorkflowStep): WorkflowStep => {
+          if (!waitsInQueue(step)) return publicStep(step);
+          queuedSteps.add(step.id);
+          return { ...publicStep(step), waiting: true };
+        };
         const runDetail = (run: StoredWorkflowRun): WorkflowRunDetail => ({
           run: publicRun(run),
           steps: runs.steps(run.id).map(shownStep),
