@@ -1113,8 +1113,9 @@ then `~/.cursor/auth.json`; on Linux `$XDG_CONFIG_HOME/cursor/auth.json` or
 a desktop keyring keeps its sign-in in the Secret Service (service `cursor-credentials`, account
 `cursor-user`) and leaves only `{"storedIn":"os-secret-store"}` in `auth.json`. With that marker the
 reader runs `secret-tool search`, not `lookup`, so a locked keyring gives no reading and no unlock
-prompt at each poll. It keeps the result until the CLI rewrites `auth.json`, which the CLI does after
-each keyring write. A timeout or a missing `secret-tool` is not kept. Windows 2026.11.22 keeps its
+prompt at each poll. It keeps a token until the CLI rewrites `auth.json`, which the CLI does after
+each keyring write, and a read with no token (locked keyring, no session bus, no `secret-tool`) for 30
+minutes. Windows 2026.11.22 keeps its
 sign-in in `auth.dpapi`, which the reader does not read. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a

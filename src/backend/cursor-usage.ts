@@ -14,6 +14,7 @@ const CURSOR_USAGE_TIMEOUT_MS = 10_000;
 const KEYCHAIN_TIMEOUT_MS = 3_000;
 const SECRET_TOOL_PATHS = ["/usr/bin/secret-tool", "/usr/local/bin/secret-tool"];
 const SECRET_SERVICE_ATTRIBUTES = ["service", "cursor-credentials", "account", "cursor-user"];
+const SECRET_SERVICE_MISS_REUSE_MS = 30 * 60_000;
 
 const execFileAsync = promisify(execFile);
 
@@ -45,11 +46,8 @@ function secretServiceEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.
   return { ...env, DBUS_SESSION_BUS_ADDRESS: `unix:path=${join(env.XDG_RUNTIME_DIR, "bus")}` };
 }
 
-function exitedWithCode(cause: unknown): boolean {
-  return typeof cause === "object" && cause !== null && "code" in cause && typeof cause.code === "number";
-}
-
-let secretServiceRead: { authFile: string; modifiedMs: number; accessToken: string | null } | null = null;
+let secretServiceRead: { authFile: string; modifiedMs: number; readAt: number; accessToken: string | null } | null =
+  null;
 
 const readSecretServiceAccessToken = Effect.fn("Cursor.readSecretServiceAccessToken")(function* (authFile: string) {
   const modified = yield* Effect.tryPromise({
@@ -58,7 +56,11 @@ const readSecretServiceAccessToken = Effect.fn("Cursor.readSecretServiceAccessTo
   }).pipe(Effect.option);
   if (Option.isNone(modified)) return null;
   const modifiedMs = modified.value.mtimeMs;
-  if (secretServiceRead?.authFile === authFile && secretServiceRead.modifiedMs === modifiedMs) {
+  if (
+    secretServiceRead?.authFile === authFile &&
+    secretServiceRead.modifiedMs === modifiedMs &&
+    (secretServiceRead.accessToken !== null || Date.now() - secretServiceRead.readAt < SECRET_SERVICE_MISS_REUSE_MS)
+  ) {
     return secretServiceRead.accessToken;
   }
   const output = yield* Effect.tryPromise({
@@ -69,15 +71,11 @@ const readSecretServiceAccessToken = Effect.fn("Cursor.readSecretServiceAccessTo
         { timeout: CURSOR_USAGE_TIMEOUT_MS, env: secretServiceEnvironment() },
       ),
     catch: (cause) => new CursorUsageFailed({ cause }),
-  }).pipe(
-    Effect.map(({ stdout }) => stdout),
-    Effect.catch((failure) => Effect.succeed(exitedWithCode(failure.cause) ? "" : null)),
-  );
-  if (output === null) return null;
-  const secret = /^secret = (.*)$/mu.exec(output)?.[1];
+  }).pipe(Effect.option);
+  const secret = Option.isSome(output) ? /^secret = (.*)$/mu.exec(output.value.stdout)?.[1] : undefined;
   const auth = secret === undefined ? Option.none() : decodeCursorAuth(secret);
   const accessToken = Option.isSome(auth) && auth.value.accessToken ? auth.value.accessToken : null;
-  secretServiceRead = { authFile, modifiedMs, accessToken };
+  secretServiceRead = { authFile, modifiedMs, readAt: Date.now(), accessToken };
   return accessToken;
 });
 
