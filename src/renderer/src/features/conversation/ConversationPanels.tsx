@@ -3,6 +3,7 @@ import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
+import { WORKSPACE_DIRECTORY_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { settingsPanelMaxWidth } from "@openbot/ui/components/SettingsPanel";
@@ -41,7 +42,7 @@ import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { openedAttachmentUrl } from "./attachment-preview";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
-import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
+import { htmlAttachmentPageUrl, htmlFilePageHtml } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
@@ -159,6 +160,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     agentActivity,
     browserSidebarOpen,
     browserExpandedOpen,
+    browserWindowShown,
     browserTabs,
     closeShownSidePanelFile,
     closeBrowserTab,
@@ -413,6 +415,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     return serverHasStorage(server) ? server : undefined;
   };
   const filesTitle = () => channel?.name() ?? props.agent?.name ?? "this chat";
+  const workspaceAgents = createMemo(() => {
+    if (!serverSupportsCapability(props.server, WORKSPACE_DIRECTORY_CAPABILITY)) return [];
+    if (!channel) return props.agent ? [props.agent] : [];
+    const agentIds = channel.memberAgentIds();
+    return props.agents.filter((agent) => agentIds.has(agent.id));
+  });
+  const openAgentWorkspace = (agentId: string) => openWorkspaceFolder(".", agentId, "tab");
   function showFileMessage(messageId: string) {
     if (channel) void replyJump.reveal(messageId, undefined, undefined);
     else void props.onOpenSearchMessage?.(messageId);
@@ -549,6 +558,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             onClose: closePanelThread,
             onMove: moveSideThread,
             onToChat: movePanelThreadToChat,
+            onArchive: props.threads?.header.onArchive,
+            onDelete: props.threads?.header.onDelete,
           }}
           files={{
             items: sidePanel().files,
@@ -605,7 +616,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
                 sourceUrl={openedAttachmentUrl(attached()?.previewUrl)}
                 pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
-                pageHtml={props.runtime?.visualPage ? htmlAttachmentPageHtml(attached(), file().preview) : undefined}
+                pageHtml={props.runtime?.visualPage ? htmlFilePageHtml(attached(), file().preview) : undefined}
                 fileKey={previewFileKey()}
                 selectionQuoteId={previewQuoteId()}
                 onPageQuote={(text) => {
@@ -644,6 +655,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                   onPreviewFile={(file) => void previewAttachment(file)}
                   onShowMessage={showFileMessage}
                   calls={props.runtime?.storageCalls}
+                  workspaceAgents={workspaceAgents()}
+                  onOpenWorkspace={openAgentWorkspace}
                 />
               </Loading>
             )}
@@ -738,6 +751,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           <div class="ui-dialog-overlay browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
           <BrowserFullViewAdapter />
         </Portal>
+      </Show>
+
+      <Show when={browserWindowShown()}>
+        <BrowserWindowBridge />
       </Show>
 
       {channel ? (
@@ -907,6 +924,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
 
 const AgentSettingsPanel = lazy(loadAgentSettingsPanel);
 const BrowserFullViewAdapter = lazy(() => import("./BrowserFullViewAdapter"));
+const BrowserWindowBridge = lazy(() => import("./BrowserWindowBridge"));
 const FilePreviewPanel = lazy(() => import("./FilePreviewPanel"));
 const ChatFilesPanel = lazy(() => import("../files/ChatFilesPanel"));
 

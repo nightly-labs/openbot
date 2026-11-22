@@ -1,4 +1,8 @@
-import { CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX, type ChannelMessage } from "@openbot/contracts/ipc";
+import {
+  CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX,
+  type ChannelMessage,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
+} from "@openbot/contracts/ipc";
 
 const NOT_COUNTED_ITEM_TYPES: ReadonlySet<string> = new Set([
   "plan",
@@ -22,7 +26,8 @@ export function firstUnreadChannelMessageId(
     if (
       entry.author.id === memberId ||
       NOT_COUNTED_ITEM_TYPES.has(itemType) ||
-      itemType.startsWith(CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX)
+      itemType.startsWith(CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX) ||
+      itemType.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX)
     )
       continue;
     remaining -= 1;

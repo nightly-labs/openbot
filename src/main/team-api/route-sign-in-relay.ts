@@ -18,11 +18,17 @@ import { devinSignInPageRelayed } from "../../backend/acp-sign-in";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { MCP_OAUTH_REDIRECT_URL } from "../deep-link-router";
 import { parseTestMcpServer } from "../ipc/mcp-inputs";
-import type { TeamApiMcpServerOwners, TeamApiMcpServers, TeamApiSignInRelay } from "./dependencies";
+import type {
+  TeamApiMcpServerOwners,
+  TeamApiMcpServers,
+  TeamApiProviderAccounts,
+  TeamApiSignInRelay,
+} from "./dependencies";
 import { HttpError } from "./http-error";
 import { requireMcpAccess, requireOwnMcpAddress } from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { nullableString, readJson, requireAdmin, stringField } from "./request-helpers";
+import { requireRoomForAccount } from "./route-provider-accounts";
 
 const ROUTES: ReadonlySet<string> = new Set([
   ...Object.values(SIGN_IN_RELAY_ROUTES),
@@ -34,6 +40,7 @@ export async function routeSignInRelay(
   relay: TeamApiSignInRelay | undefined,
   mcpServers?: Pick<TeamApiMcpServers, "listMcpServers">,
   owners?: TeamApiMcpServerOwners,
+  providerAccounts?: Pick<TeamApiProviderAccounts, "list">,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, sessionId, request, json } = context;
   const accountStart =
@@ -45,12 +52,9 @@ export async function routeSignInRelay(
     const body = await readJson(request);
     const provider = accountStart.providers.find((id) => id === stringField(body, "provider"));
     if (!provider) throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
-    return json(
-      200,
-      await runCauseEffect(
-        relay.startProviderAccount(member.id, provider, nullableString(body, "accountId"), sessionId),
-      ),
-    );
+    const accountId = nullableString(body, "accountId");
+    requireRoomForAccount(capabilities, providerAccounts, provider, accountId);
+    return json(200, await runCauseEffect(relay.startProviderAccount(member.id, provider, accountId, sessionId)));
   }
   if (method === "POST" && url.pathname === PROVIDER_SIGN_IN_RELAY_V2_ROUTES.start) {
     if (!relay || !devinSignInPageRelayed() || !capabilities.has(PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY))

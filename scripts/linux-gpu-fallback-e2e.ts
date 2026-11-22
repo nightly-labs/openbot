@@ -78,6 +78,8 @@ try {
   process.kill(gpuProcess, "SIGSEGV");
   await until(() => existsSync(join(data, GPU_CRASH_FILE)), "the GPU crash writes the crash file");
   await quit(launch);
+  const crashRecord = JSON.parse(readFileSync(join(data, GPU_CRASH_FILE), "utf8"));
+  assert.equal(crashRecord.version, 2, "the crash file has the current record version");
 
   launch = await start(data, 1_000);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "gpu-process-crash" });
@@ -111,12 +113,22 @@ try {
   steps.push({ step: "OPENBOT_DISABLE_GPU=0", ready: launch.ready });
   await quit(launch);
 
-  await writeFile(join(data, GPU_CRASH_FILE), JSON.stringify({ version: 1, chromium: "0" }));
+  await writeFile(join(data, GPU_CRASH_FILE), JSON.stringify({ version: 2, chromium: "0" }));
   launch = await start(data, 600_000);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "default" });
   await quit(launch);
   assert.equal(existsSync(join(data, GPU_START_FILE)), false, "a clean quit removes the start file");
   steps.push({ step: "crash from another Chromium major version", ready: launch.ready });
+  const staleRecords = join(root, "stale-records");
+  await mkdir(staleRecords, { recursive: true });
+  const staleRecord = JSON.stringify({ version: 1, chromium: crashRecord.chromium });
+  await writeFile(join(staleRecords, GPU_CRASH_FILE), staleRecord);
+  await writeFile(join(staleRecords, GPU_START_FILE), staleRecord);
+  launch = await start(staleRecords, 600_000);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "default" });
+  assert.equal(launch.ready.hardwareAccelerationEnabled, true);
+  await quit(launch);
+  steps.push({ step: "records from a version before the false-crash fixes", ready: launch.ready });
   const contextLost = join(root, "context-lost");
   launch = await start(contextLost, 1_000, {}, ["--context-lost"]);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "default" });

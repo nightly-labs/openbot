@@ -17,15 +17,9 @@ export function filePreviewFromBytes(name: string, bytes: Uint8Array, generation
   if (bytes.byteLength > ATTACHMENT_LIMITS.fileBytes) throw new Error(sourceText("error.attachment.previewTooLarge"));
   const mimeType = mimeTypeForName(name);
   const kind = filePreviewKindForFile(name, mimeType);
-  const pageUrl = kind === "pdf" ? filePreviewPages.add(mimeType, bytes, generation) : undefined;
-  return {
-    name,
-    size: bytes.byteLength,
-    mimeType,
-    previewKind: kind,
-    bytes: kind === "none" ? null : bytes,
-    ...(pageUrl ? { pageUrl } : {}),
-  };
+  if (kind === "none") return { name, size: bytes.byteLength, mimeType, previewKind: kind, bytes: null };
+  const pageUrl = filePreviewPages.add(mimeType, bytes, generation);
+  return { name, size: bytes.byteLength, mimeType, previewKind: kind, bytes, ...(pageUrl ? { pageUrl } : {}) };
 }
 
 export const localFilePreview = Effect.fn("FilePreview.local")(function* (

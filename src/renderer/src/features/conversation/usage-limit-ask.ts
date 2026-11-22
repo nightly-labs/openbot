@@ -60,17 +60,22 @@ export function usageLimitAskFrom(source: UsageLimitAskSource) {
       return undefined;
     const agentId = agent.id;
     const reasoningEffort = agent.reasoningEffort;
+    const modelOf = (choiceProvider: string, model: string, accountId: string | null | undefined) =>
+      source.modelOptions().find((option) => option.provider === choiceProvider && option.id === model) ??
+      source
+        .providers()
+        ?.find((row) => row.id === choiceProvider)
+        ?.accounts?.find((account) => account.id === accountId)
+        ?.models?.find((option) => option.id === model);
     return {
       provider,
-      model: source.modelOptions().find((option) => option.provider === provider && option.id === agent.model)?.name,
+      model: modelOf(provider, agent.model, agent.providerAccountId)?.name,
       agentName: inChannel ? agent.name : undefined,
       resetsAt,
       options,
       rememberable: source.rememberable(),
       onSend: async (option, remember) => {
-        const model = source
-          .modelOptions()
-          .find((candidate) => candidate.provider === option.choice.provider && candidate.id === option.choice.model);
+        const model = modelOf(option.choice.provider, option.choice.model, option.choice.providerAccountId);
         await source.update(agentId, {
           provider: option.choice.provider,
           model: option.choice.model,

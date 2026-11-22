@@ -103,7 +103,7 @@ export class ModelCatalog {
           logger.warn("A provider reported a model id that is not valid.", { provider: client.provider, id });
           continue;
         }
-        serverModels.set(id, { ...item, model: id });
+        serverModels.set(id, { ...item, model: id, ...(response.steersTurns ? { steersTurns: true } : {}) });
       }
       cursor = catalog.paged ? response.nextCursor : undefined;
       if (cursor && cursors.has(cursor))

@@ -66,16 +66,18 @@ import {
 } from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput, signInCodexWithApiKey } from "../ipc/provider-handlers";
 import { isObject } from "../ipc/validation";
-import type { TeamApiAdmin } from "./dependencies";
+import type { TeamApiAdmin, TeamApiProviderAccounts } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
+import { requireRoomForKeyAccount } from "./route-provider-accounts";
 
 const RUNTIME_MESSAGE_LIMIT = 1024;
 
 export async function routeProviders(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
+  providerAccounts?: TeamApiProviderAccounts | undefined,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
@@ -200,6 +202,7 @@ export async function routeProviders(
           await signInCodexWithApiKey(service, input.key);
           return json(200, {});
         }
+        requireRoomForKeyAccount(capabilities, providerAccounts, input.provider);
         const save = () =>
           credentials
             .set(input.provider, input.key)

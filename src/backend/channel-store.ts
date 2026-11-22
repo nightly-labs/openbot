@@ -12,14 +12,16 @@ import {
   type ChannelThread,
   CONTEXT_RESET_ITEM_TYPE,
   decodeChannel,
+  isChannelFolderPaths,
   isChannelMessage,
   isChannelTask,
   MCP_SIGN_IN_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
   withBrowserMember,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { changesModelContent } from "./channel-history";
 import { deleteAggregateHistory, deleteReceiptsOf, deleteThreadAttachments } from "./database/database-core";
@@ -51,6 +53,7 @@ const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread FROM projection_channel_mess
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?`;
 
@@ -108,6 +111,56 @@ export interface ChannelHistorySummary {
   text: string;
 }
 
+interface MemberFolderSource {
+  key: string;
+  folders: readonly string[];
+  agentIds: readonly string[];
+}
+
+const MEMBER_FOLDER_COLUMNS =
+  "json_extract(channel_json, '$.folders') AS folders, json_extract(channel_json, '$.members') AS members, json_extract(channel_json, '$.archived') AS archived";
+
+function memberFolderSource(
+  folders: readonly string[] | undefined,
+  agentIds: readonly string[],
+  archived: boolean,
+): MemberFolderSource | null {
+  if (archived || !folders?.length) return null;
+  return { key: JSON.stringify([folders, agentIds]), folders, agentIds };
+}
+
+function parsedJsonColumn<T>(value: DynamicRecord[string], parse: (decoded: unknown) => T, fallback: T): T {
+  if (!isString(value)) return fallback;
+  try {
+    return parse(JSON.parse(value));
+  } catch {
+    return fallback;
+  }
+}
+
+function storedFolders(value: DynamicRecord[string]): readonly string[] | undefined {
+  return parsedJsonColumn(value, (decoded) => (isChannelFolderPaths(decoded) ? decoded : undefined), undefined);
+}
+
+function storedMemberAgentIds(value: DynamicRecord[string]): readonly string[] {
+  return parsedJsonColumn(
+    value,
+    (decoded) =>
+      Array.isArray(decoded)
+        ? decoded.flatMap((member) => (isDynamicRecord(member) && isString(member.agentId) ? [member.agentId] : []))
+        : [],
+    [],
+  );
+}
+
+function storedMemberFolderSource(row: DynamicRecord): MemberFolderSource | null {
+  return memberFolderSource(
+    storedFolders(row.folders),
+    storedMemberAgentIds(row.members),
+    row.archived === true || row.archived === 1,
+  );
+}
+
 interface ChannelChange {
   channel: Channel;
   messages: ChannelMessage[];
@@ -121,7 +174,50 @@ export class ChannelStore {
   #unreadCountsConnection: DatabaseSync | null = null;
   #unreadCountsDataVersion: unknown = null;
 
-  constructor(readonly database: OpenBotDatabase) {}
+  #memberFolders: { connection: DatabaseSync; folders: ReadonlyMap<string, readonly string[]> } | null = null;
+
+  constructor(
+    readonly database: OpenBotDatabase,
+    private readonly memberFoldersChanged: (agentIds: readonly string[]) => void = () => {},
+  ) {}
+
+  memberFolders(agentId: string): readonly string[] {
+    const connection = this.database.connection;
+    if (connection.isTransaction) return this.#readMemberFolders(connection).get(agentId) ?? [];
+    if (this.#memberFolders?.connection !== connection)
+      this.#memberFolders = { connection, folders: this.#readMemberFolders(connection) };
+    return this.#memberFolders.folders.get(agentId) ?? [];
+  }
+
+  #readMemberFolders(connection: DatabaseSync): ReadonlyMap<string, readonly string[]> {
+    const folders = new Map<string, string[]>();
+    const rows = databaseRows(
+      connection
+        .prepare(
+          `SELECT ${MEMBER_FOLDER_COLUMNS} FROM projection_channels WHERE json_array_length(channel_json, '$.folders') > 0 ORDER BY rowid`,
+        )
+        .all(),
+    );
+    for (const row of rows) {
+      const source = storedMemberFolderSource(row);
+      if (!source) continue;
+      for (const agentId of source.agentIds) {
+        const known = folders.get(agentId) ?? [];
+        folders.set(agentId, [...known, ...source.folders.filter((path) => !known.includes(path))]);
+      }
+    }
+    return folders;
+  }
+
+  #replaceMemberFolders(db: DatabaseSync, channelId: string, next: MemberFolderSource | null): void {
+    const row = databaseRow(
+      db.prepare(`SELECT ${MEMBER_FOLDER_COLUMNS} FROM projection_channels WHERE channel_id = ?`).get(channelId),
+    );
+    const previous = row ? storedMemberFolderSource(row) : null;
+    if (previous?.key === next?.key) return;
+    this.#memberFolders = null;
+    this.memberFoldersChanged([...new Set([...(previous?.agentIds ?? []), ...(next?.agentIds ?? [])])]);
+  }
 
   #keepsUnreadCounts(): boolean {
     const db = this.database.connection;
@@ -148,6 +244,7 @@ export class ChannelStore {
         excludedId,
         `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
         `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
+        `${SETTING_LINK_ITEM_TYPE_PREFIX}%`,
       ),
     );
     const count = Number(row?.unread ?? 0);
@@ -393,14 +490,14 @@ export class ChannelStore {
     );
   }
 
-  agentAssignment(
+  agentWork(
     agentId: string,
     states: readonly ChannelAssignment["state"][],
-  ): { assignment: ChannelAssignment; channel: Channel } | null {
-    if (!states.length) return null;
+  ): Array<{ assignment: ChannelAssignment; channel: Channel }> {
+    if (!states.length) return [];
     const placeholders = states.map(() => "?").join(", ");
     const ranking = states.map((_, index) => `WHEN ? THEN ${index}`).join(" ");
-    const row = databaseRow(
+    return databaseRows(
       this.database.connection
         .prepare(
           `SELECT assignments.assignment_json AS assignment_json, channels.channel_json AS channel_json
@@ -410,16 +507,13 @@ export class ChannelStore {
               AND json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
               AND COALESCE(json_extract(channels.channel_json, '$.archived'), 0) = 0
             ORDER BY CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END,
-                     assignments.rowid
-            LIMIT 1`,
+                     assignments.rowid`,
         )
-        .get(agentId, ...states, ...states),
-    );
-    if (!row) return null;
-    return {
+        .all(agentId, ...states, ...states),
+    ).map((row) => ({
       assignment: decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))),
       channel: decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json"))),
-    };
+    }));
   }
 
   assignmentForDelivery(deliveryId: string): ChannelAssignment | null {
@@ -648,6 +742,15 @@ export class ChannelStore {
 
   private project(db: DatabaseSync, change: ChannelChange): void {
     this.#unreadCounts.delete(change.channel.id);
+    this.#replaceMemberFolders(
+      db,
+      change.channel.id,
+      memberFolderSource(
+        change.channel.folders,
+        change.channel.members.map((member) => member.agentId),
+        change.channel.archived === true,
+      ),
+    );
     db.prepare(
       "INSERT INTO projection_channels VALUES (?, ?) ON CONFLICT(channel_id) DO UPDATE SET channel_json = excluded.channel_json",
     ).run(change.channel.id, JSON.stringify(change.channel));
@@ -822,6 +925,7 @@ export class ChannelStore {
       ],
       (db) => {
         this.#unreadCounts.delete(channelId);
+        this.#replaceMemberFolders(db, channelId, null);
         const memoryIds = databaseRows(
           db.prepare("SELECT memory_id FROM projection_channel_memories WHERE channel_id = ?").all(channelId),
         ).map((row) => requiredStringColumn(row, "memory_id"));

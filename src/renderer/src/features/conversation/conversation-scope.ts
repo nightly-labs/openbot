@@ -17,7 +17,9 @@ import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
+import { awaitingReplyEnded } from "@openbot/ui/features/conversation/AwaitingReplies";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { prefersReducedMotion, usesTouchLayout } from "@openbot/ui/utils";
 import { errorReference } from "@openbot/user-errors";
@@ -33,14 +35,17 @@ import {
   useContext,
 } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { matchesShortcut } from "../../keyboard-shortcut-preference";
 import { holdNativeBrowserPage } from "../../native-browser-page";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
+import { insideOverlay } from "../window/workspace-shortcuts";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import { createChangeMarkerActions } from "./change-marker-actions";
 import type { ChatSearchMatch } from "./chat-search";
+import { appendDraftText, EMPTY_DRAFT } from "./composer-draft";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey, promptRequestKey } from "./conversation-keys";
 import { conversationPort } from "./conversation-port";
@@ -183,6 +188,10 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserAddress,
     browserPipBounds,
     setBrowserPipBounds,
+    browserWindowOpen,
+    setBrowserWindowOpen,
+    browserWindowBounds,
+    setBrowserWindowBounds,
     sidebarFilePreview,
     setSidebarFilePreview,
     openReactionMessageId,
@@ -248,6 +257,9 @@ export function createConversationViewScope(props: ConversationProps) {
     settingsModel,
     settingsReasoning,
     setBrowserPipBounds,
+    browserWindowOpen,
+    setBrowserWindowOpen,
+    setBrowserWindowBounds,
     sidebarFilePreview,
     setSidebarFilePreview,
     setComposerError: setScopedComposerError,
@@ -291,6 +303,9 @@ export function createConversationViewScope(props: ConversationProps) {
     openRoutineRunMessage,
     showBrowserPip,
     saveBrowserPipBounds,
+    saveBrowserWindowBounds,
+    openBrowserWindow,
+    reattachBrowserWindow,
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
@@ -449,14 +464,16 @@ export function createConversationViewScope(props: ConversationProps) {
   const awaitingReplies = channel
     ? createMemo(() => {
         const hidden = hiddenAwaitingReplyIds();
-        return channel
-          .awaitingReplies()
-          .filter((row) => !(hidden.has(row.id) && (row.state === "replied" || row.state === "failed")));
+        return channel.awaitingReplies().filter((row) => !(hidden.has(row.id) && awaitingReplyEnded(row.state)));
       })
     : queue.awaitingReplies;
   const dismissAwaitingReplies = () => {
     setHiddenAwaitingReplyIds((ids) => new Set([...ids, ...awaitingReplies().map((row) => row.id)]));
     setComposerFocusRequest((value) => value + 1);
+  };
+  const stopAwaitingReply = (rowId: string) => {
+    const row = awaitingReplies().find((item) => item.id === rowId);
+    if (row?.agent && row.deliveryId) props.onCancelQueuedMessage(row.deliveryId, row.agent.id);
   };
   const activity = createActivityStore({
     props,
@@ -504,6 +521,7 @@ export function createConversationViewScope(props: ConversationProps) {
     panels: {
       activeRightPanel,
       setActiveRightPanel,
+      reattachBrowserWindow,
       closeBrowserPane,
     },
   });
@@ -962,6 +980,43 @@ export function createConversationViewScope(props: ConversationProps) {
     flush();
     requestThreadFocus();
   };
+  const openNeighborThread = (offset: 1 | -1): boolean => {
+    const header = props.threads?.header;
+    if (!header || header.tabs.length === 0) return false;
+    const order = [MAIN_THREAD_ID, ...header.tabs.map((tab) => tab.id)];
+    const index = Math.max(0, order.indexOf(header.activeId));
+    const next = order[(index + offset + order.length) % order.length];
+    if (next === undefined || next === header.activeId) return false;
+    header.onOpen(next);
+    flush();
+    requestThreadFocus();
+    return true;
+  };
+  const focusComposer = (): boolean => {
+    if (sideThreadOpen()) requestThreadFocus();
+    else setComposerFocusRequest((value) => value + 1);
+    return true;
+  };
+  const threadShortcutAction = (event: KeyboardEvent): (() => boolean) | undefined => {
+    if (matchesShortcut(event, "newThread"))
+      return () => {
+        if (!props.threads?.header.canStartNew) return false;
+        startNewThread();
+        return true;
+      };
+    if (matchesShortcut(event, "previousThread")) return () => openNeighborThread(-1);
+    if (matchesShortcut(event, "nextThread")) return () => openNeighborThread(1);
+    if (matchesShortcut(event, "focusComposer")) return focusComposer;
+    return undefined;
+  };
+  const handleThreadShortcut = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.repeat) return;
+    if (insideOverlay(event.target)) return;
+    const action = threadShortcutAction(event);
+    if (!action?.()) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
   const startThreadVoiceRecording = () => {
     const key = threadComposer.openDraftKey();
     if (key !== undefined) void startVoiceRecording(key);
@@ -1009,17 +1064,38 @@ export function createConversationViewScope(props: ConversationProps) {
     return () => setPromptComposerAnswer((current) => (current === answer ? undefined : current));
   };
   const openPromptKey = () => promptRequestKey(props.prompt?.turnId, props.prompt?.requestId);
+  const openChatKey = () => {
+    const open = props.threads?.open;
+    return JSON.stringify([
+      agentConversationKey(props.server?.id ?? "local", conversationOwnerId(props) ?? ""),
+      open === undefined ? null : (open?.id ?? ""),
+    ]);
+  };
   const composerHasText = () => Boolean(currentDraft().text.trim() || voiceLiveText().trim());
   const [draftHeldPromptKey, setDraftHeldPromptKey] = createSignal<string | null>(null);
+  let unsentPromptAnswer: { chat: string; key: string; text: string } | undefined;
+  const keepUnsentPromptAnswer = (text: string | undefined) => {
+    const key = openPromptKey();
+    unsentPromptAnswer = text === undefined || key === null ? undefined : { chat: openChatKey(), key, text };
+  };
+  createEffect(
+    () => ({ chat: openChatKey(), key: openPromptKey(), target: currentConversationTarget(props) }),
+    ({ chat, key, target }) => {
+      const unsent = unsentPromptAnswer;
+      if (!unsent || unsent.chat !== chat || unsent.key === key || !target) return;
+      unsentPromptAnswer = undefined;
+      const draftKey = composerDraftKey(target);
+      setDrafts((current) => ({
+        ...current,
+        [draftKey]: appendDraftText(current[draftKey] ?? EMPTY_DRAFT, unsent.text),
+      }));
+    },
+  );
   let lastOpenPrompt: { chat: string; key: string | null } | undefined;
   createEffect(
     () => {
-      const open = props.threads?.open;
       return {
-        chat: JSON.stringify([
-          agentConversationKey(props.server?.id ?? "local", conversationOwnerId(props) ?? ""),
-          open === undefined ? null : (open?.id ?? ""),
-        ]),
+        chat: openChatKey(),
         key: openPromptKey(),
         hasText: untrack(composerHasText),
       };
@@ -1547,6 +1623,8 @@ export function createConversationViewScope(props: ConversationProps) {
     };
     const escapeListener = whenVisible(closeOnEscape);
     const chatSearchListener = whenVisible(handleChatSearchShortcut);
+    const threadListener = whenVisible(handleThreadShortcut);
+    keyboardTarget.addEventListener("keydown", threadListener);
     keyboardTarget.addEventListener("keydown", escapeListener);
     keyboardWindow.addEventListener("keydown", closeActiveRemoteBrowserTab);
     keyboardTarget.addEventListener("keydown", chatSearchListener);
@@ -1604,6 +1682,7 @@ export function createConversationViewScope(props: ConversationProps) {
       keyboardTarget.removeEventListener("keydown", escapeListener);
       keyboardWindow.removeEventListener("keydown", closeActiveRemoteBrowserTab);
       keyboardTarget.removeEventListener("keydown", chatSearchListener);
+      keyboardTarget.removeEventListener("keydown", threadListener);
       window.removeEventListener("pointerdown", closeMessageMenus);
       readerInput?.removeEventListener("wheel", readerWheel);
       readerInput?.removeEventListener("touchmove", readerTouchMove);
@@ -1964,11 +2043,14 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
+  const browserWindowShown = () => browserWindowOpen() && props.browserEnabled !== false;
+  const browserCanDetach = () =>
+    !props.runtime && (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-view"));
   createEffect(
     () => ({
       agentId: props.agent?.id,
       activeTab: activeBrowserTab(),
-      screenOpen: screenOpen(),
+      screenOpen: screenOpen() || browserWindowShown(),
       activeBrowserTabId: props.activeBrowserTabId,
       onActivateBrowserTab: activateBrowserTab,
       suspended: props.browserVisibilitySuspended,
@@ -2011,7 +2093,7 @@ export function createConversationViewScope(props: ConversationProps) {
       browserBoundsFrame = undefined;
       if (!browserEnabled) return;
       if (!visible) {
-        void conversationRuntime(props).browser.setVisible({ visible: false });
+        void conversationRuntime(props).browser.setVisible({ visible: false, target: "main" });
         return;
       }
       browserVisibilityFrame = requestAnimationFrame(() => {
@@ -2084,6 +2166,38 @@ export function createConversationViewScope(props: ConversationProps) {
     setActiveRightPanel(event.type === "dock" ? "browser-expanded" : "none");
   });
 
+  let browserWindowRequested = false;
+  const browserWindowState = (): "closed" | "open" | "unavailable" => {
+    if (!browserWindowShown()) return "closed";
+    return browserCanDetach() ? "open" : "unavailable";
+  };
+  createEffect(browserWindowState, (state) => {
+    const runtime = conversationRuntime(props);
+    if (state === "unavailable") {
+      setBrowserWindowOpen(false);
+      return;
+    }
+    if (state === "closed") {
+      if (!browserWindowRequested) return;
+      browserWindowRequested = false;
+      void runtime.browser.closeWindow();
+      return;
+    }
+    if (browserWindowRequested) return;
+    browserWindowRequested = true;
+    runtime.browser
+      .openWindow(untrack(browserWindowBounds) ?? undefined)
+      .then(saveBrowserWindowBounds)
+      .catch((error: unknown) => {
+        setBrowserWindowOpen(false);
+        setScopedComposerError(currentText().t("browser.window.openFailed"), undefined, error);
+      });
+  });
+
+  const removeBrowserWindowListener = conversationRuntime(props).browser.onWindowEvent((event) => {
+    if (event.type === "dock") reattachBrowserWindow();
+  });
+
   onCleanup(() => {
     browserVisibilityGeneration += 1;
     if (browserVisibilityFrame !== undefined) cancelAnimationFrame(browserVisibilityFrame);
@@ -2091,8 +2205,9 @@ export function createConversationViewScope(props: ConversationProps) {
     browserResizeObserver?.disconnect();
     if (browserWindowResizeHandler) window.removeEventListener("resize", browserWindowResizeHandler);
     removeBrowserPictureInPictureListener();
+    removeBrowserWindowListener();
     if (props.browserEnabled !== false) {
-      void conversationRuntime(props).browser.setVisible({ visible: false });
+      void conversationRuntime(props).browser.setVisible({ visible: false, target: "main" });
       void conversationRuntime(props).browser.closePictureInPicture();
     }
   });
@@ -2410,6 +2525,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
+    stopAwaitingReply,
     clearComposerError,
     setComposerErrorForTarget,
     clearChatErrors,
@@ -2565,6 +2681,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setOpenReactionMessageId,
     setRequiredInteractionElement,
     registerPromptComposerAnswer,
+    keepUnsentPromptAnswer,
     handleRoutineSettingsRequest,
     setShowComposerActions,
     settingsModel,
@@ -2575,6 +2692,10 @@ export function createConversationViewScope(props: ConversationProps) {
     sidePanelWidth,
     sidebarFilePreview,
     showBrowserPip,
+    browserWindowShown,
+    browserCanDetach,
+    openBrowserWindow,
+    reattachBrowserWindow,
     showComposerActions,
     showScrollToLatest,
     startVoiceRecording,

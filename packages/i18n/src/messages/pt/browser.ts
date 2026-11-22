@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Fechar janela flutuante do navegador",
   "browser.pip.reattachFailed": "O OpenBot não conseguiu reanexar o navegador.",
   "browser.pip.closeFailed": "O OpenBot não conseguiu fechar a janela flutuante do navegador.",
+  "browser.window.open": "Abrir navegador em nova janela",
+  "browser.window.openFailed": "O OpenBot não conseguiu abrir a janela do navegador.",
   "browser.popupBlocked.title": "Pop-up bloqueado",
   "browser.popupBlocked.dismiss": "Dispensar mensagem de pop-up",
   "browser.liveView.label": "Visualização ao vivo da página no servidor",

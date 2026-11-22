@@ -22,6 +22,9 @@ const HELD_MAX_AGE_MS = 20 * 60_000;
 const MESSAGE_MAX_AGE_MS = 24 * 60 * 60_000;
 const APPROVE_TEXT = /^(1|approve|yes)$/iu;
 const DECLINE_TEXT = /^(2|deny|no)$/iu;
+const CONTACT_LIMIT = 20;
+const CONTACT_PHONE_LIMIT = 5;
+const CONTACT_FIELD_LIMIT = 128;
 
 export interface WhatsAppIdentity {
   number: string;
@@ -124,9 +127,10 @@ export async function whatsAppInbound(
   const quotedId = contextInfo?.stanzaId ?? null;
   const mentioned = (contextInfo?.mentionedJid ?? []).map((jid) => jidNormalizedUser(jid));
   const namesMe = mentioned.some((jid) => isMe(jid, context.me));
+  const repliesToPost = quotedId !== null && context.isOwnPost(quotedId);
   const repliesToMe =
     quotedId !== null &&
-    (context.isOwnPost(quotedId) ||
+    (repliesToPost ||
       (contextInfo?.participant ? isMe(jidNormalizedUser(contextInfo.participant), context.me) : false));
   const text = textOf(content);
   if (isSelfChat && isOtherOpenBotPost(text)) return historyOnly ? null : { type: "otherOpenBot", chatJid };
@@ -187,7 +191,7 @@ export async function whatsAppInbound(
     target,
     platformMessageId: id,
     isDirect: !isGroup,
-    requiresLink: isGroup && !namesMe,
+    requiresLink: isGroup && !namesMe && !repliesToPost,
     authorId,
     text: withMentions(text, mentioned, context.me),
     mentionedUserIds: mentioned.filter((jid) => !isMe(jid, context.me)).flatMap((jid) => userOf(jid) ?? []),
@@ -257,6 +261,8 @@ function contextOf(content: proto.IMessage): proto.IContextInfo | null {
     content.videoMessage?.contextInfo ??
     content.documentMessage?.contextInfo ??
     content.audioMessage?.contextInfo ??
+    content.contactMessage?.contextInfo ??
+    content.contactsArrayMessage?.contextInfo ??
     null
   );
 }
@@ -268,8 +274,46 @@ function textOf(content: proto.IMessage): string {
     content.imageMessage?.caption ??
     content.videoMessage?.caption ??
     content.documentMessage?.caption ??
-    ""
+    contactsText(content)
   ).trim();
+}
+
+function contactsText(content: proto.IMessage): string {
+  const contacts = content.contactMessage ? [content.contactMessage] : (content.contactsArrayMessage?.contacts ?? []);
+  return contacts.slice(0, CONTACT_LIMIT).map(contactLine).join("\n");
+}
+
+function contactLine(contact: proto.Message.IContactMessage): string {
+  const card = vcardFields(contact.vcard);
+  const name = contactValue(contact.displayName ?? "") || card.name;
+  const details = [name, card.phones.join(", ")].filter(Boolean).join(" ");
+  return details ? `[Contact: ${details}]` : "[Contact]";
+}
+
+function vcardFields(vcard: string | null | undefined): { name: string; phones: string[] } {
+  let fullName = "";
+  let structuredName = "";
+  const phones: string[] = [];
+  for (const line of (vcard ?? "").replace(/\r?\n[ \t]/gu, "").split(/\r?\n/u)) {
+    const colon = line.indexOf(":");
+    if (colon < 0) continue;
+    const key = line.slice(0, colon).split(";")[0]?.split(".").pop()?.trim().toUpperCase();
+    const value = contactValue(line.slice(colon + 1));
+    if (!value) continue;
+    if (key === "FN") fullName ||= value;
+    else if (key === "N") structuredName ||= contactValue(value.replace(/;/gu, " "));
+    else if (key === "TEL" && phones.length < CONTACT_PHONE_LIMIT) phones.push(value.replace(/^tel:/iu, "").trim());
+  }
+  return { name: fullName || structuredName, phones: phones.filter(Boolean) };
+}
+
+function contactValue(value: string): string {
+  return value
+    .replace(/\\n/giu, " ")
+    .replace(/\\([,;\\])/gu, "$1")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, CONTACT_FIELD_LIMIT);
 }
 
 function filesOf(content: proto.IMessage, chatJid: string, messageId: string): InboundFile[] {

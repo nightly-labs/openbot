@@ -111,7 +111,7 @@ export function isProviderAccountId(value: unknown): value is string {
   return typeof value === "string" && PROVIDER_ACCOUNT_ID.test(value);
 }
 
-export const MAX_PROVIDER_ACCOUNTS = 10;
+export const MAX_PROVIDER_ACCOUNTS = 20;
 
 export const PROVIDER_ACCOUNT_STATES = ["connected", "connecting", "checking", "signed-out", "error"] as const;
 export type ProviderAccountState = (typeof PROVIDER_ACCOUNT_STATES)[number];
@@ -237,6 +237,7 @@ export interface AccountUsageLimit {
   groups?: AccountUsageGroup[];
   sharedQuotaWith?: AgentProviderId;
   creditsAvailable?: boolean;
+  readFailed?: true;
 }
 
 export interface AccountUsage {
@@ -260,7 +261,8 @@ export function isAccountUsage(value: unknown): value is AccountUsage {
             limit.groups.length <= MAX_USAGE_GROUPS &&
             limit.groups.every(isAccountUsageGroup))) &&
         (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)) &&
-        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean"),
+        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean") &&
+        (limit.readFailed === undefined || limit.readFailed === true),
     )
   );
 }

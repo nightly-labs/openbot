@@ -87,6 +87,15 @@
   inset-inline-end: 0;
 }
 
+.web-app-window[data-loading-waited-long] > .app-loading {
+  z-index: var(--openbot-layer-dropdown);
+}
+
+.web-app-window[data-loading-waited-long] > .window-rail {
+  z-index: calc(var(--openbot-layer-dropdown) + 1);
+  background: var(--window-frame);
+}
+
 @media (max-width: 720px) {
   .web-app-window {
     --web-mobile-navigation-height: 64px;

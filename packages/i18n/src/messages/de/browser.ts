@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Browser-Popup schließen",
   "browser.pip.reattachFailed": "OpenBot konnte den Browser nicht wieder andocken.",
   "browser.pip.closeFailed": "OpenBot konnte das Browser-Popup nicht schließen.",
+  "browser.window.open": "Browser in neuem Fenster öffnen",
+  "browser.window.openFailed": "OpenBot konnte das Browserfenster nicht öffnen.",
   "browser.popupBlocked.title": "Popup blockiert",
   "browser.popupBlocked.dismiss": "Popup-Meldung schließen",
   "browser.liveView.label": "Live-Ansicht der Seite auf dem Server",

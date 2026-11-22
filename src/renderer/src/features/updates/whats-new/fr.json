@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Sur un serveur, les tâches exécutées en même temps, le compte de voix en direct, l’interrupteur de la mémoire d’OpenBot, les dossiers de workflows, les réponses typées des workflows et plus de 10 comptes d’un même fournisseur ne fonctionnent que si le serveur a cette version.",
+      "Après cette mise à jour, une version plus ancienne d’OpenBot ne peut pas ouvrir vos données."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Un agent peut répartir des travaux indépendants en tâches exécutées en même temps. Chaque résultat revient dans la discussion principale, et l’agent combine les résultats pour vous.",
+          "Consultez tous les fils ouverts d’un agent dans le nouvel onglet Fils du panneau latéral. L’onglet affiche le nombre de fils qui vous attendent.",
+          "Changez vos raccourcis clavier dans le nouvel onglet Clavier des Réglages. Les nouveaux raccourcis ouvrent un fil et passent au fil suivant et au fil précédent.",
+          "Les workflows s’ouvrent dans des onglets, et les étapes de workflow peuvent donner des réponses typées. Écrivez {{name}} pour placer une réponse dans une étape suivante.",
+          "Importez une vidéo MP4 ou WebM comme arrière-plan de la fenêtre dans Réglages > Apparence.",
+          "Choisissez le compte ChatGPT qu’utilise la voix en direct de GPT dans Réglages > Voix."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un fournisseur garde jusqu’à 20 comptes. Avant, la limite était de 10.",
+          "La dictée enregistre jusqu’à 10 minutes. Avant, elle s’arrêtait après 2 minutes.",
+          "Un fil charge les messages plus anciens quand vous faites défiler près du haut. Vous n’avez pas besoin de cliquer sur un bouton."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Une routine planifiée ne s’éteint plus en silence quand une exécution n’a rien à signaler.",
+          "Une longue discussion garde tous ses messages, dans le bon ordre, pendant qu’une réponse s’affiche.",
+          "Un numéro WhatsApp lié ne cesse plus de recevoir des messages alors qu’il affiche encore « Connecté ».",
+          "Sous Windows, les agents OpenCode exécutent de nouveau des commandes. Avant, ils échouaient souvent avec « opencode-pty request timed out ».",
+          "Un agent que vous avez mis en sourdine ne vous envoie plus de notification quand il répond dans un canal."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

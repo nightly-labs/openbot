@@ -268,7 +268,7 @@ export class AgentUsage {
     const rows = databaseRows(
       this.#core.connection
         .prepare(
-          "SELECT tokens_json, estimated_cost_usd FROM agent_usage_records WHERE agent_id = ? AND occurred_at >= ? AND turn_id = ?",
+          "SELECT provider, model, occurred_at, tokens_json, estimated_cost_usd FROM agent_usage_records WHERE agent_id = ? AND occurred_at >= ? AND turn_id = ?",
         )
         .all(agentId, since, turnId),
     );
@@ -278,7 +278,7 @@ export class AgentUsage {
     for (const row of rows) {
       const counts = decodeUsageTokens(JSON.parse(requiredStringColumn(row, "tokens_json")));
       for (const key of TOKEN_KEYS) tokens += counts[key] ?? 0;
-      const cost = optionalNumberColumn(row, "estimated_cost_usd");
+      const cost = recordCost(row, counts);
       costUsd = costUsd === null || cost === null ? null : costUsd + cost;
     }
     return { tokens, costUsd };
@@ -354,6 +354,7 @@ export class AgentUsage {
     for (const row of records) {
       const tokens = decodeUsageTokens(JSON.parse(requiredStringColumn(row, "tokens_json")));
       const turn = JSON.stringify([row.agent_id, row.provider, row.session_id, row.turn_id]);
+      const cost = recordCost(row, tokens);
       const scope = targets(row);
       for (const target of scope.targets) {
         if (TOKEN_KEYS.some((key) => tokens[key] !== null)) target.usageTurns.add(turn);
@@ -365,16 +366,14 @@ export class AgentUsage {
           }
         }
         if (TOKEN_KEYS.some((key) => tokens[key] === null)) target.values.incompleteRecords++;
-        if (typeof row.estimated_cost_usd === "number")
-          target.values.estimatedCostUsd = (target.values.estimatedCostUsd ?? 0) + row.estimated_cost_usd;
+        if (cost !== null) target.values.estimatedCostUsd = (target.values.estimatedCostUsd ?? 0) + cost;
         else target.values.unpricedRecords++;
       }
       const cell = scope.cell;
       if (cell) {
         for (const key of TOKEN_KEYS) if (tokens[key] !== null) cell.processedTokens += tokens[key];
         if (tokens.cachedInput !== null) cell.cachedInput = (cell.cachedInput ?? 0) + tokens.cachedInput;
-        if (typeof row.estimated_cost_usd === "number")
-          cell.estimatedCostUsd = (cell.estimatedCostUsd ?? 0) + row.estimated_cost_usd;
+        if (cost !== null) cell.estimatedCostUsd = (cell.estimatedCostUsd ?? 0) + cost;
       }
     }
     for (const row of activity) {
@@ -402,10 +401,14 @@ export class AgentUsage {
         skills.set(name, entry);
       }
       entry.row.loads++;
-      const tokens = optionalNumberColumn(row, "tokens") ?? 0;
+      const loadTokens = optionalNumberColumn(row, "tokens");
+      const tokens = loadTokens ?? 0;
       entry.row.tokens += tokens;
       skillTokens += tokens;
-      const cost = optionalNumberColumn(row, "estimated_cost_usd");
+      const cost =
+        loadTokens === null
+          ? null
+          : recordCost(row, { uncachedInput: loadTokens, cachedInput: 0, cacheCreation: 0, output: 0 });
       if (cost !== null) entry.row.estimatedCostUsd = (entry.row.estimatedCostUsd ?? 0) + cost;
       entry.agents.add(requiredStringColumn(row, "agent_id"));
     }
@@ -451,6 +454,19 @@ interface Bucket {
 }
 function bucket(): Bucket {
   return { values: emptyAnalyticsTotals(), sessions: new Set(), turns: new Set(), usageTurns: new Set() };
+}
+function recordCost(row: DynamicRecord, tokens: UsageTokens): number | null {
+  return (
+    optionalNumberColumn(row, "estimated_cost_usd") ??
+    estimateUsageCost(
+      requiredStringColumn(row, "provider"),
+      requiredStringColumn(row, "model"),
+      tokens,
+      null,
+      null,
+      requiredStringColumn(row, "occurred_at"),
+    ).cost
+  );
 }
 function finish(item: Bucket): AnalyticsTotals {
   return {
