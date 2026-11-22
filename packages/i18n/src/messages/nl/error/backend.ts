@@ -235,7 +235,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Een wachtpunt heeft een bericht nodig om verder te gaan. Deze beurt heeft geen bericht.",
   "error.backend.agentWaitOwnChatOnly":
-    "Open een wachtpunt alleen in je eigen chat. Een kanaal- of berichtentaak kan niet wachten.",
+    "Open een wachtpunt in je eigen chat of in een zijthread. Een kanaal- of berichtengesprek kan niet wachten.",
   "error.backend.agentWaitNoteRequired": "Geef een korte notitie die zegt waarvoor het wachtpunt is.",
   "error.backend.agentWaitRoutineGone": "Deze agent heeft geen routine met deze id.",
   "error.backend.agentWaitNoRoutine":
@@ -345,6 +345,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "De map bestaat niet of is al verwijderd.",
   "error.backend.libraryFolderOtherAgent": "Een bestand kan alleen naar een map van zijn agent.",
   "error.backend.libraryFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
+  "error.backend.workflowFolderLimit": "Een server kan maximaal {limit} workflowmappen hebben.",
+  "error.backend.workflowFolderPlacementLimit": "Er staan te veel workflows in mappen.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",
@@ -380,6 +382,7 @@ export const messages = {
     "Alleen de OpenBot-app op de telefoon kan dit rapport sturen, omdat die de versie en het ondersteuningslog van de telefoon toevoegt. Open deze chat op de telefoon. Zie je dit bericht daar, werk dan de telefoon-app bij.",
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
+  "error.backend.apiKeyListFailed": "OpenBot kon de opgeslagen API-sleutels niet lezen.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
   "error.backend.apiKeyAnswerUnreadable":

@@ -99,6 +99,7 @@ export interface ProviderAccountsHost {
   consumeUsageReset(client: AgentClient): Effect.Effect<ProviderUsageResetOutcome, ProviderAccountFailed>;
   changed(): void;
   modelsListed?(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
+  signedIn?(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
   usageChanged(limit: AccountUsageLimit): void;
   redact(text: string): string;
 }
@@ -314,6 +315,7 @@ export class ProviderAccounts {
       }),
     ).pipe(
       Effect.andThen(this.#check(account, true)),
+      Effect.andThen(this.#host.signedIn?.(provider, account.id) ?? Effect.void),
       Effect.onError((cause) =>
         Cause.hasInterruptsOnly(cause)
           ? Effect.void
@@ -460,6 +462,7 @@ export class ProviderAccounts {
       }),
       Effect.mapError((error) => accountFailure(this.#message(provider, signInCause(error) ?? error))),
     );
+    yield* this.#host.signedIn?.(provider, account.id) ?? Effect.void;
     return account.id;
   }).bind(this);
 
@@ -816,19 +819,20 @@ export class ProviderAccounts {
             .pipe(Effect.flatMap((usage) => this.#storeUsage(account, client, usage)));
           const limit =
             agentProviderDescriptor(provider).reportsUsage && !isKeyAccount(account)
-              ? yield* afterSignIn
-                  ? reading.pipe(
-                      Effect.catch((error) =>
-                        Effect.sync(() => {
-                          logger.warn("A provider account usage reading failed after its sign-in.", {
-                            provider,
-                            message: this.#message(provider, error),
-                          });
-                          return null;
-                        }),
-                      ),
-                    )
-                  : reading
+              ? yield* reading.pipe(
+                  Effect.catchIf(
+                    (error) => afterSignIn || !isSignInError(error),
+                    (error) =>
+                      Effect.sync(() => {
+                        logger.warn("A provider account usage reading failed.", {
+                          provider,
+                          afterSignIn,
+                          message: this.#message(provider, error),
+                        });
+                        return null;
+                      }),
+                  ),
+                )
               : null;
           this.#setState(account.id, { state: "connected", email, organization, message: ownApiKeyNotice(signedIn) });
           if (limit) this.#host.usageChanged(limit);

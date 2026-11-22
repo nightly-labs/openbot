@@ -1021,6 +1021,8 @@ function AppSettings(props: AccountProps) {
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
+    mobileInstallRequest,
+    clearMobileInstallRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -1057,6 +1059,7 @@ function AppSettings(props: AccountProps) {
         onCancelScheduledRestart={updates.cancelScheduledRestart}
         onRestartWhenIdle={updates.restartWhenIdle}
         onCancelIdleRestart={updates.cancelIdleRestart}
+        onRestartNow={updates.restartNow}
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}
@@ -1096,6 +1099,8 @@ function AppSettings(props: AccountProps) {
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
+        mobileInstallRequest={mobileInstallRequest()}
+        onMobileInstallRequestHandled={clearMobileInstallRequest}
       />
     </Loading>
   );

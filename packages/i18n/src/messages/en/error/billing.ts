@@ -30,4 +30,6 @@ export const messages = defineMessages("error.billing", {
   "error.billing.invalidRequest": "The billing request is invalid.",
   "error.billing.invalidResponse": "The billing response is invalid.",
   "error.billing.notStripePage": "The billing page is not a Stripe page.",
+  "error.billing.customServerOfferMissing": "This server has no plan to pay for.",
+  "error.billing.checkoutUnavailable": "Payment cannot start now. Try again in a minute.",
 });

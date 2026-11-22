@@ -288,6 +288,8 @@ export const messages = {
     "Bu bilgisayarın işlemcisi bu sağlayıcıyı çalıştıramıyor. Başka bir sağlayıcı kullanın.",
   "error.provider.opencodeDatabaseNewer":
     "Daha yeni bir OpenCode sürümü veritabanını değiştirdiği için OpenCode veritabanını açamadı. OpenCode'u 2 veya daha yeni bir sürüme güncelleyin, sonra yeniden deneyin.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok başlamadı, çünkü yapılandırmasındaki allowed_models ayarı varsayılan modelini içermiyor. Varsayılan modeli allowed_models listesine ekleyin veya allowed_models ayarını kaldırın, sonra yeniden deneyin.",
   "error.provider.opencodeNoAnswer":
     "OpenCode modeli turu yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -427,6 +429,8 @@ export const messages = {
     "Bu sohbet, modele gönderilemeyecek kadar büyüdü. Bunun nedeni çoğu zaman sohbetteki görsellerdir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.opencodeSessionRejected":
     "OpenCode isteği reddetti ve nedenini belirtmedi. Bu, uzun bir sohbette veya model değişikliğinden sonra olabilir. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model veya daha düşük bir efor seçin.",
+  "error.provider.opencodeInputRefused":
+    "Model bu sohbetin içeriğini reddetti ve nedenini belirtmedi. Buna sohbetteki bir dosya, örneğin bir PDF veya görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Mesajınızı dosya olmadan yeniden gönderin veya başka bir model seçin.",
   "error.provider.opencodeCompactionFailed":
     "Model, bağlam penceresinde yer açmak için bu uzun sohbeti özetleyemedi. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse daha güçlü bir model seçin.",
   "error.provider.museMcpStartupFault":
@@ -541,6 +545,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
   "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",
+  "error.provider.acpSessionStale": "{provider} bu sohbetin en son sürümünü yükleyemedi. Mesajınızı yeniden gönderin.",
   "error.provider.acpModelNotOffered":
     "{provider} şu anda {model} modelini sunmuyor. Bu ajan için başka bir model seçip yeniden deneyin.",
   "error.provider.piStopped": "Pi çalışmıyor. Pi'yi bağlayıp tekrar deneyin.",

@@ -147,6 +147,8 @@ export const messages = defineMessages("conversation", {
   "conversation.voice.key.metaWin": "Win",
   "conversation.voice.key.metaLinux": "Super",
   "conversation.voice.key.enter": "Enter",
+  "conversation.voice.key.tab": "Tab",
+  "conversation.voice.key.escape": "Esc",
   "conversation.voice.interrupt": "Interrupt",
   "conversation.voice.start": "Start voice conversation",
   "conversation.voice.end": "End voice conversation",

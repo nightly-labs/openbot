@@ -84,6 +84,7 @@ export interface AcpFlavor {
   lostServerUntilRestart?(error: unknown): boolean;
   serverLost?(error: unknown): boolean;
   sessionBusy?(error: unknown): boolean;
+  staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
@@ -301,6 +302,15 @@ function hermesRefusal(error: unknown): boolean {
   );
 }
 
+function kimiStaleSession(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32600 &&
+    isRecord(error.data) &&
+    error.data.code === "session.stale"
+  );
+}
+
 function hermesSessionBusy(error: unknown): boolean {
   return (
     error instanceof RequestError &&
@@ -399,6 +409,7 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpToolsFixedAtStart: true,
   turnStallMs: 12 * 60_000,
+  staleSession: kimiStaleSession,
 };
 
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
@@ -425,6 +436,16 @@ function ompSessionNotFound(error: RequestError, sessionId: string): boolean | n
   return error.code === -32603
     ? isRecord(error.data) && error.data.details === `Unsupported ACP session: ${sessionId}`
     : null;
+}
+
+function geminiCliSessionNotFound(error: RequestError, sessionId: string): true | null {
+  if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
+  const details = error.code === -32603 && isRecord(error.data) ? error.data.details : undefined;
+  return typeof details === "string" && details.startsWith(`Invalid session identifier "${sessionId}"`) ? true : null;
+}
+
+function customSessionNotFound(error: RequestError, sessionId: string): boolean | null {
+  return geminiCliSessionNotFound(error, sessionId) ?? ompSessionNotFound(error, sessionId);
 }
 
 function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
@@ -459,7 +480,7 @@ const OMP_ACP_FLAVOR: AcpFlavor = {
 };
 
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
-  sessionNotFound: ompSessionNotFound,
+  sessionNotFound: customSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,
   failureCause: customFailureCause,
@@ -484,7 +505,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },
-  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true },
+  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true, staleSession: kimiStaleSession },
   "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
 };
 

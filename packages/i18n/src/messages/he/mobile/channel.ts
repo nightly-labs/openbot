@@ -81,6 +81,8 @@ export const messages = {
   "mobile.channel.form.deselectAll": "ביטול הבחירה",
   "mobile.channel.form.memories": "זיכרונות",
   "mobile.channel.form.routines": "שגרות",
+  "mobile.channel.folders.description": "כל החברים ב־{channel} יכולים לשנות קבצים ולהריץ פקודות בתיקיות האלה.",
+  "mobile.channel.folders.removeBody": "החברים ב־{channel} כבר לא יכולים לשנות קבצים ב־{folder}",
   "mobile.channel.form.deleteTitle": "למחוק את הערוץ?",
   "mobile.channel.form.deleteBody":
     "פעולה זו עוצרת את הערוץ. ההיסטוריה שלו נשארת ב״ערוצים שנמחקו״ לתצוגה מקדימה בלבד, ואפשר לשחזר אותו משם. סוכנים חברים נשמרים.",

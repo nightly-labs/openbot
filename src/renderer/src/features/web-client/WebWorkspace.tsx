@@ -54,6 +54,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHAT_HISTORY_CAPABILITY } from "@openbot/contracts/team-protocol/chat-history-v1";
@@ -72,7 +73,6 @@ import { DISCORD_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/disc
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
-import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
@@ -169,6 +169,7 @@ import {
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
+import { createServerPaywall } from "@openbot/ui/features/servers/ServerPaywall";
 import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
@@ -198,6 +199,7 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import { matchesShortcut } from "../../keyboard-shortcut-preference";
 import { queuedDeliveriesInOrder } from "../../queue-reconciliation";
 import { backgroundWorkKey } from "../conversation/background-work-key";
 import "katex/contrib/copy-tex";
@@ -206,7 +208,6 @@ import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { collectThreadMessageMatches, formatMessageTime, toAgentMessage } from "../../app-message-projection";
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
-import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
 import {
   AgentUsagePanel,
@@ -329,6 +330,7 @@ import {
 } from "../window/SettingsPageFrame";
 import { WindowBackdrop } from "../window/WindowBackdrop";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
+import { useWorkspaceShortcuts } from "../window/workspace-shortcuts";
 import { workflowAgentProgress } from "../workflows/workflow-agent-progress";
 import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -622,6 +624,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
         ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
         ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
+        ...(host.paymentRequired ? { paymentRequired: host.paymentRequired } : {}),
+        ...(host.customPlan ? { customPlan: host.customPlan } : {}),
         compatibility: {
           localAppVersion: "web",
           hostAppVersion: incompatibility?.hostAppVersion ?? null,
@@ -637,7 +641,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }),
   );
   const server = createMemo(() => servers().find((item) => item.active));
+  const paywall = createServerPaywall({
+    server,
+    subscribe: (request) => hostedServers.calls.openCustomCheckout(request),
+    billingDetails: createWebBillingCalls(props.accountFetch),
+    errorMessage: (error) => text.errorMessage(error, t("server.paywall.checkoutFailed")),
+  });
   const blockedServer = createMemo(() => {
+    const paywallServer = paywall.server();
+    if (paywallServer) return paywallServer;
     const current = server();
     if (!current) return null;
     return current.state === "incompatible" || serverPlanBlocks(current, hostedServers.planDeletesAt(current.id))
@@ -681,6 +693,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     if (!loading) setPageLoad(false);
   });
   const [loadingCover, setLoadingCover] = createSignal<boolean>(untrack(fullWindowLoading));
+  const [loadingWaitedLong, setLoadingWaitedLong] = createSignal(false);
   createEffect(
     () => fullWindowLoading() && !loadingCover(),
     (show) => {
@@ -805,8 +818,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     nonce: number;
   } | null>(null);
   let notificationFocusNonce = 0;
+  const [keyboardFocusRequest, setKeyboardFocusRequest] = createSignal<number | null>(null);
+  let keyboardFocusNonce = 0;
   createEffect(accountSettingsOpen, (open) => {
-    if (!open) setNotificationFocusRequest(null);
+    if (open) return;
+    setNotificationFocusRequest(null);
+    setKeyboardFocusRequest(null);
   });
   function openNotificationSettings(serverId: string): void {
     setNotificationFocusRequest({ serverId, nonce: ++notificationFocusNonce });
@@ -829,7 +846,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   } | null>(null);
   onSettled(() => {
     const toggleSearch = (event: KeyboardEvent) => {
-      if (!isGlobalSearchShortcut(event)) return;
+      if (!matchesShortcut(event, "globalSearch")) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       setSearchOpen((open) => !open);
@@ -1435,16 +1452,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return (
       !hostedServers.isHosted(serverId) &&
       server()?.id === serverId &&
-      workspace.state.status === "online" &&
-      workspace.runtime.admin !== undefined &&
-      workspace.state.capabilities.includes(HOST_RESTART_CAPABILITY)
+      workspace.state.restartReady &&
+      workspace.runtime.admin !== undefined
     );
   }
   async function restartHost(): Promise<void> {
     const hostId = restartRequest()?.hostId;
     if (!hostId) return;
     if (hostedServers.isHosted(hostId)) await hostedServers.calls.restart(hostId);
-    else await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
+    else {
+      await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
+      workspace.restartRequested();
+    }
   }
   createEffect(
     () => props.billingReturn,
@@ -1898,6 +1917,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     deletesAnyMessage: () => canAdministerServer(workspace.state.host?.role),
     pictureSupported: () => workspace.state.capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
     contextActionsSupported: () => workspace.state.capabilities.includes(CHAT_HISTORY_CAPABILITY),
+    foldersMode: () =>
+      workspace.state.capabilities.includes(CHANNEL_FOLDERS_CAPABILITY) &&
+      canAdministerServer(workspace.state.host?.role)
+        ? "remote"
+        : null,
     beforeOpen: () => {
       setCreating(false);
       setHostPage(null);
@@ -2637,6 +2661,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     showAgents();
     setCreating(true);
   }
+  useWorkspaceShortcuts({
+    newAgent: () => {
+      if (!createSupported()) return false;
+      startCreate();
+      return true;
+    },
+    toggleSidebar: () => {
+      if (phone()) return false;
+      if (layout.sidebarClosed()) layout.expandSidebar();
+      else closeSidebar();
+      return true;
+    },
+    showShortcuts: () => {
+      setKeyboardFocusRequest(++keyboardFocusNonce);
+      openAccountSettings();
+      return true;
+    },
+  });
   const railPage = (): PageRailPage | null => {
     const current = page();
     if (current === "agents") return "agents";
@@ -2709,6 +2751,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         }
         busy={workspace.state.status === "connecting" || !workspace.state.host}
         onRetry={() => void workspace.run(workspace.reconnect)}
+        onWaitedLong={cover ? setLoadingWaitedLong : undefined}
         onManage={() => setBillingOpen(true)}
         upsell={offlineUpsell()}
       />
@@ -2733,7 +2776,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           }
         >
           <WindowBackdrop pages="srcdoc" />
-          <div class="app-window web-app-window">
+          <div
+            class="app-window web-app-window"
+            data-loading-waited-long={loadingCover() && loadingWaitedLong() ? "" : undefined}
+          >
             <PageRail
               hidden={false}
               logo={{ variant: "production", href: "/" }}
@@ -2797,6 +2843,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               data-web-mobile-pane={mobilePane()}
               compact={compact()}
               blockedServer={blockedServer()}
+              paywall={paywall}
               planDeletesAt={hostedServers.planDeletesAt}
               onRenewPlan={hostedServers.renewPlan}
               initialLoading={hostOffline()}
@@ -3048,7 +3095,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       {...serverActionCallbacks}
                     />
                   </Show>
-                  <Show when={!planScreenShown()}>
+                  <Show when={!planScreenShown() && !paywall.server()}>
                     <Sidebar
                       agentsConnecting={!noHost() && !workspace.state.agentsLoaded}
                       channels={sidebarChannels().filter((channel) => !channel.archived)}
@@ -3293,6 +3340,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onSignOut={signOut}
                         notifications={notificationSettings}
                         notificationFocusRequest={notificationFocusRequest()}
+                        keyboardFocusRequest={keyboardFocusRequest()}
                       />
                     </Loading>
                   </Show>

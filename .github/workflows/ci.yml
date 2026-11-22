@@ -442,6 +442,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-waits-tools
 
+      - name: Run the side-thread open-wait E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-waits-side-thread
+
       - name: Run the browser takeover deadline E2E test
         if: ${{ !cancelled() }}
         run: bun run test:browser-takeover-deadline
@@ -570,6 +574,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:routine-report-failure
 
+      - name: Run the routine skipped runs report E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:routine-skipped-runs-report
+
       - name: Run the agent webhook routine E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-webhook-routine
@@ -585,6 +593,10 @@ jobs:
       - name: Run the Library folders agent tool E2E test
         if: ${{ !cancelled() }}
         run: bun run test:library-folders
+
+      - name: Run the workflow folders E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-folders
 
       - name: Run the agent workflow gate E2E test
         if: ${{ !cancelled() }}
@@ -633,6 +645,14 @@ jobs:
       - name: Run the Claude late steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:claude-late-steer
+
+      - name: Run the Claude steer during a tool call E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-steer-now
+
+      - name: Run the Claude message during a question E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:question-steer-order
 
       - name: Run the provider session reuse E2E test
         if: ${{ !cancelled() }}
@@ -706,6 +726,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-failing-session
 
+      - name: Run the Gemini account verification link E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-verification-link
+
       - name: Run the Gemini Windows zip E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-windows-zip
@@ -741,6 +765,10 @@ jobs:
       - name: Run the workflow agent step E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-agent-step
+
+      - name: Run the workflow answers E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-answers
 
       - name: Run the workflow schedule E2E test
         if: ${{ !cancelled() }}
@@ -835,6 +863,7 @@ jobs:
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
             .openbot-build/agent-waits-tools-e2e/
+            .openbot-build/agent-waits-side-thread-e2e/
             .openbot-build/browser-takeover-deadline-e2e/
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/agent-create-retry-e2e/
@@ -866,10 +895,12 @@ jobs:
             .openbot-build/usage-read-pacing-e2e/
             .openbot-build/routine-fresh-session-e2e/
             .openbot-build/routine-report-failure-e2e/
+            .openbot-build/routine-skipped-runs-report-e2e/
             .openbot-build/agent-webhook-routine-e2e/
             .openbot-build/agent-channel-manage-e2e/
             .openbot-build/agent-channel-create-e2e/
             .openbot-build/library-folders-e2e/
+            .openbot-build/workflow-folders-e2e/
             .openbot-build/agent-workflow-gate-e2e/
             .openbot-build/pinned-message-agent-tool-e2e/
             .openbot-build/messaging-owner-card-e2e/
@@ -882,6 +913,8 @@ jobs:
             .openbot-build/claude-background-hold-e2e/
             .openbot-build/claude-turn-context-e2e/
             .openbot-build/claude-late-steer-e2e/
+            .openbot-build/claude-steer-now-e2e/
+            .openbot-build/question-steer-order-e2e/
             .openbot-build/provider-session-reuse-e2e/
             .openbot-build/backup-model-failover-e2e/
             .openbot-build/codex-empty-lead-turn-e2e/
@@ -897,6 +930,7 @@ jobs:
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/antigravity-quota-failover-e2e/
             .openbot-build/antigravity-failing-session-e2e/
+            .openbot-build/antigravity-verification-link-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
@@ -905,6 +939,7 @@ jobs:
             .openbot-build/workflow-agent-tools-e2e/
             .openbot-build/workflow-join-e2e/
             .openbot-build/workflow-agent-step-e2e/
+            .openbot-build/workflow-answers-e2e/
             .openbot-build/provider-image-mime-e2e/
             .openbot-build/workflow-step-settings-e2e/
             .openbot-build/discord-github-files-e2e/

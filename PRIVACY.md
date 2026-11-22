@@ -570,7 +570,7 @@ account service stores a hash of the token of that request and the time of the l
 no customer data. The account service stores the Leaseweb server ID with the server. So that an operator can
 find the server in the Leaseweb portal, the operator gives it a reference in Leaseweb: your account
 email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
-delete the server, when its plan is cancelled with a refund, or 14 days after its plan ends with no renewal, the account service deletes the old
+delete the server, when its plan is cancelled with a refund, when a payment of a plan less than 30 days old is disputed, or 14 days after its plan ends with no renewal, the account service deletes the old
 sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
 its reference to `pool`.
 
@@ -895,6 +895,10 @@ message to a private Discord channel of the OpenBot team, through a Discord webh
 your account email, the plan or the license tier and its number of users, the billing period, the
 currency, and the list amount or the amount of the payment. It has no card data, no Stripe ID and no
 server ID. Discord keeps the message under its own policy.
+
+When your hosted server plan ends and the OpenBot team stores the data of the server in its archive,
+the same channel gets one message with your account email, the plan, the first 8 characters of the
+server ID, the size of the archive and the ID of the machine.
 
 ## Data stored on the OpenBot computer
 

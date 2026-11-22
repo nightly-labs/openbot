@@ -235,7 +235,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Un'attesa ha bisogno di un messaggio per continuare. Questo turno non ha messaggi.",
   "error.backend.agentWaitOwnChatOnly":
-    "Apri un'attesa solo nella tua chat. Un canale o un'attività di messaggistica non può attendere.",
+    "Apri un'attesa nella tua chat o in un thread laterale. Una conversazione di canale o di messaggistica non può attendere.",
   "error.backend.agentWaitNoteRequired": "Scrivi una breve nota che spieghi a cosa serve l'attesa.",
   "error.backend.agentWaitRoutineGone": "Questo agente non ha una routine con questo id.",
   "error.backend.agentWaitNoRoutine":
@@ -346,6 +346,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "La cartella non esiste o è già stata eliminata.",
   "error.backend.libraryFolderOtherAgent": "Un file può andare solo in una cartella del suo agente.",
   "error.backend.libraryFolderMoveInvalid": "Questa cartella non può essere spostata lì.",
+  "error.backend.workflowFolderLimit": "Un server può avere al massimo {limit} cartelle di workflow.",
+  "error.backend.workflowFolderPlacementLimit": "Ci sono troppi workflow nelle cartelle.",
   "error.backend.sectionNameDuplicate": "I nomi delle sezioni devono essere univoci.",
   "error.backend.directMessageRequired": "Scrivi prima un messaggio.",
   "error.backend.directMessageTooLong": "Un messaggio diretto può avere fino a {limit} caratteri.",
@@ -378,6 +380,7 @@ export const messages = {
     "Solo l'app OpenBot del telefono può inviare questa segnalazione, perché aggiunge la versione e il log di assistenza del telefono. Apri questa chat sul telefono. Se vedi questo messaggio lì, aggiorna l'app del telefono.",
   "error.backend.takeoverInactive": "Questo intervento nel browser non è più attivo.",
   "error.backend.authSubmitting": "L'invio dell'autenticazione è già in corso.",
+  "error.backend.apiKeyListFailed": "OpenBot non è riuscito a leggere le chiavi API salvate.",
   "error.backend.apiKeySaveFailed": "OpenBot non è riuscito a salvare la chiave API. Riprova.",
   "error.backend.apiKeySaving": "La chiave API è già in fase di salvataggio.",
   "error.backend.apiKeyAnswerUnreadable":

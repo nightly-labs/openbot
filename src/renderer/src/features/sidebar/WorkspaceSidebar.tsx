@@ -6,6 +6,7 @@ import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
+import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { sidebarChannelWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
@@ -67,7 +68,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   );
   const { openServerSettings, serverSettingsOpen } = useServerSettings();
   const serverActions = useServerActions();
-  const { openAppSettings, setSkillsMarketplaceOpen } = useSettings();
+  const { openMobileInstall, setSkillsMarketplaceOpen } = useSettings();
   const {
     agentList,
     agentListConnecting,
@@ -77,6 +78,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     duplicatingAgentIds,
     openAgentSetup,
     userHiddenAgents,
+    userHiddenAgentIds,
     userPausedAgentIds,
     userHiddenAgentsWork,
     mutedAgentIds,
@@ -137,6 +139,13 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   } = useSidebar();
   const [mobileAppDismissed, setMobileAppDismissed] = createSignal(
     window.localStorage.getItem(MOBILE_APP_DISMISSED_STORAGE_KEY) === "true",
+  );
+  const mobileAppCrew = createMemo(() =>
+    sidebarAgentOrder(agentList(), {
+      layout: sidebarLayout(),
+      pinnedItems: pinnedSidebarItems(),
+      hiddenAgentIds: userHiddenAgentIds(),
+    }).filter((agent) => !userHiddenAgentIds().has(agent.id)),
   );
   const communityCard = createCommunityCardVisibility();
   const alertCards = createSidebarAlertCards(activeServer);
@@ -209,7 +218,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         chatHistory={{
           back: backTarget(),
           forward: chatName(chatHistory.next()),
-          keys: chatHistoryKeys(platform.appInfo()?.platform === "darwin"),
+          keys: chatHistoryKeys(t),
           onBack: chatHistory.goBack,
           onForward: chatHistory.goForward,
         }}
@@ -311,7 +320,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             />
             <Show when={!platform.landingPreview && !alertCards.shown() && !mobileAppDismissed()}>
               <SidebarMobileAppCard
-                onOpenInstall={() => openAppSettings(null, "mobile-connect")}
+                agents={mobileAppCrew()}
+                onInstall={(phone) => openMobileInstall(phone)}
                 onDismiss={() => {
                   window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
                   setMobileAppDismissed(true);

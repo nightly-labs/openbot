@@ -85,6 +85,7 @@ import { billingIpcHandlers } from "./ipc/billing-handlers";
 import { bitwardenConnectorIpcHandlers } from "./ipc/bitwarden-connector-handlers";
 import { browserDockIpcHandlers } from "./ipc/browser-dock-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
+import { channelFolderIpcHandlers } from "./ipc/channel-folder-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
@@ -708,6 +709,7 @@ function registerIpcHandlers({
   mailbox,
   browser,
   browserPictureInPicture,
+  detachedBrowserWindow,
   localSignIn,
   browserDock,
   browserView,
@@ -724,6 +726,7 @@ function registerIpcHandlers({
   agentHostSettings,
   agentDefaultsSettings,
   agentFolders,
+  channelFolders,
   agentInstructions,
   browserProfiles,
   language,
@@ -797,6 +800,7 @@ function registerIpcHandlers({
   computerUsePermissionHelp,
   storageUsage,
   libraryFoldersService,
+  workflowFoldersService,
   machineAlerts,
   trace,
   resourceMonitor,
@@ -892,6 +896,12 @@ function registerIpcHandlers({
       getMainWindow: getDialogParent,
       translate: language.translate,
     }),
+    ...channelFolderIpcHandlers({
+      folders: channelFolders,
+      remoteServers,
+      getMainWindow: getDialogParent,
+      translate: language.translate,
+    }),
     ...agentInstructionsIpcHandlers({ files: agentInstructions, remoteServers }),
     ...hostedSiteIpcHandlers({
       hostedSites,
@@ -972,7 +982,13 @@ function registerIpcHandlers({
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
-    ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
+    ...workflowIpcHandlers({
+      workflows,
+      events,
+      github: workflowGitHub,
+      workflowFolders: workflowFoldersService,
+      remoteServers,
+    }),
     ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
@@ -1076,7 +1092,14 @@ function registerIpcHandlers({
       modelVisibility,
       closeChatNotifications,
     }),
-    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
+    ...browserIpcHandlers({
+      browserPictureInPicture,
+      detachedBrowserWindow,
+      browser,
+      remoteServers,
+      browserView,
+      localSignIn,
+    }),
   });
 }
 

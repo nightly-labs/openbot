@@ -32,11 +32,15 @@ import {
   type BitwardenConnectorStatus,
   type BitwardenHostConnectInput,
   type BrowseAgentFoldersInput,
+  type BrowseChannelFoldersInput,
   type BrowserProfileList,
   type BrowserProfileSummary,
   type BrowserProxyList,
   type BrowserProxySummary,
   type CancelMcpSignInInput,
+  type ChannelFolderChange,
+  type ChannelFolderInput,
+  type ChannelFolderList,
   type ChatColors,
   type ClaudeCompactWindowSetting,
   type ClearBrowserDataInput,
@@ -64,6 +68,8 @@ import {
   decodeBrowserProfileSummary,
   decodeBrowserProxyList,
   decodeBrowserProxySummary,
+  decodeChannelFolderChangeFromMain,
+  decodeChannelFolderListFromMain,
   decodeChannelStorageUsage,
   decodeCustomAgentResult,
   decodeCustomAgentSummaries,
@@ -305,6 +311,7 @@ import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bit
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CHANNEL_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   CLAUDE_COMPACT_WINDOW_ROUTES,
@@ -1789,6 +1796,33 @@ export function browseAgentFolders(
   input: BrowseAgentFoldersInput,
 ): Effect.Effect<AgentFolderBrowse, TeamAdminRequestError> {
   return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, { ...input }));
+}
+
+export function readChannelFolders(
+  request: TeamApiRequest,
+  channelId: string,
+): Effect.Effect<ChannelFolderList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.read, decodeChannelFolderListFromMain, { channelId }));
+}
+export function addChannelFolder(
+  request: TeamApiRequest,
+  input: ChannelFolderInput,
+): Effect.Effect<ChannelFolderChange, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.add, decodeChannelFolderChangeFromMain, { ...input }));
+}
+export function removeChannelFolder(
+  request: TeamApiRequest,
+  input: ChannelFolderInput,
+): Effect.Effect<ChannelFolderChange, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CHANNEL_FOLDERS_ROUTES.remove, decodeChannelFolderChangeFromMain, { ...input }),
+  );
+}
+export function browseChannelFolders(
+  request: TeamApiRequest,
+  input: BrowseChannelFoldersInput,
+): Effect.Effect<AgentFolderBrowse, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, { ...input }));
 }
 
 function decodeHiddenAgents(value: unknown): HiddenAgentsSnapshot {

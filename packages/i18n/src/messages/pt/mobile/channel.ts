@@ -78,6 +78,9 @@ export const messages = {
   "mobile.channel.form.deselectAll": "Desmarcar tudo",
   "mobile.channel.form.memories": "Memórias",
   "mobile.channel.form.routines": "Rotinas",
+  "mobile.channel.folders.description":
+    "Todos os membros de {channel} podem alterar arquivos e executar comandos nestas pastas.",
+  "mobile.channel.folders.removeBody": "Os membros de {channel} não podem mais alterar arquivos em {folder}",
   "mobile.channel.form.deleteTitle": "Excluir canal?",
   "mobile.channel.form.deleteBody":
     "Isso para o canal. O histórico continua em Canais excluídos, somente para visualização. Você pode restaurá-lo de lá. Os agentes membros são mantidos.",

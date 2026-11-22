@@ -24,6 +24,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Скачайте модель синтеза речи в разделе «Настройки» → «Голос».",
   "error.voice.speech.timedOut": "Время чтения ответа вслух истекло.",
   "error.voice.speech.failed": "OpenBot не смог прочитать ответ вслух.",
+  "error.voice.speech.providerRefused": "{provider} отказался создать аудио: {reason}",
   "error.voice.recordingNotKept": "OpenBot не смог сохранить голосовую запись.",
   "error.voice.live.timedOut": "Живой голос Codex не запустился вовремя. Попробуйте ещё раз.",
   "error.voice.live.failed": "Живой голос остановлен: {reason}",

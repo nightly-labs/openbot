@@ -202,7 +202,7 @@ export const messages = {
     "该助手已有 {count} 个未关闭的等待。请先用 openbot.close_wait 关闭一个等待，再开启新的等待。",
   "error.backend.agentWaitGone": "该等待未开启：可能是助手自己关闭了，或被他人取消。",
   "error.backend.agentWaitNoRequest": "等待需要一条消息才能继续，而本轮对话没有消息。",
-  "error.backend.agentWaitOwnChatOnly": "只能在自己的对话中开启等待。频道或消息任务无法等待。",
+  "error.backend.agentWaitOwnChatOnly": "请在自己的对话或侧边线程中开启等待。频道或消息对话无法等待。",
   "error.backend.agentWaitNoteRequired": "请用一句简短说明写清这个等待是为了什么。",
   "error.backend.agentWaitRoutineGone": "该助手没有这个 id 的自动化任务。",
   "error.backend.agentWaitNoRoutine":
@@ -301,6 +301,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "该文件夹不存在或已被删除。",
   "error.backend.libraryFolderOtherAgent": "文件只能放入其所属助手的文件夹。",
   "error.backend.libraryFolderMoveInvalid": "无法将此文件夹移到那里。",
+  "error.backend.workflowFolderLimit": "一台服务器最多可有 {limit} 个工作流文件夹。",
+  "error.backend.workflowFolderPlacementLimit": "文件夹中的工作流过多。",
   "error.backend.sectionNameDuplicate": "分区名称必须唯一。",
   "error.backend.directMessageRequired": "请先写下消息内容。",
   "error.backend.directMessageTooLong": "私信最多可有 {limit} 个字符。",
@@ -334,6 +336,7 @@ export const messages = {
     "只有 OpenBot 手机应用可以发送这份报告，因为它会附上手机的版本和支持日志。请在手机上打开此对话。如果在手机上也看到这条消息，请更新手机应用。",
   "error.backend.takeoverInactive": "该浏览器接管已不再有效。",
   "error.backend.authSubmitting": "身份验证正在提交中。",
+  "error.backend.apiKeyListFailed": "OpenBot 无法读取已保存的 API 密钥。",
   "error.backend.apiKeySaveFailed": "OpenBot 无法保存 API 密钥，请重试。",
   "error.backend.apiKeySaving": "API 密钥正在保存中。",
   "error.backend.apiKeyAnswerUnreadable":

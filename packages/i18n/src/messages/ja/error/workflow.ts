@@ -20,6 +20,9 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "エージェントはこのステップに回答する前に停止しました。ステップをもう一度実行してください。",
   "error.workflow.conditionUnclear": "モデルが「はい」か「いいえ」で回答しませんでした。",
+  "error.workflow.answerInvalid":
+    "回答に、このステップが求めるフィールドがありませんでした: {fields}。ステップをもう一度実行してください。",
+  "error.workflow.checkInvalid": "このステップのチェックが無効です。修正してから、ステップをもう一度実行してください。",
   "error.workflow.modelFailed": "モデルが回答できませんでした。ステップをもう一度実行してください。",
   "error.workflow.modelTimedOut":
     "モデルが時間内に回答しませんでした。このステップの推論レベルを下げるか、より速いモデルを選んでから、もう一度実行してください。",

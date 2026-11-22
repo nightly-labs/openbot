@@ -108,7 +108,9 @@ agent can hold the result that the user asked for, so it is never quiet.
 A quiet turn can start background work, such as a background command or subagent. When it ends while
 no turn runs, Claude starts a turn of its own to answer it, and no delivery started that turn. The
 Claude client keeps the turn that started each background task (`task_started`), and the turn that
-answers it names those turns (`continues` on `turn/started`). When each of them ended quiet, the
+answers it names those turns (`continues` on `turn/started`). A task that a subagent starts for itself
+(`owned_by_subagent`) is not counted: its end does not wake the agent. A task that a subagent starts as
+its own subagent (`parent_task_id`) counts for the turn that started that subagent. When each of them ended quiet, the
 turn can end quiet in the same way: the no-update tool accepts the call, and its text answers become
 quiet answers (#10847). Work that ends while that turn runs goes to it too
 (`openbot/turn-continues`). Work of a person's request, or of an unknown turn, keeps the answer in
@@ -222,7 +224,12 @@ routine thread and the chat of one agent can then drive the screen at the same t
 can. A channel thread keeps Computer Use too (see [channels](channels-and-messaging.md)). Only
 `start_task` tasks and branches run without it. The runs of a routine thread also keep the tools of
 the chat that side threads do not have: `OpenBotToolRouter` does not count a routine thread as an
-execution thread, so a run can call `await_event` and `start_task`.
+execution thread, so a run can call `await_event` and `start_task`. A side thread that the user
+opened can call `await_event` too, but not `start_task`. A thread that the agent started cannot. A wait keeps no thread column: `AgentWaits`
+finds the side thread from the mailbox message of the wait's request. `RoutineScheduler` sends a run
+that names the wait to that side thread, and gives each other side thread with woken waits its own
+routine message (`#wakeInSideThread`). That message continues the wait and does not run the routine task
+again. A failure there keeps the wait in the run's place and does not fail the run. `AgentTasks.waitThread` opens an archived side thread again.
 
 A routine run (in its thread, or in the agent's own chat) does not resume a provider session.
 `DrainScheduler.startDelivery` starts a new session for each run with
@@ -362,6 +369,26 @@ changed, on this computer and on a joined host.
   replies to (`discordTriggerFiles` in `discord-matching.ts`). GitHub has no attachment API for an App
   token, so `attachFiles` in `github-rest.ts` commits them, before the change is recorded as sent, with the Git Data API to the orphan `openbot-attachments` branch, which has no workflow files
   and so starts no Actions. A file that it cannot copy keeps its Discord link, which expires.
+- Typed answers (`ipc-workflow-answers.ts` in the contracts, `workflow-answers.ts` in the backend) are
+  plain text in `node.fields`, so the wire and the database do not change, and a client that does not
+  know them keeps them. `answer` on an agent, a model step or a webhook trigger lists the fields of
+  its answer, one for each line as `name: type`: `text`, `number`, `yes/no`, `list`, or labels such as
+  `high|normal|low`; `name?` is optional. A model step asks for one JSON object and tries once more
+  with the problems; an agent step gets one more handoff (key `workflow-step:<id>:answer`) and then
+  fails with `answerInvalid`. The step keeps the checked JSON as its output. A webhook trigger checks
+  the request body when it arrives and answers 400 when a field is missing or wrong. `check` on a
+  condition (`priority = high and count > 2`, `urgent`, `not done`, `title contains "refund"`, joined
+  with `and` and `or`) tests the answers before it and makes no model call. `{{name}}` in an agent
+  task, a model prompt or system text, or an approval question takes the value of that field. Only
+  the names that a connected step before it declares are replaced; other `{{...}}` text stays as it
+  is. Text and list values come in JSON quotes, because they can hold text from outside OpenBot, also
+  when a model or an agent copies webhook text into its answer. A step reads the answers of the connected steps before it, through conditions and
+  approvals, in run order (`workflowAnswerSources`); an output shows them as `name: value` lines.
+  In a manual run, the trigger reads its answer from the run input as a JSON object.
+  `edit_workflow` refuses an edit that adds an answer problem (`workflowAnswerProblems`) and tells
+  the agent how to correct it; an unknown `{{name}}` only adds a note to the result. The canvas edits
+  these fields from the node toolbar and shows the same problems on the node, only on a host with
+  `workflows-answers-v1`.
 - A restart keeps approvals and agent steps, because their state is in the database and the
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a
@@ -946,7 +973,11 @@ by the user. A turn whose results each come after an answer of the same teammate
 request that an earlier finished turn already took (`MailboxStore.answersHandledRequest`) also ends
 quietly, with the same or new text (#13130, #13746): the requester already had a result to act on,
 and an empty turn means that it has nothing to add, as OpenClaw and Hermes Agent treat an empty turn
-for a sub-agent result. The later answer stays in the chat. An OpenBot note for a failed request does
+for a sub-agent result. The later answer stays in the chat. A turn whose results restart recovery each gave again after a restart
+(`restartedResult`, #12039) ends quietly too (#14330) when each result was `running` in a provider turn
+before the restart (`restartedTurnId`): the requester can have taken them in that turn, and the turn note tells it
+to check its earlier work. A result that was only `starting`, also a steer that the provider did not confirm, keeps the retry and
+the error. An OpenBot note for a failed request does
 not count as an earlier answer, so the first real result after it still fails as above. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
 error. With no backup, a turn that only teammate results started runs once more on the same model.
@@ -1027,6 +1058,22 @@ external chat turn the rule is left out: there the turn's answer is still due. T
 ID, so the history import finds the delivery without `teammatePrompts`. A routine run gets no block. A slash command from the person gets none, as at the
 start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
 block.
+
+Claude Code holds a plain steer until the running tool call ends, and a subagent is one tool call. An
+agent that gave its work to a subagent therefore read the steer only after the subagent was done, and
+answered that it was too late. While a main-thread tool call is open, `ClaudeAgentClient` sends the
+steer with `priority: "now"`. Claude Code then stops the turn (`terminal_reason` `aborted_tools`):
+it moves a running shell command to the background and stops other tools, a subagent included, and
+starts a new turn with the steer. The aborted result does not list the steer's uuid
+(`untakenSteerIds`), so the client closes the open tool calls, aborts its open host tool calls
+(`hostToolCalls`, so the host removes their approval cards), and keeps the OpenBot turn open. The
+result of the steer's turn completes it. A stop from the person (`stopRequested`) still ends the turn
+as interrupted. While a question, an elicitation or a write approval waits for the person
+(`personRequests`), the steer has no priority: the open card stays the one that Claude waits for, and
+the steer arrives after the answer. A shell command that runs one script cannot change its plan: the
+steer reaches the model when the script is done. `scripts/claude-steer-now-e2e.ts` checks the turn
+with a stand-in CLI, `scripts/question-steer-order-e2e.ts` checks the order during a question, and
+`scripts/steer-framing-bench.ts` measures the real CLIs.
 
 A message from another agent follows the recipient's busy-message mode, as a message from the person
 does: a request, an answer, a requested result, or a notice. When the mode is "steer", the provider

@@ -83,7 +83,12 @@ import {
   toPublicTab,
 } from "./browser-host-tab";
 import { BrowserHintRequests, sessionBrowserUserAgent } from "./browser-identity";
-import { describeBrowserTarget, navigateAndWait, waitForLoading } from "./browser-navigation";
+import {
+  describeBrowserTarget,
+  isCommittedNavigationTimeout,
+  navigateAndWait,
+  waitForLoading,
+} from "./browser-navigation";
 import {
   browserLoadOptions,
   browserRequestHeaders,
@@ -530,6 +535,7 @@ export class BrowserHost {
   #bounds: BrowserBounds | null = null;
   #attachedView: WebContentsView | null = null;
   #pictureInPictureWindow: BrowserWindow | null = null;
+  #pictureInPictureShortcuts = false;
   #pictureInPictureOverlayView: WebContentsView | null = null;
   #mainPageListener: ((page: BrowserMainPage | null) => void) | null = null;
   #target: BrowserViewTarget = "main";
@@ -919,8 +925,9 @@ export class BrowserHost {
     return { tabs: this.listTabs(), activeTabId: this.#activeTabId };
   }
 
-  setPictureInPictureWindow(window: BrowserWindow | null): void {
+  setPictureInPictureWindow(window: BrowserWindow | null, options: { shortcuts?: boolean } = {}): void {
     this.#pictureInPictureWindow = window;
+    this.#pictureInPictureShortcuts = window !== null && options.shortcuts === true;
     if (!window && this.#target === "picture-in-picture") {
       this.#visible = false;
       this.#target = "main";
@@ -1018,7 +1025,10 @@ export class BrowserHost {
           tab.contents,
           () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
           null,
-        ).pipe(Effect.ensuring(Effect.sync(() => (tab.opening = false))));
+        ).pipe(
+          Effect.catchIf(isCommittedNavigationTimeout, () => Effect.void),
+          Effect.ensuring(Effect.sync(() => (tab.opening = false))),
+        );
         if (focus) {
           this.#focusTab(tab);
           setImmediate(() => this.#focusTab(tab));
@@ -1085,6 +1095,7 @@ export class BrowserHost {
     tabId: string,
     direction: BrowserNavigationDirection,
   ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaveSilentPage(tabId, direction);
     yield* this.#enqueue(tabId, (tab) =>
       Effect.gen({ self: this }, function* () {
         yield* untilStopped(
@@ -1101,6 +1112,7 @@ export class BrowserHost {
     url: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
+    yield* this.#leaveSilentPage(tabId);
     yield* this.#enqueue(
       tabId,
       (tab) =>
@@ -1128,6 +1140,7 @@ export class BrowserHost {
     this: BrowserHost,
     tabId: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaveSilentPage(tabId);
     yield* this.#enqueue(
       tabId,
       (tab) =>
@@ -1490,7 +1503,6 @@ export class BrowserHost {
     const protection = { origin: url.origin, submitted: false, replaced: false, running: false };
     tab.secret = protection;
     stopCookieBanners(tab.contents);
-    this.#invalidateViews(tab);
     this.#syncAttachedView();
     return yield* Effect.gen({ self: this }, function* () {
       const entry = yield* this.#enqueue(
@@ -1941,6 +1953,7 @@ export class BrowserHost {
     const active = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
     if (active && input.visible) yield* this.#wake(active);
     yield* browserSync(() => {
+      if (!input.visible && input.target !== undefined && input.target !== this.#target) return;
       const restoreRendererFocus = !input.visible && this.#attachedView?.webContents.isFocused();
       this.#visible = input.visible;
       if (input.bounds) this.#bounds = validateBounds(input.bounds);
@@ -2181,9 +2194,20 @@ export class BrowserHost {
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
     yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser view"));
-    const generation = tab.captureGeneration;
+    let generation = tab.captureGeneration;
     let invalidated = false;
+    let stopped = false;
+    let stopStream: (() => Effect.Effect<void>) | undefined;
+    let resume: Deferred.Deferred<void> | undefined;
+    let paused: Fiber.Fiber<void> | undefined;
+    let sequence = 0;
     let lastCursor: BrowserViewCursor | null = null;
+    const showsPage = (streamGeneration: number) =>
+      streamGeneration === generation &&
+      !tab.secret?.submitted &&
+      !tab.filledCard &&
+      !tab.secretShown &&
+      tab.captureGeneration === streamGeneration;
     const cursorChanged = (_event: unknown, type: string) => {
       if (tab.secret?.submitted || tab.captureGeneration !== generation) return;
       const cursor = browserViewCursor(type);
@@ -2194,16 +2218,16 @@ export class BrowserHost {
     const stopCursor = () => {
       if (onCursor && !tab.contents.isDestroyed()) tab.contents.off("cursor-changed", cursorChanged);
     };
-    const invalidate = () => {
+    const end = (reason: string) => {
       invalidated = true;
       tab.viewInvalidations.delete(invalidate);
       stopCursor();
-      onEnded?.("Authentication changed the browser view. Open a new view to continue.");
+      onEnded?.(reason);
     };
-    tab.viewInvalidations.add(invalidate);
-    if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
-    return yield* Effect.gen({ self: this }, function* () {
-      const stop = yield* tab.engine.startScreencast(
+    const endForAuthentication = () => end("Authentication changed the browser view. Open a new view to continue.");
+    const tabGone = () => tab.closing || tab.contents.isDestroyed() || this.#tabs.get(tab.id) !== tab;
+    const openStream = (streamGeneration: number) =>
+      tab.engine.startScreencast(
         {
           quality: VIEW_FRAME_QUALITY,
           maxWidth: VIEW_FRAME_MAX_WIDTH,
@@ -2212,37 +2236,74 @@ export class BrowserHost {
           ...(onPageCopy
             ? {
                 onPageCopy: (text: string) => {
-                  if (
-                    !tab.secret?.submitted &&
-                    !tab.filledCard &&
-                    !tab.secretShown &&
-                    tab.captureGeneration === generation
-                  )
-                    onPageCopy(text);
+                  if (showsPage(streamGeneration)) onPageCopy(text);
                 },
               }
             : {}),
         },
         (frame) => {
-          if (!tab.secret?.submitted && !tab.filledCard && !tab.secretShown && tab.captureGeneration === generation)
-            onFrame(frame);
+          if (!showsPage(streamGeneration)) return;
+          sequence += 1;
+          onFrame({ ...frame, sequence });
         },
         (error) => {
+          if (streamGeneration !== generation) return;
           tab.viewInvalidations.delete(invalidate);
           stopCursor();
           logger.warn("The live browser view stopped.", { error: toLogValue(error) });
           onEnded?.("The live browser view stopped. Open a new view to continue.");
         },
       );
-      let stopped = false;
+    const pauseUntilProtectionEnds = (previous: () => Effect.Effect<void>) => {
+      const protectionEnded = Deferred.makeUnsafe<void>();
+      const stopListening = this.onChanged(() => {
+        if (tabGone() || !tab.secret?.running) Deferred.doneUnsafe(protectionEnded, Effect.void);
+      });
+      const release = () => {
+        stopListening();
+        if (resume !== protectionEnded) return;
+        resume = undefined;
+        paused = undefined;
+      };
+      resume = protectionEnded;
+      paused = Effect.runFork(
+        Effect.gen(function* () {
+          yield* previous();
+          yield* Deferred.await(protectionEnded);
+          stopListening();
+          if (stopped) return;
+          if (tabGone() || tab.secret?.submitted || tab.filledCard || tab.secretShown) return endForAuthentication();
+          const streamGeneration = tab.captureGeneration;
+          generation = streamGeneration;
+          stopStream = yield* openStream(streamGeneration);
+          if (stopped) return;
+          release();
+          if (!showsPage(streamGeneration) || tabGone()) invalidate();
+        }).pipe(
+          Effect.catchCause(() => Effect.sync(endForAuthentication)),
+          Effect.ensuring(Effect.sync(release)),
+        ),
+      );
+    };
+    const invalidate = () => {
+      if (paused) return;
+      if (!stopStream || stopped || !tab.secret?.submitted || tab.filledCard) return endForAuthentication();
+      pauseUntilProtectionEnds(stopStream);
+    };
+    tab.viewInvalidations.add(invalidate);
+    if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
+    return yield* Effect.gen({ self: this }, function* () {
+      stopStream = yield* openStream(generation);
       const stopOnce = () =>
         Effect.gen({ self: this }, function* () {
           tab.viewInvalidations.delete(invalidate);
           stopCursor();
           if (stopped) return;
           stopped = true;
+          if (resume) Deferred.doneUnsafe(resume, Effect.void);
+          if (paused) yield* Fiber.await(paused);
           tab.engine.releaseViewButton();
-          yield* stop();
+          if (stopStream) yield* stopStream();
         });
       if (invalidated) yield* stopOnce();
       return stopOnce;
@@ -2856,6 +2917,9 @@ export class BrowserHost {
   ) {
     const { url, direction } = args;
     if (!url && !direction) return yield* browserFailure(new Error("navigate requires url or direction."));
+    if (url) yield* browserSync(() => normalizeBrowserUrl(url));
+    if (!this.#takeoverTabIds.has(tabId) && !this.#userControlTabIds.has(tabId))
+      yield* this.#leaveSilentPage(tabId, url ? undefined : direction);
     return yield* this.#runAction(
       tabId,
       "navigate",
@@ -3638,12 +3702,10 @@ export class BrowserHost {
         this.#collapseOnEscape(tab);
         return;
       }
-      if (
-        isBrowserViewShortcut(input, process.platform === "darwin") &&
-        this.#mountedViews.get(tab.view) === this.#window
-      ) {
+      const shortcutWindow = this.#shortcutWindow(tab.view);
+      if (isBrowserViewShortcut(input, process.platform === "darwin") && shortcutWindow) {
         event.preventDefault();
-        this.#forwardKeyToWindow(input);
+        this.#forwardKeyToWindow(input, shortcutWindow);
         return;
       }
       if (!isCloseBrowserTabShortcut(input)) return;
@@ -3729,6 +3791,7 @@ export class BrowserHost {
     contents.on("page-title-updated", changed);
     contents.on("render-process-gone", (_event, details) => {
       if (tab.closing || tab.contents !== contents || contents.isDestroyed() || details.reason === "clean-exit") return;
+      if (tab.endingSilentPage) return;
       tab.crashes = (tab.crashes ?? 0) + 1;
       if (tab.secret) return;
       const reload =
@@ -3887,17 +3950,23 @@ export class BrowserHost {
     });
   }
 
-  #forwardKeyToWindow(input: Input): void {
-    if (this.#window.isDestroyed()) return;
+  #shortcutWindow(view: WebContentsView): BrowserWindow | null {
+    const mounted = this.#mountedViews.get(view);
+    if (mounted === this.#window) return mounted;
+    return this.#pictureInPictureShortcuts && mounted === this.#pictureInPictureWindow ? mounted : null;
+  }
+
+  #forwardKeyToWindow(input: Input, window: BrowserWindow = this.#window): void {
+    if (window.isDestroyed()) return;
     const keyCode = FORWARDED_KEY_CODES[input.key] ?? (input.key.length === 1 ? input.key.toUpperCase() : input.key);
     const modifiers: Array<"shift" | "control" | "alt" | "meta"> = [];
     if (input.shift) modifiers.push("shift");
     if (input.control) modifiers.push("control");
     if (input.alt) modifiers.push("alt");
     if (input.meta) modifiers.push("meta");
-    this.#window.webContents.focus();
-    this.#window.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
-    this.#window.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+    window.webContents.focus();
+    window.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+    window.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
   }
 
   #collapseOnEscape(tab: BrowserHostTab): void {
@@ -4193,7 +4262,8 @@ export class BrowserHost {
       const contents = this.#tabs.get(tabId)?.contents;
       if (!contents || contents.isDestroyed()) return;
       const gone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails) => {
-        if (details.reason !== "clean-exit") resume(Effect.succeed({ status: "page_crashed" }));
+        if (details.reason !== "clean-exit" && !this.#tabs.get(tabId)?.endingSilentPage)
+          resume(Effect.succeed({ status: "page_crashed" }));
       };
       contents.on("render-process-gone", gone);
       return Effect.sync(() => contents.off("render-process-gone", gone));
@@ -4287,6 +4357,36 @@ export class BrowserHost {
     const { title, url } = toPublicTab(tab);
     return { title: tab.engine.scrubText(title), url: tab.engine.scrubText(url) };
   }
+
+  readonly #leaveSilentPage = Effect.fn("BrowserHost.leaveSilentPage")(function* (
+    this: BrowserHost,
+    tabId: string,
+    direction?: BrowserNavigationDirection | "reload",
+  ) {
+    const tab = this.#tabs.get(tabId);
+    if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return;
+    if (direction === "back" && !hasHistoryEntry(tab.contents, -1)) return;
+    if (direction === "forward" && !hasHistoryEntry(tab.contents, 1)) return;
+    if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return;
+    logger.warn("Ending the renderer of a browser tab whose page does not answer before it navigates");
+    const contents = tab.contents;
+    yield* Effect.callback<void>((resume) => {
+      const gone = () => resume(Effect.void);
+      contents.once("render-process-gone", gone);
+      tab.endingSilentPage = true;
+      contents.forcefullyCrashRenderer();
+      return Effect.sync(() => {
+        if (!contents.isDestroyed()) contents.off("render-process-gone", gone);
+      });
+    }).pipe(
+      Effect.timeoutOption(SILENT_PAGE_EXIT_WAIT_MS),
+      Effect.ensuring(
+        Effect.sync(() => {
+          tab.endingSilentPage = false;
+        }),
+      ),
+    );
+  });
 
   readonly #enqueue = Effect.fn("BrowserHost.enqueue")(function* <T>(
     this: BrowserHost,
@@ -4504,6 +4604,8 @@ function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolea
   return page.url === current.url && page.document === current.document && page.generation === current.generation;
 }
 const CRASH_RELOAD_TIMEOUT_MS = 30_000;
+
+const SILENT_PAGE_EXIT_WAIT_MS = 5_000;
 
 const reloadCrashedPage = Effect.fn("BrowserHost.reloadCrashedPage")(function* (tab: BrowserHostTab) {
   const url = currentTabUrl(tab);

@@ -222,7 +222,8 @@ export const messages = defineMessages("error.backend", {
     "This agent already has {count} open waits. Close a wait with openbot.close_wait before you open another one.",
   "error.backend.agentWaitGone": "This wait is not open. The agent closed it, or someone cancelled it.",
   "error.backend.agentWaitNoRequest": "A wait needs a message to continue. This turn has no message.",
-  "error.backend.agentWaitOwnChatOnly": "Open a wait only in your own chat. A channel or messaging task cannot wait.",
+  "error.backend.agentWaitOwnChatOnly":
+    "Open a wait in your own chat or in a side thread. A channel or messaging conversation cannot wait.",
   "error.backend.agentWaitNoteRequired": "Give a short note that says what the wait is for.",
   "error.backend.agentWaitRoutineGone": "This agent has no routine with this id.",
   "error.backend.agentWaitNoRoutine":
@@ -340,6 +341,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.libraryFolderGone": "The folder does not exist or is already deleted.",
   "error.backend.libraryFolderOtherAgent": "A file can go only into a folder of its agent.",
   "error.backend.libraryFolderMoveInvalid": "This folder cannot go there.",
+  "error.backend.workflowFolderLimit": "A server can have up to {limit} workflow folders.",
+  "error.backend.workflowFolderPlacementLimit": "Too many workflows are in folders.",
   "error.backend.sectionNameDuplicate": "Section names must be unique.",
   "error.backend.directMessageRequired": "Write a message first.",
   "error.backend.directMessageTooLong": "A direct message can have up to {limit} characters.",
@@ -375,6 +378,7 @@ export const messages = defineMessages("error.backend", {
     "Only the OpenBot phone app can send this report, because it adds the phone's version and support log. Open this chat on the phone. If you see this message there, update the phone app.",
   "error.backend.takeoverInactive": "This browser takeover is no longer active.",
   "error.backend.authSubmitting": "Authentication submission is already in progress.",
+  "error.backend.apiKeyListFailed": "OpenBot could not read the saved API keys.",
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
   "error.backend.apiKeySaving": "The API key is already being saved.",
   "error.backend.apiKeyAnswerUnreadable":

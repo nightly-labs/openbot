@@ -109,6 +109,7 @@ export interface MessagingCredentials {
 export interface MessagingAgents {
   listAgents(): AgentSummary[];
   respondToApproval(input: RespondToApprovalInput): Effect.Effect<void, AgentLifecycleFailed>;
+  approvalExecutionThreadId(requestId: string | number): string | undefined;
   onEvent(listener: (event: AgentEvent) => void): () => void;
   createAgentProfile(
     input: Pick<AddMessagingOrchestratorInput, "provider" | "model" | "reasoningEffort"> & {
@@ -275,6 +276,10 @@ export class MessagingService {
     );
     this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
+      keysUnreadable: (connectionId) => {
+        const record = this.#threads.store.connection(connectionId);
+        return record ? this.#summary(record).state === "secret_storage_unavailable" : false;
+      },
       places: (connectionId) => this.#outboundPlaces(connectionId),
       history: (connectionId, placeId, limit, filter) => this.#outboundHistory(connectionId, placeId, limit, filter),
       post: (connectionId, target, markdown, files, embeds) =>
@@ -1703,6 +1708,9 @@ export class MessagingService {
         return {
           posted: true as const,
           messageId: captioned.success,
+          ...(guildId
+            ? { url: `https://discord.com/channels/${guildId}/${target.platformChannelId}/${captioned.success}` }
+            : {}),
           ...directPing(`${text}\nFiles: ${single.name}`),
         };
       }
@@ -2053,7 +2061,13 @@ export class MessagingService {
   }
 
   #agentEvent(event: AgentEvent): void {
-    if (event.type === "approval") this.#dispatch(this.#approval(event.approval));
+    if (event.type === "approval")
+      this.#dispatch(
+        this.#approval(
+          event.approval,
+          this.#agents.approvalExecutionThreadId(event.approval.requestId) ?? event.approval.threadId,
+        ),
+      );
     else if (event.type === "agent-input-resolved" && event.kind === "approval")
       this.#dispatch(this.#approvalResolved(event.requestId));
   }
@@ -2061,8 +2075,9 @@ export class MessagingService {
   readonly #approval = Effect.fn("MessagingService.approval")(function* (
     this: MessagingService,
     approval: AgentApproval,
+    executionThreadId: string,
   ) {
-    const own = this.#threads.store.linkForThread(approval.threadId);
+    const own = this.#threads.store.linkForThread(executionThreadId);
     const request = own ? null : this.#threads.teammateRequest(approval.agentId, approval.turnId);
     const link = own ?? request?.link;
     if (!link) return;

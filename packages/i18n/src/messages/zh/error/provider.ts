@@ -250,6 +250,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "这台电脑的处理器无法运行此服务商。请使用其他服务商。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok 未能启动，因为其配置中的 allowed_models 设置不包含它的默认模型。请将默认模型添加到 allowed_models，或删除 allowed_models，然后重试。",
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 模型给出推理过程后结束本轮对话，但没有回答。请重试或改用其他模型。",
@@ -376,6 +378,8 @@ export const messages = {
     "此聊天太大，无法发送给模型。这通常是聊天中的图片导致的。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
+  "error.provider.opencodeInputRefused":
+    "模型拒绝了这个聊天的内容，但没有给出原因。聊天中的文件（例如 PDF 或图片）可能导致这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话。请去掉该文件后重新发送消息，或换一个模型。",
   "error.provider.opencodeCompactionFailed":
     "模型无法总结这段长对话，因此无法在上下文窗口中腾出空间。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请选择更强的模型。",
   "error.provider.museMcpStartupFault":
@@ -471,6 +475,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "无法读取 {provider} CLI 版本。",
   "error.provider.piSessionBusy": "请等待当前 Pi 对话结束。",
   "error.provider.acpSessionBusy": "{provider} 仍在结束已停止的对话。请稍后再试。",
+  "error.provider.acpSessionStale": "{provider} 无法加载此对话的最新版本。请重新发送你的消息。",
   "error.provider.acpModelNotOffered": "{provider} 目前不提供 {model}。请为此智能体选择其他模型，然后重试。",
   "error.provider.piStopped": "Pi 未运行。请连接 Pi 后重试。",
   "error.provider.piSessionMissing": "该电脑上没有可用的 Pi 会话文件。",

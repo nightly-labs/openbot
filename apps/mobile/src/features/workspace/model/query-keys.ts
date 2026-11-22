@@ -97,16 +97,22 @@ export const queryKeys = {
     agentId,
     path,
   ],
-  agentDefaults: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "agent-defaults"],
-  backgroundProcesses: (scope: QueryScope, serverId: string) => ["background-processes", ...scope, serverId],
-  sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
-  channelInfo: (scope: QueryScope, serverId: string, channelId: string, ...part: [] | ["memories" | "routines"]) => [
-    "channel-info",
+  channelFolderBrowse: (scope: QueryScope, serverId: string, channelId: string, path: string | null) => [
+    "channel-folder-browse",
     ...scope,
     serverId,
     channelId,
-    ...part,
+    path,
   ],
+  agentDefaults: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "agent-defaults"],
+  backgroundProcesses: (scope: QueryScope, serverId: string) => ["background-processes", ...scope, serverId],
+  sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
+  channelInfo: (
+    scope: QueryScope,
+    serverId: string,
+    channelId: string,
+    ...part: [] | ["memories" | "routines" | "folders"]
+  ) => ["channel-info", ...scope, serverId, channelId, ...part],
   agentAvatar: (
     scope: QueryScope,
     serverId: string | undefined,

@@ -19,6 +19,9 @@ export const messages = {
   "error.workflow.agentStepEnded": "El mensaje al agente se eliminó antes de que respondiera.",
   "error.workflow.agentStepStopped": "El agente se detuvo antes de responder a este paso. Ejecuta el paso de nuevo.",
   "error.workflow.conditionUnclear": "El modelo no respondió sí o no.",
+  "error.workflow.answerInvalid":
+    "La respuesta no tenía los campos que pide este paso: {fields}. Ejecuta el paso de nuevo.",
+  "error.workflow.checkInvalid": "La comprobación de este paso no es válida. Corrígela y ejecuta el paso de nuevo.",
   "error.workflow.modelFailed": "El modelo no pudo responder. Ejecuta el paso de nuevo.",
   "error.workflow.modelTimedOut":
     "El modelo no respondió a tiempo. Elige un esfuerzo menor o un modelo más rápido para este paso y ejecútalo de nuevo.",

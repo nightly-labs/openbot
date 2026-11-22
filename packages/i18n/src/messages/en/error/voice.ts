@@ -24,6 +24,7 @@ export const messages = defineMessages("error.voice", {
   "error.voice.speech.timedOut": "Reading the reply aloud timed out.",
   "error.voice.speech.failed": "OpenBot could not read the reply aloud.",
   "error.voice.speech.providerFailed": "{provider} did not send the audio. Try again.",
+  "error.voice.speech.providerRefused": "{provider} refused to make the audio: {reason}",
   "error.voice.speech.providerUnreachable": "Could not connect to {provider}. Check the connection.",
   "error.voice.recordingNotKept": "OpenBot could not keep the voice recording.",
   "error.voice.live.timedOut": "Codex live voice did not start in time. Try again.",

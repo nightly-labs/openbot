@@ -212,7 +212,8 @@ export const messages = {
     "לסוכן הזה כבר יש {count} המתנות פתוחות. יש לסגור המתנה עם openbot.close_wait לפני שפותחים אחרת.",
   "error.backend.agentWaitGone": "ההמתנה הזו אינה פתוחה. הסוכן סגר אותה, או שמישהו ביטל אותה.",
   "error.backend.agentWaitNoRequest": "המתנה צריכה הודעה כדי להמשיך. לתור הזה אין הודעה.",
-  "error.backend.agentWaitOwnChatOnly": "יש לפתוח המתנה רק בצ'אט שלך. משימת ערוץ או הודעות אינה יכולה להמתין.",
+  "error.backend.agentWaitOwnChatOnly":
+    "יש לפתוח המתנה בצ'אט שלך או בשרשור צדדי. שיחת ערוץ או הודעות אינה יכולה להמתין.",
   "error.backend.agentWaitNoteRequired": "יש לכתוב הערה קצרה שאומרת בשביל מה ההמתנה.",
   "error.backend.agentWaitRoutineGone": "לסוכן הזה אין שגרה עם המזהה הזה.",
   "error.backend.agentWaitNoRoutine":
@@ -316,6 +317,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "התיקייה אינה קיימת או שכבר נמחקה.",
   "error.backend.libraryFolderOtherAgent": "אפשר להעביר קובץ רק לתיקייה של הסוכן שלו.",
   "error.backend.libraryFolderMoveInvalid": "אי אפשר להעביר את התיקייה הזו לשם.",
+  "error.backend.workflowFolderLimit": "בשרת יכולות להיות לכל היותר {limit} תיקיות של תהליכי עבודה.",
+  "error.backend.workflowFolderPlacementLimit": "יש יותר מדי תהליכי עבודה בתיקיות.",
   "error.backend.sectionNameDuplicate": "שמות החלקים חייבים להיות ייחודיים.",
   "error.backend.directMessageRequired": "יש לכתוב הודעה קודם.",
   "error.backend.directMessageTooLong": "הודעה ישירה יכולה להכיל עד {limit} תווים.",
@@ -349,6 +352,7 @@ export const messages = {
     "רק אפליקציית OpenBot לטלפון יכולה לשלוח את הדיווח הזה, כי היא מוסיפה את גרסת הטלפון ואת יומן התמיכה. יש לפתוח את הצ'אט הזה בטלפון. אם ההודעה הזו מופיעה שם, יש לעדכן את אפליקציית הטלפון.",
   "error.backend.takeoverInactive": "השתלטות הדפדפן הזו אינה פעילה עוד.",
   "error.backend.authSubmitting": "שליחת האימות כבר מתבצעת.",
+  "error.backend.apiKeyListFailed": "OpenBot לא הצליח לקרוא את מפתחות ה-API השמורים.",
   "error.backend.apiKeySaveFailed": "OpenBot לא הצליח לשמור את מפתח ה-API. יש לנסות שוב.",
   "error.backend.apiKeySaving": "מפתח ה-API כבר נשמר.",
   "error.backend.apiKeyAnswerUnreadable":

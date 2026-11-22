@@ -291,6 +291,8 @@ export const messages = {
     "Il processore di questo computer non può eseguire questo provider. Usa un altro provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode non è riuscito ad aprire il suo database perché una versione più recente di OpenCode lo ha modificato. Aggiorna OpenCode alla versione 2 o successiva, poi riprova.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok non si è avviato perché l'impostazione allowed_models nella sua configurazione non include il suo modello predefinito. Aggiungi il modello predefinito ad allowed_models, oppure rimuovi allowed_models, poi riprova.",
   "error.provider.opencodeNoAnswer":
     "Il modello OpenCode ha terminato il turno senza risposta. Riprova o scegli un altro modello.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -428,6 +430,8 @@ export const messages = {
     "Questa chat è diventata troppo grande da inviare al modello. Spesso la causa sono le immagini nella chat. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.opencodeSessionRejected":
     "OpenCode ha rifiutato la richiesta senza indicarne la causa. Può succedere in una chat lunga o dopo un cambio di modello. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello o un impegno minore.",
+  "error.provider.opencodeInputRefused":
+    "Il modello ha rifiutato il contenuto di questa chat senza indicarne la causa. Può dipendere da un file nella chat, come un PDF o un’immagine. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Invia di nuovo il messaggio senza il file, oppure scegli un altro modello.",
   "error.provider.opencodeCompactionFailed":
     "Il modello non è riuscito a riassumere questa chat lunga per liberare spazio nella finestra di contesto. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Riprova. Se l’errore continua, scegli un modello più potente.",
   "error.provider.museMcpStartupFault":
@@ -544,6 +548,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Impossibile leggere la versione della CLI di {provider}.",
   "error.provider.piSessionBusy": "Attendi che il turno attuale di Pi finisca.",
   "error.provider.acpSessionBusy": "{provider} sta ancora finendo un turno interrotto. Riprova tra un attimo.",
+  "error.provider.acpSessionStale":
+    "{provider} non è riuscito a caricare la versione più recente di questa chat. Invia di nuovo il messaggio.",
   "error.provider.acpModelNotOffered":
     "{provider} non offre {model} al momento. Scegli un altro modello per questo agente, poi riprova.",
   "error.provider.piStopped": "Pi non è in esecuzione. Connetti Pi e riprova.",

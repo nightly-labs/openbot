@@ -99,7 +99,7 @@ export const messages = {
   "composer.voice.progress": "جارٍ تنزيل النموذج الصوتي {progress}%",
   "composer.voice.recording": "تسجيل صوتي",
   "composer.voice.limitSoon": "يتوقف التسجيل خلال {seconds} ثانية.",
-  "composer.voice.limitReached": "توقف التسجيل عند حد الدقيقتين. ما قلته موجود في الرسالة.",
+  "composer.voice.limitReached": "توقف التسجيل عند حد 10 دقائق. ما قلته موجود في الرسالة.",
   "composer.send.saveQueued": "حفظ الرسالة في قائمة الانتظار",
   "composer.send.voice": "إرسال رسالة صوتية",
   "composer.send.message": "إرسال الرسالة",

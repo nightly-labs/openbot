@@ -1,8 +1,11 @@
 import {
   type AgentAccessLevels,
+  applyWorkflowFolderAction,
   graphAgentIds,
   type StoredFileRow,
   type WorkflowDetail,
+  type WorkflowFolderAction,
+  type WorkflowFoldersSnapshot,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
@@ -13,6 +16,7 @@ import {
 import type { AppTextKey } from "@openbot/i18n";
 import { toast } from "@openbot/ui";
 import type { WorkflowCanvasProps } from "@openbot/ui/features/workflows/WorkflowCanvas";
+import type { WorkflowCanvasTabs } from "@openbot/ui/features/workflows/WorkflowTabs";
 import type { WorkflowBuild } from "@openbot/ui/features/workflows/workflow-build";
 import {
   EMPTY_GITHUB_HISTORY,
@@ -84,6 +88,22 @@ function rememberLastWorkflow(hostKey: string, workflowId: string): void {
   } catch {}
 }
 
+const tabsKey = (hostKey: string) => `openbot:workflow-tabs:${hostKey}`;
+function readTabs(hostKey: string | undefined): readonly string[] {
+  if (hostKey === undefined) return [];
+  try {
+    return (window.localStorage.getItem(tabsKey(hostKey)) ?? "").split("\n").filter((id) => id !== "");
+  } catch {
+    return [];
+  }
+}
+function rememberTabs(hostKey: string | undefined, ids: readonly string[]): void {
+  if (hostKey === undefined) return;
+  try {
+    window.localStorage.setItem(tabsKey(hostKey), ids.join("\n"));
+  } catch {}
+}
+
 export function createWorkflowsController(
   host: WorkflowHost,
   analytics?: () => DesktopAnalyticsScope,
@@ -139,6 +159,8 @@ export function createWorkflowsController(
   const [levels, setLevels] = createSignal<AgentAccessLevels | null>(hostCache?.levels ?? null);
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
   const [resetKey, setResetKey] = createSignal(0);
+  const [tabIds, setTabIds] = createSignal<readonly string[]>(readTabs(hostKey));
+  const [folders, setFolders] = createSignal<WorkflowFoldersSnapshot>();
   const [build, setBuild] = createSignal<WorkflowBuild>();
   const [opening, setOpening] = createSignal<string>();
   const [failed, setFailed] = createSignal(false);
@@ -288,6 +310,7 @@ export function createWorkflowsController(
     if (disposed) return;
     library = list;
     setSummaries(list);
+    pruneTabs(list);
     if (hostKey !== undefined) {
       const entry = cache.get(hostKey);
       if (entry) entry.library = list;
@@ -407,6 +430,87 @@ export function createWorkflowsController(
     write(() => load(workflowId));
   };
 
+  const keepTabs = (next: readonly string[]) => {
+    setTabIds(next);
+    rememberTabs(hostKey, next);
+  };
+  const pruneTabs = (list: readonly WorkflowSummary[]) => {
+    const known = new Set(list.map((summary) => summary.id));
+    const kept = untrack(tabIds).filter((id) => id === current || known.has(id));
+    if (kept.length !== untrack(tabIds).length) keepTabs(kept);
+  };
+  createEffect(
+    () => stored()?.detail.summary.id,
+    (workflowId) => {
+      if (workflowId === undefined) return;
+      const ids = untrack(tabIds);
+      if (!ids.includes(workflowId)) keepTabs([...ids, workflowId]);
+    },
+  );
+  const shownTabs = () => {
+    const open = stored()?.detail.summary.id;
+    const known = new Set(summaries().map((summary) => summary.id));
+    return tabIds().filter((id) => id === open || known.has(id));
+  };
+  const closeTabs = (keep: (id: string, index: number) => boolean, fallback: string) => {
+    const ids = shownTabs();
+    const kept = ids.filter(keep);
+    if (kept.length === 0) return;
+    keepTabs(kept);
+    if (kept.includes(current)) return;
+    const index = ids.indexOf(current);
+    const next =
+      ids.slice(index + 1).find((id) => kept.includes(id)) ?? (kept.includes(fallback) ? fallback : kept.at(-1));
+    if (next !== undefined) open(next);
+  };
+  const tabs: WorkflowCanvasTabs = {
+    get ids() {
+      return shownTabs();
+    },
+    onClose: (workflowId) => closeTabs((id) => id !== workflowId, workflowId),
+    onCloseOthers: (workflowId) => closeTabs((id) => id === workflowId, workflowId),
+    onCloseRight: (workflowId) => {
+      const index = shownTabs().indexOf(workflowId);
+      closeTabs((_, at) => at <= index, workflowId);
+    },
+    onMove: (workflowId, index) => {
+      const ids = shownTabs().filter((id) => id !== workflowId);
+      ids.splice(Math.max(0, Math.min(index, ids.length)), 0, workflowId);
+      keepTabs(ids);
+    },
+  };
+
+  let folderRead = 0;
+  const readFolders = () => {
+    const request = ++folderRead;
+    if (!host.foldersSupported()) {
+      setFolders(undefined);
+      return;
+    }
+    host.folders().then((next) => {
+      if (!disposed && request === folderRead) setFolders(next);
+    }, report);
+  };
+  const folderFailed = (error: unknown) => {
+    toast.error(errorMessage(error, t("workflow.canvas.folder.failed")));
+    readFolders();
+  };
+  const folderAction = (action: WorkflowFolderAction) => {
+    const before = folders();
+    if (!before) return;
+    try {
+      const workflowIds = new Set(summaries().map((summary) => summary.id));
+      setFolders(applyWorkflowFolderAction(before, action, { workflowIds }));
+    } catch (error) {
+      folderFailed(error);
+      return;
+    }
+    const request = ++folderRead;
+    host.folderAction(action).then((next) => {
+      if (!disposed && request === folderRead) setFolders(next);
+    }, folderFailed);
+  };
+
   const readLevels = () => {
     host.agentLevels().then((next) => {
       if (hostKey !== undefined) {
@@ -468,13 +572,16 @@ export function createWorkflowsController(
     readPlaces();
     readLevels();
     readGitHubCatalog();
+    readFolders();
   };
 
   onSettled(() => {
     const stop = host.onChanged(refresh);
+    const stopFolders = host.onFoldersChanged(readFolders);
     window.addEventListener("focus", onFocus);
     return () => {
       stop();
+      stopFolders();
       window.removeEventListener("focus", onFocus);
       flush();
       disposed = true;
@@ -485,6 +592,7 @@ export function createWorkflowsController(
     readPlaces();
     readLevels();
     readGitHubCatalog();
+    readFolders();
   });
   void queued(async () => {
     const asked = untrack(() => requested?.workflowId());
@@ -611,6 +719,11 @@ export function createWorkflowsController(
     get library() {
       return summaries();
     },
+    tabs,
+    get folders() {
+      return folders();
+    },
+    onFolderAction: folderAction,
     get opening() {
       return opening() !== undefined;
     },
@@ -629,11 +742,14 @@ export function createWorkflowsController(
         }),
       );
     },
-    onRunStep: (nodeId) => {
+    onRunStep: (nodeId, takes = 1) => {
       const kind = stored()?.detail.graph.nodes.find((node) => node.id === nodeId)?.kind;
       start(
         "run_step",
-        (workflowId) => host.workflows.runStep({ workflowId, nodeId, requestId: crypto.randomUUID() }),
+        async (workflowId) => {
+          for (let take = 0; take < takes; take += 1)
+            await host.workflows.runStep({ workflowId, nodeId, requestId: crypto.randomUUID() });
+        },
         kind,
       );
     },
@@ -697,8 +813,13 @@ export function createWorkflowsController(
         if (hostKey !== undefined) cache.get(hostKey)?.workflows.delete(workflowId);
         if (disposed || workflowId !== current) return;
         const rest = before.filter((summary) => summary.id !== workflowId);
-        const next = rest[Math.min(Math.max(index, 0), rest.length - 1)];
-        const opened = next?.id ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary.id;
+        const ids = untrack(shownTabs);
+        const at = ids.indexOf(workflowId);
+        const neighbor = [...ids.slice(at + 1), ...ids.slice(0, Math.max(at, 0)).reverse()].find((id) =>
+          rest.some((summary) => summary.id === id),
+        );
+        const next = neighbor ?? rest[Math.min(Math.max(index, 0), rest.length - 1)]?.id;
+        const opened = next ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary.id;
         closePreview();
         await load(opened);
       });

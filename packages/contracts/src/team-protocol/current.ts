@@ -72,6 +72,7 @@ import {
 import { BROWSING_MEMORY_CAPABILITY } from "./browsing-memory-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "./channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
@@ -154,6 +155,7 @@ import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "./provider-many-accounts-v1";
 import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "./provider-model-source-v1";
 import { PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY } from "./provider-sign-in-relay-v2";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
@@ -198,6 +200,7 @@ import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
 import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
+import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "./storage-workflow-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
@@ -242,7 +245,9 @@ import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
+import { WORKFLOW_FOLDERS_CAPABILITY } from "./workflow-folders-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "./workflows-agent-files-v1";
+import { WORKFLOWS_ANSWERS_CAPABILITY } from "./workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
@@ -336,6 +341,7 @@ export {
   BROWSING_MEMORY_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
@@ -474,7 +480,9 @@ export {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  WORKFLOW_FOLDERS_CAPABILITY,
   WORKFLOWS_AGENT_FILES_CAPABILITY,
+  WORKFLOWS_ANSWERS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -785,7 +793,12 @@ const TEAM_CAPABILITY_REGISTRY = [
   [PENDING_PROMPTS_CAPABILITY, V10],
   [LIVE_VOICE_ACCOUNT_CAPABILITY, V10],
   [SIDE_QUESTION_THREADS_CAPABILITY, V10],
+  [WORKFLOW_FOLDERS_CAPABILITY, V10],
   [AGENT_BUILTIN_MEMORY_CAPABILITY, V10],
+  [WORKFLOWS_ANSWERS_CAPABILITY, V10],
+  [STORAGE_WORKFLOW_FILES_CAPABILITY, V10],
+  [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
+  [CHANNEL_FOLDERS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

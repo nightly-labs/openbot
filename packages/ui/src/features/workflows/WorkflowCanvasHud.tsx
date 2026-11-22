@@ -4,11 +4,9 @@ import {
   Button,
   buttonVariants,
   Check,
-  ChevronDown,
   CircleAlert,
   DropdownMenu,
   History,
-  Input,
   LabelTooltipTrigger,
   LoaderCircle,
   Play,
@@ -105,12 +103,7 @@ export interface HudStep {
 
 export function WorkflowCanvasHeader(props: {
   frame: "window" | undefined;
-  name: string;
-  renaming: boolean;
-  menuRef: (element: HTMLButtonElement) => void;
-  switcher: JSX.Element;
-  onName: (name: string) => void;
-  onEndRename: (keep: boolean) => void;
+  title: JSX.Element;
   previewing: boolean;
   viewing: number | null;
   onView: (run: number | null) => void;
@@ -160,40 +153,7 @@ export function WorkflowCanvasHeader(props: {
   });
   return (
     <header class={props.frame === "window" ? "wfn-hud-top window-drag" : "wfn-hud-top"}>
-      <div class="wfn-hud wfn-hud-title">
-        <DropdownMenu.Root placement="bottom-start" gutter={8} getAnchorRect={hudBarRect} modal={false}>
-          <DropdownMenu.Trigger
-            ref={props.menuRef}
-            class={`${buttonVariants({ variant: "ghost", size: "sm" })} wfn-hud-button wfn-hud-switcher`}
-            hidden={props.renaming}
-          >
-            <span class="wfn-hud-switcher-name">{props.name}</span>
-            <ChevronDown class="wfn-hud-chevron" aria-hidden="true" />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>{props.switcher}</DropdownMenu.Portal>
-        </DropdownMenu.Root>
-        <Show when={props.renaming}>
-          <Input
-            ref={(element: HTMLInputElement) => {
-              queueMicrotask(() => {
-                element.focus();
-                element.select();
-              });
-            }}
-            class="wfn-hud-name"
-            aria-label={t("workflow.canvas.switcher.name")}
-            spellcheck={false}
-            value={props.name}
-            onValueChange={props.onName}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" && event.key !== "Escape") return;
-              event.preventDefault();
-              props.onEndRename(event.key === "Enter");
-            }}
-            onBlur={() => props.onEndRename(true)}
-          />
-        </Show>
-      </div>
+      {props.title}
       <div class="wfn-hud-group">
         <Show when={!props.previewing && viewedRun()}>
           {(entry) => (

@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "关闭浏览器弹窗",
   "browser.pip.reattachFailed": "OpenBot 无法重新附加浏览器。",
   "browser.pip.closeFailed": "OpenBot 无法关闭浏览器弹窗。",
+  "browser.window.open": "在新窗口中打开浏览器",
+  "browser.window.openFailed": "OpenBot 无法打开浏览器窗口。",
   "browser.popupBlocked.title": "弹窗被拦截",
   "browser.popupBlocked.dismiss": "关闭弹窗提示",
   "browser.liveView.label": "服务器上页面的实时视图",

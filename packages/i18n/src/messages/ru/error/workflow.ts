@@ -19,6 +19,8 @@ export const messages = {
   "error.workflow.agentStepEnded": "Сообщение агенту было удалено до его ответа.",
   "error.workflow.agentStepStopped": "Агент остановился, не ответив на этот шаг. Запустите шаг снова.",
   "error.workflow.conditionUnclear": "Модель не ответила «да» или «нет».",
+  "error.workflow.answerInvalid": "В ответе нет полей, которые нужны этому шагу: {fields}. Запустите шаг снова.",
+  "error.workflow.checkInvalid": "Проверка этого шага недействительна. Исправьте её и запустите шаг снова.",
   "error.workflow.modelFailed": "Модель не смогла ответить. Запустите шаг снова.",
   "error.workflow.modelTimedOut":
     "Модель не ответила вовремя. Выберите меньшее усилие или более быструю модель для этого шага и запустите его снова.",

@@ -49,6 +49,7 @@ import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
+import { CHANNEL_FOLDERS_CODECS } from "./channel-folders-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
 import { CLAUDE_COMPACT_WINDOW_CODECS } from "./claude-compact-window-v1";
@@ -163,6 +164,7 @@ import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
 import { WHATSAPP_STATUS_REACTIONS_CODECS } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
+import { WORKFLOW_FOLDERS_CODECS } from "./workflow-folders-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CODECS } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_CATALOG_CODECS } from "./workflows-media-catalog-v1";
@@ -236,6 +238,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_TASK_LIMIT_CODECS,
   ...AGENT_NEW_CHAT_CODECS,
   ...AGENT_FOLDERS_CODECS,
+  ...CHANNEL_FOLDERS_CODECS,
   ...AGENT_FAST_MODE_CODECS,
   ...AGENT_SPEED_CODECS,
   ...CONTEXT_COMPACT_CODECS,
@@ -343,6 +346,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_STEP_SETTINGS_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
   ...LIBRARY_FOLDERS_CODECS,
+  ...WORKFLOW_FOLDERS_CODECS,
   ...VAULT_CODECS,
   ...BROWSER_SECRET_VAULT_CODECS,
   ...VAULT_IMPORT_CODECS,

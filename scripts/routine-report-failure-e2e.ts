@@ -566,14 +566,13 @@ try {
   };
   const textRequest = await requestTurnOf("Check the docs build. TEAMMATE-REQUEST-TEXT");
   pass(
-    "An answered teammate request ends quiet without the no-update tool",
+    "An answered teammate request keeps the agent's text answer in the chat without the no-update tool",
     toolResults(textRequest.turn.turnId, "send_message")[0]?.result?.success === true &&
       toolResults(textRequest.turn.turnId, "routine_no_update").length === 0 &&
       textRequest.event.type === "turn-completed" &&
-      textRequest.event.quiet === true &&
-      textRequest.answers.some((message) => message.text === "The result went to the teammate.") &&
-      textRequest.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
-      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId) === undefined,
+      textRequest.event.quiet !== true &&
+      textRequest.answers.every((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId)?.text === "The result went to the teammate.",
     textRequest,
   );
   const noticeRequest = await requestTurnOf("Check the notice build. TEAMMATE-REQUEST-TEXT NOTICE NO-FINAL");
@@ -605,12 +604,11 @@ try {
   });
   const unansweredDelivery = mailbox.completedDeliveriesOfTurn(checker.id, unanswered.turn.turnId)[0]?.delivery;
   pass(
-    "A teammate request with no reply ends quiet after OpenBot sent its answer to the teammate",
+    "A teammate request with no reply keeps its answer in the chat after OpenBot sent it to the teammate",
     unanswered.event.type === "turn-completed" &&
-      unanswered.event.quiet === true &&
-      unanswered.answers.some((message) => message.text === "All good.") &&
-      unanswered.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
-      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId) === undefined &&
+      unanswered.event.quiet !== true &&
+      unanswered.answers.every((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId)?.text === "All good." &&
       sentResults.length === 1 &&
       sentResults[0]?.text.includes("All good.") === true &&
       unansweredDelivery !== undefined &&
@@ -1098,7 +1096,51 @@ try {
     stopPrompt?.includes("is not a stop condition: keep this routine on") === true,
     stopPrompt,
   );
-  for (const name of ["Paused then failed", "Failed then paused"]) {
+  const pausedThenQuiet = await selfPausing("Paused then quiet", (id) => [pauseRoutine(id), noUpdate]);
+  const quietResumedResult = toolResults(pausedThenQuiet.turnId, "routine_no_update")[0]?.result;
+  pass(
+    "A run that pauses its own routine and then has nothing to report turns the routine on again, and does not end quiet (#14038)",
+    pausedThenQuiet.active === true &&
+      pausedThenQuiet.ran.run.status === "succeeded" &&
+      quietResumedResult?.success === false &&
+      quietResumedResult.contentItems.some((item) => item.text.includes("this routine is on again")),
+    { active: pausedThenQuiet.active, run: pausedThenQuiet.ran.run.status, quietResumedResult },
+  );
+  const stopsWithReport = await selfPausing("Stops with a report", (id) => [
+    pauseRoutine(id),
+    noUpdate,
+    pauseRoutine(id),
+  ]);
+  const secondPause = toolResults(stopsWithReport.turnId, "update_routine")[1]?.result;
+  pass(
+    "A run that pauses its own routine again after the refused quiet end stops the routine (#14038)",
+    stopsWithReport.active === false && stopsWithReport.ran.run.status === "succeeded" && secondPause?.success === true,
+    { active: stopsWithReport.active, run: stopsWithReport.ran.run.status, secondPause },
+  );
+  const quietThenPaused = await selfPausing("Quiet then paused", (id) => [noUpdate, pauseRoutine(id)]);
+  const refusedQuietPause = toolResults(quietThenPaused.turnId, "update_routine")[0]?.result;
+  pass(
+    "A run that ended with nothing to report cannot pause its own routine (#14038)",
+    quietThenPaused.active === true &&
+      quietThenPaused.ran.run.status === "succeeded" &&
+      refusedQuietPause?.success === false &&
+      refusedQuietPause.contentItems.some((item) => item.text.includes("not a stop condition")),
+    { active: quietThenPaused.active, run: quietThenPaused.ran.run.status, refusedQuietPause },
+  );
+  pass(
+    "The run prompt says that nothing to report is not a stop condition (#14038)",
+    stopPrompt?.includes(
+      "Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report",
+    ) === true,
+    stopPrompt,
+  );
+  for (const name of [
+    "Paused then failed",
+    "Failed then paused",
+    "Paused then quiet",
+    "Stops with a report",
+    "Quiet then paused",
+  ]) {
     const routine = agents.listRoutines(checker.id).find((entry) => entry.name === name);
     if (routine) agents.updateRoutine({ agentId: checker.id, routineId: routine.id, active: false });
   }

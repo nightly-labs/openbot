@@ -522,16 +522,21 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       }
       this.#options.reportMcpDrops?.(this.provider, handoff.dropped);
       const mcpServers = Object.fromEntries(
-        [...handoff.servers, ...bridge.servers].map((server) => [
+        [
+          ...handoff.servers.map((server) => ({ server, mode: "optional" })),
+          ...bridge.servers.map((server) => ({ server, mode: "required" })),
+        ].map(({ server, mode }) => [
           server.name,
           "url" in server
             ? {
                 transport: "streamableHttp",
+                mode,
                 url: server.url,
                 headers: Object.fromEntries(server.headers.map((header) => [header.name, header.value])),
               }
             : {
                 transport: "stdio",
+                mode,
                 command: server.command,
                 args: server.args,
                 env: Object.fromEntries(server.env.map((entry) => [entry.name, entry.value])),

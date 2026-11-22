@@ -80,6 +80,10 @@
   line-height: 1.6;
 }
 
+.file-preview-document-line {
+  white-space: pre-wrap;
+}
+
 .file-preview-markdown-status {
   min-width: 0;
   margin: 0;
