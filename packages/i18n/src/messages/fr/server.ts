@@ -22,6 +22,8 @@ export const messages = {
   "server.connection.loadingHint": "Vous pouvez sélectionner un autre serveur pendant le chargement de celui-ci.",
   "server.connection.cachedHint":
     "Le contenu chargé et les brouillons sont conservés. Les actions du serveur reprendront après la reconnexion.",
+  "server.connection.computerOffline":
+    "{name} est hors ligne. Vérifiez que son ordinateur est allumé, qu'OpenBot est ouvert et que Publier ce serveur est activé dans Réglages du serveur > Membres.",
   "server.connection.conversationFailed": "Impossible de charger la conversation. Réessayez.",
   "server.connection.panelsFailed": "Certains panneaux de l’espace de travail n’ont pas pu se charger. Réessayez.",
   "server.connection.retry": "Réessayer",

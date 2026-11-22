@@ -2791,10 +2791,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const unavailable = async (): Promise<never> => {
     throw new Error(t("webClient.error.desktopOnly"));
   };
-  const connectionDetail = () =>
-    workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
-      ? (workspace.state.connectionError ?? null)
-      : null;
+  const connectionDetail = () => {
+    if (workspace.state.hostedSleep === "sleeping" || workspace.state.hostedIssue || hostUpdating()) return null;
+    if (workspace.state.hostOffline && workspace.state.host && workspace.state.host.hosted !== true)
+      return {
+        message: t("server.connection.computerOffline", { name: workspace.state.host.name }),
+        reference: workspace.state.connectionError?.reference ?? null,
+      };
+    return workspace.state.connectionError ?? null;
+  };
   const frameConnecting = () =>
     connectionShown() &&
     !fullWindowLoading() &&

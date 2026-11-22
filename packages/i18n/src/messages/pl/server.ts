@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Możesz wybrać inny serwer, gdy ten się wczytuje.",
   "server.connection.cachedHint":
     "Wczytana zawartość i wersje robocze są zachowane. Działania serwera wznowią się po ponownym połączeniu.",
+  "server.connection.computerOffline":
+    "{name} jest offline. Sprawdź, czy jego komputer jest włączony, OpenBot jest otwarty, a opcja Opublikuj ten serwer jest włączona w Ustawienia serwera > Członkowie.",
   "server.connection.conversationFailed": "Nie udało się wczytać rozmowy. Spróbuj ponownie.",
   "server.connection.panelsFailed": "Nie udało się wczytać niektórych paneli obszaru roboczego. Spróbuj ponownie.",
   "server.connection.retry": "Ponów",

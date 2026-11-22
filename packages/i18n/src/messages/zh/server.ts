@@ -19,6 +19,8 @@ export const messages = {
   "server.connection.planHint": "打开账号设置查看服务器套餐。",
   "server.connection.loadingHint": "加载期间你可以切换到其他服务器。",
   "server.connection.cachedHint": "已加载的内容和草稿会保留，服务器操作将在重新连接后继续。",
+  "server.connection.computerOffline":
+    "{name} 已离线。请确认它的电脑已开机并打开了 OpenBot，且已在服务器设置 > 成员中打开发布该服务器。",
   "server.connection.conversationFailed": "对话加载失败，请重试。",
   "server.connection.panelsFailed": "部分工作区面板加载失败，请重试。",
   "server.connection.retry": "重试",

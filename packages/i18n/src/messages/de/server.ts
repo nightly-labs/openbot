@@ -20,6 +20,8 @@ export const messages = {
   "server.connection.loadingHint": "Du kannst einen anderen Server auswählen, während dieser geladen wird.",
   "server.connection.cachedHint":
     "Geladene Inhalte und Entwürfe bleiben erhalten. Serveraktionen werden nach dem erneuten Verbinden fortgesetzt.",
+  "server.connection.computerOffline":
+    "{name} ist offline. Prüfe, ob sein Computer eingeschaltet und OpenBot geöffnet ist und Server veröffentlichen unter Servereinstellungen > Mitglieder aktiviert ist.",
   "server.connection.conversationFailed": "Die Unterhaltung konnte nicht geladen werden. Versuche es erneut.",
   "server.connection.panelsFailed":
     "Einige Bereiche des Arbeitsbereichs konnten nicht geladen werden. Versuche es erneut.",

@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Je kunt een andere server kiezen terwijl deze laadt.",
   "server.connection.cachedHint":
     "Geladen inhoud en concepten blijven bewaard. Serveracties gaan verder zodra de verbinding terug is.",
+  "server.connection.computerOffline":
+    "{name} is offline. Controleer of de computer aan staat, OpenBot open is en Publiceer deze server aan staat in Serverinstellingen > Leden.",
   "server.connection.conversationFailed": "Het gesprek kon niet laden. Probeer het opnieuw.",
   "server.connection.panelsFailed": "Sommige panelen van de werkruimte konden niet laden. Probeer het opnieuw.",
   "server.connection.retry": "Opnieuw",

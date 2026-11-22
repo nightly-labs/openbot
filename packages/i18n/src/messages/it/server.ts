@@ -20,6 +20,8 @@ export const messages = {
   "server.connection.loadingHint": "Puoi selezionare un altro server mentre questo si carica.",
   "server.connection.cachedHint":
     "I contenuti caricati e le bozze vengono conservati. Le azioni sul server riprenderanno dopo la riconnessione.",
+  "server.connection.computerOffline":
+    "{name} è offline. Verifica che il suo computer sia acceso, che OpenBot sia aperto e che Pubblica questo server sia attivo in Impostazioni server > Membri.",
   "server.connection.conversationFailed": "Impossibile caricare la conversazione. Riprova.",
   "server.connection.panelsFailed": "Impossibile caricare alcuni pannelli del workspace. Riprova.",
   "server.connection.retry": "Riprova",
