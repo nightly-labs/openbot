@@ -237,6 +237,10 @@
   color: var(--openbot-text-muted);
 }
 
+.wfn-media-pill > svg.wfn-model-logo {
+  translate: 0 -1px;
+}
+
 .wfn-pill > svg.wfn-model-logo,
 .wfn-menu.ui-action-menu [role="menuitem"] > svg.wfn-model-logo {
   flex: none;
