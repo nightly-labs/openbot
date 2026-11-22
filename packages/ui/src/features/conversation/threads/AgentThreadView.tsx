@@ -78,6 +78,7 @@ import {
   MessageSelectionActions,
   type QuoteShortcutModifier,
 } from "@openbot/ui/features/conversation/SelectionActions";
+import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
@@ -258,6 +259,12 @@ export interface AgentThreadViewProps {
   onOpenWaitingAgent?: ((agentId: string) => void) | undefined;
   selectionActions?: AgentThreadSelectionActions | undefined;
   failureText?: ((error: string) => string) | undefined;
+  subagents?: AgentThreadSubagents | undefined;
+}
+
+export interface AgentThreadSubagents {
+  selectedId: string | null;
+  onOpen: (subagentId: string) => void;
 }
 
 export interface AgentThreadSelectionActions {
@@ -796,6 +803,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           <For each={shownRows()} keyed={(message) => message.id}>
             {(message, index) => {
               const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
+              const subagentGroup = () =>
+                props.subagents && message().kind === "subagents" ? message().subagents : undefined;
               const stepsInRow = () =>
                 props.traceAbove !== undefined &&
                 !props.stepsOpenByDefault &&
@@ -804,6 +813,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 !agentMessageMarker(message()) &&
                 !changeMarker(message()) &&
                 !card() &&
+                !subagentGroup() &&
                 author(message()).kind === "agent";
               const stepsDisclosure = () => (
                 <Show when={props.stepsAbove?.(message().id)}>
@@ -892,8 +902,24 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       </article>
                     )}
                   </Show>
+                  <Show when={subagentGroup()}>
+                    {(subagents) => (
+                      <article data-chat-search-message={message().id}>
+                        <SubagentGroup
+                          subagents={subagents()}
+                          selectedId={props.subagents?.selectedId}
+                          onOpen={(subagentId) => props.subagents?.onOpen(subagentId)}
+                        />
+                      </article>
+                    )}
+                  </Show>
                   <Show
-                    when={message().kind !== "thinking" && !agentMessageMarker(message()) && !changeMarker(message())}
+                    when={
+                      message().kind !== "thinking" &&
+                      !subagentGroup() &&
+                      !agentMessageMarker(message()) &&
+                      !changeMarker(message())
+                    }
                   >
                     <Show
                       when={card()}

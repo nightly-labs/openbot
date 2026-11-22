@@ -79,6 +79,8 @@ export function ConversationThread() {
     copiedMessageId,
     branchThread,
     changeMarkerActions,
+    shownSubagentId,
+    toggleSubagentPanel,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
@@ -359,6 +361,7 @@ export function ConversationThread() {
             queue={threadQueue.view(current().threads.open, threadComposer.openDraftKey())}
             awaiting={awaiting()}
             selectionActions={selectionActions(current().threads)}
+            subagents={{ selectedId: shownSubagentId(), onOpen: toggleSubagentPanel }}
           />
         </>
       )}
