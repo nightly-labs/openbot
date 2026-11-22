@@ -251,6 +251,7 @@ import {
   type AgentFeedback,
   type AgentMessageSteer,
   type AgentServerClaims,
+  type McpServerOwnerHooks,
   OpenBotToolRouter,
 } from "./agent/openbot-tool-router";
 import { PlanContinuation } from "./agent/plan-continuation";
@@ -432,6 +433,7 @@ export interface AgentServiceOptions {
   crm?: (() => CrmHandle | null) | undefined;
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   personCanAdminister?: ((personId: string) => boolean) | undefined;
+  mcpServerOwners?: McpServerOwnerHooks | undefined;
   sidebarLayout?: AgentSidebar | null;
   libraryFolders?: AgentLibraryFolders | null;
   credentials?: ProviderClientContext;
@@ -2046,6 +2048,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? {}
         : { crmAgentVisibleToMembers: options.crmAgentVisibleToMembers }),
       ...(options.personCanAdminister === undefined ? {} : { personCanAdminister: options.personCanAdminister }),
+      ...(options.mcpServerOwners === undefined ? {} : { mcpServerOwners: options.mcpServerOwners }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),

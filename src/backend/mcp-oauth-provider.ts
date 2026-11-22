@@ -179,6 +179,7 @@ export type McpSignInOpener = (url: string) => Promise<void>;
 export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   refreshAccessToken: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
+  endRefusedSignIn: (url: string, rejected: string) => Effect.Effect<boolean, McpOperationError>;
   signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   cancelSignIn: (url: string) => boolean;
   signInLink: (url: string) => string | null;
@@ -243,6 +244,15 @@ export class McpOAuth implements McpOAuthAuthority {
     if ((yield* this.#refresh(key)) === "unusable") return yield* this.#end(key, rejected);
     const next = yield* mcpSync(() => this.#options.storage.read(key)?.tokens?.access_token ?? null);
     return next === rejected ? null : next;
+  }).bind(this);
+
+  readonly endRefusedSignIn = Effect.fn("McpOAuth.endRefusedSignIn")(function* (
+    this: McpOAuth,
+    url: string,
+    rejected: string,
+  ): Effect.fn.Return<boolean, McpOperationError> {
+    const key = mcpOAuthAccountKey(url);
+    return key !== null && (yield* this.#end(key, rejected)) === null;
   }).bind(this);
 
   readonly #end = Effect.fn("McpOAuth.end")(function* (this: McpOAuth, key: string, rejected: string) {
