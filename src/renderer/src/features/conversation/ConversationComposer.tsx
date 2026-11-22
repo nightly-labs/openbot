@@ -8,12 +8,12 @@ import {
   type CustomProviderModel,
   type CustomProviderSummary,
   canPreviewAttachment,
-  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
   queueHoldWorker,
   routineRunsTurn,
+  savedCustomModelId,
 } from "@openbot/contracts/ipc";
 import {
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
@@ -318,7 +318,9 @@ export function ConversationComposer() {
     if (!currentDraft().attachments.some((attachment) => attachment.kind === "image")) return undefined;
     const endpoint = customProviderOfModel(agent.model, props.customProviders ?? []);
     if (endpoint?.harness !== "pi") return undefined;
-    const model = endpoint.models.find((item) => composedCustomModelId(endpoint.id, item.id) === agent.model);
+    const model = endpoint.models.find(
+      (item) => savedCustomModelId(endpoint.id, endpoint.harness, item.id) === agent.model,
+    );
     if (!model || (model.inputs ?? CUSTOM_PROVIDER_DEFAULT_INPUTS.pi).includes("image")) return undefined;
     return { endpoint, model };
   });

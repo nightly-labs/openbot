@@ -1,13 +1,8 @@
-import { type CustomProviderHarness, composedCustomModelId, isAgentModel } from "@openbot/contracts/ipc";
+import { encodedModelId } from "@openbot/contracts/ipc";
+
+export { encodedModelId };
 
 const ENCODED_MODEL = "b64:";
-
-export function encodedModelId(prefix: string, value: string): string {
-  const plain = `${prefix}${value}`;
-  return isAgentModel(plain) && !value.startsWith(ENCODED_MODEL)
-    ? plain
-    : `${prefix}${ENCODED_MODEL}${Buffer.from(value, "utf8").toString("base64url")}`;
-}
 
 export function providerModelValue(model: string): string {
   return model.startsWith(ENCODED_MODEL)
@@ -20,8 +15,4 @@ export function isEncodedModelOf(id: string, value: string): boolean {
   if (!id.startsWith(ENCODED_MODEL, start)) return false;
   const prefix = id.slice(0, start);
   return value.startsWith(prefix) && encodedModelId(prefix, value.slice(prefix.length)) === id;
-}
-
-export function savedCustomModelId(endpointId: string, harness: CustomProviderHarness, modelId: string): string {
-  return harness === "pi" ? encodedModelId(`${endpointId}/`, modelId) : composedCustomModelId(endpointId, modelId);
 }

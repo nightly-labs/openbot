@@ -7,7 +7,6 @@ import {
   CUSTOM_PROVIDER_HARNESSES,
   type CustomProviderRestart,
   type CustomProviderSummary,
-  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderHarness,
@@ -16,6 +15,7 @@ import {
   type ProviderRuntimeDownload,
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
+  savedCustomModelId,
   type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { Text } from "@openbot/ui";
@@ -150,7 +150,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   const firstEndpointModel = () => {
     const endpoint = customProviders().find((item) => item.models.length > 0);
     const firstModel = endpoint?.models[0];
-    return endpoint && firstModel ? composedCustomModelId(endpoint.id, firstModel.id) : null;
+    return endpoint && firstModel ? savedCustomModelId(endpoint.id, endpoint.harness, firstModel.id) : null;
   };
 
   async function selectProvider(
@@ -193,7 +193,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
       await selectProvider(
         value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
         true,
-        composedCustomModelId(value.id, firstModel.id),
+        savedCustomModelId(value.id, value.harness, firstModel.id),
       );
     }
   }
@@ -225,12 +225,14 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
     },
     onUpdated: (input) => {
       const provider = props.defaultProvider?.preferredProvider ?? null;
-      const model = isCustomProviderHarness(provider) ? props.defaultProvider?.preferredModel : null;
-      if (!provider || !model?.startsWith(`${input.id}/`)) return;
-      if (!input.models.some((item) => model === composedCustomModelId(input.id, item.id))) {
+      if (!isCustomProviderHarness(provider)) return;
+      const model = props.defaultProvider?.preferredModel;
+      if (!model?.startsWith(`${input.id}/`)) return;
+      const kept = input.models.find((item) => model === savedCustomModelId(input.id, provider, item.id));
+      if (!kept) {
         void selectProvider(provider, false, null);
       } else if (input.harness && input.harness !== provider) {
-        void selectProvider(input.harness, true, model);
+        void selectProvider(input.harness, true, savedCustomModelId(input.id, input.harness, kept.id));
       }
     },
   });

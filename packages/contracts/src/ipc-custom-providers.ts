@@ -228,6 +228,31 @@ export function customModelKey(providerId: string, modelId: string): string {
   return composedCustomModelId(providerId, modelId).slice(providerId.length + 1);
 }
 
+const ENCODED_MODEL = "b64:";
+
+function base64Url(value: string): string {
+  let binary = "";
+  for (const byte of new TextEncoder().encode(value)) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+
+export function encodedModelId(prefix: string, value: string): string {
+  const plain = `${prefix}${value}`;
+  return isAgentModel(plain) && !value.startsWith(ENCODED_MODEL)
+    ? plain
+    : `${prefix}${ENCODED_MODEL}${base64Url(value)}`;
+}
+
+export function savedCustomModelId(
+  endpointId: string,
+  harness: CustomProviderHarness | undefined,
+  modelId: string,
+): string {
+  return (harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS) === "pi"
+    ? encodedModelId(`${endpointId}/`, modelId)
+    : composedCustomModelId(endpointId, modelId);
+}
+
 export function isCustomProviderModelId(modelId: string, providerIds: ReadonlySet<string>): boolean {
   const separator = modelId.indexOf("/");
   return separator > 0 && providerIds.has(modelId.slice(0, separator));

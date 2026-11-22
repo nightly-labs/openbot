@@ -158,6 +158,7 @@ import {
   type SkillLearningMode,
   sameAgentBrowserProfile,
   sameAgentModelChoice,
+  savedCustomModelId,
   WORKFLOW_CATALOG_PROVIDERS,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX,
@@ -326,7 +327,6 @@ import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
-import { savedCustomModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
