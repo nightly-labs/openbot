@@ -42,7 +42,7 @@ const rowValue = (entry: string, model: string) => `${entry}|${model}`;
 function ModelLogo(props: { model: WorkflowImageModel }) {
   return (
     <Show
-      when={creditModelMakerNamed(props.model.maker)}
+      when={props.model.provider === "openbot" && creditModelMakerNamed(props.model.maker)}
       fallback={<ProviderLogo provider={props.model.provider} class="wfn-model-logo" />}
     >
       {(maker) => <MakerLogo maker={maker()} mono />}

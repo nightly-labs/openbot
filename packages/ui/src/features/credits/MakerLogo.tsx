@@ -1,22 +1,22 @@
 import { CREDIT_MODEL_MAKERS, type CreditModelMaker } from "@openbot/contracts/credits";
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
+import alibabaLogo from "../../assets/maker-logos/alibaba.svg";
+import bflLogo from "../../assets/maker-logos/bfl.svg";
+import bytedanceLogo from "../../assets/maker-logos/bytedance.svg";
+import googleLogo from "../../assets/maker-logos/google.svg";
+import ideogramLogo from "../../assets/maker-logos/ideogram.svg";
+import klingLogo from "../../assets/maker-logos/kling.svg";
+import metaLogo from "../../assets/maker-logos/meta.svg";
+import minimaxLogo from "../../assets/maker-logos/minimax.svg";
+import openaiLogo from "../../assets/maker-logos/openai.svg";
+import pixverseLogo from "../../assets/maker-logos/pixverse.svg";
+import recraftLogo from "../../assets/maker-logos/recraft.svg";
+import syncLogo from "../../assets/maker-logos/sync.svg";
+import tencentLogo from "../../assets/maker-logos/tencent.svg";
+import viduLogo from "../../assets/maker-logos/vidu.svg";
+import xaiLogo from "../../assets/maker-logos/xai.svg";
 import { cx } from "../../utils";
-import alibabaLogo from "./maker-logos/alibaba.svg";
-import bflLogo from "./maker-logos/bfl.svg";
-import bytedanceLogo from "./maker-logos/bytedance.svg";
-import googleLogo from "./maker-logos/google.svg";
-import ideogramLogo from "./maker-logos/ideogram.svg";
-import klingLogo from "./maker-logos/kling.svg";
-import metaLogo from "./maker-logos/meta.svg";
-import minimaxLogo from "./maker-logos/minimax.svg";
-import openaiLogo from "./maker-logos/openai.svg";
-import pixverseLogo from "./maker-logos/pixverse.svg";
-import recraftLogo from "./maker-logos/recraft.svg";
-import syncLogo from "./maker-logos/sync.svg";
-import tencentLogo from "./maker-logos/tencent.svg";
-import viduLogo from "./maker-logos/vidu.svg";
-import xaiLogo from "./maker-logos/xai.svg";
 import "./maker-logo.css";
 
 const COLOR_LOGOS: Partial<Record<CreditModelMaker, string>> = {
