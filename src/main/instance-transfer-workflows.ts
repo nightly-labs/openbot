@@ -1,4 +1,10 @@
-import { isWorkflowGraph, type WorkflowGraph, type WorkflowNode } from "@openbot/contracts/ipc";
+import {
+  isWorkflowGraph,
+  WORKFLOW_UNLINKED_CONNECTION,
+  type WorkflowFields,
+  type WorkflowGraph,
+  type WorkflowNode,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
 import { reason } from "./instance-transfer-preferences";
@@ -24,7 +30,7 @@ export function exportWorkflows(
   return workflows.slice(0, TRANSFER_WORKFLOWS).map((workflow) => ({
     title: workflow.title,
     graph: remapGraph(workflow.graph, agentKeys, channelKeys, true),
-    ...(workflow.graph.nodes.some(hasConnection) ? { relink: true } : {}),
+    ...(workflow.graph.nodes.some(needsLink) ? { relink: true } : {}),
   }));
 }
 
@@ -69,15 +75,27 @@ function remapGraph(
         fields.agentId = agentIds.get(fields.agentId) ?? "";
       if (node.kind === "output" && fields.target === "chat-channel" && typeof fields.channelId === "string")
         fields.channelId = channelIds.get(fields.channelId) ?? "";
-      if (clearConnections && hasConnection(node)) fields.connectionId = "";
-      return { ...node, fields };
+      return { ...node, fields: clearConnections && hasConnection(node) ? unlinked(fields) : fields };
     }),
+  };
+}
+
+function unlinked(fields: WorkflowFields): WorkflowFields {
+  return {
+    ...fields,
+    connectionId: WORKFLOW_UNLINKED_CONNECTION,
+    ...("placeId" in fields ? { placeId: "" } : {}),
+    ...("roles" in fields ? { roles: "" } : {}),
   };
 }
 
 function hasConnection(node: WorkflowNode): boolean {
   const value = node.fields.connectionId;
-  return typeof value === "string" && value !== "" && value !== "trigger";
+  return typeof value === "string" && value !== "" && value !== "trigger" && value !== WORKFLOW_UNLINKED_CONNECTION;
+}
+
+function needsLink(node: WorkflowNode): boolean {
+  return hasConnection(node) || node.fields.connectionId === WORKFLOW_UNLINKED_CONNECTION;
 }
 
 function isWebhookTrigger(node: WorkflowNode): boolean {

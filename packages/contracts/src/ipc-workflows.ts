@@ -61,6 +61,7 @@ export type WorkflowFields = Record<string, WorkflowFieldValue>;
 
 export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
 export const WORKFLOW_STEP_NAME_FIELD = "stepName";
+export const WORKFLOW_UNLINKED_CONNECTION = "unlinked";
 
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
