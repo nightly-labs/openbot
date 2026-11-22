@@ -420,11 +420,23 @@ describe("registerSecretValue", () => {
     expect(redactText("pw=claude-sonnet-5-5.")).not.toContain("sonnet-5-5");
   });
 
-  it("does not mask a saved value in a chat app post", () => {
+  it("masks a saved value in a chat app post only when it is a whole token", () => {
     registerSecretValue("acmeshop", { allowShort: true });
 
-    expect(redactPostText("Your Wi-Fi password is acmeshop. Write to biuro@acmeshop.pl")).toBe(
-      "Your Wi-Fi password is acmeshop. Write to biuro@acmeshop.pl",
+    expect(
+      redactPostText(
+        "Code: acmeshop. Write to biuro@acmeshop.pl, see https://acmeshop.pl/kontakt, acmeshopping, zażółćacmeshop",
+      ),
+    ).toBe(
+      "Code: [redacted]. Write to biuro@acmeshop.pl, see https://acmeshop.pl/kontakt, acmeshopping, zażółćacmeshop",
+    );
+  });
+
+  it("masks an internal token with no key format in a chat app post", () => {
+    registerSecretValue("mt4f9a2c7e1b3d5f60");
+
+    expect(redactPostText("Token: `mt4f9a2c7e1b3d5f60` and http://127.0.0.1:4100/mcp/mt4f9a2c7e1b3d5f60")).toBe(
+      "Token: `[redacted]` and http://127.0.0.1:4100/mcp/[redacted]",
     );
   });
 

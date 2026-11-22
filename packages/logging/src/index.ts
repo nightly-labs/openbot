@@ -107,7 +107,24 @@ export function redactSecrets(value: string): string {
 }
 
 export function redactPostText(value: string): string {
-  return applyKeyFormatRules(value);
+  return applyKeyFormatRules(maskWholeRegisteredSecrets(value));
+}
+
+const POST_TOKEN_CHARACTER = /[\p{L}\p{N}._~+@%-]/u;
+const POST_TOKEN_TAIL = /^[\p{L}\p{N}._~+@%-]*/u;
+const SENTENCE_DOTS = /^\.*$/u;
+
+function maskWholeRegisteredSecrets(value: string): string {
+  const pattern = registeredSecretPattern;
+  if (!pattern) return value;
+  return value.replace(pattern, (secret: string, offset: number) =>
+    isWholeToken(value, offset, offset + secret.length) ? "[redacted]" : secret,
+  );
+}
+
+function isWholeToken(value: string, start: number, end: number): boolean {
+  if (start > 0 && POST_TOKEN_CHARACTER.test(value.charAt(start - 1))) return false;
+  return SENTENCE_DOTS.test(POST_TOKEN_TAIL.exec(value.slice(end))?.[0] ?? "");
 }
 
 function redact(value: string, emails: boolean, keepUnscanned = false): string {
