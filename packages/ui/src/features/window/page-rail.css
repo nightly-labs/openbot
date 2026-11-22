@@ -242,6 +242,10 @@
   line-height: 1;
 }
 
+.window-rail-credits-count[data-empty] {
+  color: var(--openbot-text-muted);
+}
+
 .window-rail-credits-count[data-usage-tone="warning"] {
   color: var(--openbot-warning-text);
 }

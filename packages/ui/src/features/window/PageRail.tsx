@@ -296,8 +296,14 @@ function mediaCreditsTone(row: MediaCreditsRailRow) {
   return row.available > 0 ? "neutral" : "critical";
 }
 
+const EXACT_CREDITS_LIMIT = 10_000;
+
 function CreditsRailButton(props: { balance: number | undefined; current: boolean; onOpen: () => void }) {
   const { t, format } = useText();
+  const amount = (credits: number) =>
+    credits < EXACT_CREDITS_LIMIT
+      ? format.number(credits, { maximumFractionDigits: 0, roundingMode: "trunc" })
+      : format.number(credits, { notation: "compact", maximumFractionDigits: 1, roundingMode: "trunc" });
   const balance = () => props.balance;
   const label = () => {
     const credits = balance();
@@ -308,10 +314,10 @@ function CreditsRailButton(props: { balance: number | undefined; current: boolea
   const layout = () => (balance() === undefined ? "credit-rail-icon" : "credit-rail-icon window-rail-credits");
   return (
     <RailButton label={label()} class={layout()} current={props.current} onClick={props.onOpen}>
-      <CreditIcon tile />
+      <CreditIcon />
       <Show when={balance() !== undefined}>
-        <span class="window-rail-credits-count" aria-hidden="true">
-          {format.compact(balance() ?? 0)}
+        <span class="window-rail-credits-count" data-empty={(balance() ?? 0) <= 0 ? "" : undefined} aria-hidden="true">
+          {amount(balance() ?? 0)}
         </span>
       </Show>
     </RailButton>
