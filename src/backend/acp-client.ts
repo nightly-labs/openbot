@@ -305,6 +305,8 @@ interface AcpThread {
   backgroundSkipUntil: number;
   backgroundReplay: Deferred.Deferred<void> | null;
   workHold: { since: number; changedAt: number } | null;
+  wakesAfterCommands: boolean;
+  showsCommandWait: boolean;
   leftOutMcpServers: Map<McpServer, string>;
   throwaway: boolean;
   keepsHistory: boolean;
@@ -548,7 +550,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #subagents = newSubagentState();
   readonly #subagentThreads = new Map<string, string>();
   readonly #openCodeLaunches: OpenCodeLaunches = new Map();
-  readonly #selfWakes = new WeakMap<AcpThread, { left: number; until: number }>();
+  readonly #selfWakes = new WeakMap<AcpThread, { left: number; until: number; commands: string }>();
 
   constructor(
     cli: AgentCliInfo,
@@ -942,6 +944,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#turnContext.forget(sessionId);
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
+    this.#showCommandWait(thread, false);
     yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
   });
 
@@ -1866,6 +1869,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               backgroundSkipUntil: 0,
               backgroundReplay: null,
               workHold: null,
+              wakesAfterCommands: false,
+              showsCommandWait: false,
               leftOutMcpServers: new Map(),
               throwaway: isRecord(params) && params.ephemeral === true,
               keepsHistory: !isRecord(params) || params.persistSession !== false,
@@ -2374,6 +2379,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       thread.instructionsSent = thread.developerInstructions;
       thread.promptsSinceInstructions = 1;
     }
+    thread.wakesAfterCommands = isRecord(params) && params.wakeAfterCommands === true;
     const turn = this.#beginTurn(thread, turnId, {
       unprompted: false,
       answerOptional: isRecord(params) && params.answerOptional === true,
@@ -2493,6 +2499,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     };
     thread.activeTurn = turn;
     this.#threads.holdForTurn(thread);
+    this.#showCommandWait(thread, false);
     this.emit("notification", {
       method: "turn/started",
       params: {
@@ -2589,7 +2596,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           response = providerResult(reply);
         }
         const running: string = response.stopReason === "end_turn" && !staleWake ? this.#backgroundCommands(turn) : "";
-        if (!running) break;
+        if (!running || thread.wakesAfterCommands) break;
         const wake = yield* this.#awaitSessionChange(thread, turn);
         if (thread.activeTurn !== turn || turn.completing) return;
         if (wake === "steered") continue;
@@ -4006,6 +4013,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       status === "completed" &&
       !turn.stopped &&
       [...turn.toolItems.values()].some((item) => item.status === "in_progress");
+    const commands = thread.wakesAfterCommands && status === "completed" ? this.#backgroundCommands(turn) : "";
+    const commandWake = commands !== "" && !(turn.wake && commands === this.#selfWakes.get(thread)?.commands);
     for (const item of turn.toolItems.values()) {
       const interrupted = (this.#flavor.interruptToolsOnStop === true || turn.abandoned) && status !== "completed";
       const settled = interrupted ? { ...item, status: status === "failed" ? "failed" : "interrupted" } : item;
@@ -4019,7 +4028,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.toolItems.clear();
     const selfWakes =
       this.#flavor.wakesAfterPromptEnds === true && this.#steersByPrompt && status === "completed" && !turn.stopped
-        ? this.#selfWakesStarted(turn)
+        ? this.#selfWakesStarted(turn) + (commandWake ? 1 : 0)
         : 0;
     this.#emitSubagents(endSubagentTurn(this.#subagents, turn.id, new Date().toISOString()));
     if (!this.#subagents.turns.has(turn.id)) this.#subagentThreads.delete(turn.id);
@@ -4082,19 +4091,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
     }
+    if (commandWake) this.#showCommandWait(thread, true);
     this.emit("notification", {
       method: "turn/completed",
       params: { threadId: thread.id, turn: { id: turn.id, status } },
     });
     thread.activeTurn = null;
-    if (this.#threads.get(thread.id) !== thread) return;
+    if (this.#threads.get(thread.id) !== thread) return this.#showCommandWait(thread, false);
     const earlier = this.#selfWakes.get(thread);
     const kept = earlier && Date.now() < earlier.until ? earlier : null;
     const left = status === "completed" && !turn.stopped ? (kept?.left ?? 0) + selfWakes : 0;
     if (left > 0) {
       const until = selfWakes > 0 ? Date.now() + ACP_BACKGROUND_WATCH_MS : (kept?.until ?? 0);
-      const wake = { left, until };
+      const wake = { left, until, commands: commandWake ? commands : (kept?.commands ?? "") };
       this.#selfWakes.set(thread, wake);
+      this.#showCommandWait(thread, wake.commands !== "");
       Effect.runFork(this.#watchSelfWake(thread, wake).pipe(Effect.forkIn(this.#scope)));
     } else this.#selfWakes.delete(thread);
     if (workRuns || selfWakes > 0) this.#holdForWork(thread);
@@ -4176,8 +4187,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       yield* Effect.forkIn(this.#watchStall(thread, turn), this.#scope);
       return;
     }
-    if (this.#selfWakes.get(thread) === wake) this.#selfWakes.delete(thread);
+    if (this.#selfWakes.get(thread) !== wake) return;
+    this.#selfWakes.delete(thread);
+    this.#showCommandWait(thread, false);
   });
+
+  #showCommandWait(thread: AcpThread, shown: boolean): void {
+    if (thread.showsCommandWait === shown) return;
+    thread.showsCommandWait = shown;
+    this.emit("notification", { method: "openbot/background-work", params: { threadId: thread.id, running: shown } });
+  }
+
+  wakesAfterBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
+    return Effect.succeed(this.#threads.get(threadId)?.showsCommandWait === true);
+  }
 
   #isApprovedEditSweep(turn: AcpTurn, update: AcpToolCallUpdate, toolKind: string): boolean {
     const sweep = this.#flavor.approvedEditSweep;

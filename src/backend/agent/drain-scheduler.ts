@@ -1019,6 +1019,14 @@ export class DrainScheduler {
       }
       this.#conversation.emitConversation(snapshot);
 
+      const inOwnChat = (providerThreadId: string) =>
+        planNote === undefined &&
+        taskId === null &&
+        !ownSession &&
+        !channelDelivery &&
+        !messagingDelivery &&
+        batch.every((item) => item.delivery.sender.kind === "user") &&
+        this.#conversation.publicThreadId(agent.id, providerThreadId) === this.#store.get(agent.id)?.threadId;
       const startTurn = (providerThreadId: string) =>
         Effect.gen({ self: this }, function* () {
           yield* drainStep(requireServedModel(this.#providers.configRevision(client)));
@@ -1040,6 +1048,7 @@ export class DrainScheduler {
                   : {}),
                 answerOptional:
                   delivery.sender.kind === "agent" && delivery.expectsReply === false && !delivery.replyToMessageId,
+                wakeAfterCommands: inOwnChat(providerThreadId),
                 input: inputForThread(providerThreadId),
                 cwd: agent.workspacePath,
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
