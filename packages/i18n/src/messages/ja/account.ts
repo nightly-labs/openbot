@@ -20,6 +20,7 @@ export const messages = {
   "account.usage.notReported": "上限の報告なし",
   "account.usage.value.notReported": "報告なし",
   "account.usage.providerNotReported": "使用量データなし",
+  "account.usage.readFailed": "使用量を読み取れませんでした。後で再試行します。",
   "account.usage.row.unavailable": "{name}、表示できません",
   "account.usage.row.notReported": "{name}、使用量の報告なし",
   "account.usage.row.loading": "{name}、読み込み中",

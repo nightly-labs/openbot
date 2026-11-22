@@ -162,16 +162,19 @@ function UsageRings(props: {
   const { t, format } = useText();
   const rows = () => [props.row, ...props.shared];
   const label = () =>
-    t("app.rail.usageRings", {
-      name: format.list(rows().map((row) => row.name)),
-      windows: rows()
-        .flatMap((row) => row.windows)
-        .map((window) => t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }))
-        .join(", "),
-    });
+    unavailable()
+      ? t("app.rail.usageUnavailable", { name: props.row.name })
+      : t("app.rail.usageRings", {
+          name: format.list(rows().map((row) => row.name)),
+          windows: rows()
+            .flatMap((row) => row.windows)
+            .map((window) => t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }))
+            .join(", "),
+        });
   const ringRow = () =>
     rows().reduce((lowest, row) => ((row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest));
   const windows = () => [...ringRow().ringWindows].reverse().slice(0, 2);
+  const unavailable = () => props.row.readFailed && windows().length === 0;
   const outerRadius = (RING.size - RING.stroke) / 2;
   return (
     <RailButton
@@ -207,6 +210,18 @@ function UsageRings(props: {
             </g>
           )}
         </For>
+        {/* A dashed track: the usage could not be read. An empty solid track means none is left. */}
+        <Show when={unavailable()}>
+          <circle
+            class="window-rail-usage-track"
+            cx={RING.size / 2}
+            cy={RING.size / 2}
+            r={outerRadius}
+            stroke-width={RING.stroke}
+            pathLength={100}
+            stroke-dasharray="4 6"
+          />
+        </Show>
       </svg>
       <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
     </RailButton>
@@ -514,7 +529,7 @@ function RailLogo(props: { variant: AppLogoVariant; href: string | undefined }) 
 export function PageRail(props: PageRailProps) {
   const { t } = useText();
   const rings = createMemo((): UsageRing[] => {
-    const rows = props.usageRows.filter((row) => row.reportsUsage && row.windows.length > 0);
+    const rows = props.usageRows.filter((row) => row.reportsUsage && (row.windows.length > 0 || row.readFailed));
     const owner = (row: AccountUsageProviderRow) =>
       rows.find((other) => other.accountId === null && other.provider === row.sharedQuotaWith);
     return rows

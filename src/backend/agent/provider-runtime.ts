@@ -2,8 +2,10 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import { basename } from "node:path";
+import { RequestError } from "@agentclientprotocol/sdk";
 import type {
   AccountUsage,
+  AccountUsageLimit,
   AgentEvent,
   AgentModelId,
   AgentModelOption,
@@ -376,6 +378,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #ownResetCredits = new Map<AgentProvider, number | null>();
   readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   readonly #usageUnreported = new Set<AgentProvider>();
+  /** Providers whose own sign-in usage read failed last, for the rail's unavailable ring (#11771). */
+  readonly #usageReadFailed = new Set<AgentProvider>();
   readonly #usageGates = new Map<AgentProvider, UsageReadGate>();
   readonly #releasedUsage = new Map<string, { gate: UsageReadGate; usage: AccountUsage }>();
   readonly #customAgentUsage = new Map<string, { prompt: string; text: string | null; readAt: number }>();
@@ -995,7 +999,9 @@ export class ProviderRuntime implements ProviderPort {
       const collected = new Map<string, AccountUsage["limits"][number]>();
       const logFailure = (provider: AgentProvider) => this.#logUsageFailure(provider);
       const keptReading = (provider: AgentProvider) =>
-        this.#usageUnreported.has(provider) ? null : (this.#lastUsage.get(provider) ?? null);
+        this.#usageUnreported.has(provider)
+          ? null
+          : (this.#lastUsage.get(provider) ?? (this.#usageReadFailed.has(provider) ? readFailedLimit(provider) : null));
       const readOwn = (provider: AgentProvider) =>
         Effect.gen({ self: this }, function* () {
           let usage: AccountUsage;
@@ -1049,6 +1055,7 @@ export class ProviderRuntime implements ProviderPort {
           const limit = usage.limits[0];
           if (!limit || (!limit.primary && !limit.secondary)) {
             this.#usageUnreported.add(provider);
+            this.#usageReadFailed.delete(provider);
             return null;
           }
           this.#keepUsage(provider, usage);
@@ -1066,8 +1073,15 @@ export class ProviderRuntime implements ProviderPort {
               },
             })
             .pipe(
+              // A failed read keeps the last reading. With none, the rail shows the provider as unavailable.
               Effect.catch((error) =>
-                Effect.fail(error).pipe(this.#logUsageFailure(provider), Effect.as(keptReading(provider))),
+                Effect.fail(error).pipe(
+                  this.#logUsageFailure(provider),
+                  Effect.map(() => {
+                    if (!usageReadRefused(error)) this.#usageReadFailed.add(provider);
+                    return keptReading(provider);
+                  }),
+                ),
               ),
             );
           if (!limit) return;
@@ -1341,12 +1355,14 @@ export class ProviderRuntime implements ProviderPort {
     const limit = usage.limits[0];
     if (!limit || (!limit.primary && !limit.secondary)) return;
     this.#usageUnreported.delete(provider);
+    this.#usageReadFailed.delete(provider);
     this.#lastUsage.set(provider, { ...limit, id: provider });
   }
 
   #forgetUsage(provider: AgentProvider): void {
     this.#usageGate(provider).reset();
     this.#lastUsage.delete(provider);
+    this.#usageReadFailed.delete(provider);
     this.#ownResetCredits.delete(provider);
     for (const key of [...this.#releasedUsage.keys()])
       if (key.startsWith(releasedUsageKey(provider, ""))) this.#releasedUsage.delete(key);
@@ -4493,5 +4509,20 @@ export class ProviderOperationFailed extends Schema.TaggedError<ProviderOperatio
   cause: Schema.Defect(),
 }) {}
 const { sync: providerStep, rewrap: toProviderOperationFailed } = causeHelpers(ProviderOperationFailed);
+
+/** The reading of a provider whose own usage read failed, with no earlier reading to keep (#11771). */
+function readFailedLimit(provider: AgentProvider): AccountUsageLimit {
+  return { id: provider, primary: null, secondary: null, readFailed: true };
+}
+
+/**
+ * Whether the provider refused the usage read for its sign-in, as Grok's billing refuses an xAI API key
+ * with "Authentication required". That sign-in has no plan usage, so it gets no unavailable ring.
+ */
+function usageReadRefused(error: { readonly cause: unknown }): boolean {
+  return (
+    (error.cause instanceof RequestError && error.cause.code === -32000) || classifyUserError(error.cause) === "auth"
+  );
+}
 
 export { toProviderOperationFailed };

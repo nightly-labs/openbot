@@ -171,6 +171,7 @@ import {
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   type TeamCurrentCapability,
@@ -275,6 +276,7 @@ import {
   withUiBlockVaultRequests,
 } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import { USAGE_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/usage-credits-v1";
+import { usageEventWithoutReadFailed } from "@openbot/contracts/team-protocol/usage-read-failed-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -1556,8 +1558,10 @@ export class TeamApiServer {
     providerHidden?: ReadonlySet<string>,
   ): string | null {
     const protocol = eventProtocol(capabilities);
-    const visible = this.#peerView(event, capabilities, blocked, providerHidden);
-    if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
+    const view = this.#peerView(event, capabilities, blocked, providerHidden);
+    if (!isAgentEvent(view) && !isTeamRealtimeEvent(view)) return null;
+    const visible = usageEventForPeer(view, capabilities);
+    if (visible === null) return null;
     if (protocol !== 1) {
       const encoded = (
         protocol === 8
@@ -1578,6 +1582,7 @@ export class TeamApiServer {
         backgroundWork: capabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
         usageGroups: capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
+        usageReadFailed: capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         queueHold: capabilities.has(QUEUE_HOLD_CAPABILITY),
         queueHoldSignIn: capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
@@ -2398,6 +2403,7 @@ export class TeamApiServer {
       memoryChanges: route.capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
       usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
       usageGroups: route.capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
+      usageReadFailed: route.capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY),
       agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
       queueHold: route.capabilities.has(QUEUE_HOLD_CAPABILITY),
       queueHoldSignIn: route.capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
@@ -2971,6 +2977,19 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
   };
 }
 
+/**
+ * A peer without `usage-read-failed-v1` gets the usage events that it got before, with no limit for a
+ * failed read, and no event when nothing else is left in it (#11771).
+ */
+function usageEventForPeer(
+  event: AgentEvent | TeamRealtimeEvent,
+  capabilities: ReadonlySet<string>,
+): AgentEvent | TeamRealtimeEvent | null {
+  if (event.type !== "usage-changed" || capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY)) return event;
+  const usage = usageEventWithoutReadFailed(event.usage);
+  return usage === event.usage ? event : usage && { ...event, usage };
+}
+
 function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 | 6 | 7 | 8 {
   if (capabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)) return 8;
   if (capabilities.has(TEAM_PI_MUSE_CAPABILITY)) return 7;
@@ -2986,6 +3005,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_CONTEXT_USAGE_CAPABILITY,
   AGENT_BACKGROUND_WORK_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,

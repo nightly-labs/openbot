@@ -94,6 +94,7 @@ export const messages = defineMessages("app", {
     "My AI agents now work on my own computer with OpenBot. My chats and files stay with me. Try it: {site}",
   "app.socialFollow.redditTitle": "How I use OpenBot",
   "app.rail.usageRings": "{name} usage: {windows}. Open usage",
+  "app.rail.usageUnavailable": "{name} usage unavailable. Open usage",
   "app.rail.customAgentUsage": "{name} usage. Open usage",
   "app.rail.moreUsage": { one: "{count} more account. Open usage", other: "{count} more accounts. Open usage" },
   "app.rail.moreUsageCount": "+{count}",

@@ -20,6 +20,7 @@ export const messages = {
   "account.usage.notReported": "لم يُبلَّغ عن حد",
   "account.usage.value.notReported": "غير مُبلَّغ",
   "account.usage.providerNotReported": "لا توجد قراءة للاستخدام",
+  "account.usage.readFailed": "تعذّرت قراءة الاستخدام. ستُعاد المحاولة لاحقًا.",
   "account.usage.row.unavailable": "{name}، غير متاح",
   "account.usage.row.notReported": "{name}، لم يُبلَّغ عن الاستخدام",
   "account.usage.row.loading": "{name}، جارٍ التحميل",

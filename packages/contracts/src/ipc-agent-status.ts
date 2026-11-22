@@ -237,6 +237,13 @@ export interface AccountUsageLimit {
   groups?: AccountUsageGroup[];
   sharedQuotaWith?: AgentProviderId;
   creditsAvailable?: boolean;
+  /**
+   * The provider's own sign-in only: its last usage read failed and no earlier reading is kept, so
+   * `primary` and `secondary` are null. The rail shows the provider as unavailable instead of hiding
+   * it (#11771). A provider that has no plan usage, or that refused the read for its sign-in, has no
+   * limit at all. The Team API sends it only to a peer with `usage-read-failed-v1`.
+   */
+  readFailed?: true;
 }
 
 export interface AccountUsage {
@@ -260,7 +267,8 @@ export function isAccountUsage(value: unknown): value is AccountUsage {
             limit.groups.length <= MAX_USAGE_GROUPS &&
             limit.groups.every(isAccountUsageGroup))) &&
         (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)) &&
-        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean"),
+        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean") &&
+        (limit.readFailed === undefined || limit.readFailed === true),
     )
   );
 }

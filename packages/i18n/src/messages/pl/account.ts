@@ -20,6 +20,7 @@ export const messages = {
   "account.usage.notReported": "Brak danych o limicie",
   "account.usage.value.notReported": "Brak danych",
   "account.usage.providerNotReported": "Brak odczytu użycia",
+  "account.usage.readFailed": "Nie można odczytać użycia. Ponowna próba później.",
   "account.usage.row.unavailable": "{name}, niedostępne",
   "account.usage.row.notReported": "{name}, brak danych o użyciu",
   "account.usage.row.loading": "{name}, wczytywanie",

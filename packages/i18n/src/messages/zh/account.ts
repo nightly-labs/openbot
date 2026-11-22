@@ -20,6 +20,7 @@ export const messages = {
   "account.usage.notReported": "未报告额度上限",
   "account.usage.value.notReported": "未报告",
   "account.usage.providerNotReported": "无用量数据",
+  "account.usage.readFailed": "无法读取用量，稍后重试。",
   "account.usage.row.unavailable": "{name}，不可用",
   "account.usage.row.notReported": "{name}，未报告用量",
   "account.usage.row.loading": "{name}，加载中",
