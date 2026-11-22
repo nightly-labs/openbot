@@ -4173,7 +4173,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     while (Date.now() < wake.until) {
       yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
       if (this.#selfWakes.get(thread) !== wake) return;
-      if (thread.activeTurn || this.#openingTurns.has(thread.id)) return;
+      if (thread.activeTurn || this.#openingTurns.has(thread.id)) {
+        before = undefined;
+        continue;
+      }
       if (this.#threads.get(thread.id) !== thread || thread.needsResume) break;
       const read = yield* Effect.result(this.#sessionUpdatedAt(thread));
       if (Result.isFailure(read)) continue;
@@ -4182,7 +4185,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         before = read.success;
         continue;
       }
-      if (this.#selfWakes.get(thread) !== wake || thread.activeTurn || this.#openingTurns.has(thread.id)) return;
+      if (this.#selfWakes.get(thread) !== wake) return;
+      if (thread.activeTurn || this.#openingTurns.has(thread.id)) {
+        before = undefined;
+        continue;
+      }
       if (this.#threads.get(thread.id) !== thread || thread.needsResume) break;
       wake.left -= 1;
       const turn = this.#beginTurn(thread, randomUUID(), { unprompted: false, answerOptional: true, wake: true });
