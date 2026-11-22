@@ -174,9 +174,9 @@ export function isUsageLimitDiagnostic(message: string): boolean {
 }
 
 export function isPlanLimitDiagnostic(message: string): boolean {
-  if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
+  if (isBalanceDiagnostic(message) && !/\b(?:try again at|limit · resets)\b/iu.test(message)) return false;
   return (
-    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|\d+-hour) )*limit\b/iu.test(message) ||
+    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|fable|\d+-hour) )*limit\b/iu.test(message) ||
     /\b(?:hit|reached) your (?:session|weekly|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit\b/iu.test(
       message,
     ) ||
@@ -208,6 +208,10 @@ export function providerResetDelayMs(message: string): number | null {
 
 export function isBalanceDiagnostic(message: string): boolean {
   return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
+}
+
+export function isSpentBalanceDiagnostic(message: string): boolean {
+  return isBalanceDiagnostic(message) && !isPlanLimitDiagnostic(message);
 }
 
 export function isImageTooSmallDiagnostic(message: string): boolean {
