@@ -35,6 +35,7 @@ interface Report {
     wakePrompt: string;
   };
   otherTurn?: { events: Seen[]; turnsStarted: number; listedWhileOpen: boolean };
+  answeredInNextTurn?: { events: Seen[]; waitsAfterTurn: boolean };
   failure?: string;
 }
 
@@ -90,13 +91,18 @@ async function open(name: string): Promise<{ client: AgentClient; log: string; t
   return { client, log, thread };
 }
 
-async function startTurn(client: AgentClient, thread: string, wakeAfterCommands: boolean): Promise<string> {
+async function startTurn(
+  client: AgentClient,
+  thread: string,
+  wakeAfterCommands: boolean,
+  text = "linger",
+): Promise<string> {
   const turnId = await runCauseEffect(
     client.request(
       "turn/start",
       {
         threadId: thread,
-        input: [{ type: "text", text: "linger", text_elements: [] }],
+        input: [{ type: "text", text, text_elements: [] }],
         ...(wakeAfterCommands ? { wakeAfterCommands } : {}),
       },
       (value) => getString(getRecord(value, "turn"), "id"),
@@ -173,6 +179,24 @@ try {
   assert.ok(!otherSeen.some((entry) => entry.method === "background-work"));
   assert.ok(otherSeen.some((entry) => entry.text?.includes("The command finished.")));
   report.otherTurn = { events: otherSeen, turnsStarted, listedWhileOpen };
+
+  const next = await open("next-turn");
+  const nextSeen = record(next.client, next.thread);
+  await startTurn(next.client, next.thread, true);
+  await waitFor(() => completions(nextSeen) === 1, "the chat turn completes while its command runs");
+  assert.equal(await waits(next.client, next.thread), true);
+  const beforeStatus = nextSeen.length;
+  await startTurn(next.client, next.thread, true, "status");
+  await waitFor(() => completions(nextSeen) === 2, "the next turn reads the finished command");
+  const statusEvents = nextSeen.slice(beforeStatus);
+  assert.ok(statusEvents.some((entry) => entry.text === "The command already finished."));
+  assert.ok(
+    !statusEvents.some((entry) => entry.method === "background-work" && entry.running),
+    "A command that the next turn saw finish must not show the wait again.",
+  );
+  const waitsAfterTurn = await waits(next.client, next.thread);
+  assert.equal(waitsAfterTurn, false);
+  report.answeredInNextTurn = { events: statusEvents, waitsAfterTurn };
 
   report.passed = true;
 } catch (error) {

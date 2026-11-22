@@ -4015,6 +4015,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       [...turn.toolItems.values()].some((item) => item.status === "in_progress");
     const commands = thread.wakesAfterCommands && status === "completed" ? this.#backgroundCommands(turn) : "";
     const commandWake = commands !== "" && !(turn.wake && commands === this.#selfWakes.get(thread)?.commands);
+    const earlierCommands = (this.#selfWakes.get(thread)?.commands ?? "").split("\n").filter(Boolean);
+    const endedTools = new Set(turn.messages.flatMap((item) => (item.type === "toolCall" ? [item.id] : [])));
+    const stillRunning = earlierCommands
+      .filter((id) => !endedTools.has(id) && (turn.toolItems.get(id)?.status ?? "in_progress") === "in_progress")
+      .join("\n");
+    const endedCommandWake = !turn.wake && earlierCommands.length > 0 && stillRunning === "" ? 1 : 0;
     for (const item of turn.toolItems.values()) {
       const interrupted = (this.#flavor.interruptToolsOnStop === true || turn.abandoned) && status !== "completed";
       const settled = interrupted ? { ...item, status: status === "failed" ? "failed" : "interrupted" } : item;
@@ -4091,19 +4097,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
     }
-    if (commandWake) this.#showCommandWait(thread, true);
+    if (commandWake && this.#threads.get(thread.id) === thread) this.#showCommandWait(thread, true);
     this.emit("notification", {
       method: "turn/completed",
       params: { threadId: thread.id, turn: { id: turn.id, status } },
     });
     thread.activeTurn = null;
-    if (this.#threads.get(thread.id) !== thread) return this.#showCommandWait(thread, false);
+    if (this.#threads.get(thread.id) !== thread) return;
     const earlier = this.#selfWakes.get(thread);
     const kept = earlier && Date.now() < earlier.until ? earlier : null;
-    const left = status === "completed" && !turn.stopped ? (kept?.left ?? 0) + selfWakes : 0;
+    const keptWakes = Math.max(0, (kept?.left ?? 0) - endedCommandWake);
+    const left = status === "completed" && !turn.stopped ? keptWakes + selfWakes : 0;
     if (left > 0) {
       const until = selfWakes > 0 ? Date.now() + ACP_BACKGROUND_WATCH_MS : (kept?.until ?? 0);
-      const wake = { left, until, commands: commandWake ? commands : (kept?.commands ?? "") };
+      const wake = { left, until, commands: commandWake ? commands : kept ? stillRunning : "" };
       this.#selfWakes.set(thread, wake);
       this.#showCommandWait(thread, wake.commands !== "");
       Effect.runFork(this.#watchSelfWake(thread, wake).pipe(Effect.forkIn(this.#scope)));
@@ -4160,7 +4167,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #watchSelfWake = Effect.fn("AcpAgentClient.watchSelfWake")(function* (
     this: AcpAgentClient,
     thread: AcpThread,
-    wake: { left: number; until: number },
+    wake: { left: number; until: number; commands: string },
   ) {
     let before: string | undefined;
     while (Date.now() < wake.until) {
@@ -4180,7 +4187,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       wake.left -= 1;
       const turn = this.#beginTurn(thread, randomUUID(), { unprompted: false, answerOptional: true, wake: true });
       turn.task = yield* Effect.forkIn(
-        this.#consumePrompt(thread, turn, [{ type: "text", text: SELF_WAKE_NOTE }], {}),
+        this.#consumePrompt(
+          thread,
+          turn,
+          [{ type: "text", text: wake.commands ? BACKGROUND_WAKE_NOTE : SELF_WAKE_NOTE }],
+          {},
+        ),
         this.#scope,
         { startImmediately: true },
       );

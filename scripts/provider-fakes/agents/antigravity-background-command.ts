@@ -88,6 +88,11 @@ serveFakeAcpAgent({
     } else if (text.includes("<openbot_background_wake>") && finishedCommand(sessionId)) {
       peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId: COMMAND, status: "completed" });
       peer.say(sessionId, "The command finished.");
+    } else if (text.endsWith("status") && session?.commandAt) {
+      session.commandAt = null;
+      session.finished = true;
+      peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId: COMMAND, status: "completed" });
+      peer.say(sessionId, "The command already finished.");
     } else peer.say(sessionId, "ok");
     replies += 1;
     peer.reply(request, {
