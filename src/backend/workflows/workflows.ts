@@ -138,11 +138,13 @@ import {
   modelAnswerAsk,
   readAnswer,
   readableAnswerInputs,
+  readGivenAnswer,
   runInputProblems,
   stepAnswer,
   stepAnswerGap,
   type TemplateReader,
   templateValues,
+  toolAnswerFixAsk,
   webhookAnswerEvent,
   withRunAnswerSpec,
 } from "./workflow-answers";
@@ -287,6 +289,13 @@ export interface WorkflowRunEnd {
   stepKinds: WorkflowNodeKind[];
 }
 
+type WorkflowToolAnswer =
+  | { kind: "none" }
+  | { kind: "several" }
+  | { kind: "free" }
+  | { kind: "saved" }
+  | { kind: "problems"; text: string };
+
 export interface WorkflowsDependencies {
   store: WorkflowStore;
   runs: WorkflowRunStore;
@@ -418,6 +427,7 @@ interface WorkflowsShape {
   run(runId: string): Effect.Effect<WorkflowRunDetail, WorkflowFailed>;
   stepSettings(stepId: string): Effect.Effect<WorkflowStepSettings, WorkflowFailed>;
   workflowOf(ref: { runId: string } | { stepId: string }): Effect.Effect<WorkflowRunScope | null, WorkflowFailed>;
+  giveAnswer(deliveryIds: readonly string[], value: unknown): Effect.Effect<WorkflowToolAnswer, WorkflowFailed>;
   sweep(): Effect.Effect<void>;
   notice(event: AgentEvent): Effect.Effect<void>;
   working(): boolean;
@@ -552,9 +562,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (delivery.turnId) runs.attachTurn(step.id, delivery.turnId, now());
           if (delivery.status === "completed") {
             if (delivery.error) return settle(step, { status: "failed", error: delivery.error });
+            const fields = answerFields(step.settings);
+            const toolAnswer = fields.length > 0 ? (runs.step(step.id)?.output ?? null) : null;
+            if (toolAnswer !== null) return settle(step, { status: "done", output: toolAnswer });
             const answer = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             const output = answer === null || isNoUpdateAnswer(answer) ? "" : answer;
-            const fields = answerFields(step.settings);
             if (fields.length === 0) return settle(step, { status: "done", output });
             const read = readAnswer(fields, output);
             if ("output" in read) return settle(step, { status: "done", output: read.output });
@@ -2227,6 +2239,28 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           });
         });
 
+        const giveAnswer = Effect.fn("Workflows.giveAnswer")(function* (
+          deliveryIds: readonly string[],
+          value: unknown,
+        ) {
+          return yield* attempt((): WorkflowToolAnswer => {
+            const steps = deliveryIds.flatMap((deliveryId) => {
+              const step = runs.runningAgentStep(deliveryId);
+              return step ? [{ step, deliveryId }] : [];
+            });
+            const [found, ...others] = steps;
+            if (!found) return { kind: "none" };
+            if (others.length > 0) return { kind: "several" };
+            const fields = answerFields(found.step.settings);
+            if (fields.length === 0) return { kind: "free" };
+            const read = readGivenAnswer(fields, value);
+            if ("problems" in read) return { kind: "problems", text: toolAnswerFixAsk(fields, read.problems) };
+            if (!runs.keepAgentAnswer(found.step.id, found.deliveryId, read.output, now())) return { kind: "none" };
+            changed(found.step.workflowId);
+            return { kind: "saved" };
+          });
+        });
+
         return Workflows.of({
           list,
           listWithGraphs,
@@ -2263,6 +2297,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           run,
           stepSettings,
           workflowOf,
+          giveAnswer,
           sweep,
           notice,
           working: () => working.size > 0,

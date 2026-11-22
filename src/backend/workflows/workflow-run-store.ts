@@ -291,6 +291,25 @@ export class WorkflowRunStore {
     return databaseRows(rows).map(toStep);
   }
 
+  runningAgentStep(deliveryId: string): StoredWorkflowStep | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare(`${STEP_SELECT} WHERE delivery_id = ? AND status = 'running' AND kind = 'agent'`)
+        .get(deliveryId),
+    );
+    return row ? toStep(row) : null;
+  }
+
+  keepAgentAnswer(stepId: string, deliveryId: string, output: string, now = new Date()): boolean {
+    return (
+      this.#database.connection
+        .prepare(
+          "UPDATE workflow_steps SET output = ?, updated_at = ? WHERE step_id = ? AND delivery_id = ? AND status = 'running'",
+        )
+        .run(output, now.toISOString(), stepId, deliveryId).changes > 0
+    );
+  }
+
   openSteps(): StoredWorkflowStep[] {
     return databaseRows(
       this.#database.connection

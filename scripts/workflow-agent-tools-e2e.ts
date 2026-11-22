@@ -196,7 +196,7 @@ try {
   const ready = search.tools.filter((tool) => "inputSchema" in tool).map((tool) => tool.name);
   check(
     "a workflow search gives all 6 workflow tools with schemas, and the guidance",
-    ready.filter((name) => name.includes("workflow")).length === 6 &&
+    ready.filter((name) => name.includes("workflow") && !name.endsWith(".workflow_answer")).length === 6 &&
       (search.guidance ?? []).some((text) => text.includes("Fields by kind")),
     search,
   );
@@ -209,7 +209,9 @@ try {
   const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
   check(
     "a canvas search gives all 6 workflow tools with schemas",
-    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 6,
+    canvas.tools.filter(
+      (tool) => tool.name.includes("workflow") && !tool.name.endsWith(".workflow_answer") && "inputSchema" in tool,
+    ).length === 6,
     canvas.tools.map((tool) => tool.name),
   );
   const otherReady = ["click canvas", "connect routine agents canvas"].flatMap((query) =>

@@ -82,7 +82,7 @@ import {
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
 } from "./routine-tool-schema";
-import { WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
+import { WORKFLOW_ANSWER_TOOL_DEFINITION, WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
 
 interface OpenBotToolDefinition {
   name: string;
@@ -284,6 +284,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   ...ROUTINE_FLOW_TOOL_DEFINITIONS,
   ...WORKFLOW_TOOL_DEFINITIONS,
+  WORKFLOW_ANSWER_TOOL_DEFINITION,
   ...CRM_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {

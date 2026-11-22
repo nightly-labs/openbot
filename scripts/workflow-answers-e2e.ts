@@ -12,7 +12,7 @@ import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../src/backend/workflows/workflow-store";
-import { handleWorkflowTool } from "../src/backend/workflows/workflow-tools";
+import { handleWorkflowAnswerTool, handleWorkflowTool } from "../src/backend/workflows/workflow-tools";
 import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
 import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/workflows";
 
@@ -117,6 +117,14 @@ const complete = (deliveryId: string, answer: string) => {
   turnAnswers.set(turnId, answer);
 };
 
+async function answerTool(args: unknown, deliveryIds: readonly string[]) {
+  assert.ok(service);
+  const response = await runCauseEffect(handleWorkflowAnswerTool(args, service, deliveryIds));
+  const item = response.contentItems[0];
+  assert.ok(item && item.type === "inputText");
+  return { ok: response.success, text: item.text };
+}
+
 async function tool(name: string, args: unknown) {
   assert.ok(service);
   const response = await runCauseEffect(
@@ -202,7 +210,8 @@ try {
   check(
     "the agent task gets the answer values and the answer request",
     handoff?.text.includes("Handle the high ticket for 3 users.") === true &&
-      handoff.text.includes("End your reply with one JSON object") &&
+      handoff.text.includes("openbot.workflow_answer") &&
+      handoff.text.includes("end your reply with the same JSON object") &&
       handoff.text.includes("- done: true or false"),
     handoff?.text,
   );
@@ -303,6 +312,36 @@ try {
     stepOf(detail, "agent")?.status === "failed" &&
       stepOf(detail, "agent")?.error === sourceText("error.workflow.answerInvalid", { fields: "done" }),
     stepOf(detail, "agent"),
+  );
+
+  modelReplies = ['{"priority":"high","count":5}'];
+  const viaTool = await startRun(workflows, "Answer with the tool", triageGraph("priority = high", REPORT));
+  await runUntil(workflows, viaTool, (run) => stepOf(run, "agent")?.status === "running");
+  const toolDelivery = report.handoffs.at(-1)?.deliveryId ?? "";
+  const handoffsBefore = report.handoffs.length;
+  const misfit = await answerTool({ answer: { summary: "Restarted", done: "maybe" } }, [toolDelivery]);
+  check(
+    "workflow_answer refuses an answer that does not fit and tells the agent what to correct",
+    !misfit.ok && misfit.text.includes("done") && misfit.text.includes("Call workflow_answer again"),
+    misfit.text,
+  );
+  const right = await answerTool({ answer: '{"summary":"Restarted the service","done":true}' }, [toolDelivery]);
+  check("workflow_answer keeps an answer that fits, also given as JSON text", right.ok, right.text);
+  complete(toolDelivery, "I restarted the service and told the users.");
+  detail = await runUntil(workflows, viaTool, ended);
+  check(
+    "the step takes the tool answer, not the text of the reply, and asks for no fix",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === '{"summary":"Restarted the service","done":true}' &&
+      report.handoffs.length === handoffsBefore,
+    { step: stepOf(detail, "agent"), handoffs: report.handoffs.length - handoffsBefore },
+  );
+  const outside = await answerTool({ answer: { summary: "x", done: true } }, ["delivery-not-a-step"]);
+  const afterEnd = await answerTool({ answer: { summary: "x", done: true } }, [toolDelivery]);
+  check(
+    "workflow_answer outside a running workflow step is refused",
+    !outside.ok && outside.text.includes("only in a workflow step") && !afterEnd.ok,
+    { outside, afterEnd },
   );
 
   const refused = await tool("edit_workflow", {

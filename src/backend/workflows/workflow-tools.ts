@@ -3,6 +3,7 @@ import {
   isGitHubRepositoryName,
   isRoutineSchedule,
   isWorkflowGraph,
+  lastJsonObject,
   WORKFLOW_BRANCHES,
   WORKFLOW_DISCORD_EVENTS,
   WORKFLOW_GITHUB_EVENTS,
@@ -39,6 +40,7 @@ import { z } from "zod";
 import { openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import { ToolOperationFailed, toolStep } from "../agent/tool-operation";
 import { githubTriggerRepositories } from "./github-matching";
+import { WORKFLOW_ANSWER_TOOL } from "./workflow-answers";
 import { runtimeFields } from "./workflow-graph";
 import { WorkflowStoreError } from "./workflow-store";
 import type { WorkflowsHandle } from "./workflows";
@@ -56,6 +58,7 @@ export type WorkflowTools = Pick<
   | "runs"
   | "run"
   | "stepSettings"
+  | "giveAnswer"
 >;
 
 const identifier = z.string().min(1).max(INPUT_LIMITS.identifier);
@@ -142,6 +145,53 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
     shape: runsSchema.shape,
   },
 ] as const;
+
+const answerToolSchema = z
+  .object({
+    answer: z
+      .union([z.object({}).catchall(z.unknown()), z.string().max(INPUT_LIMITS.workflowStepInput)])
+      .describe("the answer fields of the step as one JSON object"),
+  })
+  .strict();
+
+export const WORKFLOW_ANSWER_TOOL_DEFINITION = {
+  name: WORKFLOW_ANSWER_TOOL,
+  description:
+    "Only in a workflow step that asks for answer fields: give them as one JSON object. OpenBot checks them at once and tells you what to correct; then call it again. The last answer that fits is the result of the step.",
+  shape: answerToolSchema.shape,
+} as const;
+
+export const handleWorkflowAnswerTool = Effect.fn("WorkflowTools.answer")(function* (
+  args: unknown,
+  workflows: Pick<WorkflowTools, "giveAnswer"> | null,
+  deliveryIds: readonly string[],
+) {
+  const input = yield* toolStep(() => answerToolSchema.parse(args ?? {}));
+  if (!workflows) return yield* new ToolOperationFailed({ cause: new Error("Workflows are unavailable.") });
+  const value = typeof input.answer === "string" ? (lastJsonObject(input.answer) ?? input.answer) : input.answer;
+  const result = yield* workflows
+    .giveAnswer(deliveryIds, value)
+    .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+  switch (result.kind) {
+    case "saved":
+      return openBotToolResult({
+        status: "saved",
+        note: "OpenBot keeps this answer as the result of the step. Finish your turn.",
+      });
+    case "problems":
+      return openBotToolFailure(result.text);
+    case "free":
+      return openBotToolFailure("This workflow step asks for no answer fields. Give your answer as text.");
+    case "several":
+      return openBotToolFailure(
+        "This turn has more than one workflow step. End your reply with one JSON object with the answer fields.",
+      );
+    case "none":
+      return openBotToolFailure(
+        "Use this tool only in a workflow step that asks for answer fields. Give your answer as usual.",
+      );
+  }
+});
 
 export const WORKFLOW_TOOL_NAMES: ReadonlySet<string> = new Set(WORKFLOW_TOOL_DEFINITIONS.map((tool) => tool.name));
 
