@@ -88,6 +88,7 @@ export function CreditTargetSelect(props: {
         )}
         align="end"
         menuClass="credit-picker-menu"
+        currentCheck={false}
         triggerClass="credit-corner-select"
         triggerLabel={t("billing.credits.forLabel")}
       >

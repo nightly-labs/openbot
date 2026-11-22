@@ -704,6 +704,10 @@ svg.credit-target-logo {
   max-width: calc(100vw - var(--openbot-space-4));
 }
 
+.credit-picker-menu .search-picker-option[aria-selected="true"] {
+  box-shadow: inset 0 0 0 1px var(--openbot-border-strong);
+}
+
 .search-picker-option .credit-picker-logo {
   width: 18px;
   height: 18px;

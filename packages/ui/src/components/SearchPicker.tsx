@@ -28,6 +28,7 @@ export interface SearchPickerProps<Option> {
   trailing?: ((option: Option) => JSX.Element) | undefined;
   align?: PickerAlign | undefined;
   menuClass?: string | undefined;
+  currentCheck?: boolean | undefined;
   triggerClass: string;
   triggerLabel: string;
   children: JSX.Element;
@@ -128,7 +129,7 @@ export function SearchPicker<Option>(props: SearchPickerProps<Option>) {
                 {props.leading(item.item.rawValue)}
                 <MatchedName class="search-picker-name" name={props.optionName(item.item.rawValue)} query={query()} />
                 {props.trailing?.(item.item.rawValue)}
-                <Show when={isCurrent(item.item.rawValue)}>
+                <Show when={props.currentCheck !== false && isCurrent(item.item.rawValue)}>
                   <Check aria-hidden="true" class="search-picker-check" />
                 </Show>
               </Combobox.Item>
