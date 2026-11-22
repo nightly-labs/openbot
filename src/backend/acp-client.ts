@@ -574,6 +574,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
       deletesSessions: () => this.#deletesSessions,
       effortCategories: options.flavor.effortCategories,
+      stillStarting: options.flavor.stillStarting,
     });
   }
 

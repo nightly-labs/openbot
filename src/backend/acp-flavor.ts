@@ -79,6 +79,7 @@ export interface AcpFlavor {
     error: unknown,
     method: "load" | "resume",
   ): "wait-for-start" | "list-sessions" | "confirm-missing" | null;
+  stillStarting?(error: unknown): boolean;
   lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
   refusesUntilRestart?(error: unknown): boolean;
   lostServerUntilRestart?(error: unknown): boolean;

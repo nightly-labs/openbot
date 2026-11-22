@@ -8,7 +8,7 @@ import {
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Exit, Fiber, type Scope, Semaphore } from "effect";
+import { Effect, Exit, Fiber, Schedule, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
 import { type AgentProvider, ProviderModelNotOfferedError } from "./agent-client";
 import { isRecord } from "./protocol";
@@ -28,6 +28,8 @@ const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
 const MODEL_REASONING_CLEANUP_MS = 1_000;
 
 const MODEL_DISCOVERY_RETURN_MS = 250;
+
+const PROBE_START_RETRY_MS = 1_000;
 
 export interface AcpModel {
   id: string;
@@ -64,6 +66,7 @@ export interface AcpConfigurationOptions {
   probeCloseDelayMs?: number | undefined;
   effortCategories?: readonly string[] | undefined;
   deletesSessions?: () => boolean;
+  stillStarting?: ((error: unknown) => boolean) | undefined;
 }
 
 const EFFORT_CATEGORIES: readonly string[] = ["thought_level"];
@@ -103,7 +106,7 @@ export class AcpConfiguration {
     const connection = yield* providerSync(() => this.options.connection());
     const deadline = Date.now() + requestTimeoutMs - MODEL_DISCOVERY_RETURN_MS;
     const sweep = Effect.acquireUseRelease(
-      this.#openProbe(connection),
+      this.#openProbe(connection, deadline),
       (probe) =>
         this.#modelReasoningEffortsEffect(
           connection,
@@ -159,9 +162,27 @@ export class AcpConfiguration {
 
   #openProbe(
     connection: ClientSideConnection,
+    deadline: number,
   ): Effect.Effect<SessionSetupResponse & { sessionId: string }, ProviderClientOperationError> {
     const cwd = this.options.discoveryCwd?.() ?? process.cwd();
-    const opened = providerCall(() => connection.newSession({ cwd, mcpServers: [] }));
+    const stillStarting = this.options.stillStarting;
+    const opened = Effect.suspend(() => {
+      let attemptStartedAt = 0;
+      let longestAttemptMs = 0;
+      return Effect.suspend(() => {
+        attemptStartedAt = Date.now();
+        return providerCall(() => connection.newSession({ cwd, mcpServers: [] }));
+      }).pipe(
+        Effect.retry({
+          while: (failure) => {
+            const now = Date.now();
+            longestAttemptMs = Math.max(longestAttemptMs, now - attemptStartedAt);
+            return stillStarting?.(failure.cause) === true && now + longestAttemptMs + PROBE_START_RETRY_MS < deadline;
+          },
+          schedule: Schedule.spaced(PROBE_START_RETRY_MS),
+        }),
+      );
+    });
     const kept = this.#probe?.connection === connection ? this.#probe.sessionId : null;
     if (!kept || !this.options.keepProbeSession?.()) return opened;
     this.#probe = null;
