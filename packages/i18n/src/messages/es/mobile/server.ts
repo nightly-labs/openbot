@@ -1157,10 +1157,15 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "No se pudieron cambiar los modelos. Inténtalo de nuevo.",
   "mobile.server.providers.promptCache": "Caché de prompts",
   "mobile.server.providers.promptCacheHint":
-    "Cuánto tiempo guarda Claude el contexto de un agente en la caché entre turnos. El cambio se aplica cuando Claude se reinicia.",
-  "mobile.server.providers.promptCacheDefault": "Predeterminado de Claude Code",
+    "Cuánto tiempo Claude y Pi guardan el contexto de un agente en la caché entre turnos. El cambio se aplica cuando el proveedor se inicia de nuevo.",
+  "mobile.server.providers.promptCacheDefault": "Predeterminado del proveedor",
   "mobile.server.providers.promptCacheHour": "1 hora",
   "mobile.server.providers.promptCacheLoadFailed": "No se pudo cargar el tiempo de caché de prompts de este servidor.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compactar antes de que caduque la caché",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Cuando un chat con 200K o más tokens de contexto está inactivo con una caché de 1 hora, el agente compacta el contexto antes de que caduque la caché. Así el siguiente mensaje no vuelve a leer todo el contexto sin caché.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "No se pudo cargar el ajuste de compactación de este servidor.",
   "mobile.server.providers.compactWindow": "Compactar chats en",
   "mobile.server.providers.compactWindowHint":
     "Claude Code resume los turnos antiguos de un chat cuando el chat alcanza este tamaño. Menos mantiene los turnos rápidos y baratos. Más conserva más detalle. Un modelo con una ventana más pequeña compacta en su propio límite.",

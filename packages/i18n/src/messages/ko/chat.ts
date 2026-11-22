@@ -483,6 +483,8 @@ export const messages = {
   "chat.compaction.running": "컨텍스트 압축 중",
   "chat.compaction.completed": "컨텍스트를 압축했어요",
   "chat.compaction.failed": "컨텍스트를 압축할 수 없어요",
+  "chat.compaction.cacheExpiryRunning": "프롬프트 캐시가 만료되기 전에 컨텍스트 압축 중",
+  "chat.compaction.cacheExpiryCompleted": "프롬프트 캐시가 만료되기 전에 컨텍스트를 압축했어요",
   "chat.compaction.tokens": "{before} → {after} 토큰",
   "chat.compaction.continues": "대기 중인 메시지는 계속 처리돼요.",
   "chat.reference.kind.tab": "브라우저 탭",

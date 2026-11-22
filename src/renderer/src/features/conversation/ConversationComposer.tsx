@@ -715,6 +715,7 @@ export function ConversationComposer() {
                 startedAt={compaction()?.startedAt ?? 0}
                 expectedMs={compaction()?.expectedMs}
                 status={compaction()?.status}
+                reason={compaction()?.reason}
                 onDone={() =>
                   setDismissedCompactions((current) => ({ ...current, [currentChatConversationKey() ?? ""]: id }))
                 }

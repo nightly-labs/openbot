@@ -49,6 +49,7 @@ import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
+import { CACHE_EXPIRY_COMPACTION_CODECS } from "./cache-expiry-compaction-v1";
 import { CHANNEL_FOLDERS_CODECS } from "./channel-folders-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
@@ -259,6 +260,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_RUN_COMMAND_CODECS,
   ...CLAUDE_USER_SETUP_CODECS,
   ...CLAUDE_COMPACT_WINDOW_CODECS,
+  ...CACHE_EXPIRY_COMPACTION_CODECS,
   ...PROVIDER_ENVIRONMENT_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,

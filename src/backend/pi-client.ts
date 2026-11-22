@@ -87,6 +87,8 @@ const PI_TURN_STALL_MS = 10 * 60_000;
 
 const PI_THREAD_IDLE_RELEASE_MS = 5 * 60_000;
 
+const PI_LONG_CACHE_TTL_MS = 60 * 60_000;
+
 const PI_START_TIMEOUT_MS = 120_000;
 
 const PI_IDLE_THREAD_LIMIT = 1;
@@ -191,6 +193,7 @@ interface ClientEvents {
 
 export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "request";
+  readonly #cacheTtls = new Map<string, number>();
   readonly provisionalAnswers = true;
   readonly turnContext = true;
   readonly imageInput = (): boolean => true;
@@ -472,6 +475,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         yield* thread.gate
           .withPermit(thread.rpc.request({ type: "compact" }, timeoutMs ?? 120_000))
           .pipe(Effect.catch((failure) => this.#compactionFailure(thread, failure)));
+        yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
+          Effect.tap((stats) => Effect.sync(() => this.#notifyContextUsage(thread, stats))),
+          Effect.ignore,
+        );
         response = {};
         break;
       }
@@ -951,6 +958,30 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     turn.items.set(id, { id, type: "userMessage", content: [{ type: "text", text }] });
   }
 
+  promptCacheTtlMs(externalThreadId: string): number | null {
+    return this.#cacheTtls.get(externalThreadId) ?? null;
+  }
+
+  #observeCacheWrite(threadId: string, usage: DynamicRecord | null): void {
+    const written = typeof usage?.cacheWrite === "number" ? usage.cacheWrite : 0;
+    const writtenForHour = typeof usage?.cacheWrite1h === "number" ? usage.cacheWrite1h : 0;
+    if (written <= 0) return;
+    if (writtenForHour >= written) this.#cacheTtls.set(threadId, PI_LONG_CACHE_TTL_MS);
+    else this.#cacheTtls.delete(threadId);
+  }
+
+  #notifyContextUsage(thread: PiThread, stats: unknown): void {
+    const context = Schema.decodeUnknownOption(PiContextUsage)(getRecord(stats, "contextUsage"));
+    if (Option.isNone(context)) return;
+    this.#notify("thread/tokenUsage/updated", thread, {
+      tokenUsage: {
+        last: { totalTokens: context.value.tokens },
+        modelContextWindow: context.value.contextWindow,
+        estimated: true,
+      },
+    });
+  }
+
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {
     const safe =
       method === "openbot/usage" ||
@@ -1019,6 +1050,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     } else if (record.type === "message_end") {
       const message = getRecord(record, "message");
       if (getString(message, "role") !== "assistant") return;
+      this.#observeCacheWrite(thread.id, getRecord(message, "usage"));
       const id = `${turn.id}:message:${turn.messageIndex++}`;
       for (const key of turn.items.keys()) if (key.startsWith(`${id}:`)) turn.items.delete(key);
       for (const item of piMessageItems(message, id)) {
@@ -1071,15 +1103,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       });
     yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
       Effect.flatMap((stats) => {
-        const context = Schema.decodeUnknownOption(PiContextUsage)(getRecord(stats, "contextUsage"));
-        if (Option.isSome(context))
-          this.#notify("thread/tokenUsage/updated", thread, {
-            tokenUsage: {
-              last: { totalTokens: context.value.tokens },
-              modelContextWindow: context.value.contextWindow,
-              estimated: true,
-            },
-          });
+        this.#notifyContextUsage(thread, stats);
         const cost = Schema.decodeUnknownOption(PiSessionCost)(stats);
         return providerSync(() => ({
           ...Schema.decodeUnknownSync(PiSessionUsage)(stats),

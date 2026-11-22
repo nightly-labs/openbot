@@ -1092,10 +1092,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "모델을 변경할 수 없습니다. 다시 시도하세요.",
   "mobile.server.providers.promptCache": "프롬프트 캐시",
   "mobile.server.providers.promptCacheHint":
-    "턴 사이에 Claude가 에이전트의 컨텍스트를 캐시에 보관하는 시간입니다. 변경 사항은 Claude가 다시 시작할 때 적용됩니다.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code 기본값",
+    "턴 사이에 Claude와 Pi가 에이전트의 컨텍스트를 캐시에 보관하는 시간이에요. 변경 사항은 공급자가 다시 시작할 때 적용돼요.",
+  "mobile.server.providers.promptCacheDefault": "공급자 기본값",
   "mobile.server.providers.promptCacheHour": "1시간",
   "mobile.server.providers.promptCacheLoadFailed": "이 서버의 프롬프트 캐시 시간을 불러올 수 없습니다.",
+  "mobile.server.providers.cacheExpiryCompaction": "캐시가 만료되기 전에 압축",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "컨텍스트가 20만 토큰 이상인 채팅이 1시간 캐시로 유휴 상태이면, 에이전트가 캐시가 만료되기 전에 컨텍스트를 압축해요. 그러면 다음 메시지가 캐시 없이 전체 컨텍스트를 다시 읽지 않아요.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "이 서버의 압축 설정을 불러올 수 없어요.",
   "mobile.server.providers.compactWindow": "채팅 압축 크기",
   "mobile.server.providers.compactWindowHint":
     "채팅이 이 크기에 도달하면 Claude Code가 이전 턴을 요약해요. 낮으면 턴이 빠르고 저렴해요. 높으면 더 많은 세부 정보가 남아요. 창이 더 작은 모델은 자체 한도에서 압축해요.",

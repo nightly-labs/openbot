@@ -482,6 +482,8 @@ export const messages = {
   "chat.compaction.running": "正在压缩上下文",
   "chat.compaction.completed": "上下文已压缩",
   "chat.compaction.failed": "无法压缩上下文",
+  "chat.compaction.cacheExpiryRunning": "正在提示缓存过期前压缩上下文",
+  "chat.compaction.cacheExpiryCompleted": "已在提示缓存过期前压缩上下文",
   "chat.compaction.tokens": "{before} → {after} 个 token",
   "chat.compaction.continues": "排队中的消息会继续执行。",
   "chat.reference.kind.tab": "浏览器标签页",

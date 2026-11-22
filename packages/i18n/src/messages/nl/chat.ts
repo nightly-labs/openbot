@@ -493,6 +493,8 @@ export const messages = {
   "chat.compaction.running": "Context comprimeren",
   "chat.compaction.completed": "Context gecomprimeerd",
   "chat.compaction.failed": "Kan context niet comprimeren",
+  "chat.compaction.cacheExpiryRunning": "Context comprimeren voordat de promptcache verloopt",
+  "chat.compaction.cacheExpiryCompleted": "Context gecomprimeerd voordat de promptcache verliep",
   "chat.compaction.tokens": "{before} → {after} tokens",
   "chat.compaction.continues": "Berichten in de wachtrij gaan door.",
   "chat.reference.kind.tab": "Browsertabblad",
