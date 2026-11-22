@@ -1397,7 +1397,12 @@ closed.
 The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `hermes acp`. OpenBot has
 no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
 and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
-`PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
+`PATH` and in `~/.local/bin`, and on Windows also in `bin` of `HERMES_HOME` (default
+`%LOCALAPPDATA%\hermes`), where the Hermes Windows installer puts it. It reads the version from
+`hermes acp --version`, or from `Hermes Agent vX.Y.Z` in `hermes --version` before Hermes 0.14.
+On Windows, `where.exe` for each provider CLI also searches the User and Machine `PATH` that the registry
+holds now, after the `PATH` that OpenBot got at start, so a check finds a CLI that was installed or
+repaired while OpenBot was open.
 
 A missing CLI is `not-installed`. On macOS and Linux, with no `OPENBOT_HERMES_PATH`, its row has a
 Download: `HermesInstaller` (`src/main/hermes-installer.ts`) runs the official installer as the
