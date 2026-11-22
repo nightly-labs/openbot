@@ -334,6 +334,7 @@
     "test:workflow-output-templates": "bun scripts/workflow-output-templates-e2e.ts",
     "test:workflow-trigger-fields": "bun scripts/workflow-trigger-fields-e2e.ts",
     "test:workflow-file-codec": "bun scripts/workflow-file-codec-e2e.ts",
+    "test:workflow-format": "bun scripts/workflow-format-e2e.ts",
     "test:workflow-schedule": "bun scripts/workflow-schedule-e2e.ts",
     "test:provider-image-mime": "bun scripts/provider-image-mime-e2e.ts",
     "test:workflow-step-settings": "bun scripts/workflow-step-settings-e2e.ts",
