@@ -294,6 +294,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "El procesador de este equipo no puede ejecutar este proveedor. Usa otro proveedor.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode no pudo abrir su base de datos porque una versión más reciente de OpenCode la cambió. Actualiza OpenCode a la versión 2 o posterior y vuelve a intentarlo.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok no se inició porque el ajuste allowed_models de su configuración no incluye su modelo predeterminado. Añade el modelo predeterminado a allowed_models, o elimina allowed_models, y vuelve a intentarlo.",
   "error.provider.opencodeNoAnswer":
     "El modelo de OpenCode terminó el turno sin respuesta. Inténtalo de nuevo o elige otro modelo.",
   "error.provider.opencodeReasoningWithoutAnswer":

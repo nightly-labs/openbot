@@ -250,6 +250,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "这台电脑的处理器无法运行此服务商。请使用其他服务商。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok 未能启动，因为其配置中的 allowed_models 设置不包含它的默认模型。请将默认模型添加到 allowed_models，或删除 allowed_models，然后重试。",
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 模型给出推理过程后结束本轮对话，但没有回答。请重试或改用其他模型。",

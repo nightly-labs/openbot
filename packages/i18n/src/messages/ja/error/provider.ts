@@ -295,6 +295,8 @@ export const messages = {
     "このコンピューターのプロセッサーでは、このプロバイダーを実行できません。別のプロバイダーを使用してください。",
   "error.provider.opencodeDatabaseNewer":
     "新しいバージョンの OpenCode がデータベースを変更したため、OpenCode はデータベースを開けませんでした。OpenCode をバージョン 2 以降に更新してから、もう一度お試しください。",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok の設定の allowed_models に既定のモデルが含まれていないため、Grok は起動しませんでした。既定のモデルを allowed_models に追加するか、allowed_models を削除してから、もう一度お試しください。",
   "error.provider.opencodeNoAnswer":
     "OpenCode のモデルが、回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.opencodeReasoningWithoutAnswer":
