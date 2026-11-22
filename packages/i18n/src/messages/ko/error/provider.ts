@@ -276,6 +276,8 @@ export const messages = {
     "OpenCode가 이 강도에서 이 모델의 추론을 읽지 못했습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.opencodeModelNotServed":
     "모델 제공자가 지금 이 모델을 계정에 제공하지 않아요. 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.opencodeSafetyBlocked":
+    "모델 제공자가 안전 규칙 때문에 이 메시지를 차단했습니다. 다른 표현으로 요청을 다시 보내세요. 다음 메시지도 차단되면 새 채팅을 시작하거나 다른 모델을 선택하세요.",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":

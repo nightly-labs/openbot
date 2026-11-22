@@ -282,6 +282,8 @@ export const messages = {
     "OpenCode non è riuscito a leggere il ragionamento di questo modello con questo impegno. Seleziona un impegno minore o un altro modello, poi invia di nuovo il messaggio.",
   "error.provider.opencodeModelNotServed":
     "Il provider del modello ora non offre questo modello al tuo account. Scegli un altro modello, poi invia di nuovo il messaggio.",
+  "error.provider.opencodeSafetyBlocked":
+    "Il provider del modello ha bloccato questo messaggio per le sue regole di sicurezza. Invia di nuovo la richiesta con parole diverse. Se blocca anche i tuoi prossimi messaggi, avvia una nuova chat o scegli un altro modello.",
   "error.provider.opencodeNetwork":
     "OpenCode non è riuscito a connettersi al provider del modello. Controlla la connessione di rete del computer che esegue OpenBot, poi riprova.\n{detail}",
   "error.provider.codexStateBusy":

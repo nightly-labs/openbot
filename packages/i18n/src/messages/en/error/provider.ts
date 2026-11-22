@@ -268,6 +268,8 @@ export const messages = defineMessages("error.provider", {
     "OpenCode could not read the reasoning of this model at this effort. Select a lower effort or another model, then send your message again.",
   "error.provider.opencodeModelNotServed":
     "The model provider does not offer this model to your account now. Choose another model, then send your message again.",
+  "error.provider.opencodeSafetyBlocked":
+    "The model provider blocked this message because of its safety rules. Send your request again with different words. If it also blocks your next messages, start a new chat or choose another model.",
   "error.provider.opencodeNetwork":
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
   "error.provider.codexStateBusy":

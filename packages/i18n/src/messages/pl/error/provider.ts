@@ -273,6 +273,8 @@ export const messages = {
     "OpenCode nie mógł odczytać rozumowania tego modelu przy tym poziomie wysiłku. Wybierz niższy wysiłek lub inny model, a potem wyślij wiadomość ponownie.",
   "error.provider.opencodeModelNotServed":
     "Dostawca modelu nie udostępnia teraz tego modelu Twojemu kontu. Wybierz inny model, a następnie wyślij wiadomość ponownie.",
+  "error.provider.opencodeSafetyBlocked":
+    "Dostawca modelu zablokował tę wiadomość z powodu swoich zasad bezpieczeństwa. Wyślij prośbę ponownie innymi słowami. Jeśli zablokuje też kolejne wiadomości, rozpocznij nowy czat lub wybierz inny model.",
   "error.provider.opencodeNetwork":
     "OpenCode nie połączył się z dostawcą modelu. Sprawdź połączenie sieciowe komputera, na którym działa OpenBot, a potem spróbuj ponownie.\n{detail}",
   "error.provider.codexStateBusy":

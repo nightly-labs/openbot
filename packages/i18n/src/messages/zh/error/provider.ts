@@ -242,6 +242,8 @@ export const messages = {
   "error.provider.opencodeReasoningOverlap":
     "OpenCode 无法在此推理强度下读取该模型的推理内容。请选择更低的推理强度或其他模型，然后重新发送消息。",
   "error.provider.opencodeModelNotServed": "模型服务商目前不向你的账号提供此模型。请选择其他模型，然后重新发送消息。",
+  "error.provider.opencodeSafetyBlocked":
+    "模型服务商因其安全规则拦截了此消息。请换一种说法重新发送你的请求。如果后续消息也被拦截，请开始新的聊天或选择其他模型。",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
   "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
