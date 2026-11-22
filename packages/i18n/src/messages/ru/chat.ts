@@ -147,6 +147,7 @@ export const messages = {
   "chat.awaiting.state.working": "Работает",
   "chat.awaiting.state.replied": "Ответил",
   "chat.awaiting.state.failed": "Ошибка",
+  "chat.awaiting.state.stopped": "Остановлено",
   "chat.awaiting.readsNext": "{name} прочитает следующим",
   "chat.awaiting.working": "{name} работает",
   "chat.awaiting.needsYou": "{name} ждёт вас",

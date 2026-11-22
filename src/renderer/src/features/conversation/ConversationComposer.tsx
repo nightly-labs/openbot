@@ -530,6 +530,7 @@ export function ConversationComposer() {
                   props.activeTurnId && !channel && steers() && !steerRefused() ? props.onSteerQueuedMessage : undefined
                 }
                 onStop={channel ? (channel.readOnly() ? undefined : channel.stopAwaitingReply) : stopAwaitingReply}
+                stopDisplay={channel ? undefined : "icon"}
               />
             )}
           </ComposerStackCard>

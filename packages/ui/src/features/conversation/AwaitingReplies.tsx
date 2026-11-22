@@ -7,7 +7,11 @@ import type { SidebarAgentWait } from "../sidebar/sidebar-agent-states";
 import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_TITLE, sidebarUsageResetTime } from "../sidebar/sidebar-filtering";
 import { createTaskListPlayState, TaskListHeader, TaskMark, type TaskMarkState } from "./TaskList";
 
-export type AwaitingReplyState = "asked" | "working" | "replied" | "failed";
+export type AwaitingReplyState = "asked" | "working" | "replied" | "failed" | "stopped";
+
+export function awaitingReplyEnded(state: AwaitingReplyState): boolean {
+  return state === "replied" || state === "failed" || state === "stopped";
+}
 
 export interface AwaitingReplyItem {
   id: string;
@@ -29,6 +33,7 @@ export interface AwaitingReplyListProps {
   onOpenAgent?: ((agentId: string) => void) | undefined;
   onSteer?: ((deliveryId: string) => void) | undefined;
   onStop?: ((id: string) => void) | undefined;
+  stopDisplay?: "button" | "icon" | undefined;
   class?: string;
 }
 
@@ -37,6 +42,7 @@ const MARK_STATE: Record<AwaitingReplyState, TaskMarkState> = {
   working: "active",
   replied: "done",
   failed: "failed",
+  stopped: "failed",
 };
 
 const STATE_LABEL = {
@@ -44,6 +50,7 @@ const STATE_LABEL = {
   working: "chat.awaiting.state.working",
   replied: "chat.awaiting.state.replied",
   failed: "chat.awaiting.state.failed",
+  stopped: "chat.awaiting.state.stopped",
 } as const;
 
 export function AwaitingReplies(props: AwaitingReplyListProps) {
@@ -100,7 +107,8 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
     if (item.stoppable === false || (item.state !== "asked" && item.state !== "working") || !stop) return undefined;
     return () => stop(item.id);
   };
-  const settled = () => props.items.every((item) => item.state === "replied" || item.state === "failed");
+  const settled = () => props.items.every((item) => awaitingReplyEnded(item.state));
+  const stopIcon = () => props.stopDisplay === "icon";
   return (
     <section
       style={{ "--task-list-play-state": playState() }}
@@ -144,6 +152,7 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
                   class="task-list-item awaiting-replies-item"
                   data-state={markState(item())}
                   data-wait={item().wait ? "" : undefined}
+                  data-stopped={item().state === "stopped" ? "" : undefined}
                   style={{ "--task-list-index": index() }}
                 >
                   <AgentAvatar
@@ -164,8 +173,25 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
                       {(detail) => <span class="awaiting-replies-detail">{detail()}</span>}
                     </Show>
                     <span class="awaiting-replies-state-label">{stateLabel(item())}</span>
-                    <span class="task-list-item-mark" aria-hidden="true">
-                      <TaskMark state={markState(item())} />
+                    <span class="awaiting-replies-mark">
+                      <span class="task-list-item-mark" aria-hidden="true">
+                        <TaskMark state={markState(item())} />
+                      </span>
+                      <Show when={stopIcon() && stopAction(item())}>
+                        {(stop) => (
+                          <IconButton
+                            id={`${rowId}-stop`}
+                            class="awaiting-replies-stop-icon"
+                            label={t("chat.awaiting.stop")}
+                            aria-labelledby={`${rowId}-stop ${rowId}-name`}
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => stop()()}
+                          >
+                            <X aria-hidden="true" />
+                          </IconButton>
+                        )}
+                      </Show>
                     </span>
                   </span>
                   <Show when={openAction(item())}>
@@ -196,7 +222,7 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
                       </Button>
                     )}
                   </Show>
-                  <Show when={stopAction(item())}>
+                  <Show when={!stopIcon() && stopAction(item())}>
                     {(stop) => (
                       <Button
                         id={`${rowId}-stop`}

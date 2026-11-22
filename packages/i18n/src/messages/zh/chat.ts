@@ -102,6 +102,7 @@ export const messages = {
   "chat.awaiting.state.working": "处理中",
   "chat.awaiting.state.replied": "已回复",
   "chat.awaiting.state.failed": "失败",
+  "chat.awaiting.state.stopped": "已停止",
   "chat.awaiting.readsNext": "接下来由 {name} 阅读",
   "chat.awaiting.working": "{name} 正在处理",
   "chat.awaiting.needsYou": "{name} 需要你处理",
