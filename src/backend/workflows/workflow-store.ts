@@ -129,15 +129,15 @@ export class WorkflowStore {
     };
   }
 
-  create(input: { title: string; graph?: WorkflowGraph }, now = new Date()): WorkflowDetail {
+  create(input: { title: string; graph?: WorkflowGraph; paused?: true }, now = new Date()): WorkflowDetail {
     const graph = input.graph ?? { nodes: [], edges: [], strokes: [] };
     assertRunnable(graph);
     const workflowId = this.#createId();
     return this.#transaction(() => {
       const at = now.toISOString();
       this.#database.connection
-        .prepare("INSERT INTO workflows (workflow_id, title, created_at, updated_at) VALUES (?, ?, ?, ?)")
-        .run(workflowId, input.title.trim(), at, at);
+        .prepare("INSERT INTO workflows (workflow_id, title, paused, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+        .run(workflowId, input.title.trim(), input.paused ? 1 : 0, at, at);
       this.#writeGraph(workflowId, graph, now);
       return this.#requireDetail(workflowId);
     });
@@ -147,6 +147,14 @@ export class WorkflowStore {
     const result = this.#database.connection
       .prepare("UPDATE workflows SET title = ?, updated_at = ? WHERE workflow_id = ?")
       .run(title.trim(), now.toISOString(), workflowId);
+    if (Number(result.changes) === 0) throw missing();
+    return this.#requireDetail(workflowId).summary;
+  }
+
+  setPaused(workflowId: string, paused: boolean, now = new Date()): WorkflowSummary {
+    const result = this.#database.connection
+      .prepare("UPDATE workflows SET paused = ?, updated_at = ? WHERE workflow_id = ?")
+      .run(paused ? 1 : 0, now.toISOString(), workflowId);
     if (Number(result.changes) === 0) throw missing();
     return this.#requireDetail(workflowId).summary;
   }
@@ -453,7 +461,7 @@ export class WorkflowStore {
 }
 
 const SUMMARY_SELECT = `
-  SELECT w.workflow_id, w.title, w.graph_revision, w.strokes_json, w.updated_at,
+  SELECT w.workflow_id, w.title, w.graph_revision, w.strokes_json, w.updated_at, w.paused,
     (SELECT COUNT(*) FROM workflow_nodes AS n
       WHERE n.workflow_id = w.workflow_id AND n.kind NOT IN ('text', 'note', 'shape')) AS steps,
     (SELECT r.status FROM workflow_runs AS r WHERE r.workflow_id = w.workflow_id
@@ -553,6 +561,7 @@ function toSummary(row: DynamicRecord): WorkflowSummary {
     steps: requiredNumberColumn(row, "steps"),
     updatedAt: requiredStringColumn(row, "updated_at"),
     lastRun: isOneOf(WORKFLOW_RUN_STATUSES, status) && at !== null ? { status, at } : null,
+    ...(requiredNumberColumn(row, "paused") === 1 ? { paused: true } : {}),
   };
 }
 

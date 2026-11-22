@@ -5,6 +5,7 @@ import {
   buttonVariants,
   Check,
   CircleAlert,
+  CirclePause,
   DropdownMenu,
   History,
   LabelTooltipTrigger,
@@ -119,6 +120,8 @@ export function WorkflowCanvasHeader(props: {
   progress: { done: number; total: number };
   onRun: () => void;
   onStop: () => void;
+  paused: boolean;
+  onResume?: (() => void) | undefined;
   people?: JSX.Element;
 }) {
   const { t, format } = useText();
@@ -174,6 +177,27 @@ export function WorkflowCanvasHeader(props: {
               </Hint>
             </div>
           )}
+        </Show>
+        <Show when={props.paused}>
+          <div class="wfn-hud wfn-hud-paused">
+            <CirclePause aria-hidden="true" />
+            <span class="wfn-hud-label">{t("workflow.canvas.paused")}</span>
+            <Show when={props.onResume}>
+              {(resume) => (
+                <Hint label={t("workflow.canvas.resume")} placement="bottom">
+                  <LabelTooltipTrigger
+                    as={Button}
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("workflow.canvas.resume")}
+                    onClick={() => resume()()}
+                  >
+                    <Play />
+                  </LabelTooltipTrigger>
+                </Hint>
+              )}
+            </Show>
+          </div>
         </Show>
         <div class="sr-only" role="status">
           <Show when={announcement()}>

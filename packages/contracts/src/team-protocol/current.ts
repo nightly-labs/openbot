@@ -261,6 +261,7 @@ import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY } from "./workflows-media-se
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "./workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
+import { WORKFLOWS_PAUSE_CAPABILITY } from "./workflows-pause-v1";
 import { WORKFLOWS_STEP_SETTINGS_CAPABILITY } from "./workflows-step-settings-v1";
 import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
@@ -499,6 +500,7 @@ export {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+  WORKFLOWS_PAUSE_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
@@ -806,6 +808,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [PROMPT_CACHE_TTL_PI_CAPABILITY, V10],
   [CACHE_EXPIRY_COMPACTION_CAPABILITY, V10],
   [AGENT_ARCHIVED_THREADS_CAPABILITY, V10],
+  [WORKFLOWS_PAUSE_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

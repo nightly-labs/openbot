@@ -238,8 +238,9 @@ export interface WorkflowCanvasProps {
   onRestoreVersion: (versionId: string) => void;
   onPreviewVersion?: ((versionId: string | null) => void) | undefined;
   onSelect: (workflowId: string) => void;
-  onCreate: (input: { title: string; graph?: WorkflowGraph }) => void;
+  onCreate: (input: { title: string; graph?: WorkflowGraph; paused?: true }) => void;
   onRename: (workflowId: string, title: string) => void;
+  onSetPaused?: ((workflowId: string, paused: boolean) => void) | undefined;
   onDelete: (workflowId: string) => Promise<unknown>;
   tabs?: WorkflowCanvasTabs | undefined;
   folders?: WorkflowFoldersSnapshot | undefined;
@@ -1130,8 +1131,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       : [props.workflow.summary, ...props.library];
     return list.map((workflow) =>
       workflow.id === openId()
-        ? { id: workflow.id, title: name(), steps: live().filter((node) => isWorkflowStepKind(node.kind)).length }
-        : { id: workflow.id, title: workflow.title, steps: workflow.steps },
+        ? {
+            id: workflow.id,
+            title: name(),
+            steps: live().filter((node) => isWorkflowStepKind(node.kind)).length,
+            paused: workflow.paused === true,
+          }
+        : { id: workflow.id, title: workflow.title, steps: workflow.steps, paused: workflow.paused === true },
     );
   };
   const onSwitcher = (action: SwitcherAction) => {
@@ -1144,7 +1150,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       props.onCreate({
         title: t("workflow.canvas.copyOf", { name: name() }),
         graph: liveCanvas ? graphFromSnapshot(liveCanvas) : graph(),
+        ...(props.onSetPaused ? { paused: true } : {}),
       });
+    else if (action === "pause" || action === "resume") props.onSetPaused?.(openId(), action === "pause");
     else if (action === "delete") deleteWorkflow();
     else if (action !== `open:${openId()}`) props.onSelect(action.slice("open:".length));
   };
@@ -1230,6 +1238,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (renaming()) endRename(keep);
     else endFolderEdit(keep);
   };
+  const paused = () => props.workflow.summary.paused === true;
+  const switcherPaused = () => (props.onSetPaused ? paused() : undefined);
+  const resumeAction = () => {
+    const setPaused = props.readOnly ? undefined : props.onSetPaused;
+    return setPaused && (() => setPaused(openId(), false));
+  };
   const switcherFolders = () =>
     props.folders && props.onFolderAction
       ? { folders: props.folders.folders, placement: props.folders.placement }
@@ -1249,6 +1263,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           viewing={props.versionPreview?.versionId}
           versionsDisabled={running()}
           readOnly={props.readOnly === true}
+          paused={switcherPaused()}
           folders={switcherFolders()}
           onAction={onSwitcher}
           onFolder={onFolderMenu}
@@ -3830,6 +3845,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           progress={progress()}
           onRun={() => props.onRun({})}
           onStop={stopRun}
+          paused={paused()}
+          onResume={resumeAction()}
           people={
             <Show when={peers().length > 0}>
               <PresenceBar self={self()} peers={peers()} following={following()} onFollow={toggleFollow} />

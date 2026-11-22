@@ -47,6 +47,10 @@ import {
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
@@ -191,8 +195,16 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     workflows: {
       list: () => post(WORKFLOWS_ROUTES.list, decodeRemoteWorkflowList, {}),
       get: (workflowId) => post(WORKFLOWS_ROUTES.get, decodeRemoteWorkflowDetail, { workflowId }),
-      create: (input) => post(WORKFLOWS_ROUTES.create, decodeRemoteWorkflowDetail, input),
+      create: ({ paused, ...input }) =>
+        post(WORKFLOWS_ROUTES.create, decodeRemoteWorkflowDetail, {
+          ...input,
+          ...(paused && has(WORKFLOWS_PAUSE_CAPABILITY) ? { paused } : {}),
+        }),
       rename: (input) => post(WORKFLOWS_ROUTES.rename, decodeRemoteWorkflowSummary, input),
+      setPaused: async (input) => {
+        if (!has(WORKFLOWS_PAUSE_CAPABILITY)) throw tooOld();
+        return post(WORKFLOWS_PAUSE_ROUTES.pause, decodeRemoteWorkflowSummary, input);
+      },
       delete: (workflowId) => post(WORKFLOWS_ROUTES.delete, empty, { workflowId }),
       saveGraph: (input) => post(WORKFLOWS_ROUTES.saveGraph, decodeRemoteWorkflowSaveResult, input),
       versions: (workflowId) => post(WORKFLOWS_ROUTES.versions, decodeRemoteWorkflowVersions, { workflowId }),
@@ -367,6 +379,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     agentFilesSupported: () => has(WORKFLOWS_AGENT_FILES_CAPABILITY),
     answersSupported: () => has(WORKFLOWS_ANSWERS_CAPABILITY),
     stepSettingsSupported: () => has(WORKFLOWS_STEP_SETTINGS_CAPABILITY),
+    pauseSupported: () => has(WORKFLOWS_PAUSE_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl(attachmentId) {
       const previews = options.previewMedia;
