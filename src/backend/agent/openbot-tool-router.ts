@@ -2382,9 +2382,10 @@ export class OpenBotToolRouter {
           eventType: "marketplace.suggested",
           detail: { appId },
         });
-      const connected = this.#messaging.store
+      const enabled = this.#messaging.store
         .connections()
         .filter((record) => record.enabled && record.lastErrorCode === null && record.platform === args.app);
+      const connected = enabled.filter((record) => !this.#messaging.keysUnreadable(record.connectionId));
       const connection = connected[0];
       if (connection) {
         const name = PLATFORM_NAMES[connection.platform];
@@ -2401,6 +2402,16 @@ export class OpenBotToolRouter {
           status: "connected",
           app: args.app,
           next: `${name} is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Call openbot.messaging_list_places for the connection and place ids, then openbot.messaging_post to send the message; search your tools for messaging when they are not in your tool list. When the place is not in the list, tell the user what its result says.`,
+        });
+      }
+      const unreadable = enabled[0];
+      if (unreadable) {
+        const name = PLATFORM_NAMES[unreadable.platform];
+        suggestCard();
+        return openBotToolResult({
+          status: "keys_unreadable",
+          app: args.app,
+          next: `${name} was connected on this server, but OpenBot cannot read its saved keys now, so the connection does not run and the openbot.messaging tools cannot use it. Do not say that ${name} is connected. The card is in the chat. End your answer: tell the user in plain words that OpenBot cannot read the saved keys of ${name}, and that they must connect it again with the card, or in Marketplace > Apps > ${name}, as the panel there shows.`,
         });
       }
       const installed = this.#marketplaceAppServer(args.app);
