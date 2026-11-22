@@ -32,6 +32,7 @@ interface WorkflowFieldSpec {
   readonly list?: true;
   readonly admin?: readonly string[];
   readonly id?: WorkflowIdKind;
+  readonly step?: true;
 }
 
 type WorkflowNodeSpec = Readonly<Record<string, WorkflowFieldSpec>>;
@@ -45,6 +46,9 @@ const TEMPLATE: WorkflowFieldSpec = { runtime: true, template: true };
 const EFFORT: WorkflowFieldSpec = { runtime: true, values: AGENT_REASONING_EFFORTS };
 const CONNECTION: WorkflowFieldSpec = { runtime: true, id: "connection" };
 const PLACE: WorkflowFieldSpec = { runtime: true, id: "place" };
+const STEP: WorkflowFieldSpec = { runtime: true, step: true };
+const FROM_TRIGGER = "trigger";
+const TRIGGER_LINKED: ReadonlySet<WorkflowIdKind> = new Set(["connection", "place"]);
 const CHAT_APPS = ["github", "discord", "telegram", "slack"] as const;
 const TEXT_ONLY: WorkflowNodeSpec = { text: RUNTIME };
 
@@ -135,8 +139,8 @@ const WORKFLOW_NODE_REGISTRY: Readonly<Record<WorkflowNodeKind, WorkflowNodeSpec
     background: { runtime: true, values: ["solid", "transparent"] },
     duration: RUNTIME,
     resolution: RUNTIME,
-    firstFrame: RUNTIME,
-    lastFrame: RUNTIME,
+    firstFrame: STEP,
+    lastFrame: STEP,
     voice: { runtime: true, values: WORKFLOW_VIDEO_VOICES.map((voice) => voice.id) },
     options: RUNTIME,
   },
@@ -180,6 +184,23 @@ export function workflowIdFields(kind: WorkflowNodeKind): readonly WorkflowIdFie
   return Object.entries(WORKFLOW_NODE_REGISTRY[kind]).flatMap(([name, spec]) =>
     spec.id ? [{ name, id: spec.id }] : [],
   );
+}
+
+export function workflowIdFollowsTrigger(field: WorkflowIdField, value: unknown): boolean {
+  return value === FROM_TRIGGER && TRIGGER_LINKED.has(field.id);
+}
+
+export function workflowFieldsWithoutIds(kind: WorkflowNodeKind, fields: WorkflowFields): WorkflowFields {
+  const kept: WorkflowFields = { ...fields };
+  for (const field of workflowIdFields(kind)) {
+    const value = fields[field.name];
+    if (typeof value === "string" && value !== "" && !workflowIdFollowsTrigger(field, value)) kept[field.name] = "";
+  }
+  return kept;
+}
+
+export function workflowStepFields(kind: WorkflowNodeKind): readonly string[] {
+  return Object.entries(WORKFLOW_NODE_REGISTRY[kind]).flatMap(([name, spec]) => (spec.step ? [name] : []));
 }
 
 function knownValue(spec: WorkflowFieldSpec, value: unknown): boolean {

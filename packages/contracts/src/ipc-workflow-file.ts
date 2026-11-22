@@ -10,6 +10,7 @@ import {
   type WorkflowIdField,
   type WorkflowIdKind,
   workflowIdFields,
+  workflowIdFollowsTrigger,
   workflowNodeHasUnknownValue,
 } from "./ipc-workflow-nodes";
 import {
@@ -308,7 +309,7 @@ export function encodeWorkflowFile(source: WorkflowFileSource): WorkflowFileExpo
     let needsLink = false;
     for (const field of workflowIdFields(node.kind)) {
       const value = stringField(node.fields, field.name);
-      if (!value) continue;
+      if (!value || workflowIdFollowsTrigger(field, value)) continue;
       needsLink ||= LINK_FIELDS.has(field.id);
       fields[field.name] = portableField(source, keys, uses, node, field, value, problems);
     }
@@ -514,7 +515,7 @@ function referencesResolve(
   return graph.nodes.every((node) =>
     workflowIdFields(node.kind).every((field) => {
       const value = stringField(node.fields, field.name);
-      if (!value) return true;
+      if (!value || workflowIdFollowsTrigger(field, value)) return true;
       if (field.id === "file") return Object.hasOwn(assets, value);
       if (field.id !== "agent" && field.id !== "channel") return false;
       return Object.hasOwn(references, value) && references[value]?.kind === field.id;
@@ -605,7 +606,7 @@ export function workflowFromFile(
     const fields: WorkflowFields = { ...node.fields };
     for (const field of workflowIdFields(node.kind)) {
       const value = stringField(node.fields, field.name);
-      if (!value) continue;
+      if (!value || workflowIdFollowsTrigger(field, value)) continue;
       if (field.id === "file") {
         const asset = targets.assets.get(value);
         fields[field.name] = asset?.id ?? "";

@@ -114,6 +114,9 @@ export const messages = defineMessages("error.import", {
     "{name}: the workflow needs a new webhook address. Open it, make the address again, and give it to the sender.",
   "error.import.transferWorkflowConnection":
     "{name}: choose the Slack, Discord, or Telegram connection of the workflow again after you connect it here.",
+  "error.import.transferWorkflowNewer":
+    "{name}: some steps need a newer version of OpenBot. They are kept as locked notes.",
+  "error.import.transferWorkflowPaused": "The imported workflows are paused. Examine each workflow, then resume it.",
   "error.import.transferHistorySkipped": "{name}: the chat history in the file is invalid, so it is not imported.",
   "error.import.transferChatsSkipped": {
     one: "{name}: {count} chat is not imported.",

@@ -802,6 +802,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-team-api
 
+      - name: Run the instance transfer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:instance-transfer
+
       - name: Run the Discord files to GitHub E2E test
         if: ${{ !cancelled() }}
         run: bun run test:discord-github-files
@@ -967,6 +971,7 @@ jobs:
             .openbot-build/provider-image-mime-e2e/
             .openbot-build/workflow-step-settings-e2e/
             .openbot-build/workflow-team-api-e2e/
+            .openbot-build/instance-transfer-everything-e2e/
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/

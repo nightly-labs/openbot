@@ -793,6 +793,38 @@
     "tr",
     "zh"
   ],
+  "error.import.transferWorkflowNewer": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
+  "error.import.transferWorkflowPaused": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.import.transferWorkflowWebhook": [
     "ar",
     "de",

@@ -258,6 +258,7 @@ export function WorkflowsCanvas(props: {
           catalogs={catalogs}
           github={workflows.github}
           frame="window"
+          server={props.serverId}
           readOnly={workflows.readOnly()}
           agentProgress={props.agentProgress}
           {...workflows.props}

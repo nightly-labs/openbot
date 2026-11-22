@@ -17,6 +17,8 @@ import {
   type WorkflowTriggerState,
   type WorkflowVersion,
   type WorkflowVersionKind,
+  workflowFieldsWithoutIds,
+  workflowStepFields,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -233,6 +235,7 @@ export interface WorkflowCanvasProps {
   presence?: WorkflowPresence | undefined;
   build?: WorkflowBuild | undefined;
   frame?: "window" | undefined;
+  server?: string | undefined;
   agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
   onGraphChange: (graph: WorkflowGraph) => void;
   onRun: (input: { fromNodeId?: string }) => void;
@@ -1134,6 +1137,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   });
 
   const openId = () => props.workflow.summary.id;
+  const serverKey = () => props.server ?? "";
   const listed = (): readonly SwitcherWorkflow[] => {
     const list = props.library.some((workflow) => workflow.id === openId())
       ? props.library
@@ -1760,6 +1764,19 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     for (const node of clip.nodes) {
       ids.set(node.id, `${node.kind}-${tag}-${crypto.randomUUID()}`);
     }
+    const kinds = new Map(clip.nodes.map((node) => [node.id, node.kind]));
+    const kept = new Set(clip.edges.map((edge) => `${edge.from}>${edge.to}`));
+    const relinked = (id: string, fields: WfnFields): WfnFields => {
+      const kind = kinds.get(id);
+      if (!kind) return fields;
+      const next = { ...fields };
+      for (const name of workflowStepFields(kind)) {
+        const value = fields[name];
+        if (typeof value === "string" && value !== "")
+          next[name] = ids.get(value) ?? (kept.has(`${value}>${id}`) ? value : "");
+      }
+      return next;
+    };
     const copies = clip.nodes.map((node) => ({
       ...node,
       id: ids.get(node.id) ?? node.id,
@@ -1771,7 +1788,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setSizes((draft) => {
       for (const [id, size] of Object.entries(clip.sizes)) draft[ids.get(id) ?? id] = { ...size };
     });
-    for (const [id, fields] of Object.entries(regroupCopies(clip.fields))) canvas.putFields(ids.get(id) ?? id, fields);
+    for (const [id, fields] of Object.entries(regroupCopies(clip.fields)))
+      canvas.putFields(ids.get(id) ?? id, relinked(id, fields));
     setNodes((list) => [...list, ...copies]);
     canvas.addEdges(
       clip.edges.flatMap((edge) => {
@@ -1789,6 +1807,19 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       }),
     );
     canvas.select(copies.map((node) => node.id));
+  };
+
+  const withoutIds = (clip: Clip): Clip => {
+    const kinds = new Map(clip.nodes.map((node) => [node.id, node.kind]));
+    return {
+      ...clip,
+      fields: Object.fromEntries(
+        Object.entries(clip.fields).map(([id, fields]) => {
+          const kind = kinds.get(id);
+          return [id, kind ? workflowFieldsWithoutIds(kind, fields) : fields];
+        }),
+      ),
+    };
   };
 
   const referencesInto = (clip: Clip): WfnEdge[] => {
@@ -2394,12 +2425,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     copying = ids;
     const written = document.execCommand("copy");
     copying = undefined;
-    if (!written) setCopied({ key: "", clip, from: openId() });
+    if (!written) setCopied({ key: "", clip, from: openId(), server: serverKey() });
   };
 
   const pasteNodes = (point?: WfnPoint) => {
     const held = copied();
-    const clip = held?.clip;
+    const foreign = held !== undefined && held.server !== serverKey();
+    const clip = held && (foreign ? withoutIds(held.clip) : held.clip);
     const box = clip ? union(clip.nodes.map((node) => ({ ...node.at, width: 0, height: 0 }))) : undefined;
     if (!held || !clip || !box) return;
     const center = () => {
@@ -2411,7 +2443,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const target =
       at && !again
         ? at
-        : held.from === openId()
+        : held.from === openId() && !foreign
           ? snapPoint({ x: box.x + DUPLICATE_OFFSET, y: box.y + DUPLICATE_OFFSET })
           : snapPoint(center());
     pastedAt = at;
@@ -2420,6 +2452,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setCopied({
       key: held.key,
       from: openId(),
+      server: serverKey(),
       clip: {
         ...clip,
         nodes: clip.nodes.map((node) => ({ ...node, at: { x: node.at.x + shift.x, y: node.at.y + shift.y } })),
@@ -3164,7 +3197,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       event.preventDefault();
       const key = crypto.randomUUID();
       event.clipboardData.setData(CLIP_TYPE, key);
-      setCopied({ key, clip, from: openId() });
+      setCopied({ key, clip, from: openId(), server: serverKey() });
       pastedAt = undefined;
       if (event.type === "cut") canvas.deleteNodes(ids);
     };

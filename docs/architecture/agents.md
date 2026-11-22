@@ -445,6 +445,17 @@ changed, on this computer and on a joined host.
 - An asset node with no file, a file output node and a message trigger node are kept in the graph but
   do not run yet (`unsupportedNode` in `workflow-walk.ts`); a run that reaches one fails with
   `nodeUnsupported`.
+- Copied steps record the server of the canvas (`copied` in `workflow-clipboard.ts`, the `server` prop
+  of `WorkflowCanvas`). A paste on another server clears every id field of the node registry
+  (`workflowFieldsWithoutIds`) except a connection or place that follows the trigger. Each paste and
+  duplicate gives the step fields of the registry (`workflowStepFields`: `firstFrame` and `lastFrame`)
+  the new node ids; a field that names a step outside the copy is cleared unless the copy keeps its edge.
+- The instance transfer (`instance-transfer-workflows.ts`) remaps with the same registry: agent and
+  channel ids become keys and then new ids, connections and file ids are cleared, and a value that
+  follows the trigger stays. Each workflow in the file has its graph `format`. Import keeps a step of
+  an unknown kind as a locked note with its fields, drops the edges that this version cannot read, and
+  warns that the workflow needs a newer OpenBot. Each workflow goes through `parseCreateWorkflow` (the
+  1 MB limit) and is created paused.
 - Agents use workflows with six `openbot` tools (`workflow-tools.ts`): `list_workflows`,
   `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
   are not in the visible set, so before `tool_search` finds them they cost only their names. A search
