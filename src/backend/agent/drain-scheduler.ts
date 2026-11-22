@@ -1174,7 +1174,7 @@ export class DrainScheduler {
               agentId: delivery.recipientAgentId,
               model: requestedModel,
             });
-            this.#usageLimits.failed(delivery.recipientAgentId, requestedModel);
+            this.#usageLimits.notOffered(delivery.recipientAgentId, requestedModel);
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             if (!this.#hooks.followUsageLimit(delivery.recipientAgentId))
