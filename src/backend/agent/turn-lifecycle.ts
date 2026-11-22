@@ -390,6 +390,8 @@ export class TurnLifecycle {
       compacted: boolean;
       startedBackgroundWork: boolean;
       narration: string | null;
+      narrationStepKnown: boolean;
+      narrationOpenTools: ReadonlySet<string>;
       openTools: Set<string>;
       failureReports: Set<string>;
       lastEventAt: number;
@@ -423,6 +425,7 @@ export class TurnLifecycle {
   readonly #quietRepeats = new Set<string>();
   readonly #reportedFailures = new Map<string, string>();
   readonly #endedTurns = new Set<string>();
+  readonly #channelResultNotes = new Map<string, Set<string>>();
   readonly #completingTurns = new Set<string>();
   readonly #lastEventAt = new Map<string, number>();
   readonly #codexChildren = new Map<string, CodexSubagentParent>();
@@ -581,6 +584,7 @@ export class TurnLifecycle {
     this.#quietRepeats.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
+    this.#channelResultNotes.clear();
     this.#refusedRetries.clear();
     this.#safetyBlockedTurns.clear();
     this.#sessionFailures.clear();
@@ -1263,6 +1267,8 @@ export class TurnLifecycle {
           compacted: false,
           startedBackgroundWork: false,
           narration: null,
+          narrationStepKnown: false,
+          narrationOpenTools: new Set(),
           openTools: new Set(),
           failureReports: new Set(),
           lastEventAt: Date.now(),
@@ -1336,6 +1342,15 @@ export class TurnLifecycle {
           const acted = isRepeatedWork(item);
           this.#markProduced(turnId, acted, acted, acted && isUserReactionCall(item));
         }
+        if (
+          running?.narration &&
+          !running.narrationStepKnown &&
+          !(itemId !== null && running.narrationOpenTools.has(itemId))
+        ) {
+          const step = channelNoteStep(item);
+          if (step === "result") this.#keepChannelResultNote(turnId, running.narration);
+          if (step !== null) running.narrationStepKnown = true;
+        }
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
           if (
             notification.method === "item/completed" &&
@@ -1343,8 +1358,11 @@ export class TurnLifecycle {
             isNarrationItemId(itemId, source.provider) &&
             isString(item.text) &&
             item.text.trim()
-          )
+          ) {
             running.narration = itemId;
+            running.narrationStepKnown = false;
+            running.narrationOpenTools = new Set(running.openTools);
+          }
         } else if (running && isRepeatedWork(item) && !keepsNarration(item, notification.method === "item/completed"))
           running.narration = null;
         if (item.type === "contextCompaction") {
@@ -1921,6 +1939,26 @@ export class TurnLifecycle {
 
   quietChannelTurn(turnId: string): boolean {
     return this.#quietChannelTurns.has(turnId) && !this.#reportedFailures.has(turnId);
+  }
+
+  channelNote(turnId: string, messageId: string): "result" | "pending" | "running" | null {
+    if (this.#channelResultNotes.get(turnId)?.has(messageId)) return "result";
+    const running = this.#runningTurns.get(turnId);
+    if (!running) return null;
+    return running.narration === messageId && !running.narrationStepKnown ? "pending" : "running";
+  }
+
+  #keepChannelResultNote(turnId: string, messageId: string): void {
+    const notes = this.#channelResultNotes.get(turnId);
+    if (notes) {
+      notes.add(messageId);
+      return;
+    }
+    this.#channelResultNotes.set(turnId, new Set([messageId]));
+    if (this.#channelResultNotes.size > ENDED_TURN_LIMIT) {
+      const [oldest] = this.#channelResultNotes.keys();
+      if (oldest !== undefined) this.#channelResultNotes.delete(oldest);
+    }
   }
 
   keepChannelTurnAnswers(turnId: string): void {
@@ -3520,6 +3558,28 @@ function keepsNarration(item: DynamicRecord, completed: boolean): boolean {
   if (!completed) return true;
   const calls = getArray(getRecord(getRecord(threadItem, "result"), "metadata"), "toolCalls");
   return calls.length > 0 && calls.every((call) => NARRATION_KEEPING_TOOLS.has(codeModeOpenBotTool(call) ?? ""));
+}
+
+const CHANNEL_RESULT_NAME = /(?:^|[._])channel_result$/u;
+const BRIDGE_TOOL = /(?:^|[._])(?:tool_call|use_tool)$/u;
+const CODE_CHANNEL_RESULT_CALL = /\bchannel_result\s*\(|["'`]openbot\.channel_result["'`]/u;
+
+function channelNoteStep(item: DynamicRecord): "result" | "other" | null {
+  const threadItem = toThreadItem(item);
+  if (threadItem === null || !isToolItem(threadItem)) return null;
+  if (openBotTool(threadItem) === "channel_result") return "result";
+  if (threadItem.type !== "toolCall") return "other";
+  const name = getString(threadItem, "name") ?? "";
+  if (name === "execute") {
+    const code = getString(getRecord(threadItem, "arguments"), "code");
+    if (!code) return null;
+    return CODE_CHANNEL_RESULT_CALL.test(code) ? "result" : "other";
+  }
+  if (!BRIDGE_TOOL.test(name)) return CHANNEL_RESULT_NAME.test(name) ? "result" : "other";
+  const args = threadItem.arguments;
+  const called = getString(args, "name") ?? getString(args, "tool") ?? getString(args, "tool_name");
+  if (called === null) return null;
+  return CHANNEL_RESULT_NAME.test(called) ? "result" : "other";
 }
 
 function codeModeOpenBotTool(call: unknown): string | null {
