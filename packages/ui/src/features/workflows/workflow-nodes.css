@@ -410,7 +410,7 @@
 
 .wfn-stage .wfn-toolbar .wfn-tool-action[data-tone="danger"]:is(:hover, :focus-visible) {
   background: color-mix(in srgb, var(--openbot-danger) 16%, transparent);
-  color: var(--openbot-warning-text);
+  color: var(--openbot-danger-text);
 }
 
 .wfn-toolbar-separator {
@@ -2023,7 +2023,7 @@ fieldset.wfn-picker-group {
   border-radius: var(--openbot-radius-sm);
   background: var(--wfn-card);
   box-shadow: 0 0 0 1px var(--openbot-danger-border);
-  color: var(--openbot-warning-text);
+  color: var(--openbot-danger-text);
   font-size: var(--openbot-text-sm);
   white-space: nowrap;
   pointer-events: none;
@@ -2050,7 +2050,7 @@ fieldset.wfn-picker-group {
   border-radius: var(--openbot-radius-pill);
   background: color-mix(in srgb, var(--openbot-danger) 14%, var(--wfn-card));
   box-shadow: 0 0 0 1px var(--openbot-danger-border);
-  color: var(--openbot-warning-text);
+  color: var(--openbot-danger-text);
   opacity: 1;
   scale: 1;
   transition-property: opacity, scale, background-color;
@@ -2060,7 +2060,7 @@ fieldset.wfn-picker-group {
 
 .wfn-stage .wfn-edge-actions .wfn-edge-remove:hover {
   background: color-mix(in srgb, var(--openbot-danger) 28%, var(--wfn-card));
-  color: var(--openbot-warning-text);
+  color: var(--openbot-danger-text);
 }
 
 @starting-style {
@@ -2183,7 +2183,7 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-run-time[data-failed] {
-  color: var(--openbot-warning-text);
+  color: var(--openbot-danger-text);
 }
 
 @keyframes wfn-run-time-out {
@@ -2591,7 +2591,7 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-strip-item[data-failed] {
-  color: var(--openbot-warning-text);
+  color: var(--openbot-danger-text);
 }
 
 .wfn-strip-failed {
@@ -2684,7 +2684,7 @@ fieldset.wfn-picker-group {
 .wfn-media-failed-icon {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  color: var(--openbot-warning-text);
+  color: var(--openbot-danger-text);
 }
 
 .wfn-media-failed-reason {
@@ -3612,8 +3612,8 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-alert[data-tone="danger"] {
-  background: var(--openbot-warning-soft);
-  color: var(--openbot-warning-text);
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger-text);
 }
 
 .wfn-alert[data-tone="warning"] {

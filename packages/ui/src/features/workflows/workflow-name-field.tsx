@@ -424,6 +424,7 @@ export function NameField(props: NameFieldProps) {
     const range = selectionIn(field);
     if (!range || range.start === range.end) return;
     event.preventDefault();
+    event.stopPropagation();
     event.clipboardData.setData("text/plain", fieldText(field).slice(range.start, range.end));
     if (cut && !props.readonly) replaceSelection("");
   };
