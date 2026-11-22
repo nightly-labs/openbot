@@ -1609,7 +1609,8 @@ try {
         await Effect.runPromise(current().workflows.sweep());
         const detail = await ok(WORKFLOWS_ROUTES.run, ownerToken, { runId });
         const found = newest(detail, nodeId);
-        if (found && found.status !== "running") return detail;
+        const runEnded = ["done", "failed", "stopped"].includes(String(record(detail.run, "run").status));
+        if (runEnded && found && found.status !== "running") return detail;
         await new Promise((done) => setImmediate(done));
       }
     };
