@@ -81,8 +81,8 @@ bun scripts/umbrel-app.ts --version <x.y.z> --official [--submission <pull reque
 ```
 
 The script writes `.openbot-build/umbrel/<app id>`: the manifest and the Compose file with the app id,
-the version and the digest of the image index on GHCR, the empty `data` folder, the `pre-start` hook
-and `seccomp.json`. Copy the folder to an app store, with the app id as its name. The app id is `openbot` by default. In a community
+the version and the digest of the image index on GHCR, the empty `data` folder, `exports.sh`, the `pre-start` hook,
+`seccomp.json` and `APACHE-2.0.txt`. Copy the folder to an app store, with the app id as its name. The app id is `openbot` by default. In a community
 app store, the app id must start with the id of the store. The release must contain the setup page:
 0.71.0 and older releases do not.
 
@@ -97,8 +97,10 @@ run the workflow from the Actions tab of the store.
 | `umbrel-app.yml` | The manifest. Umbrel opens the app on port 4180. The icon is `openbot.run/icon-512x512.png`, except with `--official`. |
 | `docker-compose.yml` | The container, with the same options as `docker/compose.yaml`. Umbrel sends the requests of the app to the setup page on port 8080. |
 | `data/.gitkeep` | Keeps the source folder of the `/data` bind mount in the app store. Umbrel's linter needs it. |
-| `hooks/pre-start` | Makes the data folder and gives it to UID 1000, the user of the image. |
+| `exports.sh` | Sets `APP_OPENBOT_APPARMOR_PROFILE` to `docker-<app id>` when `hooks/pre-start` loaded it, or to `docker-default` otherwise. |
+| `hooks/pre-start` | Makes the data folder for UID 1000 and, on hosts with AppArmor 4, loads the `docker-<app id>` AppArmor profile (`moby/profiles` default rules plus `userns`, assuming an unconfined `dockerd` as on stock umbrelOS). |
 | `seccomp.json` | A copy of `docker/seccomp.json`. The container stops without it, see [Security](docker.md#security). |
+| `APACHE-2.0.txt` | The Apache License 2.0 text for the Moby-derived `seccomp.json` and AppArmor profile. |
 
 ### The official Umbrel App Store
 
@@ -116,7 +118,11 @@ Write these reasons in the pull request, because Umbrel asks for them:
 - `security_opt`: the Electron sandbox in the image makes user namespaces. The default seccomp profile
   of Docker refuses the calls for it, and the container stops. `seccomp.json` is the default profile
   with one more rule: `clone` and `unshare` without limits on their flags (see
-  [Security](docker.md#security)). `no-new-privileges` is also set.
+  [Security](docker.md#security)). On hosts with AppArmor 4, such as umbrelOS 2.0 on Debian 13,
+  Docker's `docker-default` AppArmor profile also denies `userns_create`. `hooks/pre-start` loads
+  `docker-<app id>`, which keeps the `docker-default` rules and adds `userns`, and `exports.sh`
+  selects it only when loaded so hosts without AppArmor 4 stay on `docker-default`.
+  `no-new-privileges` is also set.
 - `restart: unless-stopped`: OpenBot exits with code 0 when an owner restarts the server from Server
   Settings. With `on-failure`, the app then stays stopped.
 
@@ -136,14 +142,22 @@ Desktop on macOS), with the setup page of this branch on the 0.71.0 image:
 - `openbot logout` runs in the app container.
 - Umbrel's linter (`lint:apps`) shows no errors on the `--official` app with a submission URL.
 
+The AppArmor hook and `exports.sh` were tested on umbrelOS 2.0.1 (Debian 13.7, x86_64, Docker 28.5.0,
+AppArmor 4.1.0) with the 0.76.1 image:
+
+- Before `hooks/pre-start`, `exports.sh` sets `APP_OPENBOT_APPARMOR_PROFILE=docker-default`, and
+  `unshare -Ur true` in the image with `seccomp.json` fails with `Permission denied` (`docker-default`
+  denies `userns_create`).
+- After `hooks/pre-start`, `docker-<app id>` loads in enforce mode, `exports.sh` selects it, and
+  `unshare -Ur true` succeeds with `seccomp.json` and `no-new-privileges:true`.
+
 ## Not confirmed
 
-- The app was not installed on an Umbrel Home, a Raspberry Pi or an x86_64 computer. It is not known if
-  Umbrel's review accepts `security_opt: seccomp=${APP_DATA_DIR}/seccomp.json`. No app in the official
-  Umbrel store sets a seccomp profile.
-- AppArmor was not checked. The kernel of the test has no AppArmor. On a host with AppArmor rules that
-  refuse user namespaces, the container stops at its start, as on Ubuntu 23.10 or newer (see
-  [Not confirmed](docker.md#not-confirmed)).
+- It is not known if Umbrel's review accepts `security_opt: seccomp=${APP_DATA_DIR}/seccomp.json`. No
+  app in the official Umbrel store sets a seccomp profile.
+- Hosts with AppArmor 3 (such as Debian 12) or without AppArmor were not re-tested after adding
+  `exports.sh` and the AppArmor loader in `hooks/pre-start`. On those hosts, `hooks/pre-start` skips
+  loading the profile and `exports.sh` keeps `docker-default`.
 - The Terminal page of Umbrel was not opened. `openbot logout` was run with `docker exec` in the app
   container.
 - The store was added with the API of umbreld, not in the App Store page. The store has no app before

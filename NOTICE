@@ -68,6 +68,9 @@ with only its contour and eyes, for small sizes.
 The Docker seccomp profile docker/seccomp.json is the default profile of moby/profiles
 (https://github.com/moby/profiles, commit 6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef), modified to
 allow the clone and unshare system calls. Its last rule marks the change.
+The Umbrel AppArmor profile in docker/umbrel/openbot/hooks/pre-start is derived from
+moby/profiles (apparmor/template.go, commit 6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef), modified to
+set abi/4.0, permit userns, and rely on peer=unconfined for dockerd.
 Copyright Docker, Inc. and the Moby authors.
 Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
 

@@ -36,7 +36,7 @@ if (out === TEMPLATE || notAppFolder) {
 const digest = await indexDigest(version);
 rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, "hooks"), { recursive: true });
-for (const file of ["umbrel-app.yml", "docker-compose.yml"]) {
+for (const file of ["umbrel-app.yml", "docker-compose.yml", "exports.sh", "hooks/pre-start"]) {
   let text = readFileSync(join(TEMPLATE, file), "utf8")
     .replaceAll("__APP_ID__", appId)
     .replaceAll("__VERSION__", version)
@@ -48,9 +48,11 @@ for (const file of ["umbrel-app.yml", "docker-compose.yml"]) {
   writeFileSync(join(out, file), text);
 }
 cpSync(join(TEMPLATE, "data"), join(out, "data"), { recursive: true });
-cpSync(join(TEMPLATE, "hooks/pre-start"), join(out, "hooks/pre-start"));
+chmodSync(join(out, "exports.sh"), 0o644);
 chmodSync(join(out, "hooks/pre-start"), 0o755);
 cpSync(join(ROOT, "docker/seccomp.json"), join(out, "seccomp.json"));
+cpSync(join(ROOT, "marketplace/production-catalog/licenses/APACHE-2.0.txt"), join(out, "APACHE-2.0.txt"));
+chmodSync(join(out, "APACHE-2.0.txt"), 0o644);
 logger.info(`Wrote the Umbrel app ${appId} of ${version} (${digest}) to ${out}.`);
 
 async function indexDigest(tag: string): Promise<string> {

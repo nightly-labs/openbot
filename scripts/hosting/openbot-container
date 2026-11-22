@@ -21,7 +21,7 @@ display_size() {
 [ "$(id -u)" -ne 0 ] || fail "Run the OpenBot image as its own user, not as root."
 [ -w "$HOME" ] || fail "User $(id -u) cannot write to $HOME. Give the data volume to that user: chown -R $(id -u):$(id -g) <folder>"
 unshare --user --map-root-user true 2>/dev/null ||
-  fail "OpenBot cannot make a user namespace for the Electron sandbox. Start the container with --security-opt seccomp=seccomp.json. See https://github.com/nightly-labs/openbot/blob/main/docs/docker.md"
+  fail "OpenBot cannot make a user namespace for the Electron sandbox. Start the container with --security-opt seccomp=seccomp.json, and with an AppArmor profile that permits userns on hosts where AppArmor restricts user namespaces. See https://github.com/nightly-labs/openbot/blob/main/docs/docker.md"
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 0700 "$XDG_RUNTIME_DIR"
 rm -f "$XDG_RUNTIME_DIR/control.sock"

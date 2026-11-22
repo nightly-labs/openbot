@@ -520,8 +520,8 @@ does not use systemd.
   profile and for a volume that the user cannot write. The release workflow also starts each image.
 - Not tested: a sign-in with `openbot login` in a container, remote use of a container from the app,
   Podman, Kubernetes, rootless Docker, and hosts that restrict user namespaces with AppArmor, such as
-  Ubuntu 23.10 or newer. On such a host, the container can need an AppArmor profile that permits
-  `userns`.
+  Ubuntu 23.10 or newer and Debian 13. On such a host, the container needs an AppArmor profile that
+  permits `userns`.
 - Host networking: users report that it makes the connection fast on a local network and on a
   Tailscale tailnet. This was not tested here. On a public Ubuntu 24.04 VPS with Docker 29, the
   bridge network connected in 2.0 to 2.6 s and host networking in 2.0 to 2.4 s.

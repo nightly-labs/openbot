@@ -12,6 +12,7 @@ services:
     stop_grace_period: 1m
     shm_size: "1gb"
     security_opt:
+      - apparmor=${APP_OPENBOT_APPARMOR_PROFILE:-docker-default}
       - seccomp=${APP_DATA_DIR}/seccomp.json
       - no-new-privileges:true
     volumes:
