@@ -1011,22 +1011,10 @@ export class ProviderRuntime implements ProviderPort {
             const codexType = provider === "codex" ? this.#accounts.get(provider)?.type : undefined;
             if (codexType === "apiKey" || codexType === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) return null;
             const released = this.#released.has(provider) && !this.#clients.has(provider);
-            const cli = this.#cli.get(provider);
             const accounts = ProviderAccounts.support(provider);
-            if (
-              released &&
-              !this.#usageUnreported.has(provider) &&
-              cli &&
-              accounts &&
-              !isKeyAccountSupport(accounts) &&
-              !accounts.usageLeavesSession
-            ) {
-              usage = yield* Effect.acquireUseRelease(
-                this.#authenticateClient(provider, cli, { interruptibleStart: true }),
-                ({ client }) => this.#refreshUsage(client, defaultUsageModel(provider), false),
-                ({ client }) =>
-                  client.stop().pipe(Effect.ignore, Effect.andThen(this.#hooks.onClientStopped(client)), Effect.ignore),
-              ).pipe(deadline);
+            const releasedCli = this.#releasedUsageCli(provider);
+            if (releasedCli) {
+              usage = yield* this.#readReleasedUsage(provider, releasedCli, defaultUsageModel(provider)).pipe(deadline);
             } else {
               const kept = released ? this.#lastUsage.get(provider) : undefined;
               if (kept && !usageWindowHasReset(kept)) return kept;
@@ -1107,12 +1095,49 @@ export class ProviderRuntime implements ProviderPort {
         .usageFor(scope.provider, account.id, scope.model)
         .pipe(toProviderOperationFailed);
     const client = this.#clients.get(scope.provider);
-    if (!client) return { limits: [] };
+    const releasedCli = client ? undefined : this.#releasedUsageCli(scope.provider);
+    const read = client
+      ? this.#refreshUsage(client, scope.model, false)
+      : releasedCli
+        ? this.#readReleasedUsage(scope.provider, releasedCli, scope.model).pipe(deadline)
+        : undefined;
+    if (!read) return { limits: [] };
     return yield* this.#usageGate(scope.provider).unlessWaiting({
-      read: this.#refreshUsage(client, scope.model, false),
+      read,
       waiting: (): AccountUsage => ({ limits: [] }),
     });
   }).bind(this);
+
+  #releasedUsageCli(provider: AgentProvider): AgentCliInfo | undefined {
+    const cli = this.#cli.get(provider);
+    const accounts = ProviderAccounts.support(provider);
+    const codexType = provider === "codex" ? this.#accounts.get(provider)?.type : undefined;
+    return this.#released.has(provider) &&
+      !this.#clients.has(provider) &&
+      !this.#usageUnreported.has(provider) &&
+      agentProviderDescriptor(provider).reportsUsage &&
+      codexType !== "apiKey" &&
+      codexType !== CODEX_MODEL_PROVIDER_ACCOUNT_TYPE &&
+      accounts &&
+      !isKeyAccountSupport(accounts) &&
+      !accounts.usageLeavesSession
+      ? cli
+      : undefined;
+  }
+
+  readonly #readReleasedUsage = Effect.fn("ProviderRuntime.readReleasedUsage")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    cli: AgentCliInfo,
+    model: string | undefined,
+  ) {
+    return yield* Effect.acquireUseRelease(
+      this.#authenticateClient(provider, cli, { interruptibleStart: true }),
+      ({ client }) => this.#refreshUsage(client, model, false),
+      ({ client }) =>
+        client.stop().pipe(Effect.ignore, Effect.andThen(this.#hooks.onClientStopped(client)), Effect.ignore),
+    );
+  });
 
   readonly accountUsage = Effect.fn("ProviderRuntime.accountUsage")(function* (this: ProviderRuntime) {
     const providers = (this.status().providers ?? [])
