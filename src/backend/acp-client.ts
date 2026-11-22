@@ -164,12 +164,6 @@ const SESSION_STATE_UPDATES: ReadonlySet<SessionUpdate["sessionUpdate"]> = new S
   "user_message_chunk",
 ]);
 
-const WAKE_WORK_UPDATES: ReadonlySet<SessionUpdate["sessionUpdate"]> = new Set([
-  "tool_call",
-  "tool_call_update",
-  "plan",
-]);
-
 const MODEL_RETRY_STATUS = {
   unreachable: "status.provider.modelRetryUnreachable",
   outOfMemory: "status.provider.modelRetryOutOfMemory",
@@ -3158,7 +3152,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       if (SESSION_STATE_UPDATES.has(update.sessionUpdate)) return;
-      if (!WAKE_WORK_UPDATES.has(update.sessionUpdate)) {
+      if (update.sessionUpdate !== "tool_call") {
         turn.answered = true;
         turn.beforeWakeEcho.push(update);
         return;
