@@ -71,8 +71,9 @@ export const performDynamicIslandCriticalAction = Effect.fn("DynamicIsland.criti
   }
   if (action.type === "answer-prompt") {
     const input = { requestId: action.requestId, answers: action.answers };
+    const owner = action.serverId === LOCAL_SERVER_ID ? sender() : undefined;
     return yield* action.serverId === LOCAL_SERVER_ID
-      ? local.respondToPrompt(input, { sender: sender(), privileged: true })
+      ? local.respondToPrompt(input, { ...(owner ? { sender: owner } : {}), privileged: true })
       : remote
           .request(action.serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, { method: "POST", body: input })
           .pipe(Effect.asVoid);

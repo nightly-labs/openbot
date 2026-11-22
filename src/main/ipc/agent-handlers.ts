@@ -1561,8 +1561,10 @@ export function agentIpcHandlers({
           remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId }),
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
-        local: (parsed) =>
-          runCauseEffect(service.respondToPrompt(parsed, { sender: host.conversationSender(), privileged: true })),
+        local: (parsed) => {
+          const sender = host.conversationSender();
+          return runCauseEffect(service.respondToPrompt(parsed, { ...(sender ? { sender } : {}), privileged: true }));
+        },
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {
