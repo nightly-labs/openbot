@@ -48,6 +48,7 @@ interface OpenCodeProviderEntry {
 }
 
 interface OpenCodeNativeModelEntry {
+  readonly modelID?: string;
   readonly name: string;
   readonly limit?: { readonly context: number; readonly output: number };
   readonly capabilities?: { readonly input: readonly string[]; readonly output: readonly string[] };
@@ -199,8 +200,9 @@ function nativeProviderEntry(
   };
 }
 
-function nativeModelEntry({ name, limit, modalities, variants }: OpenCodeModelEntry): OpenCodeNativeModelEntry {
+function nativeModelEntry({ id, name, limit, modalities, variants }: OpenCodeModelEntry): OpenCodeNativeModelEntry {
   return {
+    ...(id ? { modelID: id } : {}),
     name,
     ...(limit ? { limit } : {}),
     ...(modalities ? { capabilities: modalities } : {}),
