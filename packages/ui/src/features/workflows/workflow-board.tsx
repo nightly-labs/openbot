@@ -204,6 +204,7 @@ export interface WfnBoard {
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
+  waiting: (id: string) => boolean;
   progress: (id: string) => WorkflowAgentProgress | undefined;
   error: (id: string) => string | undefined;
   retry?: ((id: string) => void) | undefined;
@@ -278,6 +279,7 @@ export interface BoardOptions {
   hides?: (edge: WfnEdge) => boolean;
   dropFiles?: (id: string, files: readonly File[]) => void;
   status?: (id: string) => WfnRunStatus | undefined;
+  waiting?: (id: string) => boolean;
   progress?: (id: string) => WorkflowAgentProgress | undefined;
   error?: (id: string) => string | undefined;
   retry?: (id: string) => void;
@@ -906,6 +908,7 @@ export function createBoard(options: BoardOptions) {
     features: () => options.features?.(),
     github: () => options.github?.(),
     status: (id) => options.status?.(id),
+    waiting: (id) => options.waiting?.(id) ?? false,
     progress: (id) => options.progress?.(id),
     error: (id) => options.error?.(id),
     retry: options.retry,

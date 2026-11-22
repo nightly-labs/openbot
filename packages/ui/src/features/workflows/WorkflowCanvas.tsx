@@ -544,6 +544,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const running = () => openRun() !== undefined;
   const statusOf = (id: string) => runIndex().get(id)?.status;
+  const waitingOf = (id: string) => statusOf(id) === "running" && runIndex().get(id)?.step.waiting === true;
   const stepOf = (id: string) => runIndex().get(id)?.step.id;
 
   let viewport: HTMLElement | undefined;
@@ -601,8 +602,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       return kind ? stretchOf(kind) : "x";
     },
     status: statusOf,
+    waiting: waitingOf,
     progress: (id) => {
-      const agentId = statusOf(id) === "running" ? runIndex().get(id)?.step.agentId : null;
+      const agentId = statusOf(id) === "running" && !waitingOf(id) ? runIndex().get(id)?.step.agentId : null;
       return agentId ? props.agentProgress?.(agentId) : undefined;
     },
     error: (id) => runIndex().get(id)?.error,
@@ -1545,8 +1547,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       shown.filter((entry) => entry.status === status).map((entry) => entry.id);
     for (const status of ["approval", "failed", "running"] as const) {
       const ids = find(status);
-      const id = ids[0];
-      if (id !== undefined) return { id, status, name: stepName(id), more: ids.length - 1 };
+      const id = ids.find((candidate) => !waitingOf(candidate)) ?? ids[0];
+      if (id !== undefined) return { id, status, waiting: waitingOf(id), name: stepName(id), more: ids.length - 1 };
     }
     return undefined;
   };

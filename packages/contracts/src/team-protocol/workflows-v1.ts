@@ -157,20 +157,23 @@ const run = fields({
   startedAt: timestamp,
   endedAt: nullable(timestamp),
 });
-const step = fields({
-  id: identifier,
-  workflowId: identifier,
-  runId: nullable(identifier),
-  nodeId: identifier,
-  attempt: ordinal(Number.MAX_SAFE_INTEGER),
-  agentId: nullable(identifier),
-  status: token,
-  output: nullable(stepText),
-  branch: nullable(oneOf("yes", "no")),
-  error: nullable(stepText),
-  startedAt: nullable(timestamp),
-  endedAt: nullable(timestamp),
-});
+const step = fields(
+  {
+    id: identifier,
+    workflowId: identifier,
+    runId: nullable(identifier),
+    nodeId: identifier,
+    attempt: ordinal(Number.MAX_SAFE_INTEGER),
+    agentId: nullable(identifier),
+    status: token,
+    output: nullable(stepText),
+    branch: nullable(oneOf("yes", "no")),
+    error: nullable(stepText),
+    startedAt: nullable(timestamp),
+    endedAt: nullable(timestamp),
+  },
+  { waiting: boolean },
+);
 const runDetail = fields({ run, steps: list(step, WORKFLOW_RUN_STEP_LIMIT) });
 const runPage = fields({
   runs: list(runDetail, 50),
