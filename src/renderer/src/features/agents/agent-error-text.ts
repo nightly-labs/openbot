@@ -1,5 +1,6 @@
 import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { currentText } from "@openbot/ui/text";
 
@@ -59,6 +60,12 @@ const ERROR_DESCRIPTION_LIMIT = 300;
 const ERROR_DETAILS_LIMIT = 2_000;
 const ERROR_TOAST_DEDUPE_MS = 30_000;
 const lastErrorToastAt = new Map<string, number>();
+
+export function remoteAgentError(message: string): string {
+  return matchingSourceKeys(message.trim()).includes("error.provider.opencodeOutputLimitEndpoint")
+    ? sourceText("error.provider.opencodeOutputLimit")
+    : message;
+}
 
 export function readableAgentError(message: string): string {
   const { t, errorMessage } = currentText();

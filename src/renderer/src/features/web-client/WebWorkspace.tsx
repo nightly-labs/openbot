@@ -248,6 +248,7 @@ import {
   claimErrorToast,
   createTurnErrorBanners,
   readableAgentError,
+  remoteAgentError,
 } from "../agents/agent-error-text";
 import { agentTakeoverTabIds } from "../agents/agent-thread-attention";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
@@ -2053,7 +2054,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (event.type !== "error") return;
       if (event.agentId && serverId) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
-        const message = readableAgentError(event.message);
+        const message = readableAgentError(remoteAgentError(event.message));
         errorBanners.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         const details = agentErrorDetails(event.message, message);
@@ -2065,7 +2066,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         });
         return;
       }
-      const description = readableAgentError(event.message);
+      const description = readableAgentError(remoteAgentError(event.message));
       if (!claimErrorToast(description)) return;
       if (event.code === "mcp_server_not_started") {
         toast.error(t("agent.error.mcpNotStarted"), {
@@ -3653,6 +3654,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       hostName={target().name}
                       onBack={closeHostPage}
                       source={tasksSource}
+                      failureText={remoteAgentError}
                       responseStyle={responseStyle()}
                       mediaSource={runtime.attachmentMedia}
                       files={{

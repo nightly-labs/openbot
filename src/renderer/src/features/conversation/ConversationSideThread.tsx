@@ -17,6 +17,7 @@ import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { remoteAgentError } from "../agents/agent-error-text";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
@@ -188,6 +189,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
         {(current) => (
           <AgentThreadView
             task={current().thread.task}
+            failureText={view.server && view.server.kind !== "local" ? remoteAgentError : undefined}
             limit={view.threads?.limit ?? 1}
             agent={current().agent}
             agents={view.agents}

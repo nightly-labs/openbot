@@ -256,6 +256,7 @@ export interface AgentThreadViewProps {
   awaiting?: readonly AwaitingReplyItem[] | undefined;
   onOpenWaitingAgent?: ((agentId: string) => void) | undefined;
   selectionActions?: AgentThreadSelectionActions | undefined;
+  failureText?: ((error: string) => string) | undefined;
 }
 
 export interface AgentThreadSelectionActions {
@@ -678,7 +679,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const reason = error?.trim() ?? "";
     if (!reason) return { body: t("conversation.threads.view.failedBody"), details: null };
     const fallback = t("agent.error.continueFailed");
-    const body = errorMessage(reason, fallback);
+    const body = errorMessage(props.failureText?.(reason) ?? reason, fallback);
     return { body, details: body === fallback ? reason : null };
   };
   const running = () =>
