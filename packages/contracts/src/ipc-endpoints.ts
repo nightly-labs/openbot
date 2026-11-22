@@ -131,7 +131,9 @@ import type {
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTaskWindow,
+  ArchivedAgentTasksPage,
   BranchAgentTaskInput,
+  ListArchivedAgentTasksInput,
   MarkAgentTaskReadInput,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -257,6 +259,7 @@ import type {
   SetBrowserProfileProxyInput,
 } from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
+import type { CacheExpiryCompactionSetting } from "./ipc-cache-expiry-compaction";
 import type {
   BrowseChannelFoldersInput,
   ChannelFolderChange,
@@ -1235,6 +1238,12 @@ export const IPC_ENDPOINTS = {
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
     ),
+    getCacheExpiryCompaction: scopedQuery<CacheExpiryCompactionSetting, "required">()(
+      "host-admin:get-cache-expiry-compaction",
+    ),
+    setCacheExpiryCompaction: scopedRequest<boolean, CacheExpiryCompactionSetting, "required">()(
+      "host-admin:set-cache-expiry-compaction",
+    ),
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
       "host-admin:set-claude-user-setup",
@@ -1548,6 +1557,9 @@ export const IPC_ENDPOINTS = {
     listPinnedMessages: scopedRequest<string, PinnedMessagesSnapshot>()("agent:list-pinned-messages"),
     setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
+    listArchivedTasks: scopedRequest<ListArchivedAgentTasksInput, ArchivedAgentTasksPage>()(
+      "agent:tasks:list-archived",
+    ),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     readTaskAround: scopedRequest<ReadAgentTaskAroundInput, AgentTaskWindow>()("agent:tasks:read-around"),

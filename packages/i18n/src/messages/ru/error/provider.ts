@@ -141,6 +141,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "Ключ провайдера содержит пробел или символ, который не может быть в ключе.",
   "error.provider.noModel": "У выбранного провайдера нет доступной модели.",
   "error.provider.noModelNamed": "У {provider} нет доступной модели.",
+  "error.provider.acpModelsNotLoaded": "{provider} не смог загрузить свои модели. Отправьте сообщение ещё раз.",
   "error.provider.acpNoModels":
     "ACP CLI не сообщил ни одной модели ACP. OpenBot не будет подбирать запасную модель наугад.",
   "error.provider.endpointRemoveBusy":

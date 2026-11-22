@@ -148,6 +148,7 @@ export const messages = {
     "La clave del proveedor contiene un espacio o un carácter que una clave no puede contener.",
   "error.provider.noModel": "El proveedor seleccionado no tiene ningún modelo disponible.",
   "error.provider.noModelNamed": "{provider} no tiene ningún modelo disponible.",
+  "error.provider.acpModelsNotLoaded": "{provider} no pudo cargar sus modelos. Vuelve a enviar tu mensaje.",
   "error.provider.acpNoModels":
     "La CLI de ACP no anunció ningún modelo ACP. OpenBot no adivinará un modelo alternativo.",
   "error.provider.endpointRemoveBusy":

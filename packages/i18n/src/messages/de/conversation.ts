@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Im Chat öffnen",
   "conversation.threads.archive": "Archivieren",
   "conversation.threads.archived": "Archiviert",
+  "conversation.threads.archivedOlder": "Ältere Threads zeigen",
   "conversation.threads.restore": "Wiederherstellen",
   "conversation.threads.deleteUndo.title": "{title} gelöscht",
   "conversation.threads.hold.threadLimit": {

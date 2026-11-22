@@ -1186,8 +1186,6 @@ try {
         assert.ok(!JSON.stringify(without).includes("readFailed"), "A client without the capability got readFailed.");
         const usage = record(without.usage, "usage");
         assert.ok(Array.isArray(usage.limits) && usage.limits.length === 2, JSON.stringify(usage));
-        // The host sends the event with only a failed read first. An older client reads an empty event as
-        // "no sign-in has a reading", so the host must skip it: the first event this client gets is the next one.
         const next = await currentUsageEvent(withoutReadFailed, reading, failedReadOnly);
         const nextUsage = record(next.usage, "usage");
         assert.ok(Array.isArray(nextUsage.limits) && nextUsage.limits.length === 2, JSON.stringify(nextUsage));

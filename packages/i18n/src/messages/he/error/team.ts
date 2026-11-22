@@ -136,6 +136,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "זמן מטמון ההנחיות אינו נתמך בחיבור הזה.",
   "error.team.claudeUserSetupUnsupported": "החיבור הזה לא תומך במתג ההגדרות של Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "החיבור הזה לא תומך בגודל הכיווץ של Claude.",
+  "error.team.cacheExpiryCompactionUnsupported": "החיבור הזה לא תומך בכיווץ לפני שהמטמון פג.",
   "error.team.providerEnvironmentUnsupported": "החיבור הזה לא תומך במשתני ספק.",
   "error.team.modelVisibilityUnsupported": "רשימת המודלים אינה נתמכת בחיבור הזה.",
   "error.team.providerDefaultUnsupported": "ספק ברירת המחדל אינו נתמך בחיבור הזה.",

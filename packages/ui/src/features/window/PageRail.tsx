@@ -210,7 +210,6 @@ function UsageRings(props: {
             </g>
           )}
         </For>
-        {/* A dashed track: the usage could not be read. An empty solid track means none is left. */}
         <Show when={unavailable()}>
           <circle
             class="window-rail-usage-track"

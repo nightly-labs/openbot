@@ -1152,10 +1152,15 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Impossible de modifier les modèles. Réessayez.",
   "mobile.server.providers.promptCache": "Cache des prompts",
   "mobile.server.providers.promptCacheHint":
-    "Durée pendant laquelle Claude garde le contexte d'un agent en cache entre les tours. Le changement s'applique au prochain démarrage de Claude.",
-  "mobile.server.providers.promptCacheDefault": "Par défaut de Claude Code",
+    "Durée pendant laquelle Claude et Pi gardent le contexte d’un agent en cache entre les tours. Le changement s’applique au prochain démarrage du fournisseur.",
+  "mobile.server.providers.promptCacheDefault": "Valeur par défaut du fournisseur",
   "mobile.server.providers.promptCacheHour": "1 heure",
   "mobile.server.providers.promptCacheLoadFailed": "Impossible de charger la durée du cache des prompts de ce serveur.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compacter avant l’expiration du cache",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Quand une discussion avec 200K jetons de contexte ou plus est inactive avec un cache d’1 heure, l’agent compacte le contexte avant l’expiration du cache. Le message suivant ne relit alors pas tout le contexte sans cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Impossible de charger le réglage de compactage de ce serveur.",
   "mobile.server.providers.compactWindow": "Compacter les chats à",
   "mobile.server.providers.compactWindowHint":
     "Claude Code résume les anciens tours d’un chat quand le chat atteint cette taille. Plus bas garde des tours rapides et économiques. Plus haut garde plus de détails. Un modèle avec une fenêtre plus petite compacte à sa propre limite.",

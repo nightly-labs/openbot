@@ -2,23 +2,14 @@ import type { AccountUsage } from "../ipc-agent-status";
 import { isDynamicRecord } from "../runtime-values";
 import type { TeamProtocolV8BaseJsonValue } from "./v8-base";
 
-/**
- * The host sends a limit with `readFailed` for a provider whose own usage read failed, so the client
- * shows the provider as unavailable instead of hiding it (#11771).
- */
 export const TEAM_USAGE_READ_FAILED_CAPABILITY = "usage-read-failed-v1";
 
-/** The usage for a peer without the capability: the same limits as before it, with no failed read. */
 export function usageWithoutReadFailed(usage: AccountUsage): AccountUsage {
   return usage.limits.some((limit) => limit.readFailed === true)
     ? { ...usage, limits: usage.limits.filter((limit) => limit.readFailed !== true) }
     : usage;
 }
 
-/**
- * The `usage-changed` usage for a peer without the capability, or null when the event must not be sent:
- * an older client reads an event with no limits as "no sign-in has a reading" and clears its rail.
- */
 export function usageEventWithoutReadFailed(usage: AccountUsage): AccountUsage | null {
   const sent = usageWithoutReadFailed(usage);
   return sent.limits.length === 0 && usage.limits.length > 0 ? null : sent;

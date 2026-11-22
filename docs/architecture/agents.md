@@ -814,7 +814,19 @@ asks only for `hasOlder`, and a message that the thread does not hold has none. 
 until it fits one WebRTC frame. A thread tab on desktop and the web asks once after its read, and shows "Load older
 messages" when the thread has more; a new conversation of the thread keeps the pages that it read
 (`src/renderer/src/features/agent-tasks/agent-tasks-state.ts`). A server without the capability shows only the
-newest messages. The Tasks rail page and the phone do not read older pages. A server without either shows only
+newest messages. The Tasks rail page and the phone do not read older pages. The `agent-tasks-v1` list has at most
+50 tasks, the open ones first, then the newest archived ones. The optional `agent-archived-threads-v1` capability
+(protocol 10 only) (`packages/contracts/src/team-protocol/agent-archived-threads-v1.ts`, host route `routeAgentArchivedThreads` in
+`src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/list-archived` with
+`{agentId, before: {updatedAt, threadId} | null}`. It answers `{tasks, hasMore}`: up to 50 archived tasks after
+`before`, in the order of the list (the latest `updatedAt` first, then `threadId`), in the frozen `agent-tasks-v1`
+task shape, each with `state: "closed"` (#7204). `before: null` starts at the newest archived task. A member who can
+read the side threads of an agent with `agent-tasks-v1` can list them; the host asks for no role, and a hidden agent, or
+an agent that the peer cannot see, is not found (404). A host that grants it also grants `agent-tasks-v1`. When a list is full, the
+"Archived" menu of the thread header on desktop and the web shows "Show older threads", which reads the next page;
+the pages stay after the list, and a full list that drops an archived thread moves it to the pages
+(`src/renderer/src/features/agent-tasks/agent-tasks-state.ts`). A server without the capability shows only the
+archived tasks of the list. The Tasks rail page and the phone show only the archived tasks of the list. A server without either shows only
 the main thread, and a task control there fails with `error.backend.taskRemoteUnsupported`. Prompts, approvals and warnings of a task turn show in the main chat. On desktop and the web, the
 approval of a side thread turn also shows in that thread. A provider
 error of a task turn goes to the task: `AgentTasks` stores the redacted text in the task's `error`

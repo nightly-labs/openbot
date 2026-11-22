@@ -378,7 +378,6 @@ export class ProviderRuntime implements ProviderPort {
   readonly #ownResetCredits = new Map<AgentProvider, number | null>();
   readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   readonly #usageUnreported = new Set<AgentProvider>();
-  /** Providers whose own sign-in usage read failed last, for the rail's unavailable ring (#11771). */
   readonly #usageReadFailed = new Set<AgentProvider>();
   readonly #usageGates = new Map<AgentProvider, UsageReadGate>();
   readonly #releasedUsage = new Map<string, { gate: UsageReadGate; usage: AccountUsage }>();
@@ -554,8 +553,14 @@ export class ProviderRuntime implements ProviderPort {
             this.#refreshUsage(client, model, false).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
-          readModels: (client) =>
-            this.#modelCatalog.read(client, requireProviderDriver(client.provider).catalog).pipe(
+          readModels: (client) => {
+            const catalog = requireProviderDriver(client.provider).catalog;
+            return this.#modelCatalog.read(client, catalog).pipe(
+              Effect.catch((failure) =>
+                isProviderTimeout(failure.cause) && !catalog?.slowList
+                  ? this.#modelCatalog.read(client, catalog, this.#requestTimeoutMs)
+                  : Effect.fail(failure),
+              ),
               Effect.map(({ models }) => models),
               Effect.catch((failure) =>
                 Effect.sync(() => {
@@ -566,7 +571,8 @@ export class ProviderRuntime implements ProviderPort {
                   return null;
                 }),
               ),
-            ),
+            );
+          },
           resetCredits: (client) => this.#resetCredits.get(client),
           consumeUsageReset: (client) =>
             this.#consumeUsageReset(client).pipe(
@@ -1073,7 +1079,6 @@ export class ProviderRuntime implements ProviderPort {
               },
             })
             .pipe(
-              // A failed read keeps the last reading. With none, the rail shows the provider as unavailable.
               Effect.catch((error) =>
                 Effect.fail(error).pipe(
                   this.#logUsageFailure(provider),
@@ -4510,15 +4515,10 @@ export class ProviderOperationFailed extends Schema.TaggedError<ProviderOperatio
 }) {}
 const { sync: providerStep, rewrap: toProviderOperationFailed } = causeHelpers(ProviderOperationFailed);
 
-/** The reading of a provider whose own usage read failed, with no earlier reading to keep (#11771). */
 function readFailedLimit(provider: AgentProvider): AccountUsageLimit {
   return { id: provider, primary: null, secondary: null, readFailed: true };
 }
 
-/**
- * Whether the provider refused the usage read for its sign-in, as Grok's billing refuses an xAI API key
- * with "Authentication required". That sign-in has no plan usage, so it gets no unavailable ring.
- */
 function usageReadRefused(error: { readonly cause: unknown }): boolean {
   return (
     (error.cause instanceof RequestError && error.cause.code === -32000) || classifyUserError(error.cause) === "auth"

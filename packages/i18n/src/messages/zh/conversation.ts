@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "在聊天中打开",
   "conversation.threads.archive": "归档",
   "conversation.threads.archived": "已归档",
+  "conversation.threads.archivedOlder": "显示更早的话题",
   "conversation.threads.restore": "恢复",
   "conversation.threads.deleteUndo.title": "{title} 已删除",
   "conversation.threads.hold.threadLimit": { other: "正在等待空位。当前有 {count} 个话题在运行。" },

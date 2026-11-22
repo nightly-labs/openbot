@@ -1026,10 +1026,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "无法更改模型。请重试。",
   "mobile.server.providers.promptCache": "提示缓存",
   "mobile.server.providers.promptCacheHint":
-    "Claude 在轮次之间将智能体上下文保存在缓存中的时长。更改会在 Claude 下次启动时生效。",
-  "mobile.server.providers.promptCacheDefault": "Claude Code 默认",
+    "Claude 和 Pi 在两轮之间将智能体上下文保留在缓存中的时间。更改会在提供商下次启动时生效。",
+  "mobile.server.providers.promptCacheDefault": "提供商默认值",
   "mobile.server.providers.promptCacheHour": "1 小时",
   "mobile.server.providers.promptCacheLoadFailed": "无法加载此服务器的提示缓存时长。",
+  "mobile.server.providers.cacheExpiryCompaction": "在缓存过期前压缩",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "当上下文达到 20 万个令牌或更多的聊天在 1 小时缓存下处于空闲状态时，智能体会在缓存过期前压缩上下文。这样下一条消息就不会在没有缓存的情况下重新读取完整上下文。",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "无法加载此服务器的压缩设置。",
   "mobile.server.providers.compactWindow": "压缩聊天的大小",
   "mobile.server.providers.compactWindowHint":
     "当聊天达到此大小时，Claude Code 会总结较早的轮次。较低可使轮次更快、更便宜。较高会保留更多细节。窗口较小的模型会在其自身上限处压缩。",
