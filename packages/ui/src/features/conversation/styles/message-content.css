@@ -696,7 +696,9 @@
   contain: inline-size;
 }
 
-.message-entry-agent .ui-bubble:has(:is(.message-data-table-scroll, .message-code-block)) > .ui-bubble-content {
+.message-entry-agent
+  .ui-bubble:has(:is(.message-data-table-scroll, .message-code-block, .message-content-blocks .message-markdown-image))
+  > .ui-bubble-content {
   width: 100%;
 }
 
