@@ -298,6 +298,19 @@ export class WorkflowRunStore {
     return new Map(rows.map((step) => [step.nodeId, step]));
   }
 
+  latestSettled(workflowId: string): Map<string, StoredWorkflowStep> {
+    const rows = databaseRows(
+      this.#database.connection
+        .prepare(
+          `${STEP_SELECT} WHERE workflow_id = ? AND status IN ('done', 'failed', 'stopped')
+             AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
+           ORDER BY created_at, attempt, step_id`,
+        )
+        .all(workflowId),
+    ).map(toStep);
+    return new Map(rows.map((step) => [step.nodeId, step]));
+  }
+
   mediaOutputs(): WorkflowMediaOutput[] {
     return databaseRows(
       this.#database.connection

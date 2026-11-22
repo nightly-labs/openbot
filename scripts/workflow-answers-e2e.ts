@@ -412,6 +412,28 @@ try {
       report.handoffs.length === before,
     stepOf(detail, typeof workId === "string" ? workId : ""),
   );
+  const runsBefore = (await runCauseEffect(workflows.runs({ workflowId: saved.workflowId, limit: 50 }))).runs.length;
+  const badInput = await tool("run_workflow", {
+    workflowId: saved.workflowId,
+    input: JSON.stringify({ priority: "urgent", Title: "Down" }),
+  });
+  const proseInput = await tool("run_workflow", { workflowId: saved.workflowId, input: "The app is down." });
+  const runsAfter = (await runCauseEffect(workflows.runs({ workflowId: saved.workflowId, limit: 50 }))).runs.length;
+  check(
+    "run_workflow refuses input that does not fit the trigger answer fields and starts no run",
+    !badInput.ok &&
+      badInput.text.includes("priority") &&
+      badInput.text.includes("Title") &&
+      !proseInput.ok &&
+      proseInput.text.includes("priority, title") &&
+      runsAfter === runsBefore,
+    { badInput, proseInput, runsBefore, runsAfter },
+  );
+  const noInput = await tool("run_workflow", { workflowId: saved.workflowId });
+  const noInputRun = lastJsonObject(noInput.text);
+  assert.ok(noInputRun && typeof noInputRun.runId === "string");
+  await runUntil(workflows, noInputRun.runId, ended);
+  check("run_workflow with no input still starts a run", noInput.ok, noInput.text);
 
   modelReplies = [
     'Here: {"count":2.5,"score":"0x10","tags":"one","Count":3,"note":"x"}',
@@ -555,6 +577,64 @@ try {
       stepOf(detail, "agent")?.error === sourceText("error.workflow.answerSourceEnded", { fields: "priority" }) &&
       report.handoffs.length === joinHandoffs,
     detail.steps,
+  );
+
+  const retryGraph = (answer: string): WorkflowGraph => ({
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Ticket: the app does not start." }),
+      node("model", "llm", 300, { prompt: "Rate this ticket.", answer }),
+      node("gate", "condition", 600, { check: "priority = high" }),
+    ],
+    edges: [
+      { id: "prompt-model", from: "prompt", to: "model", type: "text" },
+      { id: "model-gate", from: "model", to: "gate", type: "text" },
+    ],
+    strokes: [],
+  });
+  modelReplies = ["no JSON", "still no JSON"];
+  const retried = await startRun(workflows, "Retry keeps the run spec", retryGraph(TRIAGE));
+  detail = await runUntil(workflows, retried, ended);
+  const retryWorkflow = detail.run.workflowId;
+  const failedModel = stepOf(detail, "model");
+  assert.ok(failedModel?.status === "failed");
+  const edited = await runCauseEffect(workflows.get(retryWorkflow));
+  const resaved = await runCauseEffect(
+    workflows.saveGraph({
+      workflowId: retryWorkflow,
+      baseRevision: edited.revision,
+      graph: retryGraph(`${TRIAGE}\nreason: text`),
+    }),
+  );
+  assert.ok(resaved.ok);
+  const retryPrompts = report.modelPrompts.length;
+  modelReplies = ['{"priority":"high","count":3}'];
+  await runCauseEffect(workflows.retryStep({ stepId: failedModel.id, requestId: crypto.randomUUID() }));
+  detail = await runUntil(workflows, retried, ended);
+  check(
+    "a retry checks the answer against the spec of the run, not a newer spec",
+    stepOf(detail, "model")?.status === "done" &&
+      stepOf(detail, "gate")?.branch === "yes" &&
+      report.modelPrompts.length === retryPrompts + 1 &&
+      report.modelPrompts.at(-1)?.includes("reason") === false,
+    { steps: detail.steps, prompt: report.modelPrompts.at(-1) },
+  );
+
+  modelReplies = ["no JSON", "still no JSON"];
+  const second = await runCauseEffect(
+    workflows.startRun({ workflowId: retryWorkflow, requestId: crypto.randomUUID() }),
+  );
+  detail = await runUntil(workflows, second.run.id, ended);
+  assert.ok(stepOf(detail, "model")?.status === "failed");
+  const solo = await runCauseEffect(
+    workflows.runStep({ workflowId: retryWorkflow, nodeId: "gate", requestId: crypto.randomUUID() }),
+  ).then(
+    (step) => ({ refused: false, detail: step.status }),
+    (error: unknown) => ({ refused: true, detail: error instanceof Error ? error.message : String(error) }),
+  );
+  check(
+    "Run one step refuses when the newest attempt of a step before it failed",
+    solo.refused && String(solo.detail).includes(sourceText("error.workflow.sourceNotDone")),
+    solo,
   );
 
   assert.ok(typeof saved.workflowId === "string" && typeof saved.ids.hook === "string");

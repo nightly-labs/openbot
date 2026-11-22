@@ -22,6 +22,9 @@ export const messages = {
     "יש בעיה בשדות התשובה של תהליך העבודה הזה כאן: {fields}. תקן את תהליך העבודה ואז הרץ את השלב שוב.",
   "error.workflow.answerSourceEnded":
     "לשדות האלה אין ערך, כי השלב שנותן אותם לא הסתיים: {fields}. הרץ קודם את השלב הזה שוב.",
+  "error.workflow.runInputInvalid":
+    "הקלט של ההרצה לא מתאים לשדות התשובה של הטריגר: {fields}. שלח אובייקט JSON אחד עם השדות האלה.",
+  "error.workflow.sourceNotDone": "שלב קודם נכשל או נעצר בפעם האחרונה שרץ. הרץ קודם את השלב הזה שוב.",
   "error.workflow.checkInvalid": "הבדיקה של השלב הזה לא תקינה. יש לתקן אותה ולהריץ את השלב שוב.",
   "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
   "error.workflow.modelTimedOut":

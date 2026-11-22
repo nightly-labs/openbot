@@ -20,6 +20,8 @@ export const messages = {
   "error.workflow.answerInvalid": "回答缺少此步骤要求的字段：{fields}。请再次运行该步骤。",
   "error.workflow.answerSetup": "此工作流的回答字段在这里有问题：{fields}。请修正工作流，然后重新运行此步骤。",
   "error.workflow.answerSourceEnded": "这些字段没有值，因为提供它们的步骤没有完成：{fields}。请先重新运行那个步骤。",
+  "error.workflow.runInputInvalid": "运行输入与触发器的回答字段不符：{fields}。请发送一个包含这些字段的 JSON 对象。",
+  "error.workflow.sourceNotDone": "前面的某个步骤上次运行时失败或被停止。请先重新运行那个步骤。",
   "error.workflow.checkInvalid": "此步骤的检查条件无效。请修正后再次运行该步骤。",
   "error.workflow.modelFailed": "模型无法回答，请再次运行该步骤。",
   "error.workflow.modelTimedOut": "模型未能及时回答。请为该步骤选择更低的强度或更快的模型，然后再次运行。",

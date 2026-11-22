@@ -395,7 +395,14 @@ changed, on this computer and on a joined host.
   into its answer. An approval question is for a person, so it gets plain text. In a check, a quote
   starts only at the start of a value, so `it's` is a word. A step reads the answers of the connected steps before it, through conditions and
   approvals, in run order (`workflowAnswerSources`); an output shows them as `name: value` lines.
-  In a manual run, the trigger reads its answer from the run input as a JSON object.
+  In a manual run, the trigger reads its answer from the run input as a JSON object. When the run
+  input is given (`run_workflow`), `startRun` checks it against the answer fields of each trigger
+  that runs (`runInputProblems`, as strict as a webhook body) and refuses the start with
+  `runInputInvalid`; a run with no input starts as before. A retry keeps the answer spec of the run
+  graph, also when the saved workflow has a newer one (`withRunAnswerSpec`), because the steps after
+  it read the answer with that spec. "Run one step" refuses with `sourceNotDone` when the newest
+  done, failed or stopped attempt of a step before it failed or stopped (`latestSettled`); it does not
+  use an older answer in its place.
   `edit_workflow` refuses an edit that adds an answer problem (`workflowAnswerProblems`) and tells
   the agent how to correct it; an unknown `{{name}}` only adds a note to the result. The canvas edits
   these fields from the node toolbar and shows the same problems on the node, only on a host with

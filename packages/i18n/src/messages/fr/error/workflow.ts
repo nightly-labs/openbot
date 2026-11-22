@@ -25,6 +25,10 @@ export const messages = {
     "Les champs de réponse de ce workflow posent un problème ici : {fields}. Corrige le workflow, puis relance l’étape.",
   "error.workflow.answerSourceEnded":
     "Ces champs n’ont pas de valeur, car l’étape qui les fournit ne s’est pas terminée : {fields}. Relance d’abord cette étape.",
+  "error.workflow.runInputInvalid":
+    "L’entrée de l’exécution ne correspond pas aux champs de réponse du déclencheur : {fields}. Envoie un objet JSON avec ces champs.",
+  "error.workflow.sourceNotDone":
+    "Une étape précédente a échoué ou a été arrêtée lors de sa dernière exécution. Relance d’abord cette étape.",
   "error.workflow.checkInvalid": "La vérification de cette étape n’est pas valide. Corrigez-la, puis relancez l’étape.",
   "error.workflow.modelFailed": "Le modèle n’a pas pu répondre. Relancez l’étape.",
   "error.workflow.modelTimedOut":
