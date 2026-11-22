@@ -1,8 +1,9 @@
 import { type WORKFLOW_ANSWER_FIELD, WORKFLOW_CHECK_FIELD, type WorkflowAnswerProblem } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { ListChecks, Popover, Textarea, TriangleAlert } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { AnswerRows, answerRows } from "./workflow-answer-rows";
 import { useBoard } from "./workflow-board";
 import { asString, ToolAction, useField } from "./workflow-node-parts";
 
@@ -77,15 +78,22 @@ export function AnswerAction(props: { id: string; field: AnswerKey; locked: bool
             <Popover.Title class="wfn-popover-title">
               {check() ? t("workflow.check.title") : t("workflow.answer.title")}
             </Popover.Title>
-            <Textarea
-              class="wfn-input wfn-answer-input"
-              aria-label={check() ? t("workflow.check.title") : t("workflow.answer.title")}
-              placeholder={check() ? t("workflow.check.placeholder") : t("workflow.answer.placeholder")}
-              readonly={props.locked}
-              spellcheck={false}
-              value={value()}
-              onValueChange={setValue}
-            />
+            <Show
+              when={!check() && answerRows(untrack(value)) !== null}
+              fallback={
+                <Textarea
+                  class="wfn-input wfn-answer-input"
+                  aria-label={check() ? t("workflow.check.title") : t("workflow.answer.title")}
+                  placeholder={check() ? t("workflow.check.placeholder") : t("workflow.answer.placeholder")}
+                  readonly={props.locked}
+                  spellcheck={false}
+                  value={value()}
+                  onValueChange={setValue}
+                />
+              }
+            >
+              <AnswerRows value={value()} locked={props.locked} onChange={setValue} />
+            </Show>
             <Show when={names().length > 0}>
               <p class="wfn-answer-names">{t("workflow.check.fields", { names: names().join(", ") })}</p>
             </Show>
