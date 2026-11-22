@@ -4227,7 +4227,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      ((this.options.confine && callsBridgeTool(thread, params.toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
+      ((this.options.confine &&
+        (callsBridgeTool(thread, params.toolCall, kind, this.#flavor.mcpCallInputNamesServer) ||
+          runsConfinedCommand(params.toolCall, kind, this.#flavor.mcpCallInputNamesServer))) ||
         (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
@@ -4548,6 +4550,16 @@ function callsBridgeTool(
       (tool) => title === `${namespace.name}__${tool.name}` || title === `Run mcp_${namespace.name}_${tool.name}`,
     ),
   );
+}
+
+function runsConfinedCommand(
+  toolCall: RequestPermissionRequest["toolCall"],
+  kind: "command" | "file-change" | "permissions",
+  inputNamesServer: true | undefined,
+): boolean {
+  if (kind !== "command") return false;
+  const input = isRecord(toolCall.rawInput) ? toolCall.rawInput : null;
+  return !(inputNamesServer && input && Object.hasOwn(input, "ServerName"));
 }
 
 function callsNoUpdateTool(thread: AcpThread, title: string | null | undefined): boolean {

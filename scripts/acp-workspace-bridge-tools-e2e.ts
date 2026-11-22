@@ -24,9 +24,19 @@ const BRIDGE_CALLS = [
   { toolCallId: "grok-title", title: "openbot__send_message", kind: "other" },
 ];
 
+const CONFINED_COMMANDS = [
+  { toolCallId: "title-command", title: "Run mcp_openbot_send_message", kind: "execute" },
+  {
+    toolCallId: "command-line",
+    title: "Run mcp_openbot_send_message",
+    kind: "execute",
+    rawInput: { CommandLine: "Run mcp_openbot_send_message" },
+  },
+  { toolCallId: "shell", title: "ls attachments", kind: "execute" },
+];
+
 const OTHER_CALLS = [
   { toolCallId: "no-server", title: "Running send_message", kind: "other" },
-  { toolCallId: "title-command", title: "Run mcp_openbot_send_message", kind: "execute" },
   { toolCallId: "other-server", title: "Run mcp_github_create_issue", kind: "other" },
   {
     toolCallId: "other-server-name",
@@ -41,12 +51,6 @@ const OTHER_CALLS = [
     rawInput: { ServerName: "openbot", ToolName: "delete_everything" },
   },
   {
-    toolCallId: "command-line",
-    title: "Run mcp_openbot_send_message",
-    kind: "execute",
-    rawInput: { CommandLine: "Run mcp_openbot_send_message" },
-  },
-  {
     toolCallId: "server-name-edit",
     title: "Edit notes.md",
     kind: "edit",
@@ -58,8 +62,11 @@ const OTHER_CALLS = [
     kind: "execute",
     rawInput: { ServerName: "openbot", ToolName: "send_message", CommandLine: "rm -rf build" },
   },
-  { toolCallId: "shell", title: "rm -rf build", kind: "execute" },
 ];
+
+const ALL_CALLS = [...BRIDGE_CALLS, ...CONFINED_COMMANDS, ...OTHER_CALLS];
+
+const bridgeIds = new Set(BRIDGE_CALLS.map((call) => call.toolCallId));
 
 const DYNAMIC_TOOLS = [
   {
@@ -101,7 +108,7 @@ async function run(name: string, confined: boolean, flavor: AcpFlavor = ANTIGRAV
   const log = join(root, name, "agent.jsonl");
   await installFakeAgent(executable, "antigravity-bridge-permission", {
     FAKE_LOG: log,
-    FAKE_TOOL_CALLS: JSON.stringify([...BRIDGE_CALLS, ...OTHER_CALLS]),
+    FAKE_TOOL_CALLS: JSON.stringify(ALL_CALLS),
   });
   const client = new AcpAgentClient({ executable, version: "1.5.10", source: "managed" }, 10_000, {
     provider: "antigravity",
@@ -142,12 +149,14 @@ try {
   assert.equal(confined.status, "completed", "The confined turn completes.");
   for (const call of BRIDGE_CALLS)
     assert.equal(confined.outcomes[call.toolCallId], "allow", `${call.toolCallId} runs without a card.`);
+  for (const call of CONFINED_COMMANDS)
+    assert.equal(confined.outcomes[call.toolCallId], "allow", `${call.toolCallId} runs in the sandbox without a card.`);
   for (const call of OTHER_CALLS)
     assert.equal(confined.outcomes[call.toolCallId], "reject", `${call.toolCallId} keeps its card.`);
   assert.deepEqual(
     confined.cards,
     OTHER_CALLS.map((call) => call.title),
-    "Only the requests that are not OpenBot tools show a card.",
+    "Only the requests that are not OpenBot tools or sandboxed commands show a card.",
   );
 
   const unconfined = await run("unconfined", false);
@@ -155,19 +164,21 @@ try {
   assert.equal(unconfined.status, "completed", "The unconfined turn completes.");
   assert.equal(
     unconfined.cards.length,
-    BRIDGE_CALLS.length + OTHER_CALLS.length,
+    ALL_CALLS.length,
     "An agent without Workspace only keeps a card for each request.",
   );
 
   const otherFlavor = await run("other-flavor", true, DEFAULT_ACP_FLAVOR);
   report.otherFlavor = otherFlavor;
   assert.equal(otherFlavor.status, "completed", "The turn of another confined flavor completes.");
-  for (const call of BRIDGE_CALLS)
+  for (const call of ALL_CALLS) {
+    const allowed = call.kind === "execute" || (call.rawInput === undefined && bridgeIds.has(call.toolCallId));
     assert.equal(
       otherFlavor.outcomes[call.toolCallId],
-      call.rawInput === undefined ? "allow" : "reject",
-      `${call.toolCallId} on another flavor reads only the title.`,
+      allowed ? "allow" : "reject",
+      `${call.toolCallId} on another flavor reads only the title, and runs each command in the sandbox.`,
     );
+  }
 
   report.passed = true;
 } catch (error) {
