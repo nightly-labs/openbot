@@ -11,6 +11,8 @@ export const messages = {
   "error.workflow.duplicateEdge": "Deze twee stappen hebben deze verbinding al.",
   "error.workflow.serverTooOld":
     "Deze server ondersteunt geen workflows. Werk OpenBot bij op de computer waarop de server draait.",
+  "error.workflow.newerSteps":
+    "Deze workflow heeft stappen uit een nieuwere OpenBot. Werk OpenBot bij om hem te wijzigen.",
   "error.workflow.nodeUnsupported":
     "Deze versie van OpenBot kan nog geen stappen voor afbeeldingen, bestanden en berichten uitvoeren.",
   "error.workflow.interrupted": "OpenBot is gestopt terwijl deze stap liep. Voer hem opnieuw uit.",

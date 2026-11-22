@@ -169,6 +169,7 @@ export class WorkflowStore {
     return this.#transaction(() => {
       const revision = this.#revision(workflowId);
       if (revision !== baseRevision) return { ok: false, conflict: this.#requireDetail(workflowId) };
+      this.#refusePlaceholders(workflowId, graph);
       this.#writeGraph(workflowId, graph, now);
       const next = this.#bumpRevision(workflowId, now);
       const last = this.#lastVersionAt(workflowId);
@@ -303,6 +304,20 @@ export class WorkflowStore {
       nextDueAt: optionalStringColumn(row, "next_due_at"),
       webhookUrl: optionalStringColumn(row, "url"),
     }));
+  }
+
+  #refusePlaceholders(workflowId: string, graph: WorkflowGraph): void {
+    const stored = new Map(
+      databaseRows(
+        this.#database.connection
+          .prepare("SELECT node_id, kind FROM workflow_nodes WHERE workflow_id = ?")
+          .all(workflowId),
+      ).map((row) => [requiredStringColumn(row, "node_id"), requiredStringColumn(row, "kind")]),
+    );
+    const placeholder = (node: WorkflowNode) =>
+      node.kind === "note" && node.locked === true && (stored.get(node.id) ?? "note") !== "note";
+    if (graph.nodes.some(placeholder))
+      throw new WorkflowStoreError({ code: "refused", message: sourceText("error.workflow.newerSteps") });
   }
 
   #writeGraph(workflowId: string, graph: WorkflowGraph, now: Date): void {

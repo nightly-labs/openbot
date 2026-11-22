@@ -10,6 +10,7 @@ export const messages = {
   "error.workflow.conditionBranch": "כל חיבור היוצא מתנאי חייב להיות כן או לא.",
   "error.workflow.duplicateEdge": "שני השלבים האלה כבר מחוברים כך.",
   "error.workflow.serverTooOld": "השרת הזה אינו תומך בתהליכי עבודה. יש לעדכן את OpenBot במחשב שמפעיל אותו.",
+  "error.workflow.newerSteps": "בתהליך העבודה הזה יש שלבים מ-OpenBot חדש יותר. יש לעדכן את OpenBot כדי לשנות אותו.",
   "error.workflow.nodeUnsupported": "הגרסה הזו של OpenBot עדיין לא יכולה להריץ שלבי תמונה, קובץ והודעה.",
   "error.workflow.interrupted": "OpenBot נעצר בזמן שהשלב הזה רץ. יש להריץ אותו שוב.",
   "error.workflow.agentMissing": "יש לבחור סוכן לשלב הזה.",

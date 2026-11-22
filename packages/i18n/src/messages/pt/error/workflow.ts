@@ -11,6 +11,8 @@ export const messages = {
   "error.workflow.duplicateEdge": "Estas duas etapas já têm esta conexão.",
   "error.workflow.serverTooOld":
     "Este servidor não oferece suporte a fluxos de trabalho. Atualize o OpenBot no computador que o executa.",
+  "error.workflow.newerSteps":
+    "Este fluxo de trabalho tem etapas de uma versão mais recente do OpenBot. Atualize o OpenBot para alterá-lo.",
   "error.workflow.nodeUnsupported":
     "Esta versão do OpenBot ainda não pode executar etapas de imagem, arquivo e mensagem.",
   "error.workflow.interrupted": "O OpenBot parou enquanto esta etapa era executada. Execute-a novamente.",

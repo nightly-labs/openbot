@@ -625,6 +625,7 @@ function v9Headers(token: string): Record<string, string> {
 type RefusalKey =
   | "error.workflow.missing"
   | "error.workflow.versionMissing"
+  | "error.workflow.newerSteps"
   | "error.workflow.tooLargeToSend"
   | "error.team.agentViewOnly"
   | "error.team.agentManageDenied"
@@ -937,6 +938,48 @@ try {
     );
     assert.equal((await runCauseEffect(current().workflows.get(ids.open))).revision, revision);
     return { status, revision };
+  });
+
+  await step("placeholders: a save that turns a step into a locked note is refused", async () => {
+    const before = Number((await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: ids.open })).revision);
+    const graph = agentGraph(open);
+    const placeholder: WorkflowGraph = {
+      ...graph,
+      nodes: graph.nodes.map((node) =>
+        node.id === "prompt" ? { ...node, kind: "note", locked: true, fields: { text: "Start." } } : node,
+      ),
+      edges: [],
+    };
+    const status = await refused(
+      WORKFLOWS_ROUTES.saveGraph,
+      ownerToken,
+      { workflowId: ids.open, baseRevision: before, graph: placeholder },
+      400,
+      "error.workflow.newerSteps",
+    );
+    const stored = await runCauseEffect(current().workflows.get(ids.open));
+    assert.equal(stored.revision, before, "A refused placeholder save changed the revision.");
+    assert.equal(stored.graph.nodes.find((node) => node.id === "prompt")?.kind, "prompt");
+    const lockedNote: WorkflowNode = { id: "pinned", kind: "note", at: at(1200), locked: true, fields: { text: "Hi" } };
+    const pinned = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+      workflowId: ids.open,
+      baseRevision: before,
+      graph: { ...graph, nodes: [...graph.nodes, lockedNote] },
+    });
+    assert.equal(pinned.ok, true, "A new locked note was refused.");
+    const kept = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+      workflowId: ids.open,
+      baseRevision: Number(pinned.revision),
+      graph: { ...graph, nodes: [...graph.nodes, { ...lockedNote, at: at(1300) }] },
+    });
+    assert.equal(kept.ok, true, "A saved locked note could not be moved.");
+    const restored = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+      workflowId: ids.open,
+      baseRevision: Number(kept.revision),
+      graph,
+    });
+    assert.equal(restored.ok, true);
+    return { placeholder: status, lockedNote: 200 };
   });
 
   await step("place output: only an owner or admin adds one or moves it; a member keeps it", async () => {

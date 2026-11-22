@@ -10,6 +10,7 @@ export const messages = {
   "error.workflow.conditionBranch": "条件发出的每个连接都必须是“是”或“否”。",
   "error.workflow.duplicateEdge": "这两个步骤之间已经有该连接。",
   "error.workflow.serverTooOld": "该服务器不支持工作流，请更新运行它的电脑上的 OpenBot。",
+  "error.workflow.newerSteps": "该工作流包含来自更新版 OpenBot 的步骤。更新 OpenBot 后才能更改它。",
   "error.workflow.nodeUnsupported": "该版本的 OpenBot 暂时无法运行图片、文件和消息步骤。",
   "error.workflow.interrupted": "该步骤运行时 OpenBot 停止了，请再次运行。",
   "error.workflow.agentMissing": "为该步骤选择一个助手。",
