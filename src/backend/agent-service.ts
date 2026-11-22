@@ -6897,15 +6897,31 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #steerAgentMessage(recipientAgentId: string, deliveryId: string, wait: boolean): Effect.Effect<AgentMessageSteer> {
     const agent = this.#store.get(recipientAgentId);
-    const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
-    if (!agent || !snapshot || !this.#mailbox.joinsChatTurn(deliveryId)) return Effect.succeed(null);
-    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId)) return Effect.succeed(null);
-    return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
+    if (!agent || !this.#mailbox.joinsRunningTurn(deliveryId)) return Effect.succeed(null);
+    const taskId = this.#mailbox.taskIdForDelivery(deliveryId);
+    const task = taskId === null ? null : this.#runningTask(recipientAgentId, taskId);
+    const snapshot = taskId === null ? this.#conversation.snapshotToUpdate(recipientAgentId) : task?.snapshot;
+    if (!snapshot) return Effect.succeed(null);
+    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId, taskId))
+      return Effect.succeed(null);
+    return this.#steerWhenBusy(agent, task, snapshot, deliveryId, false, wait);
   }
 
-  #personTurn(agentId: string, turnId: string): boolean {
+  #runningTask(
+    agentId: string,
+    taskId: string,
+  ): { taskId: string; threadId: string; snapshot: ConversationSnapshot } | null {
+    const threadId = this.#tasks.threadId(taskId);
+    const snapshot =
+      threadId === null
+        ? undefined
+        : this.#conversation.workingTaskSnapshots(agentId).find((candidate) => candidate.threadId === threadId);
+    return threadId !== null && snapshot ? { taskId, threadId, snapshot } : null;
+  }
+
+  #personTurn(agentId: string, turnId: string, taskId: string | null): boolean {
     const linked = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, null);
+    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, taskId);
     return (
       deliveries.length > 0 &&
       deliveries.every(({ delivery }) => {
