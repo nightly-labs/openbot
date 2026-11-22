@@ -84,6 +84,7 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagePinner,
+  PasswordManagerId,
   PinnedMessagesSnapshot,
   ProviderAccountCodeLoginStart,
   ProviderAccountCodeLoginStatus,
@@ -433,6 +434,7 @@ export interface AgentServiceOptions {
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
+  passwordManagerConnected?: (manager: PasswordManagerId) => boolean;
   feedbackFacts?: FeedbackFacts | null;
   feedback?: AgentFeedback | null;
   serverClaims?: AgentServerClaims | null;
@@ -2061,6 +2063,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
+      ...(options.passwordManagerConnected === undefined
+        ? {}
+        : { passwordManagerConnected: options.passwordManagerConnected }),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
       feedbackWithdrawal: this.#feedbackWithdrawal,
