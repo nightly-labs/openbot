@@ -1689,13 +1689,19 @@ export class TurnLifecycle {
         }
         const taskId =
           notification.method === "error" && agentId && threadId ? this.#taskForThread(agentId, threadId) : null;
-        const shown =
+        const backupsAtLimit =
           notification.method === "error" &&
           context.causeCode === "usage_limit" &&
-          agentId &&
-          this.#hooks.backupReadyAt(agentId) !== null
-            ? sourceText("error.agent.backupModelsAtLimit", { reason: message })
-            : message;
+          agentId !== undefined &&
+          this.#hooks.backupReadyAt(agentId) !== null;
+        if (backupsAtLimit)
+          logger.warn("A usage limit stopped an agent, and no backup model can take over.", {
+            agentId,
+            provider: source.provider,
+            model: context.model,
+            message: this.#hooks.redactMcp(message),
+          });
+        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : message;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
           this.#hooks.taskFailed(taskId, shown);

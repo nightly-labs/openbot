@@ -181,7 +181,7 @@ export const messages = {
   "error.agent.backupModelsLocalOnly":
     "Ersatzmodelle können nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
   "error.agent.backupModelsAtLimit":
-    "Kein Ersatzmodell kann jetzt übernehmen: Jedes hat sein Nutzungslimit erreicht oder ist vor Kurzem fehlgeschlagen. Modelle eines Kontos können sich ein Limit teilen. Um jetzt weiterzumachen, füge ein Ersatzmodell eines anderen Anbieters oder Kontos hinzu, oder warte auf das Zurücksetzen.\n{reason}",
+    "Kein Ersatzmodell kann jetzt übernehmen: Jedes hat sein Nutzungslimit erreicht oder ist vor Kurzem fehlgeschlagen. Modelle eines Kontos können sich ein Limit teilen. Um jetzt weiterzumachen, füge ein Ersatzmodell eines anderen Anbieters oder Kontos hinzu, oder warte auf das Zurücksetzen.",
   "error.agent.taskLimitLocalOnly":
     "Das Aufgabenlimit lässt sich nur auf dem Computer festlegen, auf dem der Agent läuft.",
   "error.agent.localScriptsOff": "Dieser Agent erlaubt keine lokalen Skripte.",
