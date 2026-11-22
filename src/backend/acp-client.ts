@@ -32,7 +32,12 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
-import { AcpConfiguration, type AcpModel, currentModelFromSessionSetup, sessionListsModels } from "./acp-configuration";
+import {
+  AcpConfiguration,
+  type AcpModel,
+  currentModelFromSessionSetup,
+  modelsFromSessionSetup,
+} from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
 import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpRetryCause } from "./acp-flavor";
 import {
@@ -1792,7 +1797,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               id = requestedThreadId;
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
-              listsModels = sessionListsModels(response);
+              listsModels = modelsFromSessionSetup(response).length > 0;
             } else {
               const created = providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta }));
               const response = providerResult(
@@ -1803,7 +1808,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
-              listsModels = sessionListsModels(response);
+              listsModels = modelsFromSessionSetup(response).length > 0;
             }
             if (sessionTransport && this.#flavor.modelsLoadWithSession && !listsModels && this.#models.length > 0)
               return yield* providerFailure(

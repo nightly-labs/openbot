@@ -690,12 +690,6 @@ function sessionConfigOptions(response: SessionSetupResponse): SessionConfigOpti
   return response.configOptions ?? [];
 }
 
-export function sessionListsModels(response: SessionSetupResponse): boolean {
-  return (
-    availableModels(response).length > 0 || sessionConfigOptions(response).some((option) => option.category === "model")
-  );
-}
-
 export function currentModelFromSessionSetup(response: SessionSetupResponse): string | null {
   return groupedModelOption(response)?.currentValue ?? listedCurrentModel(response);
 }
