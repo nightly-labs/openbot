@@ -678,6 +678,14 @@ export function ConversationTimeline() {
   };
   const nextRowGroupedEntry = (current: AgentMessage, next: AgentMessage): "agent" | "user" | undefined => {
     if (next.actionMarker || next.questionPrompt || next.id === compactionBefore()) return undefined;
+    if (
+      next.kind === "plan" ||
+      next.kind === "subagents" ||
+      next.kind === "memory-changes" ||
+      next.kind === "thinking" ||
+      shownVisualReply(next, runtime.visualPage)
+    )
+      return undefined;
     if (!rowContinuesRun(next, current, rowDayMarker(next, current) !== null)) return undefined;
     const agentEntry = next.author !== "you";
     const stepsInRow = agentEntry && (Boolean(channel) || !showAgentSteps());
