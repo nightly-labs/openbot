@@ -289,6 +289,7 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot выйдет из {provider} на сервере.",
   "provider.settings.geminiKeyReplacesAccount":
     "Вместо входа через Google используется сохранённый ключ Gemini API. Чтобы использовать тариф Google и его модели, удалите ключ.",
+  "provider.settings.museKeyInUse": "Muse использует этот ключ, а не ваш вход. Чтобы использовать вход, удалите ключ.",
   "provider.settings.versionInstalledByUser": "{version} · установлена вами",
   "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Не используется: {version} · установлена вами",

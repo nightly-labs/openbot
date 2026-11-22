@@ -313,6 +313,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.codexKeyInUse":
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "provider.settings.codexKeyAlternative": "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "provider.settings.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "provider.settings.addKey": "Add key",
   "provider.settings.changeKey": "Change key",
   "provider.settings.runtime": "Runtime",

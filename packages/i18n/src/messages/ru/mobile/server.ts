@@ -1321,6 +1321,8 @@ export const messages = {
     "ChatGPT использует этот ключ, а не ваш план ChatGPT. OpenAI списывает оплату за каждый запрос с ключа. Расход по плану не показывается.",
   "mobile.server.providers.codexKeyAlternative":
     "Или войдите с API-ключом OpenAI. OpenAI списывает оплату за каждый запрос с ключа.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse использует этот ключ, а не ваш вход. Чтобы использовать вход, удалите ключ.",
   "mobile.server.providers.sectionUse": "Использование",
   "mobile.server.providers.unused": "Не используется агентами",
   "mobile.server.providers.usedByCount": {

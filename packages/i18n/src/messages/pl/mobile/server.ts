@@ -1326,6 +1326,8 @@ export const messages = {
     "ChatGPT używa tego klucza, a nie Twojego planu ChatGPT. OpenAI nalicza opłatę za każde żądanie na klucz. Użycie planu nie jest pokazywane.",
   "mobile.server.providers.codexKeyAlternative":
     "Lub zaloguj się kluczem API OpenAI. OpenAI nalicza opłatę za każde żądanie na klucz.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse używa tego klucza, a nie Twojego logowania. Aby używać logowania, usuń klucz.",
   "mobile.server.providers.sectionUse": "Użycie",
   "mobile.server.providers.unused": "Żaden agent go nie używa",
   "mobile.server.providers.usedByCount": {

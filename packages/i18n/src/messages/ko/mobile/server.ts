@@ -1168,6 +1168,7 @@ export const messages = {
     "ChatGPT는 ChatGPT 요금제가 아니라 이 키를 사용해요. OpenAI는 요청마다 키에 요금을 청구해요. 요금제 사용량은 표시되지 않아요.",
   "mobile.server.providers.codexKeyAlternative":
     "또는 OpenAI API 키로 로그인하세요. OpenAI는 요청마다 키에 요금을 청구해요.",
+  "mobile.server.providers.museKeyInUse": "Muse는 로그인이 아닌 이 키를 사용해요. 로그인을 사용하려면 키를 제거하세요.",
   "mobile.server.providers.sectionUse": "사용",
   "mobile.server.providers.unused": "사용하는 에이전트 없음",
   "mobile.server.providers.usedByCount": { other: "에이전트 {count}개가 사용 중" },

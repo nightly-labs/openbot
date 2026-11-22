@@ -1235,6 +1235,8 @@ export const messages = {
     "ChatGPT usa esta clave, no tu plan de ChatGPT. OpenAI cobra cada solicitud a la clave. No se muestra el uso del plan.",
   "mobile.server.providers.codexKeyAlternative":
     "O inicia sesión con una clave de API de OpenAI. OpenAI cobra cada solicitud a la clave.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse usa esta clave, no tu inicio de sesión. Para usar tu inicio de sesión, elimina la clave.",
   "mobile.server.providers.sectionUse": "Uso",
   "mobile.server.providers.unused": "Ningún agente lo usa",
   "mobile.server.providers.usedByCount": { one: "1 agente lo usa", other: "{count} agentes lo usan" },

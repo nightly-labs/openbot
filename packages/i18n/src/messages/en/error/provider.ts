@@ -573,6 +573,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.museTurnFailed": "Muse turn failed.",
   "error.provider.museModelUnavailable":
     "Muse cannot use this model. Muse may not be available in the country where this agent runs, or this account has no access to the model. Choose another model, then try again.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse could not complete this request. Muse uses your saved Meta API key, not your sign-in. Replace the key, or remove it in Settings to use your sign-in.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse cannot generate a profile without access to external tools. Use another provider to generate the profile, then select Muse for the agent.",
   "error.provider.museAuthUnverified":
