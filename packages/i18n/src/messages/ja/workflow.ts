@@ -263,6 +263,7 @@ export const messages = {
   "workflow.check.title": "チェック",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "フィールド: {names}",
+  "workflow.names.title": "前のステップのフィールド",
 
   "workflow.output.title": "出力",
   "workflow.output.name": "出力",

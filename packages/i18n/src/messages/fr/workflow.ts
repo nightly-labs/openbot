@@ -266,6 +266,7 @@ export const messages = {
   "workflow.check.title": "Vérification",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Champs : {names}",
+  "workflow.names.title": "Champs des étapes précédentes",
 
   "workflow.output.title": "Sortie",
   "workflow.output.name": "sortie",

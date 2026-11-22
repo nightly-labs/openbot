@@ -263,6 +263,7 @@ export const messages = {
   "workflow.check.title": "검사",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "필드: {names}",
+  "workflow.names.title": "이전 단계의 필드",
 
   "workflow.output.title": "출력",
   "workflow.output.name": "출력",

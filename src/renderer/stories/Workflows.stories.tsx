@@ -118,6 +118,17 @@ export const GitHubRuns: Story = {
   render: () => <WorkflowStory workflows={[githubTriage()]} features={STORY_ALL_FEATURES} />,
 };
 
+export const FieldNames: Story = {
+  name: "Field names",
+  render: () => (
+    <WorkflowStory
+      workflows={[githubTriage()]}
+      features={STORY_ALL_FEATURES}
+      catalogs={{ ...STORY_CATALOGS, answers: true }}
+    />
+  ),
+};
+
 export const EmptyCanvas: Story = {
   name: "Empty canvas",
   render: () => (

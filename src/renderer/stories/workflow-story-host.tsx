@@ -11,7 +11,11 @@ import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { HelpMenu } from "@openbot/ui/features/updates/HelpMenu";
 import { PageRail, type PageRailPage } from "@openbot/ui/features/window/PageRail";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
-import { WORKFLOW_FEATURES_V1, type WorkflowFeatures } from "@openbot/ui/features/workflows/workflow-model";
+import {
+  WORKFLOW_FEATURES_V1,
+  type WorkflowCatalogs,
+  type WorkflowFeatures,
+} from "@openbot/ui/features/workflows/workflow-model";
 import type { WorkflowPresence } from "@openbot/ui/features/workflows/workflow-presence";
 import type { WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import type { JSX } from "@solidjs/web";
@@ -172,6 +176,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
 export function WorkflowStory(props: {
   workflows: readonly StoryWorkflow[];
   features?: WorkflowFeatures;
+  catalogs?: WorkflowCatalogs;
   presence?: WorkflowPresence;
 }) {
   const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
@@ -182,7 +187,7 @@ export function WorkflowStory(props: {
         <WorkflowCanvas
           workflow={workflow()}
           features={features()}
-          catalogs={STORY_CATALOGS}
+          catalogs={props.catalogs ?? STORY_CATALOGS}
           github={story.github}
           presence={props.presence}
           {...story.props}

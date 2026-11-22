@@ -1359,6 +1359,23 @@ fieldset.wfn-picker-group {
   backdrop-filter: var(--wfn-glass-blur);
 }
 
+.ui-popover-menu-surface.wfn-popover.wfn-name-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 240px;
+  max-height: min(240px, var(--kb-popper-content-available-height, 240px));
+  padding: 0;
+  overflow: hidden;
+}
+
+.wfn-name-option {
+  overflow: hidden;
+  font-family: var(--openbot-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ui-popover-menu-surface.wfn-popover.wfn-step-settings {
   display: flex;
   flex-direction: column;

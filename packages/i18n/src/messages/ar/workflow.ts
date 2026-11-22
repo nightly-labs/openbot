@@ -303,6 +303,7 @@ export const messages = {
   "workflow.check.title": "الفحص",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "الحقول: {names}",
+  "workflow.names.title": "حقول من الخطوات السابقة",
 
   "workflow.output.title": "المخرج",
   "workflow.output.name": "مخرج",

@@ -263,6 +263,7 @@ export const messages = {
   "workflow.check.title": "בדיקה",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "שדות: {names}",
+  "workflow.names.title": "שדות משלבים קודמים",
   "workflow.output.title": "פלט",
   "workflow.output.name": "פלט",
   "workflow.output.channel.openbot": "OpenBot",

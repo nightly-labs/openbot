@@ -263,6 +263,7 @@ export const messages = {
   "workflow.check.title": "检查",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "字段：{names}",
+  "workflow.names.title": "前面步骤的字段",
 
   "workflow.output.title": "输出",
   "workflow.output.name": "输出",

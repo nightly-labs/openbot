@@ -266,6 +266,7 @@ export const messages = {
   "workflow.check.title": "Controllo",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Campi: {names}",
+  "workflow.names.title": "Campi dei passaggi precedenti",
 
   "workflow.output.title": "Output",
   "workflow.output.name": "output",

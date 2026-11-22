@@ -1,5 +1,5 @@
 import { ProviderLogo } from "@openbot/brand";
-import { Bot, Button, buttonVariants, ChevronDown, DropdownMenu, Play, Textarea, TriangleAlert } from "@openbot/ui";
+import { Bot, Button, buttonVariants, ChevronDown, DropdownMenu, Play, TriangleAlert } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -10,6 +10,7 @@ import { useBoard } from "./workflow-board";
 import { InputPictures } from "./workflow-input-pictures";
 import type { WorkflowCatalogs } from "./workflow-model";
 import { modelOption } from "./workflow-model-pills";
+import { NameTextarea } from "./workflow-name-textarea";
 import {
   asString,
   Field,
@@ -161,7 +162,8 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
         <Show when={pictures().length > 0}>
           <InputPictures sources={pictures()} />
         </Show>
-        <Textarea
+        <NameTextarea
+          node={props.id}
           class="wfn-input"
           aria-label={t("workflow.agent.task")}
           placeholder={t("workflow.agent.taskPlaceholder")}

@@ -256,6 +256,7 @@ export const messages = {
   "workflow.check.title": "Controle",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Velden: {names}",
+  "workflow.names.title": "Velden uit eerdere stappen",
   "workflow.output.title": "Uitvoer",
   "workflow.output.name": "uitvoer",
   "workflow.output.channel.openbot": "OpenBot",

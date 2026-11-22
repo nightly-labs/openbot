@@ -264,6 +264,7 @@ export const messages = defineMessages("workflow", {
   "workflow.check.title": "Check",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Fields: {names}",
+  "workflow.names.title": "Fields from earlier steps",
 
   "workflow.output.title": "Output",
   "workflow.output.name": "output",

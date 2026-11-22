@@ -266,6 +266,7 @@ export const messages = {
   "workflow.check.title": "Kontrol",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Alanlar: {names}",
+  "workflow.names.title": "Önceki adımlardaki alanlar",
 
   "workflow.output.title": "Çıktı",
   "workflow.output.name": "çıktı",

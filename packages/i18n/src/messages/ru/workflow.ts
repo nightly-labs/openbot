@@ -293,6 +293,7 @@ export const messages = {
   "workflow.check.title": "Проверка",
   "workflow.check.placeholder": "priority = high and count > 2",
   "workflow.check.fields": "Поля: {names}",
+  "workflow.names.title": "Поля из предыдущих шагов",
 
   "workflow.output.title": "Вывод",
   "workflow.output.name": "вывод",

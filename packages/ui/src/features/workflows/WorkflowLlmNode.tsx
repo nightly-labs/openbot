@@ -1,11 +1,12 @@
 import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort } from "@openbot/contracts/ipc";
-import { Button, Play, Sparkles, Textarea } from "@openbot/ui";
+import { Button, Play, Sparkles } from "@openbot/ui";
 import { untrack } from "solid-js";
 import { useText } from "../../text";
 import { AnswerAction, AnswerProblems, AnswerSummary } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
+import { NameTextarea } from "./workflow-name-textarea";
 import {
   asProvider,
   asString,
@@ -76,7 +77,8 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
       }
     >
       <Field class="wfn-field-task">
-        <Textarea
+        <NameTextarea
+          node={props.id}
           class="wfn-input"
           aria-label={t("workflow.prompt.title")}
           placeholder={t("workflow.prompt.placeholder")}
@@ -108,7 +110,8 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
         </div>
       </Field>
       <Field class="wfn-field-system">
-        <Textarea
+        <NameTextarea
+          node={props.id}
           class="wfn-input"
           aria-label={t("workflow.llm.system")}
           placeholder={t("workflow.llm.systemPlaceholder")}
