@@ -46,6 +46,9 @@ const RULE_WORD =
   /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
 const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
 const URL_HOST = /(?<![A-Za-z0-9+.-])(https?:\/\/(?:[^\s/?#@]*@)?)([\p{L}\p{N}.-]+)/giu;
+const EMAIL_DOMAIN = /(?<=[\p{L}\p{N}._%+-]@)(?:[\p{L}\p{N}-]+\.)+\p{L}{2,24}(?!\.?[\p{L}\p{N}_@-])/gu;
+const BARE_DOMAIN =
+  /(?<![\p{L}\p{N}._~+/%:#?=&@-])(?:[\p{L}\p{N}-]+\.)+(?:[a-z]{2}|com|net|org|info|biz|edu|gov|app|dev|run|xyz|tech|cloud|online|site|shop|store)(?!\.?[\p{L}\p{N}_@-])/gu;
 const VALUE_MARKER = "__openbot_registered_value__";
 const LABEL_MARKER = "__openbot_registered_secret_authorization";
 const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
@@ -107,7 +110,15 @@ export function redactSecrets(value: string): string {
 }
 
 export function redactPostText(value: string): string {
-  return redact(value, false);
+  return value
+    .replace(PEM_PRIVATE_KEY, "[redacted]")
+    .replace(COOKIE_HEADER, "$1[redacted]")
+    .replace(AUTH_HEADER_SECRET, "$1[redacted]")
+    .replace(BEARER_SECRET, "[redacted]")
+    .replace(URL_PASSWORD, "$1[redacted]")
+    .replace(WEBHOOK_URL_SECRET, "$1[redacted]")
+    .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
+    .replace(JSON_WEB_TOKEN, "[redacted]");
 }
 
 function redact(value: string, emails: boolean, keepUnscanned = false): string {
@@ -126,8 +137,8 @@ function markRegisteredSecrets(value: string): string {
   for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
     let start = match.index;
     let end = start + match[0].length;
-    if (hosts === undefined) hosts = value.includes("://") ? urlHosts(value) : null;
-    if (hosts?.subarray(start, end).every((flag) => flag === HOST)) continue;
+    if (hosts === undefined) hosts = hostFlags(value);
+    if (hosts && isInsideHost(hosts, start, end)) continue;
     const previous = ranges.at(-1);
     const floor = previous?.end ?? 0;
     while (start > floor && !hosts?.[start - 1] && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
@@ -150,16 +161,39 @@ function markRegisteredSecrets(value: string): string {
 
 const HOST = 1;
 const HOST_SEPARATOR = 2;
+const DOMAIN = 3;
 
-function urlHosts(value: string): Uint8Array {
+function isInsideHost(flags: Uint8Array, start: number, end: number): boolean {
+  const span = flags.subarray(start, end);
+  if (span.every((flag) => flag === HOST)) return true;
+  return span.every((flag) => flag === DOMAIN) && (flags[start - 1] === DOMAIN || flags[end] === DOMAIN);
+}
+
+function hostFlags(value: string): Uint8Array | null {
+  const hasDomain = value.includes(".");
+  const hasUrl = value.includes("://");
+  if (!hasDomain && !hasUrl) return null;
   const flags = new Uint8Array(value.length);
+  if (hasDomain) markDomains(value, flags);
+  if (hasUrl) markUrlHosts(value, flags);
+  return flags;
+}
+
+function markDomains(value: string, flags: Uint8Array): void {
+  for (const match of value.matchAll(BARE_DOMAIN)) flags.fill(DOMAIN, match.index, match.index + match[0].length);
+  for (const match of value.matchAll(EMAIL_DOMAIN)) {
+    flags.fill(DOMAIN, match.index, match.index + match[0].length);
+    flags[match.index - 1] = HOST_SEPARATOR;
+  }
+}
+
+function markUrlHosts(value: string, flags: Uint8Array): void {
   for (const match of value.matchAll(URL_HOST)) {
     const prefix = match[1] ?? "";
     const start = match.index + prefix.length;
     flags.fill(HOST, start, start + (match[2]?.length ?? 0));
     if (prefix.endsWith("@")) flags[start - 1] = HOST_SEPARATOR;
   }
-  return flags;
 }
 
 function applyTextRules(value: string, emails: boolean): string {

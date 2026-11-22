@@ -167,18 +167,18 @@ describe("redactText", () => {
     expect(redactSecrets('{"jan@example.com":"Bearer abcdef123456"}')).toBe('{"jan@example.com":"[redacted]"}');
   });
 
-  it("keeps emails and redacts secrets in a chat app post", () => {
-    expect(redactPostText("Write to jan@example.com, password=hunter2")).toBe(
-      "Write to jan@example.com, password=[redacted]",
+  it("masks only key formats in a chat app post", () => {
+    expect(redactPostText("Write to jan@example.com, password=hunter2, key sk-ant-api03-abcdefgh")).toBe(
+      "Write to jan@example.com, password=hunter2, key [redacted]",
     );
     expect(redactPostText("postgres://admin:s3cretpw@db.example.com/app")).toBe(
       "postgres://admin:[redacted]@db.example.com/app",
     );
     expect(redactText("https://user:s3cretpw@db.example.com/x")).toBe("https://user:[redacted]@db.example.com/x");
     expect(redactSecrets("redis://:s3cretpw@cache:6379")).toBe("redis://:[redacted]@cache:6379");
-    expect(redactPostText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`)).toContain(
-      "[redacted-unscanned]",
-    );
+    const code = `${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant"}}`;
+    expect(redactPostText(code)).toBe(code);
+    expect(redactPostText("Authorization: Bearer abcdef123456")).toBe("Authorization: [redacted]");
   });
 
   it("redacts secrets inside a payload that arrives as one string", () => {
@@ -418,6 +418,32 @@ describe("registerSecretValue", () => {
     registerPublicValues(["claude-sonnet-5-5"]);
 
     expect(redactText("pw=claude-sonnet-5-5.")).not.toContain("sonnet-5-5");
+  });
+
+  it("does not mask a saved value in a chat app post", () => {
+    registerSecretValue("acmeshop", { allowShort: true });
+
+    expect(redactPostText("Your Wi-Fi password is acmeshop. Write to biuro@acmeshop.pl")).toBe(
+      "Your Wi-Fi password is acmeshop. Write to biuro@acmeshop.pl",
+    );
+  });
+
+  it("keeps a domain name and the domain of an email address, and masks the secret alone", () => {
+    registerSecretValue("acmeshop", { allowShort: true });
+    registerSecretValue("Kot.Mruczek", { allowShort: true });
+
+    expect(
+      redactSecrets("A. biuro@acmeshop.pl B. acmeshop.pl, D. biuro (at) acmeshop.pl. E. https://acmeshop.pl/kontakt/"),
+    ).toBe("A. biuro@acmeshop.pl B. acmeshop.pl, D. biuro (at) acmeshop.pl. E. https://acmeshop.pl/kontakt/");
+    expect(redactSecrets("write to acmeshop@example.com")).toBe("write to [redacted]@example.com");
+    expect(redactSecrets("postgres://admin:acmeshop@db.acmeshop.pl/x")).toBe(
+      "postgres://admin:[redacted]@db.acmeshop.pl/x",
+    );
+    expect(redactSecrets("the file /tmp/acmeshop.json")).not.toContain("acmeshop");
+    expect(redactSecrets("it is Kot.Mruczek")).toBe("it is [redacted]");
+    expect(redactSecrets("it is acmeshop.Then acmeshop.then")).not.toContain("acmeshop");
+    expect(redactSecrets("mail biuro@acmeshop.studio")).toBe("mail biuro@acmeshop.studio");
+    expect(redactSecrets("sign in with acmeshop")).toBe("sign in with [redacted]");
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
