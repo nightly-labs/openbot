@@ -3038,7 +3038,13 @@ export async function createApplicationServices({
         workflows: () =>
           workflowRuntime
             .listWithGraphs()
-            .pipe(Effect.map((list) => list.map(({ summary, graph }) => ({ title: summary.title, graph })))),
+            .pipe(
+              Effect.map((list) =>
+                list.flatMap(({ summary, graph, needsNewerApp }) =>
+                  needsNewerApp ? [] : [{ title: summary.title, graph }],
+                ),
+              ),
+            ),
         createWorkflow: (input) => workflowRuntime.create(input),
       },
       signedInProviders: () =>

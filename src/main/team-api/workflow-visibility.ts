@@ -45,7 +45,7 @@ export function workflowVisibility(
   };
   const visibleDetail = async (workflowId: string) => {
     const detail = await runWorkflowEffect(workflows.get(workflowId));
-    if (!visibleGraph(detail.graph, listed())) workflowMissing();
+    if (detail.needsNewerApp || !visibleGraph(detail.graph, listed())) workflowMissing();
     return detail;
   };
   const usableDetail = async (workflowId: string, level: WorkflowUseLevel) => {
@@ -66,5 +66,9 @@ export async function visibleWorkflowIds(
   const { listed, visibleGraph } = workflowVisibility(context, workflows, agents, hiddenAgentIds);
   const known = listed();
   const all = await runWorkflowEffect(workflows.listWithGraphs());
-  return new Set(all.filter(({ graph }) => visibleGraph(graph, known)).map(({ summary }) => summary.id));
+  return new Set(
+    all
+      .filter(({ graph, needsNewerApp }) => !needsNewerApp && visibleGraph(graph, known))
+      .map(({ summary }) => summary.id),
+  );
 }

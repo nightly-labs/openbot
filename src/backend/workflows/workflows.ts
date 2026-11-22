@@ -354,7 +354,10 @@ export function workflowNoticeEvent(event: AgentEvent): boolean {
 
 interface WorkflowsShape {
   list(): Effect.Effect<WorkflowSummary[], WorkflowFailed>;
-  listWithGraphs(): Effect.Effect<{ summary: WorkflowSummary; graph: WorkflowGraph }[], WorkflowFailed>;
+  listWithGraphs(): Effect.Effect<
+    { summary: WorkflowSummary; graph: WorkflowGraph; needsNewerApp?: true }[],
+    WorkflowFailed
+  >;
   get(workflowId: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   create(input: CreateWorkflowInput, agentId?: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   rename(input: RenameWorkflowInput): Effect.Effect<WorkflowSummary, WorkflowFailed>;
@@ -1474,6 +1477,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             triggerNodeId: from?.kind === "trigger" ? from.id : null,
             fromNodeId: from && from.kind !== "trigger" ? from.id : null,
           };
+          if (detail.needsNewerApp) return yield* refuse("refused", sourceText("error.workflow.newerSteps"));
           const workflowId = detail.summary.id;
           const answered = currentAnswers(detail.graph, runs.latestDone(workflowId), answerGraphs());
           const scope = runScope(detail.graph, start, new Set(answered.keys()));
@@ -1615,8 +1619,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         }) =>
           locked(
             Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
-              const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
-                graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
+              const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(
+                ({ summary, graph, needsNewerApp }) =>
+                  needsNewerApp
+                    ? []
+                    : graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
               );
               if (triggers.length === 0) return "none";
               let started = false;
@@ -1690,8 +1697,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         });
 
         const githubTriggers = () =>
-          store.listWithGraphs().flatMap(({ summary, graph }) =>
-            graph.nodes.flatMap((node) => {
+          store.listWithGraphs().flatMap(({ summary, graph, needsNewerApp }) =>
+            (needsNewerApp ? [] : graph.nodes).flatMap((node) => {
               const event = node.fields.event;
               return githubTriggerRepositories(node).length > 0 && isOneOf(WORKFLOW_GITHUB_EVENTS, event)
                 ? [{ workflowId: summary.id, node, event }]
@@ -1961,6 +1968,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* locked(
             Effect.gen(function* () {
               const detail = yield* attempt(() => detailOf(input.workflowId));
+              if (detail.needsNewerApp) return yield* refuse("refused", sourceText("error.workflow.newerSteps"));
               const node = detail.graph.nodes.find((candidate) => candidate.id === input.nodeId);
               if (!node) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               if (unsupportedNode(node)) return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));

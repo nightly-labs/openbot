@@ -982,6 +982,102 @@ try {
     return { placeholder: status, lockedNote: 200 };
   });
 
+  await step("bad row: a workflow with a step that does not decode stays apart and read-only", async () => {
+    const { workflows, database } = current();
+    const broken = await hostWorkflow("Broken", agentGraph(open));
+    const listed = async (token: string) =>
+      list((await ok(WORKFLOWS_ROUTES.list, token, {})).workflows, "list")
+        .map((row) => text(record(row, "summary").title, "title"))
+        .sort();
+    const ownerBefore = await listed(ownerToken);
+    const mineBefore = await listed(member);
+    assert.ok(ownerBefore.includes("Broken") && mineBefore.includes("Broken"), "The new workflow is not listed.");
+    const db = database.connection;
+    const fieldsOf = () =>
+      db.prepare("SELECT fields_json FROM workflow_nodes WHERE workflow_id = ? AND node_id = 'prompt'").get(broken.id);
+    db.prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = 'prompt'").run(
+      '{"text":{"rich":true}}',
+      broken.id,
+    );
+    const corrupt = fieldsOf();
+    const owner = await listed(ownerToken);
+    const mine = await listed(member);
+    assert.deepEqual(
+      owner,
+      ownerBefore.filter((title) => title !== "Broken"),
+      "The owner list changed with a bad row.",
+    );
+    assert.deepEqual(
+      mine,
+      mineBefore.filter((title) => title !== "Broken"),
+      "The member list changed with a bad row.",
+    );
+    const remoteGet = await refused(
+      WORKFLOWS_ROUTES.get,
+      ownerToken,
+      { workflowId: broken.id },
+      404,
+      "error.workflow.missing",
+    );
+    const local = await runCauseEffect(workflows.get(broken.id));
+    assert.equal(local.needsNewerApp, true, "The local detail is not marked for a newer app.");
+    const stand = local.graph.nodes.find((node) => node.id === "prompt");
+    assert.equal(stand?.kind, "note");
+    assert.equal(stand?.locked, true);
+    assert.equal(local.graph.edges.length, 0, "An edge to the unreadable step was kept.");
+    const agentStep = local.graph.nodes.find((node) => node.kind === "agent");
+    assert.ok(agentStep, "The readable agent step is missing.");
+    const newer = (error: unknown) =>
+      error instanceof Error && error.message === sourceText("error.workflow.newerSteps");
+    await assert.rejects(
+      runCauseEffect(
+        workflows.saveGraph({ workflowId: broken.id, baseRevision: local.revision, graph: agentGraph(open) }),
+      ),
+      newer,
+    );
+    await assert.rejects(
+      runCauseEffect(workflows.saveGraph({ workflowId: broken.id, baseRevision: local.revision, graph: local.graph })),
+      newer,
+    );
+    await assert.rejects(runCauseEffect(workflows.startRun({ workflowId: broken.id, requestId: requestId() })), newer);
+    await assert.rejects(
+      runCauseEffect(workflows.runStep({ workflowId: broken.id, nodeId: agentStep.id, requestId: requestId() })),
+      newer,
+    );
+    const version = (await runCauseEffect(workflows.versions(broken.id)))[0];
+    assert.ok(version, "The broken workflow has no version.");
+    await assert.rejects(
+      runCauseEffect(workflows.restoreVersion({ workflowId: broken.id, versionId: version.id })),
+      newer,
+    );
+    assert.deepEqual(fieldsOf(), corrupt, "A refused write changed the unreadable row.");
+    assert.equal((await runCauseEffect(workflows.get(broken.id))).revision, local.revision);
+    const page = await runCauseEffect(workflows.runs({ workflowId: ids.closed, limit: 10 }));
+    const earlier = page.runs[0]?.run.id;
+    assert.ok(earlier, "The closed workflow has no run.");
+    const graphOf = db.prepare("SELECT graph_json FROM workflow_runs WHERE run_id = ?");
+    const saved = text(record(graphOf.get(earlier), "run row").graph_json, "graph json");
+    const setGraph = db.prepare("UPDATE workflow_runs SET graph_json = ? WHERE run_id = ?");
+    setGraph.run('{"nodes":"newer"}', earlier);
+    try {
+      const listed = await runCauseEffect(workflows.runs({ workflowId: ids.closed, limit: 10 }));
+      assert.ok(
+        listed.runs.some(({ run }) => run.id === earlier),
+        "A run with an unreadable graph left the run list.",
+      );
+      await Effect.runPromise(workflows.sweep());
+    } finally {
+      setGraph.run(saved, earlier);
+    }
+    await runCauseEffect(workflows.remove(broken.id));
+    assert.equal(
+      (await runCauseEffect(workflows.list())).some((summary) => summary.id === broken.id),
+      false,
+      "The broken workflow could not be deleted.",
+    );
+    return { owner, mine, remoteGet, refused: ["save", "placeholderSave", "run", "step", "restore"] };
+  });
+
   await step("place output: only an owner or admin adds one or moves it; a member keeps it", async () => {
     const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open })).revision);
     const posting = withOutput(agentGraph(open), channelOutput("C-first"));
