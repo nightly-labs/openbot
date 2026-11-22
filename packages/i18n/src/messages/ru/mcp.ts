@@ -103,6 +103,7 @@ export const messages = {
   "mcp.panel.signIn": "Войти",
   "mcp.panel.signOut": "Выйти",
   "mcp.panel.cancelSignIn": "Отменить вход",
+  "mcp.panel.useAddress": "Использовать этот адрес",
   "mcp.panel.signInTo": "Войти в {name}",
   "mcp.panel.signInWaiting": {
     one: "Завершите вход в браузере. OpenBot ждёт не дольше {count} минуты.",

@@ -261,6 +261,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "이 서버에 로그인해야 해요. 호스트 컴퓨터의 OpenBot에서 로그인하세요.",
   "error.backend.mcpSignInNeedsHttps":
     "이 서버에 로그인해야 하는데, OpenBot은 https로만 로그인해요. URL을 {url}(으)로 변경하세요.",
+  "error.backend.mcpSignInOtherAddress":
+    "이 서버는 {url}에서만 로그인할 수 있습니다. URL을 이 주소로 바꾼 다음 다시 로그인하세요.",
   "error.backend.mcpSignInCancelled": "로그인이 취소되었어요.",
   "error.backend.mcpSignInTimedOut": "브라우저에서 로그인을 마치지 않았어요.",
   "error.backend.mcpSignInRefused": "로그인 페이지에서 접근을 거부했어요. 다시 로그인하세요.",

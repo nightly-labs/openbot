@@ -281,6 +281,8 @@ export const messages = {
     "このサーバーはサインインを求めています。ホストコンピューターの OpenBot でサインインしてください。",
   "error.backend.mcpSignInNeedsHttps":
     "このサーバーはサインインを求めていますが、OpenBot は https でのみサインインします。URL を {url} に変更してください。",
+  "error.backend.mcpSignInOtherAddress":
+    "このサーバーは {url} でのみサインインできます。URL をこのアドレスに変更してから、もう一度サインインしてください。",
   "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
   "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
   "error.backend.mcpSignInRefused": "サインインページでアクセスが拒否されました。もう一度サインインしてください。",
