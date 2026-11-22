@@ -44,7 +44,7 @@ import {
   type PlanUpdateStep,
   startClaudePlanTurn,
 } from "./agent/plan-updates";
-import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic, isSpentBalanceDiagnostic } from "./agent/provider-diagnostics";
 import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   endSubagentTurn,
@@ -1714,7 +1714,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #holdSubagentLimit(runtime: ThreadRuntime, message: ClaudeStreamMessage): void {
     const text = messageText(message.message);
     const refusal = claudeUsageLimitRefusal(message);
-    if (isBalanceDiagnostic(text) || (!refusal && !isPlanLimitDiagnostic(text))) return;
+    if (isSpentBalanceDiagnostic(text) || (!refusal && !isPlanLimitDiagnostic(text))) return;
     if (runtime.activeTurn && !runtime.activeTurn.unprompted) return;
     runtime.subagentLimit = {
       resetsAt: refusal?.resetsAt ?? null,
@@ -2045,7 +2045,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const text = messageText(message.message);
       if (message.error === "rate_limit") {
         const refusal = claudeUsageLimitRefusal(message);
-        if (isBalanceDiagnostic(text)) {
+        if (isSpentBalanceDiagnostic(text)) {
           turn.usageLimit = null;
           turn.balanceSpent = true;
         } else if (turn.usageLimit || refusal || isPlanLimitDiagnostic(text)) {
@@ -2239,7 +2239,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         limit &&
         !interrupted &&
         (limit.text !== null || limitError) &&
-        !isBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
+        !isSpentBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
       ) {
         this.emit("notification", {
           method: USAGE_LIMIT_METHOD,
