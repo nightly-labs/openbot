@@ -97,6 +97,7 @@ export interface HudRun {
 export interface HudStep {
   id: string;
   status: "running" | "approval" | "failed";
+  waiting: boolean;
   name: string;
   more: number;
 }
@@ -134,21 +135,23 @@ export function WorkflowCanvasHeader(props: {
     props.openRuns.find((run) => run.number === props.viewing) ??
     props.pastRuns.find((run) => run.number === props.viewing);
   const manyOpen = () => props.openRuns.length > 1 || props.waiting > 0;
-  const statusVerb = (status: HudStep["status"]) =>
-    status === "approval"
+  const statusVerb = (step: HudStep) =>
+    step.status === "approval"
       ? t("workflow.canvas.status.approval")
-      : status === "failed"
+      : step.status === "failed"
         ? t("workflow.canvas.status.failed")
-        : t("workflow.canvas.status.running");
+        : step.waiting
+          ? t("workflow.canvas.status.waiting")
+          : t("workflow.canvas.status.running");
   const spoken = createMemo(() => {
     const step = props.previewing ? undefined : props.step;
-    return step ? `${step.id}\u0000${step.status}` : "";
+    return step ? `${step.id}\u0000${step.status}\u0000${step.waiting}` : "";
   });
   const announcement = createMemo(() => {
     if (!spoken()) return undefined;
     return untrack(() => {
       const step = props.step;
-      return step && { verb: statusVerb(step.status), name: step.name };
+      return step && { verb: statusVerb(step), name: step.name };
     });
   });
   return (
@@ -203,7 +206,7 @@ export function WorkflowCanvasHeader(props: {
                   >
                     <LoaderCircle class="wfn-hud-spin" aria-hidden="true" />
                   </Show>
-                  <span class="wfn-hud-meta">{statusVerb(step().status)}</span>
+                  <span class="wfn-hud-meta">{statusVerb(step())}</span>
                   <span class="wfn-hud-step-name">{step().name}</span>
                   <Show when={step().more > 0}>
                     <span class="wfn-hud-count">{t("workflow.canvas.status.more", { count: step().more })}</span>

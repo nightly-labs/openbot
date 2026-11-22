@@ -2262,3 +2262,8 @@ html:not(.library-dragging)
     scrollbar-width: none;
   }
 }
+
+.conversation-files-workspace {
+  margin-bottom: var(--openbot-space-2);
+  padding: 0;
+}

@@ -192,6 +192,20 @@ async function purchasesAlertTheOperator() {
 
   await deliver("customer.subscription.updated", { id: "sub_license" });
   check("a second event of the license sends no message", alerts.length === 2, alerts);
+  const licenseGrants = database
+    .prepare(
+      "SELECT credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, starts_at, expires_at FROM credit_grants WHERE user_id = ?",
+    )
+    .all(LICENSE_BUYER.id);
+  const licenseGrant = licenseGrants[0];
+  check(
+    "a paid yearly Team license with 7 users gives its owner 400 free credits for the current month at once, one time",
+    licenseGrants.length === 1 &&
+      licenseGrant?.credits === 400 &&
+      licenseGrant.remaining === 400 &&
+      Number(licenseGrant.expires_at) - Number(licenseGrant.starts_at) <= 31 * 24 * 3600 * 1000,
+    licenseGrants,
+  );
 
   const serverTerms = `server · \`${SERVER_BUYER.email}\` · standard · $35/mo`;
   change("sub_server", { cancel_at_period_end: true, canceled_at: FIRST_CANCEL });

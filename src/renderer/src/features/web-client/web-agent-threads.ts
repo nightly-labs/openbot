@@ -1,5 +1,6 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { guardedDecoder } from "@openbot/contracts/ipc-decoding";
+import { AGENT_ARCHIVED_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import { AGENT_QUEUE_TASK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
@@ -33,6 +34,7 @@ import {
   deleteAgentThread,
   listAgentTasks,
   listAgentThreadBranches,
+  listArchivedAgentTasks,
   markAgentThreadRead,
   readAgentTask,
   readAgentThreadAround,
@@ -105,6 +107,7 @@ function webAgentTasksPort(
     get queue() {
       return queued() ? queue : undefined;
     },
+    listArchivedTasks: (input) => run((host) => listArchivedAgentTasks(host, input)),
     readTask: (input) => run((host) => readAgentTask(host, input).pipe(Effect.map(withoutPreviewUrls))),
     readTaskPage: (input) =>
       run((host) =>
@@ -157,6 +160,7 @@ export function createWebAgentThreads(options: {
     messageDeletable: () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY),
     pageable: () => workspace.state.capabilities.includes(AGENT_THREAD_PAGES_CAPABILITY),
     aroundReadable: () => workspace.state.capabilities.includes(MESSAGE_PINS_CAPABILITY),
+    archivedPageable: () => workspace.state.capabilities.includes(AGENT_ARCHIVED_THREADS_CAPABILITY),
     reloadKey: () => null,
   });
   const tabs = createAgentThreadTabs({

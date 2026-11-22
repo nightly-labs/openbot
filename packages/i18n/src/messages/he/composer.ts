@@ -99,7 +99,7 @@ export const messages = {
   "composer.voice.progress": "מוריד מודל קול {progress}%",
   "composer.voice.recording": "הקלטת קול",
   "composer.voice.limitSoon": "ההקלטה תיעצר בעוד {seconds} שניות.",
-  "composer.voice.limitReached": "ההקלטה נעצרה במגבלה של 2 דקות. מה שנאמר נמצא בהודעה.",
+  "composer.voice.limitReached": "ההקלטה נעצרה במגבלה של 10 דקות. מה שנאמר נמצא בהודעה.",
   "composer.send.saveQueued": "שמירת ההודעה בתור",
   "composer.send.voice": "שליחת הודעה קולית",
   "composer.send.message": "שליחת הודעה",

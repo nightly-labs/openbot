@@ -23,12 +23,16 @@ export const messages = {
     "Host nie zezwolił OpenBot na nagrywanie ekranu. Przyznaj na hoście uprawnienie do nagrywania ekranu, a następnie spróbuj ponownie.",
   "error.remote.windowsSessionDisconnected":
     "Sesja Windows na hoście jest rozłączona, więc nie ma ekranu do udostępnienia. Zaloguj się do Windows na ekranie hosta, a następnie spróbuj ponownie.",
+  "error.remote.windowsCaptureDenied":
+    "Windows na hoście nie pozwala OpenBot nagrywać ekranu. Odblokuj Windows na ekranie hosta, zamknij wszystkie monity administratora, a następnie spróbuj ponownie. Jeśli problem nie ustąpi, uruchom ponownie host.",
   "error.remote.macScreenLocked":
     "Mac jest zablokowany, więc nie może udostępnić ekranu. Odblokuj Maca na jego ekranie, a następnie spróbuj ponownie.",
   "error.remote.streamTooSlowLowerQuality":
     "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Spróbuj ponownie: następne połączenie użyje niższej jakości.",
   "error.remote.streamTooSlow":
     "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Użyj szybszej sieci, a następnie spróbuj ponownie.",
+  "error.remote.noPictureSwitchEncoder":
+    "Host nie wysłał obrazu. Spróbuj ponownie: następne połączenie użyje ustawienia wideo, które działa na większej liczbie komputerów.",
   "error.remote.teamSessionExpired": "Sesja zespołu wygasła.",
   "error.remote.finishTestBeforeSwitch": "Zakończ test zdalnego pulpitu, zanim przełączysz ekran.",
   "error.remote.displayNotFound": "Nie znaleziono zdalnego ekranu.",

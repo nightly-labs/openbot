@@ -12,6 +12,7 @@ interface UpdatesStoreProps {
   onCancelScheduledRestart?: () => Promise<void>;
   onRestartWhenIdle?: () => Promise<void>;
   onCancelIdleRestart?: () => Promise<void>;
+  onRestartNow?: () => Promise<void>;
 }
 
 export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
@@ -149,6 +150,8 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     targetUpdate,
     restartWhenIdle: () => changeIdleRestart(props.onRestartWhenIdle, "update.idleRestart.requestFailed"),
     cancelIdleRestart: () => changeIdleRestart(props.onCancelIdleRestart, "update.idleRestart.cancelFailed"),
+    restartNowOffered: () => Boolean(props.onRestartNow),
+    restartNow: () => changeIdleRestart(props.onRestartNow, "update.idleRestart.failedTitle"),
   };
 }
 

@@ -36,6 +36,8 @@ export const messages = {
   "status.messaging.telegramNoAgent":
     "لا يوجد وكيل يستطيع الإجابة هنا بعد. في OpenBot، افتح المتجر > التطبيقات > Telegram وانقر على إضافة وكيل.",
   "status.messaging.telegramLinked": "OpenBot متصل بهذه الدردشة. اذكر {bot} أو ردّ على رسالة من OpenBot لسؤال الوكلاء.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot غير متصل بهذه الدردشة. لربطه، افتح تطبيق OpenBot وانتقل إلى المتجر ← التطبيقات ← Telegram، ثم اختر «إضافة إلى مجموعة» أو «فتح دردشة مباشرة».",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "يجيب في Telegram ويسأل الفريق",
   "status.messaging.whatsappNoAgent": "لا يوجد وكيل يستطيع الإجابة هنا بعد. أضف WhatsApp Orchestrator في OpenBot.",

@@ -55,3 +55,16 @@ export function workflowVisibility(
   };
   return { admin, listed, visibleAgents, visibleGraph, requireUsable, visibleDetail, usableDetail };
 }
+
+export async function visibleWorkflowIds(
+  context: TeamApiRequestContext,
+  workflows: Pick<TeamApiWorkflows, "get" | "listWithGraphs"> | undefined,
+  agents: Pick<TeamApiAgents, "listAgents">,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<ReadonlySet<string>> {
+  if (!workflows) return new Set();
+  const { listed, visibleGraph } = workflowVisibility(context, workflows, agents, hiddenAgentIds);
+  const known = listed();
+  const all = await runWorkflowEffect(workflows.listWithGraphs());
+  return new Set(all.filter(({ graph }) => visibleGraph(graph, known)).map(({ summary }) => summary.id));
+}

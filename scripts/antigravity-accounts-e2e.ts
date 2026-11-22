@@ -16,7 +16,9 @@ import { BUILT_IN_PROVIDER_DRIVERS, NO_PROVIDER_CREDENTIALS } from "../src/backe
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-accounts-e2e");
 const SAVED_KEY = "fake-gemini-key-for-the-first-account";
-const GOOGLE_PAGE = "https://accounts.google.com/o/oauth2/auth?client_id=fake&state=fake";
+const GOOGLE_PAGE = "https://accounts.google.com/o/oauth2/auth?client_id=fake&state=fake&prompt=consent";
+const GOOGLE_PAGE_WITH_CHOOSER =
+  "https://accounts.google.com/o/oauth2/auth?client_id=fake&state=fake&prompt=consent+select_account";
 const PROJECT = "fake-account-project";
 const TOKEN_FILE = "antigravity-oauth-token";
 const LEGACY_TOKEN_FILE = "acp_token.json";
@@ -386,7 +388,7 @@ try {
   const accountHome = store.home(account);
   const tokenInAccount = await exists(join(accountHome, "antigravity-acp", TOKEN_FILE));
   report.signIn = { pageOpened: [...pageOpened], accountState: accountRows(runtime)?.[1]?.state, tokenInAccount };
-  assert.deepEqual(pageOpened, [GOOGLE_PAGE]);
+  assert.deepEqual(pageOpened, [GOOGLE_PAGE_WITH_CHOOSER], "Google shows the account chooser for a new account");
   assert.equal(report.signIn.accountState, "connected");
   assert.ok(tokenInAccount);
   assert.equal(await readFile(join(defaultData, TOKEN_FILE), "utf8"), imported);
@@ -483,7 +485,7 @@ try {
   assert.ok(report.reconnect.logoutFirst);
   assert.ok(report.reconnect.agentProcessStopped);
   assert.equal(report.reconnect.accountState, "connected");
-  assert.equal(pageOpened.length, 2);
+  assert.deepEqual(pageOpened, [GOOGLE_PAGE_WITH_CHOOSER, GOOGLE_PAGE_WITH_CHOOSER]);
 
   const startsBeforeUsage = (await entries()).filter((entry) => entry.event === "start").length;
   await runCauseEffect(runtime.accountUsage());

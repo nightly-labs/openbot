@@ -925,7 +925,8 @@ export function AgentDock(props: AgentDockProps) {
     if (!props.onMove || event.button !== 0 || endSeatDrag || leaving.has(id) || !state.seats.includes(id)) return;
     const element = event.currentTarget;
     const pointerId = event.pointerId;
-    const startY = event.clientY;
+    const stageTop = () => stage.getBoundingClientRect().top;
+    const startY = event.clientY - stageTop();
     const springs = seatSprings(id);
     const initial = [...state.seats];
     let order = initial;
@@ -951,8 +952,9 @@ export function AgentDock(props: AgentDockProps) {
     };
     const scroll = () => {
       const view = seatScroll.getBoundingClientRect();
-      const above = view.top + SEAT_FADE - pointerY;
-      const below = pointerY - (view.bottom - SEAT_FADE);
+      const top = stageTop();
+      const above = view.top - top + SEAT_FADE - pointerY;
+      const below = pointerY - (view.bottom - top - SEAT_FADE);
       const step = above > 0 ? -above : below > 0 ? below : 0;
       const before = seatScroll.scrollTop;
       if (step !== 0) seatScroll.scrollTop = before + step * SEAT_DRAG_SCROLL;
@@ -970,7 +972,7 @@ export function AgentDock(props: AgentDockProps) {
     };
     const move = (moved: PointerEvent) => {
       if (moved.pointerId !== pointerId) return;
-      pointerY = moved.clientY;
+      pointerY = moved.clientY - stageTop();
       if (!started && Math.abs(pointerY - startY) < SEAT_DRAG_START) return;
       if (!started) start();
       follow();

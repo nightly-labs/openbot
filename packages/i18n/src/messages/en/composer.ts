@@ -98,7 +98,7 @@ export const messages = defineMessages("composer", {
   "composer.voice.progress": "Downloading voice model {progress}%",
   "composer.voice.recording": "Voice recording",
   "composer.voice.limitSoon": "Recording stops in {seconds} seconds.",
-  "composer.voice.limitReached": "Recording stopped at the 2-minute limit. What you said is in the message.",
+  "composer.voice.limitReached": "Recording stopped at the 10-minute limit. What you said is in the message.",
   "composer.send.saveQueued": "Save queued message",
   "composer.send.voice": "Send voice message",
   "composer.send.message": "Send message",

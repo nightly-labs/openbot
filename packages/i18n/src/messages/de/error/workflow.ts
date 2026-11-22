@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "Diese Version des Workflows existiert nicht mehr.",
   "error.workflow.annotation": "Texte, Notizen und Formen können keine Verbindungen haben.",
   "error.workflow.port": "Ein Schritt kann diese Art von Eingabe nicht annehmen.",
+  "error.workflow.unknownValue":
+    "Dieses OpenBot kennt eine Einstellung eines Schritts nicht. Aktualisiere OpenBot und versuche es dann erneut.",
   "error.workflow.branch": "Nur eine Bedingung kann Ja- und Nein-Verbindungen haben.",
   "error.workflow.conditionBranch": "Jede Verbindung einer Bedingung muss Ja oder Nein sein.",
   "error.workflow.duplicateEdge": "Diese zwei Schritte haben diese Verbindung bereits.",
@@ -20,6 +22,18 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "Der Agent hat angehalten, bevor er auf diesen Schritt antwortete. Führe den Schritt erneut aus.",
   "error.workflow.conditionUnclear": "Das Modell hat nicht mit Ja oder Nein geantwortet.",
+  "error.workflow.answerInvalid":
+    "Die Antwort hatte nicht die Felder, die dieser Schritt verlangt: {fields}. Führe den Schritt erneut aus.",
+  "error.workflow.answerSetup":
+    "Die Antwortfelder dieses Workflows passen hier nicht: {fields}. Korrigiere den Workflow und führe den Schritt dann erneut aus.",
+  "error.workflow.answerSourceEnded":
+    "Diese Felder haben keinen Wert, weil der Schritt, der sie liefert, nicht abgeschlossen wurde: {fields}. Führe zuerst diesen Schritt erneut aus.",
+  "error.workflow.runInputInvalid":
+    "Die Eingabe des Laufs passt nicht zu den Antwortfeldern des Auslösers: {fields}. Sende ein JSON-Objekt mit diesen Feldern.",
+  "error.workflow.sourceNotDone":
+    "Ein Schritt davor ist beim letzten Lauf fehlgeschlagen oder wurde gestoppt. Führe zuerst diesen Schritt erneut aus.",
+  "error.workflow.checkInvalid":
+    "Die Prüfung dieses Schritts ist ungültig. Korrigiere sie und führe den Schritt erneut aus.",
   "error.workflow.modelFailed": "Das Modell konnte nicht antworten. Führe den Schritt erneut aus.",
   "error.workflow.modelTimedOut":
     "Das Modell hat nicht rechtzeitig geantwortet. Wähle für diesen Schritt einen geringeren Aufwand oder ein schnelleres Modell und führe ihn erneut aus.",

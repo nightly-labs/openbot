@@ -16,12 +16,19 @@ export interface WorkflowNodeResult {
   at: string;
   value: string;
   failed?: boolean;
+  branch?: string;
+}
+
+export interface WorkflowNodePending {
+  id: string;
+  at: string;
 }
 
 export interface WorkflowNodeRunState {
   status: WorkflowNodeRunStatus | undefined;
   error: string | undefined;
   results: readonly WorkflowNodeResult[];
+  pending: readonly WorkflowNodePending[];
   step: WorkflowStep;
 }
 
@@ -54,10 +61,14 @@ export function indexRunView(view: WorkflowRunView, focusRunId?: string): Readon
   const focused = view.runs.find((entry) => entry.run.id === focusRunId) ?? view.runs[0];
   const results = new Map<string, WorkflowNodeResult[]>();
   const shown = new Map<string, WorkflowStep>();
+  const pending = new Map<string, WorkflowNodePending[]>();
   for (const step of all) {
     const result = resultOf(step, step.runId ? numbers.get(step.runId) : undefined);
     if (result) results.set(step.nodeId, [...(results.get(step.nodeId) ?? []), result]);
-    if (step.runId === null || step.runId === focused?.run.id) shown.set(step.nodeId, step);
+    if (step.runId !== null && step.runId !== focused?.run.id) continue;
+    shown.set(step.nodeId, step);
+    if (step.status === "running" && step.startedAt)
+      pending.set(step.nodeId, [...(pending.get(step.nodeId) ?? []), { id: step.id, at: step.startedAt }]);
   }
   const index = new Map<string, WorkflowNodeRunState>();
   for (const [nodeId, step] of shown) {
@@ -65,6 +76,7 @@ export function indexRunView(view: WorkflowRunView, focusRunId?: string): Readon
       status: NODE_STATUS[step.status],
       error: step.status === "failed" ? (step.error ?? undefined) : undefined,
       results: results.get(nodeId) ?? [],
+      pending: pending.get(nodeId) ?? [],
       step,
     });
   }
@@ -75,7 +87,8 @@ function resultOf(step: WorkflowStep, run: number | undefined): WorkflowNodeResu
   const at = step.endedAt ?? step.startedAt;
   if (!at) return undefined;
   const base = run === undefined ? { id: step.id, at } : { id: step.id, run, at };
-  if (step.status === "done" && step.output !== null) return { ...base, value: step.output };
+  if (step.status === "done" && step.output !== null)
+    return step.branch ? { ...base, value: step.output, branch: step.branch } : { ...base, value: step.output };
   if (step.status === "failed") return { ...base, value: step.error ?? "", failed: true };
   return undefined;
 }

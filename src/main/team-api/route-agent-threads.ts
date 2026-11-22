@@ -1,6 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { agentThreadTitle } from "@openbot/contracts/ipc";
-import { isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import {
+  AGENT_ARCHIVED_THREADS_CAPABILITY,
+  AGENT_ARCHIVED_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import {
   AGENT_THREAD_BRANCHES_CAPABILITY,
   AGENT_THREAD_BRANCHES_LIMIT,
@@ -195,6 +199,25 @@ export async function routeAgentThreadBranches(
     }
   }
   throw failure.cause;
+}
+
+export async function routeAgentArchivedThreads(
+  context: TeamApiRequestContext,
+  tasks: TeamApiAgentTasks | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, request, json } = context;
+  if (method !== "POST" || url.pathname !== AGENT_ARCHIVED_THREADS_ROUTES.list) return "unmatched";
+  if (!tasks || !capabilities.has(AGENT_ARCHIVED_THREADS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.backend.threadRemoteUnsupported"));
+  const body = await readJson(request);
+  const agentId = stringField(body, "agentId");
+  if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  requireListedAgent(tasks, agentId);
+  const before = isDynamicRecord(body.before)
+    ? { updatedAt: stringField(body.before, "updatedAt", false, 160), threadId: stringField(body.before, "threadId") }
+    : null;
+  return json(200, tasks.listArchivedTasks({ agentId, before }));
 }
 
 export async function routeAgentThreadPages(

@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Sohbette aç",
   "conversation.threads.archive": "Arşivle",
   "conversation.threads.archived": "Arşivlenenler",
+  "conversation.threads.archivedOlder": "Eski dizileri göster",
   "conversation.threads.restore": "Geri yükle",
   "conversation.threads.deleteUndo.title": "{title} silindi",
   "conversation.threads.hold.threadLimit": {
@@ -150,6 +151,8 @@ export const messages = {
   "conversation.voice.key.metaWin": "Win",
   "conversation.voice.key.metaLinux": "Super",
   "conversation.voice.key.enter": "Enter",
+  "conversation.voice.key.tab": "Tab",
+  "conversation.voice.key.escape": "Esc",
   "conversation.voice.interrupt": "Böl",
   "conversation.voice.start": "Sesli konuşma başlat",
   "conversation.voice.end": "Sesli konuşmayı bitir",

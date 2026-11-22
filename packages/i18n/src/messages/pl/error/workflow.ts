@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "Ta wersja przepływu pracy już nie istnieje.",
   "error.workflow.annotation": "Teksty, notatki i kształty nie mogą mieć połączeń.",
   "error.workflow.port": "Krok nie może przyjąć tego typu danych.",
+  "error.workflow.unknownValue":
+    "Ten OpenBot nie zna ustawienia jednego z kroków. Zaktualizuj OpenBot i spróbuj ponownie.",
   "error.workflow.branch": "Tylko warunek może mieć połączenia tak i nie.",
   "error.workflow.conditionBranch": "Każde połączenie z warunku musi być tak albo nie.",
   "error.workflow.duplicateEdge": "Te dwa kroki mają już to połączenie.",
@@ -18,6 +20,17 @@ export const messages = {
   "error.workflow.agentStepEnded": "Wiadomość do agenta została usunięta, zanim odpowiedział.",
   "error.workflow.agentStepStopped": "Agent zatrzymał się, zanim odpowiedział na ten krok. Uruchom krok ponownie.",
   "error.workflow.conditionUnclear": "Model nie odpowiedział tak ani nie.",
+  "error.workflow.answerInvalid": "Odpowiedź nie miała pól, których wymaga ten krok: {fields}. Uruchom krok ponownie.",
+  "error.workflow.answerSetup":
+    "Pola odpowiedzi tego przepływu mają tu problem: {fields}. Popraw przepływ, a potem uruchom krok ponownie.",
+  "error.workflow.answerSourceEnded":
+    "Te pola nie mają wartości, bo krok, który je podaje, się nie zakończył: {fields}. Najpierw uruchom ponownie tamten krok.",
+  "error.workflow.runInputInvalid":
+    "Dane wejściowe uruchomienia nie pasują do pól odpowiedzi wyzwalacza: {fields}. Wyślij jeden obiekt JSON z tymi polami.",
+  "error.workflow.sourceNotDone":
+    "Krok przed tym kończył się błędem lub został zatrzymany przy ostatnim uruchomieniu. Najpierw uruchom ponownie tamten krok.",
+  "error.workflow.checkInvalid":
+    "Warunek sprawdzenia w tym kroku jest nieprawidłowy. Popraw go i uruchom krok ponownie.",
   "error.workflow.modelFailed": "Model nie mógł odpowiedzieć. Uruchom krok ponownie.",
   "error.workflow.modelTimedOut":
     "Model nie odpowiedział na czas. Wybierz mniejszy wysiłek lub szybszy model dla tego kroku, a potem uruchom go ponownie.",

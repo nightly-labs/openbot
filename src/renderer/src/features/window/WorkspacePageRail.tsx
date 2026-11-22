@@ -70,6 +70,9 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
   function crmRailAction(): ((button: HTMLElement) => void) | undefined {
     return crmShown() ? windowPage.openCrm : undefined;
   }
+  function creditsRailAction(): (() => void) | undefined {
+    return windowPage.creditsAvailable() ? () => windowPage.openCredits(null) : undefined;
+  }
   function crmConnectorsAction(): ((button: HTMLElement) => void) | undefined {
     if (!crmShown()) return undefined;
     return (button) => windowPage.openCrm(button, true);
@@ -109,6 +112,8 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       onProviders={openProviders()}
       onCrm={crmRailAction()}
       onCrmConnectors={crmConnectorsAction()}
+      onCredits={creditsRailAction()}
+      creditBalance={windowPage.creditsMenu().state?.balance}
       onMarketplace={() => {
         windowPage.leavePricing();
         setSkillsMarketplaceOpen(true);
@@ -130,6 +135,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
             onInstallServer={serverActions.addMenuInstallServer()}
             addCreatesServer={serverActions.addCreatesServer()}
             hiddenLocal={serverActions.hiddenLocal()}
+            credits={windowPage.creditsMenu()}
             {...serverActions.callbacks}
           />
         </Show>

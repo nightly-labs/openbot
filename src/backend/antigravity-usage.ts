@@ -17,6 +17,7 @@ const DESKTOP_BUILD = "963137146";
 const DEV_CODE_ASSIST_URL = "OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL";
 
 const QUOTA_CALL_TIMEOUT_MS = 10_000;
+const VALIDATION_LINK_TIMEOUT_MS = 3_000;
 
 const FIVE_HOUR_WINDOW_MINS = 300;
 const WEEKLY_WINDOW_MINS = 10_080;
@@ -34,6 +35,16 @@ const TokenFileEmail = Schema.Struct({ id_token_email: Schema.optional(Schema.St
 const decodeTokenFileEmail = Schema.decodeUnknownOption(Schema.fromJsonString(TokenFileEmail));
 
 const LoadCodeAssistAnswer = Schema.Struct({ cloudaicompanionProject: Schema.optional(Schema.String) });
+
+const IneligibleTiersAnswer = Schema.Struct({
+  ineligibleTiers: Schema.optional(
+    Schema.Array(
+      Schema.Struct({ reasonCode: Schema.optional(Schema.String), validationUrl: Schema.optional(Schema.String) }),
+    ),
+  ),
+});
+
+const VALIDATION_REQUIRED = "VALIDATION_REQUIRED";
 
 const QuotaBucket = Schema.Struct({
   window: Schema.optional(Schema.String),
@@ -64,21 +75,23 @@ type UsageWindow = AccountRateLimitWindowResult & { usedPercent: number };
 
 type QuotaGroup = AccountRateLimitGroupResult & { primary: UsageWindow | null; secondary: UsageWindow | null };
 
-export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function* (options: {
+type FetchFunction = (url: string, init: RequestInit) => Promise<Response>;
+
+const codeAssistCall = Effect.fn("AntigravityUsage.codeAssistCall")(function* (options: {
   tokenFile: string;
-  model: string | null;
-  fetch?: (url: string, init: RequestInit) => Promise<Response>;
+  fetch?: FetchFunction | undefined;
+  timeoutMs: number;
 }) {
   const send = options.fetch ?? fetch;
   const accessToken = yield* Effect.tryPromise(() => readFile(options.tokenFile, "utf8")).pipe(
     Effect.map(validAccessToken),
     Effect.orElseSucceed(() => null),
   );
-  if (!accessToken) return NO_USAGE;
+  if (!accessToken) return null;
   const testEndpoint = localTestUrl(process.env[DEV_CODE_ASSIST_URL]);
-  const call = <S extends Schema.Top>(endpoint: string, method: string, body: { project?: string }, answer: S) =>
+  return <S extends Schema.Top>(endpoint: string, method: string, body: { project?: string }, answer: S) =>
     Effect.tryPromise(async (signal) => {
-      const response = await send(`${endpoint}:${method}`, {
+      const response = await send(`${testEndpoint ?? endpoint}:${method}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -86,21 +99,54 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
           "User-Agent": antigravityUserAgent(),
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.any([signal, AbortSignal.timeout(QUOTA_CALL_TIMEOUT_MS)]),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(options.timeoutMs)]),
       });
       if (!response.ok) throw new Error(`Code Assist answered ${response.status}.`);
       return await response.text();
     }).pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(answer))));
-  return yield* call(testEndpoint ?? CODE_ASSIST_URL, "loadCodeAssist", {}, LoadCodeAssistAnswer).pipe(
+});
+
+export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function* (options: {
+  tokenFile: string;
+  model: string | null;
+  fetch?: FetchFunction;
+}) {
+  const call = yield* codeAssistCall({ ...options, timeoutMs: QUOTA_CALL_TIMEOUT_MS });
+  if (!call) return NO_USAGE;
+  return yield* call(CODE_ASSIST_URL, "loadCodeAssist", {}, LoadCodeAssistAnswer).pipe(
     Effect.flatMap(({ cloudaicompanionProject: project }) =>
       project
-        ? call(testEndpoint ?? DAILY_CODE_ASSIST_URL, "retrieveUserQuotaSummary", { project }, AntigravityQuotaSummary)
+        ? call(DAILY_CODE_ASSIST_URL, "retrieveUserQuotaSummary", { project }, AntigravityQuotaSummary)
         : Effect.succeed({}),
     ),
     Effect.map((summary) => antigravityRateLimits(summary, options.model)),
     Effect.orElseSucceed(() => NO_USAGE),
   );
 });
+
+export const readAntigravityValidationLink = Effect.fn("AntigravityUsage.readValidationLink")(function* (options: {
+  tokenFile: string;
+  fetch?: FetchFunction | undefined;
+}) {
+  const call = yield* codeAssistCall({ ...options, timeoutMs: VALIDATION_LINK_TIMEOUT_MS });
+  if (!call) return null;
+  return yield* call(CODE_ASSIST_URL, "loadCodeAssist", {}, IneligibleTiersAnswer).pipe(
+    Effect.map(
+      ({ ineligibleTiers }) =>
+        ineligibleTiers
+          ?.filter((tier) => tier.reasonCode === VALIDATION_REQUIRED)
+          .map((tier) => tier.validationUrl)
+          .find(isGoogleAccountLink) ?? null,
+    ),
+    Effect.orElseSucceed(() => null),
+  );
+});
+
+function isGoogleAccountLink(link: string | undefined): link is string {
+  if (!link || !URL.canParse(link)) return false;
+  const url = new URL(link);
+  return url.protocol === "https:" && url.hostname === "accounts.google.com";
+}
 
 export const readAntigravityEmail = Effect.fn("AntigravityUsage.readEmail")(function* (tokenFile: string) {
   return yield* Effect.tryPromise(() => readFile(tokenFile, "utf8")).pipe(

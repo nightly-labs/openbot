@@ -143,6 +143,7 @@ export const messages = {
     "De sleutel van de aanbieder bevat een spatie of een teken dat een sleutel niet kan bevatten.",
   "error.provider.noModel": "De gekozen aanbieder heeft geen beschikbaar model.",
   "error.provider.noModelNamed": "{provider} heeft geen model beschikbaar.",
+  "error.provider.acpModelsNotLoaded": "{provider} kon zijn modellen niet laden. Stuur je bericht opnieuw.",
   "error.provider.acpNoModels": "ACP CLI heeft geen ACP-modellen aangeboden. OpenBot raadt geen reservemodel.",
   "error.provider.endpointRemoveBusy":
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je dit endpoint verwijdert.",
@@ -248,6 +249,7 @@ export const messages = {
     "OpenCode Go heeft het verzoek geweigerd. Een nieuwe API-sleutel lost dit niet op. Je OpenCode Go-abonnement is misschien niet actief, of OpenCode Go blokkeert misschien je netwerk: sommige diensten blokkeren vpn's, proxy's of bepaalde landen. Controleer in OpenCode Console of je abonnement actief is, of zet de vpn uit, en probeer het opnieuw. Je kunt ook een ander model kiezen.",
   "error.provider.opencodeServiceFailure":
     "OpenCode kon deze beurt niet voltooien, omdat de lokale service is mislukt. Probeer het opnieuw. Blijft de fout, verbind OpenCode dan opnieuw in Instellingen.",
+  "error.provider.opencodeStillStarting": "OpenCode is niet op tijd klaar met laden. OpenBot probeert het opnieuw.",
   "error.provider.opencodeRateLimited":
     "De modelaanbieder heeft het verzoek geweigerd vanwege de limiet op het aantal verzoeken. Wacht een paar minuten of kies een ander model, en probeer het opnieuw.\n{detail}",
   "error.provider.opencodeBilling":
@@ -276,6 +278,8 @@ export const messages = {
     "OpenCode kon de redenering van dit model bij dit denkniveau niet lezen. Kies een lager denkniveau of een ander model en stuur je bericht dan opnieuw.",
   "error.provider.opencodeModelNotServed":
     "De modelaanbieder biedt dit model nu niet aan je account aan. Kies een ander model en stuur je bericht daarna opnieuw.",
+  "error.provider.opencodeSafetyBlocked":
+    "De modelaanbieder heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels. Stuur je verzoek opnieuw met andere woorden. Als hij ook je volgende berichten blokkeert, start dan een nieuwe chat of kies een ander model.",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
   "error.provider.codexStateBusy":
@@ -288,6 +292,8 @@ export const messages = {
     "De processor van deze computer kan deze aanbieder niet uitvoeren. Gebruik een andere aanbieder.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode kon de database niet openen, omdat een nieuwere versie van OpenCode deze heeft gewijzigd. Werk OpenCode bij naar versie 2 of nieuwer en probeer het opnieuw.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok is niet gestart, omdat de instelling allowed_models in de configuratie het standaardmodel niet bevat. Voeg het standaardmodel toe aan allowed_models, of verwijder allowed_models, en probeer het daarna opnieuw.",
   "error.provider.opencodeNoAnswer":
     "Het OpenCode-model beëindigde de beurt zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -424,6 +430,8 @@ export const messages = {
     "Deze chat is te groot geworden om naar het model te sturen. Afbeeldingen in de chat zijn vaak de oorzaak. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
+  "error.provider.opencodeInputRefused":
+    "Het model heeft de inhoud van deze chat geweigerd zonder de oorzaak te geven. Een bestand in de chat, zoals een pdf of een afbeelding, kan de oorzaak zijn. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw zonder het bestand, of kies een ander model.",
   "error.provider.opencodeCompactionFailed":
     "Het model kon deze lange chat niet samenvatten om ruimte te maken in het contextvenster. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een sterker model.",
   "error.provider.museMcpStartupFault":
@@ -535,6 +543,7 @@ export const messages = {
     "Deze instelling is niet beschikbaar in de huidige sessie van de aanbieder.",
   "error.provider.sessionSettingInvalid": "Deze waarde is niet beschikbaar voor de instelling.",
   "error.provider.sessionSettingsBusy": "Wacht tot de huidige beurt klaar is voordat je een sessie-instelling wijzigt.",
+  "error.provider.sessionSettingsTimedOut": "De sessie van de agent reageerde niet op tijd. Probeer het opnieuw.",
   "error.provider.piOutdated":
     "Pi {version} is te oud. Installeer Pi 1.1.0 of nieuwer voor native ondersteuning van RPC en MCP.",
   "error.provider.nativeMissing": "De {provider} CLI is niet geïnstalleerd. Download hem in Instellingen.",
@@ -542,6 +551,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "De versie van de {provider} CLI kon niet worden gelezen.",
   "error.provider.piSessionBusy": "Wacht tot de huidige Pi-beurt klaar is.",
   "error.provider.acpSessionBusy": "{provider} rondt nog een gestopte beurt af. Probeer het zo opnieuw.",
+  "error.provider.acpSessionStale":
+    "{provider} kon de nieuwste versie van deze chat niet laden. Stuur je bericht opnieuw.",
   "error.provider.acpModelNotOffered":
     "{provider} biedt {model} nu niet aan. Kies een ander model voor deze agent en probeer het opnieuw.",
   "error.provider.piStopped": "Pi draait niet. Verbind Pi en probeer het opnieuw.",
@@ -586,6 +597,8 @@ export const messages = {
   "error.provider.museTurnFailed": "De Muse-beurt is mislukt.",
   "error.provider.museModelUnavailable":
     "Muse kan dit model niet gebruiken. Muse is mogelijk niet beschikbaar in het land waar deze agent draait, of dit account heeft geen toegang tot het model. Kies een ander model en probeer het opnieuw.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse kon dit verzoek niet voltooien. Muse gebruikt je opgeslagen Meta API-sleutel, niet je login. Vervang de sleutel, of verwijder hem in Instellingen om je login te gebruiken.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse kan geen profiel maken zonder toegang tot externe tools. Gebruik een andere aanbieder om het profiel te maken en kies daarna Muse voor de agent.",
   "error.provider.museAuthUnverified":

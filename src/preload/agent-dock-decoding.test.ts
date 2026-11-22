@@ -250,6 +250,18 @@ describe("agent dock decoding", () => {
     );
   });
 
+  it("keeps a visual reply mark and rejects one that is not a boolean", () => {
+    const chat = PRESENTATION.chats[0];
+    const message = chat?.messages[0];
+    if (!chat || !message) throw new Error("The presentation fixture has no agent message.");
+    const visual = { ...chat, messages: [{ ...message, visual: true }] };
+    expect(decodeAgentDockPresentation({ ...PRESENTATION, chats: [visual] })?.chats[0]).toEqual(visual);
+    const wrong = { ...chat, messages: [{ ...message, visual: "yes" }] };
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: [wrong] })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
   it("keeps a chat question, takeover and usage limit, and rejects one that is not whole", () => {
     const chat = PRESENTATION.chats[1];
     if (!chat) throw new Error("The presentation fixture has no channel chat.");

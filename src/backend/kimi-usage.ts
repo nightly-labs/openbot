@@ -1,8 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { Effect, Option, Schema } from "effect";
-import { kimiHomeDirectory } from "./process-confinement";
+import { kimiCodeHomeDirectory, kimiHomeDirectory } from "./process-confinement";
 import {
   type AccountRateLimitsReadResult,
   type AccountRateLimitWindowResult,
@@ -22,10 +21,6 @@ const NO_USAGE: AccountRateLimitsReadResult = { rateLimits: null, rateLimitsByLi
 class KimiUsageFailed extends Schema.TaggedError<KimiUsageFailed>()("KimiUsageFailed", {
   cause: Schema.Defect(),
 }) {}
-
-function kimiCodeHomeDirectory(env: NodeJS.ProcessEnv, home = homedir()): string {
-  return env.KIMI_CODE_HOME?.trim() || join(home, ".kimi-code");
-}
 
 const MANAGED_PROVIDER_HEADER = /^\[\s*providers\.(?:"managed:kimi-code"|'managed:kimi-code')\s*\]\s*(?:#.*)?$/u;
 const MANAGED_OAUTH_HEADER = /^\[\s*providers\.(?:"managed:kimi-code"|'managed:kimi-code')\.oauth\s*\]\s*(?:#.*)?$/u;

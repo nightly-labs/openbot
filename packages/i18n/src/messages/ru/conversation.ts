@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Открыть в чате",
   "conversation.threads.archive": "Архивировать",
   "conversation.threads.archived": "В архиве",
+  "conversation.threads.archivedOlder": "Показать прежние ветки",
   "conversation.threads.restore": "Восстановить",
   "conversation.threads.deleteUndo.title": "Удалено: {title}",
   "conversation.threads.hold.threadLimit": {
@@ -151,6 +152,8 @@ export const messages = {
   "conversation.voice.key.metaWin": "Win",
   "conversation.voice.key.metaLinux": "Super",
   "conversation.voice.key.enter": "Enter",
+  "conversation.voice.key.tab": "Tab",
+  "conversation.voice.key.escape": "Esc",
   "conversation.voice.interrupt": "Прервать",
   "conversation.voice.start": "Начать голосовой разговор",
   "conversation.voice.end": "Завершить голосовой разговор",

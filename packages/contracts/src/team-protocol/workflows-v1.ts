@@ -139,7 +139,10 @@ const trigger = fields({
   nextDueAt: nullable(timestamp),
   webhookUrl: nullable(string(2_048)),
 });
-const detail = fields({ summary, graph, revision: count, triggers: list(trigger, 200) });
+const detail = fields(
+  { summary, graph, revision: count, triggers: list(trigger, 200) },
+  { format: count, hostFormat: count },
+);
 const saveResult: AdminDecoder = (value) => {
   if (isDynamicRecord(value) && value.ok === true) return fields({ ok: boolean, revision: count })(value);
   if (isDynamicRecord(value) && value.ok === false) return fields({ ok: boolean, conflict: detail })(value);
@@ -157,20 +160,23 @@ const run = fields({
   startedAt: timestamp,
   endedAt: nullable(timestamp),
 });
-const step = fields({
-  id: identifier,
-  workflowId: identifier,
-  runId: nullable(identifier),
-  nodeId: identifier,
-  attempt: ordinal(Number.MAX_SAFE_INTEGER),
-  agentId: nullable(identifier),
-  status: token,
-  output: nullable(stepText),
-  branch: nullable(oneOf("yes", "no")),
-  error: nullable(stepText),
-  startedAt: nullable(timestamp),
-  endedAt: nullable(timestamp),
-});
+const step = fields(
+  {
+    id: identifier,
+    workflowId: identifier,
+    runId: nullable(identifier),
+    nodeId: identifier,
+    attempt: ordinal(Number.MAX_SAFE_INTEGER),
+    agentId: nullable(identifier),
+    status: token,
+    output: nullable(stepText),
+    branch: nullable(oneOf("yes", "no")),
+    error: nullable(stepText),
+    startedAt: nullable(timestamp),
+    endedAt: nullable(timestamp),
+  },
+  { waiting: boolean },
+);
 const runDetail = fields({ run, steps: list(step, WORKFLOW_RUN_STEP_LIMIT) });
 const runPage = fields({
   runs: list(runDetail, 50),
