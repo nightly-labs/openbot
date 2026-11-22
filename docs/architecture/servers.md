@@ -538,6 +538,22 @@ is format 3 when a step after the trigger reads one of these names in `{{name}}`
 step declares that name. A host of format 2 does not give these fields, so the editor offers them,
 and checks names against them, only when `hostFormat` is 3 or higher (`WorkflowAnswerScope`).
 
+An `openbot.workflow` file holds one workflow (`packages/contracts/src/ipc-workflow-file.ts`). It has
+`format`, the file `version`, the `graphFormat` of the graph, the `minAppVersion` (the version of the
+app that wrote it), the title, the graph, `references`, `links` and `assets`. The id fields of the
+node registry (`workflowIdFields`) decide what changes. An agent or a channel id becomes a key such as
+`agent-1`, and `references` gives its name (and the agent title). A connection and its place are
+cleared, and `links` names each step that needs a new link. A media account is cleared. A schedule
+with no timezone gets the timezone of the host. An asset file id becomes a key such as `file-1`, and
+`assets` holds the bytes as base64, at most `ATTACHMENT_LIMITS.fileBytes` for each file and
+`ATTACHMENT_LIMITS.totalBytes` for all. Export refuses a file with a secret in a text field and lists
+the fields; the host gives the secret test. Decode refuses an id of a host, a key with no reference,
+and asset data that is not base64. It gives "update required", with the names of the steps that it
+does not know, for a newer file version, a newer graph format, an unknown property or an unknown step
+value. Import maps each reference to a local agent or channel (`matchWorkflowFileReferences` matches
+a name, and the title when two agents have that name), and uploads the asset bytes again before it
+writes the new file ids (`workflowFromFile`).
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes

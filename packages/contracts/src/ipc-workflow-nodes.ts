@@ -23,7 +23,7 @@ import {
 } from "./ipc-workflows";
 import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
-type WorkflowIdKind = "agent" | "channel" | "connection" | "place" | "file" | "account";
+export type WorkflowIdKind = "agent" | "channel" | "connection" | "place" | "file" | "account";
 
 interface WorkflowFieldSpec {
   readonly runtime?: true;
@@ -170,6 +170,17 @@ export const WORKFLOW_RUNTIME_FIELDS: Readonly<Record<WorkflowNodeKind, readonly
 
 export const WORKFLOW_TEMPLATE_FIELDS: Readonly<Partial<Record<WorkflowNodeKind, readonly string[]>>> =
   Object.fromEntries(Object.entries(byKind((spec) => spec.template === true)).filter(([, names]) => names.length > 0));
+
+export interface WorkflowIdField {
+  readonly name: string;
+  readonly id: WorkflowIdKind;
+}
+
+export function workflowIdFields(kind: WorkflowNodeKind): readonly WorkflowIdField[] {
+  return Object.entries(WORKFLOW_NODE_REGISTRY[kind]).flatMap(([name, spec]) =>
+    spec.id ? [{ name, id: spec.id }] : [],
+  );
+}
 
 function knownValue(spec: WorkflowFieldSpec, value: unknown): boolean {
   const { values } = spec;
