@@ -1157,12 +1157,21 @@ textarea {
 }
 
 .server-menu-credits-buy {
+  position: relative;
   display: flex;
   min-height: var(--openbot-control-lg);
   align-items: center;
   gap: var(--openbot-space-2);
   padding-block: var(--openbot-space-0-5);
   padding-inline: var(--ui-menu-inset) var(--openbot-space-1);
+}
+
+.server-menu-credits-buy::before {
+  position: absolute;
+  inset: 0 var(--ui-menu-inset) auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  content: "";
 }
 
 .server-menu-credits-buy-icon {
