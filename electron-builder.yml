@@ -117,6 +117,16 @@ mac:
     NSMicrophoneUsageDescription: OpenBot uses the microphone to transcribe voice prompts locally on this Mac.
     NSScreenCaptureUsageDescription: OpenBot captures the screen so an agent can see the app windows you ask it to control.
     NSAppleEventsUsageDescription: OpenBot sends Automation events so an agent can control the apps you ask it to control.
+    # Agent commands are child processes, so macOS asks for Calendars and Reminders access in
+    # OpenBot's name. Without these sentences and `com.apple.security.personal-information.calendars`,
+    # macOS refuses with no prompt and does not list OpenBot in Privacy & Security. macOS asks only
+    # when a command requests the access. The `Full Access` and `Write Only` keys are for macOS 14 and
+    # later; the other two keys are for older versions.
+    NSCalendarsFullAccessUsageDescription: OpenBot lets the commands that an agent runs read and change your calendar events.
+    NSCalendarsWriteOnlyAccessUsageDescription: OpenBot lets the commands that an agent runs add events to your calendars.
+    NSCalendarsUsageDescription: OpenBot lets the commands that an agent runs use your calendars.
+    NSRemindersFullAccessUsageDescription: OpenBot lets the commands that an agent runs read and change your reminders.
+    NSRemindersUsageDescription: OpenBot lets the commands that an agent runs use your reminders.
     NSUserActivityTypes:
       - NSUserActivityTypeBrowsingWeb
   target:
