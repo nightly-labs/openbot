@@ -99,7 +99,7 @@ function CreditsCard(props: { label: string; buyLabel: string; balance: number; 
         <CreditAmount value={format.number(props.balance)} class="ui-menu-trailing server-menu-credit-value" />
       </DropdownMenu.Item>
       <div class="server-menu-credits-buy">
-        <CreditIcon class="server-menu-credits-buy-icon" />
+        <CreditIcon class="server-menu-credits-buy-icon" tile />
         <span class="server-menu-credits-buy-label" aria-hidden="true">
           {t("billing.credits.buy")}
         </span>

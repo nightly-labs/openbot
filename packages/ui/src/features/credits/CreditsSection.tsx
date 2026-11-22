@@ -164,7 +164,7 @@ export function CreditsSection(props: CreditsSectionProps): JSX.Element {
           <ItemGroup class="settings-modal-card">
             <Item class="credits-section-row">
               <ItemMedia>
-                <CreditIcon class="credits-section-icon" />
+                <CreditIcon class="credits-section-icon" tile />
               </ItemMedia>
               <ItemContent>
                 <ItemTitle class="credits-section-balance">

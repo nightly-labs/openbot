@@ -296,6 +296,28 @@ function mediaCreditsTone(row: MediaCreditsRailRow) {
   return row.available > 0 ? "neutral" : "critical";
 }
 
+function CreditsRailButton(props: { balance: number | undefined; current: boolean; onOpen: () => void }) {
+  const { t, format } = useText();
+  const balance = () => props.balance;
+  const label = () => {
+    const credits = balance();
+    return credits === undefined
+      ? t("app.rail.credits")
+      : t("app.rail.creditsBalance", { count: credits, amount: format.number(credits) });
+  };
+  const layout = () => (balance() === undefined ? "credit-rail-icon" : "credit-rail-icon window-rail-credits");
+  return (
+    <RailButton label={label()} class={layout()} current={props.current} onClick={props.onOpen}>
+      <CreditIcon tile />
+      <Show when={balance() !== undefined}>
+        <span class="window-rail-credits-count" aria-hidden="true">
+          {format.compact(balance() ?? 0)}
+        </span>
+      </Show>
+    </RailButton>
+  );
+}
+
 function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
   const { t, format } = useText();
   const percent = () => mediaCreditsPercent(props.row);
@@ -409,6 +431,7 @@ export interface PageRailProps {
   onCrmConnectors?: ((button: HTMLElement) => void) | undefined;
   onMarketplace?: (() => void) | undefined;
   onCredits?: (() => void) | undefined;
+  creditBalance?: number | undefined;
   onSettings: (button: HTMLElement) => void;
   settingsNotice?: string | undefined;
   help: JSX.Element;
@@ -671,14 +694,11 @@ export function PageRail(props: PageRailProps) {
           </For>
           <Show when={props.onCredits}>
             {(onCredits) => (
-              <RailButton
-                label={t("app.rail.credits")}
-                class="credit-rail-icon"
+              <CreditsRailButton
+                balance={props.creditBalance}
                 current={props.current === "credits"}
-                onClick={() => onCredits()()}
-              >
-                <CreditIcon />
-              </RailButton>
+                onOpen={() => onCredits()()}
+              />
             )}
           </Show>
           <Show when={props.onMarketplace}>

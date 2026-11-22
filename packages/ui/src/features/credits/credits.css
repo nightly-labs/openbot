@@ -80,6 +80,19 @@
   fill: var(--openbot-credit-star);
 }
 
+.credit-icon[data-tile] {
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--openbot-radius-logo);
+  background: var(--openbot-credit-star);
+}
+
+.credit-icon[data-tile] .credit-star {
+  width: 64%;
+  height: 64%;
+  fill: var(--openbot-credit-tile-ink);
+}
+
 .credit-amount {
   display: inline-flex;
   align-items: center;
@@ -742,8 +755,8 @@ svg.credit-target-logo {
 }
 
 .credit-rail-icon .credit-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .credits-section-balance {

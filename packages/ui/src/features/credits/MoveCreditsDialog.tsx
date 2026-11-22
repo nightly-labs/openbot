@@ -45,7 +45,7 @@ function amountTenths(text: AmountText): number {
 function WalletChip(props: { serverId: string | null; name: string }) {
   return (
     <span class="credit-move-chip">
-      <Show when={props.serverId} fallback={<CreditIcon class="credit-move-chip-icon" />}>
+      <Show when={props.serverId} fallback={<CreditIcon class="credit-move-chip-icon" tile />}>
         {(serverId) => <ServerPlushLogo class="credit-move-chip-logo" seed={serverId()} />}
       </Show>
       <span class="credit-move-chip-name">{props.name}</span>

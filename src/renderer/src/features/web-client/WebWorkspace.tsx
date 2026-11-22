@@ -2858,6 +2858,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 openMarketplace();
               }}
               onCredits={creditsRailAction()}
+              creditBalance={creditsMenu().state?.balance}
               onMarketplace={workspace.state.status === "online" ? openMarketplace : undefined}
               onSettings={openAccountSettings}
               server={

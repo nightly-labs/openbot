@@ -113,6 +113,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       onCrm={crmRailAction()}
       onCrmConnectors={crmConnectorsAction()}
       onCredits={creditsRailAction()}
+      creditBalance={windowPage.creditsMenu().state?.balance}
       onMarketplace={() => {
         windowPage.leavePricing();
         setSkillsMarketplaceOpen(true);
