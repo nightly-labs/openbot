@@ -233,6 +233,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot אינו יכול לשמור את תצורת שרת ה-MCP הזו.",
   "error.backend.mcpServerNoAnswer": "השרת לא ענה תוך {seconds} שניות.",
   "error.backend.mcpSignInNotAccepted": "השרת לא קיבל את ההתחברות הזו.",
+  "error.backend.mcpSignInGrantRefused":
+    "השרת לא קיבל את ההתחברות. התחבר שוב. אם הבעיה נמשכת, ודא שהחשבון שלך נמצא באותו אתר או אזור כמו האפליקציה הזו.",
   "error.backend.mcpSignInAccountRefused":
     "השרת דחה את החשבון שאיתו התחברת. יש לוודא שלחשבון הזה יש גישה לשירות. כדי להשתמש בחשבון אחר, יש להתנתק ואז להתחבר שוב.",
   "error.backend.mcpSignInClientRefused":
