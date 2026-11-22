@@ -24,8 +24,6 @@ import {
   WORKFLOW_GITHUB_SKIP_REASONS,
   WORKFLOW_MEDIA_CATALOG_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
-  WORKFLOW_NODE_KINDS,
-  WORKFLOW_PORT_TYPES,
   WORKFLOW_RUN_SOURCES,
   WORKFLOW_RUN_STATUSES,
   WORKFLOW_STEP_STATUSES,
@@ -41,8 +39,7 @@ import {
   type WorkflowMediaServiceAccount,
   type WorkflowStepSettings,
   workflowFormatIsNewer,
-  workflowGraphHasUnknownKey,
-  workflowNodeHasUnknownValue,
+  workflowGraphPlaceholders,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -87,27 +84,12 @@ const detail = onRecord((record) => {
   const base = mapList({ ...record, summary: summary(record.summary) }, "triggers", trigger);
   const graph = base.graph;
   if (!isDynamicRecord(graph) || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return base;
-  const placeholders = new Set<unknown>();
-  const settings = graph.nodes.some(workflowNodeHasUnknownValue);
-  const nodes = graph.nodes.map(
-    onRecord((node) => {
-      if (!isUnknownName(WORKFLOW_NODE_KINDS, node.kind)) return node;
-      placeholders.add(node.id);
-      const { schedule: _schedule, ...rest } = node;
-      return { ...rest, kind: "note", locked: true };
-    }),
-  );
-  const edges = graph.edges.filter(
-    (edge) =>
-      !isDynamicRecord(edge) ||
-      !(isUnknownName(WORKFLOW_PORT_TYPES, edge.type) || placeholders.has(edge.from) || placeholders.has(edge.to)),
-  );
-  const newer =
-    workflowFormatIsNewer(record.format) ||
-    workflowGraphHasUnknownKey(graph) ||
-    settings ||
-    placeholders.size > 0 ||
-    edges.length < graph.edges.length;
+  const { nodes, edges, placeholders, newerSettings } = workflowGraphPlaceholders({
+    ...graph,
+    nodes: graph.nodes,
+    edges: graph.edges,
+  });
+  const newer = workflowFormatIsNewer(record.format) || newerSettings || placeholders > 0;
   return { ...base, graph: { ...graph, nodes, edges }, ...(newer ? { needsNewerApp: true } : {}) };
 });
 

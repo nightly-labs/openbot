@@ -1,21 +1,17 @@
 import {
   type CreateWorkflowInput,
   isWorkflowGraph,
-  WORKFLOW_BRANCHES,
-  WORKFLOW_NODE_KINDS,
-  WORKFLOW_PORT_TYPES,
   WORKFLOW_STEP_NAME_FIELD,
   type WorkflowFields,
   type WorkflowGraph,
   type WorkflowIdKind,
   workflowFormatIsNewer,
   workflowGraphFormat,
-  workflowGraphHasUnknownKey,
+  workflowGraphPlaceholders,
   workflowIdFields,
   workflowIdFollowsTrigger,
-  workflowNodeHasUnknownValue,
 } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
 import { reason } from "./instance-transfer-preferences";
@@ -129,14 +125,9 @@ function placeholderText(node: DynamicRecord, fields: DynamicRecord): string {
   return "";
 }
 
-function knownEdge(edge: unknown, placeholders: ReadonlySet<unknown>): boolean {
-  return (
-    !isDynamicRecord(edge) ||
-    (isOneOf(WORKFLOW_PORT_TYPES, edge.type) &&
-      (edge.branch === undefined || isOneOf(WORKFLOW_BRANCHES, edge.branch)) &&
-      !placeholders.has(edge.from) &&
-      !placeholders.has(edge.to))
-  );
+function placeholderFields(node: DynamicRecord): DynamicRecord {
+  const fields = isDynamicRecord(node.fields) ? node.fields : {};
+  return { fields: { ...fields, text: placeholderText(node, fields) } };
 }
 
 type NewerWorkflow = "steps" | "settings" | null;
@@ -144,20 +135,11 @@ type NewerWorkflow = "steps" | "settings" | null;
 function withPlaceholders(graph: unknown): { graph: unknown; newer: NewerWorkflow } {
   if (!isDynamicRecord(graph) || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges))
     return { graph, newer: null };
-  const placeholders = new Set<unknown>();
-  const nodes = graph.nodes.map((node: unknown) => {
-    if (!isDynamicRecord(node) || isOneOf(WORKFLOW_NODE_KINDS, node.kind)) return node;
-    placeholders.add(node.id);
-    const fields = isDynamicRecord(node.fields) ? node.fields : {};
-    const { schedule: _schedule, ...rest } = node;
-    return { ...rest, kind: "note", locked: true, fields: { ...fields, text: placeholderText(node, fields) } };
-  });
-  const edges = graph.edges.filter((edge: unknown) => knownEdge(edge, placeholders));
-  const newerSettings =
-    edges.length < graph.edges.length ||
-    workflowGraphHasUnknownKey(graph) ||
-    graph.nodes.some(workflowNodeHasUnknownValue);
-  const newer: NewerWorkflow = placeholders.size > 0 ? "steps" : newerSettings ? "settings" : null;
+  const { nodes, edges, placeholders, newerSettings } = workflowGraphPlaceholders(
+    { ...graph, nodes: graph.nodes, edges: graph.edges },
+    placeholderFields,
+  );
+  const newer: NewerWorkflow = placeholders > 0 ? "steps" : newerSettings ? "settings" : null;
   return { graph: { ...graph, nodes, edges }, newer };
 }
 

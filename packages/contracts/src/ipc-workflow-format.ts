@@ -1,14 +1,18 @@
 import { workflowAnswerSources, workflowNodeAnswerNames } from "./ipc-workflow-answers";
+import { workflowNodeHasUnknownValue } from "./ipc-workflow-nodes";
 import { WORKFLOW_TRIGGER_FIELDS_FORMAT } from "./ipc-workflow-trigger-fields";
 import {
   isWorkflowFormat,
+  WORKFLOW_BRANCHES,
+  WORKFLOW_NODE_KINDS,
+  WORKFLOW_PORT_TYPES,
   type WorkflowEdge,
   type WorkflowGraph,
   type WorkflowNode,
   type WorkflowNodeSize,
   type WorkflowStroke,
 } from "./ipc-workflows";
-import { isDynamicRecord } from "./runtime-values";
+import { type DynamicRecord, isDynamicRecord, isOneOf } from "./runtime-values";
 
 export const WORKFLOW_FORMAT = 3;
 
@@ -91,4 +95,40 @@ export function workflowGraphHasUnknownKey(graph: unknown): boolean {
     listHasOnly(graph.edges, EDGE_KEYS) &&
     listHasOnly(graph.strokes, STROKE_KEYS)
   );
+}
+
+export interface WorkflowGraphPlaceholders {
+  readonly nodes: unknown[];
+  readonly edges: unknown[];
+  readonly placeholders: number;
+  readonly newerSettings: boolean;
+}
+
+function isKnownWorkflowEdge(edge: unknown, placeholders: ReadonlySet<unknown>): boolean {
+  return (
+    !isDynamicRecord(edge) ||
+    (isOneOf(WORKFLOW_PORT_TYPES, edge.type) &&
+      (edge.branch === undefined || isOneOf(WORKFLOW_BRANCHES, edge.branch)) &&
+      !placeholders.has(edge.from) &&
+      !placeholders.has(edge.to))
+  );
+}
+
+export function workflowGraphPlaceholders(
+  graph: DynamicRecord & { readonly nodes: readonly unknown[]; readonly edges: readonly unknown[] },
+  placeholderFields: (node: DynamicRecord) => DynamicRecord = () => ({}),
+): WorkflowGraphPlaceholders {
+  const placeholders = new Set<unknown>();
+  const nodes = graph.nodes.map((node) => {
+    if (!isDynamicRecord(node) || isOneOf(WORKFLOW_NODE_KINDS, node.kind)) return node;
+    placeholders.add(node.id);
+    const { schedule: _schedule, ...rest } = node;
+    return { ...rest, kind: "note", locked: true, ...placeholderFields(node) };
+  });
+  const edges = graph.edges.filter((edge) => isKnownWorkflowEdge(edge, placeholders));
+  const newerSettings =
+    edges.length < graph.edges.length ||
+    workflowGraphHasUnknownKey(graph) ||
+    graph.nodes.some(workflowNodeHasUnknownValue);
+  return { nodes, edges, placeholders: placeholders.size, newerSettings };
 }

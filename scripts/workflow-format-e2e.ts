@@ -627,6 +627,15 @@ try {
       placeholder.fields.prompt === "Make a plan.",
     placeholder,
   );
+  const edgeCount = newerDetail.graph.edges.length;
+  const unknownBranch = JSON.parse(JSON.stringify(newerDetail));
+  unknownBranch.graph.edges[0].branch = "maybe";
+  const branchView = decodeRemoteWorkflowDetail(unknownBranch);
+  check(
+    "an older client drops an edge of an unknown branch and opens the graph read-only",
+    branchView.needsNewerApp === true && branchView.graph.edges.length === edgeCount - 1,
+    branchView.graph.edges,
+  );
   hostA.database.connection
     .prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = 'ok'")
     .run(JSON.stringify({ rule: "The plan has three steps.", effort: "ludicrous" }), newer.summary.id);
