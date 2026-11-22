@@ -1044,8 +1044,12 @@ function windowsFallbackPaths(
   }
   if (command === "kimi") paths.push(win32.join(userHome, ".kimi-code", "bin", "kimi.exe"));
   if (command === "hermes") {
-    const hermesRoot = environment.HERMES_HOME?.trim() || (localAppData ? win32.join(localAppData, "hermes") : null);
-    if (hermesRoot) {
+    const configuredRoot = environment.HERMES_HOME?.trim();
+    const hermesRoots = [
+      ...(configuredRoot ? [configuredRoot] : []),
+      ...(localAppData ? [win32.join(localAppData, "hermes")] : []),
+    ];
+    for (const hermesRoot of hermesRoots) {
       paths.push(win32.join(hermesRoot, "bin", "hermes.exe"), win32.join(hermesRoot, "bin", "hermes.cmd"));
     }
   }
