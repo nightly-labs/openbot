@@ -1,13 +1,8 @@
-import { isAgentModel } from "@openbot/contracts/ipc";
+import { encodedModelId } from "@openbot/contracts/ipc";
+
+export { encodedModelId };
 
 const ENCODED_MODEL = "b64:";
-
-export function encodedModelId(prefix: string, value: string): string {
-  const plain = `${prefix}${value}`;
-  return isAgentModel(plain) && !value.startsWith(ENCODED_MODEL)
-    ? plain
-    : `${prefix}${ENCODED_MODEL}${Buffer.from(value, "utf8").toString("base64url")}`;
-}
 
 export function providerModelValue(model: string): string {
   return model.startsWith(ENCODED_MODEL)

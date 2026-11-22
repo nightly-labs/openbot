@@ -52,7 +52,7 @@ export function createWebAccountUsage(options: {
       if (!refreshFollows) reset();
     },
   );
-  const hasReading = createMemo(() => (accountUsage()?.limits.length ?? 0) > 0);
+  const hasReading = createMemo(() => accountUsage()?.limits.some((limit) => limit.readFailed !== true) ?? false);
   createEffect(
     createMemo(() => (usageReady() && !(hasReading() && providersLoading()) ? usageTargetKey() : null)),
     (target) => {

@@ -277,6 +277,20 @@ export class WorkflowRunStore {
     return row ? toStep(row) : null;
   }
 
+  earlierAttempts(step: StoredWorkflowStep, limit: number): StoredWorkflowStep[] {
+    const rows =
+      step.runId === null
+        ? this.#database.connection
+            .prepare(
+              `${STEP_SELECT} WHERE run_id IS NULL AND workflow_id = ? AND node_id = ? AND rowid < ? ORDER BY rowid DESC LIMIT ?`,
+            )
+            .all(step.workflowId, step.nodeId, step.sequence, limit)
+        : this.#database.connection
+            .prepare(`${STEP_SELECT} WHERE run_id = ? AND node_id = ? AND attempt < ? ORDER BY attempt DESC LIMIT ?`)
+            .all(step.runId, step.nodeId, step.attempt, limit);
+    return databaseRows(rows).map(toStep);
+  }
+
   runningAgentStep(deliveryId: string): StoredWorkflowStep | null {
     const row = databaseRow(
       this.#database.connection

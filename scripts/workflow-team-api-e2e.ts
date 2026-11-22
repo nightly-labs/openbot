@@ -44,6 +44,11 @@ import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/w
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
+  WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_CODECS,
+  WORKFLOWS_CREDIT_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
+import {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CODECS,
   WORKFLOWS_HIGGSFIELD_ROUTES,
@@ -175,6 +180,22 @@ const CINEMA_MODEL: WorkflowMediaCatalogModel = {
   transparent: false,
 };
 let liveModels: readonly WorkflowMediaCatalogModel[] = [LIVE_MODEL];
+const CREDIT_MODEL: WorkflowMediaCatalogModel = {
+  id: "openbot-video_e2e",
+  provider: "openbot",
+  providerModel: "video_e2e",
+  name: "Video e2e",
+  maker: "ByteDance",
+  kinds: ["video"],
+  aspects: ["16:9", "9:16"],
+  durations: [5, 10],
+  resolutions: ["720p"],
+  transparent: false,
+  options: [{ name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" }],
+  inputs: ["frames"],
+};
+let creditModels: readonly WorkflowMediaCatalogModel[] = [];
+let creditBalance: { available: number; quota: number | null } | null = null;
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
 const handoffs: { agentId: string; text: string; sourcePaths: readonly string[] }[] = [];
@@ -430,8 +451,15 @@ async function startHost(): Promise<Host> {
           sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
           higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
           accounts: serviceAccounts,
+          openbot: creditBalance,
         }),
-      mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? liveModels : [] }),
+      mediaCatalog: (only) =>
+        Effect.succeed({
+          models:
+            only === "openbot"
+              ? creditModels
+              : [...(higgsfieldSignedIn ? liveModels : []), ...(only === undefined ? creditModels : [])],
+        }),
       mediaPrice: (request) =>
         Effect.sync(() => {
           priceRequests.push(request);
@@ -2024,6 +2052,63 @@ try {
       } finally {
         higgsfieldSignedIn = false;
         liveModels = [LIVE_MODEL];
+      }
+    },
+  );
+
+  await step(
+    "credit media: the host advertises workflows-credit-media-v1 to protocol 10; its catalog and credits routes return the credit models and balance, and the service catalogs never list a credit model",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        decodeTeamProtocolSupportExpanded((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body)
+          .capabilities;
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_CREDIT_MEDIA_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_CREDIT_MEDIA_CAPABILITY));
+      const codec = (route: string) => {
+        const found =
+          WORKFLOWS_CREDIT_MEDIA_CODECS.get(route) ??
+          WORKFLOWS_MEDIA_CATALOG_V2_CODECS.get(route) ??
+          WORKFLOWS_MEDIA_CATALOG_CODECS.get(route);
+        assert.ok(found, `No codec for ${route}.`);
+        return found;
+      };
+      const raw = async (route: string, capabilities: readonly string[] = TEAM_CURRENT_CAPABILITIES) =>
+        call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V10, capabilities });
+      const read = async (route: string) => {
+        codec(route).request({});
+        const response = await raw(route);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return codec(route).response(response.status, response.body);
+      };
+      higgsfieldSignedIn = true;
+      creditModels = [CREDIT_MODEL];
+      creditBalance = { available: 350.5, quota: null };
+      try {
+        const catalog = await read(WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog);
+        assert.deepEqual(catalog, { models: [CREDIT_MODEL] });
+        const credits = await read(WORKFLOWS_CREDIT_MEDIA_ROUTES.credits);
+        assert.deepEqual(credits, { openbot: { available: 350.5, quota: null } });
+        const catalogV2 = await read(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog);
+        assert.deepEqual(catalogV2, { models: [LIVE_MODEL] });
+        const catalogV1 = await read(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog);
+        assert.deepEqual(catalogV1, { models: [LIVE_MODEL] });
+        creditBalance = null;
+        const signedOut = await read(WORKFLOWS_CREDIT_MEDIA_ROUTES.credits);
+        assert.deepEqual(signedOut, { openbot: null });
+        const old = await raw(
+          WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog,
+          TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== WORKFLOWS_CREDIT_MEDIA_CAPABILITY),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        return { catalog, credits, catalogV2, catalogV1, signedOut, old: old.status };
+      } finally {
+        higgsfieldSignedIn = false;
+        creditModels = [];
+        creditBalance = null;
       }
     },
   );

@@ -128,6 +128,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Deze verbinding ondersteunt het wijzigen van de serveridentiteit niet.",
   "error.team.hostUpdateUnsupported": "Deze verbinding ondersteunt geen updates van de host.",
   "error.team.hostTimezoneUnsupported": "Deze verbinding ondersteunt de tijdzone van de server niet.",
+  "error.team.hostVoiceModelUnsupported": "Deze verbinding ondersteunt het spraakherkenningsmodel van de server niet.",
   "error.team.hostRestartUnsupported": "Deze verbinding ondersteunt het herstarten van de server niet.",
   "error.team.ownerTransferUnsupported": "Deze server ondersteunt het overdragen van eigendom niet.",
   "error.team.hostKeyRotationUnsupported": "Deze verbinding ondersteunt het wijzigen van de serversleutel niet.",
@@ -144,6 +145,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported":
     "Deze verbinding ondersteunt de schakelaar voor de Claude Code-instellingen niet.",
   "error.team.claudeCompactWindowUnsupported": "Deze verbinding ondersteunt de compressiegrootte van Claude niet.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Deze verbinding ondersteunt comprimeren voordat de cache verloopt niet.",
   "error.team.providerEnvironmentUnsupported": "Deze verbinding ondersteunt geen providervariabelen.",
   "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",

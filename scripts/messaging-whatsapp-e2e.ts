@@ -871,7 +871,7 @@ try {
       return { reason: signIn, general };
     });
 
-    await step("answer: an email address and a link stay, and a secret is masked", async () => {
+    await step("answer: an email address, a link and an asked password stay, and an API key is masked", async () => {
       const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
       assert.ok(link, "No conversation for the owner's chat.");
       const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
@@ -880,7 +880,8 @@ try {
       const scope = Effect.runSync(Scope.make());
       const turn = { agentId: link.agentId, threadId: link.threadId, turnId: "turn-answer-with-address" };
       agents.messaging.event({ type: "turn-started", ...turn }, scope);
-      const answer = "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2";
+      const answer =
+        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2, key sk-ant-api03-e2efakekey";
       const snapshot = database.readConversation(link.agentId, link.threadId);
       snapshot.messages.push({
         id: `${turn.turnId}:answer`,
@@ -894,7 +895,7 @@ try {
       await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
       agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
       const expected =
-        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=[redacted]";
+        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2, key [redacted]";
       const texts = () =>
         phone.sent.flatMap((sent) =>
           sent.jid === OWNER_JID && "text" in sent.content && typeof sent.content.text === "string"
@@ -904,7 +905,7 @@ try {
       await until(() => texts().some((text) => text.includes("kontakt")), "the answer");
       const posted = texts().find((text) => text.includes("kontakt"));
       assert.equal(posted, expected, "The answer changed on its way to WhatsApp.");
-      assert.ok(!texts().some((text) => text.includes("hunter2")), "A secret reached WhatsApp.");
+      assert.ok(!texts().some((text) => text.includes("e2efakekey")), "An API key reached WhatsApp.");
       for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
         const again = message({ chat: OWNER_JID, fromMe: true, text: `answer request again ${index}` });
         phone.current().receive([again]);

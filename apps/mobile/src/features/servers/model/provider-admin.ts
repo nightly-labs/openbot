@@ -9,6 +9,7 @@ import {
   type AgentStatus,
   agentProviderDescriptor,
   agentProviderName,
+  type CacheExpiryCompactionSetting,
   type ClaudeCompactWindowSetting,
   type CustomAgentResult,
   type CustomAgentSummary,
@@ -48,6 +49,7 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY, ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
+import { CACHE_EXPIRY_COMPACTION_CAPABILITY } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
@@ -63,7 +65,10 @@ import {
 import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
-import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import {
+  PROMPT_CACHE_TTL_CAPABILITY,
+  PROMPT_CACHE_TTL_PI_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -113,6 +118,7 @@ import {
   deleteCustomAgent,
   deleteCustomProvider,
   downloadProviderRuntime,
+  getHostCacheExpiryCompaction,
   getHostClaudeCompactWindow,
   getHostModelVisibility,
   getHostPromptCacheTtl,
@@ -131,6 +137,7 @@ import {
   resetProviderUsage,
   saveCustomAgent,
   saveCustomProvider,
+  setHostCacheExpiryCompaction,
   setHostClaudeCompactWindow,
   setHostModelVisibility,
   setHostPromptCacheTtl,
@@ -512,6 +519,14 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
           read: (): Promise<PromptCacheTtlSetting> => runTeamRequest(getHostPromptCacheTtl(request)),
           set: (ttl: PromptCacheTtl): Promise<PromptCacheTtlSetting> =>
             runTeamRequest(setHostPromptCacheTtl(request, ttl)),
+          appliesToPi: has(PROMPT_CACHE_TTL_PI_CAPABILITY),
+        }
+      : null,
+    cacheExpiryCompaction: has(CACHE_EXPIRY_COMPACTION_CAPABILITY)
+      ? {
+          read: (): Promise<CacheExpiryCompactionSetting> => runTeamRequest(getHostCacheExpiryCompaction(request)),
+          set: (enabled: boolean): Promise<CacheExpiryCompactionSetting> =>
+            runTeamRequest(setHostCacheExpiryCompaction(request, enabled)),
         }
       : null,
     compactWindow: has(CLAUDE_COMPACT_WINDOW_CAPABILITY)

@@ -126,6 +126,11 @@ const PRICES: Readonly<Record<string, Price>> = {
     verified: "2026-11-18",
     short: { input: 1.5, cached: 0.075, output: 7.5 },
   },
+  "antigravity:gemini-4-neon": {
+    source: GEMINI,
+    verified: "2026-11-22",
+    short: { input: 3, cached: 0.15, output: 15 },
+  },
   "antigravity:gemini-3.8-flash": {
     source: GEMINI,
     verified: ANTIGRAVITY_VERIFIED,

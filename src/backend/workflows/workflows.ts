@@ -18,9 +18,10 @@ import {
   type SaveWorkflowGraphInput,
   type StartWorkflowRunInput,
   WORKFLOW_CHECK_FIELD,
+  WORKFLOW_CREDIT_MODEL_PREFIX,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_PICTURE_TYPES,
-  type WorkflowCatalogProvider,
+  type WorkflowCatalogSource,
   type WorkflowDetail,
   type WorkflowGitHubHistory,
   type WorkflowGitHubLastEventInput,
@@ -50,7 +51,7 @@ import {
   workflowAnswerFieldsOf,
   workflowAnswerSources,
   workflowCatalogMediaModel,
-  workflowCatalogProvider,
+  workflowCatalogSource,
   workflowCheckPasses,
   workflowMediaKind,
   workflowMediaModel,
@@ -201,7 +202,8 @@ const GITHUB_SELF_WINDOW_MS = 60 * 60_000;
 const CREDIT_MEDIA_AT_ONCE = 4;
 const SUBSCRIPTION_MEDIA_AT_ONCE = 2;
 
-const paysWithCredits = (provider: WorkflowMediaProvider) => provider === "sunra" || provider === "higgsfield";
+const paysWithCredits = (provider: WorkflowMediaProvider) =>
+  provider === "sunra" || provider === "higgsfield" || provider === "openbot";
 
 class WorkflowFailed extends Schema.TaggedError<WorkflowFailed>()("WorkflowFailed", {
   cause: Schema.Defect(),
@@ -237,7 +239,29 @@ interface WorkflowTextChoice {
   effort: AgentReasoningEffort;
 }
 
+const EARLIER_JOB_LOOKUPS = 3;
+
+function sameStepRequest(earlier: StoredWorkflowStep, step: StoredWorkflowStep): boolean {
+  return (
+    earlier.kind === step.kind &&
+    earlier.input === step.input &&
+    JSON.stringify(earlier.settings) === JSON.stringify(step.settings) &&
+    JSON.stringify(earlier.sources) === JSON.stringify(step.sources)
+  );
+}
+
+function earlierJobIds(step: StoredWorkflowStep, attempts: readonly StoredWorkflowStep[]): string[] {
+  const ids: string[] = [];
+  for (const earlier of attempts) {
+    if ((earlier.status !== "failed" && earlier.status !== "stopped") || !sameStepRequest(earlier, step)) break;
+    ids.push(earlier.id);
+  }
+  return ids;
+}
+
 interface WorkflowMediaRequest {
+  jobId: string;
+  earlierJobIds: readonly string[];
   kind: WorkflowMediaKind;
   provider: WorkflowMediaProvider;
   model: string;
@@ -267,7 +291,7 @@ export interface WorkflowRunEnd {
   stepKinds: WorkflowNodeKind[];
 }
 
-export type WorkflowToolAnswer =
+type WorkflowToolAnswer =
   | { kind: "none" }
   | { kind: "several" }
   | { kind: "free" }
@@ -299,8 +323,8 @@ export interface WorkflowsDependencies {
     types: ReadonlySet<string>,
   ) => Effect.Effect<string | "missing" | "type", { readonly cause: unknown }>;
   mediaProviders?: () => WorkflowMediaProviders;
-  mediaCredits?: (only?: WorkflowCatalogProvider) => Effect.Effect<WorkflowMediaCredits>;
-  mediaCatalog?: (only?: WorkflowCatalogProvider) => Effect.Effect<WorkflowMediaCatalog>;
+  mediaCredits?: (only?: WorkflowCatalogSource) => Effect.Effect<WorkflowMediaCredits>;
+  mediaCatalog?: (only?: WorkflowCatalogSource) => Effect.Effect<WorkflowMediaCatalog>;
   mediaPrice?: (request: WorkflowMediaPriceRequest) => Effect.Effect<WorkflowMediaPrice>;
   notify(notice: WorkflowNotice): void;
   connectionOn(connectionId: string): boolean;
@@ -393,8 +417,8 @@ interface WorkflowsShape {
   githubRepositories(): Effect.Effect<string[], WorkflowFailed>;
   keepPicture(draftId: string): Effect.Effect<string, WorkflowFailed>;
   mediaProviders(): WorkflowMediaProviders;
-  mediaCredits(only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCredits>;
-  mediaCatalog(): Effect.Effect<WorkflowMediaCatalog>;
+  mediaCredits(only?: WorkflowCatalogSource): Effect.Effect<WorkflowMediaCredits>;
+  mediaCatalog(only?: WorkflowCatalogSource): Effect.Effect<WorkflowMediaCatalog>;
   mediaPrice(request: WorkflowMediaPriceRequest): Effect.Effect<WorkflowMediaPrice>;
   runStep(input: RunWorkflowStepInput): Effect.Effect<WorkflowStep, WorkflowFailed>;
   stopStep(stepId: string): Effect.Effect<void, WorkflowFailed>;
@@ -424,6 +448,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         const { store, runs, github, changed, rearm } = dependencies;
         const now = () => (dependencies.now ?? (() => new Date()))();
         const working = new Map<string, Fiber.Fiber<void>>();
+        const paidMedia = new Set<string>();
 
         const attempt = <A>(work: () => A) =>
           Effect.try({ try: work, catch: (cause) => new WorkflowFailed({ cause }) });
@@ -540,7 +565,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (delivery.status === "completed") {
             if (delivery.error) return settle(step, { status: "failed", error: delivery.error });
             const fields = answerFields(step.settings);
-            if (fields.length > 0 && step.output !== null) return settle(step, { status: "done", output: step.output });
+            const toolAnswer = fields.length > 0 ? (runs.step(step.id)?.output ?? null) : null;
+            if (toolAnswer !== null) return settle(step, { status: "done", output: toolAnswer });
             const answer = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             const output = answer === null || isNoUpdateAnswer(answer) ? "" : answer;
             if (fields.length === 0) return settle(step, { status: "done", output });
@@ -671,6 +697,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           step: StoredWorkflowStep,
           node: WorkflowNode,
           run: StoredWorkflowRun | null,
+          resumed = false,
         ): Effect.Effect<void> => {
           const kind = workflowMediaKind(node.fields);
           const generateMedia = dependencies.generateMedia;
@@ -694,37 +721,58 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const empty = !fieldText(node, "prompt").trim() && !step.input.trim() && images.length === 0;
           const make = Effect.gen(function* () {
             const service =
-              !empty && typeof node.fields.model === "string" ? workflowCatalogProvider(node.fields.model) : null;
+              !empty && typeof node.fields.model === "string" ? workflowCatalogSource(node.fields.model) : null;
             const live = service
               ? (yield* mediaCatalog(service)).models.flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
               : [];
             const model = workflowMediaModel(node.fields, live);
+            if (resumed && model?.provider !== "openbot") {
+              settle(step, { status: "failed", error: sourceText("error.workflow.interrupted") });
+              return yield* requestSweep();
+            }
             const specs = workflowMediaSpecs(node.fields, kind, model);
             if (model && !empty && generateMedia)
               runs.recordUsedSettings(step.id, usedMediaSettings(kind, model, specs));
+            const recorded = runs.step(step.id) ?? step;
+            const earlier =
+              model?.provider === "openbot"
+                ? earlierJobIds(recorded, runs.earlierAttempts(recorded, EARLIER_JOB_LOOKUPS))
+                : [];
             const result = empty
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
               : !generateMedia || !model
                 ? Result.fail({ message: sourceText("error.workflow.nodeUnsupported") })
                 : yield* (paysWithCredits(model.provider) ? creditMedia : subscriptionMedia)
                     .withPermit(
-                      generateMedia({
-                        kind,
-                        provider: model.provider,
-                        model: model.providerModel ?? model.id,
-                        catalogId: model.id,
-                        account: mediaAccount(node.fields),
-                        specs,
-                        prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
-                        images,
-                        voice: mediaVoice(node.fields, kind, model),
+                      Effect.suspend(() => {
+                        if (model.provider === "openbot") paidMedia.add(step.id);
+                        return generateMedia({
+                          jobId: step.id,
+                          earlierJobIds: earlier,
+                          kind,
+                          provider: model.provider,
+                          model: model.providerModel ?? model.id,
+                          catalogId: model.id,
+                          account: mediaAccount(node.fields),
+                          specs,
+                          prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
+                          images,
+                          voice: mediaVoice(node.fields, kind, model),
+                        });
                       }).pipe(Effect.flatMap(sized(specs))),
                     )
                     .pipe(Effect.result);
             if (Result.isFailure(result)) settle(step, { status: "failed", error: result.failure.message });
             else settle(step, { status: "done", output: result.success });
             yield* requestSweep();
-          }).pipe(Effect.ensuring(Effect.sync(() => working.delete(step.id))));
+          }).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                working.delete(step.id);
+                paidMedia.delete(step.id);
+              }),
+            ),
+          );
           return Effect.forkIn(make, scope).pipe(
             Effect.tap((fiber) => Effect.sync(() => working.set(step.id, fiber))),
             Effect.asVoid,
@@ -1257,7 +1305,19 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
         };
 
+        const resumesPaidMedia = (step: StoredWorkflowStep) => {
+          if (step.kind !== "image" || step.status !== "running") return null;
+          const run = step.runId ? runs.run(step.runId) : null;
+          const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
+          const node = graph?.nodes.find((candidate) => candidate.id === step.nodeId);
+          const model = node?.fields.model;
+          return node && typeof model === "string" && model.startsWith(WORKFLOW_CREDIT_MODEL_PREFIX)
+            ? { node, run }
+            : null;
+        };
+
         const stopNow = Effect.fn("Workflows.stopNow")(function* (step: StoredWorkflowStep) {
+          if (paidMedia.has(step.id) || (!working.has(step.id) && resumesPaidMedia(step))) return;
           if (step.deliveryId && step.agentId)
             yield* dependencies.stopDelivery(step.agentId, step.deliveryId).pipe(
               Effect.catch((failure) =>
@@ -1398,10 +1458,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               step.kind === "output"
             ) {
               if (working.has(step.id)) continue;
-              ended =
-                step.kind === "output"
-                  ? yield* resumeOutputStep(step)
-                  : settle(step, { status: "failed", error: sourceText("error.workflow.interrupted") });
+              const paid = resumesPaidMedia(step);
+              if (paid) yield* startMedia(step, paid.node, paid.run, true);
+              else
+                ended =
+                  step.kind === "output"
+                    ? yield* resumeOutputStep(step)
+                    : settle(step, { status: "failed", error: sourceText("error.workflow.interrupted") });
             } else {
               const run = step.runId ? runs.run(step.runId) : null;
               const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
@@ -2001,9 +2064,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
 
         const mediaProviders = (): WorkflowMediaProviders =>
           dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false, accounts: null };
-        const mediaCredits = (only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCredits> =>
+        const mediaCredits = (only?: WorkflowCatalogSource): Effect.Effect<WorkflowMediaCredits> =>
           dependencies.mediaCredits?.(only) ?? Effect.succeed({ sunra: null, higgsfield: null, accounts: null });
-        const mediaCatalog = (only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCatalog> =>
+        const mediaCatalog = (only?: WorkflowCatalogSource): Effect.Effect<WorkflowMediaCatalog> =>
           dependencies.mediaCatalog?.(only) ?? Effect.succeed({ models: [] });
         const mediaPrice = (request: WorkflowMediaPriceRequest): Effect.Effect<WorkflowMediaPrice> =>
           dependencies.mediaPrice?.(request) ?? Effect.succeed({ credits: null });

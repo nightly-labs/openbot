@@ -26,7 +26,7 @@ import {
   type WorkflowStepSettings,
   workflowAnswerProblems,
   workflowAnswerProblemText,
-  workflowCatalogProvider,
+  workflowCatalogSource,
   workflowGitHubTriggerRepositoryFields,
   workflowGraphProblemAt,
   workflowListField,
@@ -454,7 +454,7 @@ function checkMedia(node: WorkflowNode, op: number): void {
   if (media !== undefined && !isOneOf(MEDIA_KINDS, media))
     refuse(`Op ${op}: media "${String(media)}" is unknown. Set media to one of: ${MEDIA_KINDS.join(", ")}.`);
   if (model === undefined || model === "") return;
-  if (typeof model === "string" && workflowCatalogProvider(model)) return;
+  if (typeof model === "string" && workflowCatalogSource(model)) return;
   const kind = workflowMediaKind(node.fields);
   const known = WORKFLOW_MEDIA_MODELS.filter((item) => item.kinds.includes(kind)).map((item) => item.id);
   if (typeof model === "string" && known.includes(model)) return;

@@ -95,6 +95,7 @@ export const messages = {
     "Meine KI-Agenten arbeiten jetzt mit OpenBot auf meinem eigenen Computer. Meine Chats und Dateien bleiben bei mir. Probier es aus: {site}",
   "app.socialFollow.redditTitle": "Wie ich OpenBot nutze",
   "app.rail.usageRings": "Nutzung von {name}: {windows}. Nutzung öffnen",
+  "app.rail.usageUnavailable": "Nutzung von {name} nicht verfügbar. Nutzung öffnen",
   "app.rail.customAgentUsage": "Nutzung von {name}. Nutzung öffnen",
   "app.rail.moreUsage": {
     one: "{count} weiteres Konto. Nutzung öffnen",

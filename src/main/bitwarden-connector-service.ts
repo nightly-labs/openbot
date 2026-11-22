@@ -6,7 +6,7 @@ import type { BitwardenConnectorStatus, BitwardenHostConnectInput } from "@openb
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
-import { cliPathEnvironment, cliSpawnTarget, loginSearchPath } from "../backend/cli";
+import { cliPathEnvironment, cliSpawnTarget, loginSearchPath, windowsRegistryPathFolders } from "../backend/cli";
 import { causeHelpers } from "../backend/effect-boundary";
 import {
   type PasswordVault,
@@ -159,30 +159,12 @@ async function firstCli(
   return null;
 }
 
-const WINDOWS_PATH_KEYS = [
-  "HKCU\\Environment",
-  "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
-];
-
-async function currentWindowsPathFolders(): Promise<string[]> {
-  const reg = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "reg.exe");
-  const values = await Promise.all(
-    WINDOWS_PATH_KEYS.map(
-      (key) =>
-        new Promise<string>((resolve) => {
-          execFile(reg, ["query", key, "/v", "Path"], { timeout: 5_000, windowsHide: true }, (error, stdout) => {
-            resolve(error ? "" : (/^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$/imu.exec(stdout)?.[1] ?? ""));
-          });
-        }),
-    ),
-  );
-  const folders = values
-    .flatMap((value) => value.split(";"))
-    .map((folder) => folder.trim().replace(/%([^%]+)%/gu, (text, name: string) => process.env[name] ?? text));
+function wingetLinkFolders(): string[] {
   const { LOCALAPPDATA, ProgramFiles } = process.env;
-  if (LOCALAPPDATA) folders.push(join(LOCALAPPDATA, "Microsoft", "WinGet", "Links"));
-  if (ProgramFiles) folders.push(join(ProgramFiles, "WinGet", "Links"));
-  return folders;
+  return [
+    ...(LOCALAPPDATA ? [join(LOCALAPPDATA, "Microsoft", "WinGet", "Links")] : []),
+    ...(ProgramFiles ? [join(ProgramFiles, "WinGet", "Links")] : []),
+  ];
 }
 
 const findCli: BitwardenCliFinder = Effect.fn("BitwardenConnector.findCli")(function* ({ searchLoginShell }) {
@@ -191,7 +173,8 @@ const findCli: BitwardenCliFinder = Effect.fn("BitwardenConnector.findCli")(func
   const found = yield* Effect.promise(() => firstCli(names, directories));
   if (found) return { executable: found };
   if (process.platform === "win32") {
-    const registered = yield* Effect.promise(async () => firstCli(names, await currentWindowsPathFolders()));
+    const folders = [...(yield* windowsRegistryPathFolders()), ...wingetLinkFolders()];
+    const registered = yield* Effect.promise(() => firstCli(names, folders));
     if (registered) return { executable: registered };
   } else if (searchLoginShell) {
     const folders = (yield* loginSearchPath()).filter(isAbsolute);

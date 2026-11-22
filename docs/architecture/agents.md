@@ -14,6 +14,13 @@ a script that loops cannot spend the user's quota. The value is an account defau
 (`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Server Settings ›
 Agents › Local scripts.
 
+A script answers as a person who is not the owner (`respondToLocalAttention`): it cannot press a
+privileged UI block action or accept an owner-only approval, so a frozen block with a privileged
+answer always comes from the owner or an admin. A click in the desktop app or the Dynamic Island
+answers as the owner and saves `HostService.conversationSender()` as `respondedBy`, the same as a
+Team API click saves the member. Signed out, there is no sender to save. `history_read` and
+`channel_history` give it to agents as `answeredBy` on the answered card message.
+
 A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
 kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
 crash. The flag is in `agent_json` and needs no migration; a profile without it is off. Only the user
@@ -121,7 +128,10 @@ answer after a person's request, the tool returns `shown`, not a refusal: after 
 did not call the tool on the later wakes. The CLI wakes the model with its own prompt, which does not
 name the tool, so a Claude agent always loads the tool (not behind the tool search) and its developer
 instructions say when a wake needs no answer. The model decides: in tests, Sonnet called the tool on
-a wake with nothing new, and Haiku often wrote a status line instead. The lifecycle
+a wake with nothing new, and Haiku often wrote a status line instead. The client starts the CLI with
+`CLAUDE_CODE_SILENT_TURN_REMINDER=0`: that CLI reminder tells the model, after some turns with no
+text, to say what it is doing, so the model wrote a status line on wakes that had nothing new, and
+each line notified the user (#14730). The lifecycle
 keeps the newest quiet turns and the newest such turns in memory only, so after a restart such a turn
 shows.
 
@@ -420,7 +430,7 @@ changed, on this computer and on a joined host.
   the loop backs. `path`: on some paths no step before it gives a required field that it uses, for
   example another branch, another trigger, or the first pass of a loop; a field marked optional
   (`name?`) does not count. `repeated`: two steps that give the same field can both run in the same
-  pass. The check stops above 10 conditions before the step. Both problems only refuse new edits and
+  pass. The check stops when the triggers times the condition outcomes before the step are more than 256. Both problems only refuse new edits and
   show on the canvas; a run does not fail a step for them, so saved workflows run as before. The canvas edits
   these fields from the node toolbar and shows the same problems on the node, only on a host with
   `workflows-answers-v1`.
@@ -849,7 +859,19 @@ asks only for `hasOlder`, and a message that the thread does not hold has none. 
 until it fits one WebRTC frame. A thread tab on desktop and the web asks once after its read, and shows "Load older
 messages" when the thread has more; a new conversation of the thread keeps the pages that it read
 (`src/renderer/src/features/agent-tasks/agent-tasks-state.ts`). A server without the capability shows only the
-newest messages. The Tasks rail page and the phone do not read older pages. A server without either shows only
+newest messages. The Tasks rail page and the phone do not read older pages. The `agent-tasks-v1` list has at most
+50 tasks, the open ones first, then the newest archived ones. The optional `agent-archived-threads-v1` capability
+(protocol 10 only) (`packages/contracts/src/team-protocol/agent-archived-threads-v1.ts`, host route `routeAgentArchivedThreads` in
+`src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/list-archived` with
+`{agentId, before: {updatedAt, threadId} | null}`. It answers `{tasks, hasMore}`: up to 50 archived tasks after
+`before`, in the order of the list (the latest `updatedAt` first, then `threadId`), in the frozen `agent-tasks-v1`
+task shape, each with `state: "closed"` (#7204). `before: null` starts at the newest archived task. A member who can
+read the side threads of an agent with `agent-tasks-v1` can list them; the host asks for no role, and a hidden agent, or
+an agent that the peer cannot see, is not found (404). A host that grants it also grants `agent-tasks-v1`. When a list is full, the
+"Archived" menu of the thread header on desktop and the web shows "Show older threads", which reads the next page;
+the pages stay after the list, and a full list that drops an archived thread moves it to the pages
+(`src/renderer/src/features/agent-tasks/agent-tasks-state.ts`). A server without the capability shows only the
+archived tasks of the list. The Tasks rail page and the phone show only the archived tasks of the list. A server without either shows only
 the main thread, and a task control there fails with `error.backend.taskRemoteUnsupported`. Prompts, approvals and warnings of a task turn show in the main chat. On desktop and the web, the
 approval of a side thread turn also shows in that thread. A provider
 error of a task turn goes to the task: `AgentTasks` stores the redacted text in the task's `error`
@@ -1122,8 +1144,10 @@ stop, or an exit of the provider process), the sender gets an OpenBot note (`Mai
 never comes. Routine runs, channel work and messages from Slack, Telegram or
 WhatsApp do not steer automatically: each starts a turn of its own. A question back (a reply that
 expects a reply) asks for no `send_message` reply, so it stays queued and its own turn's answer goes
-back. Channel, messaging and task work, and each answer to a request that went to two or more teammates, stay queued
-(`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that
+back. Channel and messaging work, and each answer to a request that went to two or more teammates, stay queued
+(`MailboxStore.joinsRunningTurn`), so those answers still start together. An answer to a thread (a
+branched chat, a side thread or a task) steers the running turn of that thread, not of the main chat
+(`AgentService.#runningTask`). A message from an agent that
 cannot steer gets no fallback reason on its row. A message from an agent also stays queued while a
 turn that only the person's messages started runs, and starts as a turn of its own after it: the tools
 that only a person's message can start check each message of the turn, and a message from an agent

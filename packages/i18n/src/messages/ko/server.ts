@@ -389,6 +389,11 @@ export const messages = {
     "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요. 서버에서는 다음 재시작 후 브라우저도 이 시간대를 사용해요.",
   "server.settings.timezoneAutomatic": "자동 ({zone})",
   "server.settings.timezoneLoadFailed": "서버 시간대를 불러올 수 없었어요.",
+  "server.settings.voiceModel.section": "음성 인식",
+  "server.settings.voiceModel.description": "이 서버의 에이전트는 자막이 없는 동영상의 소리를 이 모델로 받아 적어요.",
+  "server.settings.voiceModel.loadFailed": "서버의 음성 인식 모델을 불러오지 못했어요.",
+  "server.settings.voiceModel.group": "이 서버",
+  "server.settings.voiceModel.removeLabel": "이 서버에서 {name} 제거",
   "server.settings.turnLimit": "동시 실행 스레드",
   "server.settings.turnLimitDescription":
     "이 서버에서 동시에 실행할 수 있는 에이전트 스레드 수입니다. 스레드가 많을수록 메모리를 더 사용합니다.",

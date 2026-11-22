@@ -95,6 +95,7 @@ export const messages = {
     "وكلائي للذكاء الاصطناعي يعملون الآن على حاسوبي مع OpenBot. محادثاتي وملفاتي تبقى معي. جرّبه: {site}",
   "app.socialFollow.redditTitle": "كيف أستخدم OpenBot",
   "app.rail.usageRings": "استخدام {name}: {windows}. فتح الاستخدام",
+  "app.rail.usageUnavailable": "استخدام {name} غير متاح. فتح الاستخدام",
   "app.rail.customAgentUsage": "استخدام {name}. فتح الاستخدام",
   "app.rail.moreUsage": {
     zero: "لا حسابات أخرى. فتح الاستخدام",

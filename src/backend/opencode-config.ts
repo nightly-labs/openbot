@@ -1,4 +1,9 @@
-import type { CustomProviderHarness, CustomProviderHeader, CustomProviderModel } from "@openbot/contracts/ipc";
+import {
+  type CustomProviderHarness,
+  type CustomProviderHeader,
+  type CustomProviderModel,
+  customModelKey,
+} from "@openbot/contracts/ipc";
 
 export interface CustomProviderConfig {
   readonly id: string;
@@ -28,6 +33,7 @@ interface OpenCodeProviderOptions {
 }
 
 interface OpenCodeModelEntry {
+  readonly id?: string;
   readonly name: string;
   readonly limit?: { readonly context: number; readonly output: number };
   readonly variants?: Readonly<Record<string, { readonly reasoningEffort: string }>>;
@@ -42,6 +48,7 @@ interface OpenCodeProviderEntry {
 }
 
 interface OpenCodeNativeModelEntry {
+  readonly modelID?: string;
   readonly name: string;
   readonly limit?: { readonly context: number; readonly output: number };
   readonly capabilities?: { readonly input: readonly string[]; readonly output: readonly string[] };
@@ -126,10 +133,11 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
         : {}),
     },
     models: Object.fromEntries(
-      provider.models.map((model) => [
-        model.id,
-        modelEntry(model, provider.withoutReasoning?.includes(model.id) === true),
-      ]),
+      provider.models.map((model) => {
+        const key = customModelKey(provider.id, model.id);
+        const entry = modelEntry(model, provider.withoutReasoning?.includes(model.id) === true);
+        return [key, key === model.id ? entry : { id: model.id, ...entry }];
+      }),
     ),
   };
 }
@@ -192,8 +200,9 @@ function nativeProviderEntry(
   };
 }
 
-function nativeModelEntry({ name, limit, modalities, variants }: OpenCodeModelEntry): OpenCodeNativeModelEntry {
+function nativeModelEntry({ id, name, limit, modalities, variants }: OpenCodeModelEntry): OpenCodeNativeModelEntry {
   return {
+    ...(id ? { modelID: id } : {}),
     name,
     ...(limit ? { limit } : {}),
     ...(modalities ? { capabilities: modalities } : {}),

@@ -405,6 +405,7 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
       transparent,
       ...(settings.options.length > 0 ? { options: settings.options } : {}),
       ...(kind === "video" ? { inputs: WORKFLOW_MEDIA_INPUTS.filter((input) => takes.has(input)) } : {}),
+      ...(kind === "video" && takes.has("frames") ? { frameCount: roles.has("end_image") ? 2 : 1 } : {}),
       ...(modes.length > 0 ? { modes } : {}),
     },
     plan,

@@ -299,10 +299,14 @@ export const messages = {
   "provider.settings.useDownloadedVersion": "Использовать от OpenBot",
   "provider.settings.cache": "Кэш",
   "provider.settings.promptCache": "Кэш промптов",
-  "provider.settings.promptCacheDescription": "Как долго Claude хранит контекст агента в кэше между ходами.",
+  "provider.settings.promptCacheDescription": "Как долго Claude и Pi хранят контекст агента в кэше между ходами.",
   "provider.settings.promptCacheHour": "1 час",
-  "provider.settings.promptCacheDefault": "По умолчанию Claude Code",
+  "provider.settings.promptCacheDefault": "По умолчанию у провайдера",
   "provider.settings.promptCacheLoadFailed": "Не удалось загрузить время кэша промптов этого сервера.",
+  "provider.settings.cacheExpiryCompaction": "Сжимать до истечения кэша",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Когда чат с контекстом от 200K токенов простаивает с кэшем на 1 час, агент сжимает контекст до истечения кэша. Тогда следующее сообщение не читает весь контекст заново без кэша.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Не удалось загрузить настройку сжатия этого сервера.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Использовать мою настройку Claude Code",
   "provider.settings.claudeUserSetupDescription":
