@@ -125,7 +125,7 @@ export function creditWorkflowModel(model: CreditMediaModel): WorkflowMediaCatal
           ],
         }
       : {}),
-    ...(inputs.length > 0 ? { inputs } : {}),
+    inputs,
     ...(model.kind === "video" && model.frames > 0 ? { frameCount: model.frames } : {}),
   };
 }
