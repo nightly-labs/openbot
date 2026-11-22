@@ -1,8 +1,8 @@
 ### Added
 
 - OpenBot credits. Buy credits for yourself or for a server from the Credits button in the page rail,
-  or from Settings > Billing. The buy page has a slider and three packs, and the selector in the
-  window corner sets who gets the credits. A server owner can move credits from their own balance to
+  or from Settings > Billing. The buy page has a slider and six packs in three tiers (Basic, Plus and Max), and the
+  selector in the window corner sets who gets the credits. A server owner can move credits from their own balance to
   a server and back. This works in the desktop app and in the web client. Before checkout, a
   confirmation shows the total with VAT and asks for the billing country when it is not set. You
   can pay in EUR, USD, PLN or BRL. When a server is removed or deleted, its credits go to the
