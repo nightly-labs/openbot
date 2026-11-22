@@ -581,6 +581,7 @@ export const messages = {
   "server.desktop.gatewayPolicyDescription": "远程桌面没有单独的密码。下方设置决定谁可以控制此电脑。",
   "server.desktop.componentInstalled": "主机组件已安装",
   "server.desktop.componentNotInstalled": "主机组件未安装",
+  "server.desktop.needsX11Session": "需要 X11 会话",
   "server.desktop.sessions": "无人值守：{unattended} · 活跃会话：{active}/{max}",
   "server.desktop.unattendedEnabled": "已启用",
   "server.desktop.unattendedUnavailable": "不可用",

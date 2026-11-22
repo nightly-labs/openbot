@@ -549,6 +549,7 @@ export const messages = {
     "Não há uma senha separada para a área de trabalho remota. As configurações abaixo escolhem quem pode controlar este computador.",
   "server.desktop.componentInstalled": "Componente instalado",
   "server.desktop.componentNotInstalled": "Componente não instalado",
+  "server.desktop.needsX11Session": "Requer sessão X11",
   "server.desktop.sessions": "Acesso não supervisionado: {unattended} · Sessões ativas: {active}/{max}",
   "server.desktop.unattendedEnabled": "ativado",
   "server.desktop.unattendedUnavailable": "indisponível",

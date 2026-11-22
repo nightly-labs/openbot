@@ -581,6 +581,7 @@ export const messages = {
     "Отдельного пароля для удалённого рабочего стола нет. Настройки ниже определяют, кто может управлять этим компьютером.",
   "server.desktop.componentInstalled": "Компонент хоста установлен",
   "server.desktop.componentNotInstalled": "Компонент хоста не установлен",
+  "server.desktop.needsX11Session": "Нужен сеанс X11",
   "server.desktop.sessions": "Без присмотра: {unattended} · Активные сеансы: {active}/{max}",
   "server.desktop.unattendedEnabled": "включено",
   "server.desktop.unattendedUnavailable": "недоступно",

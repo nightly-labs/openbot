@@ -565,6 +565,7 @@ export const messages = {
     "Es gibt kein separates Passwort für den Remotedesktop. Die Einstellungen unten legen fest, wer diesen Computer steuern darf.",
   "server.desktop.componentInstalled": "Host-Komponente installiert",
   "server.desktop.componentNotInstalled": "Host-Komponente nicht installiert",
+  "server.desktop.needsX11Session": "X11-Sitzung nötig",
   "server.desktop.sessions": "Unbeaufsichtigt: {unattended} · Aktive Sitzungen: {active}/{max}",
   "server.desktop.unattendedEnabled": "aktiviert",
   "server.desktop.unattendedUnavailable": "nicht verfügbar",

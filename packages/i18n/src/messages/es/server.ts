@@ -560,6 +560,7 @@ export const messages = {
     "No hay una contraseña aparte para el escritorio remoto. Los ajustes de abajo eligen quién puede controlar este equipo.",
   "server.desktop.componentInstalled": "Componente del host instalado",
   "server.desktop.componentNotInstalled": "Componente del host sin instalar",
+  "server.desktop.needsX11Session": "Requiere sesión X11",
   "server.desktop.sessions": "Acceso desatendido: {unattended} · Sesiones activas: {active}/{max}",
   "server.desktop.unattendedEnabled": "activado",
   "server.desktop.unattendedUnavailable": "no disponible",

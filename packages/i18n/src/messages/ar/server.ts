@@ -717,6 +717,7 @@ export const messages = {
     "لا توجد كلمة مرور منفصلة لسطح المكتب البعيد. تحدد الإعدادات أدناه من يمكنه التحكم في هذا الحاسوب.",
   "server.desktop.componentInstalled": "مكوّن المضيف مثبّت",
   "server.desktop.componentNotInstalled": "مكوّن المضيف غير مثبّت",
+  "server.desktop.needsX11Session": "يتطلب جلسة X11",
   "server.desktop.sessions": "دون مراقبة: {unattended} · الجلسات النشطة: {active}/{max}",
   "server.desktop.unattendedEnabled": "مفعّل",
   "server.desktop.unattendedUnavailable": "غير متاح",

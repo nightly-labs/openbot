@@ -652,6 +652,7 @@ export const messages = defineMessages("server", {
     "There is no separate remote desktop password. The settings below choose who can control this computer.",
   "server.desktop.componentInstalled": "Host component installed",
   "server.desktop.componentNotInstalled": "Host component not installed",
+  "server.desktop.needsX11Session": "Needs an X11 session",
   "server.desktop.sessions": "Unattended: {unattended} · Active sessions: {active}/{max}",
   "server.desktop.unattendedEnabled": "enabled",
   "server.desktop.unattendedUnavailable": "not available",
