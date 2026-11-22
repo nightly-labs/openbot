@@ -1690,6 +1690,7 @@ export class OpenBotToolRouter {
   }
 
   #settingForCaller(summary: SettingLinkSummary, callerId: string): SettingLinkSummary {
+    if (summary.id !== "agent.access") return summary;
     const caller = this.#hooks.listAgents().find((candidate) => candidate.id === callerId);
     if (!caller) return summary;
     return agentAccessSummary(summary, agentPermissionLevels(caller.provider, this.#permissionLevel(caller)));
@@ -1755,7 +1756,6 @@ export class OpenBotToolRouter {
         : {}),
       notifications: agent.notifications,
       ...this.#agentBrowserProfile(agent),
-      autoApprove: permissions === "full",
       ...(skills ? { skills } : { skillsError }),
       routines: this.#routines.list(agent.id).map((routine) => ({
         id: routine.id,

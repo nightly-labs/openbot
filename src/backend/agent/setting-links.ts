@@ -355,10 +355,10 @@ export function agentAccessSummary(
   levels: readonly AgentPermissionLevel[],
 ): SettingLinkSummary {
   if (summary.id !== "agent.access" || levels.length === AGENT_PERMISSION_LEVELS.length) return summary;
-  const choices = levels.map((level) => ACCESS_LEVEL_NAMES[level]).join(" or ");
+  const choices = levels.map((level) => ACCESS_LEVEL_NAMES[level]).join(", ");
   return {
     ...summary,
-    about: `What the agent can do without approval. The provider of this agent offers only ${choices}.`,
+    about: `What the agent can do without approval. Your choices are: ${choices}. For another agent, read_agent gives its choices in permissionLevels.`,
   };
 }
 
