@@ -19,18 +19,6 @@ export function newMessagesLabel(count: number, t: AppTranslate): string {
   return t("chat.newMessages.count", { count });
 }
 
-/**
- * The way back to the newest message, and how much of it the reader has not seen.
- *
- * With a count the round arrow becomes a labelled pill, and the dismiss button drops the count
- * without moving the view. The two buttons are siblings inside the pill, not one inside the other:
- * a button in a button is invalid, and a dismiss click would also read as a jump.
- *
- * `aria-live="off"` is deliberate. The channel transcript is a polite live region and the direct
- * transcript is a log, so every step of the count would be read out from inside them, over the
- * unread banner that already announces the same news. The count still reaches a screen reader
- * through the name of the jump button.
- */
 export function ScrollToLatestButton(props: { onClick: () => void; newMessageCount?: number; onDismiss?: () => void }) {
   const { t } = useText();
   const count = () => props.newMessageCount ?? 0;
@@ -68,10 +56,6 @@ export function ScrollToLatestButton(props: { onClick: () => void; newMessageCou
   );
 }
 
-/**
- * The way back to a reply after its quote opened the original. It stands where "scroll to latest"
- * stands, in the same pill. The dismiss button keeps the view where it is.
- */
 export function ReplyReturnButton(props: { onBack: () => void; onStay: () => void }) {
   const { t } = useText();
   return (

@@ -1,16 +1,11 @@
-/* The badge of a sidebar agent that works: three felt balls hop in a wave inside a pill.
-   The thread tabs show the same dots in a smaller pill, so the ball rules apply to this badge only. */
-
 .agent-row-agent-status-working {
   width: 30px;
   height: 16px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface);
-  /* A shadow makes a halo on the dark sidebar. */
   box-shadow: none;
 }
 
-/* The balls stand on a line as high as one ball, so a ball at rest is on the centre of the pill. */
 .agent-row-agent-status-working .agent-row-thinking-dots {
   align-items: flex-end;
   gap: 1px;
@@ -48,12 +43,10 @@
   }
 }
 
-/* A badge off screen keeps its balls still: each hopping ball is restyled on each frame. */
 .agent-row-agent-status-working.agent-row-agent-status-still .agent-row-thinking-dots i {
   animation: none;
 }
 
-/* A low hop with a soft squash, so each ball stays inside the pill border. */
 @keyframes agent-row-ball-hop {
   0%,
   62%,

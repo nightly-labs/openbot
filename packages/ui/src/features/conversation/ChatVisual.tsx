@@ -31,7 +31,6 @@ import {
   showSelectionAction,
 } from "./SelectionActions";
 
-/** The page variables and the app tokens that give their values. */
 const THEME_TOKENS: ReadonlyArray<readonly [`--${string}`, string]> = [
   ["--foreground", "--openbot-text-primary"],
   ["--muted-foreground", "--openbot-text-muted"],
@@ -42,7 +41,6 @@ const THEME_TOKENS: ReadonlyArray<readonly [`--${string}`, string]> = [
   ["--accent", "--openbot-accent-text"],
   ["--destructive", "--openbot-danger-text"],
   ["--success", "--openbot-success-text"],
-  // The storage hues were checked together for colour-vision separation; the two series hues follow.
   ["--chart-1", "--openbot-chart-storage-workspaces"],
   ["--chart-2", "--openbot-chart-storage-files"],
   ["--chart-3", "--openbot-chart-storage-chats"],
@@ -54,7 +52,6 @@ const THEME_TOKENS: ReadonlyArray<readonly [`--${string}`, string]> = [
   ["--font-mono", "--openbot-font-mono"],
 ];
 
-/** The theme at the place of an element. The page shows the chat through its transparent canvas. */
 function visualTheme(element: Element): ChatVisualTheme {
   const style = getComputedStyle(element);
   const theme: ChatVisualTheme = { "--background": "transparent" };
@@ -66,62 +63,23 @@ function visualTheme(element: Element): ChatVisualTheme {
 }
 
 interface ChatVisualProps {
-  /**
-   * The page URL, or nothing while the app gets it. The server that gives it must send a sandbox
-   * policy, as the frame does.
-   */
   src?: string | undefined;
-  /**
-   * The page itself, for a client that has no page URL, such as a browser. The frame gets it as
-   * `srcdoc` with the same sandbox, so the page still has an opaque origin. It replaces `src`.
-   */
   html?: string | undefined;
   title: string;
-  /** The height that the agent asked for, and the maximum height of the frame. */
   height?: number | undefined;
-  /** Set when the app cannot get the page. The text replaces the page in the same box. */
   failed?: boolean;
-  /** The frame fills its box, as in the file preview, and the page scrolls in it. */
   fill?: boolean;
   onOpenLink: (url: string) => void;
-  /**
-   * Text that the page wrote for the user's message box. The app puts it there and the user sends
-   * it, so a page never sends a message itself. Without it, the page cannot write a message.
-   */
   onMessage?: ((text: string) => void) | undefined;
-  /** The page state for the agent, shown to the user with their next message. Empty text removes it. */
   onContext?: ((text: string) => void) | undefined;
-  /**
-   * Whether a key chord that the user pressed in the page is an app shortcut. The frame gives an
-   * accepted chord to the app as a key press on the frame element. Without it, no key leaves the page.
-   */
   isAppShortcut?: ((key: ChatVisualKey) => boolean) | undefined;
-  /**
-   * Quotes text that the user selected in the page. The app shows the Quote action of a message
-   * selection over it, and the quote shortcut does the same. Without it, the page offers no quote.
-   */
   onQuote?: ((text: string) => void) | undefined;
-  /**
-   * Opens the page as a file tab of the side panel. Inline only: the page shows a button for it next
-   * to full screen. Without it, the page has no such button.
-   */
   onOpenInSidePanel?: (() => void) | undefined;
-  /**
-   * Puts the page behind the window. Inline only: the page shows a button for it next to full screen.
-   * The page row has no message menu, so this is where "Use as backdrop" of a visual page goes.
-   */
   onUseAsBackdrop?: (() => void) | undefined;
-  /** The modifier of the quote shortcut on this device. */
   quoteShortcut?: QuoteShortcutModifier | undefined;
-  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
   macWindowControls?: boolean | undefined;
 }
 
-/**
- * An agent's HTML page with its scripts. With `fill`, the page fills the file preview of the side
- * panel. Inline, the page shows in the chat and has no card of its own; while it loads or after it fails, the box keeps
- * the agent's height, so the content below it does not move.
- */
 export function ChatVisual(props: ChatVisualProps) {
   const { t } = useText();
   return (
@@ -141,15 +99,6 @@ export function ChatVisual(props: ChatVisualProps) {
   );
 }
 
-/**
- * The frame has scripts but not `allow-same-origin`, so the page has an opaque origin and cannot
- * read the app. The page can only post messages, and each one is checked. A request that acts for
- * the user, such as a link or a message, needs a click or a key that the user made in this frame.
- *
- * Full screen puts the frame's box in the top layer. The frame stays where it is in the document,
- * so the page does not load again and keeps its state. The app's own dialogs and menus cannot show
- * above the top layer, so the page goes back into the chat before the app shows one for it.
- */
 function VisualFrame(props: ChatVisualProps) {
   const { t } = useText();
   const [theme, setTheme] = createSignal<ChatVisualTheme>();
@@ -160,7 +109,6 @@ function VisualFrame(props: ChatVisualProps) {
   let frame: HTMLIFrameElement | undefined;
   let box: HTMLDivElement | undefined;
   let expandButton: HTMLButtonElement | undefined;
-  // The page waits for the theme, which the frame reads at its place once it is mounted.
   const url = () => {
     const current = theme();
     return current && props.html === undefined && props.src !== undefined
@@ -173,7 +121,6 @@ function VisualFrame(props: ChatVisualProps) {
   };
   const filled = () => props.fill === true || fullscreen();
 
-  /** The user clicked or pressed a key in this frame just now. */
   const userActed = () => document.activeElement === frame && navigator.userActivation.isActive;
   const shown = () => box?.matches(":popover-open") === true;
 
@@ -189,23 +136,15 @@ function VisualFrame(props: ChatVisualProps) {
     const open = shown();
     setFullscreen(open);
     frame?.contentWindow?.postMessage(chatVisualDisplayModeMessage(open ? "fullscreen" : "inline"), "*");
-    // The close button leaves with full screen; the expand button takes the focus back.
     if (!open && document.activeElement !== frame) expandButton?.focus({ preventScroll: true });
   };
 
-  /**
-   * The text that the user quoted or closed the action for. The page keeps its selection and reports
-   * it again when its frame changes size or scrolls, for example when the side panel opens, so the
-   * action stays closed for this text until the selection changes.
-   */
   let quoted: string | undefined;
-  /** Closes the action until the page selection changes. */
   const dismiss = () => {
     const selected = selection();
     if (selected) quoted = selected.text;
     setSelection(null);
   };
-  /** Quotes the page selection. The next selection shows the action again. */
   const quote = () => {
     const selected = selection();
     if (!selected || !props.onQuote) return;
@@ -231,13 +170,11 @@ function VisualFrame(props: ChatVisualProps) {
         if (!userActed()) return;
         const url = safeBrowserUrl(message.url);
         if (!url) return;
-        // One click opens one link: the next link needs a new click, which focuses the frame again.
         frame?.blur();
         props.onOpenLink(url);
         return;
       }
       case "display-mode":
-        // Going back into the chat is always allowed; filling the window needs the user.
         if (message.mode === "inline") exitFullscreen();
         else if (userActed()) enterFullscreen();
         reply({ mode: shown() ? "fullscreen" : "inline" });
@@ -256,7 +193,6 @@ function VisualFrame(props: ChatVisualProps) {
       case "open-image":
         if (!userActed()) return;
         exitFullscreen();
-        // The viewer reads Esc in the app window, so the app takes the focus back from the page.
         frame?.blur();
         setImage({ images: [pageImage(message.src, message.name)], index: 0 });
         return;
@@ -272,15 +208,12 @@ function VisualFrame(props: ChatVisualProps) {
         if (key.key === "Escape" && !key.metaKey && !key.ctrlKey) return exitFullscreen();
         if (!frame || !userActed()) return;
         if (selection() && isQuoteShortcut(key, props.quoteShortcut ?? "ctrl")) {
-          // The quote goes to the message box, which takes the focus and shows under full screen.
           exitFullscreen();
           frame.blur();
           return quote();
         }
         if (!props.isAppShortcut?.(key)) return;
         exitFullscreen();
-        // The app acts on the key, so it takes the focus back first. Else the window gets its focus
-        // event when the shortcut's view takes the focus, inside that view's effect.
         frame.blur();
         frame.dispatchEvent(new KeyboardEvent("keydown", { ...key, bubbles: true, cancelable: true, composed: true }));
         return;
@@ -294,13 +227,10 @@ function VisualFrame(props: ChatVisualProps) {
       exitFullscreen();
     }
   };
-  // A click on the dim area around the page in full screen goes back to the chat. Esc does the same.
   const onBoxClick = (event: MouseEvent) => {
     if (event.target === box) exitFullscreen();
   };
 
-  // A press in the app, outside the Quote action, closes the action. A press in the page reaches the
-  // page only, and the page reports its new selection.
   let quoteLayer: HTMLDivElement | undefined;
   const onPointerDown = (event: PointerEvent) => {
     if (!(event.target instanceof Node && quoteLayer?.contains(event.target))) dismiss();
@@ -322,7 +252,6 @@ function VisualFrame(props: ChatVisualProps) {
       box?.removeEventListener("click", onBoxClick);
     };
   });
-  // A page that is open gets the colors of the other palette as a message, so it does not load again.
   let shownScheme = untrack(documentColorScheme);
   createEffect(documentColorScheme, (scheme) => {
     if (scheme === shownScheme) return;
@@ -367,15 +296,12 @@ function VisualFrame(props: ChatVisualProps) {
           src={url()}
           srcdoc={pageDocument()}
           style={filled() ? undefined : `height: ${chatVisualFrameHeight(reported(), props.height)}px`}
-          // The frame loads `about:blank` while it is inserted, which runs this handler inside a render.
           onLoad={() => {
-            // The colors at this time, which can be the other palette since the URL was made.
             if (frame && untrack(theme))
               frame.contentWindow?.postMessage(chatVisualThemeMessage(visualTheme(frame)), "*");
           }}
         />
       </section>
-      {/* They stay in the document in full screen, so full screen can give the focus back when the page returns. */}
       <Show when={!props.fill}>
         <div class="chat-visual-actions">
           <Show when={props.onOpenInSidePanel}>
@@ -421,7 +347,6 @@ function VisualFrame(props: ChatVisualProps) {
           </Button>
         </div>
       </Show>
-      {/* The action shows above the app, so it stays in the chat's layer: full screen hides it. */}
       <Show when={!fullscreen() && selection()}>
         {(selected) => (
           <PageQuoteAction
@@ -449,10 +374,6 @@ function VisualFrame(props: ChatVisualProps) {
   );
 }
 
-/**
- * The Quote action of a message selection, for a selection in the page. The page gives the place of
- * its selection in the frame, and the action shows next to it in the app window.
- */
 function PageQuoteAction(props: {
   frame: () => HTMLIFrameElement | undefined;
   rect: ChatVisualRect;
@@ -467,13 +388,10 @@ function PageQuoteAction(props: {
   const place = () => {
     const frame = props.frame();
     if (!bar || !frame) return;
-    // The page viewport starts inside the frame's border and padding.
     const box = frame.getBoundingClientRect();
     const style = getComputedStyle(frame);
     const top = box.top + frame.clientTop + Number.parseFloat(style.paddingTop);
     const left = box.left + frame.clientLeft + Number.parseFloat(style.paddingLeft);
-    // The page gives the box, so it is kept inside the frame. A selection that the page scrolled out
-    // of its frame has no action.
     const selected = {
       top: Math.max(box.top, top + props.rect.top),
       left: Math.max(box.left, left + props.rect.left),
@@ -498,7 +416,6 @@ function PageQuoteAction(props: {
     () => place(),
   );
   onSettled(() => {
-    // The chat or the side panel scrolls the frame, so the action moves with it.
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     return () => {
@@ -531,7 +448,6 @@ function PageQuoteAction(props: {
   );
 }
 
-/** A page image for the image viewer, which shows it as it shows an image in a message. */
 function pageImage(src: string, name: string): AttachmentSummary {
   return {
     id: "chat-visual-image",

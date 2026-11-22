@@ -4,11 +4,6 @@ import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import type { ChatMessageAuthor } from "./ChatMessageRow";
 
-/**
- * How the reader's own bubbles look in a chat with one agent. `solid` fills them with the color of the
- * agent's avatar, `tint` mixes that color into the bubble as a chat color does, and `classic` keeps
- * the reader's own chat color, or grey. A channel has many agents, so it always looks classic.
- */
 export const CHAT_BUBBLE_STYLES = ["solid", "tint", "classic"] as const;
 export type ChatBubbleStyle = (typeof CHAT_BUBBLE_STYLES)[number];
 export const DEFAULT_CHAT_BUBBLE_STYLE: ChatBubbleStyle = "solid";
@@ -23,17 +18,12 @@ export function isChatBubbleStyle(value: unknown): value is ChatBubbleStyle {
   return CHAT_BUBBLE_STYLES.some((style) => style === value);
 }
 
-/** The color of the agent's face. An agent with its own picture has no face color, so it has none. */
 function agentFaceColor(agent: AgentProfile): AvatarColor | undefined {
   if (agent.avatarUrl !== null) return undefined;
   const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor ?? null).toLowerCase();
   return isAvatarColor(color) ? color : undefined;
 }
 
-/**
- * The reader's own author in a chat with `agent`. Solid and tint give the bubble the agent's face
- * color; classic, an agent with a picture, and a chat with no agent keep the reader's chat color.
- */
 export function ownMessageAuthor(input: {
   name: string;
   style: ChatBubbleStyle;
@@ -50,11 +40,6 @@ function linearChannel(value: number): number {
   return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 }
 
-/**
- * True when white text on a solid bubble of `color` is below 3:1 (WCAG relative luminance). The
- * bubble then takes dark text: yellow, lime, green, cyan, sky and sand do; red, blue and violet keep
- * white, as a solid chat bubble usually has.
- */
 export function solidBubbleTakesDarkText(color: AvatarColor): boolean {
   const value = Number.parseInt(color.slice(1), 16);
   const luminance =

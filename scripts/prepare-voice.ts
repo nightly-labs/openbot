@@ -13,14 +13,10 @@ const SHERPA_ONNX_VERSION = "2.0.1";
 
 interface RuntimePackage {
   name: string;
-  /** The npm `dist.integrity` of the published tarball. */
   integrity: string;
-  /** The addon and the libraries it loads from its own directory. */
   files: readonly string[];
 }
 
-// Only these native files run. The JavaScript wrapper of `sherpa-onnx-node` is not used: the voice
-// host calls the N-API addon directly. The C++ API library is not loaded by the addon.
 const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
   "darwin-arm64": {
     name: "sherpa-onnx-darwin-arm64",
@@ -52,7 +48,6 @@ const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
 const buildRoot = resolve(".openbot-build/voice");
 const runtimeRoot = join(buildRoot, "runtime");
 const modelRoot = join(buildRoot, "model");
-// Beside the runtime, not in it: electron-builder copies the whole runtime directory.
 const runtimeMarker = join(buildRoot, "runtime-package.txt");
 const runtimeOnly = process.argv.includes("--runtime-only");
 const target = `${process.platform}-${process.arch}`;
@@ -106,10 +101,6 @@ async function prepareRuntime(runtime: RuntimePackage): Promise<void> {
   }
 }
 
-/**
- * The ONNX Runtime session settings files that the voice hosts read. They are written on every run,
- * so a runtime that an earlier run prepared gets the current settings.
- */
 async function writeSessionConfigs(): Promise<void> {
   await Promise.all(
     Object.entries(VOICE_SESSION_CONFIGS).map(([name, content]) => writeFile(join(runtimeRoot, name), content)),
@@ -135,7 +126,6 @@ async function prepareModel(): Promise<void> {
   }
 }
 
-/** Removes model files of an earlier pin, so a stale encoder cannot be packaged or loaded by mistake. */
 async function removeOtherModels(): Promise<void> {
   const expected = new Set(PARAKEET_MODEL_FILES.map((file) => file.name));
   const entries = await readdir(modelRoot);
@@ -151,11 +141,6 @@ async function isExpectedFile(path: string, bytes: number, expectedSha256: strin
   return (await sha256(path)) === expectedSha256;
 }
 
-/**
- * The published Linux addon also searches its CI build directory, and the empty and relative entries
- * of its RUNPATH search the working directory. A library planted there would load into the voice host.
- * Shortens each search path to `$ORIGIN` in place, so the addon loads libraries only from its own directory.
- */
 function pinSearchPathToOrigin(path: string): void {
   const file = readFileSync(path);
   const paths = elfSearchPaths(file).filter(({ value }) => value !== ORIGIN_SEARCH_PATH);

@@ -4,8 +4,6 @@ import { CONTACT_ROUTE, CONTACT_SOCIAL_IMAGE_PATH } from "../../lib/contact";
 import { loadSitePage, siteLocale } from "../../lib/site-locale";
 import { sitePageHead } from "../../lib/site-page-head";
 
-// The contact page in the language of the request: Polish for Polish, Brazilian Portuguese for
-// Portuguese, English for all others. `/pl/contact` always shows Polish, and `/pt/contact` Portuguese.
 export const Route = createFileRoute("/_contact/contact")({
   loader: ({ context }) => loadSitePage(siteLocale(context.locale), contactPageText),
   head: ({ match, loaderData }) => {

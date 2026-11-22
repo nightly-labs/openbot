@@ -1,4 +1,3 @@
-import * as Clipboard from "expo-clipboard";
 import { GlassView } from "expo-glass-effect";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
@@ -19,7 +18,6 @@ import { FlatList, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier, Easing, Keyframe } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { shareLocalAttachment } from "@/features/chat/components/attachment-preview";
 import { ScrollingCodeBlock } from "@/features/chat/components/chat-code-block";
 import { ChatGlassIconButton, ChatGlassLabel } from "@/features/chat/components/chat-glass-icon-button";
@@ -30,9 +28,11 @@ import { SpreadsheetFilePreview } from "@/features/chat/components/file-document
 import { HtmlPage } from "@/features/chat/components/html-page";
 import HtmlPreview from "@/features/chat/components/html-preview.dom";
 import { PdfPreview } from "@/features/chat/components/pdf-preview";
+import { copyToClipboard } from "@/features/chat/components/use-copy-message";
 import { type CodePreviewEntry, codePreview } from "@/features/chat/model/code-preview-store";
 import { type MarkdownPreviewPart, markdownPreviewSeries } from "@/features/chat/model/markdown-preview-parts";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
+import { webLink } from "@/features/chat/model/message-file-target";
 import { textPreviewParts } from "@/features/chat/model/text-preview-parts";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
@@ -48,38 +48,18 @@ type PreviewView = "preview" | "code";
 const SWITCH_DURATION = 200;
 const SWITCH_EASING = cubicBezier(0.23, 1, 0.32, 1);
 const HIDDEN_SCALE = 0.98;
-/** The header title rises into place when the view changes, in step with the views. */
 const TITLE_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ translateY: 4 }] },
   100: { opacity: 1, transform: [{ translateY: 0 }], easing: Easing.bezier(0.23, 1, 0.32, 1) },
 }).duration(SWITCH_DURATION);
-/** The floating header: its buttons are 48 points high, 8 points under the safe area, as in the chat. */
 const HEADER_OFFSET = 8;
 const HEADER_HEIGHT = 48;
-/** The part buttons of a long text float this far above the bottom safe area. */
 const PART_BAR_OFFSET = 8;
 
-function webLink(href: string): string | null {
-  try {
-    const url = new URL(href);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * A ```html page or a ```mermaid diagram from a reply, or a file from the chat, on a screen of its
- * own, with the floating glass header of the chat: Back on the left and a menu on the right that
- * switches between the preview and the code, copies the code and shares a file. The edge swipe
- * also goes back. Both views stay mounted, so the page does not load again when the user switches.
- * A text file has only the code view, and a PDF or a spreadsheet only the preview.
- */
 export function CodePreviewScreen() {
   const { previewId } = useLocalSearchParams<{ previewId: string }>();
   const entry = codePreview(previewId);
 
-  // The blocks are kept in memory only, so a screen restored after a restart has nothing to show.
   useEffect(() => {
     if (!entry && router.canGoBack()) router.back();
   }, [entry]);
@@ -93,12 +73,9 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
   const liquidGlass = useLiquidGlass();
   const { theme } = useUniwind();
   const [foreground, background, fieldBackground] = useThemeColor(["foreground", "background", "default"]);
-  // A page, a diagram and a Markdown file have both views. A text file is its code.
   const switchable = entry.kind === "html" || entry.kind === "mermaid" || entry.kind === "markdown";
   const documentFile = entry.kind === "pdf" || entry.kind === "spreadsheet";
   const [view, setView] = useState<PreviewView>(entry.kind === "text" ? "code" : "preview");
-  // The code view mounts when it first shows, not under the preview: a long file draws its text and
-  // its colours only when the reader asks for them.
   const [codeOpened, setCodeOpened] = useState(view === "code");
   if (view === "code" && !codeOpened) setCodeOpened(true);
   const [wrap, setWrap] = useState(false);
@@ -111,7 +88,6 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
       : entry.kind === "mermaid"
         ? t("mobile.chat.preview.mermaidTitle")
         : t("mobile.chat.preview.markdownTitle"));
-  // The header names what the screen shows now: the page, the diagram or the document, or its code.
   const headerTitle =
     view === "code" && switchable
       ? entry.kind === "html"
@@ -132,7 +108,6 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
             : entry.kind === "spreadsheet"
               ? Sheet
               : FileText;
-  // The code view shows a long text one part at a time, with buttons for the parts around it.
   const textParts = useMemo(() => (codeOpened ? textPreviewParts(entry.source) : null), [codeOpened, entry.source]);
   const [textPart, setTextPart] = useState(0);
   const partCount = textParts?.length ?? 0;
@@ -149,15 +124,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
     void haptics.selection();
     setView(next);
   };
-  const copy = async () => {
-    try {
-      await Clipboard.setStringAsync(entry.source);
-      void haptics.notification("success");
-    } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(error, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
-    }
-  };
+  const copy = () => copyToClipboard(entry.source, "mobile.chat.code.copyFailed", t);
   const wrapAction: MenuAction = {
     id: "wrap",
     title: t("mobile.chat.preview.wrapLines"),
@@ -189,7 +156,6 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
   ];
   const actions: MenuAction[] = [
     ...(switchable ? viewActions : []),
-    // Wrapping matters only to the code, so the menu offers it there.
     ...(view === "code" ? [wrapAction] : []),
     ...(documentFile ? [] : [copyAction]),
     ...(file ? [shareAction] : []),
@@ -203,7 +169,6 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
         ) : entry.kind === "spreadsheet" && file ? (
           <SpreadsheetFilePreview uri={file.uri} title={title} insets={{ top: headerBottom, bottom: insets.bottom }} />
         ) : entry.kind === "html" && file && HtmlPage ? (
-          // An HTML file runs its scripts, as on desktop; a ```html block from a reply does not.
           <HtmlPage
             source={entry.source}
             title={title}
@@ -239,7 +204,6 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
       {documentFile || !codeOpened ? null : (
         <SwitchLayer shown={view === "code"} reducedMotion={reducedMotion}>
           <CodeDocument
-            // A new part opens at its top.
             key={textPart}
             text={codeText}
             firstLine={shownPart?.firstLine ?? 1}
@@ -247,7 +211,6 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
             title={headerTitle}
             wrap={wrap}
             topInset={headerBottom}
-            // The last lines scroll clear of the part buttons.
             bottomInset={partCount > 1 ? insets.bottom + PART_BAR_OFFSET + HEADER_HEIGHT : insets.bottom}
           />
         </SwitchLayer>
@@ -349,7 +312,6 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
   );
 }
 
-/** A glass capsule of the header height, as the chat header draws its title. The menu owns the touch. */
 function GlassCapsule({
   liquidGlass,
   fallbackBackground,
@@ -380,17 +342,10 @@ function GlassCapsule({
   );
 }
 
-/** The space between two blocks of a Markdown part, as `ChatMarkdown` puts between its blocks. */
 const PART_GAP = 10;
 
-/**
- * A Markdown file, drawn as the chat draws a reply, with selectable text. The file is a list of
- * rows, so the list draws only the rows near the screen, and a long file reads its next part as the
- * reader scrolls to it. A code block of more than 25 lines scrolls inside a box of 25 lines.
- */
 function MarkdownPreview({ source, insets }: { source: string; insets: { top: number; bottom: number } }) {
   const sides = useSafeAreaInsets();
-  // The parser counts `\n` line ends, so the parts start where it says.
   const text = useMemo(() => source.replace(/\r\n?/gu, "\n"), [source]);
   const [series, setSeries] = useState(() => markdownPreviewSeries(text));
   const readNext = () =>
@@ -430,7 +385,6 @@ function MarkdownPreview({ source, insets }: { source: string; insets: { top: nu
   );
 }
 
-/** The diagram from the shared renderer. It is usually ready, because the chat card drew it. */
 function DiagramPreview({
   source,
   title,
@@ -465,7 +419,6 @@ function DiagramPreview({
   );
 }
 
-/** One of the two views. The one that leaves fades and sinks back a little; the new one rises. */
 function SwitchLayer({
   shown,
   reducedMotion,

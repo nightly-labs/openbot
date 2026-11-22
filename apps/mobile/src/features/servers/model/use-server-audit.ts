@@ -2,7 +2,7 @@ import type { AgentAccessLevel, ServerAuditChange, ServerAuditEntry, ServerAudit
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
+import { AGENT_ACCESS_LEVEL_KEYS, SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -19,13 +19,6 @@ export const AUDIT_FILTER_KEYS = {
   roles: "mobile.server.audit.filterRoles",
   agents: "mobile.server.audit.filterAgents",
 } as const satisfies Record<AuditFilter, MobileTextKey>;
-
-const LEVEL_KEYS = {
-  none: "mobile.server.roles.level.none",
-  view: "mobile.server.roles.level.view",
-  chat: "mobile.server.roles.level.chat",
-  manage: "mobile.server.roles.level.manage",
-} as const satisfies Record<AgentAccessLevel, MobileTextKey>;
 
 export function auditCategory(change: ServerAuditChange): Exclude<AuditFilter, "all"> {
   switch (change.kind) {
@@ -45,18 +38,12 @@ type Piece =
   | { kind: "key"; text: string; level?: AgentAccessLevel }
   | { kind: "to"; text: string };
 
-/**
- * One piece of a change line: the words between keywords, a keyword, or the word between two values.
- * `id` is its place in the line, which does not change, so a row can key its pieces by it.
- */
 export type AuditPart = Piece & { id: number };
 
 type Key = Extract<Piece, { kind: "key" }>;
 
-// Marks a placeholder in a translated line, so the line can be split around its keywords.
 const MARK = "\u0000";
 
-/** The line of a change in the interface language, as the desktop audit log writes it. */
 export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPart[] {
   const values: Piece[][] = [];
   const show = (...parts: Piece[]) => `${MARK}${values.push(parts) - 1}${MARK}`;
@@ -65,7 +52,7 @@ export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPar
   const name = (value: ServerAuditName) => key(value.name);
   const step = (from: Key, to: Key) => show(from, { kind: "to", text: t("mobile.server.audit.to") }, to);
   const memberRole = (role: "admin" | "member") => key(t(SERVER_ROLE_LABEL_KEYS[role]));
-  const level = (value: AgentAccessLevel) => key(t(LEVEL_KEYS[value]), value);
+  const level = (value: AgentAccessLevel) => key(t(AGENT_ACCESS_LEVEL_KEYS[value]), value);
   const change = entry.change;
   const line = (() => {
     switch (change.kind) {
@@ -75,7 +62,6 @@ export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPar
           role: show(memberRole(change.role)),
         });
       case "member-removed":
-        // A member who removed themself left.
         return entry.actor?.id === change.member.id
           ? t("mobile.server.audit.memberLeft", { member: show(name(change.member)) })
           : t("mobile.server.audit.memberRemoved", { member: show(name(change.member)) });
@@ -113,20 +99,14 @@ export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPar
     .map((piece, id) => ({ ...piece, id }));
 }
 
-/** The line as plain text, for the search. */
 export function auditLineText(parts: readonly AuditPart[]): string {
   return parts.map((part) => (part.kind === "to" ? ` ${part.text} ` : part.text)).join("");
 }
 
-/** Who made the change. A join from an invitation has no other actor. */
 export function auditActor(entry: ServerAuditEntry, t: MobileText["t"]): string {
   return entry.actor?.name ?? (entry.change.kind === "member-joined" ? "" : t("mobile.server.audit.unknownActor"));
 }
 
-/**
- * The audit log of one server (`server-audit-v1`), for its owners and admins. It is read again each
- * time the page opens, so the changes made since then appear.
- */
 export function useServerAudit(serverId: string) {
   const available = useMobileWorkspaceSelector((workspace) => workspace.canReadServerAudit(serverId));
   const { loadServerAuditLog } = useMobileWorkspaceActions();

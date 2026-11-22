@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "נעצר.",
   "status.messaging.stop": "עצירה",
   "status.messaging.approvalTitle": "OpenBot מבקש אישור כדי להמשיך.",
+  "status.messaging.approvalTitleTeammate": "חבר הצוות {agent} מבקש אישור כדי להמשיך.",
   "status.messaging.approvalCommand": "הרצת פקודה",
   "status.messaging.approvalFileChange": "שינוי קבצים",
   "status.messaging.approvalPermissions": "קבלת הרשאות נוספות",
@@ -32,7 +33,8 @@ export const messages = {
   "status.messaging.integrationsSection": "שילובים",
   "status.messaging.signInReceived": "OpenBot קיבל את התקנת Slack. אפשר לסגור את הלשונית הזו.",
   "status.messaging.signInUnknown": "OpenBot לא התחיל את התקנת Slack הזו. יש להתחיל אותה שוב ב-OpenBot.",
-  "status.messaging.telegramNoAgent": "עדיין אין סוכן שיכול לענות כאן. יש להוסיף את Telegram Orchestrator ב-OpenBot.",
+  "status.messaging.telegramNoAgent":
+    "עדיין אין סוכן שיכול לענות כאן. ב-OpenBot, יש לפתוח את חנות > אפליקציות > Telegram וללחוץ על הוספת סוכן.",
   "status.messaging.telegramLinked":
     "OpenBot מחובר לצ'אט הזה. אפשר לתייג את {bot} או להשיב להודעה של OpenBot כדי לשאול את הסוכנים.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",

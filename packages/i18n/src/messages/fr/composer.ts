@@ -56,6 +56,7 @@ export const messages = {
   "composer.picker.noSkills": "Cet agent n’a aucune compétence.",
   "composer.picker.noSkillMatch": "Aucune compétence ne correspond à « {query} ».",
   "composer.picker.skillsLoadFailed": "Les compétences n’ont pas pu être chargées.",
+  "composer.picker.skillProblem": "{name} n’est pas disponible. {problem} Demandez à l’agent de le corriger.",
   "composer.token.attachment": "Ouvrir le fichier joint {name}",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Compétence {name}",
@@ -105,7 +106,7 @@ export const messages = {
   "composer.voice.recording": "Enregistrement vocal",
   "composer.voice.limitSoon": "L’enregistrement s’arrête dans {seconds} secondes.",
   "composer.voice.limitReached":
-    "L’enregistrement s’est arrêté à la limite de 2 minutes. Ce que vous avez dit est dans le message.",
+    "L’enregistrement s’est arrêté à la limite de 10 minutes. Ce que vous avez dit est dans le message.",
   "composer.send.saveQueued": "Enregistrer le message en attente",
   "composer.send.voice": "Envoyer le message vocal",
   "composer.send.message": "Envoyer le message",

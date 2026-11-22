@@ -1,17 +1,3 @@
-// Measures what the OpenCode features that OpenBot agents do not use cost in each request. Runs the
-// real `opencode` provider driver and the real OpenCode binary against a fake model on loopback
-// (`opencode-agent-harness.ts`), with the OpenBot tools of a real agent. Each variant runs in a new
-// OpenCode process and runs these turns, each in a new session:
-//   1. a one-word reply: one request, which is the fixed prefix of every request (system prompt,
-//      tools, skills, Code Mode catalog) plus a short message,
-//   2. a small task: the model reads a file, then replies, so two requests.
-// `current` is what the driver sends. `before` gives OpenCode an empty `OPENCODE_CONFIG` file, so the
-// driver adds no rules of `opencode-agent-defaults.ts`, as before they existed. Each other variant puts
-// its rules in that file instead. The fake model reports no usage, so the report counts o200k tokens of
-// each request body with `uvx --with tiktoken` when `uvx` is there, and else estimates 4 characters a
-// token. It also lists the tools, skills and Code Mode catalog of the first request.
-// `OPENCODE_CLI=<opencode> bun run bench:opencode-prompt-settings`; `--variant=<name>` runs one variant.
-// Writes .openbot-build/opencode-prompt-settings-bench/report.json.
 import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -37,9 +23,7 @@ const TASK_PROMPT = "Read notes.md and reply with its title.";
 
 interface Variant {
   name: string;
-  /** The `OPENCODE_CONFIG` file. Absent: the driver writes its own. */
   config?: { readonly [key: string]: Json };
-  /** The user's global `opencode.json`. */
   global?: { readonly [key: string]: Json };
 }
 
@@ -48,16 +32,13 @@ const SKILLS_OFF = { skill: { report: "deny", opencode: "deny" } };
 const VARIANTS: Variant[] = [
   { name: "before", config: {} },
   { name: "current" },
-  // Each rule of `current` alone.
   { name: "question-deny", config: { permission: { question: "deny" } } },
   { name: "skills-deny", config: { permission: SKILLS_OFF } },
   {
     name: "mcp-resources-deny",
     config: { permission: { opencode_list_mcp_resources: "deny", opencode_read_mcp_resource: "deny" } },
   },
-  // The user's own rule wins: `question` comes back, the other rules stay.
   { name: "user-question-allow", global: { permission: { question: "allow" } } },
-  // Features that OpenBot agents keep, measured as references on top of `before`.
   { name: "models-deny", config: { permission: { opencode_models: "deny" } } },
   { name: "explore-off", config: { agent: { explore: { disable: true } } } },
   { name: "subagent-deny", config: { permission: { subagent: "deny" } } },
@@ -67,7 +48,6 @@ const VARIANTS: Variant[] = [
 ];
 
 interface RequestReport {
-  /** Tokens of the system messages, the tool definitions and the other messages. */
   system: number;
   tools: number;
   messages: number;
@@ -84,7 +64,6 @@ interface RunReport {
   variant: string;
   config: { readonly [key: string]: Json } | null;
   global: { readonly [key: string]: Json };
-  /** The rules file that the driver wrote, when it wrote one. */
   driverDefaults: unknown;
   tools: string[];
   skills: string[];
@@ -97,7 +76,6 @@ const onlyVariant = process.argv.find((arg) => arg.startsWith("--variant="))?.sl
 const variants = onlyVariant ? VARIANTS.filter((variant) => variant.name === onlyVariant) : VARIANTS;
 if (variants.length === 0) throw new Error(`Unknown variant: ${onlyVariant}`);
 
-/** The three parts of one request, as text. */
 function requestParts(request: ModelRequest): [string, string, string] {
   const messages = getArray(request.body, "messages");
   return [
@@ -113,7 +91,6 @@ const TIKTOKEN = [
   "print(json.dumps([len(enc.encode(text)) for text in json.load(sys.stdin)]))",
 ].join(NL);
 
-/** o200k token counts with `uvx`, or null when `uvx` or the download is not there. */
 async function o200k(texts: string[]): Promise<number[] | null> {
   try {
     const child = run("uvx", ["--quiet", "--with", "tiktoken", "python", "-I", "-c", TIKTOKEN], {
@@ -136,7 +113,6 @@ const report: { openCodeVersion: string; counter: string; runs: RunReport[] } = 
   runs: [],
 };
 const texts: string[] = [];
-/** For each run and turn, the indexes of its request parts in `texts`. */
 const parts: number[][][][] = [];
 
 try {

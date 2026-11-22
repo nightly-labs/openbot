@@ -235,7 +235,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Een wachtpunt heeft een bericht nodig om verder te gaan. Deze beurt heeft geen bericht.",
   "error.backend.agentWaitOwnChatOnly":
-    "Open een wachtpunt alleen in je eigen chat. Een kanaal- of berichtentaak kan niet wachten.",
+    "Open een wachtpunt in je eigen chat of in een zijthread. Een kanaal- of berichtengesprek kan niet wachten.",
   "error.backend.agentWaitNoteRequired": "Geef een korte notitie die zegt waarvoor het wachtpunt is.",
   "error.backend.agentWaitRoutineGone": "Deze agent heeft geen routine met deze id.",
   "error.backend.agentWaitNoRoutine":
@@ -278,6 +278,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Deze server vraagt om in te loggen. Log in via OpenBot op de hostcomputer.",
   "error.backend.mcpSignInNeedsHttps":
     "Deze server vraagt om in te loggen, en OpenBot logt alleen in via https. Wijzig de URL in {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Deze server meldt alleen aan op {url}. Wijzig de URL in dit adres en meld je daarna opnieuw aan.",
   "error.backend.mcpSignInCancelled": "Het inloggen is geannuleerd.",
   "error.backend.mcpSignInTimedOut": "Het inloggen is niet afgerond in de browser.",
   "error.backend.mcpSignInRefused": "De inlogpagina weigerde de toegang. Log opnieuw in.",
@@ -303,6 +305,12 @@ export const messages = {
     "{provider} kon de MCP-server {name} niet starten. De tools ervan zijn niet beschikbaar voor {provider}. {provider} start de server zelf, dus de verbindingstest in OpenBot kan slagen. Begin een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} kon de MCP-server {name} niet starten, omdat de server niet op tijd antwoordde. Begin een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} kon de MCP-server {name} niet starten, omdat de server nu niet beschikbaar is. Wacht een paar minuten en begin dan een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} kon de MCP-server {name} niet bereiken. Open {name} in Marktplaats, Apps, en controleer of het adres klopt en of de server draait. Begin daarna een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} kon de GitHub-tools niet ophalen, omdat GitHub niet antwoordde. Open GitHub in Marktplaats, Apps, en verbind het opnieuw als daarom wordt gevraagd. Begin daarna een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -339,6 +347,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "De map bestaat niet of is al verwijderd.",
   "error.backend.libraryFolderOtherAgent": "Een bestand kan alleen naar een map van zijn agent.",
   "error.backend.libraryFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
+  "error.backend.workflowFolderLimit": "Een server kan maximaal {limit} workflowmappen hebben.",
+  "error.backend.workflowFolderPlacementLimit": "Er staan te veel workflows in mappen.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",
@@ -374,11 +384,11 @@ export const messages = {
     "Alleen de OpenBot-app op de telefoon kan dit rapport sturen, omdat die de versie en het ondersteuningslog van de telefoon toevoegt. Open deze chat op de telefoon. Zie je dit bericht daar, werk dan de telefoon-app bij.",
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
+  "error.backend.apiKeyListFailed": "OpenBot kon de opgeslagen API-sleutels niet lezen.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
-  "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
-  "error.backend.vaultItemNotAllowed":
-    "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot kon de API-sleutel niet lezen. Voer een sleutel van maximaal 8.000 tekens in en kies wie hem mag gebruiken.",
   "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
@@ -424,7 +434,7 @@ export const messages = {
     "De pop-up kon niet laden. Probeer opnieuw in te loggen vanaf de oorspronkelijke pagina.",
   "error.backend.browserTabNotFound": "Browsertabblad niet gevonden.",
   "error.backend.authActive": "Verificatie is al actief.",
-  "error.backend.authHttpsRequired": "Beveiligde verificatie vereist HTTPS.",
+  "error.backend.authWebPageRequired": "Beveiligde verificatie vereist HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Verificatiecodes moeten 4–12 cijfers hebben.",
   "error.backend.authExpired": "Het verificatieverzoek is verlopen.",
   "error.backend.authDigitsRequired": "Voer het gevraagde aantal cijfers in.",
@@ -465,6 +475,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Geef de taak een korte titel.",
   "error.backend.taskToolInvalid":
     "Geef de taak een titel van maximaal 120 tekens en een korte opdracht die zegt wat er moet gebeuren.",
+  "error.backend.taskControlInvalid":
+    "Geef de taskId van een taak die je hebt gestart. Een bericht heeft ook tekst nodig.",
   "error.backend.taskOwnChatOnly":
     "Start een taak alleen vanuit je eigen chat. Een kanaal, een berichtengesprek of een andere taak kan er geen starten.",
   "error.backend.taskUnfinishedLimit":
@@ -472,5 +484,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Deze agent heeft {count} open taken. Sluit een taak en start of open dan een andere.",
   "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.taskMessageFailed": "OpenBot kon het bericht niet naar de taak sturen. Probeer het later opnieuw.",
   "error.backend.taskStartFailed": "OpenBot kon de taak niet starten. Doe het werk in plaats daarvan in deze beurt.",
 } as const satisfies PartialTranslation<typeof source>;

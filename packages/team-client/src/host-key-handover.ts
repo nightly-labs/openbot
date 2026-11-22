@@ -3,13 +3,6 @@ import { type HostKeyHandover, hostKeyHandoverStatement } from "@openbot/contrac
 import { Effect } from "effect";
 import { bytesToBase64Url } from "./base64";
 
-/**
- * Checks one base64url Ed25519 signature, and is `false` when the key or the signature is malformed.
- * The caller gives the check: desktop main uses `node:crypto`, other clients `verifyEd25519Base64Url`.
- * Main bundles this module and `remote-directory.ts`, so they must not import `./ed25519`: the
- * electron-vite ESM shim goes after the last `import` text in the bundle, and a JSDoc example in
- * `@noble/ed25519` matches it, so main then starts with no `__dirname`.
- */
 export type HostKeySignatureCheck = (
   signature: string,
   message: Uint8Array,
@@ -21,11 +14,6 @@ export function remoteHostFingerprint(publicKey: string): string {
   return bytesToBase64Url(digest);
 }
 
-/**
- * Whether the handover chain leads from the key this client trusts to the key that the account
- * service advertises now. Each step counts only when the key before it and its own key both signed
- * it. A step that matches but does not verify stops the walk: the client keeps its pin.
- */
 export const followHostKeyHandovers = Effect.fn("HostKeyHandover.follow")(function* (input: {
   hostId: string;
   trustedFingerprint: string;
@@ -47,10 +35,6 @@ export const followHostKeyHandovers = Effect.fn("HostKeyHandover.follow")(functi
   return current === target;
 });
 
-/**
- * When the host changed to `publicKey`: the time of the handover step that leads to it. A step
- * counts only when the key before it and its own key both signed it; otherwise this is null.
- */
 export const hostKeyChangedAt = Effect.fn("HostKeyHandover.changedAt")(function* (input: {
   hostId: string;
   publicKey: string;

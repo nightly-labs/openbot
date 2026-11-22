@@ -1,9 +1,3 @@
-// Collects what `cpu-sampling.ts` summarizes for `dev:automation memory`: one
-// `ps` reading of the instance's process tree, and the JS heap and DOM counters
-// of each page CDP can reach. Read-only: nothing here changes app state. A heap
-// snapshot pauses the page it is taken from for a moment, and writes only under
-// the build directory.
-
 import { execFile } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { mkdir } from "node:fs/promises";
@@ -38,8 +32,6 @@ export interface MemoryProfile extends MemoryReport {
 
 export interface MemoryProfileOptions {
   browser: Browser;
-  // From the instance registry. Without it the process tree cannot be found
-  // without matching by name, which would count another worktree's app.
   rootPid: number | null;
   label: string;
   logger: Logger;
@@ -70,8 +62,6 @@ async function measurePages(pages: Page[], logger: Logger): Promise<PageMemory[]
       session = await page.context().newCDPSession(page);
       measured.push(await readPageMemory(session, target));
     } catch {
-      // A page that closes while we attach cannot be reported, and must not
-      // take the process-level numbers down with it.
       logger.warn(`could not read memory counters of ${target}`);
     } finally {
       await session?.detach().catch(() => undefined);
@@ -94,10 +84,6 @@ export async function profileMemory(options: MemoryProfileOptions): Promise<Memo
   return { ...summarizeMemory(collectDescendants(parseProcessTable(stdout), rootPid), label), pages };
 }
 
-/**
- * Writes a V8 heap snapshot of one page to `outPath`, streamed chunk by chunk.
- * The snapshot holds conversation text, so the file is owner-only.
- */
 export async function writeHeapSnapshot(page: Page, outPath: string, logger: Logger): Promise<void> {
   await mkdir(dirname(outPath), { recursive: true });
   const session = await page.context().newCDPSession(page);

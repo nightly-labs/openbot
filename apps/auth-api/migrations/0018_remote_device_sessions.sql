@@ -1,5 +1,3 @@
--- Nullable for the old Worker during the migration/deploy gap. Legacy sessions
--- cannot be attributed safely, so revoking any account credential still ends them.
 ALTER TABLE remote_sessions ADD COLUMN auth_session_hash TEXT;
 
 DROP INDEX remote_sessions_one_active_per_user_host;

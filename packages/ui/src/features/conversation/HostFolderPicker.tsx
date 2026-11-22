@@ -1,30 +1,20 @@
-/**
- * The folder picker for an agent on another computer. The native picker shows only this computer, so
- * this dialog lists the folders of the host one folder at a time, as the mobile app does: the folder
- * names, a step up, the home folder and the disks. Files and hidden folders are not in the list.
- */
-
 import { type AgentFolderBrowse, agentFolderName } from "@openbot/contracts/ipc";
 import { ArrowUp, Button, Dialog, Folder, HardDrive, IconButton, X } from "@openbot/ui";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 
-/** What the picked folder is for. Locate puts it in the place of a folder that is gone. */
 export type HostFolderPickMode = "add" | "exclude" | "locate";
 
 export interface HostFolderPick {
   mode: HostFolderPickMode;
   agentName: string;
-  /** The folder to open first. Null, or a folder that the host cannot open, opens the home folder. */
   start: string | null;
+  title?: string | undefined;
 }
 
 export function HostFolderPicker(props: {
-  /** The open request. Null closes the dialog. */
   request: HostFolderPick | null;
-  /** Lists the folders in one host folder. Null lists the home folder. */
   browse: (path: string | null) => Promise<AgentFolderBrowse>;
-  /** The picked folder, or null when the user closes the dialog. */
   onDone: (path: string | null) => void;
 }) {
   const { t, errorMessage } = useText();
@@ -46,14 +36,12 @@ export function HostFolderPicker(props: {
       })
       .catch((failure: unknown) => {
         if (id !== request) return;
-        // A start folder can be gone, such as the folder of a Locate. The home folder is the next place.
         if (fallbackHome && path !== null) return open(null, false);
         setLoading(false);
         setError(errorMessage(failure, t("agentSettings.folders.browse.failed")));
       });
   }
 
-  // Each new request opens at its own start folder; the folder list of the request before goes.
   createEffect(
     () => props.request,
     (pick) => {
@@ -67,6 +55,7 @@ export function HostFolderPicker(props: {
   const title = () => {
     const pick = props.request;
     if (!pick) return "";
+    if (pick.title) return pick.title;
     return pick.mode === "exclude"
       ? t("dialog.chooseAgentExclusion", { agent: pick.agentName })
       : t("dialog.chooseAgentFolder", { agent: pick.agentName });

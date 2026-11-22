@@ -83,6 +83,9 @@ export const messages = {
   "mobile.channel.form.deselectAll": "Снять выбор",
   "mobile.channel.form.memories": "Память",
   "mobile.channel.form.routines": "Регулярные задачи",
+  "mobile.channel.folders.description":
+    "Все участники канала {channel} могут изменять файлы и выполнять команды в этих папках.",
+  "mobile.channel.folders.removeBody": "Участники канала {channel} больше не могут изменять файлы в {folder}",
   "mobile.channel.form.deleteTitle": "Удалить канал?",
   "mobile.channel.form.deleteBody":
     "Канал будет остановлен. Его история останется в разделе «Удалённые каналы» только для просмотра. Оттуда канал можно восстановить. Агенты-участники сохранятся.",

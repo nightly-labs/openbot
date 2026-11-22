@@ -5,15 +5,10 @@ import { useText } from "./text";
 import { cx } from "./utils";
 
 export interface ErrorReferenceProps {
-  /** The code `errorReference` built for the failure. Nothing renders without one. */
   reference: string | null | undefined;
   class?: string;
 }
 
-/**
- * The code of a failure, beside the sentence that explains it. A user copies it into a report, so
- * support can find the cause behind a general sentence such as "The connection failed".
- */
 export function ErrorReference(props: ErrorReferenceProps): JSX.Element {
   const { t } = useText();
   return (

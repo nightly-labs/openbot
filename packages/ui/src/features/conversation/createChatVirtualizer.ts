@@ -6,7 +6,7 @@ import {
   type VirtualItem,
   Virtualizer,
 } from "@tanstack/virtual-core";
-import { createEffect, createMemo, createSignal, createStore, onSettled, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, flush, onCleanup, onSettled, untrack } from "solid-js";
 
 interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement extends Element> {
   count: () => number;
@@ -15,14 +15,11 @@ interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement ex
   getItemKey: (index: number) => string | number;
   keyVersion: () => unknown;
   scrollMargin: () => number;
-  /** Whether the reader is following new messages instead of reading older ones. */
   stickToLatest?: () => boolean;
-  /**
-   * Moves a following reader to the end, for a chat that animates the move. With it the virtualizer
-   * does not jump to the end itself when a row is added or grows.
-   */
   followLatest?: (element: TScrollElement) => void;
   onChange?: (virtualizer: Virtualizer<TScrollElement, TItemElement>) => void;
+  drawLatestFirst?: () => boolean;
+  onRowsDrawn?: (element: TScrollElement) => void;
 }
 
 export interface ChatVirtualizer<TItemElement extends Element> {
@@ -31,40 +28,40 @@ export interface ChatVirtualizer<TItemElement extends Element> {
   isVirtualized: () => boolean;
   measureElement: (element: TItemElement | null) => void;
   scrollMargin: () => number;
-  /**
-   * Where a row starts in the scroll content: measured once the row has rendered, estimated before.
-   * Read it with `getTotalSize`, which changes when a measurement does.
-   */
   itemStart: (index: number) => number | undefined;
-  /** Opens a row at the top of the list, rendered or not. A smooth scroll animates there. */
   scrollToIndex: (index: number, options?: { smooth?: boolean }) => void;
-  /** Scrolls to a position in the scroll content. It replaces the target of an earlier `scrollToIndex`. */
   scrollToOffset: (offset: number) => void;
+  firstDrawnIndex: () => number;
+  drawAllRows: () => void;
 }
 
 const STATIC_CHAT_LIMIT = 100;
-/**
- * A virtual chat draws all its rows again when it becomes static. A send adds a row and a reply can
- * remove one, so a chat near the limit would change mode at each turn: the chat stops for a moment
- * and leaves the end. It becomes static again only when it is this many rows below the limit.
- */
 const STATIC_CHAT_RETURN = 10;
+const LATEST_ROWS_FIRST = 10;
+const EARLIER_ROWS_PER_FRAME = 5;
 const SCROLL_END_THRESHOLD = 80;
 
 export function createChatVirtualizer<TScrollElement extends Element, TItemElement extends Element>(
   options: ChatVirtualizerOptions<TScrollElement, TItemElement>,
 ): ChatVirtualizer<TItemElement> {
-  // The first rows only; the effect below tracks the count, keys and margin from here on.
   const initialCount = untrack(options.count);
+  const drawsLatestFirst = (): boolean => untrack(() => options.drawLatestFirst?.() === true);
+  const latestRowsStart = (count: number): number => Math.max(0, count - LATEST_ROWS_FIRST);
+  let drawFrom = initialCount > STATIC_CHAT_LIMIT || !drawsLatestFirst() ? 0 : latestRowsStart(initialCount);
+  let drawFrame: number | undefined;
   const [virtualItems, setVirtualItems] = createSignal<VirtualItem[]>(
-    untrack(() => fallbackItems(initialCount, options.estimateSize, options.getItemKey, options.scrollMargin())),
+    untrack(() =>
+      fallbackItems(
+        initialCount,
+        fallbackStart(initialCount, drawFrom),
+        options.estimateSize,
+        options.getItemKey,
+        options.scrollMargin(),
+      ),
+    ),
   );
   const [totalSize, setTotalSize] = createSignal(initialCount * options.estimateSize(0));
   const stableItems = new Map<VirtualItem["key"], { item: VirtualItem; update: (next: VirtualItem) => void }>();
-  // Within this threshold of the end, the virtualizer keeps the reader at the end when a row grows or
-  // one is added. The rows end above the activity line, so a reader who scrolled up a little still
-  // counts as at the end, and each growth of a streaming reply would move them down. Only a reader who
-  // follows the latest message counts. It is set before each measurement and each change of rows.
   const syncScrollEndThreshold = (instance: Virtualizer<TScrollElement, TItemElement>): void => {
     instance.options.scrollEndThreshold = options.stickToLatest?.() === false ? -1 : SCROLL_END_THRESHOLD;
   };
@@ -77,9 +74,6 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     observeElementOffset,
     measureElement: (element, entry, instance) => {
       syncScrollEndThreshold(instance);
-      // A new row gets its ResizeObserver size before paint. A read of its height when it mounts
-      // lays out the page again while the chat still renders. The size that the virtualizer has now
-      // changes nothing, so the first real size stays a first measurement.
       if (!entry) {
         const index = instance.indexFromElement(element);
         return (
@@ -93,9 +87,6 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     scrollToFn: (offset, scroll, instance) => {
       const element = instance.scrollElement;
       if (element && scroll.adjustments !== undefined && options.stickToLatest?.()) {
-        // Rows end above the activity line. An estimate correction that follows the last row
-        // leaves that line below the view, then the chat's own follow pulls back to the real
-        // bottom, and the two move the chat up and down while a turn runs.
         if (options.followLatest) {
           options.followLatest(element);
           return;
@@ -117,12 +108,89 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   });
   let refreshQueued = false;
 
+  const stopDrawingEarlierRows = (): void => {
+    if (drawFrame !== undefined) cancelAnimationFrame(drawFrame);
+    drawFrame = undefined;
+    drawFrom = 0;
+  };
+
+  const unmeasuredRows = new Set<TItemElement>();
+  let measureQueued = false;
+
+  const measureNewRows = (): void => {
+    measureQueued = false;
+    for (const element of unmeasuredRows) if (element.isConnected) virtualizer.measureElement(element);
+    unmeasuredRows.clear();
+  };
+
+  const drawRowsFrom = (index: number): void => {
+    const element = options.getScrollElement();
+    const distanceFromEnd = element ? element.scrollHeight - element.scrollTop : undefined;
+    drawFrom = index;
+    flush(refresh);
+    const drawnRows = [...unmeasuredRows];
+    measureNewRows();
+    for (const row of drawnRows)
+      if (row.isConnected)
+        virtualizer.resizeItem(virtualizer.indexFromElement(row), Math.round(row.getBoundingClientRect().height));
+    if (element && distanceFromEnd !== undefined) {
+      element.scrollTop = element.scrollHeight - distanceFromEnd;
+      untrack(() => options.onRowsDrawn?.(element));
+    }
+    untrack(() => options.onChange?.(virtualizer));
+  };
+
+  const drawEarlierRows = (): void => {
+    drawFrame = undefined;
+    if (drawFrom === 0) return;
+    drawRowsFrom(Math.max(0, drawFrom - EARLIER_ROWS_PER_FRAME));
+    if (drawFrom > 0) drawFrame = requestAnimationFrame(drawEarlierRows);
+  };
+
+  const drawAllRows = (then?: () => void): void => {
+    if (drawFrom === 0) {
+      then?.();
+      return;
+    }
+    if (drawFrame !== undefined) cancelAnimationFrame(drawFrame);
+    drawFrame = requestAnimationFrame(() => {
+      drawFrame = undefined;
+      if (drawFrom > 0) drawRowsFrom(0);
+      then?.();
+    });
+  };
+
+  const opensOtherRows = (count: number): boolean => {
+    if (!drawsLatestFirst() || count <= LATEST_ROWS_FIRST || untrack(virtualized)) return false;
+    const checkedRows = drawFrom > 0 ? count : count - LATEST_ROWS_FIRST;
+    return !Array.from({ length: checkedRows }, (_, index) => options.getItemKey(index)).some((key) =>
+      stableItems.has(key),
+    );
+  };
+
+  const drawLatestRowsFirst = (count: number): void => {
+    stopDrawingEarlierRows();
+    drawFrom = latestRowsStart(count);
+    drawFrame = requestAnimationFrame(() => {
+      drawFrame = requestAnimationFrame(drawEarlierRows);
+    });
+  };
+
   const refresh = (): void => {
     const measured = [...virtualizer.getVirtualItems()];
     const count = options.count();
+    const isVirtualized = untrack(virtualized);
+    if (isVirtualized) stopDrawingEarlierRows();
+    drawFrom = Math.min(drawFrom, latestRowsStart(count));
     const items =
-      !untrack(virtualized) || measured.length === 0
-        ? fallbackItems(count, options.estimateSize, options.getItemKey, options.scrollMargin())
+      !isVirtualized || measured.length === 0
+        ? fallbackItems(
+            count,
+            fallbackStart(count, isVirtualized ? 0 : drawFrom),
+            options.estimateSize,
+            options.getItemKey,
+            options.scrollMargin(),
+          )
         : measured;
     const activeKeys = new Set(items.map((item) => item.key));
     const nextItems = items.map((item) => {
@@ -155,6 +223,8 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     });
   };
 
+  let drawnRowsVersion: unknown;
+
   createEffect(
     () => {
       const count = options.count();
@@ -164,15 +234,14 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         scrollMargin: options.scrollMargin(),
       };
     },
-    ({ count, scrollMargin }) => {
-      // The virtualizer calls `getItemKey` here; `keyVersion` above is what tracks the keys.
+    ({ count, keyVersion, scrollMargin }) => {
       untrack(() => {
+        const rowsVersion = `${count}:${String(keyVersion)}`;
+        if (rowsVersion !== drawnRowsVersion && opensOtherRows(count)) drawLatestRowsFirst(count);
+        drawnRowsVersion = rowsVersion;
         syncScrollEndThreshold(virtualizer);
         virtualizer.setOptions({
           ...virtualizer.options,
-          // A reader who does not follow is never at the end (see `syncScrollEndThreshold`). Without a
-          // follow behavior, the virtualizer does not lay out the page to read where the end is.
-          // A chat that follows the end itself gets no jump from here either.
           followOnAppend: options.followLatest || options.stickToLatest?.() === false ? false : "auto",
           count,
           getScrollElement: options.getScrollElement,
@@ -189,6 +258,8 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
       scheduleRefresh();
     },
   );
+
+  onCleanup(stopDrawingEarlierRows);
 
   onSettled(() => {
     const cleanup = virtualizer._didMount();
@@ -208,37 +279,26 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         virtualizer.measureElement(null);
         return;
       }
-      // Solid can run a ref before data-index and the row contents are committed.
-      queueMicrotask(() => {
-        if (element.isConnected) virtualizer.measureElement(element);
-      });
+      unmeasuredRows.add(element);
+      if (measureQueued) return;
+      measureQueued = true;
+      queueMicrotask(measureNewRows);
     },
     scrollMargin: options.scrollMargin,
     itemStart: (index) => virtualizer.measurementsCache[index]?.start,
     scrollToIndex: (index, scroll) =>
-      virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
+      drawAllRows(() =>
+        virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
+      ),
     scrollToOffset: (offset) => virtualizer.scrollToOffset(offset, { align: "start", behavior: "auto" }),
+    firstDrawnIndex: () => drawFrom,
+    drawAllRows: () => drawAllRows(),
   };
 }
 
-/* The reader is at the start of the loaded transcript when the first rows are on the screen. */
 const HISTORY_BOUNDARY_ROWS = 5;
 const HISTORY_BOUNDARY_DISTANCE = 80;
 
-/**
- * Whether the reader has reached the start of the loaded transcript, which is what asks the chat
- * for the next older page.
- *
- * Both the distance and the row index are needed. A transcript that is short against its viewport
- * renders its first row at every scroll position, so the row index alone reports the boundary
- * while the reader sits at the newest message: the chat then pages in its history under a reply
- * that is still arriving, and each page moves the transcript under the reader. The distance alone
- * reports the boundary in a virtualized transcript that keeps its first row far above the screen.
- *
- * A chat that follows the latest message is on its way to the bottom, so the bottom is where the
- * reader is. A chat that opens paints at the top for a frame before its follow lands, and a slow
- * server then sends an older page that nobody asked for. While it arrives, the transcript moves.
- */
 export function chatHistoryBoundaryReached(
   scrollElement: HTMLElement | undefined,
   firstRenderedIndex: number,
@@ -271,13 +331,17 @@ function virtualItemsEqual(left: VirtualItem, right: VirtualItem): boolean {
   );
 }
 
+function fallbackStart(count: number, drawFrom: number): number {
+  return count <= STATIC_CHAT_LIMIT ? drawFrom : Math.max(0, count - STATIC_CHAT_RETURN);
+}
+
 function fallbackItems(
   count: number,
+  startIndex: number,
   estimateSize: (index: number) => number,
   getItemKey: (index: number) => string | number,
   scrollMargin: number,
 ): VirtualItem[] {
-  const startIndex = count <= 100 ? 0 : Math.max(0, count - 10);
   return Array.from({ length: count - startIndex }, (_, offset): VirtualItem => {
     const index = startIndex + offset;
     const size = estimateSize(index);

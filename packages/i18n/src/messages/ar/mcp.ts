@@ -103,6 +103,7 @@ export const messages = {
   "mcp.panel.signIn": "تسجيل الدخول",
   "mcp.panel.signOut": "تسجيل الخروج",
   "mcp.panel.cancelSignIn": "إلغاء تسجيل الدخول",
+  "mcp.panel.useAddress": "استخدم هذا العنوان",
   "mcp.panel.signInTo": "تسجيل الدخول إلى {name}",
   "mcp.panel.signInWaiting": {
     zero: "أكمل تسجيل الدخول في متصفحك.",

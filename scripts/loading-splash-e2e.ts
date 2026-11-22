@@ -1,26 +1,3 @@
-// Checks the startup splash of a desktop client whose server is a slow remote host.
-//
-// Start this worktree's stack with
-// `OPENBOT_DEV_CLIENT_TRANSPORT=webrtc OPENBOT_DEV_RTT_MS=600 bun run dev:test-client`, then run
-// `bun scripts/loading-splash-e2e.ts --allow-mutations [--runs=3] [--label=<name>]`.
-//
-// The script selects the dev host as the test client's server, then checks two things:
-// - `cover`: the window reloads, which always plays the splash, and grows to the screen size while
-//   the crew fall, as when the user turns on full screen. The pit must still cover the whole window.
-//   `before` and `after` give the share of the window that the pit covers.
-// - `rains`: each run restarts only the test client (`bun run dev:restart-client`), so main connects
-//   again over the slow link, and records each loading screen and each server state until the
-//   workspace shows. The screens that continue one pile share its start, so a start that plays once
-//   gives 1 rain. A run whose splash ended before the attach is `missed` and starts again.
-// `--pause-host=<seconds>` stops the dev host's main process for that time after each restart, as a
-// server that answers late. The client then reports a failed connection and retries.
-// `--pause-host-online=<seconds>` stops the dev host for that time when the client starts to load the
-// workspace over the online link. The first reads then fail at their deadline, and the client tries again.
-// - `account`: the account service stops, main loads the account again (`auth.retry()`), and the
-//   window reloads while the account state is `loading`, as at a start with a slow link to the
-//   account service. The service continues after `--account-wait=<seconds>` (default 6). The start
-//   must also give 1 rain.
-// Writes .openbot-build/loading-splash/<label>/report.json and a screenshot of the grown window.
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -48,29 +25,21 @@ const OUT = resolve(ROOT, ".openbot-build", NAME, label);
 const logger = createOpenBotLogger(NAME);
 
 interface SplashLog {
-  /** Each pile screen when it showed: ms after the page start, the age of its pile when it mounted, and its parents. */
   screens: { at: number; pileAge: number; where: string; goneAt?: number }[];
-  /** The start of each crew that fell, from the document timeline, in ms. */
   starts: number[];
-  /** Each change of the remote server's state, as main reports it. */
   states: { at: number; state: string; issue: string | null }[];
-  /** Each change of the account state, as main reports it. */
   auth: { at: number; status: string }[];
-  /** When the recorder started, in ms after the page start. */
   attachedAt: number;
-  /** The app had rendered and showed no pile when the recorder started: the start splash had ended. */
   splashEndedAtAttach: boolean;
 }
 
 interface Cover {
   window: { width: number; height: number };
-  /** The share of the window that the pit covers, from 0 to 1. */
   share: number;
 }
 
 interface RunReport {
   rains: number;
-  /** The start splash rained before the attach, so the recorder did not see it. */
   unseenSplash: boolean;
   attachedAt: number;
   screens: SplashLog["screens"];
@@ -79,7 +48,6 @@ interface RunReport {
   workspaceReadyMs: number | null;
 }
 
-// Runs in the page. It must be a string: the page has no access to this module.
 const RECORDER = `(() => {
   if (window.__splashLog) return;
   const log = {
@@ -112,7 +80,6 @@ const RECORDER = `(() => {
     }
     for (const plush of document.querySelectorAll(".app-loading-plush")) {
       for (const animation of plush.getAnimations()) {
-        // The intro holds its last pose for an hour; the hop is shorter.
         const duration = Number(animation.effect?.getTiming().duration);
         if (!(duration > 3_000_000) || animation.startTime === null) continue;
         const start = Math.round(Number(animation.startTime));
@@ -143,7 +110,6 @@ const RECORDER = `(() => {
   setInterval(scan, ${POLL_MS});
 })()`;
 
-// The share of the frame that the pit covers. Read in the page.
 const COVER = `(() => {
   const frame = document.querySelector(".app-loading-pit-frame");
   const pit = document.querySelector(".app-loading-pit");
@@ -182,7 +148,6 @@ async function poll<T>(what: string, read: () => Promise<T | null>): Promise<T> 
   }
 }
 
-/** The Electron main process of this worktree's dev host. Its record names the electron-vite process. */
 function hostMainPid(): number {
   const hosts = readDevInstanceRecords().filter(
     (record) => record.service === "app" && resolve(record.projectRoot) === ROOT,
@@ -195,9 +160,7 @@ function hostMainPid(): number {
     children = execFileSync("pgrep", ["-P", String(host.pid)], { encoding: "utf8" })
       .split("\n")
       .filter(Boolean);
-  } catch {
-    // `pgrep` exits with 1 when the process has no children.
-  }
+  } catch {}
   const main = children.find((pid) =>
     execFileSync("ps", ["-o", "command=", "-p", pid], { encoding: "utf8" }).includes("/MacOS/Electron "),
   );
@@ -205,7 +168,6 @@ function hostMainPid(): number {
   return Number(main);
 }
 
-/** The process group of this worktree's account service. Its supervisor starts each service in its own group. */
 function accountServiceGroup(): number {
   const output = execFileSync("bun", ["scripts/dev-stack.ts", "status"], { cwd: ROOT, encoding: "utf8" });
   const status: {
@@ -219,13 +181,8 @@ function accountServiceGroup(): number {
   return api.pid;
 }
 
-// Ctrl-C ends the script through `exit`, so that each stopped process continues.
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => process.exit(130));
 
-/**
- * Stops a process (a positive id) or a process group (a negative id) for `seconds`. It does not answer
- * in this time, and then continues where it stopped.
- */
 function pause(name: string, target: number, seconds: number): () => void {
   let paused = true;
   const resume = () => {
@@ -250,7 +207,6 @@ function connect(instance: DevInstanceRecord): Promise<AutomationSession> {
   });
 }
 
-/** Makes the dev host the active server, so a restart loads it. */
 async function selectRemoteServer(instance: DevInstanceRecord): Promise<void> {
   const session = await connect(instance);
   try {
@@ -268,12 +224,9 @@ async function selectRemoteServer(instance: DevInstanceRecord): Promise<void> {
   }
 }
 
-/** Waits until the window shows the workspace, and no loading screen covers it any more. */
 async function waitForWorkspace(page: Page, what: string): Promise<void> {
-  // A hidden dev window gets no animation frames, so the page checks the state at an interval.
   await page
     .waitForFunction(
-      // A function, not a string: the window's CSP refuses `eval`.
       () =>
         performance.getEntriesByName("openbot:remote-workspace-ready").length > 0 &&
         document.querySelector(".app-loading") === null,
@@ -289,7 +242,6 @@ async function measureCover(page: Page): Promise<Cover> {
   return poll("the crew pit shows", () => page.evaluate<Cover | null>(COVER));
 }
 
-/** Grows the window to the size of the screen, as full screen does, while the crew fall. */
 async function growWindow(page: Page, cdp: CDPSession): Promise<{ before: Cover; after: Cover }> {
   const before = await measureCover(page);
   const screen = await page.evaluate<{ width: number; height: number }>(
@@ -301,7 +253,6 @@ async function growWindow(page: Page, cdp: CDPSession): Promise<{ before: Cover;
     deviceScaleFactor: 0,
     mobile: false,
   });
-  // Two frames: a resize observer runs in the first, and its style change shows in the second.
   await page.evaluate("new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))");
   const after = await measureCover(page);
   mkdirSync(OUT, { recursive: true });
@@ -310,7 +261,6 @@ async function growWindow(page: Page, cdp: CDPSession): Promise<{ before: Cover;
   return { before, after };
 }
 
-/** Reloads the window, which always plays the splash, and grows the window while the crew fall. */
 async function checkCover(instance: DevInstanceRecord): Promise<{ before: Cover; after: Cover }> {
   const session = await connect(instance);
   try {
@@ -325,14 +275,12 @@ async function checkCover(instance: DevInstanceRecord): Promise<{ before: Cover;
   }
 }
 
-/** Null when the window showed no loading screen after the attach: the splash ended before it. */
 async function run(previous: DevInstanceRecord): Promise<RunReport | null> {
   const restart = spawn("bun", ["scripts/dev-stack.ts", "restart-client"], { cwd: ROOT, stdio: "inherit" });
   const restarted = new Promise<void>((done, fail) => {
     restart.once("error", fail);
     restart.once("exit", (code) => (code === 0 ? done() : fail(new Error(`restart-client exited with ${code}.`))));
   });
-  // A failure before the wait below must not leave this rejection unhandled. The wait still gets it.
   restarted.catch(() => undefined);
   const resumes: (() => void)[] = [];
   try {
@@ -349,11 +297,9 @@ async function run(previous: DevInstanceRecord): Promise<RunReport | null> {
   }
 }
 
-/** Null when the recorder saw no loading screen. */
 async function readReport(page: Page): Promise<RunReport | null> {
   const log = await page.evaluate<SplashLog>("window.__splashLog");
   if (log.screens.length === 0) return null;
-  // The start splash rained before the attach. A pile seen later is a new rain.
   const unseenSplash = log.splashEndedAtAttach;
   const ready = await page.evaluate<number | null>(
     `performance.getEntriesByName("openbot:remote-workspace-ready")[0]?.startTime ?? null`,
@@ -369,10 +315,6 @@ async function readReport(page: Page): Promise<RunReport | null> {
   };
 }
 
-/**
- * Reloads the window while main loads the account and the account service does not answer. The
- * recorder starts with the new page, so it sees every rain.
- */
 async function checkAccountWait(instance: DevInstanceRecord): Promise<RunReport> {
   const session = await connect(instance);
   let resume: (() => void) | undefined;
@@ -402,7 +344,6 @@ async function recordStart(instance: DevInstanceRecord, resumes: (() => void)[])
     const page = session.page;
     await page.evaluate(RECORDER);
     if (pauseOnlineS > 0) {
-      // The renderer marks the start of each workspace load. The first one waits for the online link.
       await page.evaluate(`new Promise((done) => {
         const observer = new PerformanceObserver((list) => {
           if (!list.getEntriesByName("openbot:remote-workspace-load").length) return;

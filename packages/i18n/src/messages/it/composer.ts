@@ -53,6 +53,7 @@ export const messages = {
   "composer.picker.noSkills": "Questo agente non ha skill.",
   "composer.picker.noSkillMatch": "Nessuna skill corrisponde a «{query}».",
   "composer.picker.skillsLoadFailed": "Impossibile caricare le skill.",
+  "composer.picker.skillProblem": "{name} non è disponibile. {problem} Chiedi all’agente di correggerla.",
   "composer.token.attachment": "Apri il file allegato {name}",
   "composer.token.agent": "Agente {name}",
   "composer.token.skill": "Skill {name}",
@@ -102,7 +103,7 @@ export const messages = {
   "composer.voice.recording": "Registrazione vocale",
   "composer.voice.limitSoon": "La registrazione si ferma tra {seconds} secondi.",
   "composer.voice.limitReached":
-    "La registrazione si è fermata al limite di 2 minuti. Quello che hai detto è nel messaggio.",
+    "La registrazione si è fermata al limite di 10 minuti. Quello che hai detto è nel messaggio.",
   "composer.send.saveQueued": "Salva messaggio in coda",
   "composer.send.voice": "Invia messaggio vocale",
   "composer.send.message": "Invia messaggio",

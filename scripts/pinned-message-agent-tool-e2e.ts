@@ -1,10 +1,3 @@
-// Checks the `pin_message` agent tool through the real agent service and tool router, on a temporary
-// profile with a fake Codex app-server. The fake has its own thread ids, as a real provider does, and
-// calls the tool through `tool_call`. It checks that the agent pins in its own chat and in a side
-// thread, that a quote skips the user's request that also contains it, that an unpin by quote finds
-// the pinned message when a newer message has the same text, and that the agent cannot unpin a
-// person's pin.
-// `bun scripts/pinned-message-agent-tool-e2e.ts`. Writes .openbot-build/pinned-message-agent-tool-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -21,7 +14,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -38,11 +30,6 @@ const PERSON = { id: "local", name: "Alex" };
 const DECISION = "We decided: ship on Friday.";
 const QUOTE = "ship on Friday";
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose input has
- * `PIN-CALL <<ARGS{"__tool":"…",…}ARGS>>` calls `openbot.<__tool>` with the rest of that JSON
- * through `tool_call`, logs the result, and ends. The last call in the input is the current one. Other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -54,7 +41,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -93,7 +79,6 @@ const answer = (message) => {
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
       const id = "tool-" + turnId;
       waiting.set(id, { threadId: params.threadId, turnId });
-      // The packet carries the request as JSON text, so its quotes arrive escaped.
       const { __tool, ...args } = JSON.parse(match[1].replace(/\\\\"/g, '"'));
       return write({
         id,
@@ -141,6 +126,7 @@ process.stdin.on("data", (chunk) => {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -165,7 +151,6 @@ interface ToolLog {
   error: unknown;
 }
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -214,7 +199,6 @@ const agents = new AgentService({
   timezone: () => "UTC",
 });
 
-/** Waits until no chat or side thread of the agent has a turn that runs or waits to start. */
 function idle(agentId: string) {
   return waitFor(
     "the turns to end",
@@ -229,13 +213,11 @@ function idle(agentId: string) {
 const callText = (args: { quote?: string; pinned?: boolean }) =>
   `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: "pin_message", ...args })}ARGS>>`;
 
-/** Sends `text` as the person to the agent's own chat, with no tool call. */
 async function say(agentId: string, text: string) {
   await runCauseEffect(agents.sendMessage({ agentId, text }, PERSON));
   await idle(agentId);
 }
 
-/** Sends a message with a tool call as the person, to the agent's own chat or to a new side thread. */
 async function call(name: string, agentId: string, text: string, where: "chat" | "new-thread" = "chat") {
   const before = toolLogs().length;
   if (where === "chat") await runCauseEffect(agents.sendMessage({ agentId, text }, PERSON));
@@ -266,7 +248,6 @@ try {
   await idle(agent.id);
   await say(agent.id, DECISION);
 
-  // 1. A quote pins the older message, not the user's request that also quotes it.
   const pinned = await call("pin by quote", agent.id, `Pin the message "${QUOTE}". ${callText({ quote: QUOTE })}`);
   const decision = pins(agent.id).find((pin) => pin.text === DECISION);
   pass(
@@ -276,7 +257,6 @@ try {
   );
   assert.ok(decision);
 
-  // 2. An unpin by quote finds the pinned message, also when a newer message has the same text.
   await say(agent.id, `Reminder: ${QUOTE} stays the plan.`);
   const unpinned = await call(
     "unpin by quote",
@@ -289,7 +269,6 @@ try {
     `${unpinned.text} ${JSON.stringify(pins(agent.id))}`,
   );
 
-  // 3. A quote that only the request has is refused, and pins nothing.
   const missing = await call("quote only in the request", agent.id, `Pin "zebra". ${callText({ quote: "zebra" })}`);
   pass(
     "A quote that only the request contains pins nothing",
@@ -297,7 +276,6 @@ try {
     missing.text,
   );
 
-  // 4. With no quote, the current user message is the target.
   const current = await call("pin the request", agent.id, `Pin this message. ${callText({})}`);
   pass(
     "With no quote, the agent pins the current user message",
@@ -305,7 +283,6 @@ try {
     `${current.text} ${JSON.stringify(pins(agent.id))}`,
   );
 
-  // 5. The agent cannot unpin a person's pin.
   await Effect.runPromise(
     agents.setMessagePinned(
       { agentId: agent.id, messageId: decision.messageId, pinned: true },
@@ -325,7 +302,6 @@ try {
     personPin.text,
   );
 
-  // 6. In a side thread, the pin belongs to that thread.
   const inThread = await call("pin in a side thread", agent.id, `Thread note. ${callText({})}`, "new-thread");
   const task = agents.listTasks(agent.id).tasks.find((candidate) => candidate.origin !== "agent");
   pass(

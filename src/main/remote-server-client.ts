@@ -1,24 +1,3 @@
-import type { TeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
-import { hasTeamProtocolV10Lists, TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
-// One Team API call, from picking a wire format to recording that it failed.
-//
-// **Two encodings, on purpose. Never merge them.** The HTTPS path frames V1 or V3 according to the
-// protocol this app and the host negotiated; the WebRTC path frames V2 JSON and nothing else. Both
-// are released wire protocols, so a shipped frame never changes meaning -- see
-// `packages/contracts/AGENTS.md`. What looks like duplication between the two arms of every method
-// here is two protocols that happen to carry the same payload today. Collapsing them is the one
-// edit in this file that silently breaks a build already in users' hands. Deleting a *duplicated
-// call site* is fine; merging the two encodings is not.
-//
-// Everything above the wire is shared and lives here once: compatibility negotiation and its
-// in-flight deduplication, the protocol and capability headers, translating a transport failure
-// into a `RemoteRequestError`, and reporting the failure to the connection registry. The registry
-// decides what a failure means to the user; this file only decides what it means to the request.
-//
-// This file does not know the event stream exists. When a failure makes reconnecting pointless the
-// registry says so and its owner acts on it -- that is what keeps a failed HTTP request from
-// reaching in and closing a WebSocket.
-
 import { randomBytes, verify } from "node:crypto";
 import type { RemoteDesktopCapabilities, ServerCompatibility } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -43,6 +22,8 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
   teamProtocolUpdateDirection,
 } from "@openbot/contracts/team-protocol/v1";
+import type { TeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { hasTeamProtocolV10Lists, TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Option, Result } from "effect";
 import { decodeRemoteDesktopCapabilities } from "./remote-device-decoding";
@@ -62,10 +43,6 @@ import { decodeIdentityProof } from "./remote-team-decoding";
 import { fingerprint } from "./team-store";
 import { TeamWebRtcRequestError } from "./team-webrtc-client-transport";
 
-/**
- * The two transport methods a request needs. `TeamWebRtcClientTransport` also carries a live event
- * channel and a control-plane client; naming only these two is what keeps those out of this file.
- */
 export interface RemoteHostRequestTransport {
   request: (
     hostId: string,
@@ -100,17 +77,11 @@ export interface RemoteHostRequestTransport {
   >;
 }
 
-/** What the client needs from the stored server list: a server, and the token to speak for it. */
 export interface RemoteServerLookup {
   require: (serverId: string) => StoredRemoteServerView;
   token: (server: StoredRemoteServerView) => string;
 }
 
-/**
- * Where a request records what happened. The client reads the last known compatibility to avoid
- * renegotiating, and reads the last issue because a protocol failure must not be retried on every
- * call -- see `ensureCompatibility`.
- */
 export interface RemoteConnectionSink {
   compatibilityFor: (serverId: string) => ServerCompatibility | null;
   issueFor: (serverId: string) => { code: string; message: string } | null;
@@ -132,7 +103,6 @@ export interface RemoteRequestInit {
   timeoutMs?: number;
 }
 
-/** `RemoteServerClient.request` as a plain function, for callers that need nothing else from it. */
 export type RemoteRequestFn = <T>(
   serverId: string,
   path: string,
@@ -145,9 +115,6 @@ export class RemoteServerClient {
   readonly #servers: RemoteServerLookup;
   readonly #connections: RemoteConnectionSink;
   readonly #transport: RemoteHostRequestTransport | null;
-  // In-flight negotiations, so a burst of calls to a cold server produces one compatibility request
-  // rather than one per call. Private to the client: the UI never sees this, unlike the status the
-  // negotiation produces.
   readonly #compatibilityRequests = new Map<string, Deferred.Deferred<ServerCompatibility, RemoteWorkflowError>>();
 
   constructor(options: RemoteServerClientOptions) {
@@ -156,8 +123,6 @@ export class RemoteServerClient {
     this.#connections = options.connections;
     this.#transport = options.transport;
   }
-
-  /** One decoded Team API call. Every failure is reported to the registry before it is rethrown. */
 
   readonly request = Effect.fn("RemoteClient.request")(function* <T>(
     this: RemoteServerClient,
@@ -175,19 +140,12 @@ export class RemoteServerClient {
           preserveSemanticTags: supportsTeamSemanticTags(compatibility.capabilities),
           agentCreateModel: this.supportsAgentCreateModel(path, init, compatibility.capabilities),
         });
-        // Decoding is outside the transport's catch on purpose. A frame that arrived intact and then
-        // failed its route decoder is a protocol failure, not a request that happened to fail, and
-        // only `RemoteProtocolError` makes the classifier stop reconnecting to a host talking
-        // nonsense. `requestJson` draws the same line for the HTTPS arm; a plain error here left
-        // the server looking healthy.
         return yield* remoteDecode(() => addRemotePreviewUrls(decodeOrProtocolError(decoder, value), server.id));
       }
       const compatibility = yield* this.ensureCompatibility(server);
       const value = yield* requestJson(server.apiUrl, path, decoder, {
         ...init,
         token: this.#servers.token(server),
-        // A host without the capability drops the fields in its frozen projection and starts the
-        // agent on its own default, so the pair is only encoded for hosts that read it.
         agentCreateModel: this.supportsAgentCreateModel(path, init, compatibility.capabilities),
         ...this.requestProtocol(compatibility),
       }).pipe(
@@ -205,16 +163,6 @@ export class RemoteServerClient {
     }).pipe(Effect.tapError(({ cause }) => Effect.sync(() => this.#connections.reportError(server.id, cause))));
   });
 
-  /**
-   * The undecoded form, for bytes: attachments, avatars, logos and the remote viewer. The WebRTC arm
-   * rebuilds an HTTP `Response` from a V2 frame so both arms hand back the same thing.
-   *
-   * `affectsConnection` is false for the remote viewer, whose requests are triggered by page loads
-   * rather than by the user and so must not mark a healthy server offline.
-   *
-   * `timeoutMs` applies to both HTTP and WebRTC requests.
-   */
-
   readonly fetch = Effect.fn("RemoteClient.fetch")(function* (
     this: RemoteServerClient,
     server: StoredRemoteServerView,
@@ -222,9 +170,7 @@ export class RemoteServerClient {
     init: RequestInit = {},
     affectsConnection = true,
     timeoutMs?: number,
-    // Only the WebRTC arm reports here. An HTTP body arrives in parts, so its reader counts them.
     fileProgress?: RemoteFileProgress,
-    // Only the WebRTC arm reports here: the host confirms each part of the body. `fetch` does not.
     uploadProgress?: (sent: number, total: number) => void,
   ): Effect.fn.Return<Response, RemoteWorkflowError> {
     return yield* Effect.gen({ self: this }, function* () {
@@ -302,7 +248,6 @@ export class RemoteServerClient {
     );
   }).bind(this);
 
-  /** The negotiated protocol and this app's capabilities, as `requestJson` wants them. */
   requestProtocol(compatibility: ServerCompatibility): {
     protocol?: number | undefined;
     appVersion?: string | undefined;
@@ -318,14 +263,6 @@ export class RemoteServerClient {
       preserveSemanticTags: supportsTeamSemanticTags(compatibility.capabilities),
     };
   }
-
-  /**
-   * The negotiated compatibility for a server, negotiating it if this is the first call.
-   *
-   * A recorded protocol issue is rethrown without touching the network: the two ends have already
-   * agreed they cannot talk, and re-asking on every call would turn one incompatibility into a
-   * request storm. `refresh` is how an explicit reconnect gets past that.
-   */
 
   readonly ensureCompatibility = Effect.fn("RemoteClient.ensureCompatibility")(function* (
     this: RemoteServerClient,
@@ -363,10 +300,6 @@ export class RemoteServerClient {
     if (!refresh && current?.negotiatedProtocol) return current;
     const pending = this.#compatibilityRequests.get(server.id);
     if (pending) return yield* Deferred.await(pending);
-    // What the server was complaining about when this negotiation started. Only that complaint is
-    // this answer's to withdraw: a caller reusing the compatibility already on record -- the desktop
-    // probe does -- can record a protocol failure while this request is still out, and clearing it
-    // unconditionally on the way back is how a host that failed closed comes back healthy.
     const issueAtStart = this.#connections.issueFor(server.id);
     const request = Deferred.makeUnsafe<ServerCompatibility, RemoteWorkflowError>();
     this.#compatibilityRequests.set(server.id, request);
@@ -374,8 +307,6 @@ export class RemoteServerClient {
       const compatibility = yield* server.transport === "webrtc-v2"
         ? this.#negotiateWebRtcCompatibilityEffect(server.id)
         : this.negotiateCompatibility(server.apiUrl);
-      // A server in safe mode answers only with its reason. It is not a usable connection, so it is not
-      // recorded as one: the failure records the host versions for the screen that shows the reason.
       if (compatibility.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY))
         return yield* this.#serverSafeModeError(server, compatibility);
       this.#connections.setCompatibility(server.id, compatibility);
@@ -391,11 +322,6 @@ export class RemoteServerClient {
     );
   }).bind(this);
 
-  /**
-   * The failure for a server in safe mode, with the reason that the host sends to each member. The
-   * read goes past `request`, which would ask for the compatibility again. A reason that cannot be
-   * read gives the general safe-mode sentence: the user still sees why the server does not answer.
-   */
   readonly #serverSafeModeError = Effect.fn("RemoteClient.serverSafeModeError")(function* (
     this: RemoteServerClient,
     server: StoredRemoteServerView,
@@ -432,14 +358,6 @@ export class RemoteServerClient {
     });
   });
 
-  /**
-   * The one compatibility read after a WebRTC connect. It is the shared negotiation of
-   * `ensureCompatibility`, so a request that the connect starts at the same time waits for this read
-   * and does not send its own. The caller is a `connected` handler with nowhere to put an error, so
-   * this records it: the transport raises `protocol_error` for a frame the released adapter refuses,
-   * and a host talking nonsense must not look healthy.
-   */
-
   readonly refreshWebRtcCompatibility = Effect.fn("RemoteClient.refreshWebRtcCompatibility")(function* (
     this: RemoteServerClient,
     server: StoredRemoteServerView,
@@ -449,11 +367,6 @@ export class RemoteServerClient {
       Effect.tapError(({ cause }) => Effect.sync(() => this.#connections.reportError(server.id, cause))),
     );
   }).bind(this);
-
-  /**
-   * Negotiation against a bare URL, for a server not stored yet -- joining, or verifying an
-   * identity. Nothing here is recorded, because there is no connection to record it against.
-   */
 
   readonly negotiateCompatibility = Effect.fn("RemoteClient.negotiateCompatibility")(function* (
     this: RemoteServerClient,
@@ -473,9 +386,6 @@ export class RemoteServerClient {
       });
     }
     if (negotiatedProtocol <= 7) return negotiatedCompatibility(this.#appVersion, host, negotiatedProtocol);
-    // The first read is a protocol 7 request, so every released host can answer it, but a host shows
-    // a protocol 7 peer no protocol 9 capabilities. Read the list again as the negotiated protocol.
-    // A protocol 10 read gets the two protocol 10 lists, which the decoder expands.
     const current = yield* this.#readCompatibilityEffect(
       apiUrl,
       negotiatedProtocol,
@@ -488,7 +398,6 @@ export class RemoteServerClient {
     );
   }).bind(this);
 
-  /** One compatibility read against a bare URL, with its failures as the user is told them. */
   readonly #readCompatibilityEffect = Effect.fn("RemoteClient.readCompatibility")(function* (
     this: RemoteServerClient,
     apiUrl: string,
@@ -527,12 +436,6 @@ export class RemoteServerClient {
     }
     return attempt4.success;
   }).bind(this);
-
-  /**
-   * Proves the host at `apiUrl` holds the key behind `expectedFingerprint`, by making it sign a
-   * challenge this app just generated. This is what an invite link's fingerprint is for, and it runs
-   * before any token is ever sent -- so a host that fails it never learns anything.
-   */
 
   readonly verifyIdentity = Effect.fn("RemoteClient.verifyIdentity")(function* (
     this: RemoteServerClient,
@@ -582,11 +485,6 @@ export class RemoteServerClient {
     };
   }).bind(this);
 
-  /**
-   * Whether this server can share a screen right now. A host that has never heard of the route
-   * answers 404, 426 or 503; those mean "no", not "the connection is broken".
-   */
-
   readonly probeRemoteDesktop = Effect.fn("RemoteClient.probeRemoteDesktop")(function* (
     this: RemoteServerClient,
     server: StoredRemoteServerView,
@@ -623,12 +521,6 @@ export class RemoteServerClient {
       Effect.catch(({ cause: error }) =>
         Effect.gen({ self: this }, function* () {
           if (error instanceof RemoteRequestError && [404, 426, 503].includes(error.status)) return false;
-          // A host answering the probe with something no build can read is not a host without screen
-          // sharing. Every caller of this turns a rejection into `false` or `null`, so a protocol failure
-          // that is not recorded here is a host that stays healthy and reconnectable. Both error classes
-          // appear here and neither extends the other: the HTTPS arm's `requestJson` raises
-          // `RemoteProtocolError` for a body it cannot decode, the WebRTC arm's transport raises a
-          // `protocol_error` `RemoteRequestError` -- so checking one of them records half the failures.
           if (
             error instanceof RemoteProtocolError ||
             (error instanceof RemoteRequestError && error.code === "protocol_error")
@@ -641,7 +533,6 @@ export class RemoteServerClient {
     );
   }).bind(this);
 
-  /** Forgets an in-flight negotiation. Called when a server is removed or the app stops. */
   forget(serverId: string): void {
     this.#compatibilityRequests.delete(serverId);
   }
@@ -655,8 +546,6 @@ export class RemoteServerClient {
     serverId: string,
   ): Effect.fn.Return<ServerCompatibility, RemoteWorkflowError> {
     const first = yield* this.#readWebRtcCompatibilityEffect(serverId);
-    // The first read of a connection does not know the protocol, so a host of protocol 10 answers it
-    // as protocol 9. The transport knows the protocol now: read the full set again.
     const host =
       !first.lists && Math.min(first.support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum) >= TEAM_PROTOCOL_V10
         ? (yield* this.#readWebRtcCompatibilityEffect(serverId)).support
@@ -664,7 +553,6 @@ export class RemoteServerClient {
     return webRtcCompatibility(this.#appVersion, host);
   });
 
-  /** One WebRTC compatibility read, and whether the host sent the protocol 10 lists. */
   readonly #readWebRtcCompatibilityEffect = Effect.fn("RemoteClient.readWebRtcCompatibility")(function* (
     this: RemoteServerClient,
     serverId: string,
@@ -676,12 +564,6 @@ export class RemoteServerClient {
     return { support, lists: hasTeamProtocolV10Lists(value) };
   });
 
-  /**
-   * One WebRTC call, with the transport's own failures translated. Every direct `transport.request`
-   * went through this once and stopped: a `TeamWebRtcRequestError` that reaches a caller untranslated
-   * is invisible to the classifier, so the status codes below and the `protocol_error` the transport
-   * raises for a frame it cannot decode both stop meaning anything.
-   */
   readonly #hostRequestEffect = Effect.fn("RemoteClient.hostRequest")(function* (
     this: RemoteServerClient,
     serverId: string,
@@ -693,10 +575,6 @@ export class RemoteServerClient {
     }).pipe(Effect.catch(({ cause }) => remoteDecode(() => rethrowAsRemoteRequestError(cause))));
   });
 
-  /**
-   * Whether the chosen pair may ride an agent creation request to this host: only the create
-   * route carries the fields, and only a host advertising the capability reads them.
-   */
   private supportsAgentCreateModel(path: string, init: RemoteRequestInit, capabilities: readonly string[]): boolean {
     return (
       isAgentCreateRoute(init.method ?? (init.body === undefined ? "GET" : "POST"), path) &&
@@ -722,7 +600,6 @@ function decodeOrProtocolError<T>(
   }
 }
 
-/** A transport failure carries a status and a code; everything else is rethrown untouched. */
 function rethrowAsRemoteRequestError(error: unknown): never {
   if (error instanceof TeamWebRtcRequestError) throw new RemoteRequestError(error.status, error.message, error.code);
   throw error;

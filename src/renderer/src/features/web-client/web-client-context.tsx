@@ -44,6 +44,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_APPEARANCE_CAPABILITY, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
+import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
@@ -67,6 +68,7 @@ import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
+import { backgroundWorkKey } from "../conversation/background-work-key";
 import { messagePromptRequestKey, promptRequestKey } from "../conversation/conversation-keys";
 import {
   mergeConversationPage,
@@ -111,35 +113,20 @@ import { readWebServerSelection, writeWebServerSelection } from "./web-server-se
 
 interface WebConversation {
   page: ConversationPage | null;
-  /** The originals that a host page says are deleted, by id. */
   missingReferences?: Record<string, true>;
   draft: string;
   attachments: AttachmentSummary[];
   loading: boolean;
   error?: string | null;
-  /** The older pages were released; the next latest read takes the host's page and cursor. */
   trimmed?: boolean;
-  /** The last older page did not load. The chat shows it above its messages, and a scroll up tries again. */
   olderError?: string | null;
-  /**
-   * The page shows a part around an older message, not the newest messages. A latest read changes only
-   * the messages that it shows, and new messages wait until the user goes to the latest ones.
-   */
   around?: boolean;
 }
 
-/** The messages that a conversation keeps when it is not open, as on the desktop. */
 const LATEST_PAGE_SIZE = 50;
-/** The recently opened agents whose latest page a new page reads after the open one. */
 const PRELOADED_AGENTS = 3;
-/** While events stream, at most one event read of the unread state starts in this time. */
 const EVENT_READS_INTERVAL_MS = 1_000;
 
-/**
- * Releases the older pages of a conversation that is not open. Only the open conversation gets new
- * messages, so the next latest read replaces the kept messages with the host page, and the older pages
- * load again from the host's cursor, with no gap.
- */
 function trimToLatestPage(conversation: WebConversation): void {
   const page = conversation.page;
   if (!page) return;
@@ -148,7 +135,6 @@ function trimToLatestPage(conversation: WebConversation): void {
   if (page.messages.length <= LATEST_PAGE_SIZE) return;
   const kept = page.messages.slice(-LATEST_PAGE_SIZE);
   const removedById = new Map(page.messages.slice(0, -LATEST_PAGE_SIZE).map((message) => [message.id, message]));
-  // A kept reply keeps the quote of an original that the trim removes, as a page from the host gives it.
   const references: Record<string, ConversationMessage> = {};
   for (const message of kept) {
     const originalId = message.replyToMessageId;
@@ -164,59 +150,41 @@ interface WebWorkspaceState {
   hosts: RemoteTeamHost[];
   host: RemoteTeamHost | null;
   agents: ClientAgentSummary[];
-  /** The host answered an agent list. Until then, an empty `agents` does not mean the host has none. */
   agentsLoaded: boolean;
-  /** `agents` come from the saved frame, which holds no message text, until the host answers. */
   agentsFromFrame: boolean;
-  /** The channel rows of the saved frame, with no text. The sidebar shows them until the host lists channels. */
   frameChannels: ChannelSummary[];
   selectedId: string | null;
   conversations: Record<string, WebConversation>;
-  /** The queues read from the host, by agent. Each agent's queue is read on connect and on each change. */
   queues: Record<string, QueueSnapshot>;
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
   prompts: Array<Extract<AgentEvent, { type: "prompt" }>>;
-  /** The latest progress detail of each agent's running turn. */
   progress: Record<string, { turnId: string; detail: string; running?: boolean; activity?: string }>;
   takeovers: BrowserTakeoverRequest[];
-  /** How full the context of each agent's own chat is, by agent id, from the host's runtime snapshot. */
   contextStates: Record<string, AgentContextState>;
-  /** As `contextStates`, for each side thread, by thread id. */
   threadContextStates: Record<string, AgentContextState>;
+  backgroundWork: Record<string, number>;
   browserTabs: BrowserTab[];
   activeBrowserTabId: string | null;
   browserControlState: BrowserControlState;
-  /** Who is on the connected host. Null until the host answers. */
   presence: TeamPresenceSnapshot | null;
   capabilities: string[];
   status: "connecting" | "online" | "offline";
-  /**
-   * The opened host is a hosted server that the account service stopped for no use (`sleeping`), or that
-   * starts after the user's input (`waking`). Cleared when it is online again.
-   */
   hostedSleep: HostedServerSleep | null;
   hostedIssue: HostedServerIssue | null;
-  /** The step of a hosted start, while `hostedSleep` is `waking`. */
   hostedStart: HostedServerStart | null;
-  /** The last connection failure, with its code. Shown while the workspace reconnects. */
   connectionError: UserErrorDetails | null;
-  /** Signal holds the connection because the host is not online. */
   hostOffline: boolean;
-  /** Another tab of this browser has the host open. The workspace shows this in full, with "Use here". */
   otherTab: boolean;
   recovery: RemoteRecoveryStatus | null;
   workspaceLoaded: boolean;
-  /** The host answered once. A saved frame sets `workspaceLoaded` before that, so the first-load screen waits for this. */
   synced: boolean;
   panelsFailed: boolean;
   panelsLoading: boolean;
   agentStatus: AgentStatus | null;
   models: ClientAgentModelOption[];
-  /** The opened host said it restarts into an update (`host-update-v1`). Cleared when it is online again. */
   hostRestart: { state: "waiting" | "restarting"; version: string | null } | null;
-  /** The state of each host that this tab has not opened, from its status connection. */
+  restartReady: boolean;
   hostStates: Record<string, WebHostState>;
-  /** The last connection found that the host speaks no protocol this build speaks. */
   incompatibility: {
     hostId: string;
     code: WebHostIncompatibleError["code"];
@@ -232,23 +200,12 @@ interface WebWorkspaceState {
   busy: boolean;
   uploading: boolean;
   hiddenIds: string[];
-  /** The team member this connection signs in as, once the host has answered. */
   memberId: string | null;
   duplicatingAgentIds: string[];
   sidebarLayout: SidebarLayoutSnapshot;
-  /** The agents that a user hid on the host (`agent-hidden-v1`). Not the same as `hiddenIds`. */
   userHiddenAgents: HiddenAgent[];
-  /** The exact agent colours on the host (`agent-colors-v1`). The released agent list does not carry them. */
   agentColors: AgentColorEntry[];
-  /**
-   * The chat colours of the agents and members on the host (`chat-colors-v1`). The released agent list
-   * and presence do not carry them. `presence` already has the member chat colours.
-   */
   chatColors: ChatColors;
-  /**
-   * The read state of each agent's own chat for this member, from `conversationReads`. The sidebar
-   * shows its unread counts. An agent with no entry has no unread messages that this tab knows of.
-   */
   reads: Record<string, ConversationReadState>;
 }
 
@@ -265,12 +222,10 @@ export function createWebWorkspace(
     accountId: string;
     accountFetch: typeof fetch;
     onSessionCheck: () => Promise<void>;
-    /** Read when the workspace closes: true when its account session has ended. */
     accountSessionEnded?: () => boolean;
     createRuntime?: WebRuntimeFactory | undefined;
   },
   hooks: {
-    /** A new agent status of the connected host, such as the end of a provider sign-in. */
     onStatus?: (status: AgentStatus) => void;
   } = {},
 ) {
@@ -290,6 +245,7 @@ export function createWebWorkspace(
     takeovers: [],
     contextStates: {},
     threadContextStates: {},
+    backgroundWork: {},
     browserTabs: [],
     activeBrowserTabId: null,
     browserControlState: { sessions: [] },
@@ -310,6 +266,7 @@ export function createWebWorkspace(
     agentStatus: null,
     models: [],
     hostRestart: null,
+    restartReady: false,
     hostStates: {},
     incompatibility: null,
     hostsLoaded: false,
@@ -328,9 +285,9 @@ export function createWebWorkspace(
     chatColors: { agents: [], members: [] },
     reads: {},
   });
-  // Every progress line of the newest turns, by turn, for the steps under the activity line.
   const [stepLines, setStepLines] = createSignal<TurnStepLines>({});
   let generation = 0;
+  let restartCapable = false;
   let selectedId: string | null = null;
   let hostId: string | null = null;
   let disposed = false;
@@ -338,33 +295,17 @@ export function createWebWorkspace(
   let pendingReload = false;
   let reloadPromise: Promise<void> | null = null;
   let hostsRefreshPromise: Promise<void> | null = null;
-  /**
-   * The hosts this account left. The leave revokes this session and takes the host out of the list;
-   * neither is an error. An id stays until a list without its host arrives.
-   */
   const leftHostIds = new Set<string>();
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
-  /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
-  /** When the last full read of the open host ended. The events keep the state current after it. */
   let syncedAt = 0;
-  /** The queue read in flight by agent. An event during a read asks for one more read. */
   const queueLoads = new Map<string, { generation: number; again: boolean }>();
-  /** Counts queue snapshots from events by agent. A read that started before a newer snapshot is dropped. */
   const queueRevisions = new Map<string, number>();
-  /**
-   * The agents whose queue came from `agent-active-queues-v1`: only the open work, which the agent row
-   * needs. The open chat needs the finished deliveries too, so opening one of these agents reads its full
-   * queue.
-   */
   const partialQueues = new Set<string>();
-  /** The agents that wait for the next list read, and the generation of the list read in flight. */
   const queueListPending = new Set<string>();
   let queueListRunning: number | null = null;
   const readWrites = new Map<string, Promise<void>>();
-  /** The conversation reads in flight by agent, and the deltas that wait for them to finish. */
   const conversationReads = new Map<string, number>();
-  /** The newest read around a message for each agent. A newer jump or a return to the latest messages wins. */
   const aroundReads = new Map<string, number>();
   const heldDeltas = new Map<string, Array<Extract<AgentEvent, { type: "conversation-delta" }>>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
@@ -386,14 +327,9 @@ export function createWebWorkspace(
             draft.recovery = status;
           });
       },
-      // A hosted server that starts comes online soon, so the next attempt does not wait for the backoff.
       () => (state.hostedSleep === "waking" ? WAKE_RECONNECT_DELAY_MS : null),
     );
   }
-  /**
-   * Keeps a failed attempt that nothing else recorded. `connectWorkspace` and the connection updates
-   * record their own failures; an error without a code adds nothing to them.
-   */
   function noteConnectionFailure(error: unknown) {
     if (disposed || state.connectionError || !errorReference(error)) return;
     const text = currentText();
@@ -409,7 +345,6 @@ export function createWebWorkspace(
     recovery.offline();
     recovery.setActive(!document.hidden);
   }
-  /** The user is back on the page. `offline` keeps the wait after failed attempts, up to two minutes; this ends it. */
   function recoverNow() {
     if (disposed || !hostId || recoveryBlocked) return;
     if (state.recovery?.phase !== "waiting" && state.recovery?.phase !== "cooldown") return recover();
@@ -442,9 +377,53 @@ export function createWebWorkspace(
     },
   });
   const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) => void>();
-  // A runtime snapshot cuts the long texts of an approval. The whole copy is read once for each cut
-  // request. Until it comes, and from a host without `pending-approval-v1`, the card offers only Deny.
   const wholeApprovalReads = new Set<string>();
+  let promptListRead: "idle" | "reading" | "again" = "idle";
+  const resolvedDuringPromptListRead = new Set<string>();
+  let listedPrompts: { generation: number; prompts: Array<Extract<AgentEvent, { type: "prompt" }>> } = {
+    generation,
+    prompts: [],
+  };
+  function withListedPrompts(prompts: Array<Extract<AgentEvent, { type: "prompt" }>>) {
+    if (listedPrompts.generation !== generation) return prompts;
+    const known = new Set(prompts.map((item) => String(item.requestId)));
+    const missing = listedPrompts.prompts.filter((prompt) => !known.has(String(prompt.requestId)));
+    return missing.length > 0 ? [...prompts, ...missing] : prompts;
+  }
+  function forgetListedPrompt(requestId: string | number): void {
+    if (promptListRead !== "idle") resolvedDuringPromptListRead.add(String(requestId));
+    listedPrompts.prompts = listedPrompts.prompts.filter((prompt) => String(prompt.requestId) !== String(requestId));
+  }
+  function readListedPrompts(): void {
+    const list = runtime.listPendingPrompts;
+    if (!list) return;
+    if (promptListRead !== "idle") {
+      promptListRead = "again";
+      return;
+    }
+    promptListRead = "reading";
+    resolvedDuringPromptListRead.clear();
+    const current = generation;
+    void list()
+      .then((prompts) => {
+        if (disposed || current !== generation) return;
+        listedPrompts = {
+          generation: current,
+          prompts: prompts
+            .filter((prompt) => !resolvedDuringPromptListRead.has(String(prompt.requestId)))
+            .map((prompt) => ({ ...prompt, type: "prompt" as const })),
+        };
+        setState((draft) => {
+          draft.prompts = withListedPrompts(draft.prompts);
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        const again = promptListRead === "again";
+        promptListRead = "idle";
+        if (again && !disposed) readListedPrompts();
+      });
+  }
   function readWholeApprovals(): void {
     const read = runtime.readPendingApproval;
     if (!read) return;
@@ -456,7 +435,6 @@ export function createWebWorkspace(
       void read({ agentId: approval.agentId, requestId: approval.requestId }).then(
         (whole) => {
           if (disposed) return;
-          // A read that a reconnect made stale, or that an older host refused, tries again at the next snapshot.
           if (!whole || current !== generation) {
             wholeApprovalReads.delete(key);
             return;
@@ -465,16 +443,10 @@ export function createWebWorkspace(
             draft.approvals = [...withWholeApproval(draft.approvals, whole)];
           });
         },
-        // The next snapshot tries again.
         () => wholeApprovalReads.delete(key),
       );
     }
   }
-  /**
-   * The last status event and model sources of the open host. A released status event carries no
-   * source (#9956), so each one goes out with the last sources of that host, and the sources are read
-   * again after it. A changed source sends the status again.
-   */
   let hostStatus: AgentStatus | null = null;
   let hostSources: { hostId: string | null; sources: ProviderModelSourceEntry[] } = { hostId: null, sources: [] };
   let sourceRead = 0;
@@ -499,6 +471,7 @@ export function createWebWorkspace(
     props.accountId,
     {
       accountChanged: props.onSessionCheck,
+      serversChanged: retryHosts,
       accessDenied(id, error) {
         if (!disposed && id === hostId) blockAccess(error);
       },
@@ -515,38 +488,35 @@ export function createWebWorkspace(
       hostSessionRevoked: () => void retryHosts(),
       hostTaken(id) {
         if (disposed || id !== hostId) return;
-        // The user moved the host to another tab. This tab waits for "Use here" and does not reconnect.
         generation += 1;
+        restartCapable = false;
         hostLifecycle.endSleep();
         recoveryBlocked = true;
         recovery.suspend();
         setState((draft) => {
           draft.otherTab = true;
           draft.status = "offline";
+          draft.restartReady = false;
           draft.connectionError = null;
         });
       },
       connection(update) {
         if (disposed || update.hostId !== hostId) return;
         if (recoveryBlocked && update.state === "offline" && !update.code) return;
-        // A host that announced a restart comes back by itself; a wake is only for a stopped server.
-        // Signal holds a `hostOffline` attempt, so it can wake a sleeping server but needs no retry.
         const unavailable =
           (update.state === "offline" || update.hostOffline === true) && !update.code && !state.hostRestart;
         setState((draft) => {
           if (update.state !== "online") draft.status = update.state;
+          draft.restartReady = update.state === "online" && restartCapable;
           if (update.state !== "online") syncedAt = 0;
-          // A `connecting` update without `hostOffline`, such as a `rate_limited` reply, does not end the hold.
           if (update.hostOffline) draft.hostOffline = true;
           else if (update.state !== "connecting") draft.hostOffline = false;
           const text = currentText();
           const reference = update.reference ?? null;
-          // An update without a reason keeps the last failure on screen. A working connection clears it.
           if (update.state === "online") draft.connectionError = null;
           else if (update.message || reference) {
             const reconnecting = text.t("server.connection.reconnecting", { name: draft.host?.name ?? "" });
             draft.connectionError = {
-              // Browser and peer text, such as a WebRTC exception, is not for the user.
               message:
                 update.message && isSafeConnectionError(update.message)
                   ? text.errorMessage(update.message, reconnecting)
@@ -554,8 +524,6 @@ export function createWebWorkspace(
               reference,
             };
           }
-          // The lifecycle shows the message of an unavailable host only when the host does not sleep or wake.
-          // The text of a refusal or a broken frame is not for the user; its code says which it was.
           if (update.code)
             draft.connectionError = {
               message: text.t(
@@ -568,6 +536,7 @@ export function createWebWorkspace(
           if (update.state !== "online") {
             draft.approvals = [];
             draft.contextStates = {};
+            draft.backgroundWork = {};
             draft.threadContextStates = {};
             draft.prompts = [];
             draft.progress = {};
@@ -592,10 +561,6 @@ export function createWebWorkspace(
             .then(() => refreshHosts())
             .then(async () => {
               await revokedConnection?.catch(() => undefined);
-              // A member or role change anywhere on the host revokes every session, this one
-              // too. The directory still lists the host, so this account can connect again.
-              // Try once: a second revocation before the host is online waits for Reconnect.
-              // The directory copy has the new role; `state.host` keeps the role of the last connect.
               const host = state.hosts.find((listed) => listed.hostId === revokedHostId);
               if (disposed || revokedReconnect || hostId !== revokedHostId || generation !== revokedGeneration || !host)
                 return;
@@ -624,13 +589,11 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.hostRestart = event.state === "none" ? null : { state: event.state, version: event.version };
           });
-        // The host sends it at connect and after each change (`host-appearance-v1`).
         if (event.type === "host-appearance") setHostAppearance(id, event.appearance);
         if (event.type === "status") applyHostStatus(event.status);
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
           setState((draft) => {
-            // The snapshot cuts long texts. A whole copy from an `approval` event or a read stays in its place.
             draft.approvals = reconcilePendingRequests(
               draft.approvals,
               keepWholeApprovals(draft.approvals, event.snapshot.pendingApprovals),
@@ -641,20 +604,28 @@ export function createWebWorkspace(
               event.snapshot.pendingPrompts.map((prompt) => ({ ...prompt, type: "prompt" as const })),
               attentionComplete,
             );
+            if (attentionComplete) listedPrompts = { generation, prompts: [] };
+            else draft.prompts = withListedPrompts(draft.prompts);
             draft.takeovers = reconcilePendingRequests(
               draft.takeovers,
               event.snapshot.pendingBrowserTakeovers,
               attentionComplete,
             );
-            // A host without `context-usage-v1` sends neither list, so its chats show no context meter.
             draft.contextStates = Object.fromEntries(
               (event.snapshot.contextStates ?? []).map((context) => [context.agentId, context]),
             );
             draft.threadContextStates = Object.fromEntries(
               (event.snapshot.threadContextStates ?? []).map((context) => [context.threadId, context]),
             );
+            draft.backgroundWork = Object.fromEntries(
+              (event.snapshot.backgroundWork ?? []).map((work) => [
+                backgroundWorkKey(work.agentId, work.taskId),
+                work.since,
+              ]),
+            );
           });
           readWholeApprovals();
+          if (!attentionComplete) readListedPrompts();
         } else if (event.type === "prompt") {
           setState((draft) => {
             draft.prompts = [...draft.prompts.filter((item) => item.requestId !== event.requestId), event];
@@ -667,6 +638,7 @@ export function createWebWorkspace(
             ];
           });
         } else if (event.type === "agent-input-resolved") {
+          forgetListedPrompt(event.requestId);
           setState((draft) => {
             draft.approvals = draft.approvals.filter((item) => String(item.requestId) !== String(event.requestId));
             draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(event.requestId));
@@ -692,9 +664,6 @@ export function createWebWorkspace(
         } else if (event.type === "turn-completed") {
           setState((draft) => {
             if (draft.progress[event.agentId]?.turnId === event.turnId) delete draft.progress[event.agentId];
-            // The host closes each question that ends with its turn with `agent-input-resolved` before
-            // this event. A question that is still here outlives its turn, and the user can answer it
-            // later; the Team API does not mark it (#11440).
             draft.approvals = draft.approvals.filter(
               (item) =>
                 item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
@@ -712,9 +681,6 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.takeovers = draft.takeovers.filter((item) => String(item.requestId) !== String(event.requestId));
           });
-        // The frozen tab event has no field for a person's control or the history state;
-        // `browser-user-control-changed` and `browser-page-state-changed` send them, and a tab keeps
-        // its values until the next list.
         if (event.type === "browser-changed")
           setState((draft) => {
             const previous = new Map(draft.browserTabs.map((tab) => [tab.id, tab]));
@@ -777,10 +743,7 @@ export function createWebWorkspace(
         if (event.type === "chat-colors-changed") receiveChatColors({ agents: event.agents, members: event.members });
         if (event.type === "sidebar-pins-changed")
           preferences.receiveServerPins(pinScope(), { items: event.items, updatedAt: event.updatedAt });
-        // A changed chat can change the unread count of any agent, and the host tells a read on another
-        // device only with an invalidation.
         if (event.type === "conversation" || event.type === "conversation-invalidated") loadReadsSoon();
-        // A read loads only the open conversation, so the events of other agents do not start one.
         const changed = changedConversation(event);
         if (changed !== undefined && changed === selectedId) void refresh();
       },
@@ -788,16 +751,7 @@ export function createWebWorkspace(
     props.accountFetch,
   );
   const pinScope = () => (state.host ? `${props.accountId}:${state.host.hostId}` : "");
-  /**
-   * The scopes whose host said at its last connect that it keeps the pins (`sidebar-pins-v1`). A change
-   * while the host is away stays pending and goes to the host at the next connect.
-   */
   const pinScopes = new Set<string>();
-  /**
-   * Only the open host takes a request; a pin change of another host waits for its next connect. A
-   * request while the host is away fails and stays pending. This does not read `state.status`: the
-   * connect sets it in the same tick as the first sync, and the store shows it only at the next flush.
-   */
   const openHostPins = (scope: string) => {
     const pins = runtime.sidebarPins;
     if (!pins || scope !== pinScope()) throw new Error(currentText().t("error.team.sidebarPinsUnsupported"));
@@ -812,14 +766,12 @@ export function createWebWorkspace(
       seed: async (scope, items) => openHostPins(scope).seed(items),
     },
   });
-  // The other tabs show the opened host with the state this tab has for it.
   createEffect(
     () => ({ id: state.host?.hostId, status: state.status }),
     ({ id, status }) => {
       if (id) runtime.hosts?.reportSelected(id, status);
     },
   );
-  // A hide, a restore or a move updates the frame at once, so the next page does not show the old sidebar.
   createEffect(
     () =>
       state.status === "online" && state.host && !state.panelsLoading && !state.panelsFailed
@@ -833,7 +785,6 @@ export function createWebWorkspace(
         });
     },
   );
-  // The unread counts go to the frame when the reads of the load have come, and then on each change.
   createEffect(
     () =>
       state.status === "online" && state.host && !state.panelsLoading && !state.panelsFailed
@@ -850,7 +801,6 @@ export function createWebWorkspace(
       if (frame) saveRemoteFrameUnreadCounts(props.accountId, frame.hostId, frame.unreadCounts);
     },
   );
-  // A hosted server keeps running while this tab is visible and has focus (`focus-use-v1`).
   const [duplicatingSectionIds, setDuplicatingSectionIds] = createSignal<ReadonlySet<string>>(new Set());
   const [pageFocused, setPageFocused] = createSignal(!document.hidden && document.hasFocus());
   const focusUse = createFocusUsePing(() => void runtime.focusUse().catch(() => undefined));
@@ -863,16 +813,9 @@ export function createWebWorkspace(
   );
   const [serverOrder, setServerOrder] = createSignal(readWebServerOrder(props.accountId));
   const orderedHosts = createMemo(() => orderWebHosts(state.hosts, serverOrder()));
-  // The host sends an `openbot-avatar:` URL, which only the desktop app can open. The image comes
-  // from this browser's saved copy (`web-agent-pictures`) or through the host connection; until
-  // then, the agent keeps the host URL and its generated avatar.
   const [avatars, setAvatars] = createSignal<ReadonlyMap<string, { source: string; url: string }>>(new Map());
-  // The images that loaded or are loading, and those that the saved copies did not have. The host
-  // is asked for the second group when it is online.
   const avatarLoads = new Set<string>();
   const avatarMisses = new Set<string>();
-  // The images share the host connection and its file slots with the user's downloads, so only a few
-  // load at the same time.
   const avatarQueue: { hostId: string; id: string; source: string }[] = [];
   let avatarReads = 0;
   let avatarHost: string | null = null;
@@ -898,14 +841,12 @@ export function createWebWorkspace(
           (url) => {
             if (avatarHost !== hostId) return;
             if (url) setAvatars((current) => new Map(current).set(id, { source, url }));
-            // The host came online after the check of the saved copies: ask it now.
             else if (avatarOnline) avatarQueue.push(next);
             else {
               avatarLoads.delete(key);
               avatarMisses.add(key);
             }
           },
-          // A failed image keeps the generated avatar, and the next agent list tries it again.
           () => {
             if (avatarHost === hostId) avatarLoads.delete(key);
           },
@@ -919,8 +860,6 @@ export function createWebWorkspace(
   createEffect(
     () => ({
       hostId: state.host?.hostId ?? null,
-      // A saved frame shows its agents before the host connects. Their images come from the saved
-      // copies; an image with no copy waits for the connection.
       online: state.status === "online",
       listed: state.status === "online" && !state.agentsFromFrame && state.agents.length > 0,
       sources: state.agents.flatMap((agent) =>
@@ -945,7 +884,6 @@ export function createWebWorkspace(
         avatarQueue.push({ hostId, id, source });
       }
       loadAvatars();
-      // The host's list is complete: a copy of an agent that left it, or that lost its picture, goes.
       const agents = sources.map(({ id }) => id).join(" ");
       if (!listed || agents === avatarAgents) return;
       avatarAgents = agents;
@@ -975,7 +913,6 @@ export function createWebWorkspace(
       };
     });
   });
-  // A frame agent's last message is not known: its row shows no preview, not "No messages yet".
   const profiles = createMemo(() =>
     shownAgents().map((agent) => {
       const profile = toAgentProfile(agent);
@@ -1020,25 +957,21 @@ export function createWebWorkspace(
       return { ...defaultSidebarLayout(), agentOrder: [...agentIds] };
     return read();
   }
-  /** A host without `agent-hidden-v1` has no hidden agents. */
   async function readUserHiddenAgents(capabilities: readonly string[]): Promise<HiddenAgent[]> {
     const read = runtime.listHiddenAgents;
     if (!capabilities.includes(AGENT_HIDDEN_CAPABILITY) || !read) return [];
     return (await read()).agents;
   }
-  /** A host without `agent-colors-v1` has no exact colours. */
   async function readAgentColors(capabilities: readonly string[]): Promise<AgentColorEntry[]> {
     const read = runtime.listAgentColors;
     if (!capabilities.includes(AGENT_COLORS_CAPABILITY) || !read) return [];
     return (await read()).agents;
   }
-  /** A host without `chat-colors-v1` has no chat colours. */
   async function readChatColors(capabilities: readonly string[]): Promise<ChatColors> {
     const read = runtime.listChatColors;
     if (!capabilities.includes(CHAT_COLORS_CAPABILITY) || !read) return { agents: [], members: [] };
     return read();
   }
-  /** Keeps the chat colours, and puts the member chat colours on the presence that this tab has. */
   function receiveChatColors(colors: ChatColors): void {
     setState((draft) => {
       draft.chatColors = colors;
@@ -1062,7 +995,6 @@ export function createWebWorkspace(
         delete draft.progress[id];
       }
       if (nextSelected === null) draft.selectedId = null;
-      // The layout also orders channels, so only the agents that left may be dropped from it.
       const gone = new Set(removed);
       draft.sidebarLayout = {
         ...draft.sidebarLayout,
@@ -1073,7 +1005,6 @@ export function createWebWorkspace(
       };
     });
   }
-  /** Shows the plush look of a host in the server list and on the connected host. */
   function setHostAppearance(id: string, appearance: ServerAppearance | null): void {
     setState((draft) => {
       if (draft.host?.hostId === id) draft.host.appearance = appearance;
@@ -1096,7 +1027,6 @@ export function createWebWorkspace(
         const hosts = await runtime.listHosts();
         markRemoteSync("hosts");
         if (disposed) return;
-        // A server that left the list takes its frame, pictures and cached workflows with it.
         deleteRemoteWorkspaceFrames(
           props.accountId,
           hosts.map((host) => host.hostId),
@@ -1130,6 +1060,7 @@ export function createWebWorkspace(
             draft.queues = {};
             draft.approvals = [];
             draft.contextStates = {};
+            draft.backgroundWork = {};
             draft.threadContextStates = {};
             draft.prompts = [];
             draft.progress = {};
@@ -1150,18 +1081,14 @@ export function createWebWorkspace(
               ? null
               : { message: currentText().t("webClient.error.accessEnded"), reference: null };
           });
-          // First, so the host that left does not get a status connection when it stops being open.
           runtime.hosts?.setHosts(hosts);
           await runtime.disconnect().catch(() => undefined);
         }
         const connected = hosts.find((host) => host.hostId === hostId);
         setState((draft) => {
-          // The connected host is a copy from `connect`. An admin can rename it while connected.
           if (connected && draft.host?.hostId === connected.hostId) {
             draft.host.name = connected.name;
             draft.host.logoKey = connected.logoKey;
-            // A host with `host-appearance-v1` sends its look itself; the account copy can be older.
-            // An account server from before `host-appearance-v1` lists none.
             if (connected.appearance !== undefined && !draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY))
               draft.host.appearance = connected.appearance;
           }
@@ -1176,7 +1103,6 @@ export function createWebWorkspace(
             hosts.find((host) => host.hostId === savedHostId) ?? orderWebHosts(hosts, serverOrder())[0];
           if (initialHost) await connect(initialHost);
         }
-        // After the opened host, so it takes its Signal connection before the status connections.
         if (!disposed) runtime.hosts?.setHosts(hosts);
       } catch (error) {
         if (!disposed) {
@@ -1204,11 +1130,6 @@ export function createWebWorkspace(
     );
     return promise;
   }
-  /**
-   * Leaves a joined host. The host leaves the list as it does when access ends, but without an error.
-   * Resolves when the membership is gone. The list read follows it, so a failed read or the connect
-   * to the next host is not a failed leave.
-   */
   async function leaveHost(host: RemoteTeamHost): Promise<void> {
     await departHost(host, () => runtime.leaveHost(host.hostId, host.membershipId));
   }
@@ -1218,7 +1139,6 @@ export function createWebWorkspace(
     await departHost(host, () => remove(host.hostId));
   }
   async function departHost(host: RemoteTeamHost, operation: () => Promise<void>): Promise<void> {
-    // Before the request: the host revokes this session before the request answers.
     leftHostIds.add(host.hostId);
     try {
       await operation();
@@ -1226,7 +1146,6 @@ export function createWebWorkspace(
       leftHostIds.delete(host.hostId);
       throw error;
     }
-    // A read that started before the leave can still list the host, so this read starts after it.
     void (hostsRefreshPromise ?? Promise.resolve()).catch(() => undefined).then(retryHosts);
   }
   function retryHosts(): Promise<void> {
@@ -1239,18 +1158,17 @@ export function createWebWorkspace(
       });
   }
   function clearRevokedWorkspace(): void {
-    // A revoked session must not leave private conversations visible while the directory
-    // decides whether this membership still exists. Keep the host shell for a possible
-    // authorized reconnect, but invalidate every private read and pending action now.
     if (hostId) {
       deleteRemoteWorkspaceFrame(props.accountId, hostId);
       void deleteSavedServerPictures(props.accountId, hostId);
       deleteCachedWorkflows(hostId);
     }
     generation += 1;
+    restartCapable = false;
     selectedId = null;
     setState((draft) => {
       draft.revocationRevision += 1;
+      draft.restartReady = false;
       draft.workspaceLoaded = false;
       draft.synced = false;
       draft.agents = [];
@@ -1260,6 +1178,7 @@ export function createWebWorkspace(
       draft.selectedId = null;
       draft.approvals = [];
       draft.contextStates = {};
+      draft.backgroundWork = {};
       draft.threadContextStates = {};
       draft.prompts = [];
       draft.progress = {};
@@ -1318,7 +1237,6 @@ export function createWebWorkspace(
       throw new Error(currentText().t("webClient.error.invitationOffline"));
     acceptedInvite = null;
   }
-  /** With `takeOver`, the tab that has the host open gives it to this tab. */
   async function connect(host: RemoteTeamHost, takeOver = false) {
     recoveryBlocked = false;
     recovery.dispose();
@@ -1331,7 +1249,9 @@ export function createWebWorkspace(
       if (!disposed && hostId === host.hostId && state.recovery?.phase !== "suspended") recover();
     }
   }
-  /** Moves the opened host from another tab of this browser to this tab. */
+  function restartRequested(): void {
+    if (state.status !== "online") generation += 1;
+  }
   async function useHere(): Promise<void> {
     const host = state.host;
     if (host && state.otherTab) await connect(host, true);
@@ -1347,9 +1267,7 @@ export function createWebWorkspace(
   async function connectWorkspace(host: RemoteTeamHost, opened: boolean, takeOver: boolean) {
     const current = ++generation;
     const sameHost = hostId === host.hostId;
-    // A hosted server that sleeps or wakes keeps the workspace visible, so each retry keeps its agents and the selection.
     const keepWorkspace = sameHost && state.workspaceLoaded;
-    // A new page shows the frame of the last load while it connects (`remote-workspace-frame`).
     const savedFrame = keepWorkspace ? null : readRemoteWorkspaceFrame(props.accountId, host.hostId);
     const frame = savedFrame?.agents.length ? savedFrame : null;
     const frameSelected = frame?.agents.find((agent) => agent.id === frame.selectedAgentId) ?? frame?.agents[0];
@@ -1359,10 +1277,10 @@ export function createWebWorkspace(
     writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
     if (!sameHost) hostLifecycle.endSleep();
+    if (!sameHost) restartCapable = false;
     setState((draft) => {
       draft.host = host;
       draft.recovery = null;
-      // A retry keeps the last failure on screen until it ends.
       if (!sameHost) draft.connectionError = null;
       if (!sameHost) draft.hostOffline = false;
       if (!sameHost) draft.otherTab = false;
@@ -1374,6 +1292,7 @@ export function createWebWorkspace(
       }
       draft.status = "connecting";
       draft.hostRestart = null;
+      if (!sameHost) draft.restartReady = false;
       draft.memberId = sameHost ? draft.memberId : null;
       if (!keepWorkspace) {
         draft.agents = [];
@@ -1389,6 +1308,7 @@ export function createWebWorkspace(
       }
       draft.approvals = [];
       draft.contextStates = {};
+      draft.backgroundWork = {};
       draft.threadContextStates = {};
       draft.prompts = [];
       draft.takeovers = [];
@@ -1411,8 +1331,6 @@ export function createWebWorkspace(
     });
     try {
       markRemoteSync("connect-start");
-      // The connect starts first: the frame render then runs while the connect waits for the network.
-      // With the host protocol of the last visit, the gate reads go beside the compatibility read.
       const early: { gate: Promise<[ClientAgentSummary[], AgentStatus, ClientAgentModelOption[]]> | null } = {
         gate: null,
       };
@@ -1429,9 +1347,7 @@ export function createWebWorkspace(
           },
         },
       });
-      // The frame is read-only: no capabilities, so no feature reads the host before it connects.
       if (frame) {
-        // A retry after a failed connect keeps the workspace and reads no frame, so it needs this selection.
         if (frameSelected) selectedId = frameSelected.id;
         setState((draft) => {
           draft.agents = frame.agents;
@@ -1445,7 +1361,6 @@ export function createWebWorkspace(
           };
           draft.userHiddenAgents = frame.hiddenAgents;
           draft.frameChannels = frame.channels;
-          // The sidebar sorts the unread chats into their group, so the rows keep their place when the host answers.
           draft.reads = Object.fromEntries(
             Object.entries(frame.unreadCounts).map(([agentId, unreadCount]) => [
               agentId,
@@ -1461,12 +1376,16 @@ export function createWebWorkspace(
       }
       const capabilities = await connecting;
       markRemoteSync("connected");
+      if (!disposed && current === generation) {
+        restartCapable = capabilities.includes(HOST_RESTART_CAPABILITY);
+        setState((draft) => {
+          draft.restartReady = restartCapable;
+        });
+      }
       const [agents, agentStatus, models] = await (early.gate ?? readGate());
       if (disposed || current !== generation) return;
       revokedReconnect = false;
       hostLifecycle.endSleep();
-      // Signal can bring a held attempt online after the lifecycle suspended recovery for a sleeping
-      // or ended server, for example when another device wakes it.
       const unblocked = recoveryBlocked;
       if (unblocked) {
         recoveryBlocked = false;
@@ -1489,15 +1408,11 @@ export function createWebWorkspace(
       });
       syncedAt = Date.now();
       markRemoteSync("workspace-ready");
-      // From the read values: the store applies the write above only at the next flush.
       saveRemoteWorkspaceFrame(props.accountId, host.hostId, { agents, models });
       if (capabilities.includes(SIDEBAR_PINS_CAPABILITY)) pinScopes.add(pinScope());
       else pinScopes.delete(pinScope());
       preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
       void preferences.syncActiveServerPins().catch(() => undefined);
-      // The open conversation and its queue go out first. One queue read for each agent sent before
-      // them held the first page behind ~50 answers on a large host (`bun run perf:remote`).
-      // An agent the user opened in the frame stays open.
       const wanted = selectedId ?? previousSelected;
       const first = agents.find((agent) => agent.id === wanted) ?? agents[0];
       const opened = first ? select(first.id) : null;
@@ -1518,7 +1433,6 @@ export function createWebWorkspace(
             });
         })
         .catch(() => undefined);
-      // Presence only names people. A host that does not answer leaves the list empty.
       void runtime.admin?.team.getPresence().then(
         (presence) => {
           if (!disposed && current === generation && !state.presence)
@@ -1537,14 +1451,12 @@ export function createWebWorkspace(
         recentAgentIds.filter((id) => id !== first?.id && agents.some((agent) => agent.id === id)),
         current,
       );
-      // The other queues only give the sidebar its marks.
       loadQueues(agents.flatMap((agent) => (agent.id === first?.id ? [] : [agent.id])));
     } catch (error) {
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.status = "offline";
         draft.otherTab = error instanceof WebHostOtherTabError;
-        // The workspace shows an incompatible host in full, so it is not also reported as an error.
         if (error instanceof WebHostIncompatibleError)
           draft.incompatibility = {
             hostId: host.hostId,
@@ -1555,7 +1467,6 @@ export function createWebWorkspace(
           };
       });
       if (blockAccess(error)) throw error;
-      // The server can run while another tab holds it. A wake would show a start that never ends.
       if (error instanceof WebHostOtherTabError) {
         hostLifecycle.endSleep();
         recoveryBlocked = true;
@@ -1582,7 +1493,6 @@ export function createWebWorkspace(
       throw error;
     }
   }
-  /** Saves the frame of the open host for the next page. The layout waits for its read. */
   function saveFrame(): void {
     if (state.status !== "online" || !state.host) return;
     const panelsRead = !state.panelsLoading && !state.panelsFailed;
@@ -1634,7 +1544,6 @@ export function createWebWorkspace(
             });
         })
         .catch(failed),
-      // The colours are not a panel. If the read fails, the agents keep their nearest hue.
       readAgentColors(capabilities)
         .then((colors) => {
           if (isCurrent())
@@ -1643,7 +1552,6 @@ export function createWebWorkspace(
             });
         })
         .catch(() => undefined),
-      // The chat colours are not a panel. If the read fails, the bubbles keep the default colour.
       readChatColors(capabilities)
         .then((colors) => {
           if (isCurrent()) receiveChatColors(colors);
@@ -1660,8 +1568,6 @@ export function createWebWorkspace(
   async function load(id: string, older = false) {
     const current = generation;
     const previous = state.conversations[id];
-    // The cursor of a trimmed conversation is after a gap until a latest read gives the host's cursor.
-    // When that read failed, the next older load reads the latest page again.
     if (older && previous?.trimmed) {
       if (!conversationReads.has(id)) await load(id);
       return;
@@ -1678,14 +1584,9 @@ export function createWebWorkspace(
         if (!item) return;
         const old = item.page?.threadId === page.threadId ? item.page : null;
         if (old && page.revision < old.revision) return;
-        // A trim or a latest read during this older read moved the cursor, so this page is not next.
         if (older && (item.trimmed || old?.pageInfo.olderCursor !== before)) return;
-        // A trimmed conversation can be behind the host by more than one page, so its kept messages go.
         const merge = older ? "older" : old && !item.trimmed ? "latest" : "replace";
-        // A part around an older message keeps its place. The latest page changes only its shown messages.
         const around = !older && merge === "latest" && item.around === true && page.pageInfo.hasOlder;
-        // By turn and request: an agent can count its request ids from the start again after a restart, so
-        // an old answered row must not close a new question that has the same id (#11440).
         const resolvedRequests = new Set(
           page.messages.flatMap((message) =>
             message.questionPrompt?.resolution ? [messagePromptRequestKey(message)] : [],
@@ -1697,8 +1598,6 @@ export function createWebWorkspace(
             prompt.threadId !== page.threadId ||
             !resolvedRequests.has(promptRequestKey(prompt.turnId, prompt.requestId)),
         );
-        // A latest page that does not meet the loaded messages, after a long time with no connection,
-        // replaces them: joined end to end, the two would hide the messages between with no sign.
         const pageIds = new Set(page.messages.map((message) => message.id));
         const apart =
           merge === "latest" &&
@@ -1712,8 +1611,6 @@ export function createWebWorkspace(
             : mergeConversationPage(old?.messages ?? [], page.messages, apart ? "replace" : merge),
           references: merge === "replace" ? page.references : { ...old?.references, ...page.references },
           pageInfo: merge === "latest" && !apart ? (old?.pageInfo ?? page.pageInfo) : page.pageInfo,
-          // An older page has the thread's current revision but not its newest messages. The loaded
-          // newest messages keep their revision, so a delta held during this read still applies.
           revision: older && old ? old.revision : page.revision,
         };
         item.missingReferences = {
@@ -1721,7 +1618,6 @@ export function createWebWorkspace(
           ...missingReplyOriginals(page),
         };
         if (!older && page.readState) draft.reads[id] = page.readState;
-        // A conversation that closed during this read stays trimmed: it gets no new messages until it opens.
         if (!older && draft.selectedId === id) item.trimmed = false;
         if (!older && !around) item.around = false;
         item.loading = false;
@@ -1737,7 +1633,6 @@ export function createWebWorkspace(
           const item = draft.conversations[id];
           if (!item) return;
           item.loading = false;
-          // A loaded chat stays on screen: only the older page failed.
           if (older) item.olderError = currentText().errorMessage(error, currentText().t("chat.history.olderFailed"));
           else item.error = currentText().t("webClient.error.requestFailed");
         });
@@ -1753,11 +1648,6 @@ export function createWebWorkspace(
       }
     }
   }
-  /**
-   * Appends streamed text to the selected conversation without a read. A delta that arrives during
-   * a read waits for it: the page read may already hold the text, and its revision tells which
-   * deltas are newer. A delta for another thread asks for a read.
-   */
   function applyDelta(event: Extract<AgentEvent, { type: "conversation-delta" }>) {
     if (disposed || event.agentId !== selectedId) return;
     if (conversationReads.has(event.agentId)) {
@@ -1767,7 +1657,6 @@ export function createWebWorkspace(
       return;
     }
     let otherThread = false;
-    // The checks read the draft: a page that a read just wrote is not visible outside it until a flush.
     setState((draft) => {
       const item = draft.conversations[event.agentId];
       const value = item?.page;
@@ -1777,7 +1666,6 @@ export function createWebWorkspace(
         return;
       }
       if (event.revision <= value.revision) return;
-      // The streamed message is at the end of the page.
       const message = value.messages.findLast((entry) => entry.id === event.messageId);
       if (message) {
         message.text += event.delta;
@@ -1798,7 +1686,6 @@ export function createWebWorkspace(
     });
     if (otherThread) void refresh();
   }
-  // Coalesce event bursts per agent, as `refresh` does for the conversation.
   function loadQueue(id: string): void {
     const running = queueLoads.get(id);
     if (running?.generation === generation) {
@@ -1826,11 +1713,6 @@ export function createWebWorkspace(
       }
     })();
   }
-  /**
-   * Reads the queues of the agent rows. A host with `agent-active-queues-v1` gives the open work of all
-   * of them in one read; the open chat, an agent that the answer did not carry, and an older host get a
-   * full read of each queue. Calls during a list read wait for one more list read.
-   */
   function loadQueues(ids: readonly string[]): void {
     if (ids.length === 0) return;
     if (!state.capabilities.includes(AGENT_ACTIVE_QUEUES_CAPABILITY)) {
@@ -1855,7 +1737,6 @@ export function createWebWorkspace(
           try {
             answer = await runtime.activeQueues(listed);
           } catch {
-            // The full read of each queue reports its own failure.
             if (!disposed && current === generation) for (const id of listed) loadQueue(id);
             continue;
           }
@@ -1872,7 +1753,6 @@ export function createWebWorkspace(
               for (const queue of fresh) draft.queues[queue.agentId] = queue;
             });
           for (const id of answer.omitted) if (revisions.has(id)) loadQueue(id);
-          // The user opened this agent during the read: its chat needs the full queue.
           if (selectedId && revisions.has(selectedId)) loadQueue(selectedId);
         }
       } finally {
@@ -1880,7 +1760,6 @@ export function createWebWorkspace(
       }
     })();
   }
-  /** Sends one queue change for the selected agent. The host then sends the new queue as an event. */
   function changeQueue(change: (agentId: string) => Promise<void>) {
     const id = selectedId;
     const current = generation;
@@ -1918,11 +1797,6 @@ export function createWebWorkspace(
       report(error);
     }
   }
-  /**
-   * Reads the latest page of recently opened agents, one at a time, so that the first switch to one
-   * shows its messages at once. An agent with a kept page is not read again. The page stays trimmed:
-   * a closed conversation gets no events, so the read on open replaces it with the host page.
-   */
   async function preloadRecent(ids: readonly string[], current: number) {
     for (const id of ids.slice(0, PRELOADED_AGENTS)) {
       if (disposed || current !== generation) return;
@@ -1932,20 +1806,13 @@ export function createWebWorkspace(
       });
       try {
         await load(id);
-      } catch {
-        // A failed early read only costs the early page. The agent loads when it opens.
-      }
+      } catch {}
     }
   }
   let readsLoad: { generation: number; promise: Promise<void> } | null = null;
   let pendingReads = false;
-  /** When the last read started, and the event read that waits for its interval. */
   let readsStartedAt = 0;
   let readsTimer: ReturnType<typeof setTimeout> | null = null;
-  /**
-   * Reads the unread state of every agent chat. Event bursts coalesce: a call during a read schedules
-   * one more read. A failed read keeps the counts that this tab has.
-   */
   function readReads(): Promise<void> {
     pendingReads = true;
     if (readsLoad?.generation === generation) return readsLoad.promise;
@@ -1969,11 +1836,6 @@ export function createWebWorkspace(
   function loadReads(): void {
     void readReads();
   }
-  /**
-   * Reads the unread state after an event. Each read costs the host a query for each agent, so while
-   * events stream at most one read starts in `EVENT_READS_INTERVAL_MS`. The waiting read starts after
-   * the last event, so no change is lost.
-   */
   function loadReadsSoon(): void {
     if (readsTimer) return;
     const wait = readsStartedAt + EVENT_READS_INTERVAL_MS - Date.now();
@@ -1989,9 +1851,7 @@ export function createWebWorkspace(
   async function resync() {
     const current = generation;
     try {
-      // A hide on another device can land while this tab is offline, and the event is then lost.
       const [{ agents, sidebarLayout }, userHiddenAgents, agentColors, chatColors] = await Promise.all([
-        // The layout read needs the agent ids.
         runtime.listAgents().then(async (agents) => ({
           agents,
           sidebarLayout: await readSidebarLayout(
@@ -2000,9 +1860,7 @@ export function createWebWorkspace(
           ),
         })),
         readUserHiddenAgents(state.capabilities),
-        // A failed colour read keeps the colours that this tab has.
         readAgentColors(state.capabilities).catch(() => state.agentColors),
-        // A failed chat colour read keeps the chat colours that this tab has.
         readChatColors(state.capabilities).catch(() => state.chatColors),
       ]);
       if (disposed || current !== generation) return;
@@ -2022,12 +1880,9 @@ export function createWebWorkspace(
       if (current === generation) report(error);
     }
   }
-  /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
   const openExchangeReads = new Map<string, { again: boolean }>();
-  /** Puts the host's current copy of one loaded request in place. The rest of the chat stays as it is. */
   function refreshOpenExchange(id: string, messageId: string) {
     const readAround = runtime.conversationAround;
-    // A host without pages sends the whole chat in each read, so its copy is never left behind.
     if (!readAround || !state.capabilities.includes("conversation-pagination")) return;
     const key = `${id}\0${messageId}`;
     const running = openExchangeReads.get(key);
@@ -2042,7 +1897,6 @@ export function createWebWorkspace(
       try {
         while (read.again && !disposed && current === generation) {
           read.again = false;
-          // The page around the request holds its whole turn at least, with the request as the host has it.
           const page = await readAround(id, messageId, 1);
           const message = page.messages.find((candidate) => candidate.id === messageId);
           if (disposed || current !== generation || !message) return;
@@ -2054,14 +1908,10 @@ export function createWebWorkspace(
           });
         }
       } finally {
-        // In the same step as the last check, so a later page starts a new read and is not lost.
         openExchangeReads.delete(key);
       }
-    })()
-      // The next latest page reads it again.
-      .catch(() => undefined);
+    })().catch(() => undefined);
   }
-  // Coalesce event bursts; an event during a read schedules one further authoritative read.
   async function refresh() {
     pendingReload = true;
     if (reloadPromise) return reloadPromise;
@@ -2085,10 +1935,6 @@ export function createWebWorkspace(
       reloadPromise = null;
     }
   }
-  /**
-   * Sends one message to an agent of the open host. The chat shows it as pending and the answer says
-   * whether it arrived; a failure is never resent here. `clientMessageId` lets the host drop a retry.
-   */
   async function send(
     id: string,
     text: string,
@@ -2106,14 +1952,12 @@ export function createWebWorkspace(
     } catch (error) {
       return { error: errorMessage(error, t("webClient.error.deliveryUnconfirmed")) };
     }
-    // The next pending send of the chat waits for this answer, so the history reload runs beside it.
     if (current === generation && !disposed)
       refresh().catch((error: unknown) => {
         if (current === generation) report(error);
       });
     return { messageId };
   }
-  /** Marks the selected agent's messages read through the newest loaded one. Writes for one agent run in order. */
   function markRead() {
     const id = selectedId;
     if (!id || state.status !== "online") return Promise.resolve();
@@ -2123,7 +1967,6 @@ export function createWebWorkspace(
       .then(async () => {
         const conversation = state.conversations[id];
         const page = conversation?.page;
-        // A part around an older message does not show the newest messages, so they stay unread.
         if (!page || conversation.around || disposed || current !== generation) return;
         const readState = await runtime.markRead(id, page.messages.at(-1)?.id ?? null);
         if (disposed || current !== generation) return;
@@ -2136,7 +1979,6 @@ export function createWebWorkspace(
     readWrites.set(id, write);
     return write;
   }
-  /** Marks one agent's chat read through its newest message, loaded or not. Writes for one agent run in order. */
   function markAgentRead(id: string) {
     const current = generation;
     const write = (readWrites.get(id) ?? Promise.resolve())
@@ -2157,7 +1999,6 @@ export function createWebWorkspace(
     readWrites.set(id, write);
     return write;
   }
-  /** Marks every agent with unread messages read through its newest one, loaded or not. */
   async function markAllRead() {
     if (state.status !== "online") return;
     const current = generation;
@@ -2169,10 +2010,6 @@ export function createWebWorkspace(
         .map(([id]) => markAgentRead(id)),
     );
   }
-  /**
-   * Marks one message of an agent's chat and the messages after it unread, with
-   * `conversation-unread-from-v1`. Writes for one agent run in order. A failure throws to the caller.
-   */
   async function markUnreadFrom(agentId: string, messageId: string): Promise<void> {
     const current = generation;
     const write = (readWrites.get(agentId) ?? Promise.resolve())
@@ -2189,12 +2026,10 @@ export function createWebWorkspace(
     readWrites.set(agentId, write);
     await write;
   }
-  /** Marks the newest agent reply of a chat unread, loaded or not. A failure throws to the caller. */
   async function markLatestReplyUnread(agentId: string): Promise<void> {
     const reply = latestIncomingConversationMessage((await runtime.conversation(agentId)).messages);
     if (reply) await markUnreadFrom(agentId, reply.id);
   }
-  /** The connected host and its connection, as the restart notices and the update dialog read them. */
   const hostViews = (): HostRestartView[] =>
     state.host
       ? [
@@ -2204,12 +2039,10 @@ export function createWebWorkspace(
             online: state.status === "online",
             restart: state.hostRestart?.state ?? null,
             version: state.hostRestart?.version ?? null,
-            // Until the agents load, the server could be new; a notice that waits shows after them.
             firstRun: !state.agentsLoaded || state.agents.length === 0,
           },
         ]
       : [];
-  // The update dialog explains the restart of the update that it follows.
   createHostRestartToasts(() => hostViews().filter((host) => !followsServerUpdate(host.id)));
   onSettled(() => {
     void refreshHosts().catch(report);
@@ -2221,8 +2054,6 @@ export function createWebWorkspace(
         .onSessionCheck()
         .then(() => refreshHosts())
         .then(() => {
-          // While the host stays online, its events keep the workspace current. A focus soon after a
-          // full read, such as a switch between windows, does not read the host again.
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
           if (state.recovery?.phase !== "suspended") recoverNow();
         })
@@ -2279,14 +2110,12 @@ export function createWebWorkspace(
       setServerOrder(hostIds);
       writeWebServerOrder(props.accountId, hostIds);
     },
-    /** Every event of the connected host. Returns the unsubscribe function. */
     onHostEvent(listener: (event: AgentEvent | TeamRealtimeEvent) => void) {
       hostEventListeners.add(listener);
       return () => {
         hostEventListeners.delete(listener);
       };
     },
-    /** The events of the hosts this tab has not opened that a notification can show. Returns the unsubscribe function. */
     onHostNotice(listener: (hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) => void) {
       hostNoticeListeners.add(listener);
       return () => {
@@ -2300,6 +2129,7 @@ export function createWebWorkspace(
     removeOwnedHost,
     retryHosts,
     reconnect,
+    restartRequested,
     useHere,
     joinInvite,
     connect,
@@ -2312,8 +2142,6 @@ export function createWebWorkspace(
       if (!expectedTurnId) return;
       changeQueue((agentId) =>
         runtime.steerQueued({ agentId, deliveryId, expectedTurnId }).catch((error: unknown) => {
-          // A message that left the queue is in the turn already: an agent that steers each message
-          // sent while it works can take it first.
           const delivery = state.queues[agentId]?.deliveries.find((item) => item.id === deliveryId);
           if (delivery && delivery.status !== "queued") return;
           throw error;
@@ -2330,7 +2158,6 @@ export function createWebWorkspace(
     ): Promise<boolean> {
       const agentId = target?.agentId ?? selectedId;
       if (!agentId) return false;
-      // The edit belongs to the host that queued the message. This client talks only to the connected one.
       if (target && target.serverId !== hostId) {
         report(new Error(currentText().t("webClient.error.hostChanged")));
         return false;
@@ -2349,11 +2176,6 @@ export function createWebWorkspace(
     markAllRead,
     markUnreadFrom,
     markLatestReplyUnread,
-    /**
-     * Deletes one message of an agent's chat on the connected host, and removes it from the loaded
-     * page at once. A reply that quotes it shows the original as deleted. A failure throws to the
-     * dialog that asked.
-     */
     async deleteMessage(agentId: string, messageId: string): Promise<void> {
       const remove = runtime.deleteMessage;
       if (state.status !== "online" || !remove || !state.capabilities.includes(MESSAGE_DELETE_CAPABILITY))
@@ -2410,7 +2232,6 @@ export function createWebWorkspace(
           });
       }
     },
-    /** Copies a custom section and each of its agents. The selection stays where it is. */
     async duplicateSection(sectionId: string): Promise<void> {
       if (
         state.status !== "online" ||
@@ -2434,7 +2255,6 @@ export function createWebWorkspace(
           {
             layout: state.sidebarLayout,
             agentIds: state.agents.filter((agent) => !hidden.has(agent.id)).map((agent) => agent.id),
-            // The agent's own Duplicate item waits too: the host refuses a second copy of one agent.
             duplicateAgent: async (agentId) => {
               if (!isCurrent()) return null;
               setState((draft) => {
@@ -2476,11 +2296,6 @@ export function createWebWorkspace(
         });
       }
     },
-    /**
-     * Hides or restores an agent. The sidebar moves the agent at once, and the host's answer then
-     * replaces the hidden list. If the host refuses, only this agent goes back and the error is thrown.
-     * Returns false when nothing was sent.
-     */
     async setAgentHidden(agentId: string, hidden: boolean): Promise<boolean> {
       const write = runtime.setAgentHidden;
       if (state.status !== "online" || !state.capabilities.includes(AGENT_HIDDEN_CAPABILITY) || !write) return false;
@@ -2537,12 +2352,12 @@ export function createWebWorkspace(
       const current = generation;
       await runtime.answer(input);
       if (disposed || current !== generation) return;
+      forgetListedPrompt(input.requestId);
       setState((draft) => {
         draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(input.requestId));
       });
       await refresh();
     },
-    /** Answers the takeover of the selected agent's chat, or of its side thread `sideThreadId`. */
     async respondToBrowserTakeover(
       decision: "complete" | "cancel",
       sideThreadId?: string,
@@ -2572,12 +2387,6 @@ export function createWebWorkspace(
           draft.activeBrowserTabId = tabId;
         });
     },
-    /**
-     * Loads the message in the open chat and resolves whether the chat has it. A host with
-     * `conversation-pagination` gives the part around it in one read, however old it is; another host
-     * gives older pages until the message is loaded. It does not go through `run`: another action would
-     * make `run` skip the load, and a jump would then report a message that exists as missing.
-     */
     async openSearchMessage(messageId: string): Promise<boolean> {
       const id = selectedId;
       const current = generation;
@@ -2620,7 +2429,6 @@ export function createWebWorkspace(
       }
       return !disposed && current === generation && loaded();
     },
-    /** Leaves a part around an older message and shows the newest messages again. */
     loadLatest() {
       const id = selectedId;
       if (!id) return Promise.resolve();
@@ -2628,7 +2436,6 @@ export function createWebWorkspace(
       setState((draft) => {
         const item = draft.conversations[id];
         if (!item?.around) return;
-        // A trimmed conversation takes the host's latest page and cursor at the next read, with no gap.
         item.around = false;
         item.trimmed = true;
       });
@@ -2645,7 +2452,6 @@ export function createWebWorkspace(
     },
     older: () => {
       const id = selectedId;
-      // The chat shows a failed older page itself, as on the desktop, so no toast reports it again.
       return id ? run(() => load(id, true).catch(() => undefined)) : Promise.resolve();
     },
     setDraft(text: string) {
@@ -2671,7 +2477,6 @@ export function createWebWorkspace(
         try {
           const attachment = await runtime.upload(file);
           if (current !== generation || disposed) return;
-          // The agent was removed during the upload, so the host must not keep the file.
           if (!state.conversations[id]) {
             await runtime.discard(attachment.id);
             return;
@@ -2724,10 +2529,8 @@ export function createWebWorkspace(
   };
 }
 
-/** A focus within this time after a full read of an online host does not read it again. */
 const FOCUS_RESYNC_MS = 30_000;
 
-/** The agent whose conversation an event changes, for the events that can change it. */
 function changedConversation(event: AgentEvent | TeamRealtimeEvent): string | undefined {
   switch (event.type) {
     case "conversation":
@@ -2745,7 +2548,6 @@ function changedConversation(event: AgentEvent | TeamRealtimeEvent): string | un
   }
 }
 
-/** The presence with the chat colour of each member that has one. Presence on the wire has none. */
 function presenceWithChatColors(
   presence: TeamPresenceSnapshot,
   colors: readonly MemberChatColorEntry[],

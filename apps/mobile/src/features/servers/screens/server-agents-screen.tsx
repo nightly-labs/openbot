@@ -3,10 +3,6 @@ import { ServerAgentsSection, useAgentSettingsAvailable } from "@/features/serve
 import { SettingsContent, SettingsNote } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Server settings > Agents: the personality of the agents, the memories per agent and how the agents
- * learn. Each row shows only when the host serves it to this role.
- */
 export function ServerAgentsScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();

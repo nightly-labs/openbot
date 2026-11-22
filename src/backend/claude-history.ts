@@ -45,6 +45,7 @@ export interface ClaudeSessionMessage {
   parent_tool_use_id: string | null;
   parent_agent_id: string | null;
   timestamp?: string;
+  task_run_id?: string;
 }
 
 interface ParsedRecord {
@@ -63,6 +64,7 @@ interface ParsedRecord {
   teamName?: unknown;
   subtype?: unknown;
   compactMetadata?: unknown;
+  origin?: unknown;
   message?: unknown;
 }
 
@@ -125,7 +127,6 @@ const SCHEMA = `
 const MAX_TRANSCRIPT_RECORD_BYTES = 256 * 1024 * 1024;
 const MAX_TURN_FRAGMENT_ITEMS = 50;
 
-/** Reads Claude JSONL through a disk index. Message payloads are read one at a time per turn. */
 export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadProviderHistory {
   return (request, consume) =>
     Effect.tryPromise({
@@ -134,7 +135,20 @@ export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadPro
     });
 }
 
-/** Explicit test boundary for an injected SDK history reader. Production uses claudeHistoryReader. */
+export const CLAUDE_NO_RESPONSE_TEXT = "No response requested.";
+
+export function isClaudeNoResponsePlaceholder(message: unknown): boolean {
+  if (!isRecord(message) || message.model !== "<synthetic>" || !Array.isArray(message.content)) return false;
+  const [block, ...rest] = message.content;
+  return rest.length === 0 && isRecord(block) && block.type === "text" && block.text === CLAUDE_NO_RESPONSE_TEXT;
+}
+
+export function claudeTaskTurnId(sessionId: string, taskId: string, runId: string): string {
+  const hex = createHash("sha256").update(`claude-task-turn\n${sessionId}\n${taskId}\n${runId}`).digest("hex");
+  const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 export function claudeHistoryFromMessages(
   readMessages: (threadId: string, options?: { dir?: string }) => Promise<readonly ClaudeSessionMessage[]>,
 ): ReadProviderHistory {
@@ -226,10 +240,6 @@ async function scanClaudeHistory(
   });
 }
 
-/**
- * The last scan of each index. A scan holds a write transaction while it awaits transcript reads, so
- * a second scan of the same session waits for it and does not fail with "database is locked".
- */
 const indexScans = new Map<string, Promise<unknown>>();
 
 async function oneScanAtATime(indexPath: string, scan: () => Promise<void>): Promise<void> {
@@ -251,8 +261,6 @@ async function buildIndex(
   identity: FileIdentity,
   signal: AbortSignal,
 ): Promise<number> {
-  // A transcript can write one record more than once (#11557). Keep the first copy: an indexed row
-  // never changes, because a resumed read does not send the turns before its resume point again.
   const insert = database.prepare(
     `INSERT INTO entries
       (uuid, type, offset, length, parent_uuid, timestamp, session_id, parent_tool_use_id,
@@ -559,7 +567,7 @@ async function findFinalAnswer(
     if (signal.aborted) throw signal.reason;
     const row = decodeTranscriptRow(raw);
     const message = await readMessage(file, row);
-    if (message?.type !== "assistant") continue;
+    if (message?.type !== "assistant" || isClaudeNoResponsePlaceholder(message.message)) continue;
     const text = messageText(message.message);
     const thinking = messageThinking(message.message);
     const endsStep = messageToolCalls(message.message).length > 0;
@@ -603,7 +611,6 @@ async function emitMetadata(
   }
 }
 
-/** Sends the turns that start at `fromSeq` or later, newest first. False when the consumer stopped. */
 async function emitTurns(
   database: DatabaseSync,
   filePath: string,
@@ -630,16 +637,9 @@ const RESUME_POINT_KEY = "resume_point";
 interface TurnListDigest {
   turns: number;
   digest: string;
-  /** The start of the newest turn. It is sent again, because new records can add to it. */
   lastStart: number;
 }
 
-/**
- * The first `limit` turns of the index as one hash. Each turn adds its id, range and final answer, and
- * the last one only its id and start: its end and answer move when records come after it. The hash
- * also counts the selected records before the last turn. A changed branch, a compaction or a
- * rewritten transcript changes an earlier turn or that count, so the hash changes too.
- */
 function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest | null {
   const rows = [
     ...database
@@ -666,11 +666,6 @@ function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest |
   return { turns: rows.length, digest: hash.digest("hex"), lastStart: last[1] };
 }
 
-/**
- * Where a read with `resumeKey` starts. After a full read with the same key, the turns before the
- * newest turn of that read did not change when the hash of the turn list is the same, so they are
- * not sent again. Any other case sends all turns.
- */
 function resumeStartSeq(database: DatabaseSync, resumeKey: string): number {
   const raw = database.prepare("SELECT value FROM history_meta WHERE key = ?").get(RESUME_POINT_KEY);
   const row = raw === undefined ? null : databaseRow(raw);
@@ -686,7 +681,6 @@ function resumeStartSeq(database: DatabaseSync, resumeKey: string): number {
   return current && current.turns === stored.turns && current.digest === stored.digest ? current.lastStart : 0;
 }
 
-/** Saves the turn list of a read that sent every turn to a consumer with this key. */
 function writeResumePoint(database: DatabaseSync, resumeKey: string): void {
   const current = turnListDigest(database, -1);
   const value = current ? JSON.stringify({ key: resumeKey, turns: current.turns, digest: current.digest }) : null;
@@ -710,12 +704,14 @@ async function emitTurnFragments(
   let items: ThreadItem[] = [];
   let itemOffset = 0;
   let stopped = false;
+  let liveTurnId: string | null = null;
   const flush = async (complete: boolean): Promise<boolean> => {
     if (signal.aborted) throw signal.reason;
     const count = items.length;
     const result = await Effect.runPromise(
       consume({
         turnId: turn.turnId,
+        ...(liveTurnId ? { liveTurnId } : {}),
         status: "completed",
         startedAt: turnStartedAt(turn.timestamp, turn.startSeq),
         itemOffset,
@@ -764,6 +760,7 @@ async function emitTurnFragments(
           if (stopped) break;
           continue;
         }
+        if (row.seq === turn.startSeq && isClaudeTaskNotification(text)) liveTurnId = taskNotificationTurnId(message);
         if (
           row.seq !== turn.startSeq ||
           !text ||
@@ -783,7 +780,7 @@ async function emitTurnFragments(
           break;
         continue;
       }
-      if (message.type !== "assistant") continue;
+      if (message.type !== "assistant" || isClaudeNoResponsePlaceholder(message.message)) continue;
       const thinking = messageThinking(message.message);
       const endsStep = messageToolCalls(message.message).length > 0;
       if (!thinking && !text && !endsStep) continue;
@@ -825,6 +822,13 @@ async function emitTurnFragments(
   } finally {
     await file.close();
   }
+}
+
+function taskNotificationTurnId(message: ClaudeSessionMessage): string | null {
+  const taskId = [...messageText(message.message).matchAll(/<task-id>([^<]+)<\/task-id>/g)].at(-1)?.[1];
+  return taskId && message.task_run_id && message.session_id
+    ? claudeTaskTurnId(message.session_id, taskId, message.task_run_id)
+    : null;
 }
 
 function decodeTurnRow(raw: unknown): { seq: number; uuid: string; timestamp: string | null } {
@@ -876,6 +880,8 @@ async function readMessage(
   if (result.bytesRead !== row.length) throw new Error("Claude transcript changed while it was being read.");
   const parsed = parseRecord(buffer.toString("utf8"));
   if (!parsed || (parsed.type !== "user" && parsed.type !== "assistant" && parsed.type !== "system")) return null;
+  const taskRunId =
+    isRecord(parsed.origin) && parsed.origin.kind === "task-notification" ? stringOrNull(parsed.origin.runId) : null;
   return {
     type: parsed.type,
     uuid: parsed.uuid,
@@ -884,6 +890,7 @@ async function readMessage(
     parent_tool_use_id: stringOrNull(parsed.parentToolUseId ?? parsed.parent_tool_use_id),
     parent_agent_id: stringOrNull(parsed.parentAgentId ?? parsed.parent_agent_id),
     ...(parsed.timestamp ? { timestamp: String(parsed.timestamp) } : {}),
+    ...(taskRunId ? { task_run_id: taskRunId } : {}),
   };
 }
 
@@ -924,7 +931,7 @@ function historyFragments(messages: readonly ClaudeSessionMessage[], includeItem
         });
       continue;
     }
-    if (message.type !== "assistant" || skippingCompaction) continue;
+    if (message.type !== "assistant" || skippingCompaction || isClaudeNoResponsePlaceholder(message.message)) continue;
     const thinking = messageThinking(message.message);
     const endsStep = messageToolCalls(message.message).length > 0;
     if (!thinking && !text && !endsStep) continue;
@@ -1029,6 +1036,7 @@ function parseRecord(line: string): ParsedRecord | null {
       teamName: value.teamName,
       subtype: value.subtype,
       compactMetadata: value.compactMetadata,
+      origin: value.origin,
       message: value.message,
     };
   } catch {
@@ -1050,7 +1058,6 @@ function messageText(message: unknown): string {
       (block) =>
         block.type === "text" &&
         typeof block.text === "string" &&
-        // OpenBot's memory block is not text that the user wrote.
         !(message.role === "user" && isTurnContextBlock(block.text)),
     )
     .map((block) => String(block.text))

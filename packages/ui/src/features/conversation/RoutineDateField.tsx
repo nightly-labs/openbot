@@ -16,17 +16,13 @@ import {
 
 interface RoutineDateFieldProps {
   value: string;
-  /** The first date that can be picked. Earlier days are disabled. */
   today: Date;
   onChange: (value: string) => void;
   disabled?: boolean | undefined;
-  /** A month and a day that repeat each year: no year, no weekdays, and no past dates. */
   yearly?: boolean;
-  /** The popover closed, so the edit is complete. */
   onClose?: () => void;
 }
 
-/** A chip that opens a one-month calendar, for a routine that runs once or each year. */
 export function RoutineDateField(props: RoutineDateFieldProps) {
   const text = useText();
   const [open, setOpen] = createSignal(false);
@@ -101,11 +97,8 @@ function RoutineCalendar(props: {
       routineDateKey(new Date(first.getFullYear(), first.getMonth(), index + 1)),
     );
   });
-  // A yearly day has no weekday, so its grid starts at the first cell.
   const leadingBlanks = () => Array.from({ length: props.yearly ? 0 : month().getDay() });
   const isPast = (key: string) => !props.yearly && key < todayKey();
-  // One day in the month takes Tab; the arrow keys move it. A month paged away from the
-  // focused day hands the stop to its first day that can be picked.
   const tabStop = () => (days().includes(focusKey()) ? focusKey() : (days().find((key) => !isPast(key)) ?? ""));
   const canGoBack = () => props.yearly || month() > monthStart(props.today);
   const title = () =>
@@ -113,7 +106,6 @@ function RoutineCalendar(props: {
       ? routineMonthName(month().getMonth() + 1, text)
       : text.format.date(month(), { month: "long", year: "numeric" });
 
-  // A yearly calendar pages from December back to January.
   const inCalendar = (date: Date) =>
     props.yearly && !isRoutineYearlyCalendarYear(date)
       ? routineYearlyCalendarDate(date.getMonth(), date.getDate())
@@ -127,7 +119,6 @@ function RoutineCalendar(props: {
   const moveFocus = (event: KeyboardEvent, key: string) => {
     const step = NAVIGATION_STEPS[event.key];
     if (step === undefined) return;
-    // Right to left, the week runs from the right, so the horizontal arrows swap.
     const horizontal = event.key === "ArrowLeft" || event.key === "ArrowRight";
     const rightToLeft =
       event.currentTarget instanceof Element && getComputedStyle(event.currentTarget).direction === "rtl";

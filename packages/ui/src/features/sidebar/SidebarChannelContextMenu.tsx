@@ -1,5 +1,3 @@
-/** The right-click menu on a channel, in the pinned strip and in a section alike. */
-
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { ContextMenu, Hash, Pin, PinOff, RotateCcw } from "@openbot/ui";
 import { Show } from "solid-js";
@@ -38,7 +36,6 @@ export function SidebarChannelContextMenu(menuProps: { channel: ChannelSummary; 
         </ContextMenu.Item>
         <Show when={props.onDeleteChannel}>
           <ContextMenu.Separator />
-          {/* The host refuses to delete a channel while a task runs there: the user stops it first. */}
           <ContextMenu.Item
             class="ui-action-menu-danger agent-context-danger"
             disabled={menuProps.channel.activeTasks > 0}
@@ -53,7 +50,6 @@ export function SidebarChannelContextMenu(menuProps: { channel: ChannelSummary; 
   );
 }
 
-/** The right-click menu on a row in Deleted channels. */
 export function SidebarDeletedChannelContextMenu(menuProps: { channel: ChannelSummary }) {
   const { props } = useSidebarScope();
   const { t } = useText();

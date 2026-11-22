@@ -1,11 +1,3 @@
-// Runs the real OpenCode driver against a fake `opencode acp` that acts as OpenCode 1.19.3 does on a
-// session that OpenCode 2.0 wrote in its `session_v2` table: it advertises `session/resume` and
-// `session/list`, does not list the session, and answers each resume with "OpenCode service failure".
-// Checks that such a resume ends as a missing session, which the agent replaces and gives the
-// transcript; that a session the list still holds is tried once more and kept; that the OpenCode 2.x
-// answer for a session it does not have is a missing session, but its answer for a session of another
-// directory is not.
-// `bun run test:opencode-downgraded-session`. Writes .openbot-build/opencode-downgraded-session-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -38,7 +30,6 @@ const report: Report = { passed: false };
 const clients: AgentClient[] = [];
 process.env.FAKE_LOG = log;
 
-/** Resumes a thread and answers the failure, which must not be a success. */
 async function resumeFailure(client: AgentClient, threadId: string, cwd: string): Promise<Error> {
   try {
     await runCauseEffect(client.request("thread/resume", { threadId, cwd }, (value) => value));
@@ -59,8 +50,6 @@ try {
   clients.push(client);
   client.start();
 
-  // 1. A session that this version cannot read is a missing session, so the agent gets a new one
-  // with its transcript instead of failing each turn.
   const unreadable = await resumeFailure(client, "v2-1", workspace);
   const first = await readJsonl<LogEntry>(log);
   const unreadableReport = {
@@ -74,7 +63,6 @@ try {
   assert.equal(unreadableReport.listed, true, "The session list decides that the session is missing.");
   assert.equal(unreadableReport.resumes, 1, "A session that is not listed is not resumed again.");
 
-  // 2. A session that the list holds is kept: one more resume, then the service failure is reported.
   await rm(log, { force: true });
   const kept = await resumeFailure(client, "kept-1", workspace);
   const keptReport = {
@@ -87,9 +75,6 @@ try {
   assert.equal(keptReport.resumes, 2, "A listed session is resumed once more.");
   assert.equal(keptReport.error, sourceText("error.provider.opencodeServiceFailure"));
 
-  // 3. OpenCode 2.x copies 1.x sessions once, so it does not have a session that 1.x wrote later.
-  // That session is replaced. A session of another directory cannot reopen in the agent's workspace,
-  // so it is replaced too (#7622).
   report.newerVersion = {
     missing: isMissingProviderSessionError(await resumeFailure(client, "v1only-1", workspace), "opencode"),
     otherDirectory: isMissingProviderSessionError(await resumeFailure(client, "othercwd-1", workspace), "opencode"),

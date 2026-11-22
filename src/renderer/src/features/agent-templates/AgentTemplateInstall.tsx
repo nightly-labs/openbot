@@ -12,17 +12,10 @@ interface InstallState {
   loading: boolean;
 }
 
-/**
- * The dialog an `openbot://agents/<id>` link opens. It reads the template by the id the link named
- * and installs it only when the user presses Add agent: on `server` when one is given, whose host
- * downloads the template itself, otherwise on this computer.
- */
 export function AgentTemplateInstall(props: {
   templateId: string | null;
   server?: ServerSummary | undefined;
-  /** Defaults to the desktop port. */
   calls?: AgentTemplateInstallCalls | undefined;
-  /** Opens a link from the instructions. */
   onOpenLink: (url: string) => void;
   onClose: () => void;
   onInstalled: (agent: AddedAgent, serverId?: string) => Promise<void>;
@@ -51,7 +44,6 @@ export function AgentTemplateInstall(props: {
         })
         .catch((error: unknown) => {
           if (!current) return;
-          // Nothing can be shown without the template, so the dialog closes and the toast says why.
           setState((draft) => {
             draft.loading = false;
           });
@@ -100,7 +92,6 @@ export function AgentTemplateInstall(props: {
         : t("agentTemplate.install.added", { name: agent.name }),
       { description: t("agentTemplate.install.ready") },
     );
-    // Opening the new agent reports its own failure and never rejects, so it cannot read as a failed install.
     await props.onInstalled(agent, server?.id);
   }
 

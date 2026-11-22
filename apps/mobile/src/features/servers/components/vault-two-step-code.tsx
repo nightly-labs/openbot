@@ -1,6 +1,3 @@
-// The live two-step code of a Vault login, as an authenticator app shows it: the digits in two groups
-// and a ring that empties until the next code. A tap copies the code.
-
 import { groupedTwoStepCode } from "@openbot/contracts/two-step-code";
 import * as Clipboard from "expo-clipboard";
 import { Typography } from "heroui-native";
@@ -25,12 +22,9 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-/** From this many seconds left, the ring and the digits take the warning color. */
 const WARNING_SECONDS = 5;
-/** How long Copy shows its check mark, as the chat Copy does. */
 const COPIED_MS = 1_400;
 
-/** Copies a code, with a check mark for a short time and a haptic. */
 export function useCopyTwoStepCode() {
   const [copied, setCopied] = useState(false);
   const reset = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -49,10 +43,6 @@ export function useCopyTwoStepCode() {
   return { copy, copied };
 }
 
-/**
- * The time until the next code, as a ring that empties. It moves smoothly from the last tick; with
- * reduced motion it steps once a second.
- */
 function TwoStepTimer({
   code,
   now,
@@ -73,12 +63,10 @@ function TwoStepTimer({
   const periodMs = code.period * 1000;
   const remaining = Math.max(0, code.expiresAt - now);
   const fraction = useSharedValue(Math.min(1, remaining / periodMs));
-  // With reduced motion the ring steps at each tick of `now`.
   const tick = reducedMotion ? now : 0;
   useEffect(() => {
     const left = Math.max(0, code.expiresAt - Date.now());
     fraction.set(Math.min(1, left / periodMs));
-    // From the current time the ring runs down to empty at the end of the code, at an even speed.
     if (!reducedMotion && tick === 0)
       fraction.set(withTiming(0, { duration: left, easing: Easing.linear, reduceMotion: ReduceMotion.Never }));
   }, [code.expiresAt, fraction, periodMs, reducedMotion, tick]);
@@ -113,7 +101,6 @@ const DIGIT_SIZES = {
   hero: { className: "text-[44px] leading-[52px]", letterSpacing: 4 },
 } as const;
 
-/** The digits of a code in two groups. A new code fades in. */
 function TwoStepDigits({
   code,
   now,
@@ -138,7 +125,6 @@ function TwoStepDigits({
   );
 }
 
-/** The live code at the end of a Vault list row. A tap copies it; the rest of the row opens the login. */
 export function TwoStepRowCode({ code, now, site }: { code: LiveTwoStepCode; now: number; site: string }) {
   const { t } = useText();
   const { copy, copied } = useCopyTwoStepCode();
@@ -160,10 +146,6 @@ export function TwoStepRowCode({ code, now, site }: { code: LiveTwoStepCode; now
   );
 }
 
-/**
- * The current code in very large digits with its ring, for the check step. The whole card copies the
- * code. Undefined shows a placeholder.
- */
 export function TwoStepCodePanel({
   code,
   now,
@@ -223,10 +205,6 @@ export function TwoStepCodePanel({
   );
 }
 
-/**
- * The current code as a row of a login page: the digits, a Copy caption and the ring. A tap copies
- * the code. Undefined shows a placeholder and `caption`, such as a failed load.
- */
 export function TwoStepCodeRow({
   code,
   now,

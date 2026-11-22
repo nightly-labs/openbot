@@ -1,12 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 
-/**
- * Read-only queries for the Storage surfaces. `DatabaseSync` runs on the main thread, so every read
- * here is either one short aggregate per thread or one keyset page: the caller yields between calls
- * and the window keeps drawing while a large database is measured.
- */
-
 export interface StorageThread {
   threadId: string;
   agentId: string;
@@ -15,11 +9,9 @@ export interface StorageThread {
 
 export interface StorageThreadSize {
   messageCount: number;
-  /** UTF-8 bytes of the stored message JSON. */
   bytes: number;
 }
 
-/** Where a chat shows one attachment. One file can show in several chats. */
 export interface StoragePlacement {
   attachmentId: string;
   threadId: string;
@@ -29,7 +21,6 @@ export interface StoragePlacement {
 
 const STORAGE_PLACEMENT_PAGE = 500;
 
-/** Agent chats only. A channel context thread is internal: the user never sees it as a chat. */
 export function storageThreads(db: DatabaseSync, agentId?: string): StorageThread[] {
   const agentFilter = agentId === undefined ? "" : "AND agent_id = ?";
   const statement = db.prepare(
@@ -44,7 +35,6 @@ export function storageThreads(db: DatabaseSync, agentId?: string): StorageThrea
   }));
 }
 
-/** One thread at a time, on the primary key prefix, so the caller can yield between threads. */
 export function storageThreadSize(db: DatabaseSync, threadId: string): StorageThreadSize {
   const row = databaseRow(
     db
@@ -58,11 +48,6 @@ export function storageThreadSize(db: DatabaseSync, threadId: string): StorageTh
   return { messageCount: requiredNumberColumn(row, "message_count"), bytes: requiredNumberColumn(row, "bytes") };
 }
 
-/**
- * One keyset page of chat-message attachments, after `afterId`. The row id is
- * `${threadId}:${messageId}:${attachmentId}` and the owner is `${threadId}:${messageId}`, so the
- * attachment id is what follows the owner. A row that does not have that shape is skipped.
- */
 export function storagePlacementPage(
   db: DatabaseSync,
   afterId: string,

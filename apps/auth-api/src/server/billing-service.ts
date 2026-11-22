@@ -27,12 +27,15 @@ import {
 } from "@openbot/contracts/billing";
 import type { BillingDetails, BillingDetailsRequest } from "@openbot/contracts/billing-details";
 import {
-  type HostedServerCatalog,
-  type HostedServerCatalogPlan,
-  type HostedServerEntryPoint,
-  type HostedServerPlanPrices,
-  type HostedServerSize,
-  hostedServerStorageGb,
+  CUSTOM_SERVER_METADATA_KIND,
+  CUSTOM_SERVER_PAID_STATUSES,
+  type CustomServerPlan,
+} from "@openbot/contracts/custom-server-plans";
+import type {
+  HostedServerCatalog,
+  HostedServerCatalogPlan,
+  HostedServerEntryPoint,
+  HostedServerPlanPrices,
 } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_METADATA,
@@ -42,6 +45,7 @@ import {
   ORDER_METADATA,
   parseLicenseOrder,
 } from "@openbot/contracts/license";
+import type { ReferralMoney } from "@openbot/contracts/referral";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer } from "effect";
@@ -53,6 +57,7 @@ import {
   type PlanChangeDirection,
   type PlanEndReason,
 } from "./account-analytics";
+import { subscriptionPaysForOwnerSql } from "./billing-entitlement";
 import {
   BillingError,
   BillingOperationError,
@@ -63,10 +68,11 @@ import {
 } from "./billing-errors";
 import type { BillingOss } from "./billing-oss";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
+import { BillingReferral } from "./billing-referral";
 import {
   type BillingSales,
   type BillingSalesSynced,
-  type PaymentReversal,
+  isDisputeInquiry,
   paymentReversal,
   withoutTax,
 } from "./billing-sales";
@@ -79,6 +85,7 @@ import {
   type LicenseSync,
   ordersLicense,
 } from "./license-service";
+import { Referrals } from "./referrals";
 import type { RemoteFailure } from "./remote-control-plane";
 import type { StripeTransportError } from "./stripe-client";
 import {
@@ -99,37 +106,27 @@ import {
   subscriptionPaymentMethodId,
   subscriptionPeriodEnd,
   subscriptionServerItem,
+  subscriptionStartedAt,
   subscriptionStorageItem,
   subscriptionStorageTier,
   verifyStripeSignature,
 } from "./stripe-client";
 import { ViesClient } from "./vies-client";
 
-/** Stripe retries a webhook for up to 3 days, so older event ids are not needed to stop duplicates. */
 const WEBHOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
-/** The key of an account's welcome email claim in `billing_webhook_events`. No Stripe event id has it. */
 const WELCOME_EMAIL_CLAIM_PREFIX = "openbot_welcome_email:";
-/** The Remote host id shape (`requiredIdentifier` in remote-control-plane.ts). Other values are stored as no server. */
 const SERVER_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/u;
+const DISPUTE_DELETES_SERVER_MS = 30 * 24 * 60 * 60 * 1000;
 const LAPSED_PLAN_GRACE_MS = 24 * 60 * 60 * 1000;
 const LAPSED_PLAN_READ_INTERVAL_MS = 60 * 60 * 1000;
 const LAPSED_PLAN_BATCH_SIZE = 20;
-/** Prices change only when `stripe-bootstrap.ts` runs, so each isolate reads them once in this time. */
 const CATALOG_TTL_MS = 5 * 60_000;
 const catalogCache = new Map<string, { expiresAt: number; prices: ReadonlyMap<string, StripePrice> }>();
 const NO_PRICES: ReadonlyMap<string, StripePrice> = new Map();
-/**
- * A storage purchase in this time from the same storage item uses the same Stripe idempotency key, so a
- * double click is one change, and two purchases at the same time cannot each add a storage item. The key
- * does not have the tier: Stripe refuses the second purchase, as `idempotency_error`. Stripe keeps a
- * refused payment for its key, so the key also has the payment method of the subscription: a retry with a
- * new payment method gets a new key at once, and any retry gets one in the next window.
- */
 const STORAGE_PURCHASE_WINDOW_MS = 60_000;
 
 export { BillingError } from "./billing-errors";
 
-/** Where the Stripe page sends the user back: the desktop return page or the web client. */
 export type BillingReturnTarget = "desktop" | "web";
 
 export const BILLING_UNAVAILABLE_STATE: BillingState = { available: false, hasCustomer: false, servers: [] };
@@ -145,25 +142,18 @@ interface ServerPlanRow {
   status: string;
   current_period_end: number | null;
   cancel_at_period_end: number;
-  /** 1 for a hosted server on a machine of the operator. */
   on_operator_host: number;
-  /** The machine of the hosted server after a resize that waits, or null when the subscription has no server row. */
-  server_size: HostedServerSize | null;
-  /** The storage tier of the hosted server, 0 when the subscription has no server row. */
   storage_tier: number;
 }
 
-/** A subscription that the webhook stored, for a server that its metadata names. */
 export interface SubscriptionSync {
   subscriptionId: string;
   userId: string;
   serverId: string;
   status: BillingSubscriptionStatus;
-  /** The plan of the subscription now. A Customer Portal change can move it to another plan or interval. */
   plan: BillingPlanId;
   interval: BillingInterval;
   currency: BillingCurrency;
-  /** The storage tier that the subscription pays for: 0 with no storage add-on. */
   storageTier: BillingStorageTier;
 }
 
@@ -171,64 +161,42 @@ export interface BillingServiceOptions {
   database: D1Database;
   secretKey: string;
   webhookSecret: string | null;
-  /** A license bought before this time is free until then, in milliseconds since the epoch. */
   licenseTrialEnd?: number | null;
-  /** A Checkout page needs the billing country (`checkoutTax`). Off: Stripe Tax for a customer with none. */
   countryRequired?: boolean;
   fetch: StripeFetch;
   now?: () => number;
-  /**
-   * Runs after the webhook stores a subscription. Hosted servers use it to start or stop a server, so
-   * billing does not know about the provider. An error makes Stripe send the event again.
-   */
   onSubscriptionSynced?: (sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>;
-  /** Runs after the webhook stores a license change that can change the member limit of the owner's servers. */
+  onCustomServerChanged?: (hostId: string) => Effect.Effect<void, RemoteFailure>;
+  onServerRefunded?: (refund: ServerRefund) => Effect.Effect<void, HostedFailure>;
   onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
   analytics?: AccountAnalytics;
   sales?: BillingSales;
-  /**
-   * Runs once for an account, when its first plan starts. It must not throw or wait: the welcome
-   * email goes after the webhook answers.
-   */
   onFirstPlanStarted?: (start: FirstPlanStart) => void;
-  /** Runs once for each license email (`LicenseServiceOptions`). It must not throw or wait. */
   onLicenseEmail?: LicenseServiceOptions["onLicenseEmail"];
-  /**
-   * Runs once for each subscription, a server plan or a license, that starts, ends, or cancels or
-   * resumes its renewal, with the email of its account.
-   * It must not throw or wait: the operator message goes after the webhook answers.
-   */
   onPurchase?: (purchase: BillingPurchase) => void;
-  /** Checks the EU VAT IDs of the billing details. Without it, the service asks VIES itself. */
   vies?: ViesClient;
-  /**
-   * Runs once for each paid Checkout page whose billing address is in another country than the one that
-   * decided its VAT, and for each running subscription whose VAT treatment a change of the billing details
-   * changed, with the operator text. It must not throw or wait.
-   */
   onVatMismatch?: (text: string) => void;
-  /** Counts the paid invoices of consumers in other EU countries, for the One Stop Shop limit. */
   oss?: BillingOss;
 }
 
-/** The first plan of an account, for its welcome email. */
+export interface ServerRefund {
+  userId: string;
+  serverId: string;
+}
+
 export interface FirstPlanStart {
   email: string;
   plan: BillingPlanId;
   serverName: string;
 }
 
-/** A closed Checkout page. `paid` when the user paid on it, so no second page must open. */
 export type ClosedCheckout = { status: "paid" } | ({ status: "closed" } & CheckoutOrder);
 
-/** What a server Checkout page sells with the plan, and what the buyer asked for. A later page repeats it. */
 export interface CheckoutOrder {
   license: LicenseOrder | null;
-  /** The time of the early start request (`EARLY_START_METADATA`), or null when the buyer did not ask. */
   earlyStartAt: number | null;
 }
 
-/** The stored state of a subscription before a sync, to find the change that the sync made. */
 interface StoredSubscription {
   status: string;
   plan: string;
@@ -237,7 +205,6 @@ interface StoredSubscription {
   cancel_at_period_end: number;
 }
 
-/** A subscription that a webhook stored, with its account. */
 interface SyncedSubscription {
   kind: "plan";
   userId: string;
@@ -245,6 +212,22 @@ interface SyncedSubscription {
   interval: BillingInterval;
   currency: BillingCurrency;
   latestInvoiceId: string | null;
+  serverId: string | null;
+  ended: boolean;
+  startedAt: number | null;
+}
+
+interface CustomServerSync {
+  kind: "custom_server";
+}
+
+export interface CustomServerCheckoutRequest {
+  user: { id: string; email: string };
+  serverId: string;
+  plan: CustomServerPlan;
+  target: BillingReturnTarget;
+  origin: string;
+  earlyStartAt?: number;
 }
 
 export interface CheckoutRequest {
@@ -255,17 +238,9 @@ export interface CheckoutRequest {
   currency: BillingCurrency;
   target: BillingReturnTarget;
   origin: string;
-  /** Where the journey started in the app. Only analytics reads it. */
   entryPoint?: HostedServerEntryPoint;
-  /**
-   * A license to buy with the server, at the bundle price for the same interval and currency. The page
-   * then has 2 items, and the customer pays one invoice. The first sync moves the license to its own
-   * subscription (`LicenseService.splitOrder`).
-   */
   license?: LicenseOrder;
-  /** The time when the buyer asked that the hosting service begin before the withdrawal period ends. */
   earlyStartAt?: number;
-  /** The code of a discount link. Only the web client sends one. */
   promotionCode?: string;
 }
 
@@ -276,6 +251,8 @@ class BillingDependencies extends Context.Service<
     stripe: StripeClient;
     now: () => number;
     onSubscriptionSynced: ((sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>) | null;
+    onCustomServerChanged: ((hostId: string) => Effect.Effect<void, RemoteFailure>) | null;
+    onServerRefunded: ((refund: ServerRefund) => Effect.Effect<void, HostedFailure>) | null;
     analytics: AccountAnalytics;
   }
 >()("auth-api/BillingService/Dependencies") {}
@@ -292,8 +269,8 @@ export class BillingService {
   readonly #vies: ViesClient;
   readonly #onVatMismatch: ((text: string) => void) | null;
   readonly #oss: BillingOss | null;
+  readonly #referral: BillingReferral;
   readonly #countryRequired: boolean;
-  /** The commercial license. It shares the Stripe customer and the webhook with the server plans. */
   readonly license: LicenseService;
 
   constructor(options: BillingServiceOptions) {
@@ -316,7 +293,16 @@ export class BillingService {
       stripe,
       now,
       onSubscriptionSynced,
+      onCustomServerChanged: options.onCustomServerChanged ?? null,
+      onServerRefunded: options.onServerRefunded ?? null,
       analytics: this.#analytics,
+    });
+    this.#referral = new BillingReferral({
+      database,
+      stripe,
+      referrals: new Referrals({ database, now }),
+      now,
+      ensureCustomer: (user) => this.ensureCustomer(user),
     });
     this.license = new LicenseService({
       database,
@@ -326,6 +312,8 @@ export class BillingService {
       countryRequired: this.#countryRequired,
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
+      referralCoupon: (userId) => this.#referral.couponFor(userId),
+      keptReferralCoupon: (subscriptionId) => this.#referral.keptCoupon(subscriptionId),
       analytics: this.#analytics,
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
@@ -333,11 +321,6 @@ export class BillingService {
       ...(options.onPurchase ? { onPurchase: options.onPurchase } : {}),
     });
   }
-
-  /**
-   * The plans with their Stripe prices. A plan with no price in each base currency and interval is left
-   * out. An optional currency, such as BRL, is in a plan only when its Stripe Price has it.
-   */
 
   readonly catalog = Effect.fn("BillingService.catalog")(
     function* (
@@ -361,7 +344,7 @@ export class BillingService {
         }
         const entry: HostedServerCatalogPlan = {
           id: plan.id,
-          diskGb: plan.storageGb,
+          diskGb: storageTierGb(plan.id, 0),
           memberLimit: plan.memberLimit,
           relativeSpeed: plan.relativeSpeed,
           prices: planPrices,
@@ -375,10 +358,11 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * The Stripe customer of the account. The service makes it before the first Checkout, so two open
-   * Checkouts use one customer and the webhook always knows the account.
-   */
+  readonly referralCredit = (userId: string): Effect.Effect<ReferralMoney[], BillingError | BillingOperationError> =>
+    this.#referral.credit(userId);
+
+  readonly releaseReferralCredit = (): Effect.Effect<number, BillingError | BillingOperationError> =>
+    this.#referral.releaseDue();
 
   readonly ensureCustomer = Effect.fn("BillingService.ensureCustomer")(
     function* (
@@ -387,7 +371,6 @@ export class BillingService {
     ): Effect.fn.Return<string, BillingError | BillingOperationError, BillingDependencies> {
       const dependencies = yield* BillingDependencies;
       const existing = yield* this.#customerId(user.id);
-      // A customer deleted in the Stripe Dashboard cannot pay, so the account gets a new one.
       if (existing && !(yield* this.#stripeCall(() => dependencies.stripe.isCustomerDeleted(existing))))
         return existing;
       const created = yield* this.#stripeCall(() =>
@@ -418,8 +401,6 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** The billing country and the VAT ID of the account. An account with no Stripe customer has none. */
-
   readonly getBillingDetails = Effect.fn("BillingService.getBillingDetails")(
     function* (
       this: BillingService,
@@ -432,8 +413,6 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  /** Saves the billing details on the Stripe customer, which the next Checkout page reads (`billing-tax.ts`). */
 
   readonly setBillingDetails = Effect.fn("BillingService.setBillingDetails")(
     function* (
@@ -459,8 +438,6 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** A Stripe Checkout page that starts the plan of one server, and its license when the order has one. */
-
   readonly createCheckout = Effect.fn("BillingService.createCheckout")(
     function* (
       this: BillingService,
@@ -479,9 +456,9 @@ export class BillingService {
       yield* this.license.assertCurrency(request.user.id, request.currency);
       const customerId = yield* this.ensureCustomer(request.user);
       const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
+      const referralCouponId = yield* this.#referral.couponFor(request.user.id);
       const returnUrl = checkoutReturnUrl(request.origin, request.target, request.serverId);
       const returnToken = this.#sales ? crypto.randomUUID() : null;
-      // During a promotion the license is free until its trial end, so the order pays for the server only.
       const trialEnd = order ? this.license.trialEnd() : null;
       const orderMetadata = order
         ? {
@@ -490,7 +467,6 @@ export class BillingService {
           }
         : null;
       const trial = orderMetadata !== null && trialEnd !== null;
-      // The early start request goes on the session and on the subscription, as the record of it.
       const metadata = {
         ...(trial
           ? {
@@ -519,8 +495,7 @@ export class BillingService {
               }
             : {}),
           ...(request.promotionCode ? { promotionCode: request.promotionCode } : {}),
-          // Stripe puts the session ID in the URL. The desktop return page sends it with the first
-          // website visit of the browser, so that the saved checkout names the account.
+          ...(referralCouponId ? { referralCouponId } : {}),
           successUrl:
             returnToken && request.target !== "web"
               ? `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}checkout={CHECKOUT_SESSION_ID}`
@@ -592,10 +567,43 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Closes a Checkout page. The plan of a paid page is stored now: its webhook can be late, or can fail
-   * each time. A closed page returns its license order, unless the account got a license after it opened.
-   */
+  readonly createCustomServerCheckout = Effect.fn("BillingService.createCustomServerCheckout")(
+    function* (
+      this: BillingService,
+      request: CustomServerCheckoutRequest,
+    ): Effect.fn.Return<{ sessionId: string; url: string }, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      yield* this.license.assertCurrency(request.user.id, request.plan.currency);
+      const customerId = yield* this.ensureCustomer(request.user);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
+      const returnUrl = customServerReturnUrl(request.origin, request.target);
+      const session = yield* this.#stripeCall(() =>
+        dependencies.stripe.createCheckoutSession({
+          customerId,
+          inlinePrice: {
+            productName: `OpenBot ${request.plan.name}`,
+            amount: request.plan.amount,
+            interval: request.plan.interval,
+          },
+          currency: request.plan.currency,
+          userId: request.user.id,
+          serverId: request.serverId,
+          tax,
+          metadata: {
+            [LICENSE_METADATA.kind]: CUSTOM_SERVER_METADATA_KIND,
+            ...(request.earlyStartAt === undefined
+              ? {}
+              : { [EARLY_START_METADATA]: new Date(request.earlyStartAt).toISOString() }),
+          },
+          successUrl: returnUrl,
+          cancelUrl: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}cancelled=1`,
+          nowSeconds: Math.floor(dependencies.now() / 1_000),
+        }),
+      );
+      return { sessionId: session.id, url: session.url };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
 
   readonly closeCheckout = Effect.fn("BillingService.closeCheckout")(
     function* (
@@ -617,7 +625,6 @@ export class BillingService {
       }
       const subscriptionId = session.subscription;
       if (subscriptionId) {
-        // The webhook or the next close stores it. A Stripe failure is logged by `#stripeCall`.
         yield* this.#syncSubscription(subscriptionId).pipe(
           Effect.catch(() =>
             Effect.sync(() => {
@@ -630,12 +637,6 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  /**
-   * Reads again each open plan whose period ended a day ago. Stripe moves the period end at each renewal,
-   * so such a plan missed a webhook, for example a cancel while the webhook failed for 3 days.
-   * Each plan is read at most once per hour.
-   */
 
   readonly refreshLapsedPlans = Effect.fn("BillingService.refreshLapsedPlans")(
     function* (
@@ -670,11 +671,6 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  /**
-   * Cancels each open plan of one server now, with no refund. It stops at the first plan that Stripe
-   * did not cancel, so the caller can keep the server.
-   */
 
   readonly cancelServerPlans = Effect.fn("BillingService.cancelServerPlans")(
     function* (
@@ -755,7 +751,6 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** A deletion needs a fresh terminal Stripe state, never a stale local expiry date. */
   readonly subscriptionEnded = Effect.fn("BillingService.subscriptionEnded")(
     function* (
       this: BillingService,
@@ -763,16 +758,12 @@ export class BillingService {
     ): Effect.fn.Return<boolean, BillingError | BillingOperationError, BillingDependencies> {
       const dependencies = yield* BillingDependencies;
       const subscription = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
-      // A first payment that never came also ends the subscription, as in `cancelSubscription`.
       const ended = subscription.status === "canceled" || subscription.status === "incomplete_expired";
-      // Also on `false`: a stale local status that Stripe shows as open leaves the expiry query of the cron.
       yield* this.#syncSubscription(subscriptionId);
       return ended;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  /** Cancels one subscription now. A subscription that Stripe closed already counts as cancelled. */
 
   readonly cancelSubscription = Effect.fn("BillingService.cancelSubscription")(
     function* (
@@ -819,7 +810,6 @@ export class BillingService {
           }),
           Effect.mapError(stripeFailure),
         );
-      // The webhook stores the final state later. Until then the plan must not count as open.
       yield* billingCall(() =>
         dependencies.database
           .prepare(
@@ -829,7 +819,6 @@ export class BillingService {
           .bind(dependencies.now(), subscriptionId)
           .run(),
       );
-      // The webhook that follows sees the plan closed already, so the end is reported here.
       if (stored && isOneOf(BILLING_SUBSCRIPTION_STATUSES, stored.status) && isOpenBillingStatus(stored.status)) {
         dependencies.analytics.track(stored.user_id, {
           name: "billing_action",
@@ -843,8 +832,6 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  /** The open plan of each server. The server name comes only from a host that the same account owns. */
 
   readonly getState = Effect.fn("BillingService.getState")(
     function* (
@@ -861,10 +848,9 @@ export class BillingService {
                 `SELECT s.stripe_subscription_id, s.server_id, h.name AS server_name, s.plan, s.interval, s.currency,
                   s.amount, s.status, s.current_period_end, s.cancel_at_period_end,
                   hs.operator_host IS NOT NULL AS on_operator_host,
-                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size,
                   COALESCE(hs.storage_tier, 0) AS storage_tier
            FROM billing_subscriptions s
-           LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
+           LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
            LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
            WHERE s.user_id = ? AND s.status IN ${OPEN_STATUSES_SQL}
            ORDER BY h.name IS NULL, h.name COLLATE NOCASE, s.updated_at DESC`,
@@ -875,7 +861,6 @@ export class BillingService {
         ],
         { concurrency: "unbounded" },
       );
-      // The Price catalog is read only for a server that can buy storage. Without it, no tier is offered.
       const prices = rows.results.some((row) => canBuyStorage(row) && storageTierOf(row.storage_tier) < 2)
         ? yield* this.#prices().pipe(Effect.catch(() => Effect.succeed(NO_PRICES)))
         : NO_PRICES;
@@ -887,12 +872,6 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  /**
-   * Returns a Customer Portal page. The cancel flow opens on one subscription, after the service checks
-   * that the subscription belongs to the account. A plan does not change now, so the `update` flow of an
-   * older client opens the `manage` page.
-   */
 
   readonly createPortal = Effect.fn("BillingService.createPortal")(
     function* (
@@ -931,14 +910,6 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Buys a larger storage tier for the hosted server of one subscription, and returns the billing state
-   * after it. Only a server on a VPS of the operator has tiers, and a tier never goes down. Stripe invoices
-   * the prorated add-on now and refuses the change when that payment fails, so the disk grows only when it
-   * is paid. The sync after the change writes the tier to the server, and the server uses the new storage
-   * from its next start.
-   */
-
   readonly buyStorage = Effect.fn("BillingService.buyStorage")(
     function* (
       this: BillingService,
@@ -961,7 +932,6 @@ export class BillingService {
           .first<{ server_id: string }>(),
       );
       if (!owned) return yield* storageUnavailable();
-      // D1 can be behind Stripe, so the plan, the status and the tier are checked on the subscription too.
       const current = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(request.subscriptionId));
       const serverItem = subscriptionServerItem(current);
       const key = serverItem ? planLookupKey(serverItem.price) : null;
@@ -992,8 +962,6 @@ export class BillingService {
       ).pipe(
         Effect.catch((error) =>
           Effect.gen(function* () {
-            // With no answer from Stripe, the change can be applied and paid. Read it again, so that a
-            // paid change is kept.
             if (!(error instanceof StripeRequestError)) {
               const after = yield* stripeRequest(() => dependencies.stripe.getSubscription(current.id)).pipe(
                 Effect.mapError(stripeFailure),
@@ -1011,17 +979,11 @@ export class BillingService {
           }),
         ),
       );
-      // The same sync as a webhook: it stores the new amount and writes the tier to the hosted server.
       yield* this.#syncSubscription(current.id);
       return yield* this.getState(userId);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  /**
-   * Applies one Stripe event. Each event gets the subscription from Stripe again, so a late or repeated
-   * event cannot write an old state. An error makes the route answer 500, so Stripe sends the event again.
-   */
 
   readonly handleWebhook = Effect.fn("BillingService.handleWebhook")(
     function* (
@@ -1049,22 +1011,34 @@ export class BillingService {
           .first<{ seen: number }>(),
       );
       if (seen) return;
-      // A refund or a dispute names only its payment. The invoice of that payment names the plan.
       const reversal = paymentReversal(event);
       const payment = reversal
         ? yield* this.#stripeCall(() => dependencies.stripe.getPaymentInvoice(reversal.paymentIntentId))
         : null;
       const subscriptionId = eventSubscriptionId(event) ?? payment?.subscriptionId ?? null;
-      const synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
-      // The server of an ended plan stops and keeps its disk.
-      if (reversal && payment && synced && (yield* this.#reversalEndsPlan(reversal, payment, synced))) {
+      let synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
+      if (reversal?.type === "payment_disputed" && payment && synced) {
         yield* this.cancelSubscription(payment.subscriptionId);
-        yield* this.#syncSubscription(payment.subscriptionId);
+        synced = yield* this.#syncSubscription(payment.subscriptionId);
       }
-      // Stripe tries a failed renewal again by itself. The account gets one email for each unpaid invoice.
+      if (synced?.kind === "plan" && synced.ended && synced.serverId && dependencies.onServerRefunded) {
+        const invoiceId = synced.latestInvoiceId;
+        const refunded =
+          reversal?.type === "payment_refunded" ||
+          (reversal?.type === "payment_disputed" &&
+            !isDisputeInquiry(event) &&
+            synced.startedAt !== null &&
+            event.created * 1_000 - synced.startedAt < DISPUTE_DELETES_SERVER_MS) ||
+          (event.type === "customer.subscription.deleted" &&
+            invoiceId !== null &&
+            (yield* this.#stripeCall(() => dependencies.stripe.isInvoiceRefunded(invoiceId))));
+        if (refunded)
+          yield* dependencies
+            .onServerRefunded({ userId: synced.userId, serverId: synced.serverId })
+            .pipe(Effect.mapError((error) => (error instanceof BillingError ? error : new BillingOperationError({}))));
+      }
       const failedInvoice = synced?.kind === "license" ? failedRenewalInvoice(event, synced.currency) : null;
       if (synced?.kind === "license" && failedInvoice) yield* this.license.paymentFailed(synced, failedInvoice);
-      // License events count as sales with `product: license`. The sync reports the license lifecycle.
       const sold: BillingSalesSynced | null =
         synced?.kind === "license"
           ? {
@@ -1074,12 +1048,14 @@ export class BillingService {
               interval: synced.interval,
               currency: synced.currency,
             }
-          : synced;
+          : synced?.kind === "plan"
+            ? synced
+            : null;
       if (this.#sales) {
         yield* this.#sales.webhook(event, sold, payment).pipe(Effect.mapError(() => new BillingOperationError({})));
       }
       if (this.#oss) yield* this.#oss.record(event);
-      // The event is recorded only after it is applied, so a failed event is applied again on retry.
+      yield* this.#referral.record(event, payment, sold?.userId ?? null);
       yield* billingCall(() =>
         dependencies.database.batch([
           dependencies.database
@@ -1090,8 +1066,7 @@ export class BillingService {
             .bind(now - WEBHOOK_EVENT_RETENTION_MS),
         ]),
       );
-      if (!this.#sales) yield* this.#trackEvent(event, synced);
-      // After the record, so that a retry of a failed event sends no second alert.
+      if (!this.#sales) yield* this.#trackEvent(event, synced?.kind === "custom_server" ? null : synced);
       const mismatch = event.type === "checkout.session.completed" ? checkoutCountryMismatch(event.data.object) : null;
       if (mismatch) {
         console.warn(`billing: ${mismatch}`);
@@ -1101,26 +1076,6 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * A dispute ends the plan now, so Stripe does not charge the disputed card again. A full refund of the
-   * invoice that paid the current period ends it too, because the account paid nothing for that period.
-   * A partial refund, or a refund of an earlier invoice or of a plan change, keeps the plan.
-   */
-  readonly #reversalEndsPlan = Effect.fn("BillingService.reversalEndsPlan")(function* (
-    this: BillingService,
-    reversal: PaymentReversal,
-    payment: { invoiceId: string; billingReason: string | null },
-    synced: SyncedSubscription | LicenseSync,
-  ): Effect.fn.Return<boolean, BillingError | BillingOperationError, BillingDependencies> {
-    if (reversal.type === "payment_disputed") return true;
-    if (reversal.type !== "payment_refunded") return false;
-    if (payment.invoiceId !== synced.latestInvoiceId) return false;
-    if (payment.billingReason !== "subscription_create" && payment.billingReason !== "subscription_cycle") return false;
-    const dependencies = yield* BillingDependencies;
-    return yield* this.#stripeCall(() => dependencies.stripe.isPaymentRefunded(reversal.paymentIntentId));
-  });
-
-  /** Reports a payment or an expired Checkout. A change of the plan itself is reported by the sync. */
   readonly #trackEvent = Effect.fn("BillingService.trackEvent")(function* (
     this: BillingService,
     event: StripeEvent,
@@ -1165,16 +1120,18 @@ export class BillingService {
     this: BillingService,
     subscriptionId: string,
   ): Effect.fn.Return<
-    SyncedSubscription | LicenseSync | null,
+    SyncedSubscription | LicenseSync | CustomServerSync | null,
     BillingError | BillingOperationError,
     BillingDependencies
   > {
     const dependencies = yield* BillingDependencies;
-    // The time of the read, not of the write: a read that started later holds the newer state.
     const readAt = dependencies.now();
     const subscription = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
+    if (subscription.metadata[LICENSE_METADATA.kind] === CUSTOM_SERVER_METADATA_KIND) {
+      yield* this.#syncCustomServer(subscription, readAt);
+      return { kind: "custom_server" };
+    }
     const customerId = subscriptionCustomerId(subscription);
-    // A server order has a server item and a license item until its split. It is a server plan.
     const price = subscriptionServerItem(subscription)?.price;
     if (!price && subscriptionLicenseItem(subscription)) {
       const ownerId = yield* this.#subscriptionOwner(subscription, customerId);
@@ -1200,7 +1157,6 @@ export class BillingService {
     );
     const cancelAtPeriodEnd = subscription.cancel_at_period_end || typeof subscription.cancel_at === "number";
     const amount = subscriptionAmount(subscription);
-    // Two events for one subscription can run at the same time. The write of the older read is skipped.
     const stored = yield* billingCall(() =>
       dependencies.database
         .prepare(
@@ -1243,10 +1199,10 @@ export class BillingService {
       interval: key.interval,
       currency,
       latestInvoiceId: subscriptionLatestInvoiceId(subscription),
+      serverId,
+      ended: subscription.status === "canceled",
+      startedAt: subscriptionStartedAt(subscription),
     };
-    // A paid server order moves its license to its own subscription, and any server plan gives the license
-    // the bundle price from its next renewal. A sync that stores nothing new also runs both, so a failed
-    // split or price change runs again on the next webhook. Each does nothing when it is already done.
     const finish = Effect.andThen(
       ordersLicense(subscription) ? this.license.splitOrder(subscription, ownerId) : Effect.void,
       this.license.alignBundlePrice(ownerId),
@@ -1257,8 +1213,6 @@ export class BillingService {
     }
     const current = { ...synced, amount, status: subscription.status, cancelAtPeriodEnd };
     const action = planChange(previous, current);
-    // The other plans of an account whose plan starts. A failed read leaves them out: the subscription
-    // is already saved, so the event must not fail the sync.
     const others =
       action === "plan_started"
         ? yield* billingCall(() =>
@@ -1271,7 +1225,6 @@ export class BillingService {
             Effect.catch(() => Effect.succeed(null)),
           )
         : null;
-    // A plan that starts after every earlier plan of the account ended.
     const reactivated = others
       ? others.some((row) => row.status === "canceled") &&
         !others.some((row) => isOneOf(BILLING_SUBSCRIPTION_STATUSES, row.status) && isOpenBillingStatus(row.status))
@@ -1297,7 +1250,6 @@ export class BillingService {
         },
       );
     }
-    // A subscription starts once, so the first plan of an account starts once.
     if (others?.length === 0 && serverId) yield* this.#firstPlanStarted(ownerId, serverId, key.plan);
     const onSubscriptionSynced = dependencies.onSubscriptionSynced;
     const status = subscription.status;
@@ -1317,11 +1269,49 @@ export class BillingService {
     return synced;
   });
 
-  /**
-   * Claims the welcome of an account before it is sent. Stripe sends the events of a new subscription
-   * at the same time, and each one can see the start, so only the event that adds the claim sends it.
-   * The claim is kept as long as the webhook events. A failure skips the email, not the sync.
-   */
+  readonly #syncCustomServer = Effect.fn("BillingService.syncCustomServer")(function* (
+    subscription: StripeSubscription,
+    readAt: number,
+  ): Effect.fn.Return<void, BillingError | BillingOperationError, BillingDependencies> {
+    const dependencies = yield* BillingDependencies;
+    const metadataServerId = subscription.metadata[BILLING_METADATA.serverId];
+    const serverId = metadataServerId && SERVER_ID_PATTERN.test(metadataServerId) ? metadataServerId : null;
+    if (!serverId) {
+      console.warn("billing: custom server subscription has no server", { subscriptionId: subscription.id });
+      return;
+    }
+    const paid = CUSTOM_SERVER_PAID_STATUSES.map(() => "?").join(", ");
+    const stored = yield* billingCall(() =>
+      dependencies.database
+        .prepare(
+          `UPDATE custom_server_offers
+              SET stripe_subscription_id = ?, subscription_status = ?, checkout_session_id = NULL, updated_at = ?
+            WHERE host_id = ?
+              AND (stripe_subscription_id IS NULL OR stripe_subscription_id = ?
+                OR subscription_status IS NULL OR subscription_status NOT IN (${paid}))
+              AND (stripe_subscription_id IS NOT ? OR subscription_status IS NOT ?)`,
+        )
+        .bind(
+          subscription.id,
+          subscription.status,
+          readAt,
+          serverId,
+          subscription.id,
+          ...CUSTOM_SERVER_PAID_STATUSES,
+          subscription.id,
+          subscription.status,
+        )
+        .run(),
+    );
+    if (stored.meta.changes !== 1) return;
+    const changed = dependencies.onCustomServerChanged;
+    if (changed) {
+      yield* changed(serverId).pipe(
+        Effect.mapError((error) => (error instanceof BillingError ? error : new BillingOperationError({}))),
+      );
+    }
+  });
+
   readonly #firstPlanStarted = Effect.fn("BillingService.firstPlanStarted")(
     function* (
       this: BillingService,
@@ -1357,7 +1347,6 @@ export class BillingService {
       ),
   );
 
-  /** Reports the change of a plan that one sync made. A sync that changes nothing reports nothing. */
   #trackChange(
     action: BillingAction,
     previous: StoredSubscription | null,
@@ -1398,18 +1387,12 @@ export class BillingService {
     return prices;
   });
 
-  /**
-   * The account of a subscription. A known customer names it. For a new customer, the subscription
-   * metadata names the account, and the service links the customer to it. The service never moves a
-   * customer or an account to a second link.
-   */
   readonly #subscriptionOwner = Effect.fn("BillingService.subscriptionOwner")(function* (
     this: BillingService,
     subscription: StripeSubscription,
     customerId: string,
   ): Effect.fn.Return<string | null, BillingError | BillingOperationError, BillingDependencies> {
     const dependencies = yield* BillingDependencies;
-    // A stored subscription keeps its account, also after the account gets a new customer.
     const stored = yield* billingCall(() =>
       dependencies.database
         .prepare("SELECT user_id FROM billing_subscriptions WHERE stripe_subscription_id = ?")
@@ -1493,10 +1476,6 @@ function planChange(
   return current.cancelAtPeriodEnd ? "cancel_scheduled" : "cancel_withdrawn";
 }
 
-/**
- * Whether a changed plan costs more or less. The monthly amounts decide; without both amounts, the order
- * of the plans decides. A change of interval only at the same monthly amount has no direction.
- */
 function planChangeDirection(
   previous: StoredSubscription | null,
   current: { plan: BillingPlanId; interval: BillingInterval; amount: number | null },
@@ -1515,15 +1494,10 @@ function planChangeDirection(
   return after > before ? "up" : "down";
 }
 
-/** A plan that ends after its payment failed ends as unpaid; every other end is a cancellation. */
 function planEndReason(previous: StoredSubscription | null): PlanEndReason {
   return previous?.status === "past_due" || previous?.status === "unpaid" ? "unpaid" : "canceled";
 }
 
-/**
- * The plan and interval of a server plan Price. A changed amount moves the lookup key to a new Price, and
- * current subscriptions keep the old one, so the metadata names them too.
- */
 function planLookupKey(price: {
   lookup_key: string | null;
   metadata: Readonly<Record<string, string>>;
@@ -1534,10 +1508,6 @@ function planLookupKey(price: {
   );
 }
 
-/**
- * A server on a VPS of the operator whose paid plan renews. Only such a server can buy a storage tier: a
- * trial invoices 0 for the change, so the disk would grow before a payment.
- */
 function canBuyStorage(row: ServerPlanRow): boolean {
   return row.on_operator_host === 1 && row.status === "active" && row.cancel_at_period_end !== 1;
 }
@@ -1564,18 +1534,13 @@ function serverPlan(row: ServerPlanRow, prices: ReadonlyMap<string, StripePrice>
     status: row.status,
     currentPeriodEnd: row.current_period_end,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
-    storageGb: hostedServerStorageGb(row.plan, row.on_operator_host === 1, row.server_size, storageTier),
+    storageGb: storageTierGb(row.plan, storageTier),
     ...(canBuyStorage(row)
       ? { storageUpgrades: storageUpgrades(row.plan, row.interval, row.currency, storageTier, row.amount, prices) }
       : {}),
   };
 }
 
-/**
- * The tiers above `tier` that have a Price in `currency`, smallest first. The amount of each is the plan
- * and the add-on of that tier. `amount` holds the plan and the add-on of `tier`, so the add-on of `tier` is
- * taken out at its catalog Price: after a change of that Price, the amount can differ from the invoice.
- */
 function storageUpgrades(
   plan: BillingPlanId,
   interval: BillingInterval,
@@ -1597,7 +1562,6 @@ function storageUpgrades(
   });
 }
 
-/** The amount of one period in `currency`: the base amount, or the amount in `currency_options`. */
 function priceAmount(price: StripePrice | undefined, currency: BillingCurrency): number | null {
   if (!price) return null;
   const amount = price.currency === currency ? price.unit_amount : price.currency_options?.[currency]?.unit_amount;
@@ -1612,10 +1576,13 @@ function plansUnavailable(): BillingError {
   return new BillingError(503, "plans_unavailable", "The plans are not available. Try again later.");
 }
 
-/** The web client opens the progress of this server again. The desktop app polls, so its page only says to go back. */
 function checkoutReturnUrl(origin: string, target: BillingReturnTarget, serverId: string): string {
   if (target === "web") return `${origin}/app?hosting=checkout&hosted_server=${encodeURIComponent(serverId)}`;
-  // `kind` tells the return page which Stripe page closed.
+  return `${origin}/billing/return?kind=plan`;
+}
+
+function customServerReturnUrl(origin: string, target: BillingReturnTarget): string {
+  if (target === "web") return `${origin}/app?hosting=custom`;
   return `${origin}/billing/return?kind=plan`;
 }
 
@@ -1624,18 +1591,12 @@ function portalReturnUrl(origin: string, target: BillingReturnTarget): string {
   return `${origin}/billing/return?kind=portal`;
 }
 
-/** True for a Checkout event of a license page. A paid page also names its subscription, which the sync reads. */
 function isLicenseCheckout(event: StripeEvent): boolean {
   if (!event.type.startsWith("checkout.session.")) return false;
   const metadata = event.data.object.metadata;
   return isDynamicRecord(metadata) && metadata[LICENSE_METADATA.kind] === LICENSE_METADATA_KIND;
 }
 
-/**
- * The unpaid invoice of a failed renewal or trial end (`subscription_cycle`), at Stripe's first try. Null for
- * another event, for a later try, for the first payment, for a plan change, or for an amount in another
- * currency. The claim of an email stays only 7 days, and Stripe tries again for longer.
- */
 function failedRenewalInvoice(event: StripeEvent, currency: BillingCurrency): FailedLicenseInvoice | null {
   if (event.type !== "invoice.payment_failed") return null;
   const object = event.data.object;
@@ -1659,14 +1620,12 @@ function failedRenewalInvoice(event: StripeEvent, currency: BillingCurrency): Fa
   };
 }
 
-/** Only a Stripe invoice page goes into an email. */
 function stripeInvoiceUrl(value: unknown): string | null {
   if (!isString(value) || !URL.canParse(value)) return null;
   const url = new URL(value);
   return url.protocol === "https:" && url.hostname === "invoice.stripe.com" ? url.href : null;
 }
 
-/** The subscription that an event is about, or null for an event that does not change one. */
 function eventSubscriptionId(event: StripeEvent): string | null {
   const object = event.data.object;
   switch (event.type) {
@@ -1683,7 +1642,6 @@ function eventSubscriptionId(event: StripeEvent): string | null {
     case "invoice.paid":
     case "invoice.payment_failed": {
       if (isString(object.subscription)) return object.subscription;
-      // From API version 2025-03-31 the invoice names its subscription under `parent`.
       const details = isDynamicRecord(object.parent) ? object.parent.subscription_details : null;
       return isDynamicRecord(details) && isString(details.subscription) ? details.subscription : null;
     }

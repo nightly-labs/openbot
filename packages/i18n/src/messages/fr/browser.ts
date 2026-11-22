@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Fermer la fenêtre du navigateur",
   "browser.pip.reattachFailed": "OpenBot n’a pas pu rattacher le navigateur.",
   "browser.pip.closeFailed": "OpenBot n’a pas pu fermer la fenêtre du navigateur.",
+  "browser.window.open": "Ouvrir le navigateur dans une nouvelle fenêtre",
+  "browser.window.openFailed": "OpenBot n’a pas pu ouvrir la fenêtre du navigateur.",
   "browser.popupBlocked.title": "Fenêtre contextuelle bloquée",
   "browser.popupBlocked.dismiss": "Ignorer le message de fenêtre contextuelle",
   "browser.liveView.label": "Vue en direct de la page sur le serveur",

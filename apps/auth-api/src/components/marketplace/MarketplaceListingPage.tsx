@@ -19,16 +19,8 @@ import { LandingIcon } from "../landing/LandingIcon";
 import { PluginOpenButtons, type PluginOpenButtonsText } from "../plugins/PluginOpenButtons";
 import { AgentMark, CopyLinkButton, ListingLink, MarketplaceFrame, SkillIcon, VerifiedMark } from "./MarketplaceParts";
 
-/**
- * How far OpenBot checked a listing. Every listing in a list was reviewed before it went live; an
- * agent that waits for its first review is reached only through the link its creator shared.
- */
 type Trust = "verified" | "reviewed" | "pending";
 
-/**
- * A row on a listing page, drawn as the index draws one but without Add: a skill comes with its
- * agent, and a routine with its agent. With a link, the whole row opens it.
- */
 function DetailRow(props: {
   name: string;
   verified?: boolean;
@@ -66,7 +58,6 @@ function DetailRow(props: {
   );
 }
 
-/** A heading over the rows of one listing page, in one column. */
 function DetailGroup(props: { id: string; title: string; children: JSX.Element }) {
   return (
     <section class="marketplace-site-group" aria-labelledby={props.id}>
@@ -85,7 +76,6 @@ interface Fact {
   value: string;
 }
 
-/** The facts beside the rows on a wide screen, and under them on a narrow one. */
 function Information(props: { facts: readonly Fact[] }) {
   const { t } = useText();
   return (
@@ -109,10 +99,6 @@ function Information(props: { facts: readonly Fact[] }) {
   );
 }
 
-/**
- * The line before Add: who checked the listing, and what adding it allows. A verified listing has
- * none: the shield after its name says it, and a line under it would say it again.
- */
 function TrustLine(props: { trust: Trust; text: string }) {
   return (
     <Show when={props.trust !== "verified"}>
@@ -135,7 +121,6 @@ function sourceLabel(t: AppTranslate, trust: Trust): string {
   return t("sitePage.marketplace.source.reviewed");
 }
 
-/** The facts that every listing has. The category is optional on an agent. */
 function listingFacts(
   text: TextValue,
   listing: { creatorName: string; version: number; updatedAt: string; category?: SkillCategory | undefined },
@@ -160,11 +145,6 @@ function listingFacts(
   ];
 }
 
-/**
- * Add to OpenBot opens the app at the listing, which shows what it brings and asks before it adds
- * anything; the browser button opens the web app at the same place. Both links come from the shared
- * helpers, never from listing data.
- */
 function ListingActions(props: { link: MarketplaceListingLink; name: string }) {
   const { t } = useText();
   const buttonText = (): PluginOpenButtonsText => ({
@@ -191,7 +171,6 @@ function tabRoute(tab: "agents" | "skills") {
   return tab === "skills" ? MARKETPLACE_SKILLS_ROUTE : MARKETPLACE_ROUTE;
 }
 
-/** Marketplace › Agents or Skills › the listing's category, each a link, in place of a single back link. */
 function Breadcrumbs(props: { tab: "agents" | "skills"; category: SkillCategory | undefined }) {
   const { t } = useText();
   const route = () => tabRoute(props.tab);
@@ -223,11 +202,6 @@ function Breadcrumbs(props: { tab: "agents" | "skills"; category: SkillCategory 
   );
 }
 
-/**
- * The frame of an agent or a skill page. The header is the plugin page's hero row: the mark, the
- * name, the byline and who checked it on the left, Add on the right of the same line, then the
- * description. Under a rule, the rows and the information side by side. The children are the rows.
- */
 function ListingLayout(props: {
   tab: "agents" | "skills";
   link: MarketplaceListingLink;
@@ -242,7 +216,6 @@ function ListingLayout(props: {
   facts: readonly Fact[];
   children?: JSX.Element;
 }) {
-  // Reported as its tab: analytics names no listing, as it names no plugin.
   onSettled(() => landingAnalytics.start(document, window.location.hostname, tabRoute(props.tab)));
   return (
     <article class="post-container">
@@ -292,7 +265,6 @@ function AgentListingContent(props: { listing: MarketplaceAgentListing }) {
   const facts = () => listingFacts(text, agent(), trust());
   const listed = (skill: MarketplaceAgentSkill): MarketplaceSkillSummary | undefined =>
     props.listing.skills.find((entry) => entry.id === skill.skillId);
-  // A skill that is not in the catalog has no page, so its row has no link.
   const skillLink = (skill: MarketplaceAgentSkill): MarketplaceListingLink | undefined => {
     const entry = listed(skill);
     return entry ? { kind: "skill", id: entry.slug } : undefined;
@@ -385,7 +357,6 @@ interface PageLanguage {
   locale: TranslatedLocale;
 }
 
-/** `/marketplace/agents/<id>`: an approved agent, or one that waits for its first review. */
 export function MarketplaceAgentPage(props: PageLanguage & { listing: MarketplaceAgentListing }) {
   return (
     <MarketplaceFrame lang={props.lang} locale={props.locale}>
@@ -394,7 +365,6 @@ export function MarketplaceAgentPage(props: PageLanguage & { listing: Marketplac
   );
 }
 
-/** `/marketplace/skills/<slug>`: an approved skill. */
 export function MarketplaceSkillPage(props: PageLanguage & { skill: MarketplaceSkillView }) {
   return (
     <MarketplaceFrame lang={props.lang} locale={props.locale}>

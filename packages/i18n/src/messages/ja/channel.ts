@@ -21,6 +21,11 @@ export const messages = {
   "channel.panel.close": "チャンネルパネルを閉じる",
   "channel.settings.title": "チャンネル設定",
   "channel.settings.memories": "メモリー",
+  "channel.settings.folders.title": "フォルダー",
+  "channel.settings.folders.description":
+    "{channel} のすべてのメンバーが、これらのフォルダーでファイルを変更し、コマンドを実行できます。",
+  "channel.settings.folders.toastAdded": "{channel} のメンバーが {folder} のファイルを変更できるようになりました",
+  "channel.settings.folders.toastRemoved": "{channel} のメンバーは {folder} のファイルを変更できなくなりました",
   "channel.settings.isolated": "メモリーをこのチャンネルに保持",
   "channel.settings.isolatedDescription":
     "エージェントがここで学んだことはチャンネルのメモリーとして保存され、ほかのチャットには表示されません。",

@@ -5,10 +5,6 @@ import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; an old thread reads as a branch; a
-// failed upgrade leaves a column or the marker; a retry adds a column twice; a newer or incomplete
-// history is accepted; a branch link to a deleted thread breaks the foreign-key check. Sources 8 to 46
-// reach version 48 in `agent-thread-migration.test.ts`; these fixtures cover the version 47 source.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -27,7 +23,6 @@ function databaseAt(version: number): DatabaseSync {
   return db;
 }
 
-/** The agent's own chat, an open thread with a message and a closed thread, in the version 47 columns. */
 function seed(db: DatabaseSync): void {
   const conversation = db.prepare("INSERT INTO projection_threads VALUES (?, 'chief', ?, NULL, ?, ?, 1)");
   conversation.run("openbot-thread-chief", 'Chief 界"\\', "2026-10-01T07:00:00.000Z", "2026-10-01T07:00:00.000Z");
@@ -42,7 +37,6 @@ function seed(db: DatabaseSync): void {
         'Provider said no', '2026-10-01T09:00:00.000Z', '2026-10-02T09:00:00.000Z', '2026-10-03T09:00:00.000Z', 7)`);
 }
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Record<string, Record<string, SQLOutputValue>[]> {
   const tables = db
     .prepare(
@@ -54,17 +48,14 @@ function contents(db: DatabaseSync): Record<string, Record<string, SQLOutputValu
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** What the upgrade adds to each old thread: a null branch link. */
 function withBranchLink(
   before: Record<string, Record<string, SQLOutputValue>[]>,
 ): Record<string, Record<string, SQLOutputValue>[]> {
   return {
     ...before,
-    // Migration 49 adds the GitHub workflow tables, empty.
     workflow_github_actions: [],
     workflow_github_deliveries: [],
     workflow_github_runs: [],
-    // Migration 51 adds the WhatsApp allowed senders table, empty.
     projection_messaging_allowed_senders: [],
     projection_deleted_thread_messages: [],
     browser_proxies: [],
@@ -80,7 +71,6 @@ function withBranchLink(
       branch_source_thread_id: null,
       branch_source_message_id: null,
       branch_through_message_id: null,
-      // Migration 54 adds the routine link, null for every old thread.
       routine_id: null,
     })),
   };
@@ -94,7 +84,7 @@ function threadColumns(db: DatabaseSync): string[] {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 67 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -165,9 +155,9 @@ describe("agent thread branch migration", () => {
     seed(db);
     const before = contents(db);
     const columnsBefore = threadColumns(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(68,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=46");
+    db.exec("DELETE FROM schema_migrations WHERE version=68; DELETE FROM schema_migrations WHERE version=46");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 46");
     expect(contents(db)).toEqual(before);
     expect(threadColumns(db)).toEqual(columnsBefore);
@@ -178,8 +168,7 @@ describe("agent thread branch migration", () => {
     seed(db);
     migrateOpenBotDatabase(db);
     const after = contents(db);
-    // An application one release older knows versions up to 47: version 48 is newer than it supports.
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(68,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });

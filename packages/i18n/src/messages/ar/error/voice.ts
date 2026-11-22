@@ -23,6 +23,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "نزّل نموذج النطق في الإعدادات → الصوت.",
   "error.voice.speech.timedOut": "انتهت مهلة قراءة الرد بصوت عالٍ.",
   "error.voice.speech.failed": "تعذّر على OpenBot قراءة الرد بصوت عالٍ.",
+  "error.voice.speech.providerRefused": "رفضت {provider} إنشاء الصوت: {reason}",
   "error.voice.recordingNotKept": "تعذّر على OpenBot الاحتفاظ بالتسجيل الصوتي.",
   "error.voice.live.timedOut": "لم يبدأ صوت Codex المباشر في الوقت المحدد. حاول مرة أخرى.",
   "error.voice.live.failed": "توقف الصوت المباشر: {reason}",
@@ -30,6 +31,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "لم يتمكن Codex على الخادم من بدء الصوت المباشر. اطلب من مالكه تحديث Codex على ذلك الكمبيوتر وتسجيل الدخول باستخدام ChatGPT، ثم حاول مرة أخرى.",
   "error.voice.live.signIn": "سجّل الدخول إلى Codex بحساب ChatGPT لاستخدام الصوت المباشر.",
+  "error.voice.live.chooseAccount":
+    "لا يمكن لحساب ChatGPT هذا استخدام الصوت المباشر. في الإعدادات ← الصوت، اختر حسابًا تتضمن خطته الصوت.",
   "error.voice.live.unavailable": "تعذّر على OpenAI بدء الصوت المباشر. المشكلة من جهة OpenAI. حاول مرة أخرى لاحقًا.",
   "error.voice.live.refused":
     "رفضت OpenAI بدء الصوت المباشر. حاول مرة أخرى لاحقًا، أو أوقف الصوت المباشر من الإعدادات للتحدث بالصوت.",

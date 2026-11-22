@@ -145,14 +145,12 @@
   }
 }
 
-/* While a file from a joined server downloads, its download button shows the progress and stops it. */
 .attachment-download-ring {
   --ui-radial-progress-color: var(--openbot-text-primary);
 
   width: var(--openbot-control-xs);
 }
 
-/* The card sizes every button icon; the ring chart fills its own box instead. */
 .attachment-download-stop .ui-radial-progress-chart {
   width: 100%;
   height: 100%;
@@ -183,11 +181,8 @@
 .agent-queue-panel {
   --queue-row-height: 29px;
   --queue-composer-overlap: 14px;
-  /* The leading glyph fills its column, so this inset is the gap the eye sees on the left. */
   --queue-row-inset-start: 13px;
-  /* The trailing buttons are 26px boxes around 16px glyphs, so 5px of the gap is already in them. */
   --queue-row-inset-end: 8px;
-  /* What stays between the panel edge and a row's hover fill, the same on all four sides. */
   --queue-row-gutter: 5px;
 
   position: relative;
@@ -221,10 +216,6 @@
   min-height: 0;
 }
 
-/*
- * Why the queue waits, above the rows that wait. Sits inside the panel's own
- * padding because the list below owns the row insets, not the panel.
- */
 .agent-queue-hold {
   margin: 0;
   padding-block: var(--queue-row-gutter) 0;
@@ -282,7 +273,6 @@
   height: var(--openbot-control-xl);
 }
 
-/* A video has no card: only the player, as a generated video. Its details show on hover, and a right click gives its actions. */
 .message-attachments-group:has(.message-attachment[data-player="video"]),
 .message-attachments:has(.message-attachment[data-player="video"]) {
   width: min(100%, 480px);
@@ -293,7 +283,6 @@
   max-width: min(480px, 100%);
 }
 
-/* The player is all that shows. The row comes back while a download runs or after it fails. */
 .message-attachment[data-player="video"]:not([data-download]) > :not(.attachment-media-player) {
   display: none;
 }
@@ -307,13 +296,12 @@
   padding: 0;
 }
 
-/* The first frame says that the file is a video. */
 .message-attachment[data-player="video"] .attachment-file-visual {
   display: none;
 }
 
-/* An upright video keeps its shape and stays as high as a wide one is wide. */
 .message-attachment[data-player="video"] .attachment-media-player {
-  max-width: calc(480px * (var(--media-generation-ratio)));
+  width: min(480px, calc(480px * (var(--media-generation-ratio))));
+  max-width: 100%;
   border-radius: var(--openbot-radius-lg);
 }

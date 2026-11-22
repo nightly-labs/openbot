@@ -134,6 +134,8 @@ export const messages = {
   "provider.picker.download": "Загрузка {name}",
   "provider.picker.search": "Поиск моделей",
   "provider.picker.noMatches": "Моделей по вашему запросу не найдено.",
+  "provider.picker.openrouterNoMatches":
+    "Моделей по вашему запросу не найдено. Настройки конфиденциальности, провайдеров и ограничений (guardrails) на openrouter.ai могут скрывать модели из этого списка.",
   "provider.picker.workspaceOnlyUnavailable":
     "Эти модели не работают с режимом «Рабочее пространство» в Windows и Linux. Чтобы использовать их, измените «Доступ» в настройках агента.",
   "provider.picker.olderModels": "Старые модели",
@@ -360,4 +362,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot выходит из {provider} на этом компьютере. {provider} CLI в терминале остаётся в своём аккаунте.",
+  "provider.settings.updateAll": "Обновить все",
 } as const satisfies PartialTranslation<typeof source>;

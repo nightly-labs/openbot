@@ -1,12 +1,3 @@
-// A Claude agent session on Windows when the Claude CLI is a `.cmd` wrapper. The npm install of
-// Claude Code puts `claude.cmd` on PATH. Node does not start a `.cmd` with no shell (`spawn EINVAL`),
-// so the session failed to start and the provider row showed "spawn EINVAL". The real Claude Agent
-// SDK starts a stand-in CLI in a folder whose name holds a space, in two variants:
-//   - `npm`: the npm wrapper. The SDK starts the program that the wrapper names, with no `cmd.exe`.
-//   - `other-wrapper`: any other `.cmd`. It starts through `cmd.exe`. The stand-in does not stop at
-//     the end of its input, so only a kill of the whole `cmd.exe` tree stops it.
-// Windows only. `bun run test:claude:windows-cmd`; exit 0 = each session started with the arguments
-// unchanged, and stop left no Claude process. Writes .openbot-build/claude-windows-cmd-e2e/report.json.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -29,9 +20,7 @@ interface VariantReport {
 
 interface Variant {
   name: string;
-  /** Whether `cmd.exe` starts the stand-in. */
   throughCmd: boolean;
-  /** Writes the stand-in program and its wrapper in `bin`, and returns the wrapper path. */
   install: (bin: string, standIn: string) => Promise<string>;
 }
 
@@ -43,7 +32,6 @@ const VARIANTS: Variant[] = [
       const program = join(bin, "node_modules", "@anthropic-ai", "claude-code");
       await mkdir(program, { recursive: true });
       await writeFile(join(program, "cli.js"), standIn);
-      // The shape that npm's `cmd-shim` writes for a JavaScript program.
       const wrapper = join(bin, "claude.cmd");
       await writeFile(
         wrapper,
@@ -106,7 +94,6 @@ async function readStandIn(file: string): Promise<{ pid: number; ppid: number; a
   return { pid: value.pid, ppid: value.ppid, argv: value.argv.filter(isString) };
 }
 
-/** The image name of a running process, such as `cmd.exe`. */
 function imageName(pid: number): string {
   const row = execFileSync("tasklist", ["/fo", "csv", "/nh", "/fi", `PID eq ${pid}`], { encoding: "utf8" });
   return /^"([^"]+)"/.exec(row.trim())?.[1]?.toLowerCase() ?? "";
@@ -118,7 +105,6 @@ async function runVariant(variant: Variant): Promise<VariantReport> {
   let client: ClaudeAgentClient | null = null;
   let standInPid: number | null = null;
   try {
-    // A user folder such as `C:\Users\Jane Doe`: `cmd.exe` splits an unquoted path at the space.
     const bin = join(root, "Jane Doe", "npm");
     await mkdir(bin, { recursive: true });
     const recorded = join(root, "stand-in.json");

@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Notion here is taken from developers.notion.com. Each page used is
-// in `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const NOTION_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

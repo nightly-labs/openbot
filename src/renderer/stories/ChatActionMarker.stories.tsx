@@ -76,8 +76,18 @@ export const AllStates: Story = {
             agents={agents}
             onSelectAgent={onSelectAgent}
             onOpenRoutine={onOpenRoutine}
+            routineRunFailure={(runId) =>
+              runId === "run-failed" ? "The calendar service did not answer, so the brief has no meetings." : undefined
+            }
           />
         ))}
+        <ChatActionMarker
+          marker={{ ...routineMarker("failed"), runId: "run-failed-long" }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onOpenRoutine={onOpenRoutine}
+          routineRunFailure={() => longRunError}
+        />
         {routineActions.map((action) => (
           <ChatActionMarker
             marker={lifecycleMarker(action)}
@@ -229,22 +239,14 @@ function FeedbackSentStory(props: { withdrawn: boolean; result?: WithdrawFeedbac
   );
 }
 
-/**
- * After `openbot.send_feedback` opens the issue: the thank-you card with the issue link. Fix or remove
- * offers a corrected report, which the composer asks the agent for, or Remove, which asks in the card,
- * then takes the report off GitHub.
- */
 export const FeedbackSent: Story = { render: () => <FeedbackSentStory withdrawn={false} /> };
 
-/** Remove fails: the card keeps the question open and says what to do. */
 export const FeedbackSentRemoveFails: Story = {
   render: () => <FeedbackSentStory withdrawn={false} result="unavailable" />,
 };
 
-/** A joined server's report: both choices put a request for the agent in the composer. */
 export const FeedbackSentJoinedServer: Story = { render: () => <FeedbackSentStory withdrawn={false} remote /> };
 
-/** After Remove, or after the agent's `withdraw_feedback`: the report is not on GitHub anymore. */
 export const FeedbackWithdrawn: Story = { render: () => <FeedbackSentStory withdrawn /> };
 
 export const RoutineRunSummary: Story = {
@@ -350,7 +352,6 @@ export const AgentMessageGroup: Story = {
   ),
 };
 
-/** The chat draws the text of an open message in the slot under its marker. */
 export const AgentMessageText: Story = {
   render: () => {
     const [open, setOpen] = createSignal(true);
@@ -418,6 +419,8 @@ function agentMarker(
     expectsReply: true,
   };
 }
+
+const longRunError = `Provider request failed: 529 overloaded_error. ${"The service is busy now. Try the request again later. ".repeat(12)}request_id=req_011CXa9`;
 
 function routineMarker(
   status: Extract<ChatActionMarkerModel, { kind: "routine-run" }>["status"],
@@ -569,6 +572,7 @@ function SkillMarkers() {
         selectionRequest={selected()}
         agentId="chief"
         agentName="Chief"
+        agentProvider="claude"
         onOpenChange={(open) => {
           if (!open) setSelected(null);
         }}

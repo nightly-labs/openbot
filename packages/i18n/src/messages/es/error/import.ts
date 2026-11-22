@@ -98,4 +98,6 @@ export const messages = {
     "{name}: se quitaron de sus argumentos o de su dirección los valores que pueden contener un secreto. Vuelve a introducirlos en Ajustes.",
   "error.import.transferSharedKept":
     "{number} archivos de la carpeta compartida ya están aquí, así que se conservan tal como están.",
+  "error.import.transferPartSkipped":
+    "Algunas partes del archivo no se pudieron importar. Las demás partes están en este servidor, así que no vuelvas a importar el archivo.",
 } as const satisfies PartialTranslation<typeof source>;

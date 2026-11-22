@@ -1,13 +1,3 @@
-// Checks the webhook triggers of workflows on the real SQLite, the real workflow service and the real
-// events service, on a temporary profile. The relay is a fake that gives a URL and records each
-// revocation. A webhook trigger has no address until its first secret; the secret is stored as
-// ciphertext only; a signed request starts one run, and the same delivery again starts none; a wrong
-// signature is refused; a new secret replaces the old one and keeps the address; a workflow that
-// still runs skips a request; a graph that cannot run keeps the request as done; a removed trigger and a deleted workflow revoke their routes. No app,
-// provider, account or network is started.
-//
-// Run: bun scripts/workflow-webhook-e2e.ts
-// Writes .openbot-build/workflow-webhook-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -21,7 +11,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-webhook-e2e
 const root = await mkdtemp(join(tmpdir(), "openbot-workflow-webhook-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 mkdirSync(home, { recursive: true });
@@ -59,6 +48,7 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -83,7 +73,6 @@ const trigger = (type: "webhook" | "manual"): WorkflowNode => ({
   at: { x: 0, y: 0 },
   fields: { trigger: type },
 });
-/** A trigger and a step after it: a notice ends at once, an approval keeps the run open. */
 const graphOf = (type: "webhook" | "manual", step: "notify" | "approval"): WorkflowGraph => ({
   nodes: [
     trigger(type),
@@ -98,7 +87,6 @@ const graphOf = (type: "webhook" | "manual", step: "notify" | "approval"): Workf
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
-// No step talks to an agent, so no provider CLI starts.
 const agents = new AgentService({ store, mailbox, browser, preferredProvider: "codex", offProviders: AGENT_PROVIDERS });
 const workflowStore = new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") });
 const changedWorkflows: string[] = [];
@@ -133,7 +121,6 @@ try {
       receive: (delivery) => workflows.receiveWebhook(delivery),
       changed: (workflowId) => changedWorkflows.push(workflowId),
     },
-    // Reversible and visible, so the check can see that the stored value is not the secret.
     cipher: {
       encrypt: (value) => Buffer.from(`sealed:${Buffer.from(value).toString("base64")}`),
       decrypt: (value) => Buffer.from(value.toString().slice("sealed:".length), "base64").toString(),
@@ -154,8 +141,13 @@ try {
     (await runCauseEffect(workflows.get(workflowId))).triggers.find((entry) => entry.nodeId === "trigger")
       ?.webhookUrl ?? null;
   const routeIdOf = (url: string | null) => new URL(url ?? "").pathname.split("/").at(-1) ?? "";
-  const deliver = (routeId: string, secret: string, deliveryId: string) => {
-    const body = new TextEncoder().encode(JSON.stringify({ type: "order.paid", data: { order: DATA_MARKER } }));
+  const deliver = (
+    routeId: string,
+    secret: string,
+    deliveryId: string,
+    data: Readonly<Record<string, string>> = { order: DATA_MARKER },
+  ) => {
+    const body = new TextEncoder().encode(JSON.stringify({ type: "order.paid", data }));
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signature = signWebhookBody(secret, timestamp, deliveryId, body);
     return Effect.runPromise(events.receive({ routeId, deliveryId, timestamp, signature, body }));
@@ -163,7 +155,6 @@ try {
   const runsOf = async (workflowId: string) => (await runCauseEffect(workflows.runs({ workflowId, limit: 50 }))).runs;
   const statuses: Record<string, number> = {};
 
-  // 1. A webhook trigger has no address until its first secret.
   const orders = await runCauseEffect(workflows.create({ title: "Paid orders" }));
   const ordersId = orders.summary.id;
   const refused = await Effect.runPromise(
@@ -176,7 +167,6 @@ try {
   assert.ok(saved.ok);
   check("a saved webhook trigger has no address yet", (await webhookUrl(ordersId)) === null);
 
-  // 2. The first secret makes the route; the relay gives it an address.
   const first = await runCauseEffect(events.rotateWorkflowSecret({ workflowId: ordersId, nodeId: "trigger" }));
   check("the secret has the webhook secret prefix", first.secret.startsWith("whsec_"));
   const stored = database.connection
@@ -191,7 +181,6 @@ try {
   check("the workflow is told that its address changed", changedWorkflows.includes(ordersId));
   const routeId = routeIdOf(url);
 
-  // 3. A signed request starts one run; the same delivery again starts none.
   statuses.signed = (await deliver(routeId, first.secret, "delivery-1")).status;
   check("a signed request is accepted", statuses.signed === 202, statuses);
   const started = await runsOf(ordersId);
@@ -213,7 +202,6 @@ try {
   statuses.wrongSecret = (await deliver(routeId, "whsec_wrong", "delivery-2")).status;
   check("a wrong signature is refused", statuses.wrongSecret === 401 && (await runsOf(ordersId)).length === 1);
 
-  // 4. A new secret replaces the old one and keeps the address.
   const second = await runCauseEffect(events.rotateWorkflowSecret({ workflowId: ordersId, nodeId: "trigger" }));
   check("a new secret is different", second.secret !== first.secret);
   check("the address stays", (await webhookUrl(ordersId)) === url);
@@ -222,7 +210,6 @@ try {
   check("the old secret is refused", statuses.oldSecret === 401);
   check("the new secret starts a run", statuses.newSecret === 202 && (await runsOf(ordersId)).length === 2, statuses);
 
-  // 5. A workflow that still runs skips a request, as a schedule does.
   const gated = await runCauseEffect(workflows.create({ title: "Approve refunds" }));
   const gatedSaved = await runCauseEffect(
     workflows.saveGraph({
@@ -254,8 +241,6 @@ try {
   statuses.gatedRepeat = (await deliver(gatedRoute, gatedSecret.secret, "refund-2")).status;
   check("a skipped delivery again is a no-op", statuses.gatedRepeat === 200);
 
-  // 6. A graph that this version cannot run keeps the request as done, so the sender does not send
-  // it again.
   const filed = await runCauseEffect(workflows.create({ title: "File orders" }));
   const filedSaved = await runCauseEffect(
     workflows.saveGraph({
@@ -290,7 +275,45 @@ try {
   statuses.refusedRepeat = (await deliver(filedRoute, filedSecret.secret, "file-1")).status;
   check("a refused delivery again is a no-op", statuses.refusedRepeat === 200);
 
-  // 7. A removed trigger and a deleted workflow revoke their routes at the relay.
+  const typed = await runCauseEffect(workflows.create({ title: "Typed orders" }));
+  const typedGraph = graphOf("webhook", "notify");
+  const typedSaved = await runCauseEffect(
+    workflows.saveGraph({
+      workflowId: typed.summary.id,
+      baseRevision: typed.revision,
+      graph: {
+        ...typedGraph,
+        nodes: typedGraph.nodes.map((node) =>
+          node.id === "trigger" ? { ...node, fields: { ...node.fields, answer: "order: text\ntotal: number" } } : node,
+        ),
+      },
+    }),
+  );
+  assert.ok(typedSaved.ok);
+  const typedSecret = await runCauseEffect(
+    events.rotateWorkflowSecret({ workflowId: typed.summary.id, nodeId: "trigger" }),
+  );
+  const typedRoute = routeIdOf(await webhookUrl(typed.summary.id));
+  statuses.typedBad = (await deliver(typedRoute, typedSecret.secret, "typed-1", { order: DATA_MARKER })).status;
+  check(
+    "a body that does not fit the trigger's answer fields is refused with 400 and starts no run",
+    statuses.typedBad === 400 && (await runsOf(typed.summary.id)).length === 0,
+    statuses,
+  );
+  statuses.typedGood = (
+    await deliver(typedRoute, typedSecret.secret, "typed-1", { order: DATA_MARKER, total: "12.5", extra: "dropped" })
+  ).status;
+  const typedRuns = await runsOf(typed.summary.id);
+  const typedTrigger = typedRuns[0]?.steps.find((step) => step.nodeId === "trigger");
+  check(
+    "the same delivery with a fitting body starts a run with only the checked fields",
+    statuses.typedGood === 202 &&
+      typedRuns.length === 1 &&
+      typedTrigger?.output?.includes('"total":12.5') === true &&
+      !typedTrigger.output.includes("dropped"),
+    { statuses, output: typedTrigger?.output },
+  );
+
   const current = await runCauseEffect(workflows.get(ordersId));
   const manual = await runCauseEffect(
     workflows.saveGraph({ workflowId: ordersId, baseRevision: current.revision, graph: graphOf("manual", "notify") }),

@@ -10,7 +10,6 @@ import { setWindowGlass } from "../../window-glass";
 import { conversationPort, releaseFilePreviewPage } from "../conversation/conversation-port";
 import { setShownBackdropBubbles } from "./backdrop-bubbles";
 
-/** A picture as a data URL: the desktop page policy allows `data:` pictures, not `blob:`. */
 function dataUrl(backdrop: SavedBackdrop): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -20,19 +19,6 @@ function dataUrl(backdrop: SavedBackdrop): Promise<string> {
   });
 }
 
-/**
- * The scene behind the whole window: the page rail, the sidebar, the chat and the side panel. It is
- * a built-in animated scene, or a backdrop that the user added (`custom-backdrops.ts`). While one
- * shows, the window uses the clear surfaces of the transparent window, so the backdrop shows through
- * them, and the chat background color does not show.
- *
- * `pages` says how a page backdrop loads. The desktop policy stops scripts in `srcdoc`, so the
- * desktop keeps the page in main for the time it shows (`addPreviewPage`). The web client has no
- * main process and gives the HTML to the frame.
- *
- * A page can bring chat bubble colors (`chatBackdropBubbles`). The chat bubbles of the window take
- * them while that page shows (`backdrop-bubbles.tsx`).
- */
 export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
   const choice = useChatBackdrop();
   const scene = () => {
@@ -44,7 +30,6 @@ export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
     return current === null ? null : customBackdropId(current);
   };
   const saved = useCustomBackdrops();
-  /** The id and the save time: an agent that changes its scene keeps the id, so the time loads it again. */
   const customVersion = () => {
     const id = customId();
     if (id === null) return null;
@@ -53,22 +38,24 @@ export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
   type ShownBackdrop = { source: CustomBackdropSource; name: string; bubbles: ChatBackdropBubbles | null };
   const [custom, setCustom] = createSignal<ShownBackdrop | null>(null);
 
-  /**
-   * The page that shows now stays until the next one is ready, so a changed scene does not flash the
-   * window. Main keeps a desktop page until it is released.
-   */
   let shownPage: string | undefined;
-  const showCustom = (next: ShownBackdrop | null, page?: string) => {
-    setCustom(next);
-    const old = shownPage;
-    shownPage = page;
-    if (old !== page) releaseFilePreviewPage(old);
+  let shownVideo: string | undefined;
+  const releaseVideo = (url: string | undefined) => {
+    if (url !== undefined) URL.revokeObjectURL(url);
   };
-  onCleanup(() => releaseFilePreviewPage(shownPage));
-  /**
-   * The version that shows now. At start the list of backdrops is not read yet, so the version has no
-   * time; when the list comes, the same backdrop does not load again.
-   */
+  const showCustom = (next: ShownBackdrop | null, page?: string, video?: string) => {
+    setCustom(next);
+    const oldPage = shownPage;
+    shownPage = page;
+    if (oldPage !== page) releaseFilePreviewPage(oldPage);
+    const oldVideo = shownVideo;
+    shownVideo = video;
+    if (oldVideo !== video) releaseVideo(oldVideo);
+  };
+  onCleanup(() => {
+    releaseFilePreviewPage(shownPage);
+    releaseVideo(shownVideo);
+  });
   let shownVersion: string | null = null;
 
   createEffect(customVersion, (version) => {
@@ -83,13 +70,18 @@ export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
     const show = async () => {
       const backdrop = await readCustomBackdrop(id);
       if (cancelled) return;
-      // A backdrop that is gone, such as one removed in another window, shows nothing.
       if (!backdrop) {
         shownVersion = null;
         showCustom(null);
         return;
       }
       const loaded = `${id}\0${backdrop.createdAt}`;
+      if (backdrop.kind === "video") {
+        const url = URL.createObjectURL(backdrop.blob);
+        shownVersion = loaded;
+        showCustom({ source: { kind: "video", url }, name: backdrop.name, bubbles: null }, undefined, url);
+        return;
+      }
       if (backdrop.kind === "image") {
         const url = await dataUrl(backdrop);
         if (cancelled) return;

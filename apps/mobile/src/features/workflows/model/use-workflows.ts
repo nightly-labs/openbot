@@ -8,7 +8,6 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-/** The server is online and serves `workflows-v1`. */
 function useWorkflowsAvailable(serverId: string) {
   const online = useMobileWorkspaceSelector((current) =>
     current.servers.some((server) => server.id === serverId && server.state === "online"),
@@ -17,11 +16,6 @@ function useWorkflowsAvailable(serverId: string) {
   return { online, supported, ready: online && supported };
 }
 
-/**
- * The workflows that the host shows to this member, with the status of each last run. The host sends
- * `workflows-changed` on each run and step change, which reads the list again. A complete list also
- * drops the pins of workflows that are gone. `enabled: false` reads nothing, for a drawer that is closed.
- */
 export function useWorkflowList(serverId: string, enabled = true) {
   const queryScope = useQueryScope();
   const { listWorkflows, reconcileWorkflowPins } = useMobileWorkspaceActions();
@@ -55,7 +49,6 @@ export function useWorkflowDetail(serverId: string, workflowId: string) {
   });
 }
 
-/** The newest runs of a workflow, each with its steps. */
 export function useWorkflowRuns(serverId: string, workflowId: string) {
   const queryScope = useQueryScope();
   const { loadWorkflowRuns } = useMobileWorkspaceActions();
@@ -68,7 +61,6 @@ export function useWorkflowRuns(serverId: string, workflowId: string) {
   });
 }
 
-/** All runs of a workflow, newest first, a page at a time. */
 export function useWorkflowRunHistory(serverId: string, workflowId: string) {
   const queryScope = useQueryScope();
   const { loadWorkflowRuns } = useMobileWorkspaceActions();
@@ -77,14 +69,12 @@ export function useWorkflowRunHistory(serverId: string, workflowId: string) {
     queryKey: queryKeys.workflow(queryScope, serverId, workflowId, "history"),
     enabled: ready && Boolean(workflowId),
     retry: false,
-    // An empty cursor asks for the newest runs.
     initialPageParam: "",
     queryFn: ({ pageParam }) => loadWorkflowRuns(workflowId, serverId, pageParam || undefined),
     getNextPageParam: (page) => page.nextBefore ?? undefined,
   });
 }
 
-/** The saved versions of a workflow, newest first. */
 export function useWorkflowVersions(serverId: string, workflowId: string) {
   const queryScope = useQueryScope();
   const { loadWorkflowVersions } = useMobileWorkspaceActions();
@@ -97,7 +87,6 @@ export function useWorkflowVersions(serverId: string, workflowId: string) {
   });
 }
 
-/** The graph of one saved version. A version does not change, so the read stays. */
 export function useWorkflowVersionGraph(serverId: string, workflowId: string, versionId: string) {
   const queryScope = useQueryScope();
   const { loadWorkflowVersionGraph } = useMobileWorkspaceActions();
@@ -111,20 +100,14 @@ export function useWorkflowVersionGraph(serverId: string, workflowId: string, ve
   });
 }
 
-/** The host runs GitHub triggers and outputs (`workflows-github-v1`). */
 export function useWorkflowGitHubSupported(serverId: string) {
   return useMobileWorkspaceSelector((current) => current.canUseWorkflowGitHub(serverId));
 }
 
-/** The host runs Telegram and Slack triggers and outputs that a joined owner or admin changes (`workflows-chats-v1`). */
 export function useWorkflowChatsSupported(serverId: string) {
   return useMobileWorkspaceSelector((current) => current.canUseWorkflowChats(serverId));
 }
 
-/**
- * The host's Telegram chats and Slack workspaces with their channels, from the routine-results options.
- * The host gives them only to an owner or admin.
- */
 export function useWorkflowChats(serverId: string, enabled: boolean) {
   const queryScope = useQueryScope();
   const { loadRoutineResultOptions } = useMobileWorkspaceActions();
@@ -138,10 +121,6 @@ export function useWorkflowChats(serverId: string, enabled: boolean) {
   });
 }
 
-/**
- * The events of the GitHub triggers of a workflow, newest first, and the items of their runs. Each
- * `workflows-changed` reads them again, as a new event changes the workflow.
- */
 export function useWorkflowGitHubHistory(serverId: string, workflowId: string, enabled = true) {
   const queryScope = useQueryScope();
   const { loadWorkflowGitHubHistory } = useMobileWorkspaceActions();
@@ -155,7 +134,6 @@ export function useWorkflowGitHubHistory(serverId: string, workflowId: string, e
   });
 }
 
-/** The repositories of the host's GitHub connection. The host gives them only to an owner or admin. */
 export function useWorkflowGitHubCatalog(serverId: string, enabled: boolean) {
   const queryScope = useQueryScope();
   const { loadWorkflowGitHubCatalog } = useMobileWorkspaceActions();
@@ -169,7 +147,6 @@ export function useWorkflowGitHubCatalog(serverId: string, enabled: boolean) {
   });
 }
 
-/** The labels and people of one repository, for an owner or admin. */
 export function useWorkflowGitHubOptions(serverId: string, repository: string, enabled: boolean) {
   const queryScope = useQueryScope();
   const { loadWorkflowGitHubOptions } = useMobileWorkspaceActions();
@@ -183,10 +160,6 @@ export function useWorkflowGitHubOptions(serverId: string, repository: string, e
   });
 }
 
-/**
- * One run: from the newest runs when it is there, else its own read. Without `runId`, the newest run,
- * as the drawer opens it from a workflow whose last run needs the person.
- */
 export function useWorkflowRun(serverId: string, workflowId: string, runId: string | undefined) {
   const queryScope = useQueryScope();
   const { loadWorkflowRun } = useMobileWorkspaceActions();

@@ -22,8 +22,6 @@ export function encodeTeamProtocolV8WebRtcHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ) {
-  // A GET reaches the bodyless frame, whose frozen no-body route list cannot learn a route added after it.
-  // The display route carries no request body at all, so its frame is the empty object.
   if (isBrowserDisplayRoute(method, path) || isBrowserViewSessionRoute(method, path)) return {};
   if (isTeamWebRtcBodylessRoute(method, path)) return teamWebRtcBodylessRequest(method, path, value);
   return decodeTeamProtocolV2Json(
@@ -54,8 +52,11 @@ export function encodeTeamProtocolV8WebRtcHttpResponse(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     usageTertiary?: boolean;
+    usageGroups?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
+    queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ) {
   if (status === 204) return {};
@@ -82,9 +83,13 @@ export function createTeamProtocolV8Event(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     contextUsage?: boolean;
+    backgroundWork?: boolean;
     usageTertiary?: boolean;
+    usageGroups?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
+    queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV8BaseCurrentEvent(value);
