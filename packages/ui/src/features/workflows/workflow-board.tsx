@@ -235,6 +235,7 @@ export interface WfnBoard {
   markCreditsShort: (id: string, short: boolean) => void;
   shown: (id: string) => WfnResult | undefined;
   newest: (id: string) => WfnResult | undefined;
+  picked: (id: string) => string | undefined;
   pick: (id: string, result: string) => void;
   record: (id: string, value: string, run?: number) => void;
   recordFailure: (id: string, message: string, run?: number) => void;
@@ -439,6 +440,16 @@ const NO_ANSWER_PROBLEMS: readonly WorkflowAnswerProblem[] = [];
 const NO_PENDING: readonly WfnPending[] = [];
 
 export const showsStrip = (board: WfnBoard, id: string) => board.results(id).length + board.pending(id).length > 1;
+
+export const makingTake = (board: WfnBoard, id: string): WfnPending | undefined => {
+  const takes = board.pending(id);
+  const [first] = takes;
+  if (first === undefined) return undefined;
+  const picked = board.picked(id);
+  if (picked !== undefined) return takes.find((take) => take.id === picked);
+  const shown = board.shown(id);
+  return shown === undefined || (shown.id === board.newest(id)?.id && shown.at < first.at) ? first : undefined;
+};
 
 export function createBoard(options: BoardOptions) {
   const { t } = useText();
@@ -932,6 +943,10 @@ export function createBoard(options: BoardOptions) {
       return resultsOf(id).find((result) => result.id === picked.result) ?? latest;
     },
     newest: latestOf,
+    picked: (id) => {
+      const picked = state.picked[id];
+      return picked !== undefined && latestOf(id)?.id === picked.newest ? picked.result : undefined;
+    },
     pick: (id, result) => {
       const newest = latestOf(id)?.id;
       setState((draft) => {

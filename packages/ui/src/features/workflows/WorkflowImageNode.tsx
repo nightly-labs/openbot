@@ -10,7 +10,7 @@ import { VideoPlayer } from "../conversation/VideoPlayer";
 import { CreditIcon } from "../credits/CreditIcon";
 import { usePictureShape } from "./picture-shape";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
-import { resultValue, useBoard, type WfnResult } from "./workflow-board";
+import { makingTake, resultValue, useBoard, type WfnResult } from "./workflow-board";
 import {
   type Aspect,
   BACKGROUND_TEXT,
@@ -27,6 +27,7 @@ import {
   NodeToolbar,
   ToolAction,
   useElapsed,
+  useSince,
   type WfnInputPort,
 } from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
@@ -135,7 +136,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const [w = 1, h = 1] = specs().aspect.split(":").map(Number);
     return { css: aspectRatio(specs().aspect), value: w / h };
   };
-  const seconds = useElapsed(step.busy);
+  const elapsed = useElapsed(step.busy);
+  const takeSeconds = useSince(() => makingTake(board, props.id)?.at);
+  const seconds = () => takeSeconds() ?? elapsed();
   const urlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
     return step.orFile(board.catalogs().media?.(value, kind()), value);
@@ -178,12 +181,8 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const index = images.findIndex((entry) => entry.id === shown?.id);
     setViewer({ images, index: Math.max(0, index), origin: media });
   };
-  const making = () => {
-    const first = board.pending(props.id)[0];
-    if (!first) return run.running();
-    const shown = board.shown(props.id);
-    return shown === undefined || (shown.id === board.newest(props.id)?.id && shown.at < first.at);
-  };
+  const making = () =>
+    board.pending(props.id).length === 0 ? run.running() : makingTake(board, props.id) !== undefined;
   const failedTake = () => {
     const shown = board.shown(props.id);
     return shown?.failed ? shown : undefined;

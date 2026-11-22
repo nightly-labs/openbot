@@ -2492,11 +2492,6 @@ fieldset.wfn-picker-group {
   overflow: visible;
   border-color: transparent;
   background: var(--wfn-glass);
-  cursor: default;
-}
-
-.wfn-strip-take:hover {
-  scale: 1;
 }
 
 .wfn-take-ring {
