@@ -160,7 +160,7 @@ try {
         }),
       ),
     );
-    report.cancelReason = undefined;
+    delete report.cancelReason;
     const cancelled = new Promise<void>((resolveCancel) => {
       snapshotChanged = () => {
         if (report.cancelReason !== undefined) resolveCancel();
