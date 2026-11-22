@@ -411,6 +411,115 @@ try {
   complete(report.handoffs.at(-1)?.deliveryId ?? "", "Done.");
   await runUntil(workflows, hookRun, ended);
 
+  modelReplies = [
+    'Here: {"count":2.5,"score":"0x10","tags":"one","Count":3,"note":"x"}',
+    '{"count":"12","score":"1.5e2","tags":["a","b \\"c\\""]}',
+  ];
+  const strictPrompts = report.modelPrompts.length;
+  const strictHandoffs = report.handoffs.length;
+  const strict = await startRun(workflows, "Strict values", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Count the tags." }),
+      node("model", "llm", 300, { prompt: "Count them.", answer: "count: int\nscore: number\ntags: list" }),
+      node("agent", "agent", 600, { agentId: AGENT, task: "Use {{tags}} for {{count}} items." }),
+      node("ask", "approval", 600, { question: "Send {{tags}} now?" }),
+    ],
+    edges: [
+      { id: "prompt-model", from: "prompt", to: "model", type: "text" },
+      { id: "model-agent", from: "model", to: "agent", type: "text" },
+      { id: "model-ask", from: "model", to: "ask", type: "text" },
+    ],
+    strokes: [],
+  });
+  detail = await runUntil(
+    workflows,
+    strict,
+    (run) => stepOf(run, "agent")?.status === "running" && stepOf(run, "ask")?.status === "approval",
+  );
+  const strictFix = report.modelPrompts[strictPrompts + 1] ?? "";
+  check(
+    "a fraction for int, a hex number, a text for a list and unknown or wrongly cased keys get the fix ask",
+    strictFix.includes("count has the wrong type") &&
+      strictFix.includes("score has the wrong type") &&
+      strictFix.includes("tags has the wrong type") &&
+      strictFix.includes("Count is not one of the fields") &&
+      strictFix.includes("note is not one of the fields") &&
+      strictFix.includes("- count: integer"),
+    strictFix,
+  );
+  check(
+    "decimal text becomes a number and an integer, and a list stays a list",
+    stepOf(detail, "model")?.output === '{"count":12,"score":150,"tags":["a","b \\"c\\""]}',
+    stepOf(detail, "model"),
+  );
+  check(
+    "a list goes into a model text as a JSON array",
+    report.handoffs[strictHandoffs]?.text.includes('Use ["a","b \\"c\\""] for 12 items.') === true,
+    report.handoffs[strictHandoffs]?.text,
+  );
+  check("the approval question gets plain text", report.notices.includes('Send a, b "c" now?'), report.notices);
+  complete(report.handoffs[strictHandoffs]?.deliveryId ?? "", "Done.");
+  await runCauseEffect(workflows.stopRun(strict));
+
+  modelReplies = ["Nothing to add.", "Still nothing to add."];
+  const prose = await startRun(workflows, "Prose answer", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Read the ticket." }),
+      node("model", "llm", 300, { prompt: "Add a note if you have one.", answer: "note?: text" }),
+    ],
+    edges: [{ id: "prompt-model", from: "prompt", to: "model", type: "text" }],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, prose, ended);
+  check(
+    "a reply with no JSON object fails even when all fields are optional",
+    report.modelPrompts.at(-1)?.includes("the reply has no JSON object") === true &&
+      stepOf(detail, "model")?.error === sourceText("error.workflow.answerInvalid", { fields: "note" }),
+    stepOf(detail, "model"),
+  );
+
+  modelReplies = [`{"title":"it's down","priority":"high"}`];
+  const quoted = await startRun(workflows, "Quote in a word", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Read the ticket." }),
+      node("model", "llm", 300, { prompt: "Rate it.", answer: "title: text\npriority: high|low" }),
+      node("gate", "condition", 600, { check: "title contains it's and priority = high" }),
+    ],
+    edges: [
+      { id: "prompt-model", from: "prompt", to: "model", type: "text" },
+      { id: "model-gate", from: "model", to: "gate", type: "text" },
+    ],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, quoted, ended);
+  check(
+    "an apostrophe inside a word does not start a quote in a check",
+    stepOf(detail, "gate")?.branch === "yes",
+    stepOf(detail, "gate"),
+  );
+
+  assert.ok(typeof saved.workflowId === "string" && typeof saved.ids.hook === "string");
+  const hookId = saved.ids.hook;
+  const hookWorkflow = saved.workflowId;
+  const delivery = (deliveryId: string, data: Record<string, string>) =>
+    runCauseEffect(
+      workflows.receiveWebhook({
+        workflowId: hookWorkflow,
+        nodeId: hookId,
+        event: {
+          deliveryId,
+          eventType: "ticket",
+          data,
+          occurredAt: new Date().toISOString(),
+          receivedAt: new Date().toISOString(),
+        },
+      }),
+    );
+  const miscased = await delivery("miscased", { Priority: "high", title: "Down" });
+  check("a webhook with a wrongly cased field name is refused", miscased.kind === "bad-answer", miscased);
+  const extra = await delivery("extra", { priority: "high", title: "Down", source: "pager" });
+  check("a webhook with an extra field that is not an answer field still starts", extra.kind === "started", extra);
+
   report.passed = true;
 } catch (error) {
   report.failure = error instanceof Error ? error.message : String(error);
