@@ -327,7 +327,6 @@ import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
-import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
@@ -1131,7 +1130,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               endpoint.id,
               {
                 harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
-                models: endpoint.models.map((model) => encodedModelId(`${endpoint.id}/`, model.id)),
+                modelIds: endpoint.models.map((model) => model.id),
               },
             ]),
           ),
