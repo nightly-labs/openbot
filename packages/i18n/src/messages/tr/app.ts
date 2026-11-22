@@ -95,6 +95,7 @@ export const messages = {
     "Yapay zekâ ajanlarım artık OpenBot ile kendi bilgisayarımda çalışıyor. Sohbetlerim ve dosyalarım bende kalıyor. Dene: {site}",
   "app.socialFollow.redditTitle": "OpenBot'u nasıl kullanıyorum",
   "app.rail.usageRings": "{name} kullanımı: {windows}. Kullanımı aç",
+  "app.rail.usageUnavailable": "{name} kullanımı kullanılamıyor. Kullanımı aç",
   "app.rail.customAgentUsage": "{name} kullanımı. Kullanımı aç",
   "app.rail.moreUsage": { one: "{count} hesap daha. Kullanımı aç", other: "{count} hesap daha. Kullanımı aç" },
   "app.rail.moreUsageCount": "+{count}",

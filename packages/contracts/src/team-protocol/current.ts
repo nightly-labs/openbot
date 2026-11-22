@@ -114,6 +114,7 @@ import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
+import { HOST_VOICE_MODEL_CAPABILITY } from "./host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
@@ -211,6 +212,7 @@ import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
 import { TEAM_USAGE_GROUPS_CAPABILITY } from "./usage-groups-v1";
+import { TEAM_USAGE_READ_FAILED_CAPABILITY } from "./usage-read-failed-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import {
   highestCommonTeamProtocol,
@@ -468,6 +470,7 @@ export {
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
@@ -808,6 +811,8 @@ const TEAM_CAPABILITY_REGISTRY = [
   [PROMPT_CACHE_TTL_PI_CAPABILITY, V10],
   [CACHE_EXPIRY_COMPACTION_CAPABILITY, V10],
   [AGENT_ARCHIVED_THREADS_CAPABILITY, V10],
+  [HOST_VOICE_MODEL_CAPABILITY, V10],
+  [TEAM_USAGE_READ_FAILED_CAPABILITY, V10],
   [WORKFLOWS_PAUSE_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 

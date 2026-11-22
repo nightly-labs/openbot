@@ -382,6 +382,7 @@ export const messages = {
   "mobile.server.route.timezone": "Strefa czasowa",
   "mobile.server.route.personality": "Osobowość agenta",
   "mobile.server.route.agents": "Agenci",
+  "mobile.server.route.voiceModel": "Rozpoznawanie mowy",
   "mobile.server.settings.storage": "Pamięć dyskowa",
   "mobile.server.route.storage": "Pamięć dyskowa",
   "mobile.server.route.storageFiles": "Wszystkie pliki",
@@ -517,6 +518,19 @@ export const messages = {
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego strefę czasową.",
   "mobile.server.settings.timezoneUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego strefę czasową.",
+  "mobile.server.settings.voiceModelDescription":
+    "Agenci na tym serwerze używają tego modelu, aby transkrybować dźwięk filmów bez napisów.",
+  "mobile.server.settings.voiceModelLoading": "Wczytywanie rozpoznawania mowy…",
+  "mobile.server.settings.voiceModelLoadFailed": "Nie udało się wczytać modelu rozpoznawania mowy serwera.",
+  "mobile.server.settings.voiceModelSaveFailed": "Nie udało się zmienić modelu rozpoznawania mowy. Spróbuj ponownie.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego rozpoznawanie mowy.",
+  "mobile.server.settings.voiceModelReady": "Gotowy",
+  "mobile.server.settings.voiceModelDownloading": "Pobieranie: {percent}",
+  "mobile.server.settings.voiceModelSize": "Pobieranie {size}",
+  "mobile.server.settings.voiceModelDownload": "Pobierz",
+  "mobile.server.settings.voiceModelCancel": "Zatrzymaj",
+  "mobile.server.settings.voiceModelRemove": "Usuń",
   "mobile.server.settings.keySection": "Klucz serwera",
   "mobile.server.settings.keyChanged": "Ostatnia zmiana",
   "mobile.server.settings.keyChange": "Zmień klucz",

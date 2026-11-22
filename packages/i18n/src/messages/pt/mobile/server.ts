@@ -339,6 +339,7 @@ export const messages = {
   "mobile.server.route.timezone": "Fuso horário",
   "mobile.server.route.personality": "Personalidade do agente",
   "mobile.server.route.agents": "Agentes",
+  "mobile.server.route.voiceModel": "Reconhecimento de fala",
   "mobile.server.settings.storage": "Armazenamento",
   "mobile.server.route.storage": "Armazenamento",
   "mobile.server.route.storageFiles": "Todos os arquivos",
@@ -466,6 +467,21 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Conecte-se a este servidor como proprietário ou admin para alterar o fuso horário.",
   "mobile.server.settings.timezoneUnsupported": "Atualize o OpenBot neste servidor para alterar o fuso horário aqui.",
+  "mobile.server.settings.voiceModelDescription":
+    "Os agentes deste servidor usam este modelo para transcrever o som de vídeos que não têm legendas.",
+  "mobile.server.settings.voiceModelLoading": "Carregando o reconhecimento de fala…",
+  "mobile.server.settings.voiceModelLoadFailed":
+    "Não foi possível carregar o modelo de reconhecimento de fala do servidor.",
+  "mobile.server.settings.voiceModelSaveFailed":
+    "Não foi possível alterar o modelo de reconhecimento de fala. Tente de novo.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Atualize o OpenBot neste servidor para alterar o reconhecimento de fala aqui.",
+  "mobile.server.settings.voiceModelReady": "Pronto",
+  "mobile.server.settings.voiceModelDownloading": "Baixando: {percent}",
+  "mobile.server.settings.voiceModelSize": "Download de {size}",
+  "mobile.server.settings.voiceModelDownload": "Baixar",
+  "mobile.server.settings.voiceModelCancel": "Parar download",
+  "mobile.server.settings.voiceModelRemove": "Remover",
   "mobile.server.settings.keySection": "Chave do servidor",
   "mobile.server.settings.keyChanged": "Última alteração",
   "mobile.server.settings.keyChange": "Alterar chave",
