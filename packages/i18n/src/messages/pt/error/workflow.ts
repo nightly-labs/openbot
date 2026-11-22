@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "Esta versão do fluxo de trabalho não existe mais.",
   "error.workflow.annotation": "Textos, notas e formas não podem ter conexões.",
   "error.workflow.port": "Uma etapa não pode receber este tipo de entrada.",
+  "error.workflow.unknownValue":
+    "Este OpenBot não conhece uma configuração de uma etapa. Atualize o OpenBot e tente novamente.",
   "error.workflow.branch": "Somente uma condição pode ter conexões de sim e não.",
   "error.workflow.conditionBranch": "Cada conexão de uma condição deve ser sim ou não.",
   "error.workflow.duplicateEdge": "Estas duas etapas já têm esta conexão.",

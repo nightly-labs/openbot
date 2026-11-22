@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "Этой версии рабочего процесса больше нет.",
   "error.workflow.annotation": "У текста, заметок и фигур не может быть связей.",
   "error.workflow.port": "Шаг не может принимать такой тип входных данных.",
+  "error.workflow.unknownValue":
+    "Этот OpenBot не знает настройку одного из шагов. Обновите OpenBot и повторите попытку.",
   "error.workflow.branch": "Только у условия могут быть связи «да» и «нет».",
   "error.workflow.conditionBranch": "Каждая связь от условия должна быть «да» или «нет».",
   "error.workflow.duplicateEdge": "У этих двух шагов уже есть такая связь.",

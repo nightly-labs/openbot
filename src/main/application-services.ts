@@ -3039,7 +3039,7 @@ export async function createApplicationServices({
           workflowRuntime
             .listWithGraphs()
             .pipe(Effect.map((list) => list.map(({ summary, graph }) => ({ title: summary.title, graph })))),
-        createWorkflow: (input) => workflowRuntime.create(input),
+        createWorkflow: (input) => workflowRuntime.createCopy(input),
       },
       signedInProviders: () =>
         (service.getStatus().providers ?? [])
@@ -3056,6 +3056,7 @@ export async function createApplicationServices({
     accounts: providerAccountsHost,
     receiveMcpGrant: (state, code) => mcpOAuth.receiveAuthorizationCode(state, code),
     receiveMcpRefusal: (state) => mcpOAuth.refuseAuthorization(state),
+    cancelMcpSignInPage: (state) => mcpOAuth.cancelSignInPage(state),
     printedLink: (agentId, url) =>
       agentPrintedLink(
         service.searchConversationMessages(url, agentId, undefined, 20).results.map(({ message }) => message),

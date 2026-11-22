@@ -82,7 +82,6 @@ import {
   type CustomAgentSummary,
   type CustomProviderSummary,
   channelFolderCoverage,
-  composedCustomModelId,
   createMcpServerId,
   DEFAULT_AGENT_ACCESS,
   DEFAULT_AGENT_DEFAULTS,
@@ -186,6 +185,7 @@ import {
   type SkillLearningPreference,
   type SteerQueuedMessageInput,
   sameCustomProviderOrigin,
+  savedCustomModelId,
   type TeamPresenceSnapshot,
   type UpdateAgentInput,
   type UpdatePreference,
@@ -355,7 +355,7 @@ function mockCustomProviderModels(provider: CustomProviderSummary): ClientAgentM
     const efforts = model.reasoningEfforts ?? (harness === "pi" ? [] : (["low", "medium", "high"] as const));
     return {
       provider: harness,
-      id: composedCustomModelId(provider.id, model.id),
+      id: savedCustomModelId(provider.id, harness, model.id),
       name: `${provider.name}/${model.name}`,
       description: `Served by ${provider.baseUrl}.`,
       defaultReasoningEffort: efforts.includes("medium") ? "medium" : (efforts[0] ?? "medium"),

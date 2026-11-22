@@ -139,7 +139,10 @@ const trigger = fields({
   nextDueAt: nullable(timestamp),
   webhookUrl: nullable(string(2_048)),
 });
-const detail = fields({ summary, graph, revision: count, triggers: list(trigger, 200) });
+const detail = fields(
+  { summary, graph, revision: count, triggers: list(trigger, 200) },
+  { format: count, hostFormat: count },
+);
 const saveResult: AdminDecoder = (value) => {
   if (isDynamicRecord(value) && value.ok === true) return fields({ ok: boolean, revision: count })(value);
   if (isDynamicRecord(value) && value.ok === false) return fields({ ok: boolean, conflict: detail })(value);

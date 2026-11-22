@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { isRoutineSchedule, type RoutineSchedule } from "./ipc-routines";
+import { isWorkflowFormat } from "./ipc-workflow-format";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 export const WORKFLOW_NODE_KINDS = [
@@ -659,6 +660,8 @@ export interface WorkflowDetail {
   revision: number;
   triggers: WorkflowTriggerState[];
   needsNewerApp?: true;
+  format?: number;
+  hostFormat?: number;
 }
 
 export interface WorkflowVersion {
@@ -694,64 +697,6 @@ export interface WorkflowStep {
   startedAt: string | null;
   endedAt: string | null;
 }
-
-export const WORKFLOW_RUNTIME_FIELDS: Readonly<Record<WorkflowNodeKind, readonly string[]>> = {
-  trigger: [
-    "trigger",
-    "timezone",
-    "repositories",
-    "event",
-    "filters",
-    "labels",
-    "titleText",
-    "branch",
-    "connectionId",
-    "placeId",
-    "roles",
-    "text",
-    "answer",
-  ],
-  agent: ["agentId", "task", "answer"],
-  llm: ["provider", "model", "effort", "prompt", "system", "answer"],
-  condition: ["rule", "provider", "model", "effort", "check"],
-  approval: ["question"],
-  output: [
-    "target",
-    "connectionId",
-    "placeId",
-    "channelId",
-    "repository",
-    "item",
-    "action",
-    "labels",
-    "labelsFrom",
-    "person",
-    "reason",
-    "title",
-    "emoji",
-  ],
-  prompt: ["text"],
-  text: ["text"],
-  note: ["text"],
-  shape: ["text"],
-  asset: ["fileId"],
-  image: [
-    "media",
-    "model",
-    "account",
-    "prompt",
-    "aspect",
-    "width",
-    "height",
-    "background",
-    "duration",
-    "resolution",
-    "firstFrame",
-    "lastFrame",
-    "voice",
-    "options",
-  ],
-};
 
 export interface WorkflowStepSource {
   from: string;
@@ -983,7 +928,9 @@ export function isWorkflowDetail(value: unknown): value is WorkflowDetail {
     isRevision(value.revision) &&
     Array.isArray(value.triggers) &&
     value.triggers.every(isTriggerState) &&
-    (value.needsNewerApp === undefined || value.needsNewerApp === true)
+    (value.needsNewerApp === undefined || value.needsNewerApp === true) &&
+    (value.format === undefined || isWorkflowFormat(value.format)) &&
+    (value.hostFormat === undefined || isWorkflowFormat(value.hostFormat))
   );
 }
 
