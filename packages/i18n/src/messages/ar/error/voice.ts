@@ -11,6 +11,9 @@ export const messages = {
   "error.voice.transcriptionTimedOut": "انتهت مهلة التفريغ الصوتي.",
   "error.voice.prepareRequired": "التفريغ الصوتي المحلي غير متاح. شغّل `bun run voice:prepare` وأعد تشغيل OpenBot.",
   "error.voice.transcriptionFailed": "تعذّر على OpenBot تفريغ هذا التسجيل.",
+  "error.voice.videoModelMissing": "لم يتم إعداد نموذج للتعرّف على الكلام في التسجيلات في الإعدادات → الصوت.",
+  "error.voice.videoModelMissingServer":
+    "لم يتم إعداد نموذج للتعرّف على الكلام على هذا الخادم. يمكن للمالك أو المسؤول إعداد نموذج في إعدادات الخادم، في قسم التعرّف على الكلام.",
   "error.voice.cloud.keyRequired": "أضف مفتاح {provider} API في الإعدادات → الصوت.",
   "error.voice.cloud.keyRejected": "لم يقبل {provider} مفتاح API. تحقّق من المفتاح في الإعدادات → الصوت.",
   "error.voice.cloud.quotaExceeded": "استُنفدت حصتك في {provider}.",

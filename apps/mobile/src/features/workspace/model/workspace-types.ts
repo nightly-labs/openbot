@@ -88,6 +88,8 @@ import type {
   HostTimezoneSettings,
   HostUpdateSettingsChange,
   HostUpdateStatus,
+  HostVoiceModel,
+  HostVoiceModelChange,
   InstallAgentTemplateInput,
   InstalledSkill,
   InstallMarketplaceAgentInput,
@@ -145,6 +147,7 @@ import type {
   SetWhatsAppOwnNumberInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
+  SetWorkflowPausedInput,
   SharedTable,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -409,6 +412,9 @@ export interface MobileWorkspaceContextValue {
   canManageServerTimezone: (serverId: string) => boolean;
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  canManageServerVoiceModel: (serverId: string) => boolean;
+  loadServerVoiceModel: (serverId: string) => Promise<HostVoiceModel>;
+  changeServerVoiceModel: (change: HostVoiceModelChange, serverId: string) => Promise<HostVoiceModel>;
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
@@ -712,6 +718,7 @@ export interface MobileWorkspaceContextValue {
   loadWorkflow: (workflowId: string, serverId: string) => Promise<WorkflowDetail>;
   createWorkflow: (input: CreateWorkflowInput, serverId: string) => Promise<WorkflowDetail>;
   renameWorkflow: (input: RenameWorkflowInput, serverId: string) => Promise<WorkflowSummary>;
+  setWorkflowPaused: (input: SetWorkflowPausedInput, serverId: string) => Promise<WorkflowSummary>;
   deleteWorkflow: (workflowId: string, serverId: string) => Promise<void>;
   saveWorkflowGraph: (input: SaveWorkflowGraphInput, serverId: string) => Promise<WorkflowSaveResult>;
   loadWorkflowRuns: (workflowId: string, serverId: string, before?: string) => Promise<WorkflowRunPage>;
@@ -728,6 +735,7 @@ export interface MobileWorkspaceContextValue {
   restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
   canUseWorkflowGitHub: (serverId: string) => boolean;
   canUseWorkflowChats: (serverId: string) => boolean;
+  canPauseWorkflows: (serverId: string) => boolean;
   loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
   loadWorkflowGitHubOptions: (repository: string, serverId: string) => Promise<WorkflowGitHubRepositoryOptions>;
   loadWorkflowGitHubHistory: (workflowId: string, serverId: string) => Promise<WorkflowGitHubHistory>;
@@ -825,6 +833,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
+  | "canPauseWorkflows"
   | "canReadServerStorage"
   | "canOrganizeLibrary"
   | "canControlComputer"
@@ -839,6 +848,7 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageServerVoiceModel"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageMemoryReview"

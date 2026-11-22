@@ -129,6 +129,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "服务商密钥中包含空格或密钥不允许的字符。",
   "error.provider.noModel": "所选服务商没有可用模型。",
   "error.provider.noModelNamed": "{provider} 没有可用模型。",
+  "error.provider.acpModelsNotLoaded": "{provider} 无法加载其模型。请重新发送消息。",
   "error.provider.acpNoModels": "ACP CLI 未公布任何 ACP 模型。OpenBot 不会猜测备用模型。",
   "error.provider.endpointRemoveBusy": "请等待当前对话与队列结束，再移除该端点。",
   "error.provider.codexOutdated": "Codex CLI {version} 版本过低。OpenBot 需要 0.156.0 或更高版本。",

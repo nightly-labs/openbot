@@ -388,6 +388,12 @@ export const messages = {
     "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente. Su un server, anche il browser lo usa dopo il prossimo riavvio.",
   "server.settings.timezoneAutomatic": "Automatico ({zone})",
   "server.settings.timezoneLoadFailed": "Impossibile caricare il fuso orario del server.",
+  "server.settings.voiceModel.section": "Riconoscimento vocale",
+  "server.settings.voiceModel.description":
+    "Gli agenti su questo server usano questo modello per trascrivere l’audio dei video senza sottotitoli.",
+  "server.settings.voiceModel.loadFailed": "Impossibile caricare il modello di riconoscimento vocale del server.",
+  "server.settings.voiceModel.group": "Su questo server",
+  "server.settings.voiceModel.removeLabel": "Rimuovi {name} da questo server",
   "server.settings.turnLimit": "Thread contemporanei",
   "server.settings.turnLimitDescription":
     "Quanti thread degli agenti possono essere eseguiti contemporaneamente su questo server. Più thread usano più memoria.",

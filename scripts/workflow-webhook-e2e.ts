@@ -210,6 +210,33 @@ try {
   check("the old secret is refused", statuses.oldSecret === 401);
   check("the new secret starts a run", statuses.newSecret === 202 && (await runsOf(ordersId)).length === 2, statuses);
 
+  await runCauseEffect(workflows.setPaused({ workflowId: ordersId, paused: true }));
+  await Effect.runPromise(events.syncRoutes({ all: false }));
+  check("a paused workflow keeps its route", !revoked.includes(routeId), revoked);
+  statuses.paused = (await deliver(routeId, second.secret, "paused-1")).status;
+  check(
+    "a paused workflow accepts the request and starts no run",
+    statuses.paused === 202 && (await runsOf(ordersId)).length === 2,
+    statuses,
+  );
+  const pausedReceipt = database.connection
+    .prepare("SELECT status, reason FROM workflow_webhook_receipts WHERE delivery_id = 'paused-1'")
+    .get();
+  check(
+    "the paused request has a refused receipt",
+    pausedReceipt?.status === "ignored" && pausedReceipt.reason === "refused",
+    pausedReceipt,
+  );
+  statuses.pausedRepeat = (await deliver(routeId, second.secret, "paused-1")).status;
+  check("a paused delivery again is a no-op", statuses.pausedRepeat === 200);
+  await runCauseEffect(workflows.setPaused({ workflowId: ordersId, paused: false }));
+  statuses.resumed = (await deliver(routeId, second.secret, "resumed-1")).status;
+  check(
+    "a resumed workflow starts a run again",
+    statuses.resumed === 202 && (await runsOf(ordersId)).length === 3,
+    statuses,
+  );
+
   const gated = await runCauseEffect(workflows.create({ title: "Approve refunds" }));
   const gatedSaved = await runCauseEffect(
     workflows.saveGraph({
@@ -322,7 +349,7 @@ try {
   await Effect.runPromise(events.syncRoutes({ all: false }));
   check("a removed webhook trigger revokes its route", revoked.includes(routeId), revoked);
   statuses.removed = (await deliver(routeId, second.secret, "delivery-5")).status;
-  check("its address no longer starts a run", statuses.removed === 404 && (await runsOf(ordersId)).length === 2);
+  check("its address no longer starts a run", statuses.removed === 404 && (await runsOf(ordersId)).length === 3);
   await runCauseEffect(workflows.remove(gated.summary.id));
   await Effect.runPromise(events.syncRoutes({ all: false }));
   check("a deleted workflow revokes its route", revoked.includes(gatedRoute), revoked);

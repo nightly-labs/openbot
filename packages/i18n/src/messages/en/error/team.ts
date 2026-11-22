@@ -123,6 +123,8 @@ export const messages = defineMessages("error.team", {
   "error.team.hostIdentityUnsupported": "Server identity changes are not supported by this connection.",
   "error.team.hostUpdateUnsupported": "Host updates are not supported by this connection.",
   "error.team.hostTimezoneUnsupported": "The server timezone is not supported by this connection.",
+  "error.team.hostVoiceModelUnsupported":
+    "The speech recognition model of the server is not supported by this connection.",
   "error.team.hostRestartUnsupported": "Restarting the server is not supported by this connection.",
   "error.team.ownerTransferUnsupported": "Transferring ownership is not supported by this server.",
   "error.team.hostKeyRotationUnsupported": "Server key changes are not supported by this connection.",
@@ -138,6 +140,8 @@ export const messages = defineMessages("error.team", {
   "error.team.promptCacheTtlUnsupported": "The prompt cache time is not supported by this connection.",
   "error.team.claudeUserSetupUnsupported": "This connection does not support the Claude Code setup switch.",
   "error.team.claudeCompactWindowUnsupported": "This connection does not support the Claude compaction size.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "This connection does not support compaction before the cache expires.",
   "error.team.providerEnvironmentUnsupported": "This connection does not support provider variables.",
   "error.team.modelVisibilityUnsupported": "The model list is not supported by this connection.",
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",

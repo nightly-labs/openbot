@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentContextCategoryUsage, AgentContextState } from "@openbot/contracts/ipc";
+import type {
+  AgentContextCategoryUsage,
+  AgentContextCompactionReason,
+  AgentContextState,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Schema } from "effect";
@@ -9,6 +13,7 @@ import type { AgentStore } from "../agent-store";
 import { causeHelpers } from "../effect-boundary";
 import { decodeRecordResponse, getRecord } from "../protocol";
 import { finiteNumberOrNull } from "./account-usage";
+import { CacheExpiryCompaction } from "./cache-expiry-compaction";
 import type { ProviderPort } from "./provider-runtime";
 import type { ThreadOperationFailed } from "./thread-lifecycle";
 
@@ -67,6 +72,8 @@ export const USAGE_CHANGE_DELAY_MS = 250;
 
 export interface ContextCompactionOptions {
   timeoutMs?: number | undefined;
+  cacheExpiryDelayMs?: number | undefined;
+  cacheExpiryEnabled?: (() => boolean) | undefined;
   store: AgentStore;
   providers: ProviderPort;
   emitError(code: string, error: unknown, agentId?: string): void;
@@ -81,10 +88,23 @@ export interface ContextCompactionOptions {
   isStopping(): boolean;
   changed?(): void;
   compacted?(threadId: string): void;
+  compactBeforeCacheExpiry?(agentId: string, threadId: string): void;
 }
 
 export function compactsOnRequest(mode: AgentClient["contextCompaction"]): boolean {
   return mode === "events" || mode === "request" || mode === "handoff";
+}
+
+function compactsInSession(client: AgentClient): boolean {
+  return (
+    client.contextCompaction === "events" ||
+    client.contextCompaction === "request" ||
+    (client.contextCompaction === "native" && client.compactsOnDemand === true)
+  );
+}
+
+function compactsWhenAsked(client: AgentClient, reason: AgentContextCompactionReason | undefined): boolean {
+  return compactsOnRequest(client.contextCompaction) || (reason !== undefined && client.compactsOnDemand === true);
 }
 
 interface CompactionHold {
@@ -116,11 +136,14 @@ export class ContextCompaction {
   readonly #graceMs: number;
   readonly #display = new Map<string, Omit<AgentContextState, "agentId" | "threadId">>();
   readonly #awaitingPostCompaction = new Set<string>();
+  readonly #usageWhileCompacting = new Map<string, NonNullable<AgentContextState["usage"]>>();
   readonly #estimating = new Set<string>();
   readonly #durations = new Map<string, number>();
   readonly #changed: () => void;
   readonly #compacted: (threadId: string) => void;
   readonly #timers = new Map<string, NodeJS.Timeout>();
+  readonly #reasons = new Map<string, AgentContextCompactionReason>();
+  readonly #cacheExpiry: CacheExpiryCompaction;
   #usageTimer: NodeJS.Timeout | null = null;
 
   constructor(options: ContextCompactionOptions) {
@@ -137,6 +160,12 @@ export class ContextCompaction {
     this.#loadSession = options.loadSession;
     this.#rotatesSession = options.rotatesSession;
     this.#isStopping = options.isStopping;
+    this.#cacheExpiry = new CacheExpiryCompaction({
+      usedTokens: (threadId) => this.#display.get(threadId)?.usage?.usedTokens ?? null,
+      start: (agentId, threadId) => options.compactBeforeCacheExpiry?.(agentId, threadId),
+      delayMs: options.cacheExpiryDelayMs,
+      enabled: options.cacheExpiryEnabled,
+    });
   }
 
   get runTimeoutMs(): number {
@@ -189,6 +218,7 @@ export class ContextCompaction {
       estimated,
       ...(categories ? { categories } : {}),
     };
+    if (display.compaction?.status === "running") this.#usageWhileCompacting.set(threadId, display.usage);
     const after = display.compaction?.status === "completed" && this.#awaitingPostCompaction.delete(threadId);
     if (after && display.compaction) display.compaction.afterTokens = usedTokens;
     this.#display.set(threadId, display);
@@ -216,6 +246,7 @@ export class ContextCompaction {
   ): void {
     const display = this.#display.get(threadId) ?? { usage: null, compaction: null };
     if (status === "running" && display.compaction?.status === "running") return;
+    if (status !== "completed") this.#usageWhileCompacting.delete(threadId);
     const previous =
       status === "running"
         ? display.compaction?.status === "running"
@@ -224,11 +255,13 @@ export class ContextCompaction {
         : display.compaction;
     const startedAt = previous ? previous.startedAt : Date.now();
     const expectedMs = this.#durations.get(threadId);
+    const reason = previous ? previous.reason : this.#reasons.get(threadId);
     const compaction: NonNullable<typeof display.compaction> = {
       id: previous ? previous.id : randomUUID(),
       startedAt,
       status,
       ...(expectedMs === undefined ? {} : { expectedMs }),
+      ...(reason === undefined ? {} : { reason }),
       ...(previous ?? {}),
     };
     compaction.status = status;
@@ -256,6 +289,16 @@ export class ContextCompaction {
 
   beginTurn(threadId: string): void {
     this.#awaitingPostCompaction.delete(threadId);
+    this.#cacheExpiry.cancel(threadId);
+  }
+
+  threadIdle(agentId: string, threadId: string, client: AgentClient): void {
+    if (!compactsInSession(client) || this.#compacting.has(threadId)) return;
+    this.#cacheExpiry.idle(agentId, threadId, client.promptCacheTtlMs?.(threadId) ?? null);
+  }
+
+  requested(threadId: string): boolean {
+    return this.#compacting.has(threadId);
   }
 
   mayDrain(agentId: string): boolean {
@@ -409,11 +452,17 @@ export class ContextCompaction {
     return budget && budget.contextWindow > 1 ? Math.min(120_000, Math.floor(budget.contextWindow * 2)) : 120_000;
   }
 
-  reserve(agentId: string, threadId: string, manual = false, turnId: string | null = null): boolean {
+  reserve(
+    agentId: string,
+    threadId: string,
+    manual = false,
+    turnId: string | null = null,
+    reason?: AgentContextCompactionReason,
+  ): boolean {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    const mode = agent ? this.#providers.clientForAgent(agent)?.contextCompaction : undefined;
-    if (!agent || !compactsOnRequest(mode)) return false;
-    if (mode === "handoff" && !this.#rotatesSession(agentId, threadId)) return false;
+    const client = agent ? this.#providers.clientForAgent(agent) : null;
+    if (!agent || !client || !compactsWhenAsked(client, reason)) return false;
+    if (client.contextCompaction === "handoff" && !this.#rotatesSession(agentId, threadId)) return false;
     const budget = this.#budgets.get(threadId) ?? (manual ? unknownBudget() : undefined);
     if (!(budget?.pending || (manual && budget)) || budget.phase !== "idle" || this.#compacting.has(threadId)) {
       return false;
@@ -421,6 +470,7 @@ export class ContextCompaction {
     this.#budgets.set(threadId, budget);
     budget.phase = "requested";
     this.#compacting.set(threadId, { agentId, client: null, turnId });
+    if (reason) this.#reasons.set(threadId, reason);
     this.observeCompaction(threadId, "running");
     return true;
   }
@@ -444,7 +494,7 @@ export class ContextCompaction {
       budget?.phase !== "requested" ||
       !agent ||
       !client ||
-      !compactsOnRequest(client.contextCompaction) ||
+      !compactsWhenAsked(client, this.#reasons.get(threadId)) ||
       !this.#providers.isReady()
     ) {
       if (budget?.phase === "requested") this.observeCompaction(threadId, "failed");
@@ -490,6 +540,7 @@ export class ContextCompaction {
             if (started && client.contextCompaction === "request" && budget.phase === "requested") {
               this.markCompacted(threadId);
               this.finish(agentId, threadId, "completed");
+              this.#replayUsageWhileCompacting(threadId);
             }
           }),
         ),
@@ -515,6 +566,21 @@ export class ContextCompaction {
         ),
       );
   });
+
+  #replayUsageWhileCompacting(threadId: string): void {
+    const usage = this.#usageWhileCompacting.get(threadId);
+    this.#usageWhileCompacting.delete(threadId);
+    if (!usage) return;
+    this.observeUsage(
+      threadId,
+      usage.usedTokens,
+      usage.windowTokens,
+      usage.nativeManaged,
+      usage.autoCompactAt,
+      usage.estimated,
+      usage.categories,
+    );
+  }
 
   claimTurn(agentId: string, threadId: string, turnId: string): boolean {
     const budget = this.#budgets.get(threadId);
@@ -558,7 +624,9 @@ export class ContextCompaction {
     const displayed = this.#display.delete(threadId);
     this.#durations.delete(threadId);
     this.#awaitingPostCompaction.delete(threadId);
+    this.#usageWhileCompacting.delete(threadId);
     this.#estimating.delete(threadId);
+    this.#cacheExpiry.cancel(threadId);
     if (displayed) this.#emitChanged();
     this.#clearTimer(threadId);
   }
@@ -572,6 +640,7 @@ export class ContextCompaction {
   }
 
   forgetAgent(agentId: string): void {
+    this.#cacheExpiry.forgetAgent(agentId);
     for (const [threadId, compaction] of this.#compacting)
       if (compaction.agentId === agentId) this.#compacting.delete(threadId);
     for (const [threadId, hold] of this.#refusals) if (hold.agentId === agentId) this.#endRefusal(threadId, false);
@@ -599,6 +668,8 @@ export class ContextCompaction {
   }
 
   dispose(): void {
+    this.#cacheExpiry.dispose();
+    this.#reasons.clear();
     if (this.#usageTimer) clearTimeout(this.#usageTimer);
     this.#usageTimer = null;
     for (const timer of this.#timers.values()) clearTimeout(timer);
@@ -610,6 +681,7 @@ export class ContextCompaction {
     this.#display.clear();
     this.#durations.clear();
     this.#awaitingPostCompaction.clear();
+    this.#usageWhileCompacting.clear();
     this.#estimating.clear();
   }
 
@@ -710,6 +782,7 @@ export class ContextCompaction {
 
   #release(agentId: string, threadId: string): void {
     this.#clearTimer(threadId);
+    this.#reasons.delete(threadId);
     const budget = this.#budgets.get(threadId);
     if (budget) {
       budget.pending = false;

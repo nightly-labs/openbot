@@ -615,6 +615,18 @@ see answers `missing`, and a step of an agent that the member cannot see answers
 in the graph, and no secret is in them. The answer has its own route so that the frozen
 `workflows-v1` step stays as it is. The capability goes to protocol 10 peers.
 
+`workflows-pause-v1` pauses and resumes a workflow. `POST /v1/workflows/pause { workflowId, paused }`
+answers the workflow summary. A paused summary has `paused: true`; a running workflow has no
+`paused` key, so a `workflows-v1` peer decodes the summary as before. A paused workflow starts no
+run from a schedule, a webhook, a chat mention or a GitHub event. A manual run and a run that already
+started go on. A schedule moves its plan past each occurrence while it is paused, so a resume does not
+start the occurrences that it skipped. A webhook request to a paused workflow gets 202 and a receipt
+with the reason `refused`. A GitHub repository of a paused workflow is not watched. Only a member who
+manages the agents of the workflow can pause or resume it. With the capability, `create` also takes
+`paused: true`: a duplicate makes a paused copy, so a copy never starts on its own. A
+client strips `paused` from `create` when the host does not have the capability. The capability goes
+to protocol 10 peers. The state is in the `paused` column of `workflows` (migration 68).
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 
@@ -1084,6 +1096,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
+| `host-voice-model-v1` | Read the speech recognition model of the host and its downloads, and select, download, stop or remove a model. Owner or admin. Only a server in server mode, a hosted server or a server on a computer advertises it: the desktop app of a person keeps the model in its own Settings > Voice. Protocol 10 only | `hostAdmin` |
 | `host-turn-limits-v1` | Read and set the turns at the same time on the host (1 to 128, unlimited, or automatic) and the default task limit of an agent (1 to 64). Owner or admin. Protocol 9 only | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
@@ -1158,6 +1171,14 @@ through `hostSetupProviderProps`, and Continue stays blocked until a provider is
 then opens with that provider. The choice stays in memory for the server; it is not written to the
 setup file of this computer. A member, the local server, and a host without `providers-v1` open the
 form directly.
+
+`host-voice-model-v1` gives the dictation model of the host to a remote admin
+(`HostVoiceModelService`, `src/main/host-voice-model.ts`). `read_video` transcribes the sound of a
+video without captions with this model, and it never starts a download. Only the models that the host
+downloads can be selected; a cloud model gets 400. The download route answers when the first status
+of the download arrives, and the download continues on the host; a client reads the route again each
+second while a model downloads. The desktop and web clients show it in Server settings > Agent
+defaults for a joined server; mobile shows it in Server settings > Agents.
 
 `host-timezone-v1` reads and sets the server timezone (`openbot-server-timezone-v1.json`; `null` is
 automatic, the system zone of the host). When an agent creates a routine, the zone comes from the tool

@@ -78,6 +78,7 @@ export function ConversationComposer() {
     retryUpload,
     awaitingReplies,
     dismissAwaitingReplies,
+    stopAwaitingReply,
     openWaitingAgent,
     composerFocusRequest,
     composerHasContent,
@@ -530,7 +531,8 @@ export function ConversationComposer() {
                 onSteer={
                   props.activeTurnId && !channel && steers() && !steerRefused() ? props.onSteerQueuedMessage : undefined
                 }
-                onStop={channel && !channel.readOnly() ? channel.stopAwaitingReply : undefined}
+                onStop={channel ? (channel.readOnly() ? undefined : channel.stopAwaitingReply) : stopAwaitingReply}
+                stopDisplay={channel ? undefined : "icon"}
               />
             )}
           </ComposerStackCard>
@@ -715,6 +717,7 @@ export function ConversationComposer() {
                 startedAt={compaction()?.startedAt ?? 0}
                 expectedMs={compaction()?.expectedMs}
                 status={compaction()?.status}
+                reason={compaction()?.reason}
                 onDone={() =>
                   setDismissedCompactions((current) => ({ ...current, [currentChatConversationKey() ?? ""]: id }))
                 }

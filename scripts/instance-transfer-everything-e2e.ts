@@ -229,6 +229,7 @@ function profile(name: string) {
     ownerNotificationLevel: ServerNotificationLevel | null;
     browsingMemory: { enabled: boolean };
     claudeUserSetup: boolean;
+    cacheExpiryCompaction: boolean;
     claudeCompactWindow: number | null;
     machineAlerts: MachineAlertSettings;
     modelVisibility: { provider: string; hidden: string[] }[];
@@ -245,6 +246,7 @@ function profile(name: string) {
     ownerNotificationLevel: null,
     browsingMemory: { enabled: true },
     claudeUserSetup: false,
+    cacheExpiryCompaction: true,
     claudeCompactWindow: null,
     machineAlerts: DEFAULT_MACHINE_ALERT_SETTINGS,
     modelVisibility: [],
@@ -309,6 +311,7 @@ function profile(name: string) {
       ownerNotificationLevel: preference("ownerNotificationLevel"),
       browsingMemory: preference("browsingMemory"),
       claudeUserSetup: preference("claudeUserSetup"),
+      cacheExpiryCompaction: preference("cacheExpiryCompaction"),
       claudeCompactWindow: preference("claudeCompactWindow"),
       machineAlerts: preference("machineAlerts"),
       modelVisibility: preference("modelVisibility"),
@@ -633,6 +636,7 @@ try {
     ownerNotificationLevel: "needs-me",
     browsingMemory: { enabled: false },
     claudeUserSetup: true,
+    cacheExpiryCompaction: false,
     claudeCompactWindow: 400_000,
     machineAlerts: { diskPercent: 70, memoryPercent: 75, cpuPercent: 80, responsibleMemberId: "member-on-old-server" },
     modelVisibility: [{ provider: "codex", hidden: ["gpt-old-model"] }],

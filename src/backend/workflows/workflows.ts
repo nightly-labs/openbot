@@ -16,6 +16,7 @@ import {
   type RetryWorkflowStepInput,
   type RunWorkflowStepInput,
   type SaveWorkflowGraphInput,
+  type SetWorkflowPausedInput,
   type StartWorkflowRunInput,
   WORKFLOW_CHECK_FIELD,
   WORKFLOW_GITHUB_EVENTS,
@@ -377,6 +378,7 @@ interface WorkflowsShape {
   create(input: CreateWorkflowInput, agentId?: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   createCopy(input: { title: string; graph: WorkflowGraph }): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   rename(input: RenameWorkflowInput): Effect.Effect<WorkflowSummary, WorkflowFailed>;
+  setPaused(input: SetWorkflowPausedInput): Effect.Effect<WorkflowSummary, WorkflowFailed>;
   remove(workflowId: string): Effect.Effect<void, WorkflowFailed>;
   saveGraph(input: SaveWorkflowGraphInput, agentId?: string): Effect.Effect<WorkflowSaveResult, WorkflowFailed>;
   versions(workflowId: string): Effect.Effect<WorkflowVersion[], WorkflowFailed>;
@@ -1495,6 +1497,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return summary;
         });
 
+        const setPaused = Effect.fn("Workflows.setPaused")(function* (input: SetWorkflowPausedInput) {
+          const summary = yield* attempt(() => store.setPaused(input.workflowId, input.paused, now()));
+          changed(summary.id);
+          rearm();
+          watchGitHub();
+          return summary;
+        });
+
         const remove = Effect.fn("Workflows.remove")(function* (workflowId: string) {
           yield* locked(
             Effect.gen(function* () {
@@ -1623,6 +1633,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               const detail = store.detail(input.workflowId);
               const trigger = detail?.graph.nodes.find((node) => node.id === input.nodeId);
               if (!detail || trigger?.kind !== "trigger" || trigger.fields.trigger !== "schedule") return;
+              if (detail.summary.paused) return;
               if (runs.openRuns().some((run) => run.workflowId === input.workflowId)) return;
               yield* begin(detail, trigger, {
                 source: "schedule",
@@ -1644,6 +1655,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 return { kind: "gone" };
               const receipt = { workflowId, nodeId, deliveryId: event.deliveryId, receivedAt: event.receivedAt };
               if (yield* attempt(() => runs.hasWebhookReceipt(receipt))) return { kind: "duplicate" };
+              if (detail.summary.paused) {
+                yield* attempt(() =>
+                  runs.addWebhookReceipt({ ...receipt, status: "ignored", reason: "refused", runId: null }),
+                );
+                return { kind: "ignored", reason: "refused" };
+              }
               const checked = webhookAnswerEvent(trigger, event);
               if ("problems" in checked) {
                 logger.warn("A workflow webhook request did not match the trigger's answer fields.", {
@@ -1699,7 +1716,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           locked(
             Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
               const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
-                graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
+                summary.paused
+                  ? []
+                  : graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
               );
               if (triggers.length === 0) return "none";
               let started = false;
@@ -1774,7 +1793,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
 
         const githubTriggers = () =>
           store.listWithGraphs().flatMap(({ summary, graph }) =>
-            graph.nodes.flatMap((node) => {
+            (summary.paused ? [] : graph.nodes).flatMap((node) => {
               const event = node.fields.event;
               return githubTriggerRepositories(node).length > 0 && isOneOf(WORKFLOW_GITHUB_EVENTS, event)
                 ? [{ workflowId: summary.id, node, event }]
@@ -1848,7 +1867,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 node.id === delivery.nodeId &&
                 githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository),
             );
-            if (!detail || !trigger) github.endWaiting(delivery, { reason: "refused" });
+            if (!detail || !trigger || detail.summary.paused) github.endWaiting(delivery, { reason: "refused" });
             else if (delivery.causedByBot && chainTooLong(delivery.item))
               github.endWaiting(delivery, { reason: "chain" });
             else {
@@ -2240,6 +2259,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           create,
           createCopy,
           rename,
+          setPaused,
           remove,
           saveGraph,
           versions,

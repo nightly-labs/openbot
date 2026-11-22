@@ -95,6 +95,7 @@ export const messages = {
     "我的 AI 智能体现在借助 OpenBot 在我自己的电脑上工作。我的聊天和文件都留在我身边。试试看：{site}",
   "app.socialFollow.redditTitle": "我如何使用 OpenBot",
   "app.rail.usageRings": "{name} 用量：{windows}。打开用量",
+  "app.rail.usageUnavailable": "{name} 用量不可用。打开用量",
   "app.rail.customAgentUsage": "{name} 用量。打开用量",
   "app.rail.moreUsage": { one: "另外 {count} 个账号。打开用量", other: "另外 {count} 个账号。打开用量" },
   "app.rail.moreUsageCount": "+{count}",

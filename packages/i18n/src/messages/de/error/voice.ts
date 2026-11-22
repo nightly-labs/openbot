@@ -12,6 +12,10 @@ export const messages = {
   "error.voice.prepareRequired":
     "Lokale Sprachtranskription ist nicht verfügbar. Führe `bun run voice:prepare` aus und starte OpenBot neu.",
   "error.voice.transcriptionFailed": "OpenBot konnte diese Aufnahme nicht transkribieren.",
+  "error.voice.videoModelMissing":
+    "Unter Einstellungen → Diktat ist kein Spracherkennungsmodell für Aufnahmen eingerichtet.",
+  "error.voice.videoModelMissingServer":
+    "Auf diesem Server ist kein Spracherkennungsmodell eingerichtet. Ein Owner oder Admin kann in den Servereinstellungen unter Spracherkennung ein Modell einrichten.",
   "error.voice.cloud.keyRequired": "Füge deinen {provider}-API-Schlüssel unter Einstellungen → Diktat hinzu.",
   "error.voice.cloud.keyRejected":
     "{provider} hat den API-Schlüssel nicht akzeptiert. Prüfe den Schlüssel unter Einstellungen → Diktat.",

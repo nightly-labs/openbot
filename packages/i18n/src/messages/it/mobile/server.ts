@@ -335,6 +335,7 @@ export const messages = {
   "mobile.server.route.timezone": "Fuso orario",
   "mobile.server.route.personality": "Personalità dell’agente",
   "mobile.server.route.agents": "Agenti",
+  "mobile.server.route.voiceModel": "Riconoscimento vocale",
   "mobile.server.settings.storage": "Archiviazione",
   "mobile.server.route.storage": "Archiviazione",
   "mobile.server.route.storageFiles": "Tutti i file",
@@ -460,6 +461,19 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Connettiti a questo server come proprietario o admin per cambiarne il fuso orario.",
   "mobile.server.settings.timezoneUnsupported": "Aggiorna OpenBot su questo server per cambiarne qui il fuso orario.",
+  "mobile.server.settings.voiceModelDescription":
+    "Gli agenti su questo server usano questo modello per trascrivere l’audio dei video senza sottotitoli.",
+  "mobile.server.settings.voiceModelLoading": "Caricamento del riconoscimento vocale…",
+  "mobile.server.settings.voiceModelLoadFailed": "Impossibile caricare il modello di riconoscimento vocale del server.",
+  "mobile.server.settings.voiceModelSaveFailed": "Impossibile cambiare il modello di riconoscimento vocale. Riprova.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Aggiorna OpenBot su questo server per cambiarne qui il riconoscimento vocale.",
+  "mobile.server.settings.voiceModelReady": "Pronto",
+  "mobile.server.settings.voiceModelDownloading": "Download: {percent}",
+  "mobile.server.settings.voiceModelSize": "Download di {size}",
+  "mobile.server.settings.voiceModelDownload": "Scarica",
+  "mobile.server.settings.voiceModelCancel": "Ferma download",
+  "mobile.server.settings.voiceModelRemove": "Rimuovi",
   "mobile.server.settings.keySection": "Chiave del server",
   "mobile.server.settings.keyChanged": "Ultima modifica",
   "mobile.server.settings.keyChange": "Cambia chiave",
@@ -1140,11 +1154,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Impossibile modificare i modelli. Riprova.",
   "mobile.server.providers.promptCache": "Cache dei prompt",
   "mobile.server.providers.promptCacheHint":
-    "Per quanto tempo Claude tiene in cache il contesto di un agente tra i turni. La modifica vale al prossimo avvio di Claude.",
-  "mobile.server.providers.promptCacheDefault": "Predefinito di Claude Code",
+    "Per quanto tempo Claude e Pi tengono il contesto di un agente nella cache tra un turno e l’altro. La modifica si applica al prossimo avvio del provider.",
+  "mobile.server.providers.promptCacheDefault": "Predefinito del provider",
   "mobile.server.providers.promptCacheHour": "1 ora",
   "mobile.server.providers.promptCacheLoadFailed":
     "Impossibile caricare la durata della cache dei prompt di questo server.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compatta prima della scadenza della cache",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Quando una chat con 200K o più token di contesto è inattiva con una cache di 1 ora, l’agente compatta il contesto prima della scadenza della cache. Così il messaggio successivo non rilegge tutto il contesto senza cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Impossibile caricare l’impostazione di compattazione di questo server.",
   "mobile.server.providers.compactWindow": "Compatta le chat a",
   "mobile.server.providers.compactWindowHint":
     "Claude Code riassume i turni più vecchi di una chat quando la chat raggiunge questa dimensione. Più basso mantiene i turni rapidi ed economici. Più alto conserva più dettagli. Un modello con una finestra più piccola compatta al proprio limite.",

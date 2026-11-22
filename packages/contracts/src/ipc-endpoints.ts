@@ -131,7 +131,9 @@ import type {
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTaskWindow,
+  ArchivedAgentTasksPage,
   BranchAgentTaskInput,
+  ListArchivedAgentTasksInput,
   MarkAgentTaskReadInput,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -257,6 +259,7 @@ import type {
   SetBrowserProfileProxyInput,
 } from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
+import type { CacheExpiryCompactionSetting } from "./ipc-cache-expiry-compaction";
 import type {
   BrowseChannelFoldersInput,
   ChannelFolderChange,
@@ -608,6 +611,8 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
+  HostVoiceModel,
+  HostVoiceModelChange,
   SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
@@ -646,6 +651,7 @@ import type {
   RetryWorkflowStepInput,
   RunWorkflowStepInput,
   SaveWorkflowGraphInput,
+  SetWorkflowPausedInput,
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
@@ -1215,6 +1221,10 @@ export const IPC_ENDPOINTS = {
     ),
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getVoiceModel: scopedQuery<HostVoiceModel, "required">()("host-admin:get-voice-model"),
+    changeVoiceModel: scopedRequest<HostVoiceModelChange, HostVoiceModel, "required">()(
+      "host-admin:change-voice-model",
+    ),
     getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
     setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
@@ -1234,6 +1244,12 @@ export const IPC_ENDPOINTS = {
     getPromptCacheTtl: scopedQuery<PromptCacheTtlSetting, "required">()("host-admin:get-prompt-cache-ttl"),
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
+    ),
+    getCacheExpiryCompaction: scopedQuery<CacheExpiryCompactionSetting, "required">()(
+      "host-admin:get-cache-expiry-compaction",
+    ),
+    setCacheExpiryCompaction: scopedRequest<boolean, CacheExpiryCompactionSetting, "required">()(
+      "host-admin:set-cache-expiry-compaction",
     ),
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
@@ -1548,6 +1564,9 @@ export const IPC_ENDPOINTS = {
     listPinnedMessages: scopedRequest<string, PinnedMessagesSnapshot>()("agent:list-pinned-messages"),
     setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
+    listArchivedTasks: scopedRequest<ListArchivedAgentTasksInput, ArchivedAgentTasksPage>()(
+      "agent:tasks:list-archived",
+    ),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     readTaskAround: scopedRequest<ReadAgentTaskAroundInput, AgentTaskWindow>()("agent:tasks:read-around"),
@@ -1634,6 +1653,7 @@ export const IPC_ENDPOINTS = {
     get: scopedRequest<string, WorkflowDetail>()("workflows:get"),
     create: scopedRequest<CreateWorkflowInput, WorkflowDetail>()("workflows:create"),
     rename: scopedRequest<RenameWorkflowInput, WorkflowSummary>()("workflows:rename"),
+    setPaused: scopedRequest<SetWorkflowPausedInput, WorkflowSummary>()("workflows:setPaused"),
     delete: scopedRequest<string, void>()("workflows:delete"),
     saveGraph: scopedRequest<SaveWorkflowGraphInput, WorkflowSaveResult>()("workflows:save-graph"),
     versions: scopedRequest<string, WorkflowVersion[]>()("workflows:versions"),

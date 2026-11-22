@@ -74,6 +74,11 @@ import {
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_CODECS,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_CODECS,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
@@ -2469,6 +2474,90 @@ try {
       assert.deepEqual(older, { settings: null, sources: null });
 
       return { first: firstRead, second: secondRead, old, hiddenWorkflowRead, hidden, missing, older };
+    },
+  );
+
+  await step(
+    "pause: the host advertises workflows-pause-v1 to a protocol 10 peer; a member who manages the agent pauses and resumes, a chat member is refused, and an old peer is told the server is too old",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_PAUSE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_PAUSE_CAPABILITY));
+      const codec = WORKFLOWS_PAUSE_CODECS.get(WORKFLOWS_PAUSE_ROUTES.pause);
+      assert.ok(codec, "No workflows-pause-v1 codec for pause.");
+      const raw = (
+        token: string,
+        body: { workflowId: string; paused: boolean },
+        capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10),
+      ) => {
+        codec.request(body);
+        return call("POST", WORKFLOWS_PAUSE_ROUTES.pause, { token, body, protocol: TEAM_PROTOCOL_V10, capabilities });
+      };
+      const pause = async (token: string, workflowId: string, paused: boolean) => {
+        const response = await raw(token, { workflowId, paused });
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return record(codec.response(response.status, response.body), "paused summary");
+      };
+      const refusal = async (
+        response: { status: number; body: unknown },
+        status: number,
+        key: "error.workflow.serverTooOld" | "error.workflow.missing" | "error.team.agentManageDenied",
+      ) => {
+        assert.equal(response.status, status, JSON.stringify(response.body));
+        assert.ok(JSON.stringify(response.body).includes(sourceText(key)), JSON.stringify(response.body));
+        return response.status;
+      };
+
+      const workflow = await hostWorkflow("Pausable", agentGraph(open));
+      const paused = await pause(member, workflow.id, true);
+      assert.equal(paused.paused, true);
+      assert.equal((await runCauseEffect(current().workflows.get(workflow.id))).summary.paused, true);
+      const listed = list((await ok(WORKFLOWS_ROUTES.list, member, {})).workflows, "member list").map((row) =>
+        record(row, "summary"),
+      );
+      assert.equal(listed.find((row) => row.id === workflow.id)?.paused, true);
+      const resumed = await pause(member, workflow.id, false);
+      assert.equal(resumed.paused, undefined);
+      assert.equal((await runCauseEffect(current().workflows.get(workflow.id))).summary.paused, undefined);
+
+      const created = await ok(WORKFLOWS_ROUTES.create, member, {
+        title: "Paused copy",
+        graph: agentGraph(open),
+        paused: true,
+      });
+      assert.equal(record(created.summary, "summary").paused, true);
+
+      const chatWorkflow = await hostWorkflow("Chat pause", agentGraph(chatter));
+      const chat = await refusal(
+        await raw(member, { workflowId: chatWorkflow.id, paused: true }),
+        403,
+        "error.team.agentManageDenied",
+      );
+      const hiddenWorkflow = await hostWorkflow("Hidden pause", agentGraph(closed));
+      const hidden = await refusal(
+        await raw(member, { workflowId: hiddenWorkflow.id, paused: true }),
+        404,
+        "error.workflow.missing",
+      );
+      assert.equal((await runCauseEffect(current().workflows.get(chatWorkflow.id))).summary.paused, undefined);
+      assert.equal((await runCauseEffect(current().workflows.get(hiddenWorkflow.id))).summary.paused, undefined);
+      const old = await refusal(
+        await raw(
+          member,
+          { workflowId: workflow.id, paused: true },
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+            (capability) => capability !== WORKFLOWS_PAUSE_CAPABILITY,
+          ),
+        ),
+        400,
+        "error.workflow.serverTooOld",
+      );
+      assert.equal((await runCauseEffect(current().workflows.get(workflow.id))).summary.paused, undefined);
+      return { paused: true, resumed: true, createdPaused: true, chat, hidden, old };
     },
   );
 

@@ -12,6 +12,9 @@ export const messages = {
   "error.voice.prepareRequired":
     "로컬 음성 받아쓰기를 사용할 수 없어요. `bun run voice:prepare`를 실행한 후 OpenBot을 다시 시작해 주세요.",
   "error.voice.transcriptionFailed": "OpenBot이 이 녹음을 받아쓰지 못했어요.",
+  "error.voice.videoModelMissing": "설정 → 음성에 녹음용 음성 인식 모델이 설정되어 있지 않아요.",
+  "error.voice.videoModelMissingServer":
+    "이 서버에 음성 인식 모델이 설정되어 있지 않아요. 소유자나 관리자가 서버 설정의 음성 인식에서 모델을 설정할 수 있어요.",
   "error.voice.cloud.keyRequired": "설정 → 음성에서 {provider} API 키를 추가해 주세요.",
   "error.voice.cloud.keyRejected": "{provider}가 API 키를 받아들이지 않았어요. 설정 → 음성에서 키를 확인해 주세요.",
   "error.voice.cloud.quotaExceeded": "{provider} 사용량을 모두 소진했어요.",
