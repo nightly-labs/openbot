@@ -106,7 +106,7 @@ export interface AppLoadingScreenProps {
   ready?: boolean | undefined;
   onExited?: (() => void) | undefined;
   onMountViews?: (() => void) | undefined;
-  scene?: "pile" | "thinking";
+  scene?: "pile" | "thinking" | "quiet";
   seed?: number;
   label?: string;
   title?: string;
@@ -117,7 +117,8 @@ export interface AppLoadingScreenProps {
 export function AppLoadingScreen(props: AppLoadingScreenProps) {
   const { t } = useText();
   const reducedMotion = prefersReducedMotion() || documentStillFaces();
-  const pileScene = untrack(() => props.scene !== "thinking");
+  const scene = untrack(() => props.scene ?? "pile");
+  const pileScene = scene === "pile";
   const seat = pileScene
     ? takeSeat(
         untrack(() => props.seed),
@@ -224,7 +225,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
       }}
       class="app-loading"
       style={{ "--app-loading-at": `${enterAt}s`, "--app-loading-exit-delay": `${fadeDelay()}ms` }}
-      data-scene={pileScene ? "pile" : "thinking"}
+      data-scene={scene}
       data-phase={phase()}
       role="status"
       aria-live="polite"

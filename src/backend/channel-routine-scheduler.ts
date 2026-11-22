@@ -196,25 +196,37 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       for (const due of pending) {
         if (!active()) break;
         if (this.#excluded().has(due.routine.channelId)) continue;
-        const scheduledFor = yield* channelRoutineStep(() => {
+        const fire = yield* channelRoutineStep(() => {
+          const current = this.#routines.get(due.routine.channelId, due.routine.id);
+          if (!current?.active || current.trigger.id !== due.triggerId || current.trigger.nextRunAt !== due.nextRunAt)
+            return null;
+          changed.add(due.routine.channelId);
           if (due.schedule.kind === "once") {
             this.#routines.completeTrigger(due.routine.id, due.triggerId, now);
-            changed.add(due.routine.channelId);
-            return due.nextRunAt;
+            return this.#skipReason(current) ? null : { routine: current, scheduledFor: due.nextRunAt };
           }
           const occurrence = collapseMissedOccurrences(
-            due.schedule,
-            due.routine.timezone,
+            current.trigger.schedule,
+            current.timezone,
             new Date(due.nextRunAt),
             now,
           );
+          const skipReason = this.#skipReason(current);
+          if (skipReason) {
+            this.#routines.skipOccurrences(
+              current,
+              new Date(due.nextRunAt),
+              occurrence.scheduledFor,
+              occurrence.nextRunAt,
+              skipReason,
+            );
+            return null;
+          }
           this.#routines.advanceTrigger(due.routine.id, due.triggerId, occurrence.nextRunAt.toISOString());
-          changed.add(due.routine.channelId);
-          return occurrence.scheduledFor.toISOString();
+          return { routine: current, scheduledFor: occurrence.scheduledFor.toISOString() };
         });
-        if (due.routine.limitPolicy === "skip" && this.#hooks.usageLimited(due.routine.channelId)) continue;
-        if (yield* channelRoutineStep(() => this.#hasLiveRun(due.routine.channelId, due.routine.id))) continue;
-        yield* this.#fireEffect(due.routine, due.triggerId, scheduledFor);
+        if (!fire) continue;
+        yield* this.#fireEffect(fire.routine, due.triggerId, fire.scheduledFor);
       }
     }).pipe(
       Effect.ensuring(
@@ -277,6 +289,13 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
 
   reconcileAll(): void {
     for (const channelId of this.#routines.channelsWithOpenRuns()) this.reconcile(channelId);
+  }
+
+  #skipReason(routine: Pick<ChannelRoutine, "id" | "channelId" | "limitPolicy">): string | null {
+    if (this.#hasLiveRun(routine.channelId, routine.id)) return sourceText("status.agent.routineSkippedRunOpen");
+    if (routine.limitPolicy === "skip" && this.#hooks.usageLimited(routine.channelId))
+      return sourceText("status.agent.routineSkippedUsageLimit");
+    return null;
   }
 
   #hasLiveRun(channelId: string, routineId: string): boolean {

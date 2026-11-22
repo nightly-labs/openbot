@@ -107,6 +107,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   });
   const animateEntrance = untrack(() => !props.resolution);
   let stage: HTMLDivElement | undefined;
+  let card: HTMLDivElement | undefined;
   let holdTimer: number | undefined;
   let presentTimer: number | undefined;
   let resolutionPresentationPending = false;
@@ -174,15 +175,24 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       draft.announced = keepFocus || !question ? "" : markdownPlainText(question.question);
     });
     fitStage(next);
-    if (!keepFocus) return;
-    queueMicrotask(() => {
-      const page = stage?.children[next];
-      const target =
-        next < total() && toOption
-          ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
-          : null;
-      (target ?? stage)?.focus({ preventScroll: true });
-    });
+    if (keepFocus) {
+      queueMicrotask(() => {
+        const page = stage?.children[next];
+        const target =
+          next < total() && toOption
+            ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
+            : null;
+        (target ?? stage)?.focus({ preventScroll: true });
+      });
+    }
+    if (next < total()) queueMicrotask(revealCardTop);
+  }
+
+  function revealCardTop(): void {
+    const scroller = card && scrollingAncestor(card);
+    if (card && scroller && card.getBoundingClientRect().top < scroller.getBoundingClientRect().top) {
+      card.scrollIntoView({ block: "start" });
+    }
   }
 
   function presentResolution(): void {
@@ -427,6 +437,25 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     return t("prompt.question.answersSent");
   };
 
+  function ClosedOptions(optionsProps: { question: AgentPromptQuestion }) {
+    return (
+      <Show when={optionsProps.question.options?.length}>
+        <ul class="question-prompt-answers">
+          <For each={optionsProps.question.options}>
+            {(option, optionIndex) => (
+              <li class="question-prompt-answer question-prompt-answer-closed">
+                <Kbd class="question-prompt-letter" aria-hidden="true">
+                  {optionLetter(optionIndex())}
+                </Kbd>
+                {option.label}
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
+    );
+  }
+
   function Summary() {
     return (
       <section
@@ -448,12 +477,14 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             <p class="sr-only" role="status">
               {statusTitle()}
             </p>
-            <For each={props.questions}>
-              {(question) => (
-                <section class="question-prompt-section" aria-label={markdownPlainText(question.question)}>
-                  <h2 class="question-prompt-title">
-                    <QuestionText question={question.question} onOpenLink={props.onOpenLink} />
-                  </h2>
+          </Show>
+          <For each={props.questions}>
+            {(question) => (
+              <section class="question-prompt-section" aria-label={markdownPlainText(question.question)}>
+                <h2 class="question-prompt-title">
+                  <QuestionText question={question.question} onOpenLink={props.onOpenLink} />
+                </h2>
+                <Show when={resolution()?.status === "answered"} fallback={<ClosedOptions question={question} />}>
                   <Show
                     when={summaryRows(question)}
                     fallback={
@@ -480,10 +511,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                       </ul>
                     )}
                   </Show>
-                </section>
-              )}
-            </For>
-          </Show>
+                </Show>
+              </section>
+            )}
+          </For>
         </Show>
       </section>
     );
@@ -491,7 +522,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
 
   return (
     <Bubble
-      ref={(element) => props.elementRef?.(element)}
+      ref={(element) => {
+        card = element;
+        props.elementRef?.(element);
+      }}
       variant="muted"
       class="question-prompt-bubble"
       data-state={resolved() ? "done" : busy() ? "pending" : "idle"}
@@ -588,4 +622,11 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       </BubbleContent>
     </Bubble>
   );
+}
+
+function scrollingAncestor(element: HTMLElement): HTMLElement | undefined {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (/auto|scroll/.test(getComputedStyle(node).overflowY)) return node;
+  }
+  return undefined;
 }

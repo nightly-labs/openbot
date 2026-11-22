@@ -4,6 +4,7 @@ import { removeAttachmentReferences } from "@openbot/contracts/attachment-refere
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
+import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
 import { parseSelectionInstruction } from "@openbot/contracts/selection-instruction";
 import {
   AudioLines,
@@ -61,7 +62,6 @@ import {
   MarkdownInlineText,
   MarkdownMessageText,
   type MessageImageFile,
-  markdownImageName,
   messageImageFiles,
 } from "./MarkdownMessageText";
 import { ReplyQuote } from "./ReplyQuote";

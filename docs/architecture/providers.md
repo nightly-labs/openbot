@@ -395,7 +395,10 @@ The runtime manager offers the latest upstream release of each provider CLI. It 
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
 `releases/latest` for Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini (`google-antigravity/antigravity-cli`), the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entry `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
-answered, and Bun, which is a tool runtime and not a provider, stays on it.
+answered, and Bun, which is a tool runtime and not a provider, stays on it. When the last check
+found no release for a provider that is not installed, `Download` and `Retry` look it up again,
+with the blocklist, for up to 10 seconds, before they use the pinned version. A vendor can remove an old build, as
+Cognition did for Devin CLI 3000.11.234 (#13549), so the pin alone can be a dead link.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
 Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
@@ -406,8 +409,11 @@ file it installed, and every start verifies that record and the binary's `--vers
 install is used. The newest version in the store that verifies is the one that runs.
 
 `provider-runtime-blocklist.json` on `main` names versions no installation may offer. It stops a
-broken upstream release without an OpenBot release. It suppresses an offer only: it does not remove
-a version a user already installed. A list that cannot be read blocks nothing.
+broken upstream release without an OpenBot release. When the OpenBot copy of a provider runs a blocked
+version, the automatic update installs the version that the check offers, also when it is older, and then
+removes the blocked copy. Each update check also removes a blocked copy that is not active. A copy that
+another OpenBot process stamped in the retention time stays. A CLI that the user installed or configured stays. A list
+that cannot be read blocks nothing.
 
 The `Provider CLI canary` workflow (`.github/workflows/provider-cli-canary.yml`) finds a broken
 release before many users install it. Every six hours it reads the newest release of each provider
@@ -537,13 +543,22 @@ that it is not supported instead of offering a download. An older managed instal
 metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-After an app upgrade, main updates the managed CLIs with no offer (#3164).
-`openbot-provider-cli-app-version-v1.json` in `userData` keeps the app version that last started the
-update checks. A different or missing version calls `startUpdateChecks({ updateInstalled: true })`.
-Until the first check starts the downloads, `getStatus` does not offer the CLIs that it will update. That check then starts the
-download of each managed CLI that has a newer version, before it sends its status, so the renderer
-announces no offer. A CLI the user installed, an explicit path and an off provider keep the normal
-offer path. The renderer shows a notification for such an update only when it fails, with a Retry.
+Main updates the managed CLIs with no offer. After `startUpdateChecks`, each check (at start and
+then each hour) starts the download of each managed CLI that has a newer version, before it sends its
+status, so the renderer announces no offer. `providerUseChanged` does the same at once, for a provider
+that is turned on or that stops using a CLI the user installed. When a check runs at that time, it starts
+them after the check, so the download gets the latest version. Until a check starts the downloads,
+`getStatus` does not offer the CLIs that it will update. A CLI the user installed, an explicit path and
+an off provider keep the normal offer path. A failed update stays in `download-error` and is not started
+again by itself. A cancelled update is not started again for the same version until the app restarts,
+and stays offered. The decline is kept in memory only. The
+download waits for idle agents through `updateRuntime`. The renderer shows a notification for such an
+update only when it fails, with a Retry.
+
+Provider settings show "Update all" in the Connected header when one or more providers that are on
+have an offer. It calls `onUpdateProvider` for each of them, so it uses the same local or Team API path
+as the Update button of one provider. The mobile server providers screen has the same action. Both leave out installer providers
+such as Hermes.
 
 `ProvidersProvider` starts the shared renderer runtime store for the active server. The store
 announces each provider that gains an offer as one notification, from an effect over both the
@@ -1094,7 +1109,14 @@ as Connect JSON to `https://api2.cursor.sh` or `CURSOR_API_ENDPOINT`, with the C
 The token comes from where the CLI keeps it: on macOS the login Keychain item `cursor-access-token`
 (account `cursor-user`), read with `/usr/bin/security` because the CLI writes it with that tool,
 then `~/.cursor/auth.json`; on Linux `$XDG_CONFIG_HOME/cursor/auth.json` or
-`~/.config/cursor/auth.json`; on Windows `%APPDATA%\Cursor\auth.json`. Cursor does not document
+`~/.config/cursor/auth.json`; on Windows `%APPDATA%\Cursor\auth.json`. A Linux CLI from 2026.11.22 with
+a desktop keyring keeps its sign-in in the Secret Service (service `cursor-credentials`, account
+`cursor-user`) and leaves only `{"storedIn":"os-secret-store"}` in `auth.json`. With that marker the
+reader runs `secret-tool search`, not `lookup`, so a locked keyring gives no reading and no unlock
+prompt at each poll. It keeps a token until the CLI rewrites `auth.json`, which the CLI does after
+each keyring write, and a read with no token (locked keyring, no session bus, no `secret-tool`) for 30
+minutes. Windows 2026.11.22 keeps its
+sign-in in `auth.dpapi`, which the reader does not read. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a
 `cursor` row, because both windows have the same length. The total of that split plan
@@ -1158,9 +1180,13 @@ the download size. `OPENBOT_DEVIN_PATH` selects another executable.
 
 Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
 browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
-(`~/.local/share/devin`). It has no device-code sign-in, so a joined computer cannot sign in Devin on
-the host. Sign out runs `devin auth logout`. A signed-out Devin process answers `session/new` with an
-empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
+(`~/.local/share/devin`). It has no device-code sign-in. For a user at another device, the CLI gives
+its page (`https://app.devin.ai/auth/cli/continue`, with a loopback `redirect_uri`) to OpenBot's
+`open` command, and `provider-sign-in-relay-v2` relays it to the client's browser (#9561). Only a Linux host
+advertises it: on macOS the CLI runs `/usr/bin/open` by its absolute path, and on Windows OpenBot has
+no `open` command that the CLI uses, so OpenBot cannot take the page there. Sign out
+runs `devin auth logout`. A signed-out Devin process answers `session/new` with an empty model list
+and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
 
 `devinStatePaths` lets a confined process write `devin/cli` and `devin/mcp` in the XDG data folder,
 `devin` in the XDG cache folder and `~/.devin/plans`. Its config folder, `credentials.toml` and
@@ -1378,7 +1404,12 @@ closed.
 The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `hermes acp`. OpenBot has
 no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
 and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
-`PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
+`PATH` and in `~/.local/bin`, and on Windows also in `bin` of `HERMES_HOME` and of
+`%LOCALAPPDATA%\hermes`, where the Hermes Windows installer puts it. It reads the version from
+`hermes acp --version`, or from `Hermes Agent vX.Y.Z` in `hermes --version` before Hermes 0.14.
+On Windows, `where.exe` for each provider CLI also searches the User and Machine `PATH` that the registry
+holds now, after the `PATH` that OpenBot got at start, so a check finds a CLI that was installed or
+repaired while OpenBot was open.
 
 A missing CLI is `not-installed`. On macOS and Linux, with no `OPENBOT_HERMES_PATH`, its row has a
 Download: `HermesInstaller` (`src/main/hermes-installer.ts`) runs the official installer as the
@@ -1684,6 +1715,26 @@ adds it. A limit from an event has no flag, so `keepUsageCredits` keeps the last
 a client's own quota changes, `ProviderRuntime.#noteCredits` sends `usage-credits-changed`, an event
 with no data that only `usage-credits-v1` peers get, and the client reads the usage again. A host
 without the capability gives no flag, and the client shows **Usage limit reached** as before.
+
+### How many accounts a provider keeps
+
+A provider keeps up to 20 accounts, the default account included (`MAX_PROVIDER_ACCOUNTS`).
+`ProviderAccountStore` refuses the next account with `error.provider.accountLimit`. The released
+codecs of `provider-accounts-v1`, `provider-account-models-v1`, `provider-account-pool-v1` and
+`provider-usage-reset-v1` read at most 10 accounts of one provider, and they are frozen. The protocol 10
+capability `provider-many-accounts-v1`
+([`provider-many-accounts-v1.ts`](../../packages/contracts/src/team-protocol/provider-many-accounts-v1.ts))
+lets these lists, and the `leftOut` list of a pool update, hold 20 accounts when both peers send it. The rows
+keep their frozen shapes.
+
+| Peer | Rule |
+| --- | --- |
+| Client with the capability | Reads and sends lists of up to 20 accounts of one provider. Settings allows 20 accounts. |
+| Client without it | Works while each provider has 10 accounts or fewer. When a list would hold more, or a sign-in, a code sign-in, a key, a saved Claude API key or a relay sign-in would add the 11th account, the host refuses it with 409 `error.team.providerAccountListNeedsUpdate` before it changes anything (`requireProviderAccountsFit` in [`route-provider-accounts.ts`](../../src/main/team-api/route-provider-accounts.ts)). |
+| Current client, host without it | Settings allows 10 accounts, and the host keeps its own limit of 10. |
+| Older app on the same computer | Does not delete or change an account file with more than 10 accounts: its store reads the `accounts` list without a limit, and opens the file read-only if a pool leaves out more than 10 accounts. But its preload decoder refuses an agent status with more than 10 accounts of one provider ("Invalid agent status response."), so that app cannot show agent status until it is updated again. |
+
+Run `bun run test:provider-many-accounts` to check the limits through the Team API and the account store.
 
 ### Account code sign-in
 

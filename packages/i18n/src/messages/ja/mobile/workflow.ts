@@ -98,6 +98,7 @@ export const messages = {
   "mobile.workflow.output.chatChannel": "OpenBot のチャンネル",
   "mobile.workflow.output.file": "ファイル",
   "mobile.workflow.status.running": "実行中",
+  "mobile.workflow.status.waiting": "順番待ち",
   "mobile.workflow.status.approval": "対応待ち",
   "mobile.workflow.status.stopping": "停止中",
   "mobile.workflow.status.done": "完了",

@@ -399,7 +399,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "إعطاء السر",
   "routine.webhook.giveSecretFailed": "تعذّر إعطاء سر التوقيع إلى {name}.",
   "routine.webhook.secretGiven": "أصبح لدى {name} سر التوقيع الجديد.",
-  "routine.webhook.statusFailed": "تعذّر التحقق مما إذا كان المضيف متصلًا بالمرحّل.",
   "routine.webhook.stepDone": "تم",
   "routine.webhook.stepUrl": "انسخ نقطة النهاية إلى الخدمة المرسِلة",
   "routine.webhook.stepUrlHint": "يرسل المرسل طلب POST بنص JSON لا يتجاوز 64 KiB.",

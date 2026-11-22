@@ -1,5 +1,82 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, le attività eseguite in parallelo, l’account della voce dal vivo, l’interruttore della memoria di OpenBot, le cartelle dei flussi di lavoro, le risposte tipizzate dei flussi di lavoro e più di 10 account dello stesso provider funzionano solo se il server ha questa versione.",
+      "Dopo questo aggiornamento, una versione precedente di OpenBot non può aprire i tuoi dati."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Un agente può dividere il lavoro non correlato in attività che vengono eseguite in parallelo. Ogni risultato torna alla chat principale, e l’agente combina i risultati per te.",
+          "Vedi tutti i thread aperti di un agente nella nuova scheda Thread del pannello laterale. La scheda mostra il numero di thread che ti aspettano.",
+          "Cambia le scorciatoie da tastiera nella nuova scheda Tastiera delle Impostazioni. Le nuove scorciatoie avviano un thread e passano al thread successivo e a quello precedente.",
+          "I flussi di lavoro si aprono in schede, e i passaggi possono dare risposte tipizzate. Scrivi {{name}} per inserire una risposta in un passaggio successivo.",
+          "Carica un video MP4 o WebM come sfondo della finestra in Impostazioni > Aspetto.",
+          "Scegli l’account ChatGPT che usa la voce dal vivo di GPT in Impostazioni > Voce."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un provider mantiene fino a 20 account. Prima il limite era 10.",
+          "La dettatura registra fino a 10 minuti. Prima si fermava dopo 2 minuti.",
+          "Un thread carica i messaggi più vecchi quando scorri vicino alla parte alta. Non devi cliccare un pulsante."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Una routine pianificata non si spegne più in silenzio quando un’esecuzione non ha nulla da segnalare.",
+          "Una chat lunga conserva tutti i suoi messaggi, nell’ordine corretto, mentre arriva una risposta.",
+          "Un numero WhatsApp collegato non smette più di ricevere messaggi mentre mostra ancora «Connesso».",
+          "Su Windows, gli agenti OpenCode eseguono di nuovo i comandi. Prima spesso fallivano con «opencode-pty request timed out».",
+          "Un agente che hai silenziato non ti invia più notifiche quando risponde in un canale."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, le impostazioni dei passaggi del flusso di lavoro, Esegui da questo passo, il passaggio di proprietà, il pulsante Aggiorna tutti e molte correzioni per gli agenti funzionano solo se il server ha questa versione.",
+      "Dopo questo aggiornamento, una versione precedente di OpenBot non può aprire i tuoi dati."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Parla con un agente con Premi per parlare. Tieni premuto il pulsante per parlare o il tasto per parlare mentre parli. OpenBot invia ciò che hai detto quando rilasci. Cambia il tasto in Impostazioni > Voce.",
+          "Avvia di nuovo un flusso di lavoro da un passaggio. Nel menu del passaggio, seleziona Esegui da questo passo. I passaggi precedenti mantengono le loro risposte e non vengono eseguiti di nuovo.",
+          "Vedi le impostazioni e gli input che hanno prodotto il risultato di un passaggio del flusso di lavoro. Seleziona Impostazioni sul passaggio, poi Usa queste impostazioni per eseguirlo di nuovo allo stesso modo.",
+          "Passa il tuo server a un altro account OpenBot. In Impostazioni server > Membri, inserisci l’email del nuovo proprietario. Il server cambia proprietario quando lo accetta.",
+          "Aggiorna tutti i provider insieme. Impostazioni > Provider mostra Aggiorna tutti quando uno o più provider hanno un aggiornamento."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot aggiorna ogni ora le CLI dei provider che ha scaricato, quando è disponibile una nuova versione. L’aggiornamento attende che gli agenti siano inattivi.",
+          "Ogni thread di un agente può usare le schede del browser che la chat principale o un altro thread di quell’agente ha aperto.",
+          "La scheda Routine è scomparsa dalla barra laterale. Le routine continuano a essere eseguite. Gestiscile nelle impostazioni dell’agente, nella pagina Pianificazione e in Impostazioni server > Routine."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Il riavvio per un aggiornamento scaricato ora attende che gli agenti siano inattivi, con Annulla riavvio. Prima OpenBot si chiudeva subito e interrompeva l’attività dell’agente.",
+          "Un agente non resta più su «In lavorazione» con i messaggi in attesa dopo un riavvio o un limite di utilizzo. Il turno interrotto appare come interrotto, e i messaggi in attesa partono.",
+          "Un server carico con molti agenti e dispositivi collegati non esaurisce più la memoria e non si blocca quando seleziona il turno successivo.",
+          "Un messaggio che invii dopo una pausa non resta più su «Non inviato» con «Connetti Claude per continuare.» quando Claude è connesso.",
+          "Le schede del browser degli agenti che nessuno usa smettono di usare il processore dopo 2 minuti."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

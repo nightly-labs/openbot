@@ -595,6 +595,18 @@
   white-space: pre-wrap;
 }
 
+.agent-dock-visual {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.agent-dock-visual > .agent-dock-text {
+  min-width: 0;
+  flex: 1;
+  font-weight: 500;
+}
+
 .agent-dock-markdown {
   min-width: 0;
   font-size: var(--openbot-text-md);
@@ -816,7 +828,7 @@
   scale: -1 1;
 }
 
-.agent-dock[data-ambient-motion="paused"] .agent-row-thinking-dots i {
+.agent-dock[data-ambient-motion="paused"] :is(.agent-row-thinking-dots i, .agent-dock-typing-dots i) {
   animation-play-state: paused;
 }
 

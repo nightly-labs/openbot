@@ -1,7 +1,7 @@
 import type { AppInfo, SettingLinkId } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import type { AgentSettingLinkId } from "@openbot/ui/features/conversation/agent-setting-links";
-import type { SettingsTab } from "./settings-tabs";
+import { type SettingsTab, settingsTabShown } from "./settings-tabs";
 
 export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId>;
 
@@ -34,6 +34,8 @@ const TARGETS: Record<Exclude<AppSettingLinkId, "island.show">, AppSettingLinkTa
   "voice.read-replies": { tab: "voice", row: "settings.voice.speech.readReplies.title" },
   "voice.speech-voice": { tab: "voice", row: "settings.voice.speech.voice.title" },
   "voice.speech-speed": { tab: "voice", row: "settings.voice.speech.speed.title" },
+  "voice.codex-live": { tab: "voice", row: "settings.voice.speech.codexLive.title" },
+  "voice.server": { tab: "voice", row: "settings.voice.server.section" },
   "phones.devices": { tab: "mobile-connect", row: "settings.mobileConnect.phones.title" },
   "app.launch-at-login": { tab: "app-behavior", row: "settings.launchAtLogin.title" },
   "app.restore-workspace": { tab: "app-behavior", row: "settings.restoreWorkspace.title" },
@@ -54,5 +56,16 @@ export function appSettingLinkTarget(
   return {
     tab: "dynamic-island",
     row: platform === "darwin" ? "settings.notch.show.title" : "settings.notch.show.titleTopOfScreen",
+  };
+}
+
+export function appSettingRowOpener(
+  surface: () => { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
+  openRow: (tab: SettingsTab, row: AppTextKey) => void,
+): (settingId: AppSettingLinkId) => (() => void) | undefined {
+  return (settingId) => {
+    const current = surface();
+    const target = appSettingLinkTarget(settingId, current.platform);
+    return settingsTabShown(target.tab, current) ? () => openRow(target.tab, target.row) : undefined;
   };
 }

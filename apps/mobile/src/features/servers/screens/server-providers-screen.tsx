@@ -1,6 +1,8 @@
-import { isAgentProvider, providerDisplayName } from "@openbot/contracts/ipc";
+import { isInstallerProvider } from "@openbot/contracts/agent-providers";
+import { isAgentProvider, type ProviderRuntimeSnapshot, providerDisplayName } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
+import CircleArrowUp from "lucide-react-native/icons/circle-arrow-up";
 import Plus from "lucide-react-native/icons/plus";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
@@ -45,6 +47,7 @@ export function ServerProvidersScreen() {
   const { available, admin, status, runtimes, rows, applyRuntimes } = useServerProviders(serverId);
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
+  const [updatingAll, setUpdatingAll] = useState(false);
   if (!available || !status.data)
     return (
       <SettingsContent>
@@ -58,6 +61,37 @@ export function ServerProvidersScreen() {
       </SettingsContent>
     );
   const connected = rows.filter((row) => row.status?.state === "available");
+  const updates = rows.flatMap((row) =>
+    row.updatable && row.runtime && !row.status?.off && !isInstallerProvider(row.runtime.provider)
+      ? [row.runtime.provider]
+      : [],
+  );
+  const updateAll = async (providerAdmin: ProviderAdmin) => {
+    setUpdatingAll(true);
+    setCheckResult(null);
+    let failure: unknown = null;
+    let snapshot: ProviderRuntimeSnapshot | null = null;
+    try {
+      for (const provider of updates) {
+        try {
+          snapshot = await providerAdmin.download(provider);
+        } catch (cause) {
+          failure ??= cause;
+        }
+      }
+      if (snapshot) await applyRuntimes(snapshot);
+    } catch (cause) {
+      failure ??= cause;
+    } finally {
+      setUpdatingAll(false);
+    }
+    if (failure === null) {
+      void haptics.notification("success");
+      return;
+    }
+    setCheckResult(currentText().errorMessage(failure, currentText().t("mobile.server.providers.updateAllFailed")));
+    void haptics.notification("error");
+  };
   const sections = [
     { title: t("mobile.server.providers.connectedTitle"), rows: connected },
     { title: t("mobile.server.providers.otherTitle"), rows: rows.filter((row) => !connected.includes(row)) },
@@ -102,9 +136,21 @@ export function ServerProvidersScreen() {
       {admin && (admin.registry || admin.customAgents) ? <AgentsSection serverId={serverId} admin={admin} /> : null}
       {runtimes.data && admin ? (
         <SettingsSection footer={checkResult ?? undefined}>
+          {updates.length > 0 ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={updatingAll || checking}
+              leading={<RowIcon icon={CircleArrowUp} tone="accent" />}
+              onPress={() => void updateAll(admin)}
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.server.providers.updateAll")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
           <SettingsRow
             disclosure={false}
-            disabled={checking}
+            disabled={checking || updatingAll}
             leading={<RowIcon icon={RefreshCw} tone="accent" />}
             onPress={() => {
               setChecking(true);

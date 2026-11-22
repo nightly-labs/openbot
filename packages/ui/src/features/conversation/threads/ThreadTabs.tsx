@@ -12,6 +12,7 @@ import {
   X,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { createSignal, For, flush, onSettled, Show } from "solid-js";
 import { modelPickerFit } from "../model-picker-fit";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./ThreadStatusMark";
@@ -53,6 +54,7 @@ function renamable(props: ThreadHeaderProps, thread: ThreadItem | undefined): bo
 
 function ThreadTab(props: {
   thread: ThreadItem;
+  icon: (() => JSX.Element) | undefined;
   menuOpen: boolean;
   onClose: () => void;
   onMove: (step: -1 | 1) => void;
@@ -113,7 +115,7 @@ function ThreadTab(props: {
         }}
       >
         <span class="agent-threads-tab-icon">
-          <ThreadTabIcon status={props.thread.status} unread={props.thread.unread} />
+          <ThreadTabIcon status={props.thread.status} unread={props.thread.unread} idle={props.icon} />
         </span>
         <X class="agent-threads-tab-x" />
       </span>
@@ -487,7 +489,11 @@ export function ThreadTabs(props: ThreadHeaderProps) {
           onPointerDown={pickTouchTarget}
         >
           <SlidingTabs.Root class="agent-threads-tabs-root" value={props.activeId} onChange={openChosen}>
-            <SlidingTabs.List ref={list} class="agent-threads-tabs" aria-label={t("conversation.threads.open")}>
+            <SlidingTabs.List
+              ref={list}
+              class="agent-threads-tabs"
+              aria-label={props.tabText?.list ?? t("conversation.threads.open")}
+            >
               <span
                 class="ui-sliding-tabs-pill agent-threads-fill"
                 aria-hidden="true"
@@ -505,6 +511,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
                 {(thread) => (
                   <ThreadTab
                     thread={thread()}
+                    icon={props.tabIcon}
                     menuOpen={isMenuTarget(thread().id)}
                     onClose={() => closeTab(thread().id)}
                     onMove={(step) => move(thread().id, step)}
@@ -517,7 +524,10 @@ export function ThreadTabs(props: ThreadHeaderProps) {
           </SlidingTabs.Root>
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content class="agent-threads-tab-menu" aria-label={t("conversation.threads.actions")}>
+          <ContextMenu.Content
+            class="agent-threads-tab-menu"
+            aria-label={props.tabText?.actions ?? t("conversation.threads.actions")}
+          >
             <Show when={canRename()}>
               <ContextMenu.Item onSelectAfterClose={() => startRename(targetId())}>
                 <PencilLine class="agent-context-icon size-4" aria-hidden="true" />
@@ -544,12 +554,16 @@ export function ThreadTabs(props: ThreadHeaderProps) {
               <ArrowRightToLine class="agent-context-icon size-4" aria-hidden="true" />
               <span>{t("conversation.threads.closeRight")}</span>
             </ContextMenu.Item>
-            <Show when={isSide()}>
+            <Show when={isSide() && (props.onArchive !== undefined || canDelete())}>
               <ContextMenu.Separator />
-              <ContextMenu.Item disabled={targetBusy()} onSelect={() => props.onArchive(targetId())}>
-                <Archive class="agent-context-icon size-4" aria-hidden="true" />
-                <span>{t("conversation.threads.archive")}</span>
-              </ContextMenu.Item>
+              <Show when={props.onArchive}>
+                {(archive) => (
+                  <ContextMenu.Item disabled={targetBusy()} onSelect={() => archive()(targetId())}>
+                    <Archive class="agent-context-icon size-4" aria-hidden="true" />
+                    <span>{t("conversation.threads.archive")}</span>
+                  </ContextMenu.Item>
+                )}
+              </Show>
               <Show when={canDelete()}>
                 <ContextMenu.Item
                   class="ui-action-menu-danger"
@@ -577,8 +591,8 @@ export function ThreadTabs(props: ThreadHeaderProps) {
             class="agent-threads-rename"
             size="sm"
             dir="auto"
-            aria-label={t("conversation.threads.name")}
-            maxlength={INPUT_LIMITS.agentTaskTitle}
+            aria-label={props.tabText?.name ?? t("conversation.threads.name")}
+            maxlength={props.tabText?.limit ?? INPUT_LIMITS.agentTaskTitle}
             defaultValue={edit().title}
             style={renameStyle(edit())}
             onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLInputElement }) => {

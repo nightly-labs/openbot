@@ -214,10 +214,17 @@ const PROVIDER_EXECUTABLES: ReadonlySet<string> = new Set(["claude", "codex", "g
 const DEV_TOOLING =
   /(?:^|[/\s])(?:vite|electron-vite|esbuild|workerd|wrangler|dotenvx)(?:\s|$)|dev-services\.ts|bun --watch/;
 
+const SCRIPT_RUNNERS: ReadonlySet<string> = new Set(["node", "bun"]);
+
+function baseName(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+}
+
 export function classifyMemoryProcess(command: string): MemoryProcessKind {
-  const executable = command.trim().split(/\s+/)[0] ?? "";
-  const name = executable.slice(executable.lastIndexOf("/") + 1).toLowerCase();
+  const [executable = "", script = ""] = command.trim().split(/\s+/);
+  const name = baseName(executable);
   if (PROVIDER_EXECUTABLES.has(name)) return "provider";
+  if (SCRIPT_RUNNERS.has(name) && PROVIDER_EXECUTABLES.has(baseName(script))) return "provider";
   const chromium = classifyChromiumProcess(command);
   if (chromium !== "other") return chromium;
   return DEV_TOOLING.test(command) ? "dev-tooling" : "other";

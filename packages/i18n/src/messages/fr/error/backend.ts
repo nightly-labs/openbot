@@ -93,6 +93,8 @@ export const messages = {
     "Les membres de ce canal n’ont pas encore de conversation à compacter. Compactez-le après la réponse d’un membre dans le canal.",
   "error.backend.channelCompactNotSupported":
     "Aucun membre de ce canal ne peut compacter à la demande. Les membres qui le prennent en charge compactent leur contexte automatiquement quand il est presque plein.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Le fournisseur des membres du canal ne fonctionne pas pour le moment. Actualisez les fournisseurs, puis compactez à nouveau le canal.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
   "error.backend.channelArchiveRunning": "Arrêtez le travail en cours dans ce canal, puis supprimez-le.",
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
@@ -241,7 +243,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Cette attente n’est pas ouverte. L’agent l’a fermée, ou quelqu’un l’a annulée.",
   "error.backend.agentWaitNoRequest": "Une attente a besoin d’un message pour continuer. Ce tour n’a pas de message.",
   "error.backend.agentWaitOwnChatOnly":
-    "Ouvrez une attente uniquement dans votre propre discussion. Une tâche de canal ou de messagerie ne peut pas attendre.",
+    "Ouvrez une attente dans votre propre discussion ou dans un fil secondaire. Une conversation de canal ou de messagerie ne peut pas attendre.",
   "error.backend.agentWaitNoteRequired": "Indiquez une courte note qui précise l’objet de l’attente.",
   "error.backend.agentWaitRoutineGone": "Cet agent n’a pas de routine avec cet identifiant.",
   "error.backend.agentWaitNoRoutine":
@@ -261,6 +263,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot ne peut pas enregistrer cette configuration de serveur MCP.",
   "error.backend.mcpServerNoAnswer": "Le serveur n’a pas répondu en {seconds} secondes.",
   "error.backend.mcpSignInNotAccepted": "Le serveur n’a pas accepté cette connexion.",
+  "error.backend.mcpSignInGrantRefused":
+    "Le serveur n'a pas accepté la connexion. Reconnectez-vous. Si le problème persiste, vérifiez que votre compte est sur le même site ou la même région que cette app.",
   "error.backend.mcpSignInAccountRefused":
     "Le serveur a refusé le compte avec lequel vous vous êtes connecté. Vérifiez que ce compte peut utiliser le service. Pour utiliser un autre compte, déconnectez-vous, puis reconnectez-vous.",
   "error.backend.mcpSignInClientRefused":
@@ -285,6 +289,8 @@ export const messages = {
     "Ce serveur demande une connexion. Connectez-vous-y dans OpenBot sur l’ordinateur hôte.",
   "error.backend.mcpSignInNeedsHttps":
     "Ce serveur demande une connexion, et OpenBot ne se connecte qu’en https. Remplacez l’URL par {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Ce serveur ne permet la connexion qu’à {url}. Remplace l’URL par cette adresse, puis connecte-toi à nouveau.",
   "error.backend.mcpSignInCancelled": "La connexion a été annulée.",
   "error.backend.mcpSignInTimedOut": "La connexion n’a pas été terminée dans le navigateur.",
   "error.backend.mcpSignInRefused": "La page de connexion a refusé l’accès. Reconnectez-vous.",
@@ -354,6 +360,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Le dossier n’existe pas ou a déjà été supprimé.",
   "error.backend.libraryFolderOtherAgent": "Un fichier ne peut aller que dans un dossier de son agent.",
   "error.backend.libraryFolderMoveInvalid": "Ce dossier ne peut pas être déplacé ici.",
+  "error.backend.workflowFolderLimit": "Un serveur peut avoir jusqu’à {limit} dossiers de workflows.",
+  "error.backend.workflowFolderPlacementLimit": "Il y a trop de workflows dans les dossiers.",
   "error.backend.sectionNameDuplicate": "Les noms de section doivent être uniques.",
   "error.backend.directMessageRequired": "Écrivez d’abord un message.",
   "error.backend.directMessageTooLong": "Un message direct peut contenir jusqu’à {limit} caractères.",
@@ -389,6 +397,7 @@ export const messages = {
     "Seule l'app OpenBot du téléphone peut envoyer ce rapport, car elle ajoute la version et le journal d'assistance du téléphone. Ouvre cette discussion sur le téléphone. Si tu y vois ce message, mets à jour l'app du téléphone.",
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
+  "error.backend.apiKeyListFailed": "OpenBot n’a pas pu lire les clés d’API enregistrées.",
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
   "error.backend.apiKeySaving": "La clé d’API est déjà en cours d’enregistrement.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -478,6 +487,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Donnez un titre court à la tâche.",
   "error.backend.taskToolInvalid":
     "Donnez à la tâche un titre de 120 caractères au plus et des consignes qui disent quoi faire.",
+  "error.backend.taskControlInvalid":
+    "Indiquez le taskId d’une tâche que vous avez lancée. Un message doit aussi contenir du texte.",
   "error.backend.taskOwnChatOnly":
     "Lancez une tâche uniquement depuis votre propre discussion. Un canal, une conversation de messagerie ou une autre tâche ne peut pas en lancer.",
   "error.backend.taskUnfinishedLimit":
@@ -485,5 +496,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Cet agent a {count} tâches ouvertes. Fermez une tâche, puis lancez-en ou ouvrez-en une autre.",
   "error.backend.taskRemoteUnsupported": "Les tâches sont disponibles uniquement pour les agents de cet ordinateur.",
+  "error.backend.taskMessageFailed": "OpenBot n’a pas pu envoyer le message à la tâche. Réessayez plus tard.",
   "error.backend.taskStartFailed": "OpenBot n’a pas pu lancer la tâche. Faites plutôt le travail dans ce tour.",
 } as const satisfies PartialTranslation<typeof source>;

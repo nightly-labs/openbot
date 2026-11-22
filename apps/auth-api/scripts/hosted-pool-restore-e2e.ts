@@ -322,6 +322,7 @@ function world(options: { archiveKeys?: boolean } = {}) {
     t0,
     clock,
     alerts,
+    settle,
     sandboxes,
     machine,
     machineToken,
@@ -412,6 +413,15 @@ async function renewRestoresFromThePool() {
   const reportedRow = w.row(first.serverId);
   const reportedArchive = w.archiveRow(first.serverId);
   const retry = await w.poll(machine, POOL_RESTORE_VERSION, first.serverId);
+  await w.settle();
+  const restoredAlerts = w.alerts.filter((alert) => alert.startsWith("♻️ **Restored**"));
+  check(
+    "the restore report posts one Restored alert with the machine and the restore time",
+    restoredAlerts.length === 1 &&
+      restoredAlerts[0] ===
+        `♻️ **Restored** · standard server · ${first.serverId.slice(0, 8)} · machine ${machine} · 20 min`,
+    { alerts: w.alerts },
+  );
   check(
     "the restore report marks the archive restored and the server running, and a retry gets the same answer",
     report.state === "restored" &&

@@ -68,6 +68,11 @@ export const AGENT_SETTING_LINK_ROWS: Record<AgentSettingLinkId, AgentSettingLin
     page: "advanced",
     match: "agentSettings.quickAcknowledgement.title",
   },
+  "agent.builtin-memory": {
+    title: "agentSettings.builtinMemory.title",
+    page: "advanced",
+    match: "agentSettings.builtinMemory.title",
+  },
 };
 
 export function isAgentSettingLinkId(id: SettingLinkId): id is AgentSettingLinkId {

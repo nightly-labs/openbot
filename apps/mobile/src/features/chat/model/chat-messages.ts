@@ -3,6 +3,7 @@ import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type {
   AgentExchangeSummary,
   AttachmentSummary,
@@ -813,6 +814,7 @@ const projectedChannelMessages = new WeakMap<
     progress: boolean;
     replaced: boolean;
     run: RoutineRunStatus | null;
+    localize: (text: string) => string;
     rows: readonly ChatMessage[];
   }
 >();
@@ -824,6 +826,7 @@ function projectChannelMessage(
   progress: boolean,
   replaced: boolean,
   request: ReturnType<typeof channelRoutineRequest>,
+  localize: (text: string) => string,
 ): ChatMessage | null {
   if (request)
     return {
@@ -900,7 +903,7 @@ function projectChannelMessage(
     ...(self ? { mine: true } : {}),
     speaker: entry.author,
     superseded: entry.superseded,
-    body: entry.message.text,
+    body: coordinatorText(entry.author, entry.message.text, localize),
     streaming: entry.message.status === "streaming",
     status: entry.message.status,
     replyToMessageId: entry.message.replyToMessageId,
@@ -916,6 +919,7 @@ export function projectChannelMessages(
   messages: ChannelMessage[],
   tasks: readonly ChannelTask[],
   memberId: string | null,
+  localize: (text: string) => string,
   progressUpdates?: ProgressUpdates,
 ): ChatMessage[] {
   const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
@@ -963,10 +967,11 @@ export function projectChannelMessages(
         cached.latest === latest &&
         cached.progress === progress &&
         cached.replaced === replaced &&
-        cached.run === run
+        cached.run === run &&
+        cached.localize === localize
       )
         return cached.rows;
-      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced, request);
+      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced, request, localize);
       const rows: readonly ChatMessage[] = !message
         ? []
         : progress
@@ -980,7 +985,7 @@ export function projectChannelMessages(
               },
             ]
           : [message];
-      projectedChannelMessages.set(entry, { self, latest, progress, replaced, run, rows });
+      projectedChannelMessages.set(entry, { self, latest, progress, replaced, run, localize, rows });
       return rows;
     });
 }

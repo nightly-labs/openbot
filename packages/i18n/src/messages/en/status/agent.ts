@@ -152,7 +152,6 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultField.country": "Country code",
   "status.agent.vaultField.phone": "Phone",
   "status.agent.vaultField.email": "Email address",
-  "status.agent.finishCheckContinues": "The request is not finished yet. The agent continues ({current} of {limit}).",
   "status.agent.nextStepContinues": "The agent stopped before its next step. It continues ({current} of {limit}).",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
   "status.agent.planStopped": "The agent stopped with open steps in its plan. Send a message to continue.",
@@ -161,4 +160,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.providerExitContinues": "The agent stopped before it finished its answer. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
   "status.agent.importedChatTitle": "Imported chat",
+  "status.agent.takeoverLateCompleted":
+    "I finished the browser takeover in tab {tabId}. Take a fresh snapshot and continue.",
+  "status.agent.takeoverLateCancelled":
+    "I cancelled the browser takeover in tab {tabId}. Do not try it again until I ask.",
 });

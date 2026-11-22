@@ -1983,7 +1983,7 @@ button.chat-action-target:active,
   border-start-end-radius: var(--openbot-radius-sm);
 }
 
-.virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-agent:first-child)
+.virtual-chat-row[data-next-grouped="agent"]
   > .message-entry-agent:last-child
   .message-shell
   > .ui-bubble
@@ -1991,7 +1991,7 @@ button.chat-action-target:active,
   border-end-start-radius: var(--openbot-radius-sm);
 }
 
-.virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-user:first-child)
+.virtual-chat-row[data-next-grouped="user"]
   > .message-entry-user:last-child
   .message-stack
   > .ui-bubble:last-child

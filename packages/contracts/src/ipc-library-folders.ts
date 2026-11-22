@@ -178,6 +178,10 @@ function folderLevel(snapshot: LibraryFoldersSnapshot, folderId: string): number
   return libraryFolderPath(snapshot.folders, folderId).length;
 }
 
+function fitsFolder(agentId: string | null, folder: LibraryFolder): boolean {
+  return agentId === null || agentId === folder.agentId;
+}
+
 function placed(
   snapshot: LibraryFoldersSnapshot,
   fileIds: readonly string[],
@@ -188,7 +192,7 @@ function placed(
   for (const fileId of new Set(fileIds)) {
     const agentId = context.fileAgent(fileId);
     if (agentId === undefined) refuse("unknown-file");
-    if (agentId !== folder.agentId) refuse("other-agent");
+    if (!fitsFolder(agentId, folder)) refuse("other-agent");
     placement[fileId] = folder.id;
   }
   if (Object.keys(placement).length > LIBRARY_FOLDER_LIMITS.placements) refuse("file-limit");
@@ -295,7 +299,9 @@ export function applyLibraryFolderAction(
       const placement = { ...current.placement };
       for (const [fileId, folderId] of Object.entries(action.placement)) {
         const folder = byId.get(folderId);
-        if (!folder || placement[fileId] !== undefined || context.fileAgent(fileId) !== folder.agentId) continue;
+        if (!folder || placement[fileId] !== undefined) continue;
+        const agentId = context.fileAgent(fileId);
+        if (agentId === undefined || !fitsFolder(agentId, folder)) continue;
         placement[fileId] = folderId;
       }
       if (Object.keys(placement).length > LIBRARY_FOLDER_LIMITS.placements) refuse("file-limit");

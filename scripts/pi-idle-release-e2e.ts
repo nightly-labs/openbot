@@ -83,8 +83,12 @@ try {
   const resumedPid = await processOf(first);
   assert.ok(resumedPid && resumedPid !== firstPid, "The next turn starts a new process.");
   const entries = await readJsonl<LogEntry>(log);
-  const switched = entries.find((entry) => entry.pid === resumedPid && entry.event === "switch_session");
-  assert.equal(switched?.sessionFile, first, "The new process opens the same session file.");
+  const started = entries.find((entry) => entry.pid === resumedPid && entry.event === "start");
+  assert.equal(started?.sessionFile, first, "The new process starts on the same session file.");
+  assert.ok(
+    !entries.some((entry) => entry.pid === resumedPid && entry.event === "switch_session"),
+    "The new process does not replace its session, so Pi extensions start only once.",
+  );
   const prompted = entries.find((entry) => entry.pid === resumedPid && entry.event === "prompt");
   assert.equal(prompted?.sessionFile, first, "The prompt goes to the resumed session.");
   report.resumed = { pid: resumedPid, sessionFile: first };

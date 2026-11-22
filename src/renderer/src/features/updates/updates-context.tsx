@@ -84,9 +84,13 @@ const Updates = createSimpleContext({
       setStatus(await updatesPort().update.cancelIdleRestart());
     }
 
+    async function restartNow(): Promise<void> {
+      setStatus(await updatesPort().update.restartNow());
+    }
+
     createIdleRestartToast({ status, cancel: cancelIdleRestart });
 
-    return { status, runAction, cancelScheduledRestart, restartWhenIdle, cancelIdleRestart };
+    return { status, runAction, cancelScheduledRestart, restartWhenIdle, cancelIdleRestart, restartNow };
   },
 });
 

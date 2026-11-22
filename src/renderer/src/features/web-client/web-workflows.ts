@@ -1,17 +1,29 @@
 import {
   type AgentEvent,
   type AttachmentSummary,
+  decodeWorkflowFoldersSnapshot,
   STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
+  WORKFLOW_MEDIA_CATALOG_MAX,
+  type WorkflowFolderAction,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { decodeTeamProtocolV2Json, TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
+import {
+  WORKFLOW_FOLDERS_CAPABILITY,
+  WORKFLOW_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
+import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import {
+  WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
@@ -63,6 +75,7 @@ import {
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import {
+  decodeRemoteCreditMediaCredits,
   decodeRemoteHiggsfieldCredits,
   decodeRemoteHiggsfieldProviders,
   decodeRemoteMediaServiceAccounts,
@@ -161,6 +174,13 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     if (!has(WORKFLOWS_MEDIA_CAPABILITY)) throw tooOld();
     return post(path, decode, body);
   };
+  const foldersSupported = () => has(WORKFLOWS_CAPABILITY) && has(WORKFLOW_FOLDERS_CAPABILITY);
+  const postFolders = async (path: string, body: unknown) => {
+    if (!foldersSupported()) throw tooOld();
+    return post(path, decodeWorkflowFoldersSnapshot, body);
+  };
+  const folders = () => postFolders(WORKFLOW_FOLDERS_ROUTES.read, {});
+  const folderAction = (action: WorkflowFolderAction) => postFolders(WORKFLOW_FOLDERS_ROUTES.actions, action);
   const empty = () => undefined;
   const run = <T>(effect: (request: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
     runTeamEffect(Effect.suspend(() => effect(options.request())).pipe(Effect.mapError((error) => error.cause)));
@@ -172,6 +192,46 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     });
     return optionsCall;
   };
+  const serviceProviders = async () => {
+    if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+      const accounts = await post(
+        WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+        decodeRemoteMediaServiceAccounts,
+        {},
+      );
+      return workflowMediaProvidersOf(accounts);
+    }
+    const [sunra, higgsfield] = await Promise.all([
+      has(WORKFLOWS_SUNRA_CAPABILITY)
+        ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+        : { sunra: false },
+      has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
+        ? post(WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
+        : { higgsfield: false },
+    ]);
+    return { ...sunra, ...higgsfield, accounts: null };
+  };
+  const serviceCredits = async () => {
+    if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+      const accounts = await post(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits, decodeRemoteMediaServiceCredits, {});
+      return workflowMediaCreditsOf(accounts);
+    }
+    const [sunra, higgsfield] = await Promise.all([
+      has(WORKFLOWS_SUNRA_CAPABILITY)
+        ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+        : { sunra: null },
+      has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
+        ? post(WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
+        : { higgsfield: null },
+    ]);
+    return { ...sunra, ...higgsfield, accounts: null };
+  };
+  const serviceCatalog = async () =>
+    has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+      ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+      : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+        ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+        : { models: [] };
 
   return {
     workflows: {
@@ -204,56 +264,36 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       githubRunLastEvent: (input) =>
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
       keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
-      mediaProviders: async () => {
-        if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
-          const accounts = await post(
-            WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
-            decodeRemoteMediaServiceAccounts,
-            {},
-          );
-          return workflowMediaProvidersOf(accounts);
-        }
-        const [sunra, higgsfield] = await Promise.all([
-          has(WORKFLOWS_SUNRA_CAPABILITY)
-            ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
-            : { sunra: false },
-          has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
-            ? post(WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
-            : { higgsfield: false },
-        ]);
-        return { ...sunra, ...higgsfield, accounts: null };
-      },
+      mediaProviders: async () => ({
+        ...(await serviceProviders()),
+        ...(has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY) ? { openbot: true } : {}),
+      }),
       mediaCredits: async () => {
-        if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
-          const accounts = await post(
-            WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
-            decodeRemoteMediaServiceCredits,
-            {},
-          );
-          return workflowMediaCreditsOf(accounts);
-        }
-        const [sunra, higgsfield] = await Promise.all([
-          has(WORKFLOWS_SUNRA_CAPABILITY)
-            ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
-            : { sunra: null },
-          has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
-            ? post(WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
-            : { higgsfield: null },
+        const [services, credit] = await Promise.all([
+          serviceCredits(),
+          has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY)
+            ? post(WORKFLOWS_CREDIT_MEDIA_ROUTES.credits, decodeRemoteCreditMediaCredits, {})
+            : {},
         ]);
-        return { ...sunra, ...higgsfield, accounts: null };
+        return { ...services, ...credit };
       },
-      mediaCatalog: async () =>
-        has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
-          ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-          : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+      mediaCatalog: async () => {
+        const [credit, services] = await Promise.all([
+          has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY)
+            ? post(WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
             : { models: [] },
+          serviceCatalog(),
+        ]);
+        return { models: [...credit.models, ...services.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX) };
+      },
       mediaPrice: async (input) =>
         has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
           ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
           : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
             ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
             : { credits: null },
+      folders,
+      folderAction,
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -266,6 +306,13 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         reconnect();
       };
     },
+    foldersSupported,
+    folders,
+    folderAction,
+    onFoldersChanged: (changed) =>
+      options.onHostEvent((event) => {
+        if (event.type === "workflow-folders-changed") changed();
+      }),
     async places() {
       if (!placesSupported()) return [];
       const connections = await connectionOptions();
@@ -342,6 +389,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
     mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
     agentFilesSupported: () => has(WORKFLOWS_AGENT_FILES_CAPABILITY),
+    answersSupported: () => has(WORKFLOWS_ANSWERS_CAPABILITY),
     stepSettingsSupported: () => has(WORKFLOWS_STEP_SETTINGS_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl(attachmentId) {

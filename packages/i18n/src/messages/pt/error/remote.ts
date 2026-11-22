@@ -26,12 +26,16 @@ export const messages = {
     "O computador anfitrião não permitiu que o OpenBot grave a tela. Conceda a permissão de gravação de tela no computador anfitrião e tente novamente.",
   "error.remote.windowsSessionDisconnected":
     "A sessão do Windows no computador anfitrião está desconectada, então não há tela para compartilhar. Entre no Windows na tela do computador anfitrião e tente novamente.",
+  "error.remote.windowsCaptureDenied":
+    "O Windows no computador anfitrião não permite que o OpenBot grave a tela. Desbloqueie o Windows na tela do computador anfitrião, feche qualquer aviso de administrador e tente novamente. Se o problema continuar, reinicie o computador anfitrião.",
   "error.remote.macScreenLocked":
     "O Mac está bloqueado, então não pode compartilhar a tela. Desbloqueie o Mac na tela dele e tente novamente.",
   "error.remote.streamTooSlowLowerQuality":
     "A conexão com o computador anfitrião está lenta demais para a imagem. Tente novamente: a próxima conexão usará uma qualidade mais baixa.",
   "error.remote.streamTooSlow":
     "A conexão com o computador anfitrião está lenta demais para a imagem. Use uma rede mais rápida e tente novamente.",
+  "error.remote.noPictureSwitchEncoder":
+    "O computador anfitrião não enviou nenhuma imagem. Tente novamente: a próxima conexão usa uma configuração de vídeo que funciona em mais computadores.",
   "error.remote.teamSessionExpired": "A sessão da equipe expirou.",
   "error.remote.finishTestBeforeSwitch": "Conclua o teste de área de trabalho remota antes de trocar de tela.",
   "error.remote.displayNotFound": "Tela remota não encontrada.",

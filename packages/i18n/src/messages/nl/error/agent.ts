@@ -57,6 +57,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Het gekozen model van de agent is niet beschikbaar.",
   "error.agent.modelProviderNotConnected":
     "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} is niet verbonden.",
+  "error.agent.modelProviderSignInRequired":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} vraagt om aanmelding. Meld je aan bij {provider} en probeer het opnieuw.",
+  "error.agent.modelProviderNotInstalled":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} is niet geïnstalleerd.",
+  "error.agent.modelProviderOutdated":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} heeft een update nodig.",
   "error.agent.modelListEmpty":
     "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} gaf geen modellen. Laatste fout: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -164,6 +170,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Wat berichten doen terwijl de agent werkt, kun je alleen instellen op de computer waarop de agent draait.",
   "error.agent.backupModelsLocalOnly": "Reservemodellen kun je alleen instellen op de computer waarop de agent draait.",
+  "error.agent.backupModelsAtLimit":
+    "Geen reservemodel kan het nu overnemen: elk model heeft zijn gebruikslimiet bereikt of is kort geleden mislukt. Modellen van één account kunnen een limiet delen. Voeg een reservemodel van een andere provider of een ander account toe om nu verder te gaan, of wacht tot de limiet wordt hersteld.",
   "error.agent.taskLimitLocalOnly": "De takenlimiet kun je alleen instellen op de computer waarop de agent draait.",
   "error.agent.localScriptsOff": "Deze agent staat geen lokale scripts toe.",
   "error.agent.localScriptsRateLimited":

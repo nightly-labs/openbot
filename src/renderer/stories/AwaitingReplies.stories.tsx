@@ -91,6 +91,19 @@ export const ChannelSubtasks: Story = {
   },
 };
 
+export const StopAskedRequest: Story = {
+  args: {
+    onStop: fn(),
+    stopDisplay: "icon",
+    items: [
+      researchReplied,
+      { id: "reply-sales", agent: sales, name: sales.name, state: "working", stoppable: false },
+      { id: "reply-support", name: "Support", state: "asked" },
+      { id: "reply-design", name: "Design Review", state: "stopped", stoppable: false },
+    ],
+  },
+};
+
 export const NeedsApproval: Story = {
   args: {
     onOpenAgent: fn(),

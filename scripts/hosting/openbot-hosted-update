@@ -87,7 +87,7 @@ install_packages() {
   done <"$1"
   [ "${#missing[@]}" -eq 0 ] && return 0
   dpkg --configure -a
-  apt-get -o DPkg::Lock::Timeout=600 update
+  apt-get -o DPkg::Lock::Timeout=600 -o Acquire::AllowReleaseInfoChange::Label=true update
   for package in "${missing[@]}"; do
     if available_package "$package"; then
       available+=("$package")
@@ -223,6 +223,11 @@ allow_sandbox_capabilities() {
   echo "The AppArmor rule for the Claude sandbox is not installed." >&2
 }
 
+apparmor_predates_abi_4() {
+  [ ! -e /etc/apparmor.d/abi/4.0 ] && command -v apparmor_parser >/dev/null &&
+    ! apparmor_parser --skip-kernel-load --skip-cache "$1" >/dev/null 2>&1
+}
+
 install_hosting() {
   local source=$1 user file unit changed=0
   user=$(<"$INSTALL/hosted/service-user")
@@ -231,10 +236,16 @@ install_hosting() {
     install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
     mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
   done
-  install -m 0644 "$source/openbot-hosted.apparmor" /etc/apparmor.d/openbot-hosted
+  if apparmor_predates_abi_4 "$source/openbot-hosted.apparmor"; then
+    rm -f /etc/apparmor.d/openbot-hosted
+  else
+    install -m 0644 "$source/openbot-hosted.apparmor" /etc/apparmor.d/openbot-hosted
+  fi
   if command -v apparmor_parser >/dev/null && [ -d /sys/kernel/security/apparmor ]; then
-    apparmor_parser --replace /etc/apparmor.d/openbot-hosted ||
-      echo "The AppArmor profile is not loaded." >&2
+    if [ -e /etc/apparmor.d/openbot-hosted ]; then
+      apparmor_parser --replace /etc/apparmor.d/openbot-hosted ||
+        echo "The AppArmor profile is not loaded." >&2
+    fi
     allow_sandbox_capabilities
   fi
   for unit in "${UNITS[@]}"; do

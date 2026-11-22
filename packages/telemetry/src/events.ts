@@ -90,7 +90,7 @@ export const ANALYTICS_GENERATIONS = {
   desktop_host: 21,
   desktop: 13,
   web: 2,
-  mobile: 4,
+  mobile: 5,
 } as const satisfies Record<Report["surface"], number>;
 
 const FAILURE_CODES = new Set([
