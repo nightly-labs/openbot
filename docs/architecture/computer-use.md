@@ -141,6 +141,17 @@ Because the driver draws no cursor, its motion styles do not apply. The renderer
 min-jerk glide, or a wide swoop for a move over 900 points. The tap does not delay a request, so the
 cursor shows where an action went, from 180 ms to about 1.1 s after the driver acts.
 
+On macOS the daemon gets `CUA_DRIVER_KEEP_DISPLAY_AWAKE=0`, and OpenBot keeps the display awake
+itself. The driver's own guard holds `PreventUserIdleDisplaySleep` until 600 s after the last tool
+call, and `end_session` counts as a call, so the display stayed on for up to 10 minutes after the
+agent stopped, against the user's display sleep setting. The tap reports each provider tool call.
+`ComputerUseDisplayAwake` (`computer-use-display-awake.ts`) then holds Electron's
+`prevent-display-sleep` blocker, the same assertion, while a turn runs. It releases it when no turn
+runs, or 600 s after the last call, so the display never stays on longer than with the driver's
+guard. A call outside a turn takes no hold. The guard exists because display sleep locks the
+session, and a locked session gives Computer Use no windows and no input. OpenBot's own
+`list_windows` reads for the highlight go to the daemon socket, not to the tap, so they take no hold.
+
 Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 `CUA_DRIVER_RS_UPDATE_CHECK=0`. OpenBot ships the driver, so its vendor analytics are not something
 a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot
