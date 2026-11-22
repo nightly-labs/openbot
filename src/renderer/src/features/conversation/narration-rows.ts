@@ -31,7 +31,7 @@ export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef
 export function naturalThreadRows(
   messages: readonly AgentMessage[],
   provider: AgentProviderRef | undefined,
-  activeTurnId: string | null | undefined,
+  held: (message: AgentMessage) => boolean,
 ): AgentMessage[] {
   const turns: AgentMessage[][] = [];
   const listed = messages.flatMap((message) => {
@@ -40,10 +40,6 @@ export function naturalThreadRows(
     turns.push(rows);
     return rows;
   });
-  const held = (message: AgentMessage) =>
-    heldWhileWritten(message) &&
-    Boolean(activeTurnId) &&
-    (message.turnId === undefined || message.turnId === activeTurnId);
   return placeUpdatesAfterSteers(listed, turns).filter((message) => !held(message));
 }
 
@@ -123,14 +119,4 @@ function turnSteerTimes(rows: readonly AgentMessage[]): Map<string, string> {
     if (steerAt !== undefined) steerTimes.set(turnId, steerAt);
   }
   return steerTimes;
-}
-
-export function heldWhileWritten(message: AgentMessage): boolean {
-  return (
-    message.author === "agent" &&
-    message.streaming === true &&
-    message.kind === "text" &&
-    !message.imageGeneration &&
-    !message.videoGeneration
-  );
 }

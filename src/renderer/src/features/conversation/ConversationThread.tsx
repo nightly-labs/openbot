@@ -32,6 +32,7 @@ import { narrationRows, naturalThreadRows } from "./narration-rows";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { withQuestionContext } from "./stores/scroll-store";
 import { createTurnSteps } from "./turn-steps";
+import { createTurnStreamHold } from "./turn-stream-hold";
 import { useTurnTrace } from "./turn-trace";
 
 export function ConversationThread() {
@@ -101,11 +102,10 @@ export function ConversationThread() {
     [],
     { key: "id" },
   );
+  const streamHeld = createTurnStreamHold(() => props.threads?.open?.activeTurnId);
   const shownMessages = createMemo(() =>
     withQuestionContext(
-      props.responseStyle === "natural"
-        ? naturalThreadRows(messages, props.agent?.provider, props.threads?.open?.activeTurnId)
-        : messages,
+      props.responseStyle === "natural" ? naturalThreadRows(messages, props.agent?.provider, streamHeld) : messages,
       messages,
       props.prompt?.turnId,
       (thinking) => narrationRows(thinking, props.agent?.provider),

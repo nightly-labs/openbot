@@ -920,7 +920,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
-                  label={activityLabel()}
+                  label={rotatingActivityLabel}
                   detail={t("chat.activity.backgroundWork")}
                   since={since()}
                 />
