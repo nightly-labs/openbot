@@ -339,7 +339,16 @@ export function createMainWindowController({
       getServices()?.browser.releaseUserControlHeldBy({ kind: "local" });
       if ((process.platform === "darwin" || keepRunningInBackground()) && !isQuitting()) {
         event.preventDefault();
-        window.hide();
+        // On macOS a hidden full-screen window leaves its space open, and the space shows black
+        // (#14749). The window leaves full screen first, as closing it would.
+        if (window.isFullScreen()) {
+          window.once("leave-full-screen", () => {
+            if (!window.isDestroyed()) window.hide();
+          });
+          window.setFullScreen(false);
+        } else {
+          window.hide();
+        }
       }
     });
     window.on("show", () => onHiddenWhileWorking(false));
