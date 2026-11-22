@@ -49,6 +49,7 @@ import {
   type WorkflowVersion,
   type WorkflowVersionInput,
   workflowAnswerFieldsOf,
+  workflowAnswerSources,
   workflowCatalogMediaModel,
   workflowCatalogSource,
   workflowCheckPasses,
@@ -137,11 +138,13 @@ import {
   modelAnswerAsk,
   readAnswer,
   readableAnswerInputs,
+  runInputProblems,
   stepAnswer,
   stepAnswerGap,
   type TemplateReader,
   templateValues,
   webhookAnswerEvent,
+  withRunAnswerSpec,
 } from "./workflow-answers";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
@@ -1608,6 +1611,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               const detail = yield* attempt(() => detailOf(input.workflowId));
               const from = input.fromNodeId ? detail.graph.nodes.find((node) => node.id === input.fromNodeId) : null;
               if (from === undefined) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
+              const given = runInput?.trim() ? runInput : null;
+              const triggers = from ? [from] : detail.graph.nodes;
+              const problems =
+                given === null
+                  ? []
+                  : triggers.flatMap((node) => (node.kind === "trigger" ? runInputProblems(node, given) : []));
+              if (problems.length > 0)
+                return yield* refuse(
+                  "refused",
+                  sourceText("error.workflow.runInputInvalid", { fields: answerProblemNames(problems) }),
+                );
               const { run } = yield* begin(detail, from, {
                 source: "manual",
                 scheduledFor: null,
@@ -2049,6 +2063,16 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               const node = detail.graph.nodes.find((candidate) => candidate.id === input.nodeId);
               if (!node) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               if (unsupportedNode(node)) return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));
+              const settled = runs.latestSettled(input.workflowId);
+              const sourceIds = [
+                ...detail.graph.edges.flatMap((edge) => (edge.to === node.id ? [edge.from] : [])),
+                ...workflowAnswerSources(detail.graph, node.id).map((source) => source.node.id),
+              ];
+              const ended = (id: string) => {
+                const status = settled.get(id)?.status;
+                return status === "failed" || status === "stopped";
+              };
+              if (sourceIds.some(ended)) return yield* refuse("refused", sourceText("error.workflow.sourceNotDone"));
               const answered = runs.latestDone(input.workflowId);
               const inputs = soloInputs(detail.graph, node.id, answered);
               const step = yield* attempt(() =>
@@ -2113,9 +2137,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 return yield* refuse("refused", sourceText("error.workflow.notRetryable"));
               const run = failed.runId ? runs.run(failed.runId) : null;
               const current = (yield* attempt(() => detailOf(failed.workflowId))).graph;
-              const node =
-                current.nodes.find((candidate) => candidate.id === failed.nodeId && candidate.kind === failed.kind) ??
-                run?.graph.nodes.find((candidate) => candidate.id === failed.nodeId);
+              const ranNode = run?.graph.nodes.find((candidate) => candidate.id === failed.nodeId);
+              const currentNode = current.nodes.find(
+                (candidate) => candidate.id === failed.nodeId && candidate.kind === failed.kind,
+              );
+              const node = currentNode ? withRunAnswerSpec(currentNode, ranNode) : ranNode;
               if (!node) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               if (run && runs.reopenRun(run.id, now())) changed(run.workflowId);
               const graph = run?.graph ?? current;

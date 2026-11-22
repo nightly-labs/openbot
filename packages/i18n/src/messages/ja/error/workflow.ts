@@ -26,6 +26,10 @@ export const messages = {
     "このワークフローの回答フィールドにここで問題があります: {fields}。ワークフローを修正してから、ステップをもう一度実行してください。",
   "error.workflow.answerSourceEnded":
     "これらのフィールドには値がありません。値を渡すステップが完了しなかったためです: {fields}。先にそのステップをもう一度実行してください。",
+  "error.workflow.runInputInvalid":
+    "実行の入力がトリガーの回答フィールドに合いません: {fields}。これらのフィールドを持つ JSON オブジェクトを 1 つ送信してください。",
+  "error.workflow.sourceNotDone":
+    "前のステップが前回の実行で失敗したか停止しました。先にそのステップをもう一度実行してください。",
   "error.workflow.checkInvalid": "このステップのチェックが無効です。修正してから、ステップをもう一度実行してください。",
   "error.workflow.modelFailed": "モデルが回答できませんでした。ステップをもう一度実行してください。",
   "error.workflow.modelTimedOut":

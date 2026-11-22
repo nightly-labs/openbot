@@ -25,6 +25,10 @@ export const messages = {
     "Los campos de respuesta de este flujo de trabajo tienen un problema aquí: {fields}. Corrige el flujo de trabajo y vuelve a ejecutar el paso.",
   "error.workflow.answerSourceEnded":
     "Estos campos no tienen valor porque el paso que los da no terminó: {fields}. Primero vuelve a ejecutar ese paso.",
+  "error.workflow.runInputInvalid":
+    "La entrada de la ejecución no coincide con los campos de respuesta del disparador: {fields}. Envía un objeto JSON con estos campos.",
+  "error.workflow.sourceNotDone":
+    "Un paso anterior falló o se detuvo la última vez que se ejecutó. Primero vuelve a ejecutar ese paso.",
   "error.workflow.checkInvalid": "La comprobación de este paso no es válida. Corrígela y ejecuta el paso de nuevo.",
   "error.workflow.modelFailed": "El modelo no pudo responder. Ejecuta el paso de nuevo.",
   "error.workflow.modelTimedOut":

@@ -153,6 +153,22 @@ export function readAnswer(fields: readonly WorkflowAnswerField[], text: string)
   return problems.length > 0 ? { problems } : { output: JSON.stringify(answer) };
 }
 
+export function runInputProblems(trigger: WorkflowNode, input: string): WorkflowAnswerValueProblem[] {
+  const fields = workflowAnswerFieldsOf(trigger);
+  if (fields.length === 0) return [];
+  const record = lastJsonObject(input);
+  if (!record) return [{ name: fields.map((field) => field.name).join(", "), problem: "json" }];
+  const given = Object.hasOwn(record, "data") ? record.data : record;
+  return checkWorkflowAnswer(fields, given, "refuseMiscased").problems;
+}
+
+export function withRunAnswerSpec(node: WorkflowNode, runNode: WorkflowNode | undefined): WorkflowNode {
+  if (!runNode || runNode.kind !== node.kind) return node;
+  const spec = runNode.fields[WORKFLOW_ANSWER_FIELD];
+  const fields = Object.fromEntries(Object.entries(node.fields).filter(([name]) => name !== WORKFLOW_ANSWER_FIELD));
+  return { ...node, fields: spec === undefined ? fields : { ...fields, [WORKFLOW_ANSWER_FIELD]: spec } };
+}
+
 export function answerProblemNames(problems: readonly WorkflowAnswerValueProblem[]): string {
   return problems.map((problem) => problem.name).join(", ");
 }

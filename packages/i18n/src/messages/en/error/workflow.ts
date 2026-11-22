@@ -22,6 +22,10 @@ export const messages = defineMessages("error.workflow", {
     "The answer fields of this workflow have a problem here: {fields}. Correct the workflow, then run the step again.",
   "error.workflow.answerSourceEnded":
     "These fields have no value, because the step that gives them did not finish: {fields}. Run that step again first.",
+  "error.workflow.runInputInvalid":
+    "The run input does not fit the answer fields of the trigger: {fields}. Send one JSON object with these fields.",
+  "error.workflow.sourceNotDone":
+    "A step before this one failed or stopped the last time it ran. Run that step again first.",
   "error.workflow.checkInvalid": "The check of this step is not valid. Correct it, then run the step again.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
   "error.workflow.modelTimedOut":
