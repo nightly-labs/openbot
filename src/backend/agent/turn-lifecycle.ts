@@ -262,6 +262,7 @@ export interface TurnHooks {
   turnModel(agentId: string, turnId: string): string | null;
   mayFailOver(agentId: string): boolean;
   backupReadyAt(agentId: string): number | null;
+  backupsAtLimit(agentId: string): boolean;
   poolHasOtherAccount(agentId: string): boolean;
   mayContinueOnBackup(agentId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
@@ -1731,10 +1732,23 @@ export class TurnLifecycle {
         }
         const taskId =
           notification.method === "error" && agentId && threadId ? this.#taskForThread(agentId, threadId) : null;
+        const backupsAtLimit =
+          notification.method === "error" &&
+          context.causeCode === "usage_limit" &&
+          agentId !== undefined &&
+          this.#hooks.backupsAtLimit(agentId);
+        if (backupsAtLimit)
+          logger.warn("A usage limit stopped an agent, and no backup model can take over.", {
+            agentId,
+            provider: source.provider,
+            model: context.model,
+            message: this.#hooks.redactMcp(message),
+          });
+        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : message;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
-          this.#hooks.taskFailed(taskId, message);
-        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context, link);
+          this.#hooks.taskFailed(taskId, shown);
+        } else this.#hooks.emitError(`agent_${notification.method}`, shown, agentId, context, link);
       }
     }
   }).bind(this);

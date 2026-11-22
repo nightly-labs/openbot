@@ -1883,6 +1883,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         backupReadyAt: (agentId) => this.#backupReadyAt(agentId),
+        backupsAtLimit: (agentId) => this.#backupsAtLimit(agentId),
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
@@ -4148,6 +4149,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
         )
         .map(usageLimitOf),
+    );
+  }
+
+  #backupsAtLimit(agentId: string): boolean {
+    const agent = this.#store.get(agentId);
+    if (!agent?.backupModels?.automatic || this.#mayFailOver(agentId)) return false;
+    const current = agentModelChoice(agent);
+    const backups = agent.backupModels.order.filter((choice) => !sameAgentModelChoice(choice, current));
+    return (
+      backups.length > 0 &&
+      backups.every((choice) => {
+        const limit = usageLimitOf(choice);
+        return this.#usageLimits.isLimited(limit) || this.#usageLimits.isFailed(limit);
+      })
     );
   }
 
