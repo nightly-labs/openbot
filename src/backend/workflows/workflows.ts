@@ -1434,6 +1434,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         });
 
         const sweepOnce = Effect.fn("Workflows.sweepOnce")(function* () {
+          for (const stepId of queuedSteps) if (runs.step(stepId)?.status !== "running") queuedSteps.delete(stepId);
           const runIds = new Set<string>();
           for (const run of runs.openRuns()) {
             runIds.add(run.id);

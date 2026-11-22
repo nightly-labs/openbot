@@ -166,7 +166,8 @@ export function RunStepStatus({ step }: { step: WorkflowStep | undefined }) {
     "--openbot-danger-text",
   ]);
   const status = step?.status;
-  const elapsed = useElapsed(status === "running" ? (step?.startedAt ?? null) : null);
+  const timed = status === "running" && !step?.waiting;
+  const elapsed = useElapsed(timed ? (step?.startedAt ?? null) : null);
   const took = step?.startedAt && step.endedAt ? formatRunDuration(step.startedAt, step.endedAt, t) : null;
   const label = step ? t(stepStatusLabel(step)) : t("mobile.workflow.status.notRun");
   const icon =
@@ -195,7 +196,7 @@ export function RunStepStatus({ step }: { step: WorkflowStep | undefined }) {
         numberOfLines={1}
         style={[typeScale.small, { fontVariant: ["tabular-nums"] }]}
       >
-        {status === "running" ? (elapsed ?? label) : status === "done" ? (took ?? label) : label}
+        {timed ? (elapsed ?? label) : status === "done" ? (took ?? label) : label}
       </Typography.Paragraph>
     </View>
   );

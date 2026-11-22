@@ -1547,7 +1547,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       shown.filter((entry) => entry.status === status).map((entry) => entry.id);
     for (const status of ["approval", "failed", "running"] as const) {
       const ids = find(status);
-      const id = ids[0];
+      const id = ids.find((candidate) => !waitingOf(candidate)) ?? ids[0];
       if (id !== undefined) return { id, status, waiting: waitingOf(id), name: stepName(id), more: ids.length - 1 };
     }
     return undefined;

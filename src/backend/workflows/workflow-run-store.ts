@@ -493,7 +493,7 @@ export class WorkflowRunStore {
     workflowId: string,
     before: string | undefined,
     limit: number,
-    shown: (step: StoredWorkflowStep) => WorkflowStep = publicStep,
+    shown: (step: StoredWorkflowStep) => WorkflowStep,
   ): WorkflowRunPage {
     const db = this.#database.connection;
     const cursor = before === undefined ? null : runCursor(before);
