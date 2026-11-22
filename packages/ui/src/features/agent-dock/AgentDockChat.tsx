@@ -449,7 +449,12 @@ export function AgentDockChat(props: {
                         >
                           <div class="agent-dock-visual">
                             <p class="agent-dock-text">{message.body}</p>
-                            <Button variant="secondary" size="sm" onClick={() => props.onOpenInMain()}>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              aria-label={t("agent.dock.openPage", { title: message.body })}
+                              onClick={() => props.onOpenInMain()}
+                            >
                               {t("common.open")}
                             </Button>
                           </div>
