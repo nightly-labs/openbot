@@ -35,6 +35,7 @@ import type {
   AgentTasksSnapshot,
   AgentTaskWindow,
   AgentWaitsSnapshot,
+  ArchivedAgentTasksPage,
   AskSideQuestionInput,
   AttachmentDataInput,
   AvatarImageInput,
@@ -72,6 +73,7 @@ import type {
   GenerateAgentProfileInput,
   HiddenAgentsSnapshot,
   HostAnalyticsInput,
+  ListArchivedAgentTasksInput,
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   LocalBrowserSecretResponse,
@@ -6154,6 +6156,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listTasks(agentId: string): AgentTasksSnapshot {
     return this.#tasks.snapshot(agentId);
+  }
+
+  listArchivedTasks(input: ListArchivedAgentTasksInput): ArchivedAgentTasksPage {
+    return this.#tasks.archivedPage(input.agentId, input.before);
   }
 
   readTask(agentId: string, taskId: string): ConversationSnapshot {

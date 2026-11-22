@@ -124,6 +124,21 @@ export interface AgentTaskInput {
   taskId: string;
 }
 
+export interface ArchivedAgentTasksCursor {
+  updatedAt: string;
+  threadId: string;
+}
+
+export interface ListArchivedAgentTasksInput {
+  agentId: string;
+  before: ArchivedAgentTasksCursor | null;
+}
+
+export interface ArchivedAgentTasksPage {
+  tasks: AgentTask[];
+  hasMore: boolean;
+}
+
 export interface ReadAgentTaskPageInput extends AgentTaskInput {
   beforeMessageId: string;
   limit: number;
@@ -228,6 +243,20 @@ export function isAgentTaskBranch(value: unknown): value is AgentTaskBranch {
     isNullableBoundedString(value.sourceTitle, INPUT_LIMITS.agentTaskTitle) &&
     isIdentifier(value.sourceMessageId) &&
     isIdentifier(value.throughMessageId)
+  );
+}
+
+export function isArchivedAgentTasksCursor(value: unknown): value is ArchivedAgentTasksCursor {
+  return isDynamicRecord(value) && isBoundedString(value.updatedAt, 160) && isIdentifier(value.threadId);
+}
+
+export function isArchivedAgentTasksPage(value: unknown): value is ArchivedAgentTasksPage {
+  return (
+    isDynamicRecord(value) &&
+    Array.isArray(value.tasks) &&
+    value.tasks.length <= INPUT_LIMITS.agentTasks &&
+    value.tasks.every((task) => isAgentTask(task) && task.state === "closed") &&
+    typeof value.hasMore === "boolean"
   );
 }
 

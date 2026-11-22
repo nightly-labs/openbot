@@ -3,6 +3,7 @@ import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CODECS } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
+import { AGENT_ARCHIVED_THREADS_CODECS } from "./agent-archived-threads-v1";
 import { AGENT_BACKUP_MODELS_CODECS } from "./agent-backup-models-v1";
 import { AGENT_BUILTIN_MEMORY_CODECS } from "./agent-builtin-memory-v1";
 import { AGENT_COLORS_CODECS } from "./agent-colors-v1";
@@ -267,6 +268,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ACCOUNT_KEYS_CODECS,
   ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,
+  ...AGENT_ARCHIVED_THREADS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_THREAD_REQUESTS_CODECS,
   ...AGENT_ACTIVE_QUEUES_CODECS,

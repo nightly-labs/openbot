@@ -1,11 +1,13 @@
 import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
 import { feedbackSentIssue, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AcpRegistryEntry,
   AgentProviderRef,
   AgentSessionSettings,
   CreateAgentInput,
   HiddenAgentsSnapshot,
+  ListArchivedAgentTasksInput,
   McpSignInApp,
   McpSignInAppState,
   ServerNotificationLevel,
@@ -44,6 +46,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type ArchivedAgentTasksPage,
   type AttachmentImportEvent,
   type AvatarHue,
   agentAccessAuditChanges,
@@ -932,12 +935,33 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const taskUnread = new Map<string, number>(Object.entries(options.taskUnread ?? {}));
   const branches = new Map<string, AgentTask>();
 
+  const newestTaskFirst = (left: AgentTask, right: AgentTask) =>
+    right.updatedAt.localeCompare(left.updatedAt) || left.threadId.localeCompare(right.threadId);
+
   function taskList(agentId: string): AgentTasksSnapshot {
     const list = tasks.get(agentId) ?? [];
+    const archived = list.filter((task) => task.closedAt).sort(newestTaskFirst);
     return {
       agentId,
-      tasks: clone([...list.filter((task) => !task.closedAt), ...list.filter((task) => task.closedAt)]),
+      tasks: clone([...list.filter((task) => !task.closedAt), ...archived].slice(0, INPUT_LIMITS.agentTasks)),
       limit: agentTaskLimitOf(agentId),
+    };
+  }
+
+  function archivedTaskPage(input: ListArchivedAgentTasksInput): ArchivedAgentTasksPage {
+    const { before } = input;
+    const archived = (tasks.get(input.agentId) ?? [])
+      .filter((task) => task.closedAt)
+      .sort(newestTaskFirst)
+      .filter(
+        (task) =>
+          !before ||
+          task.updatedAt < before.updatedAt ||
+          (task.updatedAt === before.updatedAt && task.threadId > before.threadId),
+      );
+    return {
+      tasks: clone(archived.slice(0, INPUT_LIMITS.agentTasks)),
+      hasMore: archived.length > INPUT_LIMITS.agentTasks,
     };
   }
 
@@ -3278,6 +3302,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listWaits: async (agentId) => ({ agentId, waits: [] }),
       cancelWait: async () => undefined,
       listTasks: async (agentId) => taskList(agentId),
+      listArchivedTasks: async (input) => archivedTaskPage(input),
       readTask: async (input) => {
         const conversation = taskConversation(findTask(input.agentId, input.taskId));
         return clone({ ...conversation, messages: conversation.messages.slice(-100) });

@@ -335,6 +335,7 @@ export type TeamApiAgentTasks = Pick<
   AgentService,
   | "listAgents"
   | "listTasks"
+  | "listArchivedTasks"
   | "readTask"
   | "readTaskPage"
   | "readTaskAround"
