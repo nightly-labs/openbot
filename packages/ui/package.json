@@ -102,6 +102,7 @@
     "./features/billing/StorageTierDialog": "./src/features/billing/StorageTierDialog.tsx",
     "./features/billing/storage-tier-dialog.css": "./src/features/billing/storage-tier-dialog.css",
     "./features/credits/BuyCreditsPage": "./src/features/credits/BuyCreditsPage.tsx",
+    "./features/credits/CreditActivitySection": "./src/features/credits/CreditActivitySection.tsx",
     "./features/credits/CreditIcon": "./src/features/credits/CreditIcon.tsx",
     "./features/credits/CreditsSection": "./src/features/credits/CreditsSection.tsx",
     "./features/credits/CreditTargetSelect": "./src/features/credits/CreditTargetSelect.tsx",

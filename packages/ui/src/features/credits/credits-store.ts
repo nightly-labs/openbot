@@ -1,4 +1,5 @@
 import type {
+  CreditActivity,
   CreditCheckoutRequest,
   CreditServerWallet,
   CreditsState,
@@ -12,6 +13,7 @@ import { createStripeReturnLoad } from "../billing/billing-store";
 
 export interface CreditsCalls {
   getState: () => Promise<CreditsState>;
+  getActivity: () => Promise<CreditActivity>;
   openCheckout: (request: CreditCheckoutRequest) => Promise<void>;
   transfer: (request: CreditTransferRequest) => Promise<CreditsState>;
 }
@@ -30,6 +32,8 @@ interface CreditsStoreState {
   credits: CreditsState | null;
   checkout: CreditsCheckout | null;
   added: { serverId: string | null; credits: number; nonce: number } | null;
+  activity: CreditActivity | null;
+  activityFailed: boolean;
 }
 
 export function creditsBalance(credits: CreditsState | null, serverId: string | null): number {
@@ -47,6 +51,7 @@ export function createCreditsStore(
   calls: () => CreditsCalls | undefined,
   isActive: () => boolean,
   onChange?: (credits: CreditsState) => void,
+  options: { activity?: boolean } = {},
 ) {
   const [state, setState] = createStore<CreditsStoreState>({
     loading: false,
@@ -55,6 +60,8 @@ export function createCreditsStore(
     credits: null,
     checkout: null,
     added: null,
+    activity: null,
+    activityFailed: false,
   });
   let addedNonce = 0;
 
@@ -79,6 +86,21 @@ export function createCreditsStore(
     onChange?.(credits);
   }
 
+  async function loadActivity(api: CreditsCalls) {
+    if (!options.activity) return;
+    try {
+      const activity = await api.getActivity();
+      setState((draft) => {
+        draft.activity = activity;
+        draft.activityFailed = false;
+      });
+    } catch {
+      setState((draft) => {
+        draft.activityFailed = true;
+      });
+    }
+  }
+
   const load = createStripeReturnLoad({
     available: () => calls() !== undefined,
     isActive,
@@ -91,7 +113,8 @@ export function createCreditsStore(
       try {
         const api = calls();
         if (!api) return;
-        apply(await api.getState());
+        const [credits] = await Promise.all([api.getState(), loadActivity(api)]);
+        apply(credits);
       } catch (error) {
         setState((draft) => {
           const text = currentText();
@@ -109,7 +132,10 @@ export function createCreditsStore(
     });
     try {
       const credits = await call(api);
-      if (credits) apply(credits);
+      if (credits) {
+        apply(credits);
+        void loadActivity(api);
+      }
       return true;
     } catch (error) {
       const text = currentText();

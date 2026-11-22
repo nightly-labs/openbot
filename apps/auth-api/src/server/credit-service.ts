@@ -3,6 +3,7 @@ import {
   CREDIT_LOOKUP_KEYS,
   CREDIT_METADATA,
   CREDIT_METADATA_KIND,
+  type CreditActivity,
   type CreditCheckoutRequest,
   type CreditServerRole,
   type CreditServerWallet,
@@ -27,6 +28,7 @@ import {
 } from "./billing-errors";
 import { paymentReversal } from "./billing-sales";
 import { checkoutTax } from "./billing-tax";
+import { creditActivity } from "./credit-activity";
 import { CreditAudit, creditAuditCode } from "./credit-audit";
 import { consumeGrantsSql, creditExpiring, expiringGrantsSql, moveGrantsSql } from "./credit-grants";
 import { availableTenthsSql, overdueGrantTenthsSql } from "./credit-spending";
@@ -240,6 +242,10 @@ export class CreditService {
     if (expiring) state.expiring = expiring;
     return state;
   }).bind(this);
+
+  activity(userId: string): Effect.Effect<CreditActivity, Failure> {
+    return creditActivity(this.#database, userId);
+  }
 
   createCheckout(input: CreditCheckoutInput): Effect.Effect<{ url: string }, Failure> {
     const { user, request } = input;

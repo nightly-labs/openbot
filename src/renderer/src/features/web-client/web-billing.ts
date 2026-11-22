@@ -1,6 +1,6 @@
 import { parseBillingSessionUrl, parseBillingState } from "@openbot/contracts/billing";
 import { parseBillingDetails } from "@openbot/contracts/billing-details";
-import { parseCreditCheckoutUrl, parseCreditsState } from "@openbot/contracts/credits";
+import { parseCreditActivity, parseCreditCheckoutUrl, parseCreditsState } from "@openbot/contracts/credits";
 import {
   PRICING_ORDER_PARAMS,
   type PricingOrder,
@@ -95,6 +95,11 @@ export function createWebCreditsCalls(
 
   return {
     getState: () => state("v1/me/credits"),
+    async getActivity() {
+      const activity = await request("v1/me/credits/activity", parseCreditActivity);
+      if (!activity) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+      return activity;
+    },
     async openCheckout(checkout) {
       const url = await request("v1/me/credits/checkout", parseCreditCheckoutUrl, JSON.stringify(checkout));
       if (!url) throw new Error(currentText().sourceText("error.billing.notStripePage"));
