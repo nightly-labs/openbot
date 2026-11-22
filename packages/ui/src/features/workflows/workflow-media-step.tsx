@@ -10,6 +10,7 @@ import {
   WORKFLOW_MEDIA_SIZE_MIN,
   WORKFLOW_VIDEO_DURATIONS,
   WORKFLOW_VIDEO_VOICES,
+  type WorkflowFields,
   type WorkflowMediaAspect,
   type WorkflowMediaInput,
   type WorkflowMediaKind,
@@ -248,7 +249,11 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   const customAllowed = () => kind() === "image" && sizeHost();
   const hostAspect = (frame: Frame) =>
     sizeHost() || WORKFLOW_MEDIA_LEGACY_ASPECTS.some((legacy) => legacy === frame) ? frame : "";
-  const [duration, setDuration] = useField<number>(key, "duration", WORKFLOW_VIDEO_DURATIONS[0], asSeconds);
+  const [, setDuration] = useField<number>(key, "duration", WORKFLOW_VIDEO_DURATIONS[0], asSeconds);
+  const storedDuration = (): WorkflowFields => {
+    const seconds = asSeconds(board.field(id, "duration"));
+    return seconds === undefined ? {} : { duration: seconds };
+  };
   const [resolution, setResolution] = useField<string>(key, "resolution", "720p", asText);
   const [background, setBackground] = useField<Background>(key, "background", "solid", oneOf(BACKGROUNDS));
   const [optionsField] = useField(key, "options", "", asString);
@@ -268,7 +273,7 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
         aspect: hostAspect(aspect()),
         width: board.field(id, "width") ?? 0,
         height: board.field(id, "height") ?? 0,
-        duration: duration(),
+        ...storedDuration(),
         resolution: resolution(),
         background: background(),
         options: optionsField(),
@@ -290,6 +295,7 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   const mode = () => specs().options.find((entry) => entry.name === WORKFLOW_MEDIA_MODE_OPTION)?.value ?? "";
   const setMode = (value: string) => setOption(WORKFLOW_MEDIA_MODE_OPTION, value);
   const mediaInputs = () => shownMediaInputs(model(), mode());
+  const frameCount = () => (kind() === "video" ? model()?.frameCount : undefined);
   const resolutions = () => resolutionsBySize(workflowMediaResolutions(model(), kind()));
   const durations = () => workflowVideoDurations(model());
   const price = useMediaPrice(() => {
@@ -393,6 +399,7 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     mode,
     setMode,
     mediaInputs,
+    frameCount,
     price,
     total,
     batch,

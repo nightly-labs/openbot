@@ -44,6 +44,7 @@ function clipLabel(t: AppTranslate, inputs: readonly WorkflowMediaInput[]) {
 function videoPorts(
   t: AppTranslate,
   inputs: readonly WorkflowMediaInput[],
+  frameCount: number | undefined,
   connected: (type: "image" | "file", branch?: string) => boolean,
 ): readonly WfnInputPort[] {
   const shows = (input: WorkflowMediaInput, type: "image" | "file", branch?: string) =>
@@ -54,7 +55,7 @@ function videoPorts(
     ...(shows("frames", "image", "firstFrame")
       ? [{ type: "image" as const, branch: "firstFrame", label: t("workflow.video.role.first") }]
       : []),
-    ...(shows("frames", "image", "lastFrame")
+    ...((frameCount !== 1 && inputs.includes("frames")) || connected("image", "lastFrame")
       ? [{ type: "image" as const, branch: "lastFrame", label: t("workflow.video.role.last") }]
       : []),
     ...(shows("references", "image") ? [{ type: "image" as const, label: t("workflow.video.role.reference") }] : []),
@@ -208,7 +209,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
         inputs={["text", "image"]}
         inputPorts={
           kind() === "video"
-            ? videoPorts(t, step.mediaInputs(), (type, branch) => board.connected(props.id, "in", type, branch))
+            ? videoPorts(t, step.mediaInputs(), step.frameCount(), (type, branch) =>
+                board.connected(props.id, "in", type, branch),
+              )
             : undefined
         }
         output={kind() === "video" ? "file" : "image"}

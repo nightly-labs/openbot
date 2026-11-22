@@ -3,7 +3,13 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { CreditMediaJobRequest, CreditMediaModel } from "@openbot/contracts/credit-media";
-import type { WorkflowMediaKind, WorkflowMediaSpecs } from "@openbot/contracts/ipc";
+import {
+  isWorkflowMediaCatalogModel,
+  type WorkflowMediaKind,
+  type WorkflowMediaSpecs,
+  workflowCatalogMediaModel,
+  workflowMediaSpecs,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
 import {
@@ -200,6 +206,25 @@ async function flow() {
       entry("video-refs")?.inputs?.join(",") === "references" &&
       entry("video-frames")?.inputs?.join(",") === "frames",
     catalog,
+  );
+
+  const videoFrames = entry("video-frames");
+  const videoModel = videoBoth ? workflowCatalogMediaModel(videoBoth) : null;
+  const unsetLength = workflowMediaSpecs({ media: "video" }, "video", videoModel).duration;
+  const chosenLength = workflowMediaSpecs({ media: "video", duration: 8 }, "video", videoModel).duration;
+  check(
+    "the catalog gives the model default length and frame count, and a step with no length uses the model default",
+    videoBoth?.defaultDuration === 5 &&
+      videoBoth.frameCount === 2 &&
+      videoFrames?.frameCount === 1 &&
+      entry("video-refs")?.frameCount === undefined &&
+      videoModel?.frameCount === 2 &&
+      unsetLength === 5 &&
+      chosenLength === 8 &&
+      isWorkflowMediaCatalogModel(videoBoth) &&
+      isWorkflowMediaCatalogModel(videoFrames) &&
+      !isWorkflowMediaCatalogModel({ ...videoFrames, frameCount: 3 }),
+    { videoBoth, videoFrames, unsetLength, chosenLength },
   );
 
   const sameImage = await generate({

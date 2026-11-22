@@ -83,6 +83,8 @@ export interface WorkflowImageModel {
   voices?: boolean;
   aspects?: readonly WorkflowMediaAspect[];
   durations?: readonly number[];
+  defaultDuration?: number;
+  frameCount?: number;
   resolutions?: readonly string[];
   transparent?: boolean;
   options?: readonly WorkflowMediaOption[];

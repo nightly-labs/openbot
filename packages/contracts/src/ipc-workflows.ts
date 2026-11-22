@@ -103,10 +103,12 @@ export interface WorkflowMediaModel {
   voices: boolean;
   aspects?: readonly WorkflowMediaAspect[];
   durations?: readonly number[];
+  defaultDuration?: number;
   resolutions?: readonly string[];
   transparent?: boolean;
   options?: readonly WorkflowMediaOption[];
   inputs?: readonly WorkflowMediaInput[];
+  frameCount?: number;
   modes?: readonly WorkflowMediaMode[];
 }
 
@@ -270,7 +272,10 @@ export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
   return fields.media === "video" ? "video" : "image";
 }
 
-type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent" | "options">;
+type WorkflowMediaRange = Pick<
+  WorkflowMediaModel,
+  "aspects" | "durations" | "defaultDuration" | "resolutions" | "transparent" | "options"
+>;
 
 export function workflowMediaAspects(
   model: WorkflowMediaRange | null | undefined,
@@ -380,7 +385,8 @@ export function workflowMediaSpecs(
     ? nearestAspect(aspects, size)
     : (aspects.find((value) => value === fields.aspect) ?? aspects[0] ?? "1:1");
   const durations = workflowVideoDurations(model);
-  const asked = typeof fields.duration === "number" ? fields.duration : WORKFLOW_VIDEO_DURATIONS[0];
+  const asked =
+    typeof fields.duration === "number" ? fields.duration : (model?.defaultDuration ?? WORKFLOW_VIDEO_DURATIONS[0]);
   const duration = durations.reduce(
     (best, value) => (Math.abs(value - asked) < Math.abs(best - asked) ? value : best),
     durations[0] ?? WORKFLOW_VIDEO_DURATIONS[0],
@@ -1254,12 +1260,16 @@ export interface WorkflowMediaCatalogModel {
   kinds: readonly WorkflowMediaKind[];
   aspects: readonly WorkflowMediaAspect[];
   durations: readonly number[];
+  defaultDuration?: number;
   resolutions: readonly string[];
   transparent: boolean;
   options?: readonly WorkflowMediaOption[];
   inputs?: readonly WorkflowMediaInput[];
+  frameCount?: number;
   modes?: readonly WorkflowMediaMode[];
 }
+
+export const WORKFLOW_MEDIA_FRAME_COUNT_MAX = 2;
 
 export interface WorkflowMediaCatalog {
   models: readonly WorkflowMediaCatalogModel[];
@@ -1281,6 +1291,9 @@ export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMe
       isOneOf(WORKFLOW_MEDIA_ASPECTS, entry),
     ) &&
     isListOf(value.durations, WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX, isCreditCount) &&
+    (value.defaultDuration === undefined || isCreditCount(value.defaultDuration)) &&
+    (value.frameCount === undefined ||
+      (isCreditCount(value.frameCount) && value.frameCount <= WORKFLOW_MEDIA_FRAME_COUNT_MAX)) &&
     isListOf(value.resolutions, 16, (entry): entry is string =>
       isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
     ) &&
@@ -1344,10 +1357,14 @@ export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): Wor
     voices: false,
     aspects: entry.aspects,
     ...(kind === "video" ? { durations: entry.durations } : {}),
+    ...(kind === "video" && entry.defaultDuration !== undefined && entry.durations.includes(entry.defaultDuration)
+      ? { defaultDuration: entry.defaultDuration }
+      : {}),
     resolutions: entry.resolutions,
     transparent: kind === "image" && entry.transparent,
     ...(entry.options?.length ? { options: entry.options } : {}),
     ...(kind === "video" && entry.inputs ? { inputs: entry.inputs } : {}),
+    ...(kind === "video" && entry.frameCount !== undefined ? { frameCount: entry.frameCount } : {}),
     ...(kind === "video" && entry.modes?.length ? { modes: entry.modes } : {}),
   };
 }

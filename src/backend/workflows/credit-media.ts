@@ -104,6 +104,8 @@ function workflowInputs(model: CreditMediaModel): WorkflowMediaInput[] {
 
 export function creditWorkflowModel(model: CreditMediaModel): WorkflowMediaCatalogModel {
   const inputs = workflowInputs(model);
+  const durations = model.kind === "video" ? model.durations.filter((value) => Number.isSafeInteger(value)) : [];
+  const defaultDuration = durations.find((value) => value === model.defaultDuration);
   return {
     id: creditWorkflowModelId(model.id),
     provider: "openbot",
@@ -112,7 +114,8 @@ export function creditWorkflowModel(model: CreditMediaModel): WorkflowMediaCatal
     maker: model.maker,
     kinds: [model.kind],
     aspects: workflowAspects(model),
-    durations: model.kind === "video" ? model.durations.filter((value) => Number.isSafeInteger(value)) : [],
+    durations,
+    ...(defaultDuration === undefined ? {} : { defaultDuration }),
     resolutions: defaultFirst(model.resolutions, model.defaultResolution),
     transparent: false,
     ...(model.audio
@@ -123,6 +126,7 @@ export function creditWorkflowModel(model: CreditMediaModel): WorkflowMediaCatal
         }
       : {}),
     ...(inputs.length > 0 ? { inputs } : {}),
+    ...(model.kind === "video" && model.frames > 0 ? { frameCount: model.frames } : {}),
   };
 }
 
