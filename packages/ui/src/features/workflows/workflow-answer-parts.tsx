@@ -1,9 +1,4 @@
-import {
-  parseWorkflowAnswerSpec,
-  type WORKFLOW_ANSWER_FIELD,
-  WORKFLOW_CHECK_FIELD,
-  type WorkflowAnswerProblem,
-} from "@openbot/contracts/ipc";
+import { type WORKFLOW_ANSWER_FIELD, WORKFLOW_CHECK_FIELD, type WorkflowAnswerProblem } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { ListChecks, Popover, Textarea, TriangleAlert } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
@@ -97,32 +92,6 @@ export function AnswerAction(props: { id: string; field: AnswerKey; locked: bool
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-    </Show>
-  );
-}
-
-export function AnswerSummary(props: { id: string; field: AnswerKey }) {
-  const board = useBoard();
-  const { t } = useText();
-  const [value] = useAnswerText(() => props.id, props.field);
-  const text = () => {
-    const spec = value().trim();
-    if (!spec || board.catalogs().answers !== true) return "";
-    if (props.field === WORKFLOW_CHECK_FIELD) return spec;
-    const names = parseWorkflowAnswerSpec(spec).fields.map((field) => field.name);
-    return names.length > 0 ? names.join(", ") : spec;
-  };
-  return (
-    <Show when={text()}>
-      {(shown) => (
-        <p class="wfn-answer-summary">
-          <ListChecks class="wfn-answer-summary-icon" aria-hidden="true" />
-          <span class="sr-only">
-            {props.field === WORKFLOW_CHECK_FIELD ? t("workflow.check.title") : t("workflow.answer.title")}
-          </span>
-          <span class="wfn-answer-summary-text">{shown()}</span>
-        </p>
-      )}
     </Show>
   );
 }
