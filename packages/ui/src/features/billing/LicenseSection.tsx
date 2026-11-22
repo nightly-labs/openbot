@@ -4,7 +4,6 @@ import {
   type BillingSubscriptionStatus,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
-import type { BillingDetails } from "@openbot/contracts/billing-details";
 import {
   LICENSE_INCLUDED_USERS,
   LICENSE_MAX_USERS,
@@ -63,14 +62,7 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { guessHostedCurrency, HOSTED_BILLING_CURRENCY, HostedBillingSwitch } from "../servers/HostedServerPricing";
-import {
-  type BillingDetailsCalls,
-  type BillingDetailsDraft,
-  BillingDetailsFields,
-  billingDetailsDraft,
-  billingDetailsRequest,
-  saveBillingDetails,
-} from "./BillingDetailsFields";
+import { type BillingDetailsCalls, BillingDetailsFields, createBillingDetailsForm } from "./BillingDetailsFields";
 import type { LicenseStore } from "./license-store";
 import { formatMinorMoney } from "./money";
 
@@ -673,57 +665,6 @@ function BuyLicenseDialog(props: {
       </div>
     </ConfirmDialog>
   );
-}
-
-function createBillingDetailsForm(calls: () => BillingDetailsCalls | undefined) {
-  const { t, errorMessage } = useText();
-  const [saved, setSaved] = createSignal<BillingDetails | null>(null);
-  const [draft, setDraft] = createSignal<BillingDetailsDraft>(billingDetailsDraft(null));
-  const [edited, setEdited] = createSignal(false);
-  const [saving, setSaving] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-  const api = untrack(calls);
-  const loaded: Promise<string | null> = api
-    ? api.getDetails().then(
-        (details) => {
-          setSaved(details);
-          if (!untrack(edited)) setDraft(billingDetailsDraft(details));
-          return details.country;
-        },
-        () => null,
-      )
-    : Promise.resolve(null);
-  async function save(): Promise<boolean> {
-    const current = calls();
-    if (!current) return true;
-    if (!billingDetailsRequest(draft())) {
-      setError(t("billing.details.countryMissing"));
-      return false;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      setSaved(await saveBillingDetails(current, saved(), draft()));
-      return true;
-    } catch (failure) {
-      setError(errorMessage(failure, t("billing.details.saveFailed")));
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }
-  return {
-    draft,
-    saving,
-    error,
-    loaded,
-    save,
-    edit: (next: BillingDetailsDraft) => {
-      setEdited(true);
-      setError(null);
-      setDraft(next);
-    },
-  };
 }
 
 function Quote(props: { plan: LicensePlan; users: number; currency: BillingCurrency }): JSX.Element {

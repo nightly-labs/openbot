@@ -143,6 +143,8 @@ export const messages = {
     "Les modifications de l’identité du serveur ne sont pas prises en charge par cette connexion.",
   "error.team.hostUpdateUnsupported": "Les mises à jour de l’hôte ne sont pas prises en charge par cette connexion.",
   "error.team.hostTimezoneUnsupported": "Cette connexion ne prend pas en charge le fuseau horaire du serveur.",
+  "error.team.hostVoiceModelUnsupported":
+    "Cette connexion ne prend pas en charge le modèle de reconnaissance vocale du serveur.",
   "error.team.hostRestartUnsupported": "Cette connexion ne prend pas en charge le redémarrage du serveur.",
   "error.team.ownerTransferUnsupported": "Ce serveur ne prend pas en charge le transfert de propriété.",
   "error.team.hostKeyRotationUnsupported": "Cette connexion ne prend pas en charge le changement de clé du serveur.",
@@ -162,6 +164,8 @@ export const messages = {
     "Cette connexion ne prend pas en charge l’option de configuration Claude Code.",
   "error.team.claudeCompactWindowUnsupported":
     "Cette connexion ne prend pas en charge la taille de compactage de Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Cette connexion ne prend pas en charge le compactage avant l’expiration du cache.",
   "error.team.providerEnvironmentUnsupported": "Cette connexion ne prend pas en charge les variables de fournisseur.",
   "error.team.modelVisibilityUnsupported": "Cette connexion ne prend pas en charge la liste des modèles.",
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",

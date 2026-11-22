@@ -32,6 +32,7 @@ import {
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -848,6 +849,7 @@ export class TeamWebRtcHostPeer {
             memoryChanges: peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
             usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
             usageGroups: peerCapabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
+            usageReadFailed: peerCapabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY),
             agentPendingRuntime: peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
             queueHold: peerCapabilities.has(QUEUE_HOLD_CAPABILITY),
             queueHoldSignIn: peerCapabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
@@ -923,6 +925,7 @@ export class TeamWebRtcHostPeer {
                 backgroundWork: this.#peerCapabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
                 usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
                 usageGroups: this.#peerCapabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
+                usageReadFailed: this.#peerCapabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY),
                 agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
                 queueHold: this.#peerCapabilities.has(QUEUE_HOLD_CAPABILITY),
                 queueHoldSignIn: this.#peerCapabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),

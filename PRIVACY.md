@@ -82,6 +82,15 @@ after no use, starts, becomes ready after a start, changes its machine, stops at
 It also sends these events for a license: a Checkout starts, the license starts, its number of
 users goes up or down, its renewal is cancelled or resumed, it ends, or its payment succeeds, fails,
 is refunded or is disputed.
+It also sends an event when your OpenBot credits change: a credits Checkout starts, is paid or
+expires, a refund or a lost dispute takes credits back, you move credits to or from a server, a
+license gives free monthly credits or they expire, or a workflow step that uses OpenBot credits
+starts, is charged or ends with no charge. A credits event has your account ID (for a server step
+that no member started, or a server's free credits, the account ID of the server owner), whether
+the credits are personal or a server's, the number of credits, the currency and amount of a
+payment, and for a generation the model, its kind (image or video), the resolution, duration,
+number of results and audio setting that the step asked for, and the outcome. It does not have the
+prompt, the pictures, the result, the job, or the server ID.
 Each event has your account ID and only fixed values: the action, whether it is a server plan or a
 license, the plan, the number of license users, the billing period, the currency, the amount that
 Stripe reports, the place in the app where the plans were opened, the server size, the start reason,
@@ -89,7 +98,7 @@ how long a start took, and an error code. It has
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 When you pay for a plan or a license (it starts, each payment succeeds, it changes, or its renewal
-is cancelled or resumed), the account service also sets your normalized account email on the OpenPanel
+is cancelled or resumed), or when you buy credits, the account service also sets your normalized account email on the OpenPanel
 profile of your account ID, as the apps do at sign-in. It does this also when product analytics is
 off on your devices, so that the paid account is not anonymous in the sales data. The email is not
 copied into the events.
@@ -450,6 +459,32 @@ The service stores:
   and whether it ends at the period end. For a license, it keeps the same fields and the number of
   users in place of the plan. The service also keeps the ID, type and receive time of each
   Stripe webhook event for 7 days, to ignore a repeated event. These records hold no card data.
+- OpenBot credits: for each credit purchase, the Stripe Checkout Session ID, the account, the server
+  that gets the credits (when one is selected), the number of credits, the currency, the amount, the
+  Stripe payment ID, the status and the times. For each purchase, move, reversal, use, free monthly
+  grant and expiry, the service keeps a ledger entry: the amount, the account or server whose balance changes, the account that
+  made the change, and the time. A balance is the sum of its entries. Deleting the account removes
+  its purchases and the entries of its own balance. The entries of a server stay with the server,
+  without the ID of the deleted account. For each image or video that OpenBot credits pay for, the
+  service keeps a hold record: the job ID, the account or server that pays, the account that started
+  it, the model, the credits held and charged, the result (completed, failed, canceled, refused or
+  expired), the job ID of the media generation processor, and the times. It keeps no prompt, picture
+  or result file. Deleting the account removes the hold records of its own balance. For the free
+  monthly credits of a paid license, it keeps a grant record: the license, the account or server that
+  has them, the credits given and left, and the start and end times. Deleting the account removes the
+  grant records of its own balance.
+  Settings > Billing shows an account the ledger entries and holds of its own balance and of the
+  servers where it is a member. The owner and the admins of a server see all of the server's entries,
+  with the names of the accounts that acted. Other members see only the entries that they made. No
+  email address is shown.
+  The service also keeps a credit audit record for each credit change and each failed credit action:
+  checkouts that open or expire, purchases, moves, reversals, free credits, holds, starts, charges and
+  releases, and refused checkouts, moves and generations. A record has the action, the result and the
+  error code, the account or server, the account that acted, the credits, the model, the job, Checkout
+  Session or Stripe object ID, and for a generation that the processor refused, the HTTP status and error
+  code of the processor. It keeps no prompt, picture, result file, card data or email address. The
+  service deletes a record after 400 days. Deleting the account removes the records of its own balance,
+  and removes the account from the records of a server.
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
   Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
   deletes them after the end of the next year.
@@ -1529,6 +1564,18 @@ Higgsfield's `balance` tool, which spends no credits. It shows the number only i
 each member of a joined server who can use workflows can see it. Higgsfield's own privacy policy
 covers what Higgsfield keeps.
 
+A step with an OpenBot model uses OpenBot credits. When the computer is signed in to an OpenBot
+account, the credits of that account pay; a server pays with its own credits. The computer sends the
+prompt, the model, the size settings and the input pictures to the account service
+(`openbot.run`). The account service holds the credits, sends the same values to a media generation
+processor, and returns the result file to the computer, which keeps it. The account service passes
+the prompt, the pictures and the file through in transit only: it does not store or log them. It
+keeps only the hold record above. A failed or refused generation spends no credits. A stop does not
+cancel a generation that was sent: when the run stops or the app closes, the job continues, and the
+computer gets the file when the job ends or at its next start. While the Canvas page is open, the computer also asks the account service for the OpenBot models, their
+prices in credits and the credit balance. Each member of a joined server who can use workflows can
+see them.
+
 While the Canvas page is open, the computer also asks Sunra and Higgsfield for their model lists, and
 for the price of the model and the settings of an image or video step. A price request sends the
 model, the size settings and a fixed sample prompt. It sends no prompt of the user and no picture,
@@ -1579,6 +1626,10 @@ message. The answers go from the computer to the Slack Web API directly.
   files from its workspace or the OpenBot shared directory to a channel that OpenBot is a member of,
   and list those channels' names. A new post can ping a user that it mentions, never a channel,
   `@here`, `@everyone` or a user group.
+  In answers, status posts and posts, redacted means that text in a known key format, such as an
+  API key, a token or a private key, is removed, and a saved secret that stands alone is removed.
+  A saved secret that is part of a word, an email address or a site name is sent as written.
+  Approval requests have all known secrets and email addresses removed.
 
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
 agents work. The agents run on the host with the access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,

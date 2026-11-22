@@ -301,10 +301,14 @@ export const messages = {
   "provider.settings.cache": "Pamięć podręczna",
   "provider.settings.promptCache": "Pamięć podręczna promptów",
   "provider.settings.promptCacheDescription":
-    "Jak długo Claude trzyma kontekst agenta w pamięci podręcznej między turami.",
+    "Jak długo Claude i Pi trzymają kontekst agenta w pamięci podręcznej między turami.",
   "provider.settings.promptCacheHour": "1 godzina",
-  "provider.settings.promptCacheDefault": "Domyślne Claude Code",
+  "provider.settings.promptCacheDefault": "Domyślne ustawienie dostawcy",
   "provider.settings.promptCacheLoadFailed": "Nie udało się wczytać czasu pamięci podręcznej promptów tego serwera.",
+  "provider.settings.cacheExpiryCompaction": "Kompaktuj przed wygaśnięciem pamięci podręcznej",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Gdy czat z kontekstem 200K lub więcej tokenów jest nieaktywny z pamięcią podręczną na 1 godzinę, agent kompaktuje kontekst przed jej wygaśnięciem. Wtedy następna wiadomość nie czyta całego kontekstu ponownie bez pamięci podręcznej.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Nie udało się wczytać ustawienia kompaktowania tego serwera.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Używaj mojej konfiguracji Claude Code",
   "provider.settings.claudeUserSetupDescription":

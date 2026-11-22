@@ -143,7 +143,7 @@ export function WorkflowMediaComposer(props: {
   });
 
   const pictures = () => step.inputs().filter((source) => step.inputUrl(source) !== undefined);
-  const ready = () => !step.busy() && step.runnable() && !step.locked() && step.model() !== undefined;
+  const ready = () => !step.busy() && step.runnable() && !step.locked() && !step.short() && step.model() !== undefined;
   takeKey(
     isEscape,
     (target) => section?.contains(target) === true,

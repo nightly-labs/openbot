@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "チャットで開く",
   "conversation.threads.archive": "アーカイブ",
   "conversation.threads.archived": "アーカイブ済み",
+  "conversation.threads.archivedOlder": "以前のスレッドを表示",
   "conversation.threads.restore": "復元",
   "conversation.threads.deleteUndo.title": "{title} を削除しました",
   "conversation.threads.hold.threadLimit": { other: "空きを待っています。実行中のスレッド: {count} 件" },

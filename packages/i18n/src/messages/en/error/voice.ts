@@ -11,6 +11,9 @@ export const messages = defineMessages("error.voice", {
   "error.voice.prepareRequired":
     "Local voice transcription is unavailable. Run `bun run voice:prepare` and restart OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot could not transcribe this recording.",
+  "error.voice.videoModelMissing": "No speech recognition model for recordings is set up in Settings → Voice.",
+  "error.voice.videoModelMissingServer":
+    "No speech recognition model is set up on this server. An owner or an admin can set up a model in the server settings, in Speech recognition.",
   "error.voice.cloud.keyRequired": "Add your {provider} API key in Settings → Voice.",
   "error.voice.cloud.keyRejected": "{provider} did not accept the API key. Check the key in Settings → Voice.",
   "error.voice.cloud.quotaExceeded": "Your {provider} quota is used up.",

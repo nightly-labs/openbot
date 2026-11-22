@@ -369,10 +369,14 @@ export const messages = {
   "provider.settings.cache": "ذاكرة التخزين المؤقت",
   "provider.settings.promptCache": "ذاكرة التخزين المؤقت للموجّه",
   "provider.settings.promptCacheDescription":
-    "المدة التي يحتفظ فيها Claude بسياق الوكيل في ذاكرة التخزين المؤقت بين الأدوار.",
+    "المدة التي يحتفظ فيها Claude وPi بسياق الوكيل في ذاكرة التخزين المؤقت بين الأدوار.",
   "provider.settings.promptCacheHour": "ساعة واحدة",
-  "provider.settings.promptCacheDefault": "الافتراضي في Claude Code",
+  "provider.settings.promptCacheDefault": "الإعداد الافتراضي للمزوّد",
   "provider.settings.promptCacheLoadFailed": "تعذّر تحميل مدة ذاكرة التخزين المؤقت للموجّه لهذا الخادم.",
+  "provider.settings.cacheExpiryCompaction": "الضغط قبل انتهاء ذاكرة التخزين المؤقت",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "عندما تكون محادثة ذات سياق من 200 ألف رمز أو أكثر خاملة مع ذاكرة تخزين مؤقت لمدة ساعة، يضغط الوكيل السياق قبل انتهاء ذاكرة التخزين المؤقت. عندها لا تقرأ الرسالة التالية السياق الكامل مرة أخرى بدون ذاكرة تخزين مؤقت.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "تعذّر تحميل إعداد الضغط لهذا الخادم.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "استخدام إعداد Claude Code الخاص بي",
   "provider.settings.claudeUserSetupDescription":

@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "פתיחה בצ'אט",
   "conversation.threads.archive": "העברה לארכיון",
   "conversation.threads.archived": "בארכיון",
+  "conversation.threads.archivedOlder": "הצגת שרשורים ישנים יותר",
   "conversation.threads.restore": "שחזור",
   "conversation.threads.deleteUndo.title": "{title} נמחק",
   "conversation.threads.hold.threadLimit": {

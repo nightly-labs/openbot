@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { composedCustomModelId } from "@openbot/contracts/ipc";
 import {
   CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderConfig,
@@ -26,6 +27,7 @@ const EFFORT = "high";
 const OTHER_ENDPOINT = "lab";
 const OTHER_MODEL = "lab-model";
 const REPLY = "e2e reply";
+const VENDOR_MODEL = "@cf/openai/gpt-oss-120b";
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-mistral-"));
 
 interface CapturedRequest {
@@ -308,6 +310,33 @@ try {
   }
   assert.ok(models.includes(`${ENDPOINT}/${MODEL}`), `mistral: OpenCode did not list ${MODEL}: ${listed.stderr}`);
   assert.ok(models.includes(`${OTHER_ENDPOINT}/${OTHER_MODEL}`), `mistral: OpenCode did not list ${OTHER_MODEL}`);
+
+  const vendor = configFor([
+    { ...endpoint("https://api.mistral.ai/v1"), models: [{ id: VENDOR_MODEL, name: VENDOR_MODEL }] },
+  ]);
+  assert.equal(vendor.format, "providers", "vendor: format");
+  before = requests.length;
+  const vendorTurn = await runOpenCode(vendor.content, "vendor", [
+    "run",
+    "--standalone",
+    "--auto",
+    "--format",
+    "json",
+    "--model",
+    composedCustomModelId(ENDPOINT, VENDOR_MODEL),
+    "Run echo e2e.",
+  ]);
+  const vendorSent = requests.slice(before);
+  cases.push({
+    name: "vendor",
+    format: vendor.format,
+    entry: vendor.entry,
+    requests: vendorSent,
+    exitCode: vendorTurn.code,
+  });
+  assert.equal(vendorTurn.code, 0, `vendor: OpenCode exit ${vendorTurn.code}: ${vendorTurn.stderr}`);
+  assert.ok(vendorSent.length > 0, "vendor: the endpoint got no request");
+  for (const request of vendorSent) assert.equal(request.model, VENDOR_MODEL, "vendor: model");
   report.result = "pass";
 } catch (error) {
   report.result = "fail";

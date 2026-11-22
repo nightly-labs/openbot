@@ -13,6 +13,7 @@ import {
   type AgentTaskWindow,
   type ApplyAgentImportInput,
   type ApplyInstanceTransferInput,
+  type ArchivedAgentTasksPage,
   type AttachmentSummary,
   BROWSER_SECRET_RESPONSE_PATH,
   type BranchAgentTaskInput,
@@ -45,12 +46,14 @@ import {
   isAgentTaskReadState,
   isAgentTasksSnapshot,
   isAgentTaskWindow,
+  isArchivedAgentTasksPage,
   isAttachmentSummary,
   isConversationSnapshot,
   isQueuedMessageReceipt,
   isRoutine,
   isRoutinePausedByRun,
   isRoutineRun,
+  type ListArchivedAgentTasksInput,
   type LocalBrowserSecretResponse,
   type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
@@ -76,6 +79,7 @@ import {
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_ARCHIVED_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
   AGENT_IMPORT_V2_CHUNK_BYTES,
@@ -263,12 +267,25 @@ const decodeTaskConversation = guardedDecoder(isConversationSnapshot, "task conv
 const decodeTaskPage = guardedDecoder(isAgentTaskPage, "thread page response");
 const decodeTaskWindow = guardedDecoder(isAgentTaskWindow, "thread part response");
 const decodeTaskReceipt = guardedDecoder(isQueuedMessageReceipt, "task message receipt");
+const decodeArchivedTasks = guardedDecoder(isArchivedAgentTasksPage, "archived threads response");
 
 export const listAgentTasks = Effect.fn("TeamClient.listAgentTasks")(function* (
   request: TeamApiRequest,
   agentId: string,
 ): Effect.fn.Return<AgentTasksSnapshot, TeamRequestError> {
   return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.list, decodeAgentTasks, { agentId }));
+});
+
+export const listArchivedAgentTasks = Effect.fn("TeamClient.listArchivedAgentTasks")(function* (
+  request: TeamApiRequest,
+  { agentId, before }: ListArchivedAgentTasksInput,
+): Effect.fn.Return<ArchivedAgentTasksPage, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, decodeArchivedTasks, {
+      agentId,
+      before: before ? { updatedAt: before.updatedAt, threadId: before.threadId } : null,
+    }),
+  );
 });
 
 export const readAgentTask = Effect.fn("TeamClient.readAgentTask")(function* (
