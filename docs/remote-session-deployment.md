@@ -251,7 +251,7 @@ What moves when a machine stops:
   which names the host's new home. The client drops its resume token, because the other machine does
   not know the socket.
 - The entry: each minute the account Worker checks `/health/ready` of the machine that
-  `signal.openbot.run` gives. When it fails two checks 20 seconds apart, the Worker sets the record to
+  `signal.openbot.run` gives. When it fails three checks 20 seconds apart, the Worker sets the record to
   the address of the first other home in `REMOTE_SIGNAL_HOMES` that answers. When no machine answers,
   or the records do not show one entry machine (proxied, two A records, or an address of no home),
   it changes nothing. The name does not go back when the old machine starts again. With the 60-second
@@ -272,16 +272,18 @@ stored home, so its clients go to the entry with it.
 
 ## Regional Signal machines
 
-Two Leaseweb VPS machines give hosts far from Helsinki a nearer Signal and TURN relay. Each is a
+Three Leaseweb VPS machines give hosts far from Helsinki a nearer Signal and TURN relay. Each is a
 home like `a` and `b`, but it never holds the entry while `a` or `b` answers.
 
 | Home | Machine | Address | Names | Place |
 | --- | --- | --- | --- | --- |
 | `us` | `openbot-signal-us` (Leaseweb VPS 12728289, SFO-12, same reference) | `23.106.44.143` | `signal-us`, `turn-us` | San Jose |
 | `au` | `openbot-signal-au` (Leaseweb VPS 12728295, SYD-12, same reference) | `23.106.243.56` | `signal-au`, `turn-au` | Sydney |
+| `sg` | `openbot-signal-sg` (Leaseweb VPS 12731038, `ap-southeast-1`, same reference) | `172.255.212.149` | `signal-sg`, `turn-sg` | Singapore |
 
-The AU plan has a 5 TB monthly traffic pack. Only the outgoing traffic counts against it: Leaseweb
-bills a VPS on its outgoing traffic only, and calculates the surcharge at the end of each month
+The AU plan has a 5 TB monthly traffic pack, and the US and SG plans have 30 TB. Only the outgoing
+traffic counts against it: Leaseweb bills a VPS on its outgoing traffic only, and calculates the
+surcharge at the end of each month
 ([Metering and Billing](https://kb.leaseweb.com/kb/network/network-metering-and-billing/)). The page
 does not say whether the month is the calendar month or starts on the contract date. TURN relay
 traffic goes out too, so it counts. To see the traffic, use `leaseweb-pool.ts traffic` (in and out of

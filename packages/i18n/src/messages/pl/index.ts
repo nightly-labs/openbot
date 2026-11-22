@@ -16,7 +16,6 @@ import { messages as connector } from "./connector";
 import { messages as conversation } from "./conversation";
 import { messages as crm } from "./crm";
 import { messages as customProvider } from "./customProvider";
-import { messages as diagram } from "./diagram";
 import { messages as dialog } from "./dialog";
 import { messages as files } from "./files";
 import { messages as importAgent } from "./import";
@@ -53,18 +52,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/**
- * Polish. Written from the English source: a key that is missing here renders its English source.
- *
- * Notes for a reviewer. The text addresses the user with the informal second person, in the
- * imperative form a Polish interface uses («Otwórz», «Sprawdź»), and avoids gendered past-tense
- * forms for the user where it can. Labels stay short, because Polish words run longer than English
- * ones. Typography follows Polish convention: quotes are „dolne i górne”, and the ellipsis is the
- * single character …. Plurals fill the one, few, many and other forms. Product names stay as they
- * are: OpenBot is the application name, and ZIP and JSON are the file formats a picker shows.
- *
- * This is the desktop catalog: shared keys, source text, and every desktop area.
- */
 export const pl = {
   ...shared,
   ...source,
@@ -105,7 +92,6 @@ export const pl = {
   ...usage,
   ...sidebar,
   ...channel,
-  ...diagram,
   ...workflow,
   ...agent,
   ...agentTemplate,

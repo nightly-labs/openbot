@@ -1,9 +1,4 @@
-// What main answers for team servers, the team host, its members and invites, direct messages, and
-// remote desktop sessions.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
+import { parseCustomServerPlan } from "@openbot/contracts/custom-server-plans";
 import {
   type DirectConversationPage,
   type DirectConversationReadState,
@@ -60,6 +55,7 @@ const SERVER_ISSUE_CODES = [
   "client_update_required",
   "host_update_required",
   "protocol_error",
+  "server_safe_mode",
   "authentication_required",
   "network_unavailable",
 ] as const;
@@ -287,6 +283,8 @@ function server(summary: DynamicRecord): ServerSummary {
     hosted,
     restartAvailable,
     storageGb,
+    paymentRequired,
+    customPlan,
     keyChangedAt,
     thisComputer,
     appearance,
@@ -310,6 +308,9 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid keyChangedAt.");
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
+  if (paymentRequired !== undefined && paymentRequired !== true) throw new Error("Invalid paymentRequired.");
+  const plan = customPlan === undefined ? undefined : parseCustomServerPlan(customPlan);
+  if (plan === null) throw new Error("Invalid customPlan.");
   if (capabilitiesPending !== undefined && capabilitiesPending !== true) {
     throw new Error("Invalid capabilitiesPending.");
   }
@@ -334,7 +335,6 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(connectionSequence === undefined ? {} : { connectionSequence }),
     ...(capabilitiesPending === undefined ? {} : { capabilitiesPending }),
     ...(hostRestart === undefined ? {} : { hostRestart: hostRestart === null ? null : serverHostRestart(hostRestart) }),
-    // Only the indicator reads it, so a value from a newer main process shows no indicator.
     ...(hostedSleep === undefined
       ? {}
       : { hostedSleep: hostedSleep === "sleeping" || hostedSleep === "waking" ? hostedSleep : null }),
@@ -344,12 +344,13 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hosted === undefined ? {} : { hosted }),
     ...(restartAvailable === undefined ? {} : { restartAvailable }),
     ...(storageGb === undefined ? {} : { storageGb }),
+    ...(paymentRequired === undefined ? {} : { paymentRequired }),
+    ...(plan === undefined ? {} : { customPlan: plan }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
   };
 }
 
-/** Null for the automatic look. Main sends only a checked value, so another value fails closed. */
 function serverAppearance(value: unknown): ServerAppearance | null {
   if (value === null) return null;
   const appearance = serverAppearanceOrNull(value);
@@ -497,6 +498,7 @@ function decodeHostedStart(value: unknown): HostedServerStart | null {
   if (value === null) return null;
   const start = decodeRecord(value, "hosted start");
   const { step } = start;
-  if (step !== "machine" && step !== "openbot" && step !== "provider_limit") throw new Error("Invalid hostedStart.");
+  if (step !== "machine" && step !== "restore" && step !== "openbot" && step !== "provider_limit")
+    throw new Error("Invalid hostedStart.");
   return { step, startedAt: requiredNumber(start, "startedAt") };
 }

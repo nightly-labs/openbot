@@ -1,10 +1,10 @@
 {
-  "version": "1.4.11",
+  "version": "1.4.12",
   "highlights": [
-    "Added new integrations and expanded app connectivity.",
-    "Improved chat with context tracking, subagent progress, and memory updates.",
-    "Redesigned workflow editor with interactive Flow view.",
-    "Added more customization options for chat appearance and behavior.",
-    "Improved file handling, connection reliability, and overall app stability."
+    "Added chat backdrops with animated scenes or your own photo, and a redesigned Appearance screen.",
+    "Added side questions: ask an agent about a chat without adding to it.",
+    "Added an Open Agent shortcut for the iPhone Home Screen and Action button.",
+    "Redesigned the chat header and made chats faster and smoother while agents reply.",
+    "Improved server connections, with clear reasons when a server cannot start or is too old."
   ]
 }

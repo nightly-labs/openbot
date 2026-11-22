@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "Kan {name} niet herstarten",
   "app.provider.included": "{name} is inbegrepen bij OpenBot.",
   "app.clipboard.copyFailed": "Kan de tekst niet kopiëren.",
-  "app.voice.tooLong": "Spraakopnamen duren maximaal twee minuten.",
+  "app.voice.tooLong": "Spraakopnamen duren maximaal 10 minuten.",
   "app.avatar.type": "Kies een PNG-, JPEG-, GIF- of WebP-afbeelding.",
   "app.avatar.size": "Kies een afbeelding kleiner dan 10 MB.",
   "app.avatar.processingUnavailable": "Afbeeldingsverwerking is niet beschikbaar.",

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/connector";
 
 export const messages = {
-  // The built-in GitHub connection: the device flow, the token refresh and the stored file.
   "error.connector.githubUnavailable": "该版本的 OpenBot 不包含 GitHub App。",
   "error.connector.githubDenied": "GitHub 登录被拒绝。",
   "error.connector.githubCodeExpired": "GitHub 验证码已过期，请重新连接 GitHub。",
@@ -13,7 +12,6 @@ export const messages = {
   "error.connector.githubExpired": "GitHub 连接已过期，请重新连接 GitHub。",
   "error.connector.githubFileUnreadable": "GitHub 连接文件无法读取。",
   "error.connector.githubFileTooLarge": "GitHub 连接文件过大。",
-  // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot 找不到 1Password CLI。请安装它并在 1Password 应用中开启集成，或改用服务账号令牌。",
   "error.connector.onePasswordCliInstallFailed": "OpenBot 无法安装 1Password CLI，请检查网络连接后重试。",
@@ -47,6 +45,8 @@ export const messages = {
   "error.connector.protonPassFailed": "无法连接 Proton Pass。请重新连接。",
   "error.connector.protonPassCliInstallFailed": "无法安装 Proton Pass CLI。请检查网络连接，然后重新连接。",
   "error.connector.protonPassPlan": "你的 Proton 套餐不允许使用 Proton Pass CLI。请更改套餐，然后重新连接。",
+  "error.connector.protonPassPlanMissing":
+    "你的 Proton 套餐不包含 Proton Pass CLI。需要包含 Pass Plus 的 Proton 套餐。请更改套餐，然后重新连接。",
   "error.connector.protonPassExpired": "Proton Pass 访问已结束。请重新连接。",
   "error.connector.protonPassKeyInvalid": "请输入以 pst_ 开头的 Proton Pass 访问密钥。",
   "error.connector.protonPassExtraPassword": "额外密码不正确。请重新输入。",

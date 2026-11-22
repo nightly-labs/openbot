@@ -54,6 +54,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Слишком много попыток входа. Повторите попытку позже.",
   "error.team.clientUpdateRequired": "Обновите этот клиент OpenBot, прежде чем подключаться к этому хосту.",
   "error.team.hostUpdateRequired": "Обновите OpenBot на хосте, прежде чем подключаться.",
+  "error.team.serverSafeMode": "Этот сервер находится в безопасном режиме, потому что OpenBot на нём не запускается.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} на этом сервере не может открыть свои данные, потому что их сохранила более новая версия OpenBot. Более новый выпуск OpenBot на сервере устранит проблему.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} на этом сервере остановлен после многих неудачных запусков. Более новый выпуск OpenBot на сервере устранит проблему.",
   "error.team.sidebarLayoutUnavailable": "Структура боковой панели недоступна.",
   "error.team.providersUnsupported": "Это подключение не поддерживает настройки провайдеров.",
   "error.team.providerNotManaged": "OpenBot не управляет CLI этого провайдера.",
@@ -88,6 +93,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Это подключение не может остановить запуск регулярной задачи.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.libraryFoldersUnsupported": "Это подключение не поддерживает папки Библиотеки.",
+  "error.team.workflowFoldersUnsupported": "Это подключение не поддерживает папки рабочих процессов.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
   "error.team.sidebarPinsUnsupported":
@@ -121,11 +127,13 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Это подключение не поддерживает обновление хоста.",
   "error.team.hostTimezoneUnsupported": "Это подключение не поддерживает часовой пояс сервера.",
   "error.team.hostRestartUnsupported": "Это подключение не поддерживает перезапуск сервера.",
+  "error.team.ownerTransferUnsupported": "Этот сервер не поддерживает передачу владения.",
   "error.team.hostKeyRotationUnsupported": "Это подключение не поддерживает смену ключа сервера.",
   "error.team.localServersUnsupported": "Это подключение не поддерживает серверы на этом компьютере.",
   "error.team.routineResultsUnsupported": "Это подключение не поддерживает места отправки рутин.",
   "error.team.agentMemoryLimitUnsupported": "Это подключение не поддерживает лимит памяти агентов.",
   "error.team.agentFoldersUnsupported": "Это подключение не поддерживает папки агентов.",
+  "error.team.channelFoldersUnsupported": "Это подключение не поддерживает папки каналов.",
   "error.team.folderUnavailable": "Эта папка недоступна на компьютере хоста.",
   "error.team.memoryReviewUnsupported": "Это подключение не поддерживает проверку памяти.",
   "error.team.skillLearningUnsupported": "Это подключение не поддерживает обучение навыкам.",
@@ -145,6 +153,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Это подключение не поддерживает серверы MCP.",
   "error.team.mcpServerListNeedsUpdate":
     "Обновите OpenBot на этом устройстве, чтобы использовать на этом сервере больше {limit} серверов MCP.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Обновите OpenBot на этом устройстве, чтобы использовать на этом сервере больше {limit} аккаунтов одного провайдера.",
   "error.team.storageUnsupported": "Это подключение не поддерживает хранилище.",
   "error.team.machineResourcesUnsupported": "Это подключение не поддерживает данные о машине.",
   "error.team.machineAlertMemberInvalid":
@@ -185,6 +195,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Это подключение не поддерживает характер сервера.",
   "error.team.agentWaitsUnsupported": "Это подключение не поддерживает открытые ожидания.",
   "error.team.pendingApprovalUnsupported": "Это подключение не позволяет прочитать запрос на подтверждение целиком.",
+  "error.team.pendingPromptsUnsupported": "Это подключение не поддерживает чтение открытых вопросов.",
   "error.team.phoneFeedbackUnsupported": "Это подключение не позволяет отправить отчёт из приложения на телефоне.",
   "error.team.messagePinsUnsupported": "Это подключение не поддерживает закреплённые сообщения.",
   "error.team.queuedMessageThreadUnsupported":

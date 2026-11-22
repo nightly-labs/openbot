@@ -7,11 +7,6 @@ import { useUsage } from "../usage/usage-context";
 import { CrmScreen } from "./CrmScreen";
 import { desktopCrmHost } from "./crm-port";
 
-/**
- * The CRM of one server on the desktop, for an owner or admin. It shows nothing for a member, for a
- * joined server without `crm-v1`, and while Server Settings > Experimental has the CRM off: the rail
- * has no CRM button there.
- */
 export function CrmPage(props: { serverId: string }) {
   const { servers } = useServers();
   const { agentList } = useAgents();

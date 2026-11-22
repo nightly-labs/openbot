@@ -1,7 +1,3 @@
-// The Bot API adapter. Only Signal has the bot tokens (`@openbot/contracts/signal-protocol/telegram-route`):
-// a token goes only into the request URL here, and never into a frame, a log or an error message.
-// A host gets only the reduced result of a call (`TelegramCallResult`).
-
 import {
   TELEGRAM_FILE_BYTES_LIMIT,
   TELEGRAM_UPDATES_PATH,
@@ -30,7 +26,6 @@ interface TelegramSetWebhookParams {
   allowed_updates: string[];
 }
 
-/** What Signal sends to the Bot API: an allowed call, `getFile` without its chat, or `setWebhook`. */
 type TelegramRequestBody =
   | TelegramCallParams[TelegramCallMethod]
   | { file_id: string }
@@ -44,10 +39,8 @@ class TelegramApiError extends Schema.TaggedError<TelegramApiError>()("TelegramA
 }) {}
 
 const CALL_TIMEOUT_MILLISECONDS = 10_000;
-// A file of up to 20 MB goes through Signal at the speed of the host.
 const FILE_TIMEOUT_MILLISECONDS = 60_000;
 const ALLOWED_UPDATES = ["message", "callback_query", "my_chat_member"];
-// A Bot API `file_path`, such as `documents/file_3.pdf`.
 const FILE_PATH_PATTERN = /^(?!.*\.\.)[A-Za-z0-9_./-]{1,512}$/u;
 
 const answerSchema = z.union([
@@ -101,14 +94,12 @@ export class TelegramBotApi {
     return this.#tokens.has(botId);
   }
 
-  /** Checks `X-Telegram-Bot-Api-Secret-Token` against the bot's own webhook secret. */
   verifyWebhook(botId: string, secretToken: string): boolean {
     return (
       this.hasBot(botId) && verifyTelegramWebhookSecret(secretToken, telegramWebhookSecret(this.#webhookSecret, botId))
     );
   }
 
-  /** One Bot API method. A request that fails or times out is a 502 answer, not an error. */
   readonly call = Effect.fn("TelegramBotApi.call")(
     (botId: string, method: string, body: TelegramRequestBody, timeoutMilliseconds = CALL_TIMEOUT_MILLISECONDS) =>
       Effect.gen({ self: this }, function* () {
@@ -125,7 +116,6 @@ export class TelegramBotApi {
             });
             return answerSchema.safeParse(await response.json());
           },
-          // The cause can name the URL, and the URL has the token.
           catch: () => new TelegramApiError({ message: "The Bot API request failed." }),
         }).pipe(Effect.catch(() => Effect.succeed(null)));
         if (!answer) return UNAVAILABLE;
@@ -135,7 +125,6 @@ export class TelegramBotApi {
       }),
   );
 
-  /** The response of one file download. The caller reads or cancels its body. */
   readonly download = Effect.fn("TelegramBotApi.download")((botId: string, filePath: string) =>
     Effect.gen({ self: this }, function* () {
       const token = this.#tokens.get(botId);
@@ -169,7 +158,6 @@ export class TelegramBotApi {
       }),
   );
 
-  /** Points each bot's webhook at this Signal. A failure is logged with the bot ID only. */
   readonly setWebhooks = Effect.fn("TelegramBotApi.setWebhooks")(() =>
     Effect.gen({ self: this }, function* () {
       const origin = this.#webhookOrigin;
@@ -192,7 +180,6 @@ export interface SignalTelegram {
   files: TelegramFileTokens;
 }
 
-/** Makes one call that Signal already allowed, and reduces its result. */
 export const runTelegramCall = Effect.fn("Telegram.runCall")(function* (telegram: SignalTelegram, call: TelegramCall) {
   const { botId } = call;
   switch (call.method) {

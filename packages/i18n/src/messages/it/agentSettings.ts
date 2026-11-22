@@ -176,11 +176,12 @@ export const messages = {
     "Questa scelta vale solo per te, su tutti i tuoi dispositivi. Se il server è silenziato o impostato su «Niente», anche questo agente resta in silenzio.",
 
   "agentSettings.newChat.title": "Nuova chat",
-  "agentSettings.newChat.description": "L'agente dimentica questa chat. La sua configurazione resta.",
+  "agentSettings.newChat.description":
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. La sua configurazione resta.",
   "agentSettings.newChat.button": "Inizia",
   "agentSettings.newChat.confirmTitle": "Iniziare una nuova chat con {name}?",
   "agentSettings.newChat.confirmDescription":
-    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "agentSettings.newChat.confirm": "Inizia una nuova chat",
   "agentSettings.newChat.failed": "Impossibile iniziare una nuova chat.",
   "agentSettings.deleteHistory.title": "Elimina cronologia",
@@ -203,6 +204,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "Usa Chiedi prima",
 
   "agentSettings.links.usage": "Utilizzo",
+  "agentSettings.links.apps": "App",
+  "agentSettings.links.appsScope": "Tutti gli agenti",
   "agentSettings.links.memories": "Memorie",
   "agentSettings.links.memoriesCount": { one: "{count} salvata", other: "{count} salvate" },
   "agentSettings.links.skills": "Skill",
@@ -229,6 +232,9 @@ export const messages = {
     "L'agente può avviare una nuova chat quando la sua diventa lunga. Prima salva delle note.",
   "agentSettings.quickAcknowledgement.title": "Mostra il piano prima delle attività lunghe",
   "agentSettings.quickAcknowledgement.description": "Prima di un'attività lunga, l'agente mostra il suo piano.",
+  "agentSettings.builtinMemory.title": "Memoria di OpenBot",
+  "agentSettings.builtinMemory.description":
+    "L'agente salva e legge le proprie memorie. Disattiva per usare solo un'app di memoria, come Mem0. Le memorie salvate restano.",
   "agentSettings.browserProfile.label": "Profilo del browser",
   "agentSettings.browserProfile.shared": "Condiviso",
   "agentSettings.browserProfile.agent": "Solo questo agente",
@@ -238,6 +244,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Ogni profilo mantiene accessi e cookie propri. Una modifica chiude le schede aperte dell'agente.",
   "agentSettings.browserProfile.manage": "Gestisci",
+  "agentSettings.browserProfile.movedNote":
+    "Gli accessi ai siti restano nel profilo precedente. L'agente deve accedere di nuovo a questi siti.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "L'intero processo di {provider} gira in una sandbox, quindi una scrittura all'esterno non riesce. Disponibile solo su macOS.",
 } as const satisfies PartialTranslation<typeof source>;

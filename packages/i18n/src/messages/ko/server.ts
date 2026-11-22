@@ -46,6 +46,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name}의 OpenBot 업데이트",
   "server.compatibility.unsafeDataTitle": "호스트가 안전하지 않은 데이터를 반환했어요",
   "server.compatibility.cannotConnectTitle": "{name}에 연결할 수 없어요",
+  "server.compatibility.safeModeTitle": "{name}이(가) 시작되지 않습니다",
   "server.compatibility.updateClientDescription":
     "이 앱은 호스트보다 오래된 프로토콜만 지원해요. 이 앱을 업데이트한 후 다시 시도해 주세요.",
   "server.compatibility.updateHostDescription":
@@ -78,7 +79,6 @@ export const messages = {
   "server.join.account": "계정",
   "server.join.emailBound": "이 초대는 해당 이메일 수신자만 사용할 수 있어요.",
   "server.join.unknownDate": "알 수 없음",
-  // The dialog that the plus button on the server rail opens. {price} is a formatted amount, such as "€20".
   "server.add.title": "외부 서버에서 OpenBot을 24시간 실행하세요",
   "server.add.description":
     "OpenBot 서버는 컴퓨터가 꺼져 있어도 에이전트와 루틴을 계속 실행해요. 인프라와 유지 관리는 저희가 맡으니, 기술적인 설정 없이 바로 서버를 사용할 수 있어요.",
@@ -97,12 +97,9 @@ export const messages = {
   "server.add.license.includedTrial": "{license} 포함, {date}까지 무료",
   "server.add.billedMonthly": "매월 결제",
   "server.add.billedYearly": "연 {price} 결제",
-  // {amount} is a formatted amount, such as "€120". It follows the yearly price.
   "server.add.yearlySaving": "{amount} 절약",
-  // Visually hidden. It comes before the struck-through monthly price on yearly billing.
   "server.add.regularPrice": "정상가 {price}",
   "server.add.choosePlan": "{plan} 선택",
-  // The footer under the plans, for needs that the plans do not cover.
   "server.add.custom.title": "더 강력한 성능이나 맞춤형 솔루션이 필요하신가요?",
   "server.add.custom.description": "전용 인프라, 추가 저장 공간, 내 워크플로에 맞춘 기능을 받아 보세요.",
   "server.add.custom.action": "문의하기",
@@ -114,6 +111,7 @@ export const messages = {
   "server.local.create": "서버 만들기",
   "server.local.creating": "서버 만드는 중…",
   "server.local.createFailed": "서버를 만들지 못했어요.",
+  "server.local.createFailedRetry": "문제가 생겼어요. 다시 시도하세요. 또 실패하면 OpenBot을 다시 시작하세요.",
   "server.local.limitReached": "이 컴퓨터에는 서버를 최대 {limit}개까지 둘 수 있어요. 새로 만들려면 하나를 삭제하세요.",
   "server.local.deleteConfirmTitle": "{name}을(를) 삭제할까요?",
   "server.local.deleteConfirmDescription": "OpenBot이 서버를 중지하고 에이전트, 채팅, 파일을 휴지통으로 옮겨요.",
@@ -137,19 +135,14 @@ export const messages = {
   "server.install.setUpWithAgent": "에이전트로 설정",
   "server.install.sshAgentPrompt":
     "SSH로 내 Linux 서버에 연결하고 OpenBot을 서버로 설치해 주세요.\n\nSSH 주소 (user@host):",
-  // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "이 계정은 서버를 최대 개수까지 만들었어요",
   "server.add.limit.description": {
     other: "계정당 유료 서버를 {count}개까지 둘 수 있어요. 서버를 추가하려면 먼저 하나를 삭제하세요.",
   },
-  // Opens the list of the account's hosted servers, where the user can delete one.
   "server.add.limit.manage": "서버 관리",
-  // The offer of a hosted server after a new routine that depends on the user's computer.
   "server.upsell.modal.title": "컴퓨터가 절전 모드가 되면 루틴이 멈춰요",
-  // {name} is the routine.
   "server.upsell.modal.description":
     "{name}은(는) 컴퓨터가 켜져 있을 때만 실행돼요. OpenBot 서버를 쓰면 24시간 계속 실행돼요.",
-  // Labels in the small picture above the modal text: a laptop and a server, each with a status.
   "server.upsell.modal.computer": "내 컴퓨터",
   "server.upsell.modal.server": "OpenBot 서버",
   "server.upsell.modal.running": "실행 중",
@@ -161,7 +154,6 @@ export const messages = {
     other: "루틴 {count}개를 실행하려면 {server}이(가) 켜져 있어야 해요",
   },
   "server.upsell.notice.description": "OpenBot 서버는 루틴을 24시간 실행해요.",
-  // One line under the notice that the user's computer is offline.
   "server.upsell.offline": "OpenBot 서버는 24시간 켜져 있어서 루틴이 계속 실행돼요.",
   "server.upsell.seePlans": "요금제 보기",
   "server.upsell.notNow": "나중에",
@@ -170,13 +162,11 @@ export const messages = {
     "{server}의 여유 공간이 거의 없어요. 업그레이드하면 에이전트가 중단 없이 계속 작동해요.",
   "server.upgrade.used": "{total} 중 {used} 사용",
   "server.hosted.progressTitle": "{name} 설정 중",
-  // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "브라우저에서 결제를 완료하세요",
   "server.hosted.paymentDescription": "Stripe에서 결제가 확인되면 설정이 시작돼요.",
   "server.hosted.openPayment": "결제 페이지 다시 열기",
   "server.hosted.openingPayment": "여는 중…",
   "server.hosted.paymentFailed": "결제 페이지를 열 수 없었어요.",
-  // The name of a new server. {number} is a number, such as 2.
   "server.hosted.defaultName": "클라우드 서버",
   "server.hosted.defaultNameNumbered": "클라우드 서버 {number}",
   "server.hosted.step.create": "머신 만들기",
@@ -186,6 +176,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "머신에 OpenBot을 복사하는 중",
   "server.hosted.detail.create.key": "일회용 로그인 키를 추가하는 중",
   "server.hosted.detail.start.boot": "머신을 켜는 중",
+  "server.hosted.detail.start.restore": "데이터 복원 중",
   "server.hosted.detail.start.app": "OpenBot을 시작하는 중",
   "server.hosted.detail.start.wait": "OpenBot의 응답을 기다리는 중",
   "server.hosted.detail.connect.signIn": "내 계정으로 로그인하는 중",
@@ -236,13 +227,45 @@ export const messages = {
   "server.rail.mute": "서버 음소거",
   "server.rail.notificationSettings": "알림 설정",
   "server.rail.settings": "서버 설정",
-  // The last items of the server menu. Leave is for a joined server; restart and delete are for a hosted server that the user owns.
   "server.rail.remove": "서버 제거",
   "server.rail.restart": "서버 다시 시작",
   "server.rail.leave": "서버 나가기",
   "server.rail.delete": "서버 삭제",
   "server.rail.hide": "서버 숨기기",
   "server.rail.showLocal": "{name} 표시",
+  "server.plan.daysLeft": {
+    other: "{count}일",
+  },
+  "server.plan.ended": "플랜 종료",
+  "server.plan.status": "플랜 종료, {date}에 삭제",
+  "server.plan.deletedOn": "{date}에 삭제",
+  "server.plan.dialogTitle": "에이전트를 떠나보내지 마세요",
+  "server.plan.dialogDescription":
+    "{name}의 플랜이 끝나서 서버가 멈췄어요. {date}에 OpenBot이 에이전트와 모든 채팅, 파일을 삭제해요.",
+  "server.plan.dialogDaysLeft": {
+    other: "{count}일 남음",
+  },
+  "server.plan.later": "나중에",
+  "server.plan.keepAgents": "에이전트 지키기",
+  "server.plan.ownerRenews": "서버 소유자가 플랜을 갱신할 때까지 {name}의 에이전트를 사용할 수 없습니다.",
+  "server.paywall.ready": "{name} 준비 완료",
+  "server.paywall.wakeUp": "구독하면 에이전트가 깨어납니다.",
+  "server.paywall.yourPlan": "내 요금제",
+  "server.paywall.vcpu": "vCPU {value}개",
+  "server.paywall.memory": "메모리 {value}GB",
+  "server.paywall.storage": "저장 공간 {value}GB",
+  "server.paywall.support": "맞춤 지원",
+  "server.paywall.perYear": "연간",
+  "server.paywall.subscribe": "구독",
+  "server.paywall.checkoutFailed": "결제 창을 열지 못했습니다",
+  "server.paywall.checkoutTitle": "브라우저에서 결제를 완료하세요",
+  "server.paywall.checkoutDescription": "에이전트가 준비 중입니다.",
+  "server.paywall.openCheckoutAgain": "결제 창 다시 열기",
+  "server.paywall.active": "{name} 활성화됨",
+  "server.paywall.activeDescription": "감사합니다. 에이전트가 깨어났습니다.",
+  "server.paywall.open": "{name} 열기",
+  "server.paywall.almostReady": "{name} 준비가 거의 끝났습니다",
+  "server.paywall.ownerSubscribes": "에이전트를 시작하려면 {name} 소유자가 구독해야 합니다.",
   "server.select.failedTitle": "서버를 선택할 수 없어요",
   "server.select.failedDescription": "서버를 전환할 수 없었어요. 다시 시도해 주세요.",
   "server.select.openAgentFailed": "{name}을(를) 열 수 없었어요. 사이드바에서 찾아 주세요.",
@@ -406,7 +429,6 @@ export const messages = {
   "server.settings.reachable": "온라인에서 접속할 수 있어요. 초대받은 사람만 로그인할 수 있어요.",
   "server.settings.notReachable": "온라인에서 접속할 수 없어요. 기존 멤버와 초대는 유지돼요.",
   "server.settings.notPublished": "온라인에서 접속할 수 없어요.",
-  // A name for a server that the user publishes before naming it. {name} is the first word of the account name.
   "server.settings.generatedName": "{name} 님의 서버",
   "server.settings.hostKeyTitle": "서버 키",
   "server.settings.hostKeyRotate": "서버 키 변경",
@@ -555,7 +577,6 @@ export const messages = {
   "server.invite.pendingTitle": "대기 중인 초대",
   "server.invite.pendingCount": "대기 중 {total}건",
   "server.invite.noPending": "대기 중인 초대가 없어요.",
-  // The empty pending list. {word} is the one handwritten word of the title.
   "server.invite.emptyTitle": "첫 {word}을 보내 보세요.",
   "server.invite.emptyWord": "초대",
   "server.invite.neverExpires": { other: "만료되지 않음 · {count}명 참여" },
@@ -601,7 +622,6 @@ export const messages = {
   "server.settings.providersDescription": "이 서버를 실행하는 컴퓨터의 AI 제공자를 관리해요.",
   "server.settings.providersSwitchNote": "{name}의 AI 제공자를 관리하려면 해당 서버로 전환하세요.",
   "server.settings.providersSwitch": "이 서버로 전환",
-  // Server Settings > Updates: the OpenBot update of a joined server's host. {name} is the server.
   "server.settings.updatesTitle": "업데이트",
   "server.settings.updatesDescription": "이 서버를 실행하는 컴퓨터의 OpenBot을 업데이트해요.",
   "server.update.hostTitle": "{name}의 OpenBot",
@@ -609,9 +629,7 @@ export const messages = {
   "server.update.status.idle": "업데이트를 확인해 최신 릴리스를 찾아보세요.",
   "server.update.status.checking": "업데이트 확인 중…",
   "server.update.status.available": "{version}을(를) 사용할 수 있어요.",
-  // {progress} is a percent, such as 42%.
   "server.update.status.downloading": "{version} 다운로드 중 · {progress}",
-  // Before the host knows the size, or while it waits to start the download.
   "server.update.status.downloadingUnknown": "{version} 다운로드 중…",
   "server.update.status.ready": "{version} 다운로드를 완료했어요.",
   "server.update.status.installing": "업데이트를 설치하기 위해 {name}이(가) 다시 시작되고 있어요.",
@@ -660,7 +678,6 @@ export const messages = {
   "server.update.restarting": "다시 시작하는 중…",
   "server.update.loadFailed": "{name}의 업데이트 상태를 불러오지 못했어요.",
   "server.update.hostAction": "호스트 업데이트",
-  // The update dialog: the download, the restart and the server back online.
   "server.update.dialog.offerTitle": "{name}을(를) OpenBot {version}(으)로 업데이트",
   "server.update.dialog.offerDescription":
     "{name}은(는) OpenBot {current}을(를) 사용 중이에요. 업데이트를 먼저 다운로드한 후 다시 시작해요.",
@@ -700,10 +717,8 @@ export const messages = {
   "server.update.dialog.cancelRestart": "다시 시작 취소",
   "server.update.dialog.later": "나중에",
   "server.update.dialog.hide": "숨기기",
-  // The notice of an update whose dialog the user hid.
   "server.update.dialog.hiddenTitle": "{name} 업데이트",
   "server.update.dialog.show": "표시",
-  // The work that a restart waits for, in "Waiting for {reasons}".
   "server.update.reason.agentTurn": "에이전트 턴",
   "server.update.reason.queuedDelivery": "대기열의 메시지",
   "server.update.reason.drainTask": "에이전트의 백그라운드 작업",
@@ -717,7 +732,6 @@ export const messages = {
   "server.update.reason.updateOperation": "다른 업데이트 단계",
   "server.update.reason.initialization": "OpenBot 시작",
   "server.update.reason.other": "기타 작업",
-  // A notice to every member when a joined server restarts into an update. {name} is the server.
   "server.restartNotice.waitingTitle": "업데이트를 설치하기 위해 {name}이(가) 다시 시작돼요",
   "server.restartNotice.waitingVersionTitle": "OpenBot {version}을(를) 설치하기 위해 {name}이(가) 다시 시작돼요",
   "server.restartNotice.waitingDescription":
@@ -733,4 +747,37 @@ export const messages = {
   "server.settings.responseStyleNatural": "자연형",
   "server.settings.responseStyleClassic": "클래식",
   "server.settings.personalityLoadFailed": "서버 성격을 불러올 수 없었어요.",
+  "server.ownerTransfer.title": "소유권",
+  "server.ownerTransfer.ownerTitle": "이 서버의 소유자예요",
+  "server.ownerTransfer.ownerDescription": "다른 사람을 소유자로 지정해요. 상대가 수락하면 내 액세스는 사라져요.",
+  "server.ownerTransfer.start": "소유권 이전…",
+  "server.ownerTransfer.pending": "{email}에게 소유권 이전 대기 중",
+  "server.ownerTransfer.expires": "{date} 만료",
+  "server.ownerTransfer.cancel": "요청 취소",
+  "server.ownerTransfer.emailTitle": "{server} 소유권 이전",
+  "server.ownerTransfer.emailDescription":
+    "새 소유자의 이메일을 입력하세요. 상대는 이 이메일로 로그인한 상태에서 수락해야 해요.",
+  "server.ownerTransfer.email": "새 소유자의 이메일",
+  "server.ownerTransfer.confirmTitle": "{email}을(를) 소유자로 지정할까요?",
+  "server.ownerTransfer.confirmDescription": "{email}이(가) 수락하면:",
+  "server.ownerTransfer.confirmLoseAccess": "{server}에 대한 액세스가 사라져요.",
+  "server.ownerTransfer.confirmStays":
+    "에이전트, 루틴, 채팅, 제공자 로그인, 저장된 키, Vault 로그인, 브라우저 로그인, 연결된 앱은 서버에 남아요. 새 소유자가 사용할 수 있어요.",
+  "server.ownerTransfer.confirmExpiry": "요청은 7일 후에 만료돼요.",
+  "server.ownerTransfer.send": "요청 보내기",
+  "server.ownerTransfer.sendFailed": "소유권 이전을 보내지 못했어요.",
+  "server.ownerTransfer.incomingTitle": "{server}의 소유자가 될까요?",
+  "server.ownerTransfer.incomingDescription": "{name}님이 회원님을 {server}의 소유자로 지정하려고 해요.",
+  "server.ownerTransfer.incomingYours": "서버와 에이전트, 루틴, 데이터가 회원님의 것이 돼요.",
+  "server.ownerTransfer.incomingPrevious": "{name}님은 서버에 액세스할 수 없게 돼요.",
+  "server.ownerTransfer.incomingStays":
+    "서버의 제공자 로그인, 저장된 키, Vault 로그인, 브라우저 로그인, 연결된 앱은 그대로 남고 회원님이 사용할 수 있어요.",
+  "server.ownerTransfer.incomingMachine":
+    "서버를 실행하는 컴퓨터에 아직 로그인할 수 있는 사람은 회원님의 OpenBot 계정을 사용할 수 있어요. 그 컴퓨터의 비밀번호와 SSH 키를 바꾸세요.",
+  "server.ownerTransfer.later": "나중에",
+  "server.ownerTransfer.decline": "거절",
+  "server.ownerTransfer.accept": "수락",
+  "server.ownerTransfer.accepted": "이제 {server}의 소유자예요",
+  "server.ownerTransfer.acceptFailed": "소유권 이전을 수락하지 못했어요.",
+  "server.ownerTransfer.declineFailed": "소유권 이전을 거절하지 못했어요.",
 } as const satisfies PartialTranslation<typeof source>;

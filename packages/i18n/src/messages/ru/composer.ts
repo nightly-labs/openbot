@@ -53,6 +53,7 @@ export const messages = {
   "composer.picker.noSkills": "У этого агента нет навыков.",
   "composer.picker.noSkillMatch": "Нет навыков по запросу «{query}».",
   "composer.picker.skillsLoadFailed": "Не удалось загрузить навыки.",
+  "composer.picker.skillProblem": "Навык {name} недоступен. {problem} Попросите агента исправить его.",
   "composer.token.attachment": "Открыть прикреплённый файл {name}",
   "composer.token.agent": "Агент {name}",
   "composer.token.skill": "Навык {name}",
@@ -71,6 +72,8 @@ export const messages = {
     "Доступ к микрофону заблокирован. Разрешите OpenBot использовать микрофон в системных настройках.",
   "composer.voice.noMicrophone": "Микрофон недоступен.",
   "composer.voice.startFailed": "OpenBot не удалось начать запись голоса.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot не удалось открыть микрофон. Закройте другие приложения, которые его используют, проверьте, что он подключён и разрешён в системных настройках, и повторите попытку.",
   "composer.voice.transcribeFailed": "OpenBot не удалось расшифровать эту запись.",
   "composer.reply.toYou": "Ответ на ваше сообщение",
   "composer.reply.toAgent": "Ответ агенту",
@@ -99,7 +102,7 @@ export const messages = {
   "composer.voice.progress": "Загрузка голосовой модели: {progress}%",
   "composer.voice.recording": "Запись голоса",
   "composer.voice.limitSoon": "Запись остановится через {seconds} секунд.",
-  "composer.voice.limitReached": "Запись остановлена: достигнут лимит в 2 минуты. Сказанное уже в сообщении.",
+  "composer.voice.limitReached": "Запись остановлена: достигнут лимит в 10 минут. Сказанное уже в сообщении.",
   "composer.send.saveQueued": "Сохранить сообщение в очереди",
   "composer.send.voice": "Отправить голосовое сообщение",
   "composer.send.message": "Отправить сообщение",
@@ -130,6 +133,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Речь не записана.",
   "composer.voice.noSpeechDetected": "Речь не обнаружена.",
   "composer.voice.readFailed": "Не удалось прочитать ответ вслух.",
+  "composer.voice.languageUnsupported": "Не удалось прочитать ответ вслух. Этот язык пока недоступен.",
   "composer.error.saveEditTryAgain": "Не удалось сохранить это изменение на этом компьютере. Повторите попытку.",
   "composer.error.saveUnconfirmed":
     "Сохранение не подтверждено. Нажмите «Сохранить» ещё раз, чтобы проверить результат.",

@@ -116,6 +116,8 @@ export const messages = {
   "provider.picker.download": "הורדת {name}",
   "provider.picker.search": "חיפוש מודלים",
   "provider.picker.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "provider.picker.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
   "provider.picker.workspaceOnlyUnavailable":
     "המודלים האלה לא עובדים עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בהם, שנו את „הרשאות” בהגדרות הסוכן.",
   "provider.picker.olderModels": "מודלים ישנים",
@@ -323,6 +325,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · הורדה על ידי OpenBot",
   "provider.settings.otherVersionInstalledByUser": "לא בשימוש: {version} · הותקנה על ידיך",
   "provider.settings.otherVersionDownloaded": "לא בשימוש: {version} · הורדה על ידי OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "חלק מהמודלים צריכים רכיב שחסר בגרסה הזו. הורד את הגרסה של OpenBot כדי להשתמש בהם.",
   "provider.settings.useInstalledVersion": "השתמש בגרסה המותקנת",
   "provider.settings.useDownloadedVersion": "השתמש בגרסה של OpenBot",
   "provider.settings.update": "עדכון",
@@ -405,4 +409,5 @@ export const messages = {
   },
   "provider.settings.disconnectLocalOnly":
     "OpenBot מנתק את {provider} במחשב הזה. ה-CLI של {provider} במסוף שלך נשאר מחובר.",
+  "provider.settings.updateAll": "עדכון הכול",
 } as const satisfies PartialTranslation<typeof source>;

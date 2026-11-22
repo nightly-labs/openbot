@@ -1,10 +1,10 @@
 {
-  "version": "0.72.0",
+  "version": "0.76.1",
   "highlights": [
-    "Update your joined servers to this version too, so that the CRM, Add account with code and agent backdrops work there.",
-    "Play an animated backdrop behind the whole window, or ask an agent to make one for you.",
-    "Try the experimental CRM in Server settings > Experimental, with a Stripe import and agent proposals that you approve.",
-    "Answer an agent in the agent dock chat without the main window.",
-    "A chat that loses its saved session recovers by itself, and more agents move to their backup model at a usage limit."
+    "Update your joined servers to this version too, so that parallel tasks, workflow folders, typed workflow answers and up to 20 provider accounts work there.",
+    "Agents can split unrelated work into tasks that run at the same time and combine the results for you.",
+    "Open the agent browser in its own window and move it to a second monitor.",
+    "Word documents open in the file preview, and the Files panel opens the workspace folder of the agent.",
+    "Change any keyboard shortcut in the new Keyboard tab of Settings."
   ]
 }

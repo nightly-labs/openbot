@@ -1,8 +1,3 @@
-/**
- * A joined server's browser for the MCP sign-in stories. It draws a server's consent page for each
- * sign-in the host opened, and a click on Allow stands in for the sign-in that the host took.
- */
-
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { createStore } from "solid-js";
@@ -53,7 +48,6 @@ export function createSignInHost() {
 
   return {
     runtime,
-    /** The host tab of each sign-in page, by the address it signs in to. */
     pages,
     open(url: string, name: string, onAllow: () => void): string {
       const tabId = `sign-in-${url}`;
@@ -73,7 +67,6 @@ export function createSignInHost() {
   };
 }
 
-/** A server's consent page, the way the host's browser would show it. */
 async function drawConsentPage(name: string): Promise<Uint8Array> {
   const canvas = new OffscreenCanvas(WIDTH, HEIGHT);
   const context = canvas.getContext("2d");

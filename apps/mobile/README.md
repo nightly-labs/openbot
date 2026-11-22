@@ -21,12 +21,12 @@ After switching from the isolated linker to the hoisted linker, move the old
 from the repository root. A normal install can retain old workspace symlinks and cause
 the local fingerprint to differ from the clean EAS installation.
 
-Expo 58.0.17 is patched in `patches/expo@58.0.17.patch` so a DOM component ignores a props
+Expo 58.0.25 is patched in `patches/expo@58.0.25.patch` so a DOM component ignores a props
 message that it sends before Android mounts its web view, or after Android removes it. Android
 rejects these calls, and the rejection shows as a console error. The DOM component asks for the
 props again when it is ready.
 
-expo-splash-screen 58.0.11 is patched in `patches/expo-splash-screen@58.0.11.patch` so Android 12
+expo-splash-screen 58.0.14 is patched in `patches/expo-splash-screen@58.0.14.patch` so Android 12
 and 13 get no splash exit animation listener. With the listener, the platform hides the starting
 window on the first draw, and the app crashes when that window is already gone. Gradle links the
 prebuilt AAR of an Expo module and ignores a patch to its Kotlin source, so
@@ -39,7 +39,7 @@ Expo modules by default, so a patch to Expo Swift code needs `expo.autolinking.i
 extend `NativeMethods`, which React Native 0.87 removed from its types, so `MaskedView` was not a
 valid JSX component. Remove the patch when a release fixes the types.
 
-react-native-screens 4.30.0 is patched in `patches/react-native-screens@4.30.0.patch` so the full
+react-native-screens 4.30.1 is patched in `patches/react-native-screens@4.30.1.patch` so the full
 screen swipe back of a chat waits for a gesture handler pan in the top screen to fail. The swipe back
 starts anywhere in the chat, and a swipe to the right on a message bubble still replies. Without
 the patch, no rule sets which of the two recognizers gets the swipe. Remove the patch when a
@@ -87,8 +87,7 @@ do not commit it: the app config is in the runtime version.
 The iOS commands keep the Xcode build in `ios/DerivedData`, not in
 `~/Library/Developer/Xcode/DerivedData`, so removing a worktree removes its build. Do not remove
 `ios/build`: CocoaPods writes codegen output there. When that output is missing, `bun mobile:ios`
-installs the pods again. Metro keeps its
-caches in `.expo/metro-cache` and `.expo/metro-file-map` of the worktree.
+installs the pods again. Metro keeps its file map cache in `.expo/metro-file-map` of the worktree.
 
 `bun mobile:android` also applies the config plugins without clearing `android/`, then runs
 `expo run:android`. Three local settings make a build in a new worktree faster:
@@ -98,9 +97,35 @@ caches in `.expo/metro-cache` and `.expo/metro-file-map` of the worktree.
 - The local `android/gradle.properties` gets `org.gradle.caching=true`. Worktrees share Gradle task
   outputs in `~/.gradle/caches/build-cache-1`. The app config, fingerprint and EAS builds stay the
   same.
-- `CCACHE_BASEDIR` and `CCACHE_NOHASHDIR` let ccache share the C++ results of the app CMake project
-  between worktrees. Install ccache with `brew install ccache`; React Native uses it when it is on
-  `PATH`.
+- `CCACHE_BASEDIR` and `CCACHE_NOHASHDIR` let ccache share C++ results between worktrees. Install
+  ccache with `brew install ccache`. React Native uses it for the app CMake project when it is on
+  `PATH`, and `CMAKE_C_COMPILER_LAUNCHER` and `CMAKE_CXX_COMPILER_LAUNCHER` add it to the CMake
+  projects of the libraries, such as Reanimated, Worklets, Expo modules and Skia.
+
+The first build in a new worktree also reuses the work of other worktrees through two shared caches
+in `openbot-mobile-cache.noindex` of the common git directory (`git rev-parse --git-common-dir`), on
+the disk of the main checkout. `OPENBOT_MOBILE_BUILD_CACHE=<directory>` puts them in another
+directory; a relative path starts at the checkout root. `OPENBOT_MOBILE_BUILD_CACHE=off` turns them
+off. You can remove the directory at any time.
+
+- `metro/`: Metro transforms of all mobile commands (`metro-cache.js`). Each set of mobile
+  dependencies in `bun.lock` and their patches has its own namespace, because the Metro cache key
+  does not include the versions of the Babel plugins. Packages that only other workspaces or the dev
+  dependencies of the app use are not in the namespace. When `bun.lock` or a patch is newer than the
+  last `bun install` (`node_modules/.openbot-install-stamp`), Metro warns and does not use the shared
+  cache. A namespace that no worktree used for 14 days is removed. A transform that contains the
+  path of the checkout, such as a `use dom` component, stays in `.expo/metro-cache` of the worktree.
+  The entries use the file store of `@expo/metro-config`, which writes each entry to a temporary file
+  and renames it, so several Metro processes can use one namespace. The store is not a public export
+  of Expo: when Expo moves it, Metro warns and does not use the shared cache. Uniwind replaces the
+  Metro cache stores with one in the system temporary directory, so `metro.config.js` sets them
+  again; EAS builds keep the store of Uniwind. React Native's build scripts and the early bundle of
+  `expo run` clear the Metro cache before each release bundle; `bun mobile:ios` and
+  `bun mobile:android` keep it. `bun mobile -- --clear` clears the namespace for all worktrees.
+- `xcode/`: the Xcode compilation cache of `bun mobile:ios` (Swift, Objective-C and C++). Prefix
+  mapping replaces the checkout path and its real path with `/^openbot` in the cache keys, in the
+  debug info and in `__FILE__`. Only the `xcodebuild` build command (with `-destination`) gets these
+  settings. Xcode removes old entries above 20 GB.
 
 The local launcher enables RocketSim Connect in the local native project. The config plugin
 loads it before React Native starts, only in Debug builds on the iOS Simulator.
@@ -260,10 +285,41 @@ recent apps show a blank card. The lock screen draws in `FullWindowOverlay` on i
 Android, above sheets. Notification, Live Activity, quick action and share navigation waits until
 the user unlocks. Expo Go does not have the module: it measures with the phone clock and cannot see a phone lock.
 
+## Background refresh
+
+While the user is signed in, the phone asks the system for a background refresh at most once every
+15 minutes. The system decides when it runs. In a refresh, the workspace makes the server connections
+active for at most 25 seconds. It waits until each server loads with its channels and open chats, or
+stops at the retry cooldown, then saves the encrypted workspace copy and makes the connections
+inactive again. The app stays "away" for the hosts, so they continue to send notifications, and a
+chat on screen is not marked as read. A refresh sends no connection analytics.
+
+- iOS uses `BGAppRefreshTask` with the identifier `run.openbot.mobile.refresh` (`UIBackgroundModes`
+  `fetch` in `app.json`). The local `modules/background-refresh` module registers the task at launch
+  and gives each run to JavaScript. iOS lists the app in Settings > General > Background App Refresh.
+- Android uses `expo-background-task` (WorkManager). `package.json` excludes it, `expo-task-manager`
+  and `unimodules-app-loader` from iOS autolinking, because that package schedules only an idle
+  processing task on iOS.
+- The server connections run in a web view, so a refresh needs the React tree. When the system
+  starts the app in the background with no window, React Native does not start (iOS) or no component
+  mounts (Android). The run then ends with no network work, and the refresh stops until the user
+  opens the app again.
+- The support log shows `Background refresh: available` (or the iOS status), and for each run the
+  number of servers that loaded, or why the run did nothing (`Background refresh skipped: ...`). On
+  iOS, the device log (subsystem `run.openbot.mobile`, category `BackgroundRefresh`) shows when iOS
+  started the task and when it ended.
+- Test on a device. iOS has no background tasks in the Simulator. Attach Xcode to `OpenBot`, put
+  the app in the background and pause it. Select a thread that is not the main thread
+  (`thread select <n>`): on the main thread the command does not return. Then run
+  `e -l objc -- @import Foundation`, `e -l objc -- @import BackgroundTasks` and
+  `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] performSelector:NSSelectorFromString(@"_simulateLaunchForTaskWithIdentifier:") withObject:@"run.openbot.mobile.refresh"]`,
+  and continue. Wait before you open the app: a run with the app in the foreground does nothing.
+  On Android, `adb shell cmd jobscheduler run -f run.openbot.mobile <job id>` starts the job.
+
 ## iOS shortcuts
 
-The Shortcuts app of iOS 26 and later has two OpenBot shortcuts: List Agents and Send Message. An
-older iOS has none: their cards need `SnippetIntent`.
+The Shortcuts app of iOS 26 and later has three OpenBot shortcuts: List Agents, Send Message and
+Open Agent. An older iOS has none: their cards need `SnippetIntent`.
 
 The shortcuts run in native code, with no JavaScript of the app. iOS runs a shortcut in the
 background, also when the app is not in memory. There the app has no window, React Native does not
@@ -277,7 +333,11 @@ start, and iOS suspends the app soon after the intent returns.
   (`src/features/shortcuts/model/shortcut-directory.ts`): the agents, the agent of Settings >
   Shortcuts, the app lock and the card text. Sign-out deletes it. The servers with their public
   keys and the agent pictures are the ones that the app writes for the share extension.
-- List Agents reads that file. A tap on an agent opens its chat.
+- List Agents reads that file. A tap on an agent opens its chat. The message button of an agent runs
+  the hidden intent Message Agent: it asks for the text and sends it to that agent as Send Message
+  does, and the app does not open.
+- Open Agent opens the app on the chat of the agent of Settings > Shortcuts. With no agent, it opens
+  Settings > Shortcuts. It uses the same `ShortcutBridge` path as the card buttons.
 - Send Message sends to the agent of Settings > Shortcuts with the sender of the share extension
   (`plugins/share-extension/ShareSender.swift` and the page `share-sender.html`, which the plugin
   also adds to the app target). A hidden web view with the Team client connects to the agent's
@@ -928,14 +988,14 @@ of both platforms is required before release.
 ### Event catalog
 
 Every event has `surface=mobile`, `platform=ios|android`, `environment=production`,
-`event_schema_version=3`, `app_version` and `build_number`. Operation outcomes use `result` and,
+`event_schema_version=5`, `app_version` and `build_number`. Operation outcomes use `result` and,
 where available, `duration_ms`. Failure codes are fixed categories, never raw error text.
 
 | Event | Meaning |
 | --- | --- |
 | `mobile_app_opened` | Cold start or return from background, with `signed_in`; iOS inactive overlays do not count as a new visit |
 | `mobile_pairing_action` | Sign-in scanner opened, camera permission result, QR redemption result, scanner cancelled; `entry_point` is `qr` or `link` (a pairing link) |
-| `mobile_connection_action` | Initial connection attempt, reconnection attempt, or connection lost; result, duration and bounded loading stage |
+| `mobile_connection_action` | Initial connection attempt, reconnection attempt, or connection lost; result, duration and bounded loading stage. From generation 5, the milliseconds from the start of the attempt to the Signal socket (`signal_socket_ms`), the Signal answer (`signal_ms`), the open data channels (`channels_ms`) and the host sign-in (`auth_ms`), when the attempt made a new peer connection; `route`, the candidate types and transports of the selected WebRTC path (for example `relay/tcp -> host/udp`; for a relay candidate, the transport from the phone to the relay); and `vpn` (`off`, `on`, `proxy` for a tunnel address in `198.18.0.0/15` as Clash-type proxy apps use, or `unknown`), also on `lost`. No address or VPN name is sent |
 | `conversation_opened` | One visible-visit outcome and time to readable conversation, including cached/offline reads; failures when no readable conversation is available |
 | `message_send` | Host receipt or failure, attachment count, reply flag, provider/model/reasoning metadata when known |
 | `agent_input_action` | Submission of a structured prompt answer or an approval decision (`accept` or `decline`); no answer contents, command or path |

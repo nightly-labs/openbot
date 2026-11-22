@@ -1,16 +1,3 @@
-// The start of the agent database host does not count against the first statement. Drives the real
-// `AgentDatabaseSupervisor` against the real host, `agent-database-host.ts` run by `node` over stdio:
-// - a host that reports ready after longer than the statement deadline answers the first statement,
-//   and the reported statement time does not include the start;
-// - a host that never reports ready fails the waiting request with the start message and is ended;
-// - a host that exits before ready fails the waiting request and is not started again in a loop;
-// - a prewarmed host answers the first statement with no second start;
-// - a second failed start in a row tells the agent not to retry, starts no host until the retry delay
-//   ends, and reports each failure with its reason; a host that starts after the delay answers;
-// - through the real `AgentTables`, an agent adds a trigger to its own table in one statement, but
-//   not to a table of another agent, the owner record, or a TEMP trigger, and a trigger that a
-//   foreign-key cascade fires inside OpenBot's own `DROP TABLE` cannot reassign a table's owner.
-// `bun run test:agent-database-host-start`. Writes .openbot-build/agent-database-host-start-e2e/report.json.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -31,9 +18,7 @@ import { AgentTables } from "../src/backend/agent-data/agent-tables";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-database-host-start-e2e");
 const HOST = resolve(import.meta.dirname, "../src/backend/agent-data/agent-database-host.ts");
-/** Wide for a loaded CI runner: the first statement creates the file and the metadata tables. */
 const STATEMENT_DEADLINE_MS = 1_000;
-/** Longer than the statement deadline: before the fix, this start ended the first statement. */
 const READY_DELAY_MS = 2_000;
 const START_DEADLINE_MS = 3_000;
 const NOT_STARTED = "The database process did not start. Nothing was run. Try the call again.";
@@ -69,7 +54,6 @@ const root = await mkdtemp(join(tmpdir(), "openbot-agent-database-host-start-e2e
 const report: Report = { passed: false };
 const children: ChildProcess[] = [];
 
-/** The test transport: the host's stdio, with an optional hold on its ready message. */
 function stdioHost(args: string[], readyDelayMs = 0): AgentDatabaseHostProcess {
   const child = spawn(process.platform === "win32" ? "node.exe" : "node", args, {
     stdio: ["pipe", "pipe", "inherit"],
@@ -140,7 +124,6 @@ async function run(
     assert.equal(starts, 1, "the prewarm did not start a host");
   }
   const outcome = await select(supervisor);
-  // The start failures end the host themselves; the others are ended here.
   if (options.dispose !== false) supervisor.dispose();
   await waitForExits();
   return {
@@ -193,7 +176,6 @@ try {
       return stdioHost(["-e", "process.exit(3)"]);
     },
     hostStartDeadlineMs: START_DEADLINE_MS,
-    // Longer than this case runs, so the third call is inside the delay.
     hostStartRetryDelayMs: 60_000,
     onHostStartFailed: (failure) => reasons.push(`${failure.reason}; retry after ${failure.retryAfterMs} ms`),
   });
@@ -207,7 +189,6 @@ try {
   failing.dispose();
   await waitForExits();
 
-  // With no delay, the next call after two failed starts starts the real host and is answered.
   children.length = 0;
   const hosts = [
     ["-e", "process.exit(3)"],

@@ -9,7 +9,6 @@ import { Effect } from "effect";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 
-/** The island actions that main runs against the agent itself, with no help from the main window. */
 export type CriticalAction = Extract<
   DynamicIslandAction,
   { type: "answer-prompt" | "respond-approval" | "send-message" | "stop-agent" }
@@ -55,7 +54,6 @@ export const performDynamicIslandCriticalAction = Effect.fn("DynamicIsland.criti
       : remote
           .request(action.serverId, TEAM_API_ROUTES.agent.messages(action.agentId), decodeQueuedMessageReceipt, {
             method: "POST",
-            // The host uses this computer's zone for a routine the agent creates from the message.
             body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
           })
           .pipe(Effect.asVoid);

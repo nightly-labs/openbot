@@ -117,6 +117,8 @@ export const messages = {
   "provider.picker.download": "{name} indirmesi",
   "provider.picker.search": "Modellerde ara",
   "provider.picker.noMatches": "Aramanızla eşleşen model yok.",
+  "provider.picker.openrouterNoMatches":
+    "Aramanızla eşleşen model yok. openrouter.ai üzerindeki gizlilik, sağlayıcı ve koruma (guardrail) ayarlarınız bu listedeki bazı modelleri gizleyebilir.",
   "provider.picker.workspaceOnlyUnavailable":
     'Bu modeller Windows ve Linux\'ta "Yalnızca çalışma alanı" ile çalışmaz. Kullanmak için ajan ayarlarında "İzinler"i değiştirin.',
   "provider.picker.olderModels": "Eski modeller",
@@ -269,6 +271,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · OpenBot tarafından indirildi",
   "provider.settings.otherVersionInstalledByUser": "Kullanılmıyor: {version} · senin yüklediğin",
   "provider.settings.otherVersionDownloaded": "Kullanılmıyor: {version} · OpenBot tarafından indirildi",
+  "provider.settings.installedVersionIncomplete":
+    "Bazı modeller bu sürümde olmayan bir bileşene ihtiyaç duyar. Bunları kullanmak için OpenBot sürümünü indir.",
   "provider.settings.useInstalledVersion": "Yüklü sürümü kullan",
   "provider.settings.useDownloadedVersion": "OpenBot sürümünü kullan",
   "provider.settings.cache": "Önbellek",
@@ -335,4 +339,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "İndirme kaldırılamadı.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot bu bilgisayarda {provider} oturumunu kapatır. Terminalindeki {provider} CLI kendi oturumunu korur.",
+  "provider.settings.updateAll": "Tümünü güncelle",
 } as const satisfies PartialTranslation<typeof source>;

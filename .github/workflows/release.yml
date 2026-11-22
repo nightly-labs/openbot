@@ -264,6 +264,31 @@ jobs:
         if: always()
         run: az account clear
 
+  repository-check:
+    name: Run repository check
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Run repository check
+        run: |
+          bun run check:desktop
+          bun run test:desktop -- --maxWorkers=2
+          NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
+
   # Each architecture builds on a runner of its own kind. The install scripts run every provider
   # runtime they download, and the voice runtime and the remote desktop runtime are downloaded or
   # verified for the runner's architecture, so one runner cannot produce both. The ARM64 job keeps
@@ -332,16 +357,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      # The code is the same for both architectures, so the check runs once.
-      - name: Run repository check
-        if: matrix.arch == 'arm64'
-        run: |
-          bun run check:desktop
-          bun run test:desktop -- --maxWorkers=2
-          # The account service check needs more than the default Node heap of this 7 GB runner (about 2 GB).
-          # Its build sets a larger heap itself, in `apps/auth-api/package.json`.
-          NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
 
       - name: Install and verify native runtimes
         run: |
@@ -607,11 +622,6 @@ jobs:
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
-
-      # The Linux job checks types with tsrs, as PR CI does. tsrs has no Windows binary, so a type check
-      # here would use `tsc` from another TypeScript version and could stop a release that CI passed.
-      - name: Run Windows checks
-        run: bun run lint
 
       # Without a token, the GitHub API rate limit for the runner's address can refuse the release
       # lookup with HTTP 403.
@@ -1055,7 +1065,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: [validate, macos, windows, linux, docker]
+    needs: [validate, repository-check, macos, windows, linux, docker]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -8,12 +8,10 @@ import { SiteHeader } from "../landing/SiteHeader";
 export interface LegalPageProps {
   route: LandingScreenPath;
   title: string;
-  /** The "Last updated" date, as `YYYY-MM-DD`. */
   updatedAt: string;
   children: JSX.Element;
 }
 
-// The article layout without the artwork, reading progress and related links: a legal text is read, not browsed.
 export function LegalPage(props: LegalPageProps) {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, props.route));
 

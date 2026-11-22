@@ -20,6 +20,11 @@ export const messages = {
   "preview.unsupported.title": "Просмотр недоступен",
   "preview.unsupported.description": "Файл этого типа можно открыть в программе по умолчанию.",
   "preview.unsupported.openExternally": "Открыть в программе",
+  "preview.tooLarge.title": "Файл слишком большой для просмотра",
+  "preview.tooLarge.description": "Просмотр работает до 100 МБ. Этот файл можно открыть в программе по умолчанию.",
   "preview.spreadsheet.readFailed": "Не удалось прочитать эту таблицу.",
   "preview.spreadsheet.truncated": "Просмотр ограничен первыми {rows} строками и {columns} столбцами.",
+  "preview.document.readFailed": "Не удалось прочитать этот документ.",
+  "preview.document.empty": "В этом документе нет текста для показа.",
+  "preview.document.truncated": "Просмотр ограничен первой частью документа.",
 } as const satisfies PartialTranslation<typeof source>;

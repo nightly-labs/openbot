@@ -1,4 +1,3 @@
--- Nullable additions preserve the deployed Worker and all existing servers.
 ALTER TABLE hosted_servers ADD COLUMN deletion_scheduled_at INTEGER;
 ALTER TABLE hosted_servers ADD COLUMN deletion_subscription_id TEXT;
 ALTER TABLE hosted_servers ADD COLUMN lifecycle_token TEXT;

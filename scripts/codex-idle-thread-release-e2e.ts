@@ -1,20 +1,3 @@
-// Checks the idle release of Codex sessions. One Codex app server holds every thread of its account,
-// with the MCP servers and terminals of each thread, until the whole process is idle. OpenBot now
-// unsubscribes from each idle thread, so the app server unloads it, and resumes it at the next turn.
-// Runs the real agent service with a fake Codex app-server that forgets a thread at
-// `thread/unsubscribe`: a turn on it without `thread/resume` first fails.
-// 1. Timeout: the session of an idle agent is released after the injected timeout. The next message
-//    resumes the same session before its turn starts.
-// 2. Background terminal: a session whose thread has a background terminal stays loaded. It is
-//    released after the terminal ends.
-// 3. Race: a message arrives while the release waits for the terminal check. The turn runs on the
-//    loaded session, and the release comes only after that turn ends.
-// 4. Limit: with a long timeout, the end of a turn releases at once the older idle session of the same
-//    app server, and keeps the newer one.
-// 5. Delete: deleting an agent archives its loaded session, and waits for the answer before its folder
-//    goes. Codex unloads an unsubscribed thread only 60 s later, with the processes that it started
-//    in the workspace, and Windows does not remove a folder that a process uses (#6266).
-// `bun run test:codex-idle-thread-release`. Writes .openbot-build/codex-idle-thread-release-e2e/report.json.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -32,7 +15,6 @@ const controlPath = join(root, "control.json");
 const fakeCodex = join(root, "codex");
 const defaultHome = join(home, ".codex");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = defaultHome;
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -46,10 +28,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// A Codex app-server that saves a rollout when a turn completes, resumes a thread from it, and
-// forgets a thread at `thread/unsubscribe`, as the real one does when it unloads the thread. The
-// control file gives each thread a background terminal (`terminals`), holds the answer to the
-// terminal list (`holdList`), and holds the end of each turn (`holdTurns`).
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
@@ -98,7 +76,6 @@ const answer = (message) => {
       loaded.delete(params.threadId);
       return write({ id: message.id, result: { status: "unsubscribed" } });
     case "thread/archive":
-      // The real app server shuts the thread down before it answers.
       loaded.delete(params.threadId);
       return setTimeout(() => {
         write({ id: message.id, result: {} });
@@ -161,7 +138,6 @@ interface ProtocolLine {
   sent?: string;
 }
 
-/** What the next turn of a released session sent, in order. */
 interface ResumedTurn {
   sameSession: boolean;
   resumedBeforeTurn: boolean;
@@ -191,6 +167,7 @@ const report: Report = { passed: false };
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -220,7 +197,6 @@ function protocol(): ProtocolLine[] {
   }
 }
 
-/** Waits for a state of the service or of the fake Codex. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -244,7 +220,6 @@ const count = (method: string, threadId: string, from = 0) =>
 
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
 
-/** One run of the app on the profile, with the injected idle release. */
 async function startApp(codexIdleSessions: { releaseAfterMs: number; idleLimit: number }) {
   const database = new OpenBotDatabase(userData);
   const store = new AgentStore(userData, home, database);
@@ -289,7 +264,6 @@ async function createAgent(app: App, name: string): Promise<{ agentId: string; t
   return { agentId: agent.id, thread };
 }
 
-/** Sends a message to an agent whose session was released, and reads what its turn sent. */
 async function nextTurn(app: App, agentId: string, thread: string): Promise<ResumedTurn> {
   const from = protocol().length;
   await runCauseEffect(app.agents.sendMessage({ agentId, text: "Next message." }));
@@ -310,14 +284,12 @@ const resumedCleanly = (turn: ResumedTurn) =>
   turn.sameSession && turn.resumedBeforeTurn && turn.turnStarts === 1 && turn.newThreads === 0;
 
 control({});
-// A short timeout, so each idle session goes soon.
 let app = await startApp({ releaseAfterMs: 300, idleLimit: 1 });
 const errors: Report["errors"] = [];
 try {
   await runCauseEffect(app.agents.initialize());
   await waitFor("Codex to be ready", () => app.agents.getStatus().phase === "ready");
 
-  // 1. Timeout.
   const timeout = await createAgent(app, "Timeout");
   await waitFor("the idle release of the first session", () => requested("thread/unsubscribe", timeout.thread) >= 0);
   report.timeout = {
@@ -326,7 +298,6 @@ try {
     next: await nextTurn(app, timeout.agentId, timeout.thread),
   };
 
-  // 2. Background terminal. Each check finds a terminal, so the timer starts again.
   control({ terminals: true });
   const terminal = await createAgent(app, "Terminal");
   await waitFor("two terminal checks", () => count("thread/backgroundTerminals/list", terminal.thread) >= 2);
@@ -336,7 +307,6 @@ try {
   await waitFor("the release after the terminal ended", () => requested("thread/unsubscribe", terminal.thread) >= 0);
   report.backgroundTerminal = { thread: terminal.thread, checksWhileHeld, releasedWhileHeld, releasedAfter: true };
 
-  // 3. Race. The terminal check waits, and a turn starts on the loaded session in that time.
   const raceFrom = protocol().length;
   control({ holdList: true });
   const race = await createAgent(app, "Race");
@@ -348,7 +318,6 @@ try {
   const messageFrom = protocol().length;
   await runCauseEffect(app.agents.sendMessage({ agentId: race.agentId, text: "Message during the release." }));
   await waitFor("the turn during the release", () => count("turn/start", race.thread, messageFrom) > 0);
-  // The check answers while the turn runs. A release now would unsubscribe the running turn.
   control({ holdTurns: true });
   await waitFor("the terminal answer", () =>
     protocol()
@@ -371,7 +340,6 @@ try {
   };
   errors.push(...app.errors);
 
-  // 4. Limit. A new run of the app with a long timeout: only the limit releases a session.
   await runCauseEffect(app.agents.stop());
   app.database.close();
   app = await startApp({ releaseAfterMs: 10 * 60_000, idleLimit: 1 });
@@ -401,7 +369,6 @@ try {
     newerReleasedAfterOlderTurn: true,
   };
 
-  // 5. Delete. The long timeout keeps the newest session loaded.
   const deleted = await createAgent(app, "Delete");
   const workspace = app.store.list().find((agent) => agent.id === deleted.agentId)?.workspacePath ?? "";
   const deleteFrom = protocol().length;

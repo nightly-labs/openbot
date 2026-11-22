@@ -1,11 +1,3 @@
-/*
- * Files and storage (issue 496). The storage bar takes its hues from the
- * `--openbot-chart-storage-*` tokens in a fixed order; everything else uses the
- * shared text, surface and space tokens.
- */
-
-/* Storage bar ------------------------------------------------------------- */
-
 .storage-usage {
   display: flex;
   flex-direction: column;
@@ -31,8 +23,6 @@
   --storage-color: var(--openbot-chart-storage-app);
 }
 
-/* A 2px surface gap between segments; each segment keeps a minimum width so a
-   small share stays a visible mark next to its legend row. */
 .storage-usage-bar {
   display: flex;
   height: 10px;
@@ -97,8 +87,6 @@
   font-variant-numeric: tabular-nums;
   text-align: end;
 }
-
-/* Storage page ------------------------------------------------------------ */
 
 .storage-overview {
   container-type: inline-size;
@@ -272,8 +260,6 @@
   white-space: nowrap;
 }
 
-/* One series, so the share bar is one neutral hue; the size beside it is the
-   readable value. Scaled to the largest agent, so the top agent fills it. */
 .storage-row-share {
   width: 96px;
   height: 6px;
@@ -315,7 +301,6 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* Right to left, the arrow points the other way. */
 .storage-row-chevron:dir(rtl) {
   transform: scaleX(-1);
 }
@@ -337,7 +322,6 @@
   gap: var(--openbot-space-2);
 }
 
-/* The same size as the back icon in the settings panel header. */
 .storage-subview-back > svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
@@ -354,8 +338,6 @@
     display: none;
   }
 }
-
-/* File list ---------------------------------------------------------------- */
 
 .file-list {
   display: flex;
@@ -541,8 +523,6 @@
   background: transparent;
 }
 
-/* A missing or remote file cannot preview, but its row still reads as a row
-   rather than a disabled control. */
 .file-row-main.ui-button:disabled {
   opacity: 1;
 }
@@ -566,7 +546,6 @@
   letter-spacing: 0.02em;
 }
 
-/* The shared danger colour is too dark for 12px text on its soft fill. */
 .files-file-visual[data-file-tone="document"] {
   color: var(--openbot-danger-text);
 }
@@ -628,7 +607,6 @@
   flex: 0 0 auto;
 }
 
-/* The chat panel surface is lighter than the page; the shared danger colour is too dark on it at 12px. */
 .file-row-status.z-badge-variant-destructive-light {
   color: var(--openbot-danger-text);
 }
@@ -644,15 +622,12 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* Icons next to button text: the ui-button leaves lucide at its 24px default. */
 .files-button-icon {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
   stroke-width: var(--openbot-icon-stroke);
 }
-
-/* Agent settings > Files ------------------------------------------------- */
 
 .agent-files-view {
   position: absolute;
@@ -701,8 +676,6 @@
   margin-top: var(--openbot-space-0-5);
 }
 
-/* One grouped card with a label and a value per row: the settings panel is too narrow for
-   tiles, and a row keeps a long label such as "Files from agents" on one line. */
 .agent-files-tiles {
   display: flex;
   flex-direction: column;
@@ -748,7 +721,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The row keeps its height: the button overlaps the row padding, not the text. */
 .agent-files-tile-action {
   flex: 0 0 auto;
   margin-block: calc(var(--openbot-space-1) * -1);
@@ -766,8 +738,6 @@
   gap: var(--openbot-space-2);
 }
 
-/* Chat > Files panel ------------------------------------------------------ */
-
 .conversation-files-summary {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
@@ -781,8 +751,6 @@
   overflow-y: auto;
   padding: var(--openbot-space-3);
 }
-
-/* Machine use, at the top of Storage -------------------------------------- */
 
 .machine-resources-metrics,
 .machine-resources-settings {
@@ -854,7 +822,6 @@
   background: var(--openbot-danger);
 }
 
-/* The alert level of the metric, on its bar. */
 .machine-resources-threshold {
   position: absolute;
   top: -3px;
@@ -911,10 +878,6 @@
   }
 }
 
-/* Library ----------------------------------------------------------------------- */
-
-/* The files and pictures of every chat of a server. The page fills the space that its caller gives it. */
-/* Holds the scrolled page and the selection pill over its bottom edge. */
 .library-frame {
   position: relative;
   height: 100%;
@@ -933,7 +896,6 @@
   padding: var(--openbot-space-8) var(--openbot-space-8) var(--openbot-space-6);
 }
 
-/* The last row can scroll up above the pill. */
 .library-frame[data-pill] .library-page {
   padding-bottom: calc(var(--openbot-space-8) * 3);
 }
@@ -943,7 +905,6 @@
   user-select: none;
 }
 
-/* The rectangle that a drag draws over the files to select them. */
 .library-marquee {
   position: absolute;
   z-index: 2;
@@ -953,7 +914,6 @@
   pointer-events: none;
 }
 
-/* The selection pill has the surface of the jump-to-latest pill, with its ring and no drop shadow. */
 .library-pill {
   position: absolute;
   z-index: 5;
@@ -978,11 +938,9 @@
 
 .library-pill[data-tone="danger"] {
   border-color: var(--openbot-danger-border);
-  /* The soft danger color is translucent: lay it over the opaque surface. */
   background: linear-gradient(var(--openbot-danger-soft), var(--openbot-danger-soft)), var(--openbot-bg-surface-raised);
 }
 
-/* The content keeps its own width; the pill clips it while it springs to that width. */
 .library-pill-face {
   position: relative;
   display: flex;
@@ -1086,17 +1044,28 @@
 }
 
 .library-grid {
+  gap: var(--openbot-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
-  columns: 4 220px;
-  column-gap: var(--openbot-space-2);
+}
+
+.library-grid[data-layout="mosaic"] {
+  position: relative;
+  flex-shrink: 0;
+  height: var(--library-mosaic-height, auto);
 }
 
 .library-tile {
   position: relative;
-  margin-bottom: var(--openbot-space-2);
-  break-inside: avoid;
+  min-width: 0;
+}
+
+.library-grid[data-layout="mosaic"] > .library-tile {
+  position: absolute;
+  top: var(--library-tile-y, 0);
+  inset-inline-start: var(--library-tile-x, 0);
+  width: var(--library-tile-width, 100%);
 }
 
 .ui-button.library-picture,
@@ -1120,7 +1089,6 @@
   display: block;
   width: 100%;
   height: auto;
-  /* A square until the picture loads, so a picture below the fold does not load at once. */
   aspect-ratio: auto 1 / 1;
 }
 
@@ -1167,7 +1135,6 @@
   opacity: 1;
 }
 
-/* The check mark of a file that can be picked for a delete. The tile or row button holds the state. */
 .file-select-mark {
   display: inline-flex;
   width: var(--openbot-icon-md);
@@ -1237,13 +1204,10 @@
   }
 }
 
-/* The Library with folders: the path and the tools in the top row, the tree of agents and folders at
-   the side, then the files. A host with no folders keeps the page above. */
 .library-shell {
   display: grid;
   height: 100%;
   min-height: 0;
-  /* The side panel has the width of the settings page nav. */
   grid-template-columns: var(--library-side-width, max(var(--left-panel-width, 280px), 220px)) minmax(0, 1fr);
   grid-template-rows: var(--library-head-height, 54px) minmax(0, 1fr);
 }
@@ -1253,7 +1217,6 @@
   grid-column: 2;
 }
 
-/* The path and the view controls are in the top row, after the side panel. */
 .library-path-head {
   display: flex;
   min-width: 0;
@@ -1312,7 +1275,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The face is lower than the middle of its box, so each avatar moves up by 14% of its size, as in the app. */
 .library-path-avatar.agent-avatar {
   --agent-avatar-optical-offset: calc(18px * -0.14);
 
@@ -1327,7 +1289,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The side panel: the search field and one tree. The tree has all files, then each agent with its folders. */
 .library-side {
   display: flex;
   min-height: 0;
@@ -1368,7 +1329,6 @@
   flex: 0 0 auto;
 }
 
-/* The label draws the field, so the input in it has no frame of its own. */
 .library-side-field .ui-input {
   min-width: 0;
   height: auto;
@@ -1383,7 +1343,6 @@
   line-height: 18px;
 }
 
-/* The views, the favorites and the agents scroll below the search field. */
 .library-side-scroll {
   display: flex;
   min-height: 0;
@@ -1404,8 +1363,6 @@
   list-style: none;
 }
 
-/* Each level of folders starts 18px after the level above. The end of a row keeps space for its count,
-   and for its buttons while the pointer or the focus is on it. */
 .library-row {
   --library-row-start: 8px;
   --library-row-step: 18px;
@@ -1421,7 +1378,6 @@
   --library-row-end: 36px;
 }
 
-/* The actions show on hover, but not during a drag: the counts stay, so the user can compare folders. */
 html:not(.library-dragging) .library-row[data-actions]:is(:hover, :focus-within) {
   --library-row-end: 60px;
 }
@@ -1450,7 +1406,6 @@ html:not(.library-dragging) .library-row[data-actions]:is(:hover, :focus-within)
   font-weight: var(--openbot-weight-medium);
 }
 
-/* The avatars and the icons of one level are in one 20px column. */
 .library-row-icon {
   display: inline-flex;
   width: 20px;
@@ -1477,8 +1432,6 @@ html:not(.library-dragging) .library-row[data-actions]:is(:hover, :focus-within)
   height: 20px;
 }
 
-/* A row with folders: the pointer or the focus on the row puts the arrow over its icon. It points right
-   when the folders are hidden and down when they show. */
 .library-side .ui-button.library-row-toggle {
   position: absolute;
   z-index: 1;
@@ -1526,7 +1479,6 @@ html:not(.library-dragging) .library-row[data-actions]:is(:hover, :focus-within)
   pointer-events: none;
 }
 
-/* The buttons of a row take the place of its count while the pointer or the focus is on the row. */
 .library-row-actions {
   position: absolute;
   top: 3px;
@@ -1574,10 +1526,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   color: var(--openbot-text-secondary);
 }
 
-/* The name field of a row starts at the indent of the folder, with the same space before the icon as
-   after the name. It is a small field in the 30px of the row, so it does not touch the rows near it.
-   The icon and the name stay at their positions: the field border is in the place of the 1px border of
-   the row button. */
 .library-row-edit {
   display: flex;
   min-width: 0;
@@ -1610,8 +1558,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   font-size: var(--openbot-text-md);
 }
 
-/* A drag. The row that takes the drop has the tint of a drop target of the sidebar. A line shows the
-   position that a folder gets between two folders. */
 .library-row[data-drop="into"] > .ui-button.library-row-main {
   background: var(--openbot-accent-soft);
   color: var(--openbot-text-primary);
@@ -1639,8 +1585,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   bottom: -1px;
 }
 
-/* The folders of a row and the rows of a section close as a section of the sidebar does: the row of
-   the grid goes to zero. */
 .library-collapse {
   display: grid;
   grid-template-rows: 1fr;
@@ -1659,7 +1603,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   overflow: hidden;
 }
 
-/* The line of an open folder list is below the icon of the row above it. */
 .library-branch {
   position: relative;
   padding-top: 1px;
@@ -1703,7 +1646,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   color: var(--openbot-text-primary);
 }
 
-/* The arrow of a section shows while the pointer is on its head, and always when the section is closed. */
 .library-section-chevron {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
@@ -1742,7 +1684,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   height: var(--openbot-icon-sm);
 }
 
-/* The picker of all agents, after the agents with the newest files. */
 .library-side .ui-button.library-side-more {
   display: flex;
   width: 100%;
@@ -1774,8 +1715,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   opacity: 0.4;
 }
 
-/* The rows and the folders that cannot take the dragged item fade, so the places that can take it
-   are clear before the pointer gets to them. */
 .library-row,
 .library-folder-card {
   transition: opacity var(--openbot-duration-fast) ease;
@@ -1786,7 +1725,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   opacity: 0.4;
 }
 
-/* The place that took a drop flashes once, so the user sees where the item went. */
 @keyframes library-landed {
   from {
     background-color: var(--openbot-accent-soft);
@@ -1797,7 +1735,6 @@ html:not(.library-dragging) .library-row:is(:hover, :focus-within):has(.library-
   animation: library-landed 900ms ease-out;
 }
 
-/* The pointer moves across rows that are not the target. Only the target has a fill. */
 html.library-dragging body * {
   cursor: grabbing;
   user-select: none;
@@ -1811,8 +1748,6 @@ html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle
   opacity: 0;
 }
 
-/* The folders of the place, above the type chips and the files: the chips filter only the files. Each
-   tile is a folder with a tab. Its newest files stick out of it and rise while the pointer is on it. */
 .library-folder-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
@@ -1825,7 +1760,6 @@ html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle
 .library-folder-card {
   --library-card-back: var(--openbot-bg-surface);
   --library-card-front: var(--openbot-bg-surface-raised);
-  /* Solid tints: the tab and the back overlap, so a see-through tint would show a darker band. */
   --library-card-drop-back: color-mix(in srgb, var(--openbot-accent) 14%, var(--openbot-bg-surface));
   --library-card-drop-front: color-mix(in srgb, var(--openbot-accent) 18%, var(--openbot-bg-surface-raised));
 
@@ -1852,12 +1786,10 @@ html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle
   white-space: normal;
 }
 
-/* The 1px border of the button, so a rename does not move the folder. */
 .library-folder-card-edit {
   border: 1px solid transparent;
 }
 
-/* The back of the folder and its tab. */
 .library-folder-card-main::before,
 .library-folder-card-main::after,
 .library-folder-card-edit::before,
@@ -1883,7 +1815,6 @@ html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle
   inset-inline-start: 0;
 }
 
-/* In a right-to-left page the tab is at the start, so the round corner of the back moves too. */
 .library-folder-card-main:dir(rtl)::before,
 .library-folder-card-edit:dir(rtl)::before {
   border-radius: var(--openbot-radius-card) 0 var(--openbot-radius-card) var(--openbot-radius-card);
@@ -1937,7 +1868,6 @@ html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle
   font-size: var(--openbot-text-sm);
 }
 
-/* The front of the folder, over the lower part of the files. */
 .library-folder-card-front {
   position: relative;
   z-index: 3;
@@ -1953,7 +1883,6 @@ html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle
   transition: background-color var(--openbot-duration-hover) ease;
 }
 
-/* With no owner, the end of the front keeps the space of the menu button. */
 .library-folder-card-front:not(:has(.library-folder-card-owner)) {
   padding-inline-end: calc(var(--openbot-space-3) + 24px);
 }
@@ -1976,9 +1905,6 @@ html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle
   font-size: var(--openbot-text-sm);
 }
 
-/* The name field takes the line of the name, so the front and the detail line do not move. Its text
-   starts at the start of the name, and it has the same space at its two ends: the menu button does not
-   show during a rename. With the agent picture, the gap of the front is between them. */
 .library-folder-card-front:has(.library-folder-card-input):not(:has(.library-folder-card-owner)) {
   padding-inline-end: var(--openbot-space-3);
 }
@@ -2007,7 +1933,6 @@ html.library-dragging .library-row :is(.library-row-actions, .library-row-toggle
   transition: opacity var(--openbot-duration-hover) ease;
 }
 
-/* The menu is at the end of the front, in the place of the agent. */
 .library-folder-card .ui-button.library-folder-card-menu {
   position: absolute;
   z-index: 4;
@@ -2022,7 +1947,6 @@ html:not(.library-dragging) .library-folder-card:is(:hover, :focus-within) .libr
   opacity: 1;
 }
 
-/* During a rename the tile has no menu, so the agent stays. */
 .library-folder-card:has(.library-folder-card-menu[data-expanded]) .library-folder-card-owner,
 html:not(.library-dragging)
   .library-folder-card:is(:hover, :focus-within):has(.library-folder-card-menu)
@@ -2034,7 +1958,6 @@ html:not(.library-dragging)
   color: var(--openbot-text-primary);
 }
 
-/* A drop into the folder: all of the folder takes the tint, and its files rise as on hover. */
 .library-folder-card:not(.library-folder-card-new)[data-drop="into"] {
   --library-card-back: var(--library-card-drop-back);
   --library-card-front: var(--library-card-drop-front);
@@ -2061,7 +1984,6 @@ html:not(.library-dragging)
   animation: library-landed-front 900ms ease-out;
 }
 
-/* The tile that takes dragged files into a new folder. It has the outline of a folder, not a fill. */
 .library-folder-card-new {
   --library-card-front: transparent;
 }
@@ -2105,7 +2027,6 @@ html:not(.library-dragging)
   color: var(--openbot-accent-text);
 }
 
-/* During a drag, only the folder that takes the drop changes: the other folders keep still. */
 .library-folder-card[data-drop="into"] .library-folder-card-sheet:first-child {
   transform: translate(-50%, -8px);
 }
@@ -2141,7 +2062,6 @@ html:not(.library-dragging)
   }
 }
 
-/* The label that follows the pointer. It is on the body, so it is above the window. */
 .library-drag-chip {
   position: fixed;
   z-index: var(--openbot-layer-dropdown);
@@ -2160,7 +2080,6 @@ html:not(.library-dragging)
   pointer-events: none;
 }
 
-/* The label has the accent while the pointer is on a place that takes the drop. */
 .library-drag-chip[data-drop] {
   border-color: var(--openbot-accent-strong);
 }
@@ -2179,7 +2098,6 @@ html:not(.library-dragging)
   color: var(--openbot-text-muted);
 }
 
-/* The second line names the place that takes the drop, or says why the place cannot take it. */
 .library-drag-chip-to,
 .library-drag-chip-to > svg {
   color: var(--openbot-accent-text);
@@ -2201,18 +2119,15 @@ html:not(.library-dragging)
   transform: scaleX(-1);
 }
 
-/* A folder in the Move menu starts after the folder that holds it. */
 .library-move-item > svg {
   margin-inline-start: calc(var(--library-depth, 0) * var(--openbot-space-4));
 }
 
-/* The arrow of a submenu and the mark of the current folder are at the end of their menu row. */
 .library-menu-end {
   margin-inline-start: auto;
   color: var(--openbot-text-muted);
 }
 
-/* The page starts at the line of the search field. Its title and its tools are in the top row. */
 .library-shell .library-page {
   gap: var(--openbot-space-3);
   padding: 11px var(--openbot-space-4) var(--openbot-space-6);
@@ -2222,28 +2137,18 @@ html:not(.library-dragging)
   padding-bottom: calc(var(--openbot-space-8) * 3);
 }
 
-/* The page is a column of fixed height, and a set minimum height lets an item shrink to it. The chips
-   wrap in a narrow window, so the row keeps the height of its chips. */
 .library-shell .file-list-filters {
   min-height: 32px;
   flex: none;
   align-items: center;
 }
 
-/* The grid view: rows of tiles of one size, newest first along the row. The mosaic above is columns of free height. */
 .library-grid[data-layout="grid"] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: var(--openbot-space-3) var(--openbot-space-2);
-  columns: auto;
 }
 
-.library-grid[data-layout="grid"] > .library-tile {
-  min-width: 0;
-  margin-bottom: 0;
-}
-
-/* One button for a file: the picture or the type, then the name and the folder or chat below it. */
 .library-tile .ui-button.library-folder-tile-main {
   display: flex;
   width: 100%;
@@ -2351,10 +2256,14 @@ html:not(.library-dragging)
     --library-side-width: minmax(150px, 36%);
   }
 
-  /* The chips stay in one row that scrolls, as in the compact file list. */
   .library-shell .file-list-filters {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
   }
+}
+
+.conversation-files-workspace {
+  margin-bottom: var(--openbot-space-2);
+  padding: 0;
 }

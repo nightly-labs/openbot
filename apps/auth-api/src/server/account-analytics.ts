@@ -21,18 +21,7 @@ import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
 import type { HostedPoolGroup } from "./hosted-pool-snapshot";
 
-/** The same OpenPanel project as the desktop app and the website. ANALYTICS.md is the contract. */
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
-/**
- * The current generation. Generation 10 adds the account events, first-touch properties, and
- * `reactivated` and `end_reason` on plan events. Generation 11 adds the license to the billing events
- * (`product`, `users`, `direction`), `entry_point` on `checkout_started`, and the license totals of
- * `billing_snapshot`. A billing event without `product` is from a server plan. No generation 10
- * property changes. Generation 12 adds `email_sent`. Generation 13 adds the `license` kind of `email_sent`.
- * Generation 14 adds `email_fallback_sent`. Generation 15 adds the `ready` hosted server action, with
- * `duration_ms` and the `create` reason. Generation 16 adds `hosted_pool_snapshot`. Generation 17 adds
- * `machine` on the `provisioned`, `ready` and `setup_failed` hosted server actions.
- */
 export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 17;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
@@ -50,11 +39,6 @@ const BILLING_ACTIONS = [
   "portal_opened",
 ] as const;
 export type BillingAction = (typeof BILLING_ACTIONS)[number];
-/**
- * The billing actions of an account that pays for a plan or a license. Each one also sets the
- * account email on the OpenPanel profile, so that a paying account is never anonymous, also when
- * its apps have product analytics off.
- */
 const PAID_BILLING_ACTIONS = [
   "plan_started",
   "payment_succeeded",
@@ -77,45 +61,27 @@ const HOSTED_SERVER_ACTIONS = [
 type HostedServerAction = (typeof HOSTED_SERVER_ACTIONS)[number];
 
 const PORTAL_FLOWS = ["manage", "update", "cancel"] as const;
-/** What a billing event is for: a hosted server plan or the commercial license. */
 export const BILLING_PRODUCTS = ["server", "license"] as const;
 export type BillingProduct = (typeof BILLING_PRODUCTS)[number];
-/** On `plan_changed`: the new plan or user count costs more (`up`) or less (`down`). */
 export const PLAN_CHANGE_DIRECTIONS = ["up", "down"] as const;
 export type PlanChangeDirection = (typeof PLAN_CHANGE_DIRECTIONS)[number];
-/**
- * The largest license user count that analytics accepts. The app sells up to 10 users; a license
- * from the Stripe Dashboard can have more, so the bound only stops a value that is not a count.
- */
 const ANALYTICS_MAX_LICENSE_USERS = 10_000;
 
-/** True for a license user count that analytics can send. */
 export function isAnalyticsLicenseUsers(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= ANALYTICS_MAX_LICENSE_USERS;
 }
-/** `create`: only on `ready`, for the first start of a new server. */
 const WAKE_REASONS = ["create", "message", "restart", "schedule", "retention"] as const;
-/** Where a new server starts: on a prepared machine of the operator's pool, or in a boat sandbox. */
 const HOSTED_MACHINES = ["pool", "boat"] as const;
-/**
- * The longest start that `ready` reports. A longer one is a start time that a Worker without the column
- * left behind, not a start.
- */
 export const MAX_HOSTED_START_MS = 2 * 60 * 60 * 1000;
-/** Why a plan ended: the account cancelled it, or Stripe ended it after unpaid invoices. */
 const PLAN_END_REASONS = ["canceled", "unpaid"] as const;
 export type PlanEndReason = (typeof PLAN_END_REASONS)[number];
-/** The client that verified the sign-in code that created the account. */
 const ACCOUNT_SURFACES = ["desktop", "mobile", "web"] as const;
 export type AccountSurface = (typeof ACCOUNT_SURFACES)[number];
-/** Where the account service learned the first touch of an account. */
 const ATTRIBUTION_SOURCES = ["sign_in", "checkout"] as const;
 export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 
-/** The kinds of email that the Worker sends through the shared SMTP mailbox, and through Cloudflare when it cannot. */
-const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license"] as const;
+const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license", "owner_transfer"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
-/** `unknown`: the server got the message but did not confirm it, so it can count against the quota. */
 const EMAIL_RESULTS = ["accepted", "rate_limited", "unknown", "failed"] as const;
 export type EmailResult = (typeof EMAIL_RESULTS)[number];
 
@@ -125,23 +91,16 @@ export type AccountAnalyticsEvent =
   | {
       name: "billing_action";
       action: BillingAction;
-      /** Absent means `server`, as in generation 10. */
       product?: BillingProduct;
       plan?: BillingPlanId;
-      /** For a license: the number of users that it pays for. */
       users?: number;
-      /** On `plan_changed`. */
       direction?: PlanChangeDirection;
-      /** On `checkout_started`: where the journey started in the app. */
       entryPoint?: HostedServerEntryPoint;
       interval?: BillingInterval;
       currency?: BillingCurrency;
-      /** Minor units of `currency`, from Stripe. */
       amount?: number | null;
       flow?: (typeof PORTAL_FLOWS)[number];
-      /** On `plan_started`: the account had a plan before that ended. */
       reactivated?: boolean;
-      /** On `plan_ended`. */
       endReason?: PlanEndReason;
     }
   | { name: "account_created"; surface: AccountSurface; firstTouch: FirstTouch | null }
@@ -153,53 +112,32 @@ export type AccountAnalyticsEvent =
       size?: HostedServerSize;
       reason?: (typeof WAKE_REASONS)[number];
       error?: HostedServerError | null;
-      /**
-       * On `ready`: from the request to boat until boat reported the sandbox as usable. For a `pool`
-       * machine: from the assignment until OpenBot on the machine signed in.
-       */
       durationMs?: number;
       machine?: (typeof HOSTED_MACHINES)[number];
     }
   | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
-  /** Each 5 minutes: the machines of the operator in one location and product, by state. */
   | { name: "hosted_pool_snapshot"; group: HostedPoolGroup };
 
-/** Account events that only the Worker sees: new accounts, payments, hosted servers and email sends. */
 export interface AccountAnalytics {
-  /**
-   * Never throws and never waits: a failed send loses the event, not the request. `null` is for an
-   * event with no account, such as `email_sent`: it has no `profileId`, as `billing_snapshot`.
-   */
   track(accountId: string | null, event: AccountAnalyticsEvent): void;
 }
 
 export const NO_ACCOUNT_ANALYTICS: AccountAnalytics = { track: () => undefined };
 
 export interface AccountAnalyticsOptions {
-  /**
-   * A server client of the OpenPanel project and its write-only secret. The desktop and website
-   * client has no secret. Without both, no event is sent.
-   */
   clientId: string | undefined;
   clientSecret: string | undefined;
   fetch: (input: string, init: RequestInit) => Promise<Response>;
-  /** Keeps the Worker alive until the send ends (`waitUntil`). */
   schedule: (send: Effect.Effect<void>) => void;
-  /** Reads the account email for the profile of a paying account. */
   database: D1Database;
 }
 
 class AnalyticsDeliveryError extends Schema.TaggedError<AnalyticsDeliveryError>()("AnalyticsDeliveryError", {}) {}
 
-/** The two OpenPanel requests of the account service. An event body never has an email. */
 type OpenPanelBody =
   | { type: "track"; payload: { name: string; profileId?: string; properties: AnalyticsProperties } }
   | { type: "identify"; payload: { profileId: string; email: string } };
 
-/**
- * The normalized email of an account, for the OpenPanel profile of a paying account. `null` when the
- * account is gone or its email is not valid.
- */
 export async function readAccountEmail(database: D1Database, accountId: string): Promise<string | null> {
   const row = await database
     .prepare("SELECT email FROM users WHERE id = ?")
@@ -233,7 +171,6 @@ export function createAccountAnalytics(options: AccountAnalyticsOptions): Accoun
       });
     }
   });
-  /** Sets the account email on the profile, as the apps do at sign-in. */
   const identify = Effect.fn("AccountAnalytics.identify")(function* (accountId: string) {
     const email = yield* Effect.tryPromise({
       try: () => readAccountEmail(options.database, accountId),
@@ -267,10 +204,6 @@ export function createAccountAnalytics(options: AccountAnalyticsOptions): Accoun
   };
 }
 
-/**
- * The properties of one event, checked at runtime against the allowlists. A value that is not on a
- * list is dropped, and an unknown action drops the event.
- */
 function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperties | null {
   const properties: AnalyticsProperties = {
     surface: "account_api",
@@ -348,7 +281,6 @@ const POOL_COUNTS = [
 ] as const satisfies readonly (keyof HostedPoolGroup)[];
 const MAX_POOL_COUNT = 100_000;
 
-/** Drops the event when a location, a product or a count is not of the pool. */
 function hostedPoolProperties(properties: AnalyticsProperties, group: HostedPoolGroup): AnalyticsProperties | null {
   if (!POOL_LOCATION_PATTERN.test(group.location) || !POOL_PRODUCT_PATTERN.test(group.product)) return null;
   const result: AnalyticsProperties = { ...properties, location: group.location, product: group.product };
@@ -368,7 +300,6 @@ const FIRST_TOUCH_CAMPAIGN_PROPERTIES = {
   utmTerm: "first_touch_utm_term",
 } as const satisfies Record<(typeof FIRST_TOUCH_CAMPAIGN_FIELDS)[number], string>;
 
-/** Every property name that `firstTouchProperties` can return. */
 export const FIRST_TOUCH_PROPERTIES = [
   "first_touch_source",
   "first_touch_platform",
@@ -377,7 +308,6 @@ export const FIRST_TOUCH_PROPERTIES = [
   ...Object.values(FIRST_TOUCH_CAMPAIGN_PROPERTIES),
 ];
 
-/** The event properties of a first touch, checked again; empty without a valid one. */
 export function firstTouchProperties(value: FirstTouch | null): Record<string, string> {
   const touch = parseFirstTouch(value);
   if (!touch) return {};

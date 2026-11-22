@@ -53,6 +53,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Zbyt wiele prób logowania. Spróbuj ponownie później.",
   "error.team.clientUpdateRequired": "Zaktualizuj tego klienta OpenBot przed połączeniem z tym hostem.",
   "error.team.hostUpdateRequired": "Zaktualizuj OpenBot na hoście przed połączeniem.",
+  "error.team.serverSafeMode": "Ten serwer działa w trybie awaryjnym, ponieważ OpenBot się na nim nie uruchamia.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} na tym serwerze nie może otworzyć swoich danych, ponieważ zapisała je nowsza wersja OpenBot. Nowsze wydanie OpenBot na serwerze rozwiąże ten problem.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} na tym serwerze zatrzymał się po wielu nieudanych próbach uruchomienia. Nowsze wydanie OpenBot na serwerze rozwiąże ten problem.",
   "error.team.sidebarLayoutUnavailable": "Układ paska bocznego jest niedostępny.",
   "error.team.providersUnsupported": "To połączenie nie obsługuje ustawień dostawców.",
   "error.team.providerNotManaged": "OpenBot nie zarządza CLI tego dostawcy.",
@@ -86,6 +91,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "To połączenie nie może zatrzymać uruchomienia rutyny.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.libraryFoldersUnsupported": "To połączenie nie obsługuje folderów Biblioteki.",
+  "error.team.workflowFoldersUnsupported": "To połączenie nie obsługuje folderów przepływów pracy.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.sidebarPinsUnsupported":
@@ -119,11 +125,13 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "To połączenie nie obsługuje aktualizacji hosta.",
   "error.team.hostTimezoneUnsupported": "To połączenie nie obsługuje strefy czasowej serwera.",
   "error.team.hostRestartUnsupported": "To połączenie nie obsługuje ponownego uruchamiania serwera.",
+  "error.team.ownerTransferUnsupported": "Ten serwer nie obsługuje przekazania własności.",
   "error.team.hostKeyRotationUnsupported": "To połączenie nie obsługuje zmiany klucza serwera.",
   "error.team.localServersUnsupported": "To połączenie nie obsługuje serwerów na tym komputerze.",
   "error.team.routineResultsUnsupported": "To połączenie nie obsługuje miejsc docelowych rutyn.",
   "error.team.agentMemoryLimitUnsupported": "To połączenie nie obsługuje limitu wspomnień agentów.",
   "error.team.agentFoldersUnsupported": "To połączenie nie obsługuje folderów agentów.",
+  "error.team.channelFoldersUnsupported": "To połączenie nie obsługuje folderów kanałów.",
   "error.team.folderUnavailable": "Ten folder nie jest dostępny na komputerze hosta.",
   "error.team.memoryReviewUnsupported": "To połączenie nie obsługuje przeglądu wspomnień.",
   "error.team.skillLearningUnsupported": "To połączenie nie obsługuje uczenia się umiejętności.",
@@ -143,6 +151,8 @@ export const messages = {
   "error.team.mcpUnsupported": "To połączenie nie obsługuje serwerów MCP.",
   "error.team.mcpServerListNeedsUpdate":
     "Zaktualizuj OpenBot na tym urządzeniu, aby używać na tym serwerze więcej niż {limit} serwerów MCP.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Zaktualizuj OpenBot na tym urządzeniu, aby używać na tym serwerze więcej niż {limit} kont jednego dostawcy.",
   "error.team.storageUnsupported": "To połączenie nie obsługuje pamięci dyskowej.",
   "error.team.machineResourcesUnsupported": "To połączenie nie obsługuje użycia maszyny.",
   "error.team.machineAlertMemberInvalid":
@@ -184,6 +194,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "To połączenie nie obsługuje osobowości serwera.",
   "error.team.agentWaitsUnsupported": "To połączenie nie obsługuje otwartych oczekiwań.",
   "error.team.pendingApprovalUnsupported": "To połączenie nie pozwala odczytać całej prośby o zgodę.",
+  "error.team.pendingPromptsUnsupported": "To połączenie nie obsługuje odczytu otwartych pytań.",
   "error.team.phoneFeedbackUnsupported": "To połączenie nie pozwala wysłać zgłoszenia z aplikacji na telefon.",
   "error.team.messagePinsUnsupported": "To połączenie nie obsługuje przypiętych wiadomości.",
   "error.team.queuedMessageThreadUnsupported":

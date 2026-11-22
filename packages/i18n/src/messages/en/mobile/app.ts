@@ -39,12 +39,10 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.remoteDesktop": "Control computer",
   "mobile.app.route.marketplace": "Marketplace",
   "mobile.app.route.library": "Library",
-  // The quick actions of the app icon, which the phone shows when the icon is held.
   "mobile.app.quickAction.search": "Search",
   "mobile.app.quickAction.share": "Share OpenBot",
   "mobile.app.quickAction.support": "Wait, don't delete me!",
   "mobile.app.quickAction.supportSubtitle": "Tell us what to make better",
-  // The update header on home. A store update names its version; a downloaded update restarts the app.
   "mobile.app.update.title": "OpenBot {version} is here",
   "mobile.app.update.readyTitle": "A new OpenBot is ready",
   "mobile.app.update.storeBody": "Get the newest features and fixes.",
@@ -64,14 +62,12 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.update.group.removed": "Removed",
   "mobile.app.update.group.deprecated": "Deprecated",
   "mobile.app.update.group.security": "Security",
-  // The screen in place of the app while this version is below the lowest supported one.
   "mobile.app.update.requiredTitle": "Update required",
   "mobile.app.update.requiredBody":
     "OpenBot {version} is no longer supported. Update to {minimum} or newer to continue.",
   "mobile.app.update.notesFailed": "The release notes could not load.",
   "mobile.app.update.notesEmpty": "There are no release notes for this version yet.",
   "mobile.app.update.fullChangelog": "Full changelog",
-  // The rating ask on home. Every rating can open the store review page or a prepared post on X.
   "mobile.app.rate.title": "Enjoying OpenBot?",
   "mobile.app.rate.body": "A rating helps other teams find OpenBot.",
   "mobile.app.rate.ratingLabel": "Rating",

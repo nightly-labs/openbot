@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Arrêté.",
   "status.messaging.stop": "Arrêter",
   "status.messaging.approvalTitle": "OpenBot demande une approbation pour continuer.",
+  "status.messaging.approvalTitleTeammate": "Le coéquipier {agent} demande une approbation pour continuer.",
   "status.messaging.approvalCommand": "Exécuter une commande",
   "status.messaging.approvalFileChange": "Modifier des fichiers",
   "status.messaging.approvalPermissions": "Obtenir plus d’autorisations",
@@ -34,7 +35,7 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot a reçu l’installation Slack. Vous pouvez fermer cet onglet.",
   "status.messaging.signInUnknown": "OpenBot n’a pas lancé cette installation Slack. Relancez-la dans OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Aucun agent ne peut encore répondre ici. Ajoutez l’Orchestrateur Telegram dans OpenBot.",
+    "Aucun agent ne peut encore répondre ici. Dans OpenBot, ouvrez Marketplace > Apps > Telegram et cliquez sur Ajouter un agent.",
   "status.messaging.telegramLinked":
     "OpenBot est connecté à cette discussion. Mentionnez {bot} ou répondez à un message d’OpenBot pour solliciter les agents.",
   "status.messaging.telegramNotLinked":

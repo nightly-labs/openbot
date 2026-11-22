@@ -1,0 +1,97 @@
+diff --git a/android/src/main/java/expo/modules/image/svg/SVGDrawableTranscoder.kt b/android/src/main/java/expo/modules/image/svg/SVGDrawableTranscoder.kt
+index 40c7fce..f3f8d95 100644
+--- a/android/src/main/java/expo/modules/image/svg/SVGDrawableTranscoder.kt
++++ b/android/src/main/java/expo/modules/image/svg/SVGDrawableTranscoder.kt
+@@ -1,22 +1,65 @@
+ package expo.modules.image.svg
+ 
+ import android.content.Context
++import android.content.res.Resources
++import android.graphics.Bitmap
++import android.graphics.Canvas
+ import android.graphics.Picture
++import android.graphics.drawable.BitmapDrawable
+ import android.graphics.drawable.Drawable
+-import android.graphics.drawable.PictureDrawable
+ import com.bumptech.glide.load.Options
+ import com.bumptech.glide.load.engine.Resource
+-import com.bumptech.glide.load.resource.SimpleResource
+ import com.bumptech.glide.load.resource.transcode.ResourceTranscoder
+ import com.caverock.androidsvg.SVG
+ import com.caverock.androidsvg.applyTintColor
+ import expo.modules.image.CustomOptions
++import kotlin.math.max
++import kotlin.math.min
++import kotlin.math.sqrt
+ 
+ /**
+  * We have to use the intrinsicWidth/Height from the Picture to render the image at a high enough resolution, but at the same time we want to return the actual
+  * preferred width and height of the SVG to JS. This class allows us to do that.
+  */
+-class SVGPictureDrawable(picture: Picture, val svgIntrinsicWidth: Int, val svgIntrinsicHeight: Int) : PictureDrawable(picture)
++class SVGPictureDrawable(
++  resources: Resources,
++  bitmap: Bitmap,
++  val svgIntrinsicWidth: Int,
++  val svgIntrinsicHeight: Int,
++  private val pictureWidth: Int,
++  private val pictureHeight: Int
++) : BitmapDrawable(resources, bitmap) {
++  override fun getIntrinsicWidth(): Int = pictureWidth
++
++  override fun getIntrinsicHeight(): Int = pictureHeight
++}
++
++private const val MAX_SVG_BITMAP_PIXELS = 4_194_304.0
++
++private fun rasterize(picture: Picture): Bitmap {
++  val pictureWidth = max(1, picture.width)
++  val pictureHeight = max(1, picture.height)
++  val downscale = min(1.0, sqrt(MAX_SVG_BITMAP_PIXELS / (pictureWidth.toDouble() * pictureHeight)))
++  val bitmap = Bitmap.createBitmap(
++    max(1, (pictureWidth * downscale).toInt()),
++    max(1, (pictureHeight * downscale).toInt()),
++    Bitmap.Config.ARGB_8888
++  )
++  val canvas = Canvas(bitmap)
++  canvas.scale(downscale.toFloat(), downscale.toFloat())
++  canvas.drawPicture(picture)
++  return bitmap
++}
++
++private class SVGBitmapResource(private val drawable: SVGPictureDrawable) : Resource<Drawable> {
++  override fun getResourceClass(): Class<Drawable> = Drawable::class.java
++
++  override fun get(): Drawable = drawable
++
++  override fun getSize(): Int = drawable.bitmap.allocationByteCount
++
++  override fun recycle() = Unit
++}
+ 
+ /**
+  * Convert the [SVG]'s internal representation to an Android-compatible one ([Picture]).
+@@ -37,13 +80,16 @@ class SVGDrawableTranscoder(val context: Context) : ResourceTranscoder<SVG?, Dra
+       applyTintColor(svgData, tintColor)
+     }
+ 
+-    val picture = SVGPictureDrawable(
+-      svgData.renderToPicture(),
+-      intrinsicWidth,
+-      intrinsicHeight
+-    )
+-    return SimpleResource(
+-      picture
++    val picture = svgData.renderToPicture()
++    return SVGBitmapResource(
++      SVGPictureDrawable(
++        context.resources,
++        rasterize(picture),
++        intrinsicWidth,
++        intrinsicHeight,
++        max(1, picture.width),
++        max(1, picture.height)
++      )
+     )
+   }
+ }

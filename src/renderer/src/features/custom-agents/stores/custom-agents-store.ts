@@ -12,29 +12,18 @@ import type { CustomAgentsEndpointApi } from "../custom-agents-port";
 
 interface CustomAgentsState {
   agents: CustomAgentSummary[];
-  /** False until the first list arrives, so an empty list is not read as "none saved". */
   loaded: boolean;
-  /** The last answers to the usage prompts. An agent with no answer is not listed. */
   usage: CustomAgentUsage[];
 }
 
-/** The answer of one agent to its usage prompt, with the name that the rail shows. */
 export interface CustomAgentUsageRow {
   id: string;
   name: string;
   text: string;
 }
 
-/**
- * The user's own ACP agents, as the renderer sees them: the variable names, and never a value.
- *
- * The same shape as the custom providers store: the API is an accessor, an absent group leaves the
- * list empty, and the mutations write the list main returned and re-throw for the button that
- * started them.
- */
 export function createCustomAgentsStore(api: () => CustomAgentsEndpointApi | undefined) {
   const [state, setState] = createStore<CustomAgentsState>({ agents: [], loaded: false, usage: [] });
-  /** Changes on each `reset`, so an answer of the previous API does not replace the new list. */
   let generation = 0;
 
   function apply(agents: CustomAgentSummary[], from: number): void {
@@ -60,7 +49,6 @@ export function createCustomAgentsStore(api: () => CustomAgentsEndpointApi | und
     apply(await group.list(), from);
   }
 
-  /** Empties the list for a new API, such as another server, and drops the answers still in flight. */
   function resetCustomAgents(): void {
     generation += 1;
     setState((current) => {
@@ -70,7 +58,6 @@ export function createCustomAgentsStore(api: () => CustomAgentsEndpointApi | und
     });
   }
 
-  /** The agents that the user gave a usage prompt and that answered, in the order of the list. */
   function customAgentUsage(): CustomAgentUsageRow[] {
     return state.agents.flatMap((agent) => {
       const answer = agent.usagePrompt ? state.usage.find((usage) => usage.id === agent.id) : undefined;
@@ -78,7 +65,6 @@ export function createCustomAgentsStore(api: () => CustomAgentsEndpointApi | und
     });
   }
 
-  /** Each agent answers in a model-list process, so this can take as long as the slowest agent. */
   async function refreshCustomAgentUsage(): Promise<void> {
     const from = generation;
     const usage = await api()?.usage?.();
@@ -106,7 +92,6 @@ export function createCustomAgentsStore(api: () => CustomAgentsEndpointApi | und
     return result.restart;
   }
 
-  /** One trial start. Writes nothing, so the list does not change. */
   async function checkCustomAgent(input: CheckCustomAgentInput): Promise<CustomAgentCheckResult> {
     const check = api()?.check;
     if (!check) throw new Error(currentText().t("customProvider.saveUnavailable"));

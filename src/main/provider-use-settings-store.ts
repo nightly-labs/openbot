@@ -12,10 +12,6 @@ import { PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "
 const ProviderUseFile = Schema.Struct({
   version: Schema.Literal(1),
   off: Schema.Array(Schema.Literals(AGENT_PROVIDERS.filter((provider) => provider !== "acp"))),
-  /**
-   * The managed CLIs that run in the user's own install, also when OpenBot's copy is newer (#6327).
-   * Strings, so that a provider of a later release does not make the file unreadable after a downgrade.
-   */
   installed: Schema.optional(Schema.Array(Schema.String)),
 });
 const decodeProviderUseFile = Schema.decodeUnknownResult(ProviderUseFile);
@@ -24,7 +20,6 @@ function isManagedProviderId(value: string): value is ManagedProviderId {
   return MANAGED_RUNTIME_PROVIDERS.some((provider) => provider === value);
 }
 
-/** Owns the local provider switches and CLI choices. Unknown files stay unchanged. */
 export class ProviderUseSettingsStore {
   readonly #path: string;
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -102,7 +97,6 @@ export class ProviderUseSettingsStore {
       return Effect.fail(
         new PreferenceFileFailure({ cause: new Error(sourceText("error.provider.useSettingsReadOnly")) }),
       );
-    // Without a choice the file stays as earlier releases wrote it.
     const file = installed.length > 0 ? { version: 1, off, installed } : { version: 1, off };
     return writePreferenceFile(this.#path, file, { createDirectory: true });
   }

@@ -20,6 +20,11 @@ export const messages = {
   "preview.unsupported.title": "المعاينة غير متاحة",
   "preview.unsupported.description": "يمكن فتح هذا النوع من الملفات في تطبيقه الافتراضي.",
   "preview.unsupported.openExternally": "فتح خارجيًا",
+  "preview.tooLarge.title": "الملف كبير جدًا للمعاينة",
+  "preview.tooLarge.description": "تتوقف المعاينة عند 100 ميغابايت. يمكنك فتح هذا الملف في تطبيقه الافتراضي.",
   "preview.spreadsheet.readFailed": "تعذّرت قراءة جدول البيانات هذا.",
   "preview.spreadsheet.truncated": "المعاينة مقتصرة على أول {rows} صفوف و{columns} أعمدة.",
+  "preview.document.readFailed": "تعذرت قراءة هذا المستند.",
+  "preview.document.empty": "لا يحتوي هذا المستند على نص لعرضه.",
+  "preview.document.truncated": "المعاينة مقتصرة على الجزء الأول من المستند.",
 } as const satisfies PartialTranslation<typeof source>;

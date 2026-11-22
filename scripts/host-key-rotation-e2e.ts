@@ -1,20 +1,3 @@
-// Checks a host key rotation across restarts. A real `TeamStore` runs on a temporary profile, in a
-// child process of this script, and each step is one process that stops after its step, as an app
-// that quits or crashes does:
-//
-// 1. `begin` makes a new key and a pending handover. The host still uses the previous key.
-// 2. `inspect` starts again and must find the same pending handover, so a lost answer from the
-//    account service can be sent again with the same key.
-// 3. `complete` makes the new key the one in use. The previous private key leaves the file.
-// 4. `rotate` makes a second step, so a client that is two keys behind follows a chain.
-//
-// The client part runs the team client's `followHostKeyHandovers` on the handovers that the host
-// signed, once with the `node:crypto` check of desktop main and once with the check of the other
-// clients: a client that trusts the first key reaches the last key, and a changed signature, a step of
-// another host or a key with no handover fails. `hostKeyChangedAt`, the time that Server settings
-// shows, is the time of the step that leads to the key, and is null for a step that does not verify.
-// Run: `bun scripts/host-key-rotation-e2e.ts`.
-// Writes .openbot-build/host-key-rotation-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash, generateKeyPairSync } from "node:crypto";
@@ -50,11 +33,8 @@ interface StepResult {
   publicKey: string;
   fingerprint: string;
   pending: HostKeyHandover | null;
-  /** The handover that the `rotate` step signed and completed. */
   completed: HostKeyHandover | null;
 }
-
-// --- Host process ---
 
 async function runHost(file: string, step: Step): Promise<void> {
   const { runCauseEffect } = await import("../src/backend/effect-boundary");
@@ -125,15 +105,12 @@ function decodeStepResult(value: unknown): StepResult {
   };
 }
 
-// --- Checks ---
-
 async function follows(input: {
   hostId: string;
   trustedFingerprint: string;
   advertisedPublicKey: string;
   handovers: readonly HostKeyHandover[];
 }): Promise<boolean> {
-  // Desktop main checks with `node:crypto`, the other clients with `@noble/ed25519`. Both must agree.
   const [desktop, client] = await Promise.all([
     Effect.runPromise(followHostKeyHandovers({ ...input, verify: verifyHostKeySignature })),
     Effect.runPromise(followHostKeyHandovers({ ...input, verify: verifyEd25519Base64Url })),
@@ -155,7 +132,6 @@ async function changedAt(input: {
   return desktop;
 }
 
-/** The fingerprint that the desktop main process stores, from `src/main/team-store.ts`. */
 function hostFingerprint(publicKey: string): string {
   return createHash("sha256").update(publicKey).digest("base64url");
 }
@@ -182,7 +158,6 @@ async function main(): Promise<void> {
     assert.equal(completed.publicKey, first.publicKey, "Completion must use the new key.");
     assert.equal(completed.serverId, begun.serverId, "The host ID must not change.");
     assert.equal(completed.pending, null);
-    // The file is JSON, so the PEM text of the previous key is in it only with escaped line ends.
     const afterComplete = readFileSync(file, "utf8");
     assert.ok(!afterComplete.includes(JSON.stringify(begun.publicKey)), "The previous key pair must leave the file.");
     checks.completeUsesNewKeyAndKeepsHostId = true;

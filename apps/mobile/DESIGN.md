@@ -290,8 +290,9 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
 
 ### Palette, groups and text
 
-On iOS, sheet edges use `ProgressiveSheetBlur`: six weak native blur layers with separate,
-overlapping smooth masks. Each mask becomes transparent before the physical view edge.
+On iOS, sheet edges use `ProgressiveSheetBlur`: three native blur layers (two on an edge shorter
+than 40 pt) with separate, overlapping smooth masks. Each layer blurs the content again on each
+scroll frame, so do not add layers. Each mask becomes transparent before the physical view edge.
 The material follows the system theme. In dark mode a masked `bg-sheet` layer at 70% opacity
 covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;

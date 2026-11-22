@@ -111,6 +111,8 @@ export const messages = {
   "provider.picker.download": "Download van {name}",
   "provider.picker.search": "Modellen zoeken",
   "provider.picker.noMatches": "Geen modellen gevonden.",
+  "provider.picker.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "provider.picker.workspaceOnlyUnavailable":
     "Deze modellen werken niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig ‘Machtigingen’ in de agentinstellingen om ze te gebruiken.",
   "provider.picker.olderModels": "Oudere modellen",
@@ -305,6 +307,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · gedownload door OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Niet in gebruik: {version} · door jou geïnstalleerd",
   "provider.settings.otherVersionDownloaded": "Niet in gebruik: {version} · gedownload door OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Sommige modellen hebben een onderdeel nodig dat deze versie niet heeft. Download de versie van OpenBot om ze te gebruiken.",
   "provider.settings.useInstalledVersion": "Geïnstalleerde gebruiken",
   "provider.settings.useDownloadedVersion": "Versie van OpenBot gebruiken",
   "provider.settings.update": "Updaten",
@@ -383,4 +387,5 @@ export const messages = {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
+  "provider.settings.updateAll": "Alles updaten",
 } as const satisfies PartialTranslation<typeof source>;

@@ -10,10 +10,6 @@ import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 
-/**
- * The browser takeover of the open thread, with the secure card for a code or a password, and its result
- * after the user answers. The agent's chat and an open side thread show it.
- */
 export function ConversationBrowserTakeover() {
   const {
     props,
@@ -29,10 +25,8 @@ export function ConversationBrowserTakeover() {
   const { t, errorMessage } = useText();
   const runtime = conversationRuntime(props);
   const platform = usePlatform();
-  /**
-   * A chat window shows no browser, so the main window opens the page (#10055). Elsewhere the page opens
-   * here, and a page that this view cannot open is not offered.
-   */
+  const signInStaysOffServer = () =>
+    localSignIn.blockedTakeover() !== undefined || localSignIn.needsDesktopForTakeover();
   const openPage = () => {
     const chatWindow = platform.chatWindow;
     const request = props.browserTakeover;
@@ -50,13 +44,8 @@ export function ConversationBrowserTakeover() {
             }),
           );
     }
-    return canOpenBrowserTakeoverTab() ? () => openBrowserTakeoverTab() : undefined;
+    return canOpenBrowserTakeoverTab() && !signInStaysOffServer() ? () => openBrowserTakeoverTab() : undefined;
   };
-  /**
-   * A chat window shows no browser, so it cannot sign in for a page that refused the server's sign-in.
-   * Done there ended the step with no sign-in (#11400). The card then offers Open, and the main window
-   * asks for the sign-in on this computer.
-   */
   const completeHere = () =>
     !(
       platform.chatWindow &&
@@ -64,7 +53,6 @@ export function ConversationBrowserTakeover() {
       props.server?.kind === "remote" &&
       serverSupportsCapability(props.server, "browser-sign-in")
     );
-  /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const agentName = () =>
     (channel ? channel.interactionAgentName() : props.agent?.name) ?? t("chat.message.agentFallback");
   return (

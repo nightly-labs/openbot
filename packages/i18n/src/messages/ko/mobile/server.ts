@@ -110,8 +110,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "품절",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · {date} 종료",
+  "mobile.server.hosted.serverDataKept": "{plan} · 데이터 보관: {date}까지",
   "mobile.server.hosted.state.payment": "결제 대기 중",
   "mobile.server.hosted.state.setup": "설정 중",
+  "mobile.server.hosted.state.restoring": "데이터 복원 중",
   "mobile.server.hosted.state.starting": "시작 중",
   "mobile.server.hosted.state.running": "실행 중",
   "mobile.server.hosted.state.stopped": "중지됨",
@@ -220,6 +222,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "대기 중이에요. 호스트는 메모리가 허용하는 만큼만 턴을 실행해요.",
   "mobile.server.threads.hold.agentBusy": "이 에이전트의 다른 작업이 끝나기를 기다리는 중이에요.",
   "mobile.server.threads.hold.oneTurn": "대기 중이에요. 이 에이전트의 제공자는 한 번에 한 턴만 실행해요.",
+  "mobile.server.threads.hold.signIn": "대기 중이에요. 이 에이전트의 제공자에 로그인해야 해요.",
   "mobile.server.threads.offline": "이 서버에 연결하면 스레드를 볼 수 있어요.",
   "mobile.server.threads.loading": "스레드 불러오는 중…",
   "mobile.server.threads.loadFailed": "일부 에이전트의 스레드를 불러올 수 없어요.",
@@ -520,6 +523,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "에이전트 추가",
   "mobile.server.browserProfiles.agentsHint":
     "탭하면 에이전트에게 이 프로필을 주거나 공유 프로필로 되돌립니다. 변경하면 에이전트의 열린 탭이 닫힙니다.",
+  "mobile.server.browserProfiles.movedNote":
+    "사이트 로그인 정보는 이전 프로필에 남습니다. 옮긴 에이전트는 이 사이트에 다시 로그인해야 합니다.",
   "mobile.server.browserProfiles.clear": "데이터 지우기",
   "mobile.server.browserProfiles.clearTitle": "{name}의 데이터를 지울까요?",
   "mobile.server.browserProfiles.clearBody":
@@ -681,6 +686,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Proton Pass에서 OpenBot과 공유하는 보관함만 읽을 수 있는 액세스 키를 만든 다음 여기에 붙여 넣으세요. 키는 {host}에 보관되고 이 휴대폰에는 저장되지 않아요.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "사용 중인 Proton 플랜에는 Proton Pass 명령줄 도구가 포함되지 않아요. Pass Plus가 포함된 Proton 플랜이 필요해요. Mail Plus 같은 다른 유료 플랜에는 포함되지 않아요. 계정의 플랜을 변경한 다음 다시 연결하세요.",
   "mobile.server.connectors.passwordManager.unavailable": "이 서버에서는 {name}을(를) 사용할 수 없어요.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "이 휴대폰에서 {name}에 로그인하세요. 그러면 {host}이(가) 공유 보관함과 그 보관함의 읽기 전용 액세스 키를 만들고, 그 키만 보관해요. 에이전트는 비밀번호를 볼 수 없어요.",
@@ -709,8 +716,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "읽기 전용",
   "mobile.server.connectors.passwordManager.keyExpires": "읽기 전용. {date}에 만료돼요.",
   "mobile.server.connectors.passwordManager.keyExpired": "{date}에 만료됨",
-  "mobile.server.connectors.passwordManager.plan":
-    "{name} 명령줄 도구에는 유료 플랜이 필요해요. 계정의 플랜을 변경한 다음 다시 연결하세요.",
   "mobile.server.connectors.passwordManager.expiredTitle": "{name} 키가 만료되었어요",
   "mobile.server.connectors.passwordManager.expiredBody":
     "다시 연결할 때까지 {host}의 에이전트는 공유 로그인 항목으로 로그인할 수 없어요.",
@@ -937,7 +942,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "선택 사항이에요. 비워 두면 목록에 전화번호가 표시돼요.",
   "mobile.server.connectors.whatsapp.add": "추가",
   "mobile.server.connectors.whatsapp.groupTitle": "그룹 추가",
-  "mobile.server.connectors.whatsapp.groupDescription": "이 그룹의 사람들은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "이 그룹의 사람들은 이 번호를 멘션하거나 이 번호의 메시지에 답장하면 내 에이전트에게 작업을 맡길 수 있어요.",
   "mobile.server.connectors.whatsapp.groupSearch": "그룹 검색",
   "mobile.server.connectors.whatsapp.groupsLoading": "그룹을 읽는 중이에요…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot이 그룹을 읽지 못했어요",
@@ -1206,6 +1212,8 @@ export const messages = {
   "mobile.server.mcp.connected": { other: "연결됨 · 도구 {count}개" },
   "mobile.server.mcp.signInOnComputer":
     "이 MCP 서버는 로그인이 필요해요. 컴퓨터의 OpenBot에서 로그인한 다음 다시 테스트하세요.",
+  "mobile.server.mcp.signIn": "로그인",
+  "mobile.server.mcp.signInHere": "이 MCP 서버는 로그인을 요청합니다. 로그인을 탭한 다음 다시 테스트하세요.",
   "mobile.server.mcp.signedInDescription": "{server}이(가) 이 MCP 서버에 로그인되어 있어요.",
   "mobile.server.mcp.signOut": "로그아웃",
   "mobile.server.mcp.saveFailed": "변경 사항을 저장하지 못했어요. 다시 시도해 주세요.",
@@ -1256,6 +1264,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5시간",
   "mobile.server.planLimits.window.hours": { other: "{count}시간" },
   "mobile.server.planLimits.window.minutes": "{minutes}분",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "업데이트",
   "mobile.server.settings.updateAvailable": "업데이트 가능",
   "mobile.server.route.updates": "업데이트",
@@ -1427,7 +1436,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} 님을 {role}에 추가했어요",
   "mobile.server.audit.roleMemberRemoved": "{member} 님을 {role}에서 제거했어요",
   "mobile.server.audit.agentLevel": "{role}의 {agent}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "에이전트 가져오기",
   "mobile.server.route.import": "에이전트 가져오기",
   "mobile.server.import.unsupported": "여기서 에이전트를 가져오려면 이 서버의 OpenBot을 업데이트하세요.",
@@ -1499,7 +1507,6 @@ export const messages = {
   "mobile.server.import.channel": "채널",
   "mobile.server.import.notImportedTitle": "가져오지 못함",
   "mobile.server.import.resultWarnings": "일부 항목은 옮겨지지 않았어요",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "이전",
   "mobile.server.route.transfer": "이전",
   "mobile.server.route.transferExport": "내보내기",
@@ -1573,10 +1580,51 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "에이전트의 채널, 루틴 흐름, 워크플로, 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
   "mobile.server.transfer.copySubmit": { other: "에이전트 {count}개 복사" },
+  "mobile.server.transfer.copyDuplicatesTitle": "중복된 에이전트를 복사할까요?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server}에 이미 같은 이름의 에이전트가 있어요: {names}. 복사하면 각각 에이전트가 하나 더 추가돼요. 사본은 채팅, 파일, 메모리가 따로 있는 별개의 에이전트예요.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "중복 복사",
   "mobile.server.transfer.copying": "복사하는 중…",
   "mobile.server.transfer.copyFailed": "복사를 완료하지 못했어요.",
   "mobile.server.transfer.copied": { other: "에이전트 {count}개를 {server}에 복사했어요." },
   "mobile.server.transfer.copyAgents": "복사할 에이전트",
   "mobile.server.transfer.copyNext": "복사한 에이전트는 {server}의 승인 규칙을 사용해요.",
   "mobile.server.transfer.copyNoServer": "에이전트를 복사하려면 소유자나 관리자로 다른 서버에 연결하세요.",
+  "mobile.server.route.ownerTransfer": "소유권 이전",
+  "mobile.server.ownerTransfer.unavailable": "소유권을 이전하려면 소유자로 이 서버에 연결하세요.",
+  "mobile.server.ownerTransfer.hosted": "이 서버는 OpenBot이 호스팅하므로 소유자를 바꿀 수 없어요.",
+  "mobile.server.ownerTransfer.lede":
+    "새 소유자는 이메일을 받고, 그 이메일로 로그인한 상태에서 수락해야 해요. 그 후 이 서버에서 제거돼요.",
+  "mobile.server.ownerTransfer.email": "새 소유자 이메일",
+  "mobile.server.ownerTransfer.send": "보내기",
+  "mobile.server.ownerTransfer.sending": "보내는 중…",
+  "mobile.server.ownerTransfer.stays":
+    "에이전트, 채팅, 루틴, 제공자 로그인, 저장된 키, Vault 로그인, 브라우저 로그인, 연결된 앱은 서버에 그대로 남아요. 새 소유자가 사용할 수 있어요.",
+  "mobile.server.ownerTransfer.expiry": "요청은 7일 후에 만료돼요.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email}을(를) 소유자로 지정할까요?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "{email}이(가) 수락하면 {server}의 소유자가 되고, 나는 접근 권한을 잃어요. 데이터는 서버에 남아요. 요청은 7일 후에 만료돼요.",
+  "mobile.server.ownerTransfer.confirm": "이전",
+  "mobile.server.ownerTransfer.sendFailed": "요청을 보내지 못했어요.",
+  "mobile.server.ownerTransfer.loadFailed": "대기 중인 이전을 불러오지 못했어요.",
+  "mobile.server.ownerTransfer.pending": "새 소유자 대기 중",
+  "mobile.server.ownerTransfer.expires": "{date}에 만료",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email}은(는) 이 이메일로 로그인한 상태에서 수락해야 해요. 그때까지는 내가 소유자예요.",
+  "mobile.server.ownerTransfer.cancel": "이전 취소",
+  "mobile.server.ownerTransfer.cancelTitle": "이전을 취소할까요?",
+  "mobile.server.ownerTransfer.cancelBody": "{email}은(는) 더 이상 수락할 수 없어요.",
+  "mobile.server.ownerTransfer.keep": "유지",
+  "mobile.server.ownerTransfer.cancelFailed": "이전을 취소하지 못했어요.",
+  "mobile.server.ownerTransfer.incomingTitle": "{server}의 소유자가 될까요?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name}님이 나를 {server}의 소유자로 지정하려고 해요. 서버를 완전히 관리할 수 있고, 에이전트, 채팅, 루틴, 저장된 로그인은 그대로 남아요. {name}님은 접근 권한을 잃어요. 서버를 실행하는 컴퓨터에 아직 로그인할 수 있는 사람은 회원님의 OpenBot 계정을 사용할 수 있어요. 그 컴퓨터의 비밀번호와 SSH 키를 바꾸세요.",
+  "mobile.server.ownerTransfer.accept": "수락",
+  "mobile.server.ownerTransfer.decline": "거절",
+  "mobile.server.ownerTransfer.accepted": "이제 {server}의 소유자예요.",
+  "mobile.server.ownerTransfer.acceptFailed": "이전을 수락하지 못했어요",
+  "mobile.server.ownerTransfer.declineFailed": "이전을 거절하지 못했어요",
+  "mobile.server.ownerTransfer.tryAgain": "나중에 다시 시도해 주세요.",
+  "mobile.server.providers.updateAll": "모두 업데이트",
+  "mobile.server.providers.updateAllFailed": "일부 업데이트를 시작하지 못했습니다. 다시 시도하세요.",
 } as const satisfies PartialTranslation<typeof source>;

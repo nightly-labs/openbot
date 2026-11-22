@@ -5,10 +5,6 @@ import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import type { ProviderCodeLoginOpener, ProviderConnectionApi } from "./provider-connection-api";
 
-/**
- * The dialogs that a provider row's Connect and ⋯ menu open: the sign-in, and the hand-off to the
- * app. With `opener`, only a sign-in that this surface started.
- */
 export function ProviderSignInDialogs(props: {
   api: ProviderConnectionApi | undefined;
   opener?: ProviderCodeLoginOpener | undefined;

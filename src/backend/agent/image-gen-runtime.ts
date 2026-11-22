@@ -14,7 +14,6 @@ import { type ImageSize, imageSize, imageSizeOfBytes } from "../image-size";
 import type { MailboxStore } from "../mailbox-store";
 import { getString, type ThreadItem } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
-import { lastUserPrompt } from "./delivery-content";
 import {
   decodeGeneratedImage,
   type GeneratedMediaKind,
@@ -33,7 +32,6 @@ interface ImageGenerationOperation {
 }
 
 export interface ImageGenHooks {
-  /** Mirrors the facade's itemId → turnId index used by turn completion. */
   trackItem(itemId: string, turnId: string): void;
 }
 
@@ -43,15 +41,6 @@ export interface ImageGenRuntimeOptions {
   hooks: ImageGenHooks;
 }
 
-/**
- * Streaming image-generation and video-generation items, and the interrupt flag that races them.
- *
- * Owns the `threadId:turnId:itemId` operation map plus the `threadId:turnId`
- * interrupted set. Everything else (snapshots, attachments, events) goes
- * through the injected conversation/mailbox, so this class never imports the
- * facade. The facade keeps `#itemTurns` — it is shared with plain agent
- * messages and deltas — and only receives updates via `trackItem`.
- */
 export class ImageGenRuntime {
   readonly #conversation: ConversationRuntime;
   readonly #mailbox: MailboxStore;
@@ -66,10 +55,6 @@ export class ImageGenRuntime {
     this.#hooks = options.hooks;
   }
 
-  /**
-   * Handles one streaming item when it is an image-generation or a video-generation item.
-   * Returns true when handled, so the caller can fall through for the rest.
-   */
   readonly handleItem = Effect.fn("ImageGenRuntime.handleItem")(function* (
     this: ImageGenRuntime,
     agentId: string,
@@ -136,7 +121,6 @@ export class ImageGenRuntime {
     this.#interruptedTurns.delete(`${threadId}:${turnId}`);
   }, Effect.uninterruptible).bind(this);
 
-  /** Work the facade awaits during stop() before clearing. */
   pendingOperations(): Effect.Effect<void, GeneratedImageFailed>[] {
     return [...this.#operations.values()]
       .map((operation) => operation.fiber)
@@ -172,12 +156,11 @@ export class ImageGenRuntime {
     const previous =
       generatedMediaInfo(message)?.kind === kind ? (message.imageGeneration ?? message.videoGeneration) : undefined;
     const prompt =
+      getString(item, "revisedPrompt") ??
       getString(item, "revised_prompt") ??
       getString(item, "prompt") ??
       previous?.prompt ??
-      lastUserPrompt(snapshot) ??
       undefined;
-    // A video model makes a wide clip unless the call asks for another frame.
     const aspectRatio =
       imageGenerationAspectRatio(item) ?? previous?.aspectRatio ?? (kind === "video" ? "landscape" : "square");
     const providerStatus = getString(item, "status");
@@ -201,7 +184,6 @@ export class ImageGenRuntime {
       message.videoGeneration = video;
       info = video;
     } else {
-      // The size that the agent asked for, until the file gives the real size. Codex and Grok give none.
       const resolution =
         getString(item, "resolution") ?? getString(item, "size") ?? message.imageGeneration?.resolution ?? "";
       message.itemType = "image_generation";
@@ -233,11 +215,9 @@ export class ImageGenRuntime {
     }
 
     const savedPath = getString(item, "saved_path");
-    // Only an image comes as data. A video always comes as a file.
     const result = kind === "image" ? getString(item, "result") : null;
     yield* Effect.gen({ self: this }, function* () {
       let attachment: AttachmentSummary;
-      /** The real pixel size of the stored image. */
       let size: ImageSize | null = null;
       const storeBytes = Effect.gen({ self: this }, function* () {
         if (!result)

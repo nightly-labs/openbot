@@ -1,7 +1,3 @@
-/**
- * Runs the changes for one key in order: each change starts after the one before it settles. A
- * failed change does not stop the next one.
- */
 export function oneAtATimePerKey(): <T>(key: string, change: () => Promise<T>) => Promise<T> {
   const pending = new Map<string, Promise<unknown>>();
   return (key, change) => {

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/app";
 
 export const messages = {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Caricamento di OpenBot",
   "app.leftPanel.resize": "Ridimensiona la barra laterale sinistra",
   "app.host.thisMac": "Questo Mac",
@@ -33,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "Impossibile riavviare {name}",
   "app.provider.included": "{name} è incluso in OpenBot.",
   "app.clipboard.copyFailed": "Impossibile copiare il testo.",
-  "app.voice.tooLong": "Le registrazioni vocali sono limitate a due minuti.",
+  "app.voice.tooLong": "Le registrazioni vocali sono limitate a 10 minuti.",
   "app.avatar.type": "Scegli un'immagine PNG, JPEG, GIF o WebP.",
   "app.avatar.size": "Scegli un'immagine più piccola di 10 MB.",
   "app.avatar.processingUnavailable": "L'elaborazione delle immagini non è disponibile.",

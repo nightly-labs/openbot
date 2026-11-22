@@ -1,9 +1,9 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("dialog", {
-  // Native file pickers.
   "dialog.chooseSiteDirectory": "Choose a static site directory",
   "dialog.chooseAgentFolder": "Choose a folder for {agent}",
+  "dialog.chooseChannelFolder": "Choose a folder for {channel}",
   "dialog.chooseAgentExclusion": "Choose a folder that {agent} must not change",
   "dialog.chooseSkill": "Choose a skill folder or ZIP",
   "dialog.filter.skillPackages": "Skill packages",

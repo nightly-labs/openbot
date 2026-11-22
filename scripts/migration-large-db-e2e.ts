@@ -1,26 +1,3 @@
-// Upgrades a large database and measures each migration. No copy of `openbot.db` is made before an
-// upgrade, and one hosted server has a 17 GB database (plan 011, item 12), so a migration that rebuilds
-// or rewrites a big table costs minutes and gigabytes on the user's computer. This script shows that
-// cost before a release does.
-//
-//   bun scripts/migration-large-db-e2e.ts [--size-gb=1.5] [--from=29] [--full]
-//
-// It makes a database at schema `--from` with the migrations of this build, with rows in every table
-// (`src/backend/migration-harness.ts`), then fills the three big tables in the proportions of the 17 GB
-// database: `conversation.snapshot-updated` events 53%, `conversation.mailbox-reconciled` events 9.4%
-// (half of them repeat the event before them, which migration 39 deletes), other events 7.6%,
-// `provider_history_staging` 17%, `projection_thread_messages` 10%. `--full` makes 17 GB. Do not run
-// more than 2 GB on a developer computer.
-//
-// Then it upgrades a copy one migration at a time, each in a child process, and records for each one:
-// the time, the peak extra disk (the drop in free space of the volume, which includes the WAL and the
-// deleted temporary files of a VACUUM), the peak WAL, and the peak memory of the process. A second copy
-// upgrades in one start, as a user's computer does. Each one-migration start also runs the foreign-key
-// read and the quick check of the whole file once; the report gives their cost separately.
-//
-// Writes `.openbot-build/migration-large-db/report.json` and exits non-zero when the upgrade fails or
-// loses a row. The report holds sizes, times and counts only.
-
 import { spawn } from "node:child_process";
 import { constants, copyFileSync, existsSync, mkdirSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -45,16 +22,12 @@ function flag(name: string): string | undefined {
   return process.argv.find((argument) => argument.startsWith(`--${name}=`))?.slice(name.length + 3);
 }
 
-// ---------------------------------------------------------------------------------------------------
-// Child: run one start of the migrations and print what it cost.
-
 interface StartResult {
   seconds: number;
   maxRssBytes: number;
   startRssBytes: number;
   changedRows: number;
   version: number;
-  /** What the start did to each big table. */
   bigTables: Record<string, string[]>;
 }
 
@@ -78,7 +51,6 @@ function schemaObjects(db: DatabaseSync): SchemaObject[] {
   );
 }
 
-/** What a migration did to each big table, from the schema before and after it. */
 function bigTableWork(before: readonly SchemaObject[], after: readonly SchemaObject[]): Record<string, string[]> {
   const work: Record<string, string[]> = {};
   const find = (objects: readonly SchemaObject[], name: string) => objects.find((object) => object.name === name);
@@ -110,7 +82,6 @@ if (childDatabase) {
   const changes = query(db, "SELECT total_changes() AS n")[0]?.n;
   const result: StartResult = {
     seconds,
-    // `maxRSS` is in kilobytes and covers the life of this process.
     maxRssBytes: process.resourceUsage().maxRSS * 1024,
     startRssBytes,
     changedRows: isNumber(changes) ? changes : 0,
@@ -139,9 +110,6 @@ if (checksDatabase) {
   process.exit(0);
 }
 
-// ---------------------------------------------------------------------------------------------------
-// Parent.
-
 const sizeGb = process.argv.includes("--full") ? 17 : Number(flag("size-gb") ?? "1.5");
 const fromVersion = Number(flag("from") ?? "29");
 if (!(sizeGb > 0) || !Number.isInteger(fromVersion) || fromVersion < 8) {
@@ -152,7 +120,6 @@ const targetBytes = sizeGb * GIB;
 rmSync(OUT, { recursive: true, force: true });
 const temp = join(OUT, "tmp");
 mkdirSync(temp, { recursive: true });
-// The base, the copy that steps and the copy that upgrades in one start, plus a VACUUM of the biggest.
 const neededBytes = targetBytes * 5;
 if (freeBytes() < neededBytes) {
   throw new Error(`This run needs ${(neededBytes / GIB).toFixed(1)} GB of free disk in ${OUT}.`);
@@ -167,9 +134,6 @@ function fileBytes(path: string): number {
   return existsSync(path) ? statSync(path).size : 0;
 }
 
-// ----- Generate
-
-/** A JSON string of about `bytes` bytes. SQLite does not compress, so the content does not change the cost. */
 function payload<Fields extends object>(bytes: number, fields: Fields, seed: number): string {
   const head = JSON.stringify(fields);
   const fill = Math.max(0, bytes - head.length - 16);
@@ -177,7 +141,6 @@ function payload<Fields extends object>(bytes: number, fields: Fields, seed: num
   return JSON.stringify({ ...fields, text: text.slice(0, fill) });
 }
 
-/** Inserts a copy of the first seeded row of `table` with the given columns changed. */
 function cloner(db: DatabaseSync, table: string): (values: Record<string, string | number | null>) => void {
   const template = query(db, `SELECT * FROM ${quote(table)} ORDER BY rowid LIMIT 1`)[0];
   if (!template) throw new Error(`The seed has no row in ${table}.`);
@@ -247,7 +210,6 @@ function generate(path: string): Generated {
   for (let thread = 0; thread < threadCount; thread += 1) {
     addThread({ thread_id: `large-thread-${thread}`, created_at: time(thread), updated_at: time(thread) });
   }
-  // One pass per kind of row, each to its share of the target size.
   const shares = { snapshot: 0.53, mailbox: 0.094, other: 0.076, staging: 0.17, message: 0.1 };
   const sizes = { snapshot: 12_600, mailbox: 14_000, other: 1_000, staging: 10_400, message: 2_000 };
   const countOf = (kind: keyof typeof sizes) => Math.round((targetBytes * shares[kind]) / sizes[kind]);
@@ -262,8 +224,6 @@ function generate(path: string): Generated {
   let snapshots = 0;
   let mailboxes = 0;
   let others = 0;
-  // Events of all threads are interleaved, as they are written: mostly snapshots, a mailbox
-  // reconciliation now and then, and every second one is repeated by the next event of its thread.
   for (let index = 0; snapshots + mailboxes + others < total; index += 1) {
     const threadId = `large-thread-${index % threadCount}`;
     const position = (snapshots + mailboxes + others) / total;
@@ -326,7 +286,6 @@ function generate(path: string): Generated {
   return { seconds: (performance.now() - started) / 1000, fileBytes: fileBytes(path), rows, repeatedMailboxEvents };
 }
 
-// The generated rows only, by their keys: migration 39 also deletes the repeated pair of the seed.
 const GENERATED_ROWS: Record<string, string> = {
   orchestration_events: "event_id LIKE 'large-event-%'",
   orchestration_command_receipts: "command_id LIKE 'large-command-%'",
@@ -358,8 +317,6 @@ function tableBytes(path: string): Record<string, number> {
   return result;
 }
 
-// ----- Measure
-
 interface Measured<T> {
   result: T;
   peakExtraDiskBytes: number;
@@ -367,9 +324,7 @@ interface Measured<T> {
   fileBytesAfter: number;
 }
 
-/** Runs a child mode of this script and samples the disk until it ends. */
 function runChild<T>(args: readonly string[], database: string, parse: (value: unknown) => T): Promise<Measured<T>> {
-  // The WAL of the previous start can stay on disk; empty it, so that the peak is this start's own.
   const db = openHarnessDatabase(database);
   db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
   db.close();
@@ -382,7 +337,6 @@ function runChild<T>(args: readonly string[], database: string, parse: (value: u
       peakWalBytes = Math.max(peakWalBytes, fileBytes(`${database}-wal`));
     };
     const timer = setInterval(sample, 25);
-    // SQLite puts its temporary files (a VACUUM copy, a big sort) on the volume of the database.
     const child = spawn(process.execPath, [import.meta.filename, ...args], {
       env: { ...process.env, SQLITE_TMPDIR: temp, TMPDIR: temp },
       stdio: ["ignore", "pipe", "inherit"],
@@ -435,7 +389,6 @@ function parseChecks(value: unknown): { foreignKeyCheckSeconds: number; quickChe
 const base = join(OUT, "base.db");
 const stepped = join(OUT, "stepped.db");
 const oneStart = join(OUT, "one-start.db");
-// A copy-on-write clone where the volume has one, so that a copy costs no time or disk.
 const copy = (from: string, to: string) => copyFileSync(from, to, constants.COPYFILE_FICLONE);
 
 process.stderr.write(`Generating ${sizeGb} GB at schema ${fromVersion}...\n`);
@@ -456,8 +409,6 @@ for (;;) {
   const { result } = measured;
   if (result.version === current) break;
   current = result.version;
-  // A rebuild, a full rewrite or a VACUUM writes a big part of the file again: to the WAL, or to a
-  // temporary copy.
   const heavy =
     Object.keys(result.bigTables).length > 0 ||
     measured.peakExtraDiskBytes > generated.fileBytes * 0.1 ||
@@ -467,7 +418,6 @@ for (;;) {
     heavy,
     bigTables: result.bigTables,
     seconds: result.seconds,
-    // Less the whole-file foreign-key read and quick check that each start runs once.
     migrationSeconds: Math.max(0, result.seconds - fixedSeconds),
     peakExtraDiskGb: gb(measured.peakExtraDiskBytes),
     peakWalGb: gb(measured.peakWalBytes),
@@ -494,8 +444,6 @@ const rowsAfter = (() => {
   return counts;
 })();
 
-// Every row is kept, except the repeated mailbox events, their activities and their receipts, which
-// migration 39 deletes.
 const deletesRepeats = fromVersion < 39 && full.result.version >= 39;
 const repeats = deletesRepeats ? generated.repeatedMailboxEvents : 0;
 const expectedRows: Record<string, number> = {};

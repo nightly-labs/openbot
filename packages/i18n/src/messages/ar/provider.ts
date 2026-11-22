@@ -136,6 +136,8 @@ export const messages = {
   "provider.picker.download": "تنزيل {name}",
   "provider.picker.search": "البحث في النماذج",
   "provider.picker.noMatches": "لا توجد نماذج تطابق بحثك.",
+  "provider.picker.openrouterNoMatches":
+    "لا توجد نماذج تطابق بحثك. يمكن أن تخفي إعدادات الخصوصية والمزوّدين والحواجز الوقائية في openrouter.ai بعض النماذج من هذه القائمة.",
   "provider.picker.workspaceOnlyUnavailable":
     "لا تعمل هذه النماذج مع «مساحة العمل فقط» على Windows وLinux. لاستخدامها، غيّر «الأذونات» في إعدادات الوكيل.",
   "provider.picker.olderModels": "نماذج أقدم",
@@ -357,6 +359,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · نزّله OpenBot",
   "provider.settings.otherVersionInstalledByUser": "غير مستخدم: {version} · ثبّته أنت",
   "provider.settings.otherVersionDownloaded": "غير مستخدم: {version} · نزّله OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "تحتاج بعض النماذج إلى جزء غير موجود في هذا الإصدار. نزّل إصدار OpenBot لاستخدامها.",
   "provider.settings.useInstalledVersion": "استخدم الإصدار المثبّت",
   "provider.settings.useDownloadedVersion": "استخدم إصدار OpenBot",
   "provider.settings.update": "تحديث",
@@ -447,4 +451,5 @@ export const messages = {
   },
   "provider.settings.disconnectLocalOnly":
     "يسجّل OpenBot خروج {provider} على هذا الكمبيوتر. تحتفظ واجهة {provider} CLI في الطرفية بتسجيل دخولها.",
+  "provider.settings.updateAll": "تحديث الكل",
 } as const satisfies PartialTranslation<typeof source>;

@@ -111,6 +111,8 @@ export const messages = {
   "provider.picker.download": "Download de {name}",
   "provider.picker.search": "Buscar modelos",
   "provider.picker.noMatches": "Nenhum modelo corresponde à sua busca.",
+  "provider.picker.openrouterNoMatches":
+    "Nenhum modelo corresponde à sua busca. Suas configurações de privacidade, provedores e guardrails no openrouter.ai podem ocultar modelos desta lista.",
   "provider.picker.workspaceOnlyUnavailable":
     "Estes modelos não funcionam com “Espaço de trabalho” no Windows e no Linux. Para usá-los, altere “Permissões” nas configurações do agente.",
   "provider.picker.olderModels": "Modelos anteriores",
@@ -264,6 +266,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",
   "provider.settings.otherVersionDownloaded": "Sem uso: {version} · baixada pelo OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Alguns modelos precisam de uma parte que esta versão não tem. Baixe a versão do OpenBot para usá-los.",
   "provider.settings.useInstalledVersion": "Usar a instalada",
   "provider.settings.useDownloadedVersion": "Usar a do OpenBot",
   "provider.settings.cache": "Cache",
@@ -330,4 +334,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
   "provider.settings.disconnectLocalOnly":
     "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
+  "provider.settings.updateAll": "Atualizar tudo",
 } as const satisfies PartialTranslation<typeof source>;

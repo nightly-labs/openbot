@@ -2,7 +2,6 @@ import { type ChatBackgroundColor, isChatBackgroundColor } from "@openbot/contra
 import { createSignal } from "solid-js";
 import { applyChatBackground } from "../../chat-background";
 
-/** The key under which this browser keeps the chat background of the web client. */
 const STORAGE_KEY = "openbot.web.chat-background";
 
 export interface WebChatBackground {
@@ -12,14 +11,8 @@ export interface WebChatBackground {
 
 const NONE: WebChatBackground = { chatBackgroundLight: null, chatBackgroundDark: null };
 
-/** The choice for this page after the browser did not save it. It wins over an older saved value. */
 let unsavedPreference: WebChatBackground | undefined;
 
-/**
- * Reading `window.localStorage` throws when the browser blocks storage, so it is read inside the
- * guard. Each color is checked on its own: another tab or an older value cannot put a CSS value that
- * is not a color on the root.
- */
 function read(): WebChatBackground {
   if (unsavedPreference !== undefined) return unsavedPreference;
   let value: unknown = null;
@@ -47,23 +40,16 @@ function write(value: WebChatBackground): void {
     );
     unsavedPreference = undefined;
   } catch {
-    // Blocked or full storage keeps the choice for this page only.
     unsavedPreference = value;
   }
 }
 
 const [chatBackground, setChatBackgroundSignal] = createSignal<WebChatBackground>(NONE);
 
-/**
- * The chat background of the web client, for Light and for Dark. The web client has no main process,
- * so this browser keeps it, as it keeps the theme. Returns the function that stops it and removes the
- * colors, so the public pages do not keep them after the user leaves `/app`.
- */
 export function syncWebChatBackground(): () => void {
   setChatBackgroundSignal(read());
   applyChatBackground(chatBackground());
   function listen(event: StorageEvent): void {
-    // `localStorage.clear()` in another tab sends no key.
     if (event.key !== null && event.key !== STORAGE_KEY) return;
     setChatBackgroundSignal(read());
     applyChatBackground(chatBackground());
@@ -75,7 +61,6 @@ export function syncWebChatBackground(): () => void {
   };
 }
 
-/** The shared reactive preference: a Settings change reaches every open chat at once. */
 export function useWebChatBackground(): () => WebChatBackground {
   return chatBackground;
 }

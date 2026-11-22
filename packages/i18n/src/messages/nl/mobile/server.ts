@@ -110,8 +110,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "Uitverkocht",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · Eindigt op {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · Gegevens bewaard tot {date}",
   "mobile.server.hosted.state.payment": "Wacht op betaling",
   "mobile.server.hosted.state.setup": "Wordt ingericht",
+  "mobile.server.hosted.state.restoring": "Gegevens herstellen",
   "mobile.server.hosted.state.starting": "Starten",
   "mobile.server.hosted.state.running": "Actief",
   "mobile.server.hosted.state.stopped": "Gestopt",
@@ -226,6 +228,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Wachtend. De host voert zoveel beurten uit als zijn geheugen toelaat.",
   "mobile.server.threads.hold.agentBusy": "Wacht tot ander werk van deze agent klaar is.",
   "mobile.server.threads.hold.oneTurn": "Wachtend. De aanbieder van deze agent voert één beurt tegelijk uit.",
+  "mobile.server.threads.hold.signIn": "Wachtend. De aanbieder van deze agent moet worden aangemeld.",
   "mobile.server.threads.offline": "Maak verbinding met deze server om de threads te zien.",
   "mobile.server.threads.loading": "Threads laden…",
   "mobile.server.threads.loadFailed": "Kan de threads van sommige agents niet laden.",
@@ -542,6 +545,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Agents toevoegen",
   "mobile.server.browserProfiles.agentsHint":
     "Een tik geeft de agent dit profiel of zet hem terug naar het gedeelde profiel. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.server.browserProfiles.movedNote":
+    "Logins bij sites blijven in het oude profiel. Een verplaatste agent moet opnieuw inloggen op deze sites.",
   "mobile.server.browserProfiles.clear": "Gegevens wissen",
   "mobile.server.browserProfiles.clearTitle": "Gegevens van {name} wissen?",
   "mobile.server.browserProfiles.clearBody":
@@ -687,6 +692,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Maak in Proton Pass een toegangssleutel die alleen de kluis kan lezen die je met OpenBot deelt, en plak die hier. {host} bewaart de sleutel; deze telefoon niet.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Je Proton-abonnement bevat de opdrachtregeltool van Proton Pass niet. Daarvoor is een Proton-abonnement nodig waarin Pass Plus zit. Andere betaalde abonnementen, zoals Mail Plus, bevatten hem niet. Wijzig het abonnement van je account en verbind daarna opnieuw.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} is niet beschikbaar op deze server.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Meld je op deze telefoon aan bij {name}. Daarna maakt {host} een gedeelde kluis en een alleen-lezen toegangssleutel ervoor, en bewaart alleen die sleutel. Agents zien nooit een wachtwoord.",
@@ -716,8 +723,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Alleen lezen",
   "mobile.server.connectors.passwordManager.keyExpires": "Alleen lezen. Verloopt op {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Verlopen op {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "De opdrachtregeltool van {name} vereist een betaald abonnement. Wijzig het abonnement van je account en verbind daarna opnieuw.",
   "mobile.server.connectors.passwordManager.expiredTitle": "De sleutel van {name} is verlopen",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Agents op {host} kunnen zich pas weer aanmelden met je gedeelde logins als je opnieuw verbindt.",
@@ -957,7 +962,8 @@ export const messages = {
     "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
   "mobile.server.connectors.whatsapp.add": "Toevoegen",
   "mobile.server.connectors.whatsapp.groupTitle": "Voeg een groep toe",
-  "mobile.server.connectors.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Mensen in deze groep kunnen werk geven aan je agents als ze het nummer vermelden of op de berichten ervan reageren.",
   "mobile.server.connectors.whatsapp.groupSearch": "Zoek groepen",
   "mobile.server.connectors.whatsapp.groupsLoading": "Groepen lezen…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",
@@ -1231,6 +1237,8 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Verbonden · {count} tool", other: "Verbonden · {count} tools" },
   "mobile.server.mcp.signInOnComputer":
     "Deze MCP-server vraagt je in te loggen. Log in vanuit OpenBot op een computer en test daarna opnieuw.",
+  "mobile.server.mcp.signIn": "Inloggen",
+  "mobile.server.mcp.signInHere": "Deze MCP-server vraagt je om in te loggen. Tik op Inloggen en test daarna opnieuw.",
   "mobile.server.mcp.signedInDescription": "{server} is ingelogd bij deze MCP-server.",
   "mobile.server.mcp.signOut": "Uitloggen",
   "mobile.server.mcp.saveFailed": "Kan de wijziging niet opslaan. Probeer het opnieuw.",
@@ -1283,6 +1291,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 uur",
   "mobile.server.planLimits.window.hours": { one: "{count} uur", other: "{count} uur" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Updates",
   "mobile.server.settings.updateAvailable": "Update beschikbaar",
   "mobile.server.route.updates": "Updates",
@@ -1454,7 +1463,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} toegevoegd aan {role}",
   "mobile.server.audit.roleMemberRemoved": "{member} verwijderd uit {role}",
   "mobile.server.audit.agentLevel": "{agent} voor {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Agents importeren",
   "mobile.server.route.import": "Agents importeren",
   "mobile.server.import.unsupported": "Werk OpenBot op deze server bij om hier agents te importeren.",
@@ -1528,7 +1536,6 @@ export const messages = {
   "mobile.server.import.channel": "Kanaal",
   "mobile.server.import.notImportedTitle": "Niet geïmporteerd",
   "mobile.server.import.resultWarnings": "Sommige onderdelen zijn niet meegegaan",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Overdracht",
   "mobile.server.route.transfer": "Overdracht",
   "mobile.server.route.transferExport": "Exporteren",
@@ -1606,6 +1613,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Hun kanalen, routineflows, workflows en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
   "mobile.server.transfer.copySubmit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Dubbele agents kopiëren?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} heeft al agents met deze namen: {names}. De kopie voegt voor elk een tweede agent toe. Elke kopie is een aparte agent met eigen chats, bestanden en herinneringen.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Dubbele kopiëren",
   "mobile.server.transfer.copying": "Kopiëren…",
   "mobile.server.transfer.copyFailed": "Het kopiëren is niet voltooid.",
   "mobile.server.transfer.copied": {
@@ -1616,4 +1627,42 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Gekopieerde agents gebruiken de goedkeuringsregels van {server}.",
   "mobile.server.transfer.copyNoServer":
     "Maak verbinding met een andere server als eigenaar of beheerder om er agents naar te kopiëren.",
+  "mobile.server.route.ownerTransfer": "Eigendom overdragen",
+  "mobile.server.ownerTransfer.unavailable":
+    "Maak als eigenaar verbinding met deze server om het eigendom over te dragen.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot host deze server, dus de eigenaar kan niet veranderen.",
+  "mobile.server.ownerTransfer.lede":
+    "De nieuwe eigenaar krijgt een e-mail en moet accepteren terwijl die met dat e-mailadres is ingelogd. Daarna word je van deze server verwijderd.",
+  "mobile.server.ownerTransfer.email": "E-mail van de nieuwe eigenaar",
+  "mobile.server.ownerTransfer.send": "Versturen",
+  "mobile.server.ownerTransfer.sending": "Versturen…",
+  "mobile.server.ownerTransfer.stays":
+    "Agents, chats, routines, aanmeldingen bij aanbieders, opgeslagen sleutels, Vault-logins, browseraanmeldingen en gekoppelde apps blijven op de server. De nieuwe eigenaar kan ze gebruiken.",
+  "mobile.server.ownerTransfer.expiry": "Het verzoek verloopt na 7 dagen.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} eigenaar maken?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Als {email} accepteert, wordt die eigenaar van {server} en verlies je de toegang. De gegevens blijven op de server. Het verzoek verloopt na 7 dagen.",
+  "mobile.server.ownerTransfer.confirm": "Overdragen",
+  "mobile.server.ownerTransfer.sendFailed": "Het verzoek is niet verstuurd.",
+  "mobile.server.ownerTransfer.loadFailed": "Kan de openstaande overdracht niet lezen.",
+  "mobile.server.ownerTransfer.pending": "Wacht op de nieuwe eigenaar",
+  "mobile.server.ownerTransfer.expires": "Verloopt op {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} moet accepteren terwijl die met dit e-mailadres is ingelogd. Tot dan blijf jij de eigenaar.",
+  "mobile.server.ownerTransfer.cancel": "Annuleren",
+  "mobile.server.ownerTransfer.cancelTitle": "Overdracht annuleren?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} kan het dan niet meer accepteren.",
+  "mobile.server.ownerTransfer.keep": "Behouden",
+  "mobile.server.ownerTransfer.cancelFailed": "De overdracht is niet geannuleerd.",
+  "mobile.server.ownerTransfer.incomingTitle": "Eigenaar van {server} worden?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} wil jou eigenaar van {server} maken. Je krijgt volledige controle over de server, en de agents, chats, routines en opgeslagen aanmeldingen blijven erop. {name} verliest de toegang. Iedereen die nog kan inloggen op de computer waarop de server draait, kan je OpenBot-account gebruiken. Wijzig de wachtwoorden en SSH-sleutels ervan.",
+  "mobile.server.ownerTransfer.accept": "Accepteren",
+  "mobile.server.ownerTransfer.decline": "Weigeren",
+  "mobile.server.ownerTransfer.accepted": "Je bent nu eigenaar van {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Kan de overdracht niet accepteren",
+  "mobile.server.ownerTransfer.declineFailed": "Kan de overdracht niet weigeren",
+  "mobile.server.ownerTransfer.tryAgain": "Probeer het later opnieuw.",
+  "mobile.server.providers.updateAll": "Alles updaten",
+  "mobile.server.providers.updateAllFailed": "Sommige updates zijn niet gestart. Probeer het opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

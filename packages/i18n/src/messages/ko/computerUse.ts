@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/computerUse";
 
 export const messages = {
-  // Computer Use settings, the permission help window, and the window highlight.
   "computerUse.permission.screenRecording.title": "화면 기록",
   "computerUse.permission.screenRecording.description": "OpenBot이 앱 창을 볼 수 있어요.",
   "computerUse.permission.screenRecording.pane": "화면 및 시스템 오디오 기록",

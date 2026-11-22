@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/provider";
 
 export const messages = {
-  // The provider list, shown in Settings and during onboarding.
   "provider.availableHere": "Disponible sur cet ordinateur",
   "provider.availableOnHost": "S’exécute sur {name}",
   "provider.custom.name": "Fournisseur personnalisé",
@@ -20,8 +19,6 @@ export const messages = {
   "provider.refreshingLabel": "Vérification des fournisseurs",
   "provider.refreshing": "Vérification…",
 
-  // What a provider row reports about itself. A percentage while downloading is a number, not a
-  // message, so it has no key.
   "provider.status.connecting": "Connexion",
   "provider.status.updateAvailable": "Mise à jour disponible",
   "provider.status.settingUp": "Configuration",
@@ -40,12 +37,8 @@ export const messages = {
   "provider.status.off": "Désactivé",
   "provider.gemini.hostSignIn":
     "Pour connecter Gemini, ouvrez OpenBot sur l’hôte et sélectionnez « Connecter » dans Réglages du serveur > Fournisseurs. La connexion Google nécessite un navigateur sur cet hôte. La connexion à distance n’est pas prise en charge.",
-  // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
-  // badge: a saved key leaves the runtime "Connected" to speak for the row.
   "provider.key.free": "Gratuit",
 
-  // The buttons on a provider row, and the name a screen reader reads for each. The name repeats
-  // the provider, because a list of rows all saying "Connect" tells a screen reader user nothing.
   "provider.action.connect": "Connecter",
   "provider.action.reconnect": "Reconnecter",
   "provider.action.restart": "Redémarrer",
@@ -126,6 +119,8 @@ export const messages = {
   "provider.picker.download": "Téléchargement de {name}",
   "provider.picker.search": "Rechercher des modèles",
   "provider.picker.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "provider.picker.openrouterNoMatches":
+    "Aucun modèle ne correspond à votre recherche. Vos réglages de confidentialité, de fournisseurs et de garde-fous sur openrouter.ai peuvent masquer des modèles de cette liste.",
   "provider.picker.workspaceOnlyUnavailable":
     "Ces modèles ne fonctionnent pas avec « Espace de travail seul » sous Windows et Linux. Pour les utiliser, modifiez « Accès » dans les réglages de l’agent.",
   "provider.picker.olderModels": "Modèles plus anciens",
@@ -279,6 +274,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",
   "provider.settings.otherVersionDownloaded": "Non utilisée : {version} · téléchargée par OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Certains modèles ont besoin d'un élément absent de cette version. Téléchargez la version d'OpenBot pour les utiliser.",
   "provider.settings.useInstalledVersion": "Utiliser l'installée",
   "provider.settings.useDownloadedVersion": "Utiliser celle d'OpenBot",
   "provider.settings.cache": "Cache",
@@ -345,4 +342,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Impossible de supprimer le téléchargement.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal garde sa propre connexion.",
+  "provider.settings.updateAll": "Tout mettre à jour",
 } as const satisfies PartialTranslation<typeof source>;

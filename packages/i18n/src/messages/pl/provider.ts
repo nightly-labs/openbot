@@ -134,6 +134,8 @@ export const messages = {
   "provider.picker.download": "Pobieranie {name}",
   "provider.picker.search": "Szukaj modeli",
   "provider.picker.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "provider.picker.openrouterNoMatches":
+    "Żaden model nie pasuje do wyszukiwania. Twoje ustawienia prywatności, dostawców i zabezpieczeń (guardrails) w openrouter.ai mogą ukrywać modele na tej liście.",
   "provider.picker.workspaceOnlyUnavailable":
     "Te modele nie działają z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby ich użyć, zmień „Dostęp” w ustawieniach agenta.",
   "provider.picker.olderModels": "Starsze modele",
@@ -292,6 +294,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Nieużywana: {version} · zainstalowana przez Ciebie",
   "provider.settings.otherVersionDownloaded": "Nieużywana: {version} · pobrana przez OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Niektóre modele potrzebują części, której brakuje w tej wersji. Pobierz wersję OpenBot, aby ich używać.",
   "provider.settings.useInstalledVersion": "Użyj zainstalowanej",
   "provider.settings.useDownloadedVersion": "Użyj wersji OpenBot",
   "provider.settings.cache": "Pamięć podręczna",
@@ -359,4 +363,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Nie udało się usunąć pobranych plików.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot wylogowuje {provider} na tym komputerze. CLI {provider} w terminalu pozostaje zalogowane.",
+  "provider.settings.updateAll": "Aktualizuj wszystkie",
 } as const satisfies PartialTranslation<typeof source>;

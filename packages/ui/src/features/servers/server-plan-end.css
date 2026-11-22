@@ -1,0 +1,161 @@
+.server-plan-count {
+  --server-plan-count-ring: var(--window-frame);
+  --server-plan-count-ring-width: 2px;
+  --server-plan-count-box: 14px;
+
+  box-sizing: border-box;
+  min-width: calc(var(--server-plan-count-box) + 2 * var(--server-plan-count-ring-width));
+  height: calc(var(--server-plan-count-box) + 2 * var(--server-plan-count-ring-width));
+  border: var(--server-plan-count-ring-width) solid var(--server-plan-count-ring);
+  border-radius: var(--openbot-radius-pill);
+  background: linear-gradient(to bottom, var(--openbot-felt-raspberry-top), var(--openbot-felt-raspberry-bottom))
+    padding-box;
+  padding: 0 var(--openbot-space-0-5);
+  color: var(--openbot-felt-cream);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: var(--server-plan-count-box);
+  text-align: center;
+  white-space: nowrap;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 0.7px var(--openbot-felt-cream-stroke);
+}
+
+.window-rail-server > .server-plan-trigger-count,
+.server-rail-button > .server-plan-rail-count {
+  position: absolute;
+  inset-block-end: calc(-1 * var(--openbot-space-1));
+  inset-inline-end: calc(-1 * var(--openbot-space-1));
+}
+
+.server-rail-button > .server-plan-rail-count {
+  --server-plan-count-ring: var(--openbot-bg-sidebar);
+
+  inset-block-end: 0;
+  inset-inline-end: 0;
+}
+
+.sidebar-server-name > .server-plan-trigger-count {
+  --server-plan-count-ring: transparent;
+
+  flex: none;
+}
+
+.server-plan-chip {
+  order: 1;
+  white-space: nowrap;
+}
+
+.server-menu-row:has(.server-plan-chip) > .agent-context-submenu-chevron {
+  order: 2;
+}
+
+.server-plan-banner {
+  gap: var(--openbot-space-2);
+  margin-block-end: var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.server-plan-banner .ui-alert-icon {
+  color: var(--openbot-danger-text);
+}
+
+.server-plan-banner .ui-alert-title {
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.server-plan-banner .ui-alert-description {
+  color: var(--openbot-danger-text);
+}
+
+.server-plan-dialog .ui-confirm-dialog-main {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--openbot-space-3);
+  padding-top: 0;
+  text-align: center;
+}
+
+.server-plan-dialog .ui-confirm-dialog-media {
+  margin-inline: calc(-1 * var(--openbot-space-6));
+  background: radial-gradient(closest-side, var(--openbot-danger-soft), transparent);
+}
+
+.server-plan-dialog .ui-confirm-dialog-content {
+  padding-top: 0;
+}
+
+.server-plan-dialog .ui-confirm-dialog-title {
+  font-size: var(--openbot-text-2xl);
+}
+
+.server-plan-dialog-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-block: var(--openbot-space-8) var(--openbot-space-4);
+}
+
+.server-plan-dialog-agents {
+  display: flex;
+  align-items: flex-end;
+}
+
+.server-plan-dialog-agent {
+  width: 64px;
+  height: 64px;
+  margin-inline: calc(-1 * var(--openbot-space-1));
+}
+
+.server-plan-dialog-agent:nth-child(2) {
+  width: 84px;
+  height: 84px;
+}
+
+.server-plan-count.server-plan-dialog-count {
+  --server-plan-count-ring: var(--openbot-bg-sidebar);
+  --server-plan-count-ring-width: 3px;
+  --server-plan-count-box: 22px;
+
+  position: relative;
+  margin-top: calc(-1 * var(--openbot-space-3));
+  padding-inline: var(--openbot-space-2);
+  font-size: var(--openbot-text-md);
+}
+
+.server-plan-screen {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-6);
+  background: radial-gradient(closest-side at 50% 35%, var(--openbot-danger-soft), transparent 70%);
+  text-align: center;
+}
+
+.server-plan-screen .server-plan-dialog-hero {
+  padding-block: 0 var(--openbot-space-2);
+}
+
+.server-plan-screen-title {
+  margin: 0;
+  font-size: var(--openbot-text-2xl);
+  font-weight: 700;
+}
+
+.server-plan-screen-description {
+  max-width: 440px;
+  margin: 0;
+  color: var(--openbot-text-muted);
+}
+
+.server-plan-screen-actions {
+  display: flex;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-2);
+}

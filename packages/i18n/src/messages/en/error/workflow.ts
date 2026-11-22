@@ -1,6 +1,5 @@
 import { defineMessages } from "../../../message";
 
-/** Errors that the workflow store and runtime send. */
 export const messages = defineMessages("error.workflow", {
   "error.workflow.missing": "This workflow no longer exists.",
   "error.workflow.versionMissing": "This version of the workflow no longer exists.",
@@ -15,18 +14,27 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.agentMissing": "Choose an agent for this step.",
   "error.workflow.handoffFailed": "OpenBot could not send this step to its agent.",
   "error.workflow.agentStepEnded": "The agent's message for this step was removed before it answered.",
+  "error.workflow.agentStepStopped": "The agent stopped before it answered this step. Run the step again.",
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
+  "error.workflow.answerInvalid":
+    "The answer did not have the fields that this step asks for: {fields}. Run the step again.",
+  "error.workflow.checkInvalid": "The check of this step is not valid. Correct it, then run the step again.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
   "error.workflow.modelTimedOut":
     "The model did not answer in time. Choose a lower effort or a faster model for this step, then run it again.",
   "error.workflow.modelToolUse":
     "The model tried to use a tool, but this step can only answer with text. Run the step again, or choose a different model for it.",
+  "error.workflow.modelImageUnsupported":
+    "The model of this step cannot read pictures. Choose a model that can, or remove the picture connection.",
+  "error.workflow.modelImageType":
+    "A model step can read only PNG, JPEG, GIF and WebP pictures. Connect a picture of one of these types.",
   "error.workflow.modelUnavailable": "The model of this step is not available. Choose a different model for this step.",
   "error.workflow.providerBusy": "The provider is busy. Wait a few minutes, then run the step again.",
   "error.workflow.providerOffline":
     "OpenBot could not reach the provider. Check the internet connection, then run the step again.",
   "error.workflow.modelBusy": "Another model request is running. Run the step again soon.",
   "error.workflow.mediaFailed": "The model could not make the image or video. Run the step again.",
+  "error.workflow.mediaNotMade": "The model did not make the image or video. It said: {answer}",
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
   "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
   "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",
@@ -34,6 +42,8 @@ export const messages = defineMessages("error.workflow", {
     "Write a description, or run the steps before this one so that a text or a picture comes in.",
   "error.workflow.mediaInputNotImage":
     "This step takes only pictures, not videos. Remove the connection from the video.",
+  "error.workflow.mediaInputNotClip":
+    "This input takes only videos and audio files. Remove the connection from the file.",
   "error.workflow.stepMissing": "This step no longer exists.",
   "error.workflow.nodeMissing": "This step is not in the workflow.",
   "error.workflow.runMissing": "This run no longer exists.",

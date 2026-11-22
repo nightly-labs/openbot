@@ -2,11 +2,9 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
-  // The language setting itself.
   "settings.language.title": "Langue",
   "settings.language.description": "OpenBot affiche les menus, les boutons et les messages dans cette langue.",
   "settings.language.system": "Langue du système",
-  // The logo color setting, General tab.
   "settings.appearance.title": "Apparence",
   "settings.appearance.theme.title": "Thème",
   "settings.appearance.theme.description":
@@ -26,6 +24,15 @@ export const messages = {
   "settings.codeFont.title": "Police du code",
   "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
   "settings.codeFont.default": "Par défaut",
+  "settings.motion.title": "Mouvement",
+  "settings.backgroundBlur.title": "Flou d’arrière-plan",
+  "settings.backgroundBlur.description":
+    "Flou derrière les menus et les dialogues. Désactivé au départ sur un ordinateur sans GPU.",
+  "settings.movingFaces.title": "Visages d’agents animés",
+  "settings.movingFaces.description":
+    "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
+  "settings.startupAnimation.title": "Animation de démarrage",
+  "settings.startupAnimation.description": "Affiche l’animation des agents pendant l’ouverture d’OpenBot.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -48,15 +55,17 @@ export const messages = {
   "settings.chatBackground.default": "Par défaut",
   "settings.chatBackdrop.title": "Arrière-plan de la fenêtre",
   "settings.chatBackdrop.description":
-    "Une scène, une image ou un GIF derrière toute la fenêtre sur cet appareil. Demandez une scène à un agent, puis choisissez « Utiliser comme arrière-plan » sur sa réponse.",
+    "Une scène, une image, un GIF ou une vidéo derrière toute la fenêtre sur cet appareil. Demandez une scène à un agent, puis choisissez « Utiliser comme arrière-plan » sur sa réponse.",
   "settings.chatBackdrop.none": "Aucun",
   "settings.chatBackdrop.pond": "Bassin à koïs",
   "settings.chatBackdrop.jellyfish": "Méduses",
   "settings.chatBackdrop.sunset": "Coucher de soleil rétro",
   "settings.chatBackdrop.snowfall": "Chute de neige",
   "settings.chatBackdrop.fireflies": "Lucioles",
-  "settings.chatBackdrop.upload": "Importer une image…",
-  "settings.chatBackdrop.uploadRefused": "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus.",
+  "settings.chatBackdrop.coast": "Côte néon",
+  "settings.chatBackdrop.upload": "Importer…",
+  "settings.chatBackdrop.uploadRefused":
+    "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus, ou une vidéo MP4 ou WebM de 100 Mo au plus.",
   "settings.chatBackdrop.saveFailed": "L’arrière-plan n’a pas été enregistré.",
   "settings.chatBackdrop.removeFailed": "L’arrière-plan n’a pas été supprimé.",
   "settings.chatColor.title": "Couleur du chat",
@@ -84,7 +93,6 @@ export const messages = {
   "settings.bubbleStyle.solid": "Plein",
   "settings.bubbleStyle.tint": "Teinte",
   "settings.bubbleStyle.classic": "Classique",
-  // The Settings window, General tab.
   "settings.appBehavior.title": "Comportement de l’application",
   "settings.conversations.title": "Conversations",
   "settings.launchAtLogin.title": "Lancer OpenBot à l’ouverture de session",
@@ -110,7 +118,6 @@ export const messages = {
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
   "settings.externalLinks.description":
     "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici.",
-  // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navigateur par défaut ({name})",
@@ -314,7 +321,6 @@ export const messages = {
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte, ainsi que les sites web que vous et vos agents visitez, l’utilisation des outils et un résumé quotidien de votre configuration. Désactivé : seule l’utilisation de base, comme les tours et le nombre de tokens, est envoyée avec un identifiant d’installation aléatoire. Les conversations, fichiers et prompts ne sont jamais envoyés.",
   "settings.analytics.webDescription":
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte. Désactivé : les mêmes métadonnées sont envoyées avec un identifiant d’installation aléatoire uniquement. Les conversations, fichiers et prompts ne sont jamais envoyés. Ce réglage s’applique à ce navigateur.",
-  // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Choisir le fonctionnement des discussions et ce qu’OpenBot partage.",
   "settings.tab.agents.title": "Agents",
@@ -484,7 +490,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossible de copier l’image.",
   "settings.profile.share.createFailed": "Impossible de créer l’image.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Mes six derniers mois avec OpenBot",
   "settings.profile.activity.title": "Activité sur cet ordinateur",
   "settings.profile.activity.activeDays": {
@@ -494,7 +499,6 @@ export const messages = {
   "settings.profile.activity.empty": "Aucune activité pour l’instant",
   "settings.profile.activity.loading": "Chargement de l’activité…",
   "settings.profile.activity.loadFailed": "Impossible de charger votre activité.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} jetons en {count} jour actif sur un an",
     other: "{tokens} jetons en {count} jours actifs sur un an",
@@ -619,6 +623,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Forfait terminé",
   "settings.hostedServers.state.creating": "Création",
   "settings.hostedServers.state.starting": "Démarrage",
+  "settings.hostedServers.state.restoring": "Restauration des données",
   "settings.hostedServers.state.running": "En marche",
   "settings.hostedServers.state.stopping": "Arrêt en cours",
   "settings.hostedServers.state.stopped": "Arrêté",
@@ -629,6 +634,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configuration commence quand Stripe confirme le paiement.",
   "settings.hostedServers.planEndedDescription":
     "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées. Renouvelez le forfait pour le démarrer.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées jusqu’au {date}. Renouvelez le forfait avant cette date pour le démarrer.",
   "settings.hostedServers.pay": "Ouvrir la page de paiement",
   "settings.hostedServers.payLabel": "Ouvrir la page de paiement de {name}",
   "settings.hostedServers.renew": "Renouveler le forfait",
@@ -668,7 +675,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Pour une petite équipe avec des routines quotidiennes.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Pour de nombreux agents et un usage intensif du navigateur.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictée",
   "settings.voice.model.parakeet.description": "Rapide. Détecte seul la langue parlée, parmi 25 langues européennes.",
   "settings.voice.model.parakeetUnified.description":
@@ -737,7 +743,44 @@ export const messages = {
   "settings.voice.speech.sample": "Bonjour. Voici comment vos réponses sonneront.",
   "settings.voice.speech.listenFailed": "Impossible de lire l’extrait.",
   "settings.voice.live.section": "Voix en direct",
+  "settings.voice.talk.section": "Conversation vocale",
+  "settings.voice.talkKey.title": "Touche pour parler",
+  "settings.voice.talkKey.description": "Maintenez ces touches enfoncées pour parler dans une conversation vocale.",
+  "settings.voice.talkKey.change": "Changer la touche pour parler",
+  "settings.voice.talkKey.recording": "Appuyez sur les touches",
+  "settings.voice.talkKey.refused": "Ajoutez une autre touche",
+  "settings.voice.talkKey.reset": "Rétablir",
+  "settings.tab.keyboard.title": "Clavier",
+  "settings.tab.keyboard.description": "Modifiez les raccourcis clavier sur cet appareil.",
+  "settings.shortcuts.section": "Raccourcis",
+  "settings.shortcuts.fixed.section": "Raccourcis fixes",
+  "settings.shortcuts.command.newThread": "Nouveau fil",
+  "settings.shortcuts.command.previousThread": "Fil précédent",
+  "settings.shortcuts.command.nextThread": "Fil suivant",
+  "settings.shortcuts.command.newAgent": "Nouvel agent",
+  "settings.shortcuts.command.globalSearch": "Tout rechercher",
+  "settings.shortcuts.command.searchChat": "Rechercher dans le chat",
+  "settings.shortcuts.command.focusComposer": "Aller à la zone de message",
+  "settings.shortcuts.command.back": "Précédent",
+  "settings.shortcuts.command.forward": "Suivant",
+  "settings.shortcuts.command.toggleSidebar": "Afficher ou masquer la barre latérale",
+  "settings.shortcuts.command.showShortcuts": "Afficher les raccourcis clavier",
+  "settings.shortcuts.command.openSettings": "Ouvrir les réglages",
+  "settings.shortcuts.command.stopAllAgents": "Arrêter tous les agents",
+  "settings.shortcuts.command.switchServer": "Changer de serveur",
+  "settings.shortcuts.command.zoom": "Zoom",
+  "settings.shortcuts.refused.invalid": "Ajoutez une touche de modification",
+  "settings.shortcuts.refused.reserved": "Le système utilise ce raccourci",
+  "settings.shortcuts.refused.taken": "Utilisé par {command}",
+  "settings.shortcuts.recording": "Appuyez sur les touches",
+  "settings.shortcuts.change": "Modifier le raccourci de {command}",
+  "settings.shortcuts.reset": "Rétablir",
+  "settings.shortcuts.resetAll": "Tout rétablir",
   "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "settings.voice.live.account": "Compte",
+  "settings.voice.live.accountAutomatic": "Automatique",
+  "settings.voice.live.accountDescription":
+    "Le compte ChatGPT qu'utilise la voix en direct. Choisissez un compte dont l'abonnement inclut la voix.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":
     "Vos agents, leurs compétences, routines, souvenirs et fichiers sont réunis dans un seul fichier.",
@@ -842,6 +885,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Leurs canaux, flux de routines, workflows et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "settings.transfer.copy.submit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copier des agents en double ?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "settings.transfer.copy.duplicatesConfirm": "Copier les doublons",
   "settings.transfer.copy.copying": "Copie…",
   "settings.transfer.copy.done": {
     one: "{count} agent copié vers {server}.",

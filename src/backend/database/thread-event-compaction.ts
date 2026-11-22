@@ -15,66 +15,32 @@ export interface ThreadEventCompactionOptions {
   core: DatabaseCore;
 }
 
-/** One batch of `ThreadEventCompaction.compactNext`. */
 export interface ThreadEventCompactionBatch {
-  /** No thread is left to compact in this run. */
   done: boolean;
-  /** The events that the batch read. */
   events: number;
-  /** The events whose payload the batch wrote again, smaller. */
   rewritten: number;
-  /** The payload bytes of the rewritten events, before and after. */
   bytesBefore: number;
   bytesAfter: number;
-  /** The batch finished a thread. */
   completedThread: boolean;
-  /**
-   * The batch could not compact a thread and rolled back. The run goes on with the next thread, and
-   * the next run tries this one again. The name of the error only: its message can hold a payload.
-   */
   failedThread: string | null;
 }
 
 const BATCH_EVENTS = 256;
 const BATCH_BYTES = 4 * 1024 * 1024;
-/** A thread whose earlier events change this many times during one run waits for the next run. */
 const MAX_RESTARTS = 3;
 
 interface ThreadProgress {
   threadId: string;
-  /** The last event of the thread when its compaction started. Later events have the new shape. */
   cutoff: number;
   fold: ThreadMessageFold;
-  /** The last event that the fold read. */
   through: number;
-  /** The number and the sum of the sequences of the events that the fold read. */
   count: number;
   sequenceSum: number;
-  /** The last event and the deleted-message count when the previous batch ended. */
   lastSequence: number;
   deletedMessages: number;
   restarts: number;
 }
 
-/**
- * Removes the `changedMessages` items of old thread events that do not change a replay.
- *
- * Before #8166 and #8794, each conversation update wrote every message of the thread again, so
- * `orchestration_events` holds one full copy of the chat for each update (11.9 GB on one server).
- * After start, this class reads each thread's events in sequence order with the replay's own fold
- * (`ThreadMessageFold`) and drops an item when the replay already has that message with the same
- * value: the message is in the fold before the event, the event does not remove it, and
- * `mergeReplayedLiveMessage` of the message and the item gives the same message, with the same keys
- * in the same order. Each event row stays, with its sequence, type, detail, removed ids and active
- * turn, so the activities, the revision and the receipts of a replay stay the same. An event that
- * would then take another branch of the replay keeps one item.
- *
- * It works in small transactions and keeps the fold of the current thread in memory between them.
- * Before each batch, it checks that no earlier event of the thread was deleted or scrubbed since
- * the previous batch, and starts the thread again when one was. A thread is done when its row is in
- * `thread_event_compaction`. A kill loses only the work of the current thread since its start: a
- * second pass over compacted events finds nothing to drop. The class never imports the facade.
- */
 export class ThreadEventCompaction {
   readonly #core: DatabaseCore;
   #current: ThreadProgress | null = null;
@@ -84,7 +50,6 @@ export class ThreadEventCompaction {
     this.#core = options.core;
   }
 
-  /** Compacts one bounded batch of events of the current or the next thread, in its own transaction. */
   compactNext(): ThreadEventCompactionBatch {
     const db = this.#core.connection;
     const empty: ThreadEventCompactionBatch = {
@@ -98,8 +63,6 @@ export class ThreadEventCompaction {
     };
     const current = this.#current ?? this.#startNextThread(db);
     if (!current) {
-      // The next run starts again from the first thread. It skips the threads that are done and
-      // tries again the ones that failed in this run.
       this.#afterThreadId = "";
       return { ...empty, done: true };
     }
@@ -107,7 +70,6 @@ export class ThreadEventCompaction {
     try {
       return withTransaction(db, () => this.#compactBatch(db, current));
     } catch (error) {
-      // The fold already read events that the rollback undid. This thread waits for the next run.
       this.#current = null;
       return { ...empty, failedThread: error instanceof Error ? error.name : typeof error };
     }
@@ -155,7 +117,6 @@ export class ThreadEventCompaction {
       db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(progress.threadId),
     );
     if (!thread) {
-      // The thread was deleted between two batches. Its events went with it.
       this.#current = null;
       return batch;
     }
@@ -214,8 +175,6 @@ export class ThreadEventCompaction {
       progress.sequenceSum += sequence;
     }
 
-    // Delete and insert again with the same sequence: an UPDATE that makes a row smaller leaves its
-    // pages almost empty (see `compactRows` in provider-history-store.ts).
     const remove = db.prepare("DELETE FROM orchestration_events WHERE sequence = ?");
     const insert = db.prepare(
       `INSERT INTO orchestration_events
@@ -251,12 +210,6 @@ export class ThreadEventCompaction {
     return batch;
   }
 
-  /**
-   * Whether the events that the fold read are still the same. A write between two batches can delete
-   * an earlier event (a superseded update or flush, a pruned snapshot) or scrub a deleted message
-   * from it, and the fold would then not be the replay's. Each of these writes also appends an event
-   * or records a deleted message, so the full count runs only when one of those two values moved.
-   */
   #earlierEventsUnchanged(db: DatabaseSync, progress: ThreadProgress): boolean {
     if (deletedMessageCount(db, progress.threadId) !== progress.deletedMessages) return false;
     if (threadLastSequence(db, progress.threadId) === progress.lastSequence) return true;
@@ -276,10 +229,6 @@ export class ThreadEventCompaction {
   }
 }
 
-/**
- * The `changedMessages` items of a "changes" event that a replay needs, or null when it needs all
- * of them. `latest` is the fold before the event.
- */
 function keptChangedMessages(
   latest: ConversationSnapshot | null,
   record: DynamicRecord,
@@ -293,7 +242,6 @@ function keptChangedMessages(
     if (shown.has(message.id)) repeated.add(message.id);
     shown.set(message.id, message);
   }
-  // The replay applies the last item of an id (a Map), so the decision is made on that item.
   const lastById = new Map(messages.changedMessages.map((message) => [message.id, message]));
   const removed = new Set(messages.removedMessageIds);
   const unneeded = new Set<string>();
@@ -306,17 +254,11 @@ function keptChangedMessages(
   const needed = messages.changedEntries.map((message) => !message || !unneeded.has(message.id));
   const keepsMessage = messages.changedEntries.some((message, index) => message !== null && needed[index]);
   if (!keepsMessage && messages.removedMessageIds.length === 0 && !messages.hasActiveTurnChange) {
-    // Without a message, the event would not take the "changes" branch, and the replay would not
-    // move its revision to it. The first message stays; it changes nothing.
     needed[messages.changedEntries.findIndex((message) => message !== null)] = true;
   }
   return needed.every(Boolean) ? null : raw.filter((_, index) => needed[index]);
 }
 
-/**
- * Deep equality that also compares the order of keys and keys with an undefined value. A message
- * becomes `message_json` with `JSON.stringify`, and a later merge keeps the position of each key.
- */
 function sameValue(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (Array.isArray(left) || Array.isArray(right)) {

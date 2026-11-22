@@ -1,7 +1,3 @@
-/* The tooltips of the sidebar rows: the wait tooltip in "Needs you" and the name tooltip in the
- * compact sidebar. */
-
-/* The tooltip anchors to this wrapper, so it needs a box of its own. */
 .sidebar-agent-tooltip-trigger {
   display: block;
 }
@@ -49,7 +45,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The name tooltip has a title badge beside the name, so it is wider. */
 .sidebar-name-tooltip {
   max-width: min(280px, calc(100vw - 16px));
   overflow-wrap: anywhere;

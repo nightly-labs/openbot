@@ -1,9 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Codex here is taken from learn.chatgpt.com, where OpenAI
-// moved the Codex documentation. Each page used is in `sources`. Check them again,
-// and move `checkedAt`, whenever this file changes.
-
 const DOCS = "https://learn.chatgpt.com/docs";
 
 export const CODEX_PROVIDER: ProviderPage = {
