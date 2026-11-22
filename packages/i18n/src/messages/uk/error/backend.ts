@@ -1,0 +1,471 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/error/backend";
+
+export const messages = {
+  "error.backend.eventsUnavailable": "Zdarzenia nie są dostępne na tym hoście.",
+  "error.backend.databaseIntegrity": "Baza danych OpenBot nie przeszła kontroli integralności.",
+  "error.backend.webhookRouteLimit": "Host może mieć maksymalnie {limit} rutyn typu webhook.",
+  "error.backend.webhookSettingsInvalid": "Sprawdź ustawienia webhooka i spróbuj ponownie.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Wklej pełny sekret podpisu od nadawcy. Ma od 16 do 1024 znaków i nie zawiera spacji.",
+  "error.backend.webhookRouteUnavailable":
+    "Publiczna trasa webhooka nie jest gotowa. Sprawdź połączenie z hostem i spróbuj ponownie.",
+  "error.backend.browserViewRemoteOnly": "Podgląd przeglądarki na żywo jest tylko dla zdalnego hosta.",
+  "error.backend.browserViewUnsupported": "Ten zdalny host nie obsługuje podglądu przeglądarki na żywo.",
+  "error.backend.browserViewLimit": "Na tym hoście jest otwartych zbyt wiele widoków przeglądarki.",
+  "error.backend.browserViewEnded": "Podgląd tej strony na żywo zakończył się.",
+  "error.backend.browserViewFailed": "Podgląd tej strony na żywo nie powiódł się.",
+  "error.backend.windowTemporarilyUnavailable": "Okno OpenBot jest chwilowo niedostępne.",
+  "error.backend.windowUnavailable": "Okno OpenBot jest niedostępne.",
+  "error.backend.sunshineApiHttp": "API Sunshine zwróciło błąd HTTP {status}.",
+  "error.backend.sunshinePortsUnavailable":
+    "Nie udało się zarezerwować wolnej rodziny portów Sunshine dla zdalnego pulpitu.",
+  "error.backend.moonlightPortsUnavailable":
+    "Nie udało się zarezerwować wolnego zakresu portów Moonlight WebRTC dla zdalnego pulpitu.",
+  "error.backend.iceServerNoPort": "Serwer ICE zdalnego pulpitu nie otrzymał portu.",
+  "error.backend.remoteDesktopStoppedWhileStarting":
+    "Środowisko zdalnego pulpitu zostało zatrzymane podczas uruchamiania.",
+  "error.backend.sunshineNotStarted": "Sunshine nie uruchomił się na zarezerwowanej rodzinie portów.",
+  "error.backend.moonlightNoHost": "Moonlight nie ma sparowanego lokalnego hosta.",
+  "error.backend.sunshineNoDesktop": "Sunshine nie opublikował aplikacji Desktop.",
+  "error.backend.sunshineAmbiguousPairing": "Sunshine zwrócił niejednoznaczne lokalne żądania parowania.",
+  "error.backend.sunshineNoPairingRequest": "Sunshine nie otrzymał oczekiwanego lokalnego żądania parowania.",
+  "error.backend.moonlightPairingHttp": "Parowanie Moonlight zwróciło błąd HTTP {status}.",
+  "error.backend.moonlightRejectedPairing": "Moonlight odrzucił parowanie z Sunshine.",
+  "error.backend.moonlightNoPin": "Moonlight nie zwrócił kodu PIN parowania.",
+  "error.backend.moonlightPairingIncomplete": "Parowanie Moonlight nie zostało ukończone.",
+  "error.backend.moonlightWebNotEmbedded": "Moonlight Web nie jest wbudowaną wersją OpenBot.",
+  "error.backend.moonlightEmptyResponse": "Moonlight zwrócił pustą odpowiedź.",
+  "error.backend.remoteDesktopTimeout": "Upłynął limit czasu żądania zdalnego pulpitu.",
+  "error.backend.moonlightApiHttp": "API Moonlight zwróciło błąd HTTP {status}.",
+  "error.backend.sunshineExited": "Sunshine zakończył działanie, zanim jego API HTTPS na porcie {port} było gotowe.",
+  "error.backend.sunshineNoAnswer": "Sunshine nie odpowiedział.",
+  "error.backend.sunshineTlsUnexpected": "Sunshine zwrócił nieoczekiwany certyfikat TLS.",
+  "error.backend.moonlightWebExited": "Moonlight Web zakończył działanie, zanim {url} był gotowy.",
+  "error.backend.moonlightWebNotReady": "Moonlight Web nie osiągnął gotowości.",
+  "error.backend.channelDeleteUnsupported": "Ten serwer nie obsługuje usuwania kanałów.",
+  "error.backend.browserNavigateUnsupported":
+    "Ten zdalny host nie obsługuje nawigacji z paska adresu w istniejącej karcie.",
+  "error.backend.browserUserControlBusy":
+    "Ta karta przeglądarki czeka na sekret. Najpierw odpowiedz na prośbę o sekret.",
+  "error.backend.browserTeachBusy": "Inna osoba steruje tą kartą przeglądarki. Spróbuj ponownie, gdy skończy.",
+  "error.backend.browserTeachUnavailable": "Ta karta przeglądarki nie ma agenta, który może nauczyć się zadania.",
+  "error.backend.browserTeachUnsupported": "Ten zdalny host nie obsługuje nagrywania zadania.",
+  "error.backend.browserUserControlUnsupported":
+    "Ten zdalny host nie obsługuje przejmowania kontroli nad kartą przeglądarki.",
+  "error.backend.browserSignInUnsupported": "Ten zdalny host nie może przyjąć logowania z tego komputera.",
+  "error.backend.browserSignInOpenFailed": "OpenBot nie mógł otworzyć okna logowania.",
+  "error.backend.browserSignInReadFailed": "OpenBot nie mógł odczytać logowania z okna.",
+  "error.backend.browserStopUnsupported": "Ten zdalny host nie może zatrzymać wczytywania strony.",
+  "error.backend.sharedDataLocalOnly": "Dane współdzielone są zarządzane na komputerze, na którym działają ci agenci.",
+  "error.backend.browserUrlProtocol": "Dozwolone są tylko adresy URL HTTP(S).",
+  "error.backend.sunshineNotReady": "Sunshine nie osiągnął gotowości.",
+  "error.backend.sunshineNotReadyReason": "Sunshine nie osiągnął gotowości. {reason}",
+  "error.backend.channelLeadModelUnavailable": "Model lidera kanału jest niedostępny.",
+  "error.backend.contextCompactionIneffective":
+    "Kompaktowanie nie zmniejsza tego czatu: po dwóch kompaktowaniach nadal zajmuje {percent}% okna kontekstu modelu, więc OpenBot przestaje go kompaktować. Narzędzia i instrukcje zajmują większość okna. Wyłącz serwery MCP lub sterowanie komputerem, których ten agent nie potrzebuje, albo wybierz model z większym oknem. Potem zacznij nowy czat.",
+  "error.backend.contextCompactionStopped":
+    "Dwa kompaktowania tego czatu z rzędu się nie udały, więc OpenBot przestaje go kompaktować automatycznie. Każda próba wysyła cały czat do modelu i zużywa limit planu. Wybierz „Kompaktuj”, aby spróbować ponownie, albo zacznij nowy czat.",
+  "error.backend.providerModelAtCapacity":
+    "Model jest przeciążony. Dostawca spróbuje ponownie za kilka minut. Aby kontynuować od razu, zatrzymaj turę i wybierz inny model.",
+  "error.backend.providerRetrying":
+    "Dostawca nie wykonał tego żądania {attempts} razy i próbuje ponownie. Jeśli agent nie będzie kontynuować, zatrzymaj turę.",
+  "error.backend.providerRetryingLargeContext":
+    "Dostawca nie wykonał tego żądania {attempts} razy i próbuje ponownie. Ten czat zajmuje {percent}% okna kontekstu modelu. Jeśli agent nie będzie kontynuować, zatrzymaj turę: OpenBot skompaktuje czat przed następną wiadomością.",
+  "error.backend.sharedDataUnavailable": "Dane współdzielone są niedostępne.",
+  "error.backend.shuttingDown": "OpenBot się zamyka.",
+  "error.backend.channelUnconfirmedStart":
+    "Kanał ma niepotwierdzone rozpoczęcie przydziału. Sprawdź jego wynik przed usunięciem.",
+  "error.backend.channelNotFound": "Nie znaleziono kanału.",
+  "error.backend.channelMemberUnavailable": "Członek kanału jest niedostępny.",
+  "error.backend.channelInstructionsTooLong":
+    "Skróć instrukcje do 2000 znaków. Dłuższe instrukcje nie zostaną zapisane.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Poczekaj, aż praca w tym kanale się zakończy, a potem rozpocznij nową rozmowę.",
+  "error.backend.channelWaitBeforeCompact": "Poczekaj, aż praca w tym kanale się zakończy, a potem go skompaktuj.",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "Poczekaj, aż praca w tym kanale się zakończy, a potem usuń jego historię.",
+  "error.backend.channelCompactUnavailable":
+    "Żaden członek tego kanału nie może teraz skompaktować kontekstu. Członek musi najpierw odpowiedzieć w kanale, a jego dostawca musi obsługiwać kompaktowanie.",
+  "error.backend.channelCompactNoSession":
+    "Członkowie tego kanału nie mają jeszcze rozmowy do skompaktowania. Skompaktuj go, gdy członek odpowie w kanale.",
+  "error.backend.channelCompactNotSupported":
+    "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
+  "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
+  "error.backend.channelArchiveRunning": "Zatrzymaj trwającą pracę w tym kanale, a potem go usuń.",
+  "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
+  "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",
+  "error.backend.channelTaskComplete": "To zadanie jest już ukończone.",
+  "error.backend.channelTaskNotStopped": "Anulować można tylko zatrzymane lub nieudane zadanie.",
+  "error.backend.channelSelectAgent": "Wybierz agenta.",
+  "error.backend.channelLeadRequired": "Wybierz dostępnego lidera kanału lub przydziel to zadanie członkowi.",
+  "error.backend.channelRoutingTooLong":
+    "To żądanie przekracza limit kontekstu kierowania. Wybierz członka lub wyślij krótsze żądanie.",
+  "error.backend.channelTaskMemberRequired": "Wybierz członka do tego zadania.",
+  "error.backend.channelTaskStopped": "Zatrzymano. Kontynuuj lub przydziel ponownie to zadanie.",
+  "error.backend.channelRoutingUnreadable": "Lider nie mógł przydzielić tej wiadomości. Przydziel ją członkowi.",
+  "error.backend.channelRoutingFailed": "Kierowanie nie powiodło się. Wybierz członka lub spróbuj ponownie.",
+  "error.backend.channelLeadTimedOut": "Lider kanału nie odpowiedział na czas. Wybierz członka lub spróbuj ponownie.",
+  "error.backend.channelLeadFailed":
+    "Lider kanału nie mógł skierować tej wiadomości. Wybierz członka lub spróbuj ponownie.",
+  "error.backend.channelRequestMemberRequired": "Wybierz członka do tego żądania.",
+  "error.backend.channelDeliveryNotCreated": "Nie utworzono dostarczenia kanału.",
+  "error.backend.channelAssignmentStopped": "Ten przydział kanału został zatrzymany lub zastąpiony.",
+  "error.backend.channelAssigneeUnavailable": "Przydzielony agent jest niedostępny.",
+  "error.backend.channelAssigneeRemoved": "Przydzielony członek został usunięty.",
+  "error.backend.channelAssigneeReassign": "Przydzielony członek jest niedostępny. Przydziel to zadanie ponownie.",
+  "error.backend.channelAssignmentChanged": "Ten przydział kanału się zmienił.",
+  "error.backend.channelMemberRequired": "Wybierz dostępnego członka tego kanału.",
+  "error.backend.memoryEssentialBudget":
+    "Kluczowe wspomnienia przekraczają limit promptu. Ustaw wpis na wyszukiwanie w razie potrzeby i spróbuj ponownie.",
+  "error.backend.memorySelectionConflict": "Wspomnienie się zmieniło. Wczytaj je ponownie i spróbuj jeszcze raz.",
+  "error.backend.memorySelectionUserControlled":
+    "Ten wybór wspomnienia kontroluje użytkownik. Zachowaj wybór użytkownika.",
+  "error.backend.memorySearchQuery": "Wpisz jedno lub więcej słów wyszukiwania, do 256 znaków.",
+  "error.backend.memoryOperationFailed": "Operacja na wspomnieniach nie powiodła się. Spróbuj ponownie.",
+  "error.backend.memoryGone": "To wspomnienie już nie istnieje.",
+  "error.backend.routineGone": "Ta rutyna już nie istnieje.",
+  "error.backend.routineRunGone": "To uruchomienie rutyny już nie istnieje.",
+  "error.backend.routineRunFailedNoReason":
+    "Uruchomienie zatrzymało się z błędem, ale bez podanego powodu. Otwórz uruchomienie, aby zobaczyć, co zrobił agent.",
+  "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
+  "error.backend.routineResultConnectionOff":
+    "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",
+  "error.backend.routineResultNoDelivery": "To uruchomienie nie ma odpowiedzi do ponownego wysłania.",
+  "error.backend.channelMemoryLimit": "Kanał może mieć maksymalnie {limit} wspomnień.",
+  "error.backend.channelRoutineLimit": "Kanał może mieć maksymalnie {limit} rutyn.",
+  "error.backend.agentRoutineLimit": "Agent może mieć maksymalnie {limit} rutyn.",
+  "error.backend.agentMemoryLimit": "Agent może mieć maksymalnie {limit} wspomnień.",
+  "error.backend.agentMemoryLimitReached":
+    "Masz {saved} z {limit} wspomnień. Aby zrobić miejsce, zaktualizuj jedno wspomnienie przez memoryId, łącząc tekst dwóch powiązanych wspomnień, a następnie zapomnij drugie lub zapomnij wspomnienie, które nie jest już prawdziwe. Potem spróbuj ponownie.",
+  "error.backend.agentMemoryLimitExceeded":
+    "Liczba zapisanych wspomnień: {saved}. Limit: {limit}. Użytkownik ustawił limit poniżej liczby zapisanych wspomnień. Nie zapominaj wspomnień, aby zrobić miejsce. Powiedz użytkownikowi, że to wspomnienie nie zostało zapisane.",
+  "error.backend.channelHistoryArriving": "Wspólna wiadomość wciąż napływa. Wznów, gdy będzie kompletna.",
+  "error.backend.channelHistoryLeadRequired": "Wybierz lidera kanału, aby przygotować wspólną historię.",
+  "error.backend.channelHistoryInvalid": "Podsumowanie historii jest nieprawidłowe. Wznów, aby spróbować ponownie.",
+  "error.backend.channelContextTooLong":
+    "Ten przydział przekracza limit wspólnego kontekstu. Wyślij krótsze żądanie lub przydziel je ponownie.",
+  "error.backend.draftAttachmentLimit": "Zachowaj maksymalnie {limit} załączników wersji roboczej.",
+  "error.backend.recipientRequired": "Wymagany jest co najmniej jeden odbiorca.",
+  "error.backend.recipientLimit": "Wiadomość może mieć maksymalnie {limit} odbiorców.",
+  "error.backend.attachmentDraftGone": "Wersja robocza załącznika już nie istnieje: {id}",
+  "error.backend.attachmentInQueueEdit": "Załącznik należy do edycji w kolejce.",
+  "error.backend.messageEmpty": "Wiadomość nie może być pusta.",
+  "error.backend.attachLimit": "Załącz maksymalnie {limit} plików.",
+  "error.backend.queuedMessageNotFound": "Nie znaleziono wiadomości w kolejce.",
+  "error.backend.cancelQueuedOnly": "Anulować można tylko wiadomości w kolejce.",
+  "error.backend.messageBeingEdited": "Ta wiadomość jest edytowana. Najpierw zapisz lub anuluj edycję.",
+  "error.backend.queuedMessageUnavailable": "Ta wiadomość w kolejce nie jest już dostępna.",
+  "error.backend.editedOnOtherDevice": "Ta wiadomość jest edytowana na innym urządzeniu.",
+  "error.backend.editUnavailable": "Ta edycja nie jest już dostępna.",
+  "error.backend.attachmentInOtherEdit": "Załącznik należy do innej edycji.",
+  "error.backend.messageBeingSaved": "Ta wiadomość jest zapisywana. Spróbuj ponownie po zakończeniu.",
+  "error.backend.editQueuedOnly": "Edytować można tylko wiadomości w kolejce.",
+  "error.backend.attachmentNotInMessage": "Załącznik nie należy do wiadomości w kolejce.",
+  "error.backend.queueOrderStale": "Kolejność kolejki jest nieaktualna. Odśwież kolejkę i spróbuj ponownie.",
+  "error.backend.fileGone": "Plik nie istnieje lub został już usunięty.",
+  "error.backend.managedAttachmentChanged": "Zarządzany załącznik nie istnieje lub się zmienił: {name}",
+  "error.backend.mailboxStateCorrupt":
+    "Stan skrzynki jest uszkodzony lub pochodzi z nowszej wersji OpenBot; odmowa nadpisania.",
+  "error.backend.recipientDeleting": "Odbiorca jest usuwany. Spróbuj ponownie po zakończeniu usuwania.",
+  "error.backend.recipientHidden": "Ten agent jest ukryty. Przywróć go, aby wysyłać wiadomości.",
+  "error.backend.agentIdUnknown":
+    "Żaden agent nie ma identyfikatora {id}. Pobierz identyfikatory z openbot.list_agents i spróbuj ponownie.",
+  "error.backend.agentIdNear":
+    "Żaden agent nie ma identyfikatora {id}. Agent {name} ma prawie taki sam identyfikator {nearId}. Jeśli chodzi o tego agenta, spróbuj ponownie z jego identyfikatorem.",
+  "error.backend.attachBetween": "Załącz od 1 do {limit} plików.",
+  "error.backend.attachmentNotFile": "Załącznik nie jest plikiem: {path}",
+  "error.backend.generatedImageTooLarge": "Wygenerowany obraz przekracza limit 100 MB.",
+  "error.backend.generatedVideoTooLarge": "Wygenerowany film przekracza limit 100 MB.",
+  "error.backend.videoGenerationFailed": "Generowanie filmu nie powiodło się.",
+  "error.backend.videoGenerationNoVideo": "Generowanie filmu nie zwróciło filmu.",
+  "error.backend.videoGenerationInterrupted": "Generowanie filmu zostało przerwane.",
+  "error.backend.attachmentNotRegularFile": "Załączać można tylko zwykłe pliki: {name}",
+  "error.backend.attachmentCopyFailed": "OpenBot nie mógł skopiować pliku {name}.",
+  "error.backend.routineNameRequired": "Nazwa rutyny jest wymagana.",
+  "error.backend.routineNameTooLong": "Nazwa rutyny jest za długa.",
+  "error.backend.routineInstructionRequired": "Instrukcja rutyny jest wymagana.",
+  "error.backend.routineInstructionTooLong": "Instrukcja rutyny jest za długa.",
+  "error.backend.routineScheduleInvalid": "Harmonogram rutyny jest nieprawidłowy.",
+  "error.backend.routineIntervalTooShort":
+    "Odstęp rutyny musi wynosić co najmniej {minutes} min. Użyj {minutes} min lub więcej albo harmonogramu dziennego, tygodniowego lub cron.",
+  "error.backend.routineIntervalTooShortFixed":
+    "Odstęp rutyny musi wynosić co najmniej {minutes} min. Użyj {minutes} min lub więcej albo stałej godziny.",
+  "error.backend.routineCronTooOften": "Własne harmonogramy nie mogą uruchamiać się częściej niż co {minutes} min.",
+  "error.backend.routineAnchorInvalid": "Punkt odniesienia odstępu rutyny jest nieprawidłowy.",
+  "error.backend.routineNoOccurrence": "Harmonogram nie ma żadnego wystąpienia w ciągu najbliższych pięciu lat.",
+  "error.backend.routineOncePassed": "Czas tej jednorazowej rutyny już minął. Wybierz późniejszą datę lub godzinę.",
+  "error.backend.routineTimezoneInvalid": "Strefa czasowa rutyny jest nieprawidłowa.",
+  "error.backend.routineCronFields": "Własne harmonogramy muszą mieć pięć pól cron.",
+  "error.backend.routineCronValueInvalid": "Wartość pola cron {field} jest nieprawidłowa.",
+  "error.backend.routineCronFieldEmpty": "Pole cron {field} jest puste.",
+  "error.backend.routineDeletionBusy": "Dla tego agenta trwa już usuwanie innej rutyny.",
+  "error.backend.routineWaitForAgent": "Poczekaj na zakończenie operacji agenta, zanim uruchomisz rutynę.",
+  "error.backend.routineRunStarting":
+    "To uruchomienie rutyny wciąż się rozpoczyna. Spróbuj ponownie, gdy tura się zacznie.",
+  "error.backend.routineRunNoSession":
+    "OpenBot nie może przerwać aktywnego uruchomienia rutyny, ponieważ sesja dostawcy jest niedostępna.",
+  "error.backend.interruptSelf": "Agent nie może przerwać samego siebie.",
+  "error.backend.interruptOtherWork":
+    "Ten agent pracuje nad zadaniem, którego nie rozpoczęła twoja wiadomość. Zatrzymać je może tylko użytkownik lub nadawca tego zadania.",
+  "error.backend.interruptSharedWork":
+    "Tura tego agenta obsługuje Twoją wiadomość, a także wiadomość od użytkownika lub innego agenta. Tylko użytkownik może ją zatrzymać, przyciskiem Zatrzymaj agenta w czacie tego agenta.",
+  "error.backend.interruptStarting": "Ten agent wciąż rozpoczyna turę. Spróbuj ponownie, gdy tura się zacznie.",
+  "error.backend.interruptNoSession":
+    "OpenBot nie może przerwać tego agenta, ponieważ jego sesja dostawcy jest niedostępna.",
+  "error.backend.memoryTextRequired": "Tekst wspomnienia jest wymagany.",
+  "error.backend.memoryTextTooLong": "Tekst wspomnienia jest za długi.",
+  "error.backend.mcpServerGone": "Ten serwer MCP już nie istnieje.",
+  "error.backend.routineFlowLinkGone": "To połączenie już nie istnieje.",
+  "error.backend.routineFlowSameAgent": "Agent nie może przekazać pracy samemu sobie.",
+  "error.backend.routineFlowIntoOwner":
+    "Rutyna zaczyna się od własnego agenta, więc ten agent nie może przejmować pracy od innego.",
+  "error.backend.routineFlowNotOnPath": "Ten agent nie jest jeszcze częścią rutyny. Najpierw połącz go z rutyną.",
+  "error.backend.routineFlowDuplicate": "Ci agenci są już połączeni w tej rutynie.",
+  "error.backend.routineFlowCycle": "To połączenie utworzyłoby pętlę.",
+  "error.backend.routineFlowLinkLimit": "Rutyna może mieć maksymalnie {limit} połączeń.",
+  "error.backend.agentWaitLimit":
+    "Ten agent ma już maksymalną liczbę otwartych oczekiwań: {count}. Zamknij oczekiwanie za pomocą openbot.close_wait, zanim otworzysz kolejne.",
+  "error.backend.agentWaitGone": "To oczekiwanie nie jest otwarte. Agent je zamknął albo ktoś je anulował.",
+  "error.backend.agentWaitNoRequest": "Oczekiwanie potrzebuje wiadomości, aby kontynuować. Ta tura nie ma wiadomości.",
+  "error.backend.agentWaitOwnChatOnly":
+    "Otwieraj oczekiwanie we własnym czacie lub w wątku bocznym. Rozmowa kanału lub komunikatora nie może czekać.",
+  "error.backend.agentWaitNoteRequired": "Podaj krótką notatkę, na co jest to oczekiwanie.",
+  "error.backend.agentWaitRoutineGone": "Ten agent nie ma rutyny o tym identyfikatorze.",
+  "error.backend.agentWaitNoRoutine":
+    "Oczekiwanie budzi tylko uruchomienie jednej z twoich rutyn, a nie masz żadnej rutyny. Utwórz ją za pomocą openbot.create_routine, a potem otwórz oczekiwanie.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Oznaczanie wiadomości jako nieprzeczytanej jest dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.messageDeleteUnsupported": "Ten serwer nie obsługuje usuwania wiadomości.",
+  "error.backend.messageDeleteNotFound": "Tej wiadomości nie ma w czacie.",
+  "error.backend.messageDeleteBusy": "Ta wiadomość należy do trwającej tury. Usuń ją po zakończeniu tury.",
+  "error.backend.messageDeleteForbidden": "Możesz usuwać tylko wiadomości, które wysłałeś.",
+  "error.backend.messagePinNotFound": "Tej wiadomości nie ma na czacie.",
+  "error.backend.messagePinLimit": "Ten czat ma 50 przypiętych wiadomości. Odepnij jedną, zanim przypniesz kolejną.",
+  "error.backend.routineFlowHandoffFailed": "Rutyna nie mogła przekazać pracy temu agentowi.",
+  "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
+  "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",
+  "error.backend.mcpServerInvalid": "OpenBot nie może zapisać tej konfiguracji serwera MCP.",
+  "error.backend.mcpServerNoAnswer": "Serwer nie odpowiedział w ciągu {seconds} s.",
+  "error.backend.mcpSignInNotAccepted": "Serwer nie zaakceptował tego logowania.",
+  "error.backend.mcpSignInAccountRefused":
+    "Serwer odrzucił konto, na które się zalogowano. Sprawdź, czy to konto może korzystać z usługi. Aby użyć innego konta, wyloguj się, a potem zaloguj ponownie.",
+  "error.backend.mcpSignInClientRefused":
+    "Serwer logowania nie zaakceptował OpenBot przy kończeniu logowania. Zaloguj się ponownie: OpenBot zarejestruje się ponownie na serwerze.",
+  "error.backend.mcpSignInAppRefused":
+    "Serwer logowania nie zaakceptował aplikacji logowania tego serwera. Sprawdź identyfikator klienta i sekret klienta aplikacji logowania, a potem zaloguj się ponownie.",
+  "error.backend.mcpCommandNotFound": "Nie znaleziono polecenia: {command}",
+  "error.backend.mcpProviderLimit":
+    "Ten agent może używać tylko ograniczonej liczby serwerów MCP. Aby użyć tego serwera, wyłącz serwer MCP, którego agent nie potrzebuje.",
+  "error.backend.mcpRegistrationRefused":
+    "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, zapisz ten serwer w Marketplace, Aplikacje, a potem dodaj do niego aplikację logowania.",
+  "error.backend.mcpSignInAbandonedGeneric": "Logowanie zostało porzucone.",
+  "error.backend.mcpSignInForgotten": "Logowanie MCP zostało zapomniane w trakcie działania.",
+  "error.backend.mcpSignInAbandoned": "Logowanie MCP zostało porzucone.",
+  "error.backend.mcpSignInNoBrowser": "To logowanie MCP nie może otworzyć przeglądarki.",
+  "error.backend.mcpSignInNotWebPage": "Adres logowania nie jest stroną internetową.",
+  "error.backend.mcpSignInRequired":
+    "Ten serwer wymaga zalogowania. Wybierz „Zaloguj się”, aby kontynuować w przeglądarce.",
+  "error.backend.mcpSignInOnHost": "Ten serwer wymaga zalogowania. Zaloguj się do niego w OpenBot na komputerze hosta.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Ten serwer wymaga zalogowania, a OpenBot loguje się tylko przez https. Zmień URL na {url}.",
+  "error.backend.mcpSignInCancelled": "Logowanie zostało anulowane.",
+  "error.backend.mcpSignInTimedOut": "Logowanie nie zostało ukończone w przeglądarce.",
+  "error.backend.mcpSignInRefused": "Strona logowania odmówiła dostępu. Zaloguj się ponownie.",
+  "error.backend.mcpSignInResponseTimedOut": "Odpowiedź logowania nie dotarła na czas.",
+  "error.backend.mcpSignInMetadataUnreadable":
+    "OpenBot nie mógł odczytać informacji o logowaniu tego serwera. Sprawdź adres serwera i spróbuj ponownie.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Serwer logowania wysłał odpowiedź, której OpenBot nie może odczytać. Jeśli usługa daje Ci klucz API lub token, dodaj go w ustawieniach tego serwera, a potem ponownie przetestuj połączenie.",
+  "error.backend.mcpServerExited":
+    "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
+  "error.backend.mcpServerExitedWithOutput": "Serwer zatrzymał się przed odpowiedzią. Napisał: {detail}",
+  "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
+  "error.backend.mcpServerStoppedDuringCall": "Serwer MCP zatrzymał się, zanim odpowiedział na to wywołanie.",
+  "error.backend.mcpToolSchemaRefused":
+    "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz {name} w Marketplace, Aplikacje i wybierz Zaloguj się.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} nie może uruchomić serwera MCP {name}. Otwórz {name} w Marketplace, Aplikacje i wybierz Testuj połączenie, aby zobaczyć przyczynę.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} nie może uruchomić serwera MCP {name}. Jego narzędzia nie są dostępne dla {provider}. {provider} uruchamia serwer samodzielnie, więc test połączenia w OpenBot może się udać. Rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} nie może uruchomić serwera MCP {name}, ponieważ serwer nie odpowiedział na czas. Rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} nie może uruchomić serwera MCP {name}, ponieważ serwer jest teraz niedostępny. Poczekaj kilka minut, a potem rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} nie może połączyć się z serwerem MCP {name}. Otwórz {name} w Marketplace, Aplikacje, i sprawdź, czy adres jest poprawny i czy serwer działa. Potem rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} nie może pobrać narzędzi GitHub, ponieważ GitHub nie odpowiedział. Otwórz GitHub w Marketplace, Aplikacje, i połącz go ponownie, jeśli o to poprosi. Potem rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.mcpOAuthProxyUnavailable":
+    "OpenBot nie mógł uruchomić lokalnego połączenia logowania dla tego serwera. Uruchom ponownie OpenBot i spróbuj jeszcze raz.",
+  "error.backend.mcpOAuthSignInNeeded":
+    "Logowanie do tego serwera MCP wygasło. Użytkownik musi zalogować się ponownie w OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot nie mógł teraz odnowić logowania do tego serwera MCP. Logowanie zostaje zachowane, a następne żądanie spróbuje ponownie. Jeśli błąd się powtarza, użytkownik może wylogować się z serwera w OpenBot i zalogować ponownie.",
+  "error.backend.mcpServerUnreachable": "OpenBot nie mógł połączyć się z serwerem. Sprawdź URL i sieć.",
+  "error.backend.mcpLocalServerOff":
+    "Żaden serwer nie odpowiada pod adresem {address} na tym komputerze. Uruchom serwer lub włącz go w aplikacji, która go obsługuje, i spróbuj ponownie.",
+  "error.backend.mcpServerBlocked":
+    "Ten komputer zablokował połączenie z serwerem. Sprawdź zaporę lub oprogramowanie zabezpieczające i spróbuj ponownie.",
+  "error.backend.mcpServerIncompatible":
+    "Pod tym adresem coś odpowiedziało, ale nie jako serwer MCP przez Streamable HTTP. Sprawdź URL i zaktualizuj aplikację, która uruchamia serwer.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} To polecenie uruchamia most mcp-remote. Zamiast tego wybierz Streamable HTTP z URL {url}, a OpenBot cię zaloguje.",
+  "error.backend.oauthNotHttps":
+    "Endpoint OAuth {origin} nie używa https, więc dane uwierzytelniające nie zostały wysłane.",
+  "error.backend.oauthTooManyRedirects": "Endpoint OAuth przekierował zbyt wiele razy.",
+  "error.backend.oauthRedirectOrigin":
+    "Endpoint OAuth przekierował do {origin}, więc dane uwierzytelniające nie zostały przekazane.",
+  "error.backend.oauthTimedOut": "Endpoint OAuth {origin} nie odpowiedział na czas.",
+  "error.backend.oauthResponseTooLarge": "Endpoint OAuth {origin} wysłał zbyt dużą odpowiedź.",
+  "error.backend.oauthResponseUnreadable": "Nie udało się odczytać odpowiedzi endpointu OAuth {origin}.",
+  "error.backend.mcpOAuthPrivateEndpoint":
+    "Endpoint OAuth {origin} jest w sieci prywatnej, a serwer MCP jest publiczny, więc dane uwierzytelniające nie zostały wysłane.",
+  "error.backend.sidebarSectionLimit": "Serwer może mieć maksymalnie {limit} sekcji paska bocznego.",
+  "error.backend.sectionNameRequired": "Nazwa sekcji jest wymagana.",
+  "error.backend.sectionNameTooLong": "Nazwa sekcji jest za długa.",
+  "error.backend.sidebarFolderTooDeep": "Foldery mogą mieć tylko trzy poziomy.",
+  "error.backend.sidebarFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
+  "error.backend.libraryFolderName": "Nazwa folderu musi mieć od 1 do {limit} znaków.",
+  "error.backend.libraryFolderLimit": "Serwer może mieć maksymalnie {limit} folderów Biblioteki.",
+  "error.backend.libraryFolderFileLimit": "W folderach Biblioteki jest za dużo plików.",
+  "error.backend.libraryFolderTooDeep": "Foldery Biblioteki mogą mieć maksymalnie {limit} poziomów.",
+  "error.backend.libraryFolderGone": "Folder nie istnieje lub został już usunięty.",
+  "error.backend.libraryFolderOtherAgent": "Plik można przenieść tylko do folderu jego agenta.",
+  "error.backend.libraryFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
+  "error.backend.workflowFolderLimit": "Serwer może mieć maksymalnie {limit} folderów przepływów pracy.",
+  "error.backend.workflowFolderPlacementLimit": "W folderach jest za dużo przepływów pracy.",
+  "error.backend.sectionNameDuplicate": "Nazwy sekcji muszą być unikalne.",
+  "error.backend.directMessageRequired": "Najpierw napisz wiadomość.",
+  "error.backend.directMessageTooLong": "Wiadomość prywatna może mieć maksymalnie {limit} znaków.",
+  "error.backend.directMessageSelf": "Nie możesz wysłać wiadomości prywatnej do siebie.",
+  "error.backend.readBoundaryUnavailable": "Granica odczytu nie jest już dostępna.",
+  "error.backend.sharedFileOutside": "Plik współdzielony musi znajdować się w katalogu współdzielonym.",
+  "error.backend.sharedPathIsFolder": "Ścieżka współdzielona jest folderem, nie plikiem.",
+  "error.backend.sharedPathNotFile": "Ścieżka współdzielona nie jest plikiem.",
+  "error.backend.workspaceFileOutside": "Plik obszaru roboczego musi znajdować się w obszarze roboczym agenta.",
+  "error.backend.workspacePathNotFile": "Ścieżka obszaru roboczego nie jest plikiem.",
+  "error.backend.workspacePathNotDirectory": "Ścieżka obszaru roboczego nie jest folderem.",
+  "error.backend.workspacePathMissing": "Pod ścieżką {path} w obszarze roboczym agenta {root} nic nie ma.",
+  "error.backend.workspacePathMissingForMember": "Pod ścieżką {path} w obszarze roboczym agenta nic nie ma.",
+  "error.backend.useChannelTaskControls": "Użyj kontrolek zadań kanału dla tego przydziału.",
+  "error.backend.editFinished": "Ta edycja została już zakończona.",
+  "error.backend.editCancelled": "Ta edycja została anulowana, więc wiadomość zachowuje oryginalny tekst.",
+  "error.backend.editSaved": "Ta edycja została już zapisana.",
+  "error.backend.editSavedDifferent":
+    "Ta edycja została już zapisana z inną treścią. Twoje zmiany nie zostały zapisane.",
+  "error.backend.useChannelTaskControlsWork": "Użyj kontrolek zadań kanału do pracy w kanale.",
+  "error.backend.steerTurnChanged": "Aktywna tura zmieniła się, zanim udało się pokierować tą wiadomością.",
+  "error.backend.steerUnsupported":
+    "Ten dostawca nie może pokierować trwającą turą. Twoja wiadomość pozostaje w kolejce.",
+  "error.backend.steerRoutineRun": "Teraz działa rutyna. Twoja wiadomość czeka w kolejce i zacznie się po rutynie.",
+  "error.backend.steerQueuedOnly": "Pokierować można tylko wiadomościami w kolejce.",
+  "error.backend.promptInactive": "Ten prompt nie jest już aktywny.",
+  "error.backend.promptAnswerMismatch": "Odpowiedź na prompt nie pasuje do aktywnego pytania.",
+  "error.backend.approvalInactive": "To zatwierdzenie nie jest już aktywne.",
+  "error.backend.feedbackNeedsPhone":
+    "To zgłoszenie może wysłać tylko aplikacja OpenBot na telefon, bo dodaje wersję i dziennik pomocy telefonu. Otwórz ten czat na telefonie. Jeśli zobaczysz tam ten komunikat, zaktualizuj aplikację na telefonie.",
+  "error.backend.takeoverInactive": "To przejęcie przeglądarki nie jest już aktywne.",
+  "error.backend.authSubmitting": "Wysyłanie uwierzytelnienia już trwa.",
+  "error.backend.apiKeyListFailed": "OpenBot nie mógł odczytać zapisanych kluczy API.",
+  "error.backend.apiKeySaveFailed": "OpenBot nie mógł zapisać klucza API. Spróbuj ponownie.",
+  "error.backend.apiKeySaving": "Klucz API jest już zapisywany.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot nie mógł odczytać klucza API. Wpisz klucz o długości do 8000 znaków i wybierz, kto może go używać.",
+  "error.backend.authRequestInactive": "To żądanie bezpiecznego uwierzytelnienia nie jest już aktywne.",
+  "error.backend.secureAuthUnavailable": "Bezpieczne uwierzytelnianie jest niedostępne.",
+  "error.backend.browserUrlRequired": "Adres URL przeglądarki jest wymagany.",
+  "error.backend.browserUrlTooLong": "Adres URL przeglądarki jest za długi.",
+  "error.backend.browserTabLimit": "Przeglądarka może mieć maksymalnie {limit} otwartych kart.",
+  "error.backend.browserProfileMissing":
+    "Profil przeglądarki tego agenta już nie istnieje. Wybierz inny profil w ustawieniach agenta.",
+  "error.backend.browserProfileNotFound": "Ten profil przeglądarki już nie istnieje.",
+  "error.backend.browserProfileNameTaken": "Profil przeglądarki o tej nazwie już istnieje.",
+  "error.backend.browserSessionInUse": "Karta nadal używa tej sesji przeglądarki. Spróbuj ponownie.",
+  "error.backend.browserProfileLimit": "Możesz mieć maksymalnie {limit} profili przeglądarki.",
+  "error.backend.browserProxyNotFound": "Ten serwer proxy już nie istnieje.",
+  "error.backend.browserProxyAddressInvalid":
+    "Wpisz adres serwera proxy, np. socks5://host:1080 lub http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "Możesz mieć maksymalnie {limit} serwerów proxy.",
+  "error.backend.browserProxyTaken": "Serwer proxy z tym adresem już istnieje.",
+  "error.backend.browserProxyChanged":
+    "Ten serwer proxy zmienił się po jego otwarciu. Sprawdź go ponownie i spróbuj jeszcze raz.",
+  "error.backend.browserProxyUnreachable": "Proxy {name} nie odpowiada, więc strona się nie otworzyła.",
+  "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
+  "error.backend.browserSystemProxyFailed":
+    "Proxy w ustawieniach komputera, na którym działa OpenBot, nie odpowiada lub odrzuciło połączenie, więc strona się nie otworzyła. Sprawdź ustawienia proxy tego komputera.",
+  "error.backend.browserProxyComputerUnreachable":
+    "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Komputer używany przez ten profil otwiera tylko publiczne witryny. Nie otwiera adresów w sieci lokalnej, więc strona się nie otworzyła.",
+  "error.backend.browserCertificateUntrusted":
+    "Certyfikat bezpieczeństwa tej witryny nie jest zaufany, więc strona się nie otworzyła.",
+  "error.backend.browserLowMemory":
+    "Na tym serwerze brakuje pamięci, więc przeglądarka nie może otworzyć kolejnej karty. Zamknij kartę lub poczekaj, aż inni agenci skończą.",
+  "error.backend.browserOpenFailed": "Nie można otworzyć {url}: {reason}",
+  "error.backend.popupSecureInput":
+    "Wyskakujące okna są blokowane podczas bezpiecznego wprowadzania. Zakończ lub anuluj bezpieczne wprowadzanie, a potem ponów próbę na stronie.",
+  "error.backend.popupUnsupportedType":
+    "Ten typ wyskakującego okna nie jest obsługiwany. Użyj zwykłego linku lub przycisku logowania na stronie.",
+  "error.backend.popupUnsupportedAddress":
+    "To wyskakujące okno używa nieobsługiwanego adresu. Użyj opcji logowania HTTP lub HTTPS na stronie.",
+  "error.backend.popupTabLimit": "Osiągnięto limit kart przeglądarki. Zamknij kartę, a potem ponów próbę na stronie.",
+  "error.backend.popupLoadFailed": "Nie udało się wczytać wyskakującego okna. Ponów logowanie na pierwotnej stronie.",
+  "error.backend.browserTabNotFound": "Nie znaleziono karty przeglądarki.",
+  "error.backend.authActive": "Uwierzytelnianie jest już aktywne.",
+  "error.backend.authWebPageRequired": "Bezpieczne uwierzytelnianie wymaga HTTP/HTTPS.",
+  "error.backend.authDigitsRange": "Kody uwierzytelniające muszą mieć od 4 do 12 cyfr.",
+  "error.backend.authExpired": "Żądanie uwierzytelnienia wygasło.",
+  "error.backend.authDigitsRequired": "Wpisz wymaganą liczbę cyfr.",
+  "error.backend.browserViewProtected": "Widok przeglądarki jest chroniony podczas uwierzytelniania.",
+  "error.backend.browserPreviewPageChanged": "Strona przeglądarki zmieniła się podczas podglądu. Spróbuj ponownie.",
+  "error.backend.browserInputProtected": "Wprowadzanie w przeglądarce jest chronione podczas uwierzytelniania.",
+  "error.backend.mcpServerHttpCredentials":
+    "Serwer odpowiedział {status}. Sprawdź klucz API lub inne dane uwierzytelniające.",
+  "error.backend.mcpServerHttpUrl":
+    "Serwer odpowiedział {status}. Sprawdź URL. Link może być błędny, wygasły lub usunięty.",
+  "error.backend.mcpServerBearerKey":
+    "Ten serwer używa klucza API, a nie logowania. W Nagłówkach ustaw klucz na Authorization, a wartość na Bearer, spację i swój klucz API.",
+  "error.backend.mcpSignInAppUrl": "Aplikacja logowania wymaga prawidłowego adresu URL serwera.",
+  "error.backend.mcpSignInAppClientId": "Wpisz identyfikator klienta aplikacji logowania.",
+  "error.backend.mcpSignInAppIssuerChanged":
+    "Serwer logowania tego serwera MCP zmienił się, więc OpenBot nie wysłał mu aplikacji logowania. Jeśli ta zmiana jest poprawna, usuń aplikację logowania i dodaj ją ponownie.",
+  "error.backend.mcpSignInAppNoServer": "Zapisz ten serwer MCP jako serwer URL, zanim dodasz aplikację logowania.",
+  "error.backend.mcpSignInAppUnavailable": "Ten komputer nie może przechować aplikacji logowania.",
+  "error.backend.taskMoveRefused": "Jako zadanie można uruchomić tylko wiadomość wysłaną wyłącznie do tego agenta.",
+  "error.backend.taskNotFound": "To zadanie nie jest dostępne.",
+  "error.backend.taskClosed": "To zadanie jest zamknięte. Otwórz je ponownie, aby wysłać wiadomość.",
+  "error.backend.taskStillRunning": "To zadanie nadal działa. Poczekaj, aż się zatrzyma, a potem je zamknij.",
+  "error.backend.threadNotFound": "Ten wątek jest niedostępny.",
+  "error.backend.threadStillRunning": "Ten wątek nadal działa. Zatrzymaj go, a potem spróbuj ponownie.",
+  "error.backend.threadArchived": "Ten wątek jest zarchiwizowany. Przywróć go, aby wysłać wiadomość.",
+  "error.backend.threadTitleRequired": "Nadaj wątkowi krótki tytuł.",
+  "error.backend.threadOpenLimitReached":
+    "Liczba otwartych wątków tego agenta: {count}. Zarchiwizuj wątek, a potem rozpocznij lub przywróć inny.",
+  "error.backend.threadRemoteUnsupported": "Wątki są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.branchSourceBusy": "Zatrzymaj bieżącą turę, zanim utworzysz odgałęzienie tego czatu.",
+  "error.backend.branchMessageNotFound": "Odgałęzienie możesz utworzyć tylko od ukończonej odpowiedzi agenta.",
+  "error.backend.branchRemoteUnsupported": "Odgałęzienia są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Aby usunąć to zgłoszenie, poproś o to agenta.",
+  "error.backend.threadMoveRefused": "W nowym wątku można uruchomić tylko wiadomość wysłaną wyłącznie do tego agenta.",
+  "error.backend.taskTitleRequired": "Nadaj zadaniu krótki tytuł.",
+  "error.backend.taskToolInvalid":
+    "Nadaj zadaniu tytuł o długości maksymalnie 120 znaków i opis, który mówi, co zrobić.",
+  "error.backend.taskControlInvalid":
+    "Podaj taskId zadania, które zostało przez Ciebie uruchomione. Wiadomość wymaga też tekstu.",
+  "error.backend.taskOwnChatOnly":
+    "Zadanie możesz rozpocząć tylko z własnego czatu. Kanał, rozmowa w komunikatorze ani inne zadanie nie mogą go rozpocząć.",
+  "error.backend.taskUnfinishedLimit":
+    "Liczba niezakończonych zadań tego agenta: {count}. Rozpocznij kolejne zadanie, gdy jedno z nich się zakończy.",
+  "error.backend.taskOpenLimitReached":
+    "Liczba otwartych zadań tego agenta: {count}. Zamknij zadanie, a potem rozpocznij lub otwórz inne.",
+  "error.backend.taskRemoteUnsupported": "Zadania są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.taskMessageFailed": "OpenBot nie może wysłać wiadomości do zadania. Spróbuj ponownie później.",
+  "error.backend.taskStartFailed": "OpenBot nie może rozpocząć zadania. Zamiast tego wykonaj pracę w tej turze.",
+} as const satisfies PartialTranslation<typeof source>;

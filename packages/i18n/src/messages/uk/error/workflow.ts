@@ -1,0 +1,112 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/error/workflow";
+
+export const messages = {
+  "error.workflow.missing": "Ten przepływ pracy już nie istnieje.",
+  "error.workflow.versionMissing": "Ta wersja przepływu pracy już nie istnieje.",
+  "error.workflow.annotation": "Teksty, notatki i kształty nie mogą mieć połączeń.",
+  "error.workflow.port": "Krok nie może przyjąć tego typu danych.",
+  "error.workflow.branch": "Tylko warunek może mieć połączenia tak i nie.",
+  "error.workflow.conditionBranch": "Każde połączenie z warunku musi być tak albo nie.",
+  "error.workflow.duplicateEdge": "Te dwa kroki mają już to połączenie.",
+  "error.workflow.serverTooOld":
+    "Ten serwer nie obsługuje przepływów pracy. Zaktualizuj OpenBot na komputerze, na którym działa.",
+  "error.workflow.nodeUnsupported": "Ta wersja OpenBot nie może jeszcze uruchamiać kroków obrazu, pliku i wiadomości.",
+  "error.workflow.interrupted": "OpenBot zatrzymał się podczas tego kroku. Uruchom go ponownie.",
+  "error.workflow.agentMissing": "Wybierz agenta dla tego kroku.",
+  "error.workflow.handoffFailed": "OpenBot nie mógł wysłać tego kroku do jego agenta.",
+  "error.workflow.agentStepEnded": "Wiadomość do agenta została usunięta, zanim odpowiedział.",
+  "error.workflow.agentStepStopped": "Agent zatrzymał się, zanim odpowiedział na ten krok. Uruchom krok ponownie.",
+  "error.workflow.conditionUnclear": "Model nie odpowiedział tak ani nie.",
+  "error.workflow.answerInvalid": "Odpowiedź nie miała pól, których wymaga ten krok: {fields}. Uruchom krok ponownie.",
+  "error.workflow.checkInvalid":
+    "Warunek sprawdzenia w tym kroku jest nieprawidłowy. Popraw go i uruchom krok ponownie.",
+  "error.workflow.modelFailed": "Model nie mógł odpowiedzieć. Uruchom krok ponownie.",
+  "error.workflow.modelTimedOut":
+    "Model nie odpowiedział na czas. Wybierz mniejszy wysiłek lub szybszy model dla tego kroku, a potem uruchom go ponownie.",
+  "error.workflow.modelToolUse":
+    "Model próbował użyć narzędzia, ale ten krok może odpowiedzieć tylko tekstem. Uruchom krok ponownie lub wybierz dla niego inny model.",
+  "error.workflow.modelImageUnsupported":
+    "Model tego kroku nie może czytać obrazów. Wybierz model, który to potrafi, albo usuń połączenie obrazu.",
+  "error.workflow.modelImageType":
+    "Krok modelu może czytać tylko obrazy PNG, JPEG, GIF i WebP. Połącz obraz jednego z tych typów.",
+  "error.workflow.modelUnavailable": "Model tego kroku jest niedostępny. Wybierz inny model dla tego kroku.",
+  "error.workflow.providerBusy": "Dostawca jest zajęty. Poczekaj kilka minut, a potem uruchom krok ponownie.",
+  "error.workflow.providerOffline":
+    "OpenBot nie mógł połączyć się z dostawcą. Sprawdź połączenie z internetem, a potem uruchom krok ponownie.",
+  "error.workflow.modelBusy": "Trwa inne zapytanie do modelu. Uruchom krok ponownie za chwilę.",
+  "error.workflow.mediaFailed": "Model nie mógł utworzyć obrazu ani wideo. Uruchom krok ponownie.",
+  "error.workflow.mediaNotMade": "Model nie utworzył obrazu ani wideo. Odpowiedź modelu: {answer}",
+  "error.workflow.pictureMissing": "Obrazu nie ma już na serwerze. Wyślij go ponownie.",
+  "error.workflow.pictureType": "Użyj obrazu PNG, JPEG lub WebP.",
+  "error.workflow.mediaInputMissing": "Obraz z wcześniejszego kroku jest niedostępny. Uruchom ten krok ponownie.",
+  "error.workflow.mediaEmptyRequest": "Napisz opis albo uruchom wcześniejsze kroki, aby dotarł tekst lub obraz.",
+  "error.workflow.mediaInputNotImage": "Ten krok przyjmuje tylko obrazy, nie wideo. Usuń połączenie z wideo.",
+  "error.workflow.mediaInputNotClip": "To wejście przyjmuje tylko wideo i pliki audio. Usuń połączenie z pliku.",
+  "error.workflow.stepMissing": "Ten krok już nie istnieje.",
+  "error.workflow.nodeMissing": "Tego kroku nie ma w przepływie pracy.",
+  "error.workflow.runMissing": "To uruchomienie już nie istnieje.",
+  "error.workflow.notRetryable": "Ponownie można uruchomić tylko krok, który się nie powiódł lub został zatrzymany.",
+  "error.workflow.noDecision": "Ten krok nie czeka na decyzję.",
+  "error.workflow.outputPlaceMissing": "Wybierz miejsce w komunikatorze dla tego wyjścia.",
+  "error.workflow.outputChannelMissing": "Wybierz kanał dla tego wyjścia.",
+  "error.workflow.outputChannelFailed": "OpenBot nie mógł opublikować wyniku w kanale. Uruchom krok ponownie.",
+  "error.workflow.discordNoMessage":
+    "To wyjście działa na wiadomość z Discorda, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Discordzie albo wybierz Opublikuj na kanale.",
+  "error.workflow.slackNoMessage":
+    "To wyjście działa na wiadomość ze Slacka, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Slacku albo wybierz Opublikuj na kanale.",
+  "error.workflow.telegramNoMessage":
+    "To wyjście działa na wiadomość z Telegrama, która uruchomiła przepływ. Uruchom przepływ ze wzmianki na Telegramie albo wybierz Opublikuj na czacie.",
+  "error.workflow.outputConnectionOff":
+    "Połączenie komunikatora tego wyjścia jest wyłączone lub usunięte. Wybierz miejsce ponownie.",
+  "error.workflow.outputNotRunning": "Połączenie komunikatora teraz nie działa. Spróbuj ponownie, gdy zacznie działać.",
+  "error.workflow.outputRefused": "Miejsce odrzuciło wpis. Upewnij się, że OpenBot może tam publikować.",
+  "error.workflow.outputUncertain":
+    "Wpis zatrzymał się w drodze. Jego część może już być w tym miejscu. Sprawdź to, zanim spróbujesz ponownie.",
+  "error.workflow.tooLarge":
+    "Ten workflow jest za duży, aby go zapisać. Usuń część rysunków lub długich tekstów i spróbuj ponownie.",
+  "error.workflow.tooLargeToSend":
+    "Ten workflow jest za duży, aby wysłać go na inny komputer. Otwórz go na komputerze, na którym działa serwer.",
+  "error.workflow.webhookMissing": "Ten krok nie jest wyzwalaczem webhook. Zapisz przepływ pracy i spróbuj ponownie.",
+  "error.workflow.githubActionMissing": "Wybierz, co to wyjście robi w GitHub.",
+  "error.workflow.githubRepositoryMissing": "Wybierz repozytorium dla tego wyjścia.",
+  "error.workflow.githubItemMissing":
+    "To wyjście nie ma zgłoszenia ani pull requestu. Uruchom przepływ ze zdarzenia GitHub albo wpisz numer na jego wejściu.",
+  "error.workflow.githubPullRequestOnly": "Ta akcja działa tylko dla pull requestów.",
+  "error.workflow.githubTextMissing": "To wyjście nie ma tekstu do wysłania. Połącz krok, który go pisze.",
+  "error.workflow.githubEventText":
+    "To wyjście nie może wysłać surowego zdarzenia wyzwalacza. Umieść agenta między wyzwalaczem a tym wyjściem.",
+  "error.workflow.githubChoiceMissing": "Wybierz etykiety lub osobę dla tego wyjścia.",
+  "error.workflow.githubChoseNothing": "Model nie wybrał żadnej etykiety ani osoby z tego repozytorium.",
+  "error.workflow.githubNotConnected": "Połącz GitHub na komputerze, na którym działa ten przepływ pracy.",
+  "error.workflow.githubNoAccess":
+    "OpenBot GitHub App nie widzi tego repozytorium ani elementu. Otwórz GitHub i daj jej dostęp.",
+  "error.workflow.githubNoWrite":
+    "OpenBot GitHub App nie może zmieniać tego repozytorium. Otwórz GitHub i daj jej dostęp.",
+  "error.workflow.githubLocked": "Ta rozmowa jest zablokowana w GitHub.",
+  "error.workflow.githubRefused": "GitHub odrzucił zmianę: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot nie mógł połączyć się z GitHub. Uruchom krok ponownie.",
+  "error.workflow.githubUncertain":
+    "Zmiana zatrzymała się w drodze. Może już być w GitHub. Sprawdź tam, zanim ponownie uruchomisz krok.",
+  "error.workflow.githubNoEvent": "W GitHub nie ma zgłoszenia ani pull requestu, dla którego startuje ten wyzwalacz.",
+  "error.workflow.sunraSignIn": "Zaloguj się do Sunra w Aplikacjach, aby używać modeli Sunra.",
+  "error.workflow.sunraNoCredits":
+    "Twoje konto Sunra nie ma wystarczającej liczby kredytów. Dodaj kredyty na sunra.ai/pricing, a potem uruchom krok ponownie.",
+  "error.workflow.sunraNeedsPlan":
+    "Ten model Sunra wymaga planu Sunra. Wybierz plan na sunra.ai/pricing albo inny model.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra używa obrazów wejściowych tylko z kontem osobistym. Wybierz konto osobiste w Sunra albo usuń połączenia obrazów.",
+  "error.workflow.sunraFailed": "Sunra nie mogła utworzyć pliku: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra nie skończyła pliku na czas. Sprawdź projekt OpenBot na sunra.ai, zanim uruchomisz krok ponownie.",
+  "error.workflow.higgsfieldSignIn": "Zaloguj się do Higgsfield w Aplikacjach, aby używać modeli Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "Twoje konto Higgsfield nie ma wystarczającej liczby kredytów. Dodaj kredyty na higgsfield.ai/pricing, a potem uruchom krok ponownie.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Ten model Higgsfield wymaga planu Higgsfield. Wybierz plan na higgsfield.ai/pricing albo inny model.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield nie utworzył pliku, bo zatrzymała go kontrola treści. Zmień prompt lub obrazy wejściowe, a potem uruchom krok ponownie.",
+  "error.workflow.higgsfieldFailed": "Higgsfield nie mógł utworzyć pliku: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield nie skończył pliku na czas. Sprawdź swoją historię na higgsfield.ai, zanim uruchomisz krok ponownie.",
+} as const satisfies PartialTranslation<typeof source>;
