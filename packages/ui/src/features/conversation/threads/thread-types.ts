@@ -44,6 +44,8 @@ export interface ThreadHeaderProps {
   onMove: (id: string, index: number) => void;
   onArchive?: ((id: string) => void) | undefined;
   onRestore: (id: string) => void;
+  olderArchived?: { loading: boolean } | undefined;
+  onShowOlderArchived?: (() => void) | undefined;
   onRename?: ((id: string, title: string) => void) | undefined;
   onDelete?: ((id: string) => void) | undefined;
   onMoveToSide?: ((id: string) => void) | undefined;

@@ -132,7 +132,9 @@ import type {
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTaskWindow,
+  ArchivedAgentTasksPage,
   BranchAgentTaskInput,
+  ListArchivedAgentTasksInput,
   MarkAgentTaskReadInput,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -610,6 +612,8 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
+  HostVoiceModel,
+  HostVoiceModelChange,
   SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
@@ -1217,6 +1221,10 @@ export const IPC_ENDPOINTS = {
     ),
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getVoiceModel: scopedQuery<HostVoiceModel, "required">()("host-admin:get-voice-model"),
+    changeVoiceModel: scopedRequest<HostVoiceModelChange, HostVoiceModel, "required">()(
+      "host-admin:change-voice-model",
+    ),
     getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
     setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
@@ -1561,6 +1569,9 @@ export const IPC_ENDPOINTS = {
     listPinnedMessages: scopedRequest<string, PinnedMessagesSnapshot>()("agent:list-pinned-messages"),
     setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
+    listArchivedTasks: scopedRequest<ListArchivedAgentTasksInput, ArchivedAgentTasksPage>()(
+      "agent:tasks:list-archived",
+    ),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     readTaskAround: scopedRequest<ReadAgentTaskAroundInput, AgentTaskWindow>()("agent:tasks:read-around"),

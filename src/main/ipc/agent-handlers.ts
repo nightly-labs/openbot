@@ -51,6 +51,10 @@ import {
   AGENT_ACTIVE_QUEUES_ROUTES,
   decodeAgentActiveQueues,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import {
+  AGENT_ARCHIVED_THREADS_CAPABILITY,
+  AGENT_ARCHIVED_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import {
@@ -213,6 +217,7 @@ import {
   decodeRemoteAgentThreadBranches,
   decodeRemoteAgentThreadQueues,
   decodeRemoteAgentThreadRequests,
+  decodeRemoteArchivedAgentTasks,
   decodeRemoteTaskConversation,
   decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
@@ -243,6 +248,7 @@ import {
   parseDeleteChannelMessage,
   parseDeleteConversationMessage,
   parseInterrupt,
+  parseListArchivedAgentTasks,
   parseMarkAgentTaskRead,
   parseMarkConversationRead,
   parseMarkConversationUnread,
@@ -1309,6 +1315,18 @@ export function agentIpcHandlers({
         remote: (parsed, serverId) =>
           remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.read, decodeRemoteTaskConversation, agentTaskBody(parsed)),
       }),
+      listArchivedTasks: scopedHandler(parseListArchivedAgentTasks, {
+        local: (input) => service.listArchivedTasks(input),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_ARCHIVED_THREADS_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_ARCHIVED_THREADS_ROUTES.list, decodeRemoteArchivedAgentTasks, {
+              method: "POST",
+              body: { agentId: input.agentId, before: input.before },
+            }),
+          );
+        },
+      }),
       readTaskPage: scopedHandler(parseReadAgentTaskPage, {
         local: (parsed) => service.readTaskPage(parsed),
         remote: (parsed, serverId) => {
@@ -1561,7 +1579,10 @@ export function agentIpcHandlers({
           remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId }),
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
-        local: (parsed) => runCauseEffect(service.respondToPrompt(parsed)),
+        local: (parsed) => {
+          const sender = host.conversationSender();
+          return runCauseEffect(service.respondToPrompt(parsed, { ...(sender ? { sender } : {}), privileged: true }));
+        },
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {

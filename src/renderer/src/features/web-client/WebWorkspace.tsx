@@ -25,6 +25,7 @@ import {
   decodeAgentPlanCardSettings,
   decodeAgentSpeedSettings,
   decodeHostTurnLimits,
+  decodeHostVoiceModel,
   LEGACY_RESPONSE_STYLE,
   type McpSignInState,
   type RoutineFields,
@@ -74,6 +75,7 @@ import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
+import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
@@ -295,6 +297,7 @@ import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetti
 import type { HostTimezoneCalls } from "../servers/ServerTimezoneSetting";
 import type { HostTurnLimitsCalls } from "../servers/ServerTurnLimitsSetting";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
+import type { HostVoiceModelCalls } from "../servers/ServerVoiceModelSetting";
 import {
   remoteAdminServer,
   remoteMcpSignIn,
@@ -1661,6 +1664,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostTimezone(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setTimezone: async (timezone, serverId) =>
       runTeamEffect(setHostTimezone(hostRequest(serverId), timezone).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostVoiceModelCalls: HostVoiceModelCalls = {
+    getVoiceModel: async (serverId) =>
+      hostRequest(serverId)("POST", HOST_VOICE_MODEL_ROUTES.settings, decodeHostVoiceModel, {}),
+    changeVoiceModel: async ({ action, modelId }, serverId) =>
+      hostRequest(serverId)("POST", HOST_VOICE_MODEL_ROUTES.change, decodeHostVoiceModel, { action, modelId }),
   };
   const hostTurnLimitsCalls: HostTurnLimitsCalls = {
     getTurnLimits: async (serverId) =>
@@ -3489,6 +3498,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         providers={providerSettings()}
                         hostUpdate={{ calls: hostUpdateCalls }}
                         hostTimezone={{ calls: hostTimezoneCalls }}
+                        hostVoiceModel={{ calls: hostVoiceModelCalls }}
                         hostTurnLimits={{ calls: hostTurnLimitsCalls }}
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}

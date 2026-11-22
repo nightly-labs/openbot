@@ -101,6 +101,7 @@ export const messages = defineMessages("chat", {
   "chat.awaiting.state.working": "Working",
   "chat.awaiting.state.replied": "Replied",
   "chat.awaiting.state.failed": "Failed",
+  "chat.awaiting.state.stopped": "Stopped",
   "chat.awaiting.readsNext": "{name} reads it next",
   "chat.awaiting.working": "{name} is working",
   "chat.awaiting.needsYou": "{name} needs you",

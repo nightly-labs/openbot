@@ -66,6 +66,7 @@ import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
 import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
+import type { HostVoiceModelService } from "../host-voice-model";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import type { InstanceTransferService } from "../instance-transfer-service";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
@@ -335,6 +336,7 @@ export type TeamApiAgentTasks = Pick<
   AgentService,
   | "listAgents"
   | "listTasks"
+  | "listArchivedTasks"
   | "readTask"
   | "readTaskPage"
   | "readTaskAround"
@@ -457,6 +459,7 @@ export interface TeamApiAdmin {
   restart?: { request(memberId: string): void };
   ownerTransfer?: true;
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  voiceModel?: Pick<HostVoiceModelService, "snapshot" | "change">;
   turnLimits?: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   personality?: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };

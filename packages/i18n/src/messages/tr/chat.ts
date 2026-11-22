@@ -102,6 +102,7 @@ export const messages = {
   "chat.awaiting.state.working": "Çalışıyor",
   "chat.awaiting.state.replied": "Yanıtlandı",
   "chat.awaiting.state.failed": "Başarısız",
+  "chat.awaiting.state.stopped": "Durduruldu",
   "chat.awaiting.readsNext": "Sıradaki okuyan: {name}",
   "chat.awaiting.working": "{name} çalışıyor",
   "chat.awaiting.needsYou": "{name} sizi bekliyor",

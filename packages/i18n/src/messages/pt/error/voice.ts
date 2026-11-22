@@ -12,6 +12,10 @@ export const messages = {
   "error.voice.prepareRequired":
     "A transcrição de voz local está indisponível. Execute `bun run voice:prepare` e reinicie o OpenBot.",
   "error.voice.transcriptionFailed": "O OpenBot não conseguiu transcrever esta gravação.",
+  "error.voice.videoModelMissing":
+    "Nenhum modelo de reconhecimento de fala para gravações está configurado em Configurações → Voz.",
+  "error.voice.videoModelMissingServer":
+    "Nenhum modelo de reconhecimento de fala está configurado neste servidor. Um proprietário ou um administrador pode configurar um modelo nas configurações do servidor, em Reconhecimento de fala.",
   "error.voice.cloud.keyRequired": "Adicione sua chave de API da {provider} em Configurações → Voz.",
   "error.voice.cloud.keyRejected": "A {provider} não aceitou a chave de API. Confira a chave em Configurações → Voz.",
   "error.voice.cloud.quotaExceeded": "Sua cota da {provider} acabou.",
