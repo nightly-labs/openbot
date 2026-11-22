@@ -2465,7 +2465,14 @@ export class ChannelService {
   event(event: AgentEvent): boolean {
     if (event.type === "conversation") return this.capture(event.snapshot);
     // A tool step that starts tells what follows the note that `capture` holds.
-    if (event.type === "conversation-delta" || (event.type === "turn-progress" && event.running === true)) {
+    if (event.type === "turn-progress" && event.running === true) {
+      if (!this.store.channelForThread(event.threadId)) return false;
+      // Each tool step sends this: capture from the open snapshot only, not from the database.
+      const loaded = this.hooks.loadedSnapshot?.(event.threadId);
+      if (loaded?.agentId === event.agentId) this.capture(loaded, event.turnId);
+      return true;
+    }
+    if (event.type === "conversation-delta") {
       const channelId = this.store.channelForThread(event.threadId);
       if (!channelId) return false;
       const loaded = this.hooks.loadedSnapshot?.(event.threadId);

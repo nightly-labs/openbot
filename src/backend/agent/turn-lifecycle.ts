@@ -392,6 +392,8 @@ export class TurnLifecycle {
       narration: string | null;
       /** The step after `narration` is known. See `channelNote`. */
       narrationStepKnown: boolean;
+      /** The tools that ran when `narration` ended: their updates are not the step after it. */
+      narrationOpenTools: ReadonlySet<string>;
       openTools: Set<string>;
       failureReports: Set<string>;
       lastEventAt: number;
@@ -585,6 +587,7 @@ export class TurnLifecycle {
     this.#quietRepeats.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
+    this.#channelResultNotes.clear();
     this.#refusedRetries.clear();
     this.#safetyBlockedTurns.clear();
     this.#sessionFailures.clear();
@@ -1268,6 +1271,7 @@ export class TurnLifecycle {
           startedBackgroundWork: false,
           narration: null,
           narrationStepKnown: false,
+          narrationOpenTools: new Set(),
           openTools: new Set(),
           failureReports: new Set(),
           lastEventAt: Date.now(),
@@ -1341,7 +1345,11 @@ export class TurnLifecycle {
           const acted = isRepeatedWork(item);
           this.#markProduced(turnId, acted, acted, acted && isUserReactionCall(item));
         }
-        if (running?.narration && !running.narrationStepKnown) {
+        if (
+          running?.narration &&
+          !running.narrationStepKnown &&
+          !(itemId !== null && running.narrationOpenTools.has(itemId))
+        ) {
           const step = channelNoteStep(item);
           if (step === "result") this.#keepChannelResultNote(turnId, running.narration);
           if (step !== null) running.narrationStepKnown = true;
@@ -1356,6 +1364,7 @@ export class TurnLifecycle {
           ) {
             running.narration = itemId;
             running.narrationStepKnown = false;
+            running.narrationOpenTools = new Set(running.openTools);
           }
         } else if (running && isRepeatedWork(item) && !keepsNarration(item, notification.method === "item/completed"))
           running.narration = null;
@@ -3561,8 +3570,11 @@ function keepsNarration(item: DynamicRecord, completed: boolean): boolean {
 
 /** `channel_result` and the forms of its name that agents give, such as `openbot__channel_result`. */
 const CHANNEL_RESULT_NAME = /(?:^|[._])channel_result$/u;
-/** `tool_call`, the OpenBot tool that runs the tool its arguments name, in the forms that agents give. */
-const BRIDGE_TOOL = /(?:^|[._])tool_call$/u;
+/**
+ * The OpenBot tool that runs the tool its arguments name, in the forms that agents give: `tool_call`,
+ * such as `mcp_openbot_tool_call`, and Grok's `use_tool`.
+ */
+const BRIDGE_TOOL = /(?:^|[._])(?:tool_call|use_tool)$/u;
 /** A call of `channel_result` in the code of an OpenCode Code Mode step, not a search for it. */
 const CODE_CHANNEL_RESULT_CALL = /\bchannel_result\s*\(|["'`]openbot\.channel_result["'`]/u;
 
@@ -3584,11 +3596,12 @@ function channelNoteStep(item: DynamicRecord): "result" | "other" | null {
     if (!code) return null;
     return CODE_CHANNEL_RESULT_CALL.test(code) ? "result" : "other";
   }
-  // ACP agents also name the bridge with their own form, such as `mcp_openbot_tool_call`.
-  const called = BRIDGE_TOOL.test(name)
-    ? (getString(threadItem.arguments, "name") ?? getString(threadItem.arguments, "tool"))
-    : name;
-  return called !== null && CHANNEL_RESULT_NAME.test(called) ? "result" : "other";
+  if (!BRIDGE_TOOL.test(name)) return CHANNEL_RESULT_NAME.test(name) ? "result" : "other";
+  // An ACP agent can start a call before it sends the arguments that name the tool.
+  const args = threadItem.arguments;
+  const called = getString(args, "name") ?? getString(args, "tool") ?? getString(args, "tool_name");
+  if (called === null) return null;
+  return CHANNEL_RESULT_NAME.test(called) ? "result" : "other";
 }
 
 function codeModeOpenBotTool(call: unknown): string | null {
