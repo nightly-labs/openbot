@@ -4,6 +4,7 @@ import {
   type ChannelMessage,
   type ChannelPage,
   type ChannelTask,
+  type ConversationMessageSender,
   channelBrowserAgent,
   channelRoutingConversationEvent,
   isChannelChangeMarker,
@@ -157,7 +158,8 @@ function historyMessage({
   taskId,
   superseded,
   message,
-}: ChannelMessage): ChannelMessage {
+}: ChannelMessage): ChannelMessage & { answeredBy?: ConversationMessageSender } {
+  const answeredBy = message.uiBlock?.state.respondedBy;
   return {
     id,
     channelId,
@@ -165,6 +167,7 @@ function historyMessage({
     author,
     taskId,
     superseded,
+    ...(answeredBy ? { answeredBy } : {}),
     message: {
       id: message.id,
       author: message.author,

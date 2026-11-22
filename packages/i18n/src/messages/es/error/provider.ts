@@ -148,6 +148,7 @@ export const messages = {
     "La clave del proveedor contiene un espacio o un carácter que una clave no puede contener.",
   "error.provider.noModel": "El proveedor seleccionado no tiene ningún modelo disponible.",
   "error.provider.noModelNamed": "{provider} no tiene ningún modelo disponible.",
+  "error.provider.acpModelsNotLoaded": "{provider} no pudo cargar sus modelos. Vuelve a enviar tu mensaje.",
   "error.provider.acpNoModels":
     "La CLI de ACP no anunció ningún modelo ACP. OpenBot no adivinará un modelo alternativo.",
   "error.provider.endpointRemoveBusy":
@@ -546,6 +547,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Este ajuste no está disponible en la sesión actual del proveedor.",
   "error.provider.sessionSettingInvalid": "Este valor no está disponible para el ajuste.",
   "error.provider.sessionSettingsBusy": "Espera a que termine el turno actual antes de cambiar un ajuste de la sesión.",
+  "error.provider.sessionSettingsTimedOut": "La sesión del agente no respondió a tiempo. Inténtalo de nuevo.",
   "error.provider.piOutdated":
     "Pi {version} es demasiado antiguo. Instala Pi 1.1.0 o posterior para la compatibilidad nativa con RPC y MCP.",
   "error.provider.nativeMissing": "La CLI de {provider} no está instalada. Descárgala en Ajustes.",

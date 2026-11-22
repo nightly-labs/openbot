@@ -1,4 +1,4 @@
-.agent-picker-avatar.agent-avatar {
+.search-picker-avatar.agent-avatar {
   --agent-avatar-optical-offset: -2px;
 
   width: 18px;
@@ -6,20 +6,20 @@
   flex: 0 0 auto;
 }
 
-.agent-picker-check {
+.search-picker-check {
   color: var(--openbot-text-primary);
 }
 
-.agent-picker-menu.ui-action-menu {
-  --agent-picker-max: min(420px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 420px));
+.search-picker-menu.ui-action-menu {
+  --search-picker-max: min(420px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 420px));
 
   display: flex;
   width: 240px;
-  max-height: var(--agent-picker-max);
+  max-height: var(--search-picker-max);
   flex-direction: column;
 }
 
-.agent-picker {
+.search-picker {
   display: flex;
   min-height: 0;
   flex: 1 1 auto;
@@ -27,7 +27,7 @@
   gap: var(--ui-menu-padding);
 }
 
-.agent-picker-search {
+.search-picker-search {
   display: flex;
   height: var(--openbot-control-md);
   flex: none;
@@ -39,7 +39,7 @@
   cursor: text;
 }
 
-.agent-picker-search > svg {
+.search-picker-search > svg {
   width: 18px;
   height: var(--openbot-icon-sm);
   flex: none;
@@ -47,7 +47,7 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-.agent-picker-search .agent-picker-search-input {
+.search-picker-search .search-picker-search-input {
   min-width: 0;
   height: 100%;
   flex: 1;
@@ -61,19 +61,19 @@
   line-height: var(--openbot-leading-lg);
 }
 
-.agent-picker-search .agent-picker-search-input:focus-visible {
+.search-picker-search .search-picker-search-input:focus-visible {
   outline: 0;
   box-shadow: none;
 }
 
-.agent-picker-search-input::placeholder {
+.search-picker-search-input::placeholder {
   color: var(--openbot-text-muted);
 }
 
-.agent-picker-list {
+.search-picker-list {
   height: min(
-    calc(var(--agent-picker-rows, 0) * var(--openbot-control-md)),
-    calc(var(--agent-picker-max) - var(--openbot-control-md) - 3 * var(--ui-menu-padding))
+    calc(var(--search-picker-rows, 0) * var(--openbot-control-md)),
+    calc(var(--search-picker-max) - var(--openbot-control-md) - 3 * var(--ui-menu-padding))
   );
   min-height: 0;
   flex: none;
@@ -86,11 +86,11 @@
   transition: height var(--openbot-duration-slow) var(--ui-menu-ease);
 }
 
-.agent-picker-list::-webkit-scrollbar {
+.search-picker-list::-webkit-scrollbar {
   display: none;
 }
 
-.agent-picker-option {
+.search-picker-option {
   display: flex;
   height: var(--openbot-control-md);
   align-items: center;
@@ -104,29 +104,29 @@
   cursor: default;
 }
 
-.agent-picker-option > svg {
+.search-picker-option > svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
   stroke-width: var(--openbot-icon-stroke);
 }
 
-.agent-picker-option[data-highlighted] {
+.search-picker-option[data-highlighted] {
   background: var(--ui-menu-item-hover);
 }
 
-.agent-picker-name {
+.search-picker-name {
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.agent-picker-name b {
+.search-picker-name b {
   font-weight: var(--openbot-weight-semibold);
 }
 
-.agent-picker-empty {
+.search-picker-empty {
   margin: 0;
   padding: var(--openbot-space-1) var(--ui-menu-inset) var(--openbot-space-1-5)
     calc(var(--ui-menu-inset) + 18px + var(--openbot-space-2));
@@ -141,7 +141,7 @@
   }
 }
 
-.agent-picker-count {
+.search-picker-count {
   flex: none;
   margin-inline-start: auto;
   color: var(--openbot-text-muted);
@@ -150,8 +150,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-picker-list,
-  .agent-picker-empty {
+  .search-picker-list,
+  .search-picker-empty {
     transition: none;
   }
 }

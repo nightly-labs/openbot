@@ -95,6 +95,7 @@ export const messages = {
     "OpenBot で、AI エージェントが自分のコンピューターで動くようになりました。チャットもファイルも手元に残ります。試してみて：{site}",
   "app.socialFollow.redditTitle": "OpenBot の使い方",
   "app.rail.usageRings": "{name} の使用量: {windows}。使用量を開く",
+  "app.rail.usageUnavailable": "{name} の使用量は表示できません。使用量を開く",
   "app.rail.customAgentUsage": "{name} の使用量。使用量を開く",
   "app.rail.moreUsage": { other: "ほかのアカウント {count} 件。使用量を開く" },
   "app.rail.moreUsageCount": "+{count}",

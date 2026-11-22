@@ -255,6 +255,11 @@ The agent must still allow Local scripts for every read and response. A request 
 agent, an expired request, or a secret question cannot be answered through this API. Expired
 requests return `409`; refresh the pending list instead of retrying the old response.
 
+A script is not the server owner, because an agent can run one. It cannot press a card button that
+only the owner or an admin can press (a danger button or a button with confirm), or accept an
+approval that only the owner can give. These answers return `403`; ask the person to answer in
+OpenBot.
+
 All request bodies have a 32 KiB limit. Messages and routine runs share a limit of accepted
 requests per agent per hour, including message retries. The limit is 30 by default; change it in
 Server Settings › Agent defaults › Local scripts › Requests an hour: 30, 60, 120, 300 or 1,000. Reads, attention

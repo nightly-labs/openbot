@@ -4,6 +4,7 @@ import {
   decodeWorkflowFoldersSnapshot,
   STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
+  WORKFLOW_MEDIA_CATALOG_MAX,
   type WorkflowFolderAction,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
@@ -19,6 +20,10 @@ import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protoc
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import {
+  WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
@@ -70,6 +75,7 @@ import {
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import {
+  decodeRemoteCreditMediaCredits,
   decodeRemoteHiggsfieldCredits,
   decodeRemoteHiggsfieldProviders,
   decodeRemoteMediaServiceAccounts,
@@ -186,6 +192,46 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     });
     return optionsCall;
   };
+  const serviceProviders = async () => {
+    if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+      const accounts = await post(
+        WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+        decodeRemoteMediaServiceAccounts,
+        {},
+      );
+      return workflowMediaProvidersOf(accounts);
+    }
+    const [sunra, higgsfield] = await Promise.all([
+      has(WORKFLOWS_SUNRA_CAPABILITY)
+        ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+        : { sunra: false },
+      has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
+        ? post(WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
+        : { higgsfield: false },
+    ]);
+    return { ...sunra, ...higgsfield, accounts: null };
+  };
+  const serviceCredits = async () => {
+    if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+      const accounts = await post(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits, decodeRemoteMediaServiceCredits, {});
+      return workflowMediaCreditsOf(accounts);
+    }
+    const [sunra, higgsfield] = await Promise.all([
+      has(WORKFLOWS_SUNRA_CAPABILITY)
+        ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+        : { sunra: null },
+      has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
+        ? post(WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
+        : { higgsfield: null },
+    ]);
+    return { ...sunra, ...higgsfield, accounts: null };
+  };
+  const serviceCatalog = async () =>
+    has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+      ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+      : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+        ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+        : { models: [] };
 
   return {
     workflows: {
@@ -218,50 +264,28 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       githubRunLastEvent: (input) =>
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
       keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
-      mediaProviders: async () => {
-        if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
-          const accounts = await post(
-            WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
-            decodeRemoteMediaServiceAccounts,
-            {},
-          );
-          return workflowMediaProvidersOf(accounts);
-        }
-        const [sunra, higgsfield] = await Promise.all([
-          has(WORKFLOWS_SUNRA_CAPABILITY)
-            ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
-            : { sunra: false },
-          has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
-            ? post(WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
-            : { higgsfield: false },
-        ]);
-        return { ...sunra, ...higgsfield, accounts: null };
-      },
+      mediaProviders: async () => ({
+        ...(await serviceProviders()),
+        ...(has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY) ? { openbot: true } : {}),
+      }),
       mediaCredits: async () => {
-        if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
-          const accounts = await post(
-            WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
-            decodeRemoteMediaServiceCredits,
-            {},
-          );
-          return workflowMediaCreditsOf(accounts);
-        }
-        const [sunra, higgsfield] = await Promise.all([
-          has(WORKFLOWS_SUNRA_CAPABILITY)
-            ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
-            : { sunra: null },
-          has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
-            ? post(WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
-            : { higgsfield: null },
+        const [services, credit] = await Promise.all([
+          serviceCredits(),
+          has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY)
+            ? post(WORKFLOWS_CREDIT_MEDIA_ROUTES.credits, decodeRemoteCreditMediaCredits, {})
+            : {},
         ]);
-        return { ...sunra, ...higgsfield, accounts: null };
+        return { ...services, ...credit };
       },
-      mediaCatalog: async () =>
-        has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
-          ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-          : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+      mediaCatalog: async () => {
+        const [credit, services] = await Promise.all([
+          has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY)
+            ? post(WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
             : { models: [] },
+          serviceCatalog(),
+        ]);
+        return { models: [...credit.models, ...services.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX) };
+      },
       mediaPrice: async (input) =>
         has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
           ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)

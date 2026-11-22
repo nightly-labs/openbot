@@ -88,6 +88,8 @@ import type {
   HostTimezoneSettings,
   HostUpdateSettingsChange,
   HostUpdateStatus,
+  HostVoiceModel,
+  HostVoiceModelChange,
   InstallAgentTemplateInput,
   InstalledSkill,
   InstallMarketplaceAgentInput,
@@ -409,6 +411,9 @@ export interface MobileWorkspaceContextValue {
   canManageServerTimezone: (serverId: string) => boolean;
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  canManageServerVoiceModel: (serverId: string) => boolean;
+  loadServerVoiceModel: (serverId: string) => Promise<HostVoiceModel>;
+  changeServerVoiceModel: (change: HostVoiceModelChange, serverId: string) => Promise<HostVoiceModel>;
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
@@ -839,6 +844,7 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageServerVoiceModel"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageMemoryReview"

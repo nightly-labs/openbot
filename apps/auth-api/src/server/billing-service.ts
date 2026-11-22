@@ -48,7 +48,7 @@ import {
 import type { ReferralMoney } from "@openbot/contracts/referral";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Exit, Layer } from "effect";
 import { SOLD_OUT_PLANS } from "../lib/pricing-page";
 import {
   type AccountAnalytics,
@@ -77,6 +77,8 @@ import {
   withoutTax,
 } from "./billing-sales";
 import { billingDetailsOf, checkoutCountryMismatch, checkoutTax, setCustomerBillingDetails } from "./billing-tax";
+import { CreditGrants } from "./credit-grants";
+import { CreditService, isCreditCheckoutEvent, isCreditInvoiceEvent } from "./credit-service";
 import type { HostedFailure } from "./hosted-server-service";
 import {
   type FailedLicenseInvoice,
@@ -272,6 +274,7 @@ export class BillingService {
   readonly #referral: BillingReferral;
   readonly #countryRequired: boolean;
   readonly license: LicenseService;
+  readonly credits: CreditService;
 
   constructor(options: BillingServiceOptions) {
     const database = options.database;
@@ -303,6 +306,15 @@ export class BillingService {
       referrals: new Referrals({ database, now }),
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
+    });
+    this.credits = new CreditService({
+      database,
+      stripe,
+      secretKey: options.secretKey,
+      countryRequired: this.#countryRequired,
+      now,
+      ensureCustomer: (user) => this.ensureCustomer(user),
+      analytics: this.#analytics,
     });
     this.license = new LicenseService({
       database,
@@ -1011,6 +1023,12 @@ export class BillingService {
           .first<{ seen: number }>(),
       );
       if (seen) return;
+      yield* this.credits.webhook(event);
+      if (isCreditCheckoutEvent(event)) return yield* this.#recordEvent(event, now);
+      if (isCreditInvoiceEvent(event)) {
+        if (this.#oss) yield* this.#oss.record(event);
+        return yield* this.#recordEvent(event, now);
+      }
       const reversal = paymentReversal(event);
       const payment = reversal
         ? yield* this.#stripeCall(() => dependencies.stripe.getPaymentInvoice(reversal.paymentIntentId))
@@ -1056,16 +1074,7 @@ export class BillingService {
       }
       if (this.#oss) yield* this.#oss.record(event);
       yield* this.#referral.record(event, payment, sold?.userId ?? null);
-      yield* billingCall(() =>
-        dependencies.database.batch([
-          dependencies.database
-            .prepare("INSERT OR IGNORE INTO billing_webhook_events(event_id, type, received_at) VALUES (?, ?, ?)")
-            .bind(event.id, event.type, now),
-          dependencies.database
-            .prepare("DELETE FROM billing_webhook_events WHERE received_at < ?")
-            .bind(now - WEBHOOK_EVENT_RETENTION_MS),
-        ]),
-      );
+      yield* this.#recordEvent(event, now);
       if (!this.#sales) yield* this.#trackEvent(event, synced?.kind === "custom_server" ? null : synced);
       const mismatch = event.type === "checkout.session.completed" ? checkoutCountryMismatch(event.data.object) : null;
       if (mismatch) {
@@ -1075,6 +1084,23 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
+
+  readonly #recordEvent = Effect.fn("BillingService.recordEvent")(function* (
+    event: StripeEvent,
+    now: number,
+  ): Effect.fn.Return<void, BillingError | BillingOperationError, BillingDependencies> {
+    const dependencies = yield* BillingDependencies;
+    yield* billingCall(() =>
+      dependencies.database.batch([
+        dependencies.database
+          .prepare("INSERT OR IGNORE INTO billing_webhook_events(event_id, type, received_at) VALUES (?, ?, ?)")
+          .bind(event.id, event.type, now),
+        dependencies.database
+          .prepare("DELETE FROM billing_webhook_events WHERE received_at < ?")
+          .bind(now - WEBHOOK_EVENT_RETENTION_MS),
+      ]),
+    );
+  });
 
   readonly #trackEvent = Effect.fn("BillingService.trackEvent")(function* (
     this: BillingService,
@@ -1135,7 +1161,17 @@ export class BillingService {
     const price = subscriptionServerItem(subscription)?.price;
     if (!price && subscriptionLicenseItem(subscription)) {
       const ownerId = yield* this.#subscriptionOwner(subscription, customerId);
-      return ownerId ? yield* this.license.sync(subscription, ownerId, readAt) : null;
+      if (!ownerId) return null;
+      const synced = yield* this.license.sync(subscription, ownerId, readAt);
+      const granted = yield* Effect.exit(
+        new CreditGrants({
+          database: dependencies.database,
+          now: dependencies.now,
+          analytics: dependencies.analytics,
+        }).issue(subscription.id),
+      );
+      if (Exit.isFailure(granted)) console.warn("billing: license credits wait for the next sweep", { subscriptionId });
+      return synced;
     }
     const key = price ? planLookupKey(price) : null;
     const currency = subscription.currency.toLowerCase();

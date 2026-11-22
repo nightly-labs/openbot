@@ -25,6 +25,7 @@ import {
   decodeAgentPlanCardSettings,
   decodeAgentSpeedSettings,
   decodeHostTurnLimits,
+  decodeHostVoiceModel,
   LEGACY_RESPONSE_STYLE,
   type McpSignInState,
   type RoutineFields,
@@ -74,6 +75,7 @@ import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
+import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
@@ -115,6 +117,7 @@ import {
   getHostAgentMemoryLimit,
   getHostAuditLog,
   getHostBrowsingMemory,
+  getHostCacheExpiryCompaction,
   getHostClaudeCompactWindow,
   getHostMemoryReview,
   getHostModelVisibility,
@@ -132,6 +135,7 @@ import {
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostBrowsingMemory,
+  setHostCacheExpiryCompaction,
   setHostClaudeCompactWindow,
   setHostMemoryReview,
   setHostModelVisibility,
@@ -159,6 +163,10 @@ import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
+import { BuyCreditsPage } from "@openbot/ui/features/credits/BuyCreditsPage";
+import { CreditActivitySection } from "@openbot/ui/features/credits/CreditActivitySection";
+import { CreditsSection } from "@openbot/ui/features/credits/CreditsSection";
+import { type CreditsMenu, createCreditsStore, createCreditsSummary } from "@openbot/ui/features/credits/credits-store";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerDialog";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
@@ -290,6 +298,7 @@ import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetti
 import type { HostTimezoneCalls } from "../servers/ServerTimezoneSetting";
 import type { HostTurnLimitsCalls } from "../servers/ServerTurnLimitsSetting";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
+import type { HostVoiceModelCalls } from "../servers/ServerVoiceModelSetting";
 import {
   remoteAdminServer,
   remoteMcpSignIn,
@@ -343,7 +352,13 @@ import { createWebAgentImportCalls } from "./web-agent-import";
 import { createWebAgentThreads } from "./web-agent-threads";
 import { createWebAttachmentMedia } from "./web-attachment-media";
 import { openWebLink } from "./web-attachments";
-import { createWebBillingCalls, createWebLicenseCalls, createWebReferralCalls, type WebAppStart } from "./web-billing";
+import {
+  createWebBillingCalls,
+  createWebCreditsCalls,
+  createWebLicenseCalls,
+  createWebReferralCalls,
+  type WebAppStart,
+} from "./web-billing";
 import { webBitwardenConnectorPort } from "./web-bitwarden-connector";
 import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebChatHistory, type WebChatHistoryEntry } from "./web-chat-history";
@@ -711,6 +726,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const closeSidebar = () => layout.setSidebarClosed(true);
   const collapseSidebar = () => (phone() ? undefined : closeSidebar);
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
+  const [creditsOpen, setCreditsOpen] = createSignal<{ serverId: string | null } | null>(null);
   const [hostPage, setHostPage] = createSignal<{ view: HostPageView; trigger: HTMLElement | null } | null>(null);
   const [crmConnectorsRequest, setCrmConnectorsRequest] = createSignal<string>();
   function canOfferServerPlans(): boolean {
@@ -1179,8 +1195,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     if (accountSettingsOpen()) return "settings";
     if (marketplaceOpen()) return "marketplace";
     const host = hostPage();
-    return host && server() && !blockedServer() ? host.view : "agents";
+    if (host && server() && !blockedServer()) return host.view;
+    return creditsOpen() ? "credits" : "agents";
   });
+  createEffect(
+    () => Boolean(serverSettings.state.open || accountSettingsOpen() || marketplaceOpen() || hostPage()),
+    (otherPage) => {
+      if (otherPage) setCreditsOpen(null);
+    },
+  );
   const pageCovered = () => page() !== "agents";
   const tasksOpen = () => page() === "tasks";
   function showAgents() {
@@ -1188,6 +1211,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     serverSettings.setOpen(false);
     setMarketplaceOpen(false);
     setHostPage(null);
+    setCreditsOpen(null);
+  }
+  function openCredits(serverId: string | null) {
+    setMobilePane("conversation");
+    setAccountSettingsOpen(false);
+    serverSettings.setOpen(false);
+    setMarketplaceOpen(false);
+    setHostPage(null);
+    setCreditsOpen({ serverId });
   }
   function openMarketplace() {
     setMobilePane("conversation");
@@ -1394,6 +1426,23 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const licenseCalls = createWebLicenseCalls(props.accountFetch);
   const license = createLicenseStore(() => licenseCalls, billingOpen, trackLicenseEvent);
   const referralCalls = createWebReferralCalls(props.accountFetch);
+  const creditsCalls = createWebCreditsCalls(props.accountFetch);
+  const credits = createCreditsStore(
+    () => creditsCalls,
+    () => billingOpen() || creditsOpen() !== null,
+    (state) => creditsSummary.adopt(state),
+    { activity: true },
+  );
+  const creditsSummary = createCreditsSummary(
+    () => creditsCalls,
+    () => props.accountId,
+  );
+  function creditsRailAction(): (() => void) | undefined {
+    return creditsSummary.available() ? () => openCredits(null) : undefined;
+  }
+  function creditsMenu(): CreditsMenu {
+    return { state: creditsSummary.state(), onOpen: openCredits, onRefresh: creditsSummary.refresh };
+  }
   const billingHostedServers = createSettingsHostedServersStore(
     {
       get open() {
@@ -1618,6 +1667,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setTimezone: async (timezone, serverId) =>
       runTeamEffect(setHostTimezone(hostRequest(serverId), timezone).pipe(Effect.mapError((error) => error.cause))),
   };
+  const hostVoiceModelCalls: HostVoiceModelCalls = {
+    getVoiceModel: async (serverId) =>
+      hostRequest(serverId)("POST", HOST_VOICE_MODEL_ROUTES.settings, decodeHostVoiceModel, {}),
+    changeVoiceModel: async ({ action, modelId }, serverId) =>
+      hostRequest(serverId)("POST", HOST_VOICE_MODEL_ROUTES.change, decodeHostVoiceModel, { action, modelId }),
+  };
   const hostTurnLimitsCalls: HostTurnLimitsCalls = {
     getTurnLimits: async (serverId) =>
       hostRequest(serverId)("POST", HOST_TURN_LIMITS_ROUTES.settings, decodeHostTurnLimits, {}),
@@ -1680,6 +1735,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostPromptCacheTtl(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setPromptCacheTtl: async (ttl, serverId) =>
       runTeamEffect(setHostPromptCacheTtl(hostRequest(serverId), ttl).pipe(Effect.mapError((error) => error.cause))),
+    getCacheExpiryCompaction: async (serverId) =>
+      runTeamEffect(getHostCacheExpiryCompaction(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setCacheExpiryCompaction: async (enabled, serverId) =>
+      runTeamEffect(
+        setHostCacheExpiryCompaction(hostRequest(serverId), enabled).pipe(Effect.mapError((error) => error.cause)),
+      ),
   };
   const hostClaudeUserSetupCalls: HostClaudeUserSetupCalls = {
     getClaudeUserSetup: (serverId) =>
@@ -1925,6 +1986,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     beforeOpen: () => {
       setCreating(false);
       setHostPage(null);
+      setCreditsOpen(null);
       setMessageFocusRequest(null);
     },
     canMarkRead,
@@ -2815,6 +2877,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 setSuggestedApp({ appId: provider, connect: false });
                 openMarketplace();
               }}
+              onCredits={creditsRailAction()}
+              creditBalance={creditsMenu().state?.balance}
               onMarketplace={workspace.state.status === "online" ? openMarketplace : undefined}
               onSettings={openAccountSettings}
               server={
@@ -2827,6 +2891,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onSelect={selectServer}
                   onAdd={() => hostedServers.openAddServer("server_rail")}
                   addCreatesServer={hostedServers.available()}
+                  credits={creditsMenu()}
                   {...serverActionCallbacks}
                 />
               }
@@ -2896,42 +2961,58 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       when={settingsKind()}
                       keyed
                       fallback={
-                        <MarketplaceOverlay
-                          open={page() === "marketplace"}
-                          onOpenChange={setMarketplaceOpen}
-                          calls={marketplaceCalls}
-                          browserRuntime={workspace.runtime.browser}
-                          connectors={connectors}
-                          server={server()}
-                          agents={workspace.shownAgents()}
-                          activeAgentId={workspace.state.selectedId ?? ""}
-                          composerAvailable={status().phase === "ready" && !agentFormOpen()}
-                          onOpenAgent={(agentId) => {
-                            setMobilePane("conversation");
-                            if (agentId !== workspace.state.selectedId) void select(agentId);
-                            else {
-                              userOpensChat("agent", agentId);
-                              setCreating(false);
-                              showAgents();
-                              channels.close();
-                            }
-                          }}
-                          onAgentInstalled={async (agent) => {
-                            setMarketplaceOpen(false);
-                            await openAddedAgent(agent);
-                          }}
-                          pluginSlug={suggestedApp()?.appId ?? props.pluginSlug}
-                          pluginConnect={suggestedApp()?.connect ?? false}
-                          onPluginSlugConsumed={() => {
-                            if (suggestedApp()) setSuggestedApp(null);
-                            else props.onPluginSlugConsumed?.();
-                          }}
-                          marketplaceListing={props.marketplaceListing}
-                          onMarketplaceListingConsumed={props.onMarketplaceListingConsumed}
-                          mcpSignInRequest={mcpSignInRequest()}
-                          onMcpSignInRequestHandled={() => setMcpSignInRequest(null)}
-                          onMcpSignIns={(serverId, states) => setMcpSignIns({ serverId, states })}
-                        />
+                        <Show
+                          when={creditsOpen()}
+                          keyed
+                          fallback={
+                            <MarketplaceOverlay
+                              open={page() === "marketplace"}
+                              onOpenChange={setMarketplaceOpen}
+                              calls={marketplaceCalls}
+                              browserRuntime={workspace.runtime.browser}
+                              connectors={connectors}
+                              server={server()}
+                              agents={workspace.shownAgents()}
+                              activeAgentId={workspace.state.selectedId ?? ""}
+                              composerAvailable={status().phase === "ready" && !agentFormOpen()}
+                              onOpenAgent={(agentId) => {
+                                setMobilePane("conversation");
+                                if (agentId !== workspace.state.selectedId) void select(agentId);
+                                else {
+                                  userOpensChat("agent", agentId);
+                                  setCreating(false);
+                                  showAgents();
+                                  channels.close();
+                                }
+                              }}
+                              onAgentInstalled={async (agent) => {
+                                setMarketplaceOpen(false);
+                                await openAddedAgent(agent);
+                              }}
+                              pluginSlug={suggestedApp()?.appId ?? props.pluginSlug}
+                              pluginConnect={suggestedApp()?.connect ?? false}
+                              onPluginSlugConsumed={() => {
+                                if (suggestedApp()) setSuggestedApp(null);
+                                else props.onPluginSlugConsumed?.();
+                              }}
+                              marketplaceListing={props.marketplaceListing}
+                              onMarketplaceListingConsumed={props.onMarketplaceListingConsumed}
+                              mcpSignInRequest={mcpSignInRequest()}
+                              onMcpSignInRequestHandled={() => setMcpSignInRequest(null)}
+                              onMcpSignIns={(serverId, states) => setMcpSignIns({ serverId, states })}
+                            />
+                          }
+                        >
+                          {(request) => (
+                            <BuyCreditsPage
+                              store={credits}
+                              initialServerId={request.serverId}
+                              headerFrame="window"
+                              billingDetails={billingCalls}
+                              onClose={showAgents}
+                            />
+                          )}
+                        </Show>
                       }
                     >
                       {(kind) => (
@@ -3142,6 +3223,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onSelect: selectServer,
                         onAdd: () => hostedServers.openAddServer("server_rail"),
                         addCreatesServer: hostedServers.available(),
+                        credits: creditsMenu(),
                         ...serverActionCallbacks,
                       }}
                       agents={workspace.profiles()}
@@ -3418,6 +3500,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         providers={providerSettings()}
                         hostUpdate={{ calls: hostUpdateCalls }}
                         hostTimezone={{ calls: hostTimezoneCalls }}
+                        hostVoiceModel={{ calls: hostVoiceModelCalls }}
                         hostTurnLimits={{ calls: hostTurnLimitsCalls }}
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
@@ -3492,6 +3575,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         billingDetails={billingCalls}
                       />
                     }
+                    credits={
+                      <>
+                        <CreditsSection
+                          store={credits}
+                          onBuy={(serverId) => {
+                            setBillingOpen(false);
+                            openCredits(serverId);
+                          }}
+                        />
+                        <CreditActivitySection store={credits} />
+                      </>
+                    }
                   />
                   <ServerUpgradeOffer
                     billing={billingCalls}
@@ -3531,6 +3626,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       hostName={target().name}
                       onBack={closeHostPage}
                       source={tasksSource}
+                      responseStyle={responseStyle()}
                       mediaSource={runtime.attachmentMedia}
                       files={{
                         accepted: () => workspace.state.capabilities.includes(AGENT_THREAD_FILES_CAPABILITY),

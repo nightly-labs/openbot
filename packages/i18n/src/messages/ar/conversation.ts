@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "فتح في الدردشة",
   "conversation.threads.archive": "أرشفة",
   "conversation.threads.archived": "مؤرشفة",
+  "conversation.threads.archivedOlder": "عرض السلاسل الأقدم",
   "conversation.threads.restore": "استعادة",
   "conversation.threads.deleteUndo.title": "تم حذف {title}",
   "conversation.threads.hold.threadLimit": {
