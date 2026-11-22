@@ -420,7 +420,7 @@ changed, on this computer and on a joined host.
   the loop backs. `path`: on some paths no step before it gives a required field that it uses, for
   example another branch, another trigger, or the first pass of a loop; a field marked optional
   (`name?`) does not count. `repeated`: two steps that give the same field can both run in the same
-  pass. The check stops above 10 conditions before the step. Both problems only refuse new edits and
+  pass. The check stops when the triggers times the condition outcomes before the step are more than 256. Both problems only refuse new edits and
   show on the canvas; a run does not fail a step for them, so saved workflows run as before. The canvas edits
   these fields from the node toolbar and shows the same problems on the node, only on a host with
   `workflows-answers-v1`.

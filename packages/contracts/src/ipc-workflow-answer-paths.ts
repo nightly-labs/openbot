@@ -1,6 +1,6 @@
 import { type WorkflowEdge, type WorkflowGraph, type WorkflowNode, workflowLoopEdges } from "./ipc-workflows";
 
-export const WORKFLOW_PATH_CONDITION_LIMIT = 10;
+export const WORKFLOW_PATH_WALK_LIMIT = 256;
 
 export interface WorkflowPathSource {
   node: WorkflowNode;
@@ -31,9 +31,9 @@ export function workflowNamePathProblems(
   for (const edge of forward) before.set(edge.to, [...(before.get(edge.to) ?? []), edge]);
   const ancestors = ancestorsOf(nodeId, before);
   const conditions = ancestors.filter((id) => id !== nodeId && nodes.get(id)?.kind === "condition");
-  if (conditions.length > WORKFLOW_PATH_CONDITION_LIMIT) return [];
   const triggers = ancestors.filter((id) => nodes.get(id)?.kind === "trigger");
   const starts: (string | null)[] = triggers.length > 0 ? triggers : [null];
+  if (starts.length * 2 ** conditions.length > WORKFLOW_PATH_WALK_LIMIT) return [];
   const giving = new Map(
     names.map((name) => [name, sources.filter((source) => source.fields.some((field) => field.name === name))]),
   );

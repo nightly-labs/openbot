@@ -1,12 +1,11 @@
 import {
   checkWorkflowAnswer,
   lastJsonObject,
-  nodeAnswerProblems,
+  nodeAnswerProblemsWithoutPaths,
   parseWorkflowAnswerSpec,
   WORKFLOW_ANSWER_FIELD,
   type WorkflowAnswer,
   type WorkflowAnswerField,
-  type WorkflowAnswerProblem,
   type WorkflowAnswerSource,
   type WorkflowAnswerValueProblem,
   type WorkflowFields,
@@ -83,8 +82,6 @@ export function templateValues(
   return values;
 }
 
-const SAVE_ONLY_PROBLEMS: ReadonlySet<WorkflowAnswerProblem["code"]> = new Set(["check", "path", "repeated"]);
-
 export type AnswerGap = { kind: "setup" | "source"; names: string };
 
 export function stepAnswerGap(
@@ -94,7 +91,7 @@ export function stepAnswerGap(
 ): AnswerGap | null {
   const sources = workflowAnswerSources(graph, node.id);
   const typed = sources.length > 0;
-  const problems = nodeAnswerProblems(graph, node).filter((problem) => typed && !SAVE_ONLY_PROBLEMS.has(problem.code));
+  const problems = nodeAnswerProblemsWithoutPaths(graph, node).filter((problem) => typed && problem.code !== "check");
   if (problems.length > 0)
     return { kind: "setup", names: [...new Set(problems.map(workflowAnswerProblemName))].join(", ") };
   const used = workflowNodeAnswerNames(node);
