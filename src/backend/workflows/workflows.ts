@@ -138,6 +138,7 @@ import {
   readAnswer,
   readableAnswerInputs,
   stepAnswer,
+  stepAnswerGap,
   type TemplateReader,
   templateValues,
   webhookAnswerEvent,
@@ -169,6 +170,7 @@ import {
   conditionAnswer,
   conditionPrompt,
   currentAnswers,
+  endedWithoutAnswer,
   fieldText,
   inputText,
   type MediaImageRole,
@@ -1145,6 +1147,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             settle(step, { status: "failed", error: sourceText("error.workflow.nodeUnsupported") });
             return;
           }
+          const gap = answerGapOf(step, node, run);
+          if (gap) {
+            settle(step, { status: "failed", error: gap });
+            return;
+          }
           switch (node.kind) {
             case "trigger":
               settle(step, { status: "done", output: triggerOutput(node, run) });
@@ -1237,6 +1244,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         const answerOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null) => {
           const found = stepGraph(step, run);
           return found ? stepAnswer(found.graph, step.nodeId, found.latest) : {};
+        };
+        const answerGapOf = (step: StoredWorkflowStep, node: WorkflowNode, run: StoredWorkflowRun | null) => {
+          const found = stepGraph(step, run);
+          if (!found) return null;
+          const gap = stepAnswerGap(found.graph, node, (nodeId) =>
+            endedWithoutAnswer(found.graph, nodeId, found.latest),
+          );
+          if (!gap) return null;
+          return gap.kind === "setup"
+            ? sourceText("error.workflow.answerSetup", { fields: gap.names })
+            : sourceText("error.workflow.answerSourceEnded", { fields: gap.names });
         };
         const templateValuesOf = (
           step: StoredWorkflowStep,

@@ -1,6 +1,7 @@
 import {
   checkWorkflowAnswer,
   lastJsonObject,
+  nodeAnswerProblems,
   parseWorkflowAnswerSpec,
   WORKFLOW_ANSWER_FIELD,
   type WorkflowAnswer,
@@ -14,9 +15,11 @@ import {
   workflowAnswerFixText,
   workflowAnswerInstruction,
   workflowAnswerLines,
+  workflowAnswerProblemName,
   workflowAnswerSources,
   workflowAnswerTemplateText,
   workflowAnswerValueText,
+  workflowNodeAnswerNames,
 } from "@openbot/contracts/ipc";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { StoredWorkflowStep } from "./workflow-run-store";
@@ -77,6 +80,34 @@ export function templateValues(
       );
     }
   return values;
+}
+
+export type AnswerGap = { kind: "setup" | "source"; names: string };
+
+export function stepAnswerGap(
+  graph: WorkflowGraph,
+  node: WorkflowNode,
+  endedWithoutAnswer: (nodeId: string) => boolean,
+): AnswerGap | null {
+  const sources = workflowAnswerSources(graph, node.id);
+  const typed = sources.length > 0;
+  const problems = nodeAnswerProblems(graph, node).filter((problem) => typed && problem.code !== "check");
+  if (problems.length > 0)
+    return { kind: "setup", names: [...new Set(problems.map(workflowAnswerProblemName))].join(", ") };
+  const used = workflowNodeAnswerNames(node);
+  if (used.length === 0) return null;
+  const lost = used.filter((name) => {
+    const giving = sources.flatMap((source) => {
+      const field = source.fields.find((candidate) => candidate.name === name);
+      return field ? [{ source, field }] : [];
+    });
+    return (
+      giving.length > 0 &&
+      giving.some(({ field }) => !field.optional) &&
+      giving.every(({ source }) => endedWithoutAnswer(source.node.id))
+    );
+  });
+  return lost.length > 0 ? { kind: "source", names: lost.join(", ") } : null;
 }
 
 export function readableAnswerInputs(
