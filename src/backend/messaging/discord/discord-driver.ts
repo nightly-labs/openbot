@@ -58,6 +58,7 @@ const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_WAIT_LIMIT_MS = 60_000;
 const REDIRECT_LIMIT = 3;
 const CDN_HOSTS = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
+const POSSIBLY_POSTED_CODES = new Set(["unreachable", "invalid_answer", "discord_failed"]);
 
 const { io: adapterIo } = causeHelpers(MessagingAdapterError);
 
@@ -276,13 +277,7 @@ class DiscordAdapter implements MessagingAdapter {
       },
       decodeDiscordMessageId,
       { bytes, mimeType: file.mimeType },
-    ).pipe(
-      Effect.catch((failure) =>
-        failure.cause instanceof DiscordApiError && failure.cause.code === "invalid_request"
-          ? Effect.succeed(null)
-          : Effect.fail(failure),
-      ),
-    );
+    ).pipe(Effect.catch((failure) => (refusedBeforePost(failure.cause) ? Effect.succeed(null) : Effect.fail(failure))));
   });
 
   readonly history = Effect.fnUntraced(function* (
@@ -584,6 +579,10 @@ function compareSnowflakes(left: string, right: string): number {
 }
 
 function ignoreAnswer(): void {}
+
+function refusedBeforePost(cause: unknown): boolean {
+  return cause instanceof DiscordApiError && !POSSIBLY_POSTED_CODES.has(cause.code) && !cause.code.startsWith("http_5");
+}
 
 function trustedCdnUrl(value: string): boolean {
   try {
