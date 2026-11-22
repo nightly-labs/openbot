@@ -143,6 +143,7 @@
 .question-prompt-detail {
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
+  white-space: pre-line;
 }
 
 .question-prompt-options {
