@@ -43,7 +43,11 @@ export function creditsServer(credits: CreditsState | null, serverId: string | n
   return credits.servers.find((server) => server.serverId === serverId) ?? null;
 }
 
-export function createCreditsStore(calls: () => CreditsCalls | undefined, isActive: () => boolean) {
+export function createCreditsStore(
+  calls: () => CreditsCalls | undefined,
+  isActive: () => boolean,
+  onChange?: (credits: CreditsState) => void,
+) {
   const [state, setState] = createStore<CreditsStoreState>({
     loading: false,
     error: null,
@@ -72,6 +76,7 @@ export function createCreditsStore(calls: () => CreditsCalls | undefined, isActi
       draft.checkout = null;
     });
     if (checkout && added > 0) announceAdded(credits, checkout.serverId, added);
+    onChange?.(credits);
   }
 
   const load = createStripeReturnLoad({
@@ -150,10 +155,12 @@ export interface CreditsSummary {
   state: () => CreditsState | null;
   available: () => boolean;
   refresh: () => void;
+  adopt: (credits: CreditsState) => void;
 }
 
 export interface CreditsMenu {
   state: CreditsState | null;
+  localServerId?: string | null | undefined;
   onOpen: (serverId: string | null) => void;
   onRefresh: () => void;
 }
@@ -195,5 +202,11 @@ export function createCreditsSummary(
     state,
     available: () => state()?.available === true,
     refresh: () => setRefreshes((count) => count + 1),
+    adopt: (credits: CreditsState) => {
+      const key = account();
+      if (key === null) return;
+      request += 1;
+      setResult({ account: key, state: credits });
+    },
   };
 }

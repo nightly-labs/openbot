@@ -8,6 +8,7 @@ export function CreditsPage() {
   const store = createCreditsStore(
     () => appPort().credits,
     () => windowPage.page() === "credits",
+    windowPage.adoptCredits,
   );
   return (
     <BuyCreditsPage

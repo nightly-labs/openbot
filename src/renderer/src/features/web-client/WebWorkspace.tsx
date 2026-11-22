@@ -1424,6 +1424,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const credits = createCreditsStore(
     () => creditsCalls,
     () => billingOpen() || creditsOpen() !== null,
+    (state) => creditsSummary.adopt(state),
   );
   const creditsSummary = createCreditsSummary(
     () => creditsCalls,

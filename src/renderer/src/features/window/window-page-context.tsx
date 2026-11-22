@@ -44,7 +44,7 @@ const context = createSimpleContext({
     const settings = useSettings();
     const serverSettings = useServerSettings();
     const usage = useUsage();
-    const { activeServerId } = useServers();
+    const { activeServerId, hostStatus } = useServers();
     const { signedInAccount } = useAuth();
     const credits = createCreditsSummary(
       () => appPort().credits,
@@ -179,8 +179,10 @@ const context = createSimpleContext({
       leavePricing,
       creditsServerId: () => creditsOpen()?.serverId ?? null,
       creditsAvailable: credits.available,
+      adoptCredits: credits.adopt,
       creditsMenu: (): CreditsMenu => ({
         state: credits.state(),
+        localServerId: hostStatus().serverId,
         onOpen: openCredits,
         onRefresh: credits.refresh,
       }),

@@ -1,3 +1,4 @@
+import type { CreditsState } from "@openbot/contracts/credits";
 import type {
   AccountSession,
   AppInfo,
@@ -111,6 +112,7 @@ export interface SettingsModalProps {
   referralApi?: ReferralDesktopApi | undefined;
   licenseApi?: LicenseDesktopApi | undefined;
   creditsApi?: CreditsDesktopApi | undefined;
+  onCreditsChange?: ((credits: CreditsState) => void) | undefined;
   onBuyCredits?: ((serverId: string | null) => void) | undefined;
   onContactUs?: (() => void) | undefined;
   hostedServersApi?: HostedServersDesktopApi | undefined;
@@ -158,6 +160,7 @@ export function SettingsModal(props: SettingsModalProps) {
   const credits = createCreditsStore(
     () => props.creditsApi,
     () => props.open && activeTab() === "billing",
+    (state) => props.onCreditsChange?.(state),
   );
   const hostedServers = createSettingsHostedServersStore(props, () => activeTab() === "billing");
   const voice = createSettingsVoiceStore(() => props.open && activeTab() === "voice");

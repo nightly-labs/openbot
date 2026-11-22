@@ -131,7 +131,11 @@ export function ServerMenu(props: ServerMenuProps) {
     const state = props.credits?.state;
     return state?.available ? state : null;
   };
-  const serverWallet = (serverId: string) => credits()?.servers.find((wallet) => wallet.serverId === serverId) ?? null;
+  const walletId = (server: ServerSummary) => (server.kind === "local" ? props.credits?.localServerId : server.id);
+  const serverWallet = (server: ServerSummary) => {
+    const id = walletId(server);
+    return id ? (credits()?.servers.find((wallet) => wallet.serverId === id) ?? null) : null;
+  };
   function openCredits(serverId: string | null): void {
     props.credits?.onOpen(serverId);
   }
@@ -344,7 +348,7 @@ export function ServerMenu(props: ServerMenuProps) {
                         class="ui-action-menu agent-context-menu server-submenu"
                         aria-label={t("server.rail.actions")}
                       >
-                        <Show when={serverWallet(server().id)}>
+                        <Show when={serverWallet(server())}>
                           {(wallet) => (
                             <CreditsCard
                               label={t("billing.credits.serversTitle")}
