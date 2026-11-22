@@ -3151,7 +3151,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (isTurnContextBlock(update.content.text)) turn.beforeWakeEcho = null;
         return;
       }
-      if (SESSION_STATE_UPDATES.has(update.sessionUpdate)) return;
+      if (SESSION_STATE_UPDATES.has(update.sessionUpdate) || update.sessionUpdate === "tool_call_update") return;
       if (update.sessionUpdate !== "tool_call") {
         turn.answered = true;
         turn.beforeWakeEcho.push(update);
