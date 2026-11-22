@@ -786,6 +786,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-answers
 
+      - name: Run the workflow output templates E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-output-templates
+
+      - name: Run the workflow trigger fields E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-trigger-fields
+
       - name: Run the workflow schedule E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-schedule
@@ -960,6 +968,8 @@ jobs:
             .openbot-build/workflow-join-e2e/
             .openbot-build/workflow-agent-step-e2e/
             .openbot-build/workflow-answers-e2e/
+            .openbot-build/workflow-output-templates-e2e/
+            .openbot-build/workflow-trigger-fields-e2e/
             .openbot-build/provider-image-mime-e2e/
             .openbot-build/workflow-step-settings-e2e/
             .openbot-build/discord-github-files-e2e/

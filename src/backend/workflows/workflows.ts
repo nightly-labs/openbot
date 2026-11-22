@@ -107,6 +107,7 @@ import {
   workflowGitHubPayload,
 } from "./github-matching";
 import {
+  type GitHubOutputFill,
   type GitHubOutputPlan,
   githubChangeKeys,
   githubChoicePrompt,
@@ -398,6 +399,7 @@ interface WorkflowsShape {
   listWithGraphs(): Effect.Effect<{ summary: WorkflowSummary; graph: WorkflowGraph }[], WorkflowFailed>;
   get(workflowId: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   create(input: CreateWorkflowInput, agentId?: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
+  createCopy(input: { title: string; graph: WorkflowGraph }): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   rename(input: RenameWorkflowInput): Effect.Effect<WorkflowSummary, WorkflowFailed>;
   remove(workflowId: string): Effect.Effect<void, WorkflowFailed>;
   saveGraph(input: SaveWorkflowGraphInput, agentId?: string): Effect.Effect<WorkflowSaveResult, WorkflowFailed>;
@@ -1110,6 +1112,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             run?.triggerNodeId ?? null,
             step.runId ? github.runItem(step.runId) : null,
             run?.source === "discord" ? discordTriggerFiles(run.payload) : null,
+            fillOf(step, run),
           );
           if (plan.kind === "failed") {
             settle(step, { status: "failed", error: plan.error });
@@ -1263,7 +1266,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               dependencies.notify({
                 kind: "output",
                 workflowId: step.workflowId,
-                workflowTitle: titleOf(step.workflowId),
+                workflowTitle: fillOf(step, run)(fieldText(node, "title"), "person").trim() || titleOf(step.workflowId),
                 text: step.input,
               });
               settle(step, { status: "done", output: step.input });
@@ -1300,6 +1303,15 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const found = stepGraph(step, run);
           return found ? templateValues(found.graph, step.nodeId, found.latest, reader) : new Map<string, string>();
         };
+        const fillOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null): GitHubOutputFill => {
+          const values = new Map<TemplateReader, ReadonlyMap<string, string>>();
+          return (text, reader) => {
+            if (!text.includes("{{")) return text;
+            const known = values.get(reader) ?? templateValuesOf(step, run, reader);
+            values.set(reader, known);
+            return fillWorkflowTemplate(text, known);
+          };
+        };
 
         const stepInput = (
           node: WorkflowNode,
@@ -1308,8 +1320,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           graph: WorkflowGraph,
           latest: ReadonlyMap<string, StoredWorkflowStep>,
         ) => {
-          if (node.kind === "output" && fieldText(node, "target") === "github") return githubOutputInput(inputs);
-          if (node.kind === "output") return inputText(readableAnswerInputs(graph, node.id, latest, inputs));
+          if (node.kind === "output") {
+            const message = fieldText(node, "message");
+            const filled = message.trim()
+              ? fillWorkflowTemplate(message, templateValues(graph, node.id, latest, "person"))
+              : null;
+            if (fieldText(node, "target") === "github") return githubOutputInput(inputs, filled);
+            return filled ?? inputText(readableAnswerInputs(graph, node.id, latest, inputs));
+          }
           const text = inputText(inputs);
           if (node.kind !== "agent") return text;
           const task = fillWorkflowTemplate(fieldText(node, "task"), templateValues(graph, node.id, latest));
@@ -1529,14 +1547,28 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* attempt(() => detailOf(workflowId));
         });
 
-        const create = Effect.fn("Workflows.create")(function* (input: CreateWorkflowInput, agentId?: string) {
-          const detail = yield* attempt(() =>
-            store.create(input.graph ? { ...input, graph: prepareGraph(input.graph) } : input, now()),
-          );
+        const announceCreated = (detail: WorkflowDetail, agentId?: string) => {
           changed(detail.summary.id, agentId);
           rearm();
           watchGitHub();
           return detail;
+        };
+
+        const create = Effect.fn("Workflows.create")(function* (input: CreateWorkflowInput, agentId?: string) {
+          const detail = yield* attempt(() =>
+            store.create(input.graph ? { ...input, graph: prepareGraph(input.graph) } : input, now()),
+          );
+          return announceCreated(detail, agentId);
+        });
+
+        const createCopy = Effect.fn("Workflows.createCopy")(function* (input: {
+          title: string;
+          graph: WorkflowGraph;
+        }) {
+          const detail = yield* attempt(() =>
+            store.create({ title: input.title, graph: prepareGraph(input.graph) }, now(), "saved"),
+          );
+          return announceCreated(detail);
         });
 
         const rename = Effect.fn("Workflows.rename")(function* (input: RenameWorkflowInput) {
@@ -2288,6 +2320,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           listWithGraphs,
           get,
           create,
+          createCopy,
           rename,
           remove,
           saveGraph,

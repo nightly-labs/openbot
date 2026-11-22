@@ -364,7 +364,7 @@ function profile(name: string) {
       workflows: {
         workflows: () =>
           Effect.sync(() => workflows.listWithGraphs().map(({ summary, graph }) => ({ title: summary.title, graph }))),
-        createWorkflow: (input) => Effect.try(() => workflows.create(input)),
+        createWorkflow: (input) => Effect.try(() => workflows.create(input, new Date(), "saved")),
       },
       signedInProviders: () => [],
     },
@@ -581,27 +581,31 @@ try {
   ]);
 
   const at = { x: 0, y: 0 };
-  source.workflows.create({
-    title: "Paper pipeline",
-    graph: {
-      nodes: [
-        { id: "hook", kind: "trigger", at, fields: { trigger: "webhook" } },
-        {
-          id: "slack",
-          kind: "trigger",
-          at,
-          fields: { trigger: "slack", connectionId: "messaging-1", event: "message" },
-        },
-        { id: "write", kind: "agent", at, fields: { agentId: writer.id, task: "Write it." } },
-        { id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } },
-      ],
-      edges: [
-        { id: "e1", from: "hook", to: "write", type: "text" },
-        { id: "e2", from: "write", to: "post", type: "text" },
-      ],
-      strokes: [],
+  source.workflows.create(
+    {
+      title: "Paper pipeline",
+      graph: {
+        nodes: [
+          { id: "hook", kind: "trigger", at, fields: { trigger: "webhook" } },
+          {
+            id: "slack",
+            kind: "trigger",
+            at,
+            fields: { trigger: "slack", connectionId: "messaging-1", event: "message" },
+          },
+          { id: "write", kind: "agent", at, fields: { agentId: writer.id, task: "Write it." } },
+          { id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } },
+        ],
+        edges: [
+          { id: "e1", from: "hook", to: "write", type: "text" },
+          { id: "e2", from: "write", to: "post", type: "text" },
+        ],
+        strokes: [],
+      },
     },
-  });
+    new Date(),
+    "saved",
+  );
 
   source.workflows.create({
     title: "Channel digest",
@@ -1014,6 +1018,7 @@ try {
     JSON.stringify(newWorkflow?.graph.nodes.map((item) => item.fields)),
   );
   pass("the workflow's messaging connection is left empty", node("slack")?.connectionId === "");
+  pass("a saved value that this OpenBot does not know moves as it is", node("slack")?.event === "message");
   pass(
     "the user is told to make the webhook address and choose the connection again",
     result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("webhook")) &&

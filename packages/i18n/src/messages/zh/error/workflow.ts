@@ -6,6 +6,7 @@ export const messages = {
   "error.workflow.versionMissing": "该版本的工作流已不存在。",
   "error.workflow.annotation": "文本、便签和形状不能有连接。",
   "error.workflow.port": "该步骤不能接收这种类型的输入。",
+  "error.workflow.unknownValue": "此 OpenBot 无法识别某个步骤的设置。请更新 OpenBot，然后重试。",
   "error.workflow.branch": "只有条件可以有“是”和“否”连接。",
   "error.workflow.conditionBranch": "条件发出的每个连接都必须是“是”或“否”。",
   "error.workflow.duplicateEdge": "这两个步骤之间已经有该连接。",

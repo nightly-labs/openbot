@@ -31,6 +31,7 @@ import {
   workflowGraphProblemAt,
   workflowListField,
   workflowMediaKind,
+  workflowUnknownFields,
 } from "@openbot/contracts/ipc";
 
 import { isOneOf } from "@openbot/contracts/runtime-values";
@@ -416,6 +417,14 @@ function checkTriggerEvent(node: WorkflowNode, op: number): void {
   refuse(`Op ${op}: the ${trigger} trigger ${given}. Set event to one of: ${events.join(", ")}.`);
 }
 
+function checkKnownValues(node: WorkflowNode, op: number, names: ReadonlySet<string>): void {
+  const unknown = workflowUnknownFields(node.kind, node.fields).find((field) => names.has(field.name));
+  if (!unknown) return;
+  refuse(
+    `Op ${op}: ${unknown.name} "${String(node.fields[unknown.name])}" is unknown. Set ${unknown.name} to one of: ${unknown.values.join(", ")}.`,
+  );
+}
+
 function checkAgentStepModel(kind: WorkflowNodeKind, patch: WorkflowOp["fields"], op: number): void {
   if (kind !== "agent") return;
   const given = STEP_MODEL_FIELDS.filter((name) => {
@@ -494,6 +503,12 @@ function applyWorkflowOps(
   const placed: { id: string; withFrom: boolean }[] = [];
   const pinned = new Set<string>();
   const eventChanges = new Map<string, number>();
+  const valueChanges = new Map<string, { op: number; names: ReadonlySet<string> }>();
+  const noteValues = (id: string, op: number, patch: WorkflowOp["fields"]) => {
+    if (!patch) return;
+    const before = valueChanges.get(id)?.names ?? [];
+    valueChanges.set(id, { op, names: new Set([...before, ...Object.keys(patch)]) });
+  };
 
   ops.forEach((op, index) => {
     const n = index + 1;
@@ -510,6 +525,7 @@ function applyWorkflowOps(
         const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled);
         checkMedia(node, n);
         if (changesTriggerEvent(op.fields)) eventChanges.set(id, n);
+        noteValues(id, n, op.fields);
         const upstream = op.from === undefined ? undefined : resolve(op.from, n);
         node.at = op.at
           ? { x: clampCoordinate(op.at.x), y: clampCoordinate(op.at.y) }
@@ -532,6 +548,7 @@ function applyWorkflowOps(
         if (op.fields && ("media" in op.fields || "model" in op.fields)) checkMedia(next, n);
         replace(next);
         if (changesTriggerEvent(op.fields)) eventChanges.set(node.id, n);
+        noteValues(node.id, n, op.fields);
         return;
       }
       case "move": {
@@ -569,6 +586,8 @@ function applyWorkflowOps(
   for (const node of nodes) {
     const op = eventChanges.get(node.id);
     if (op !== undefined) checkTriggerEvent(node, op);
+    const changed = valueChanges.get(node.id);
+    if (changed !== undefined) checkKnownValues(node, changed.op, changed.names);
   }
   const empty = graph.nodes.every((node) => ANNOTATION_KINDS.has(node.kind));
   if (tidy || empty) {
