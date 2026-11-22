@@ -91,6 +91,8 @@ export const messages = {
     "Członkowie tego kanału nie mają jeszcze rozmowy do skompaktowania. Skompaktuj go, gdy członek odpowie w kanale.",
   "error.backend.channelCompactNotSupported":
     "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Dostawca członków kanału teraz nie działa. Odśwież dostawców, a potem ponownie kompaktuj kanał.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
   "error.backend.channelArchiveRunning": "Zatrzymaj trwającą pracę w tym kanale, a potem go usuń.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
@@ -229,7 +231,7 @@ export const messages = {
   "error.backend.agentWaitGone": "To oczekiwanie nie jest otwarte. Agent je zamknął albo ktoś je anulował.",
   "error.backend.agentWaitNoRequest": "Oczekiwanie potrzebuje wiadomości, aby kontynuować. Ta tura nie ma wiadomości.",
   "error.backend.agentWaitOwnChatOnly":
-    "Otwieraj oczekiwanie tylko we własnym czacie. Zadanie kanału lub komunikatora nie może czekać.",
+    "Otwieraj oczekiwanie we własnym czacie lub w wątku bocznym. Rozmowa kanału lub komunikatora nie może czekać.",
   "error.backend.agentWaitNoteRequired": "Podaj krótką notatkę, na co jest to oczekiwanie.",
   "error.backend.agentWaitRoutineGone": "Ten agent nie ma rutyny o tym identyfikatorze.",
   "error.backend.agentWaitNoRoutine":
@@ -248,6 +250,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot nie może zapisać tej konfiguracji serwera MCP.",
   "error.backend.mcpServerNoAnswer": "Serwer nie odpowiedział w ciągu {seconds} s.",
   "error.backend.mcpSignInNotAccepted": "Serwer nie zaakceptował tego logowania.",
+  "error.backend.mcpSignInGrantRefused":
+    "Serwer nie zaakceptował logowania. Zaloguj się ponownie. Jeśli problem nie ustąpi, sprawdź, czy Twoje konto jest w tej samej witrynie lub regionie co ta aplikacja.",
   "error.backend.mcpSignInAccountRefused":
     "Serwer odrzucił konto, na które się zalogowano. Sprawdź, czy to konto może korzystać z usługi. Aby użyć innego konta, wyloguj się, a potem zaloguj ponownie.",
   "error.backend.mcpSignInClientRefused":
@@ -271,6 +275,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Ten serwer wymaga zalogowania. Zaloguj się do niego w OpenBot na komputerze hosta.",
   "error.backend.mcpSignInNeedsHttps":
     "Ten serwer wymaga zalogowania, a OpenBot loguje się tylko przez https. Zmień URL na {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Ten serwer pozwala zalogować się tylko pod adresem {url}. Zmień URL na ten adres, a potem zaloguj się ponownie.",
   "error.backend.mcpSignInCancelled": "Logowanie zostało anulowane.",
   "error.backend.mcpSignInTimedOut": "Logowanie nie zostało ukończone w przeglądarce.",
   "error.backend.mcpSignInRefused": "Strona logowania odmówiła dostępu. Zaloguj się ponownie.",
@@ -339,6 +345,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Folder nie istnieje lub został już usunięty.",
   "error.backend.libraryFolderOtherAgent": "Plik można przenieść tylko do folderu jego agenta.",
   "error.backend.libraryFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
+  "error.backend.workflowFolderLimit": "Serwer może mieć maksymalnie {limit} folderów przepływów pracy.",
+  "error.backend.workflowFolderPlacementLimit": "W folderach jest za dużo przepływów pracy.",
   "error.backend.sectionNameDuplicate": "Nazwy sekcji muszą być unikalne.",
   "error.backend.directMessageRequired": "Najpierw napisz wiadomość.",
   "error.backend.directMessageTooLong": "Wiadomość prywatna może mieć maksymalnie {limit} znaków.",
@@ -371,6 +379,7 @@ export const messages = {
     "To zgłoszenie może wysłać tylko aplikacja OpenBot na telefon, bo dodaje wersję i dziennik pomocy telefonu. Otwórz ten czat na telefonie. Jeśli zobaczysz tam ten komunikat, zaktualizuj aplikację na telefonie.",
   "error.backend.takeoverInactive": "To przejęcie przeglądarki nie jest już aktywne.",
   "error.backend.authSubmitting": "Wysyłanie uwierzytelnienia już trwa.",
+  "error.backend.apiKeyListFailed": "OpenBot nie mógł odczytać zapisanych kluczy API.",
   "error.backend.apiKeySaveFailed": "OpenBot nie mógł zapisać klucza API. Spróbuj ponownie.",
   "error.backend.apiKeySaving": "Klucz API jest już zapisywany.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -454,6 +463,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Nadaj zadaniu krótki tytuł.",
   "error.backend.taskToolInvalid":
     "Nadaj zadaniu tytuł o długości maksymalnie 120 znaków i opis, który mówi, co zrobić.",
+  "error.backend.taskControlInvalid":
+    "Podaj taskId zadania, które zostało przez Ciebie uruchomione. Wiadomość wymaga też tekstu.",
   "error.backend.taskOwnChatOnly":
     "Zadanie możesz rozpocząć tylko z własnego czatu. Kanał, rozmowa w komunikatorze ani inne zadanie nie mogą go rozpocząć.",
   "error.backend.taskUnfinishedLimit":
@@ -461,5 +472,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Liczba otwartych zadań tego agenta: {count}. Zamknij zadanie, a potem rozpocznij lub otwórz inne.",
   "error.backend.taskRemoteUnsupported": "Zadania są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.taskMessageFailed": "OpenBot nie może wysłać wiadomości do zadania. Spróbuj ponownie później.",
   "error.backend.taskStartFailed": "OpenBot nie może rozpocząć zadania. Zamiast tego wykonaj pracę w tej turze.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -19,11 +19,17 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
-import { MobileConnectAddPhoneDialog, MobileConnectLinkDialog } from "./MobileConnectDialogs";
+import {
+  MobileConnectAddPhoneDialog,
+  MobileConnectLinkDialog,
+  type MobileInstallRequest,
+} from "./MobileConnectDialogs";
 import { RemoteNetworkRouteChoice } from "./RemoteNetworkRouteChoice";
 import type { SettingsMobileConnectStore } from "./stores/mobile-connect-store";
+
+export type { MobileInstallRequest };
 
 interface SettingsMobileConnectTabProps {
   store: SettingsMobileConnectStore;
@@ -32,6 +38,8 @@ interface SettingsMobileConnectTabProps {
   canManageLink: boolean;
   canRevokeDevice: boolean;
   canSetRoute: boolean;
+  installRequest?: MobileInstallRequest | null | undefined;
+  onInstallRequestHandled?: (() => void) | undefined;
 }
 
 const IOS_PLATFORM_LABEL = "iOS";
@@ -41,6 +49,16 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
   const { t } = useText();
   const [adding, setAdding] = createSignal(false);
   const [linkOpen, setLinkOpen] = createSignal(false);
+  const [dialogInstallRequest, setDialogInstallRequest] = createSignal<MobileInstallRequest | null>(null);
+  createEffect(
+    () => (props.canCreateTicket ? props.installRequest : null),
+    (request) => {
+      if (!request) return;
+      setDialogInstallRequest(request);
+      setAdding(true);
+      props.onInstallRequestHandled?.();
+    },
+  );
   const devices = () => props.store.state.devices.devices;
   const addButton = () => (
     <Button
@@ -116,6 +134,7 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
         open={adding()}
         store={props.store}
         canCancelTicket={props.canCancelTicket}
+        installRequest={dialogInstallRequest()}
         onClose={() => setAdding(false)}
       />
       <Show when={props.canManageLink}>

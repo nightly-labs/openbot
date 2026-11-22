@@ -5,7 +5,7 @@ export const messages = {
   "error.mcp.redirectByName": "Cette adresse n’est pas accessible par un nom.",
   "error.mcp.redirectNotSignIn": "Cette adresse ne fait pas partie d’une connexion.",
   "error.mcp.redirectRefused": "La connexion a été refusée. Revenez à OpenBot, puis réessayez.",
-  "error.mcp.redirectNoSignIn": "Aucune connexion n’attend cette réponse. Elle est peut-être terminée.",
+  "error.mcp.redirectNoSignIn": "Cette connexion n’est plus active. Revenez dans OpenBot et relancez la connexion.",
   "error.mcp.redirectSignedIn": "OpenBot est connecté. Vous pouvez fermer cette fenêtre.",
   "error.mcp.redirectNotSaved": "La connexion n’a pas abouti. Revenez dans OpenBot pour en voir la raison.",
   "error.mcp.signInFileUnreadable": "Impossible de lire le fichier de connexion MCP.",

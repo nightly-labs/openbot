@@ -60,6 +60,8 @@ export const messages = {
   "browser.pip.close": "Zamknij okno przeglądarki",
   "browser.pip.reattachFailed": "Nie udało się przypiąć przeglądarki z powrotem.",
   "browser.pip.closeFailed": "Nie udało się zamknąć okna przeglądarki.",
+  "browser.window.open": "Otwórz przeglądarkę w nowym oknie",
+  "browser.window.openFailed": "Nie udało się otworzyć okna przeglądarki.",
   "browser.popupBlocked.title": "Zablokowano wyskakujące okno",
   "browser.popupBlocked.dismiss": "Zamknij komunikat o wyskakującym oknie",
   "browser.liveView.label": "Podgląd na żywo strony na serwerze",

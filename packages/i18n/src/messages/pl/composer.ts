@@ -64,6 +64,7 @@ export const messages = {
   "composer.voice.stop": "Zatrzymaj nagrywanie głosu",
   "composer.voice.cancel": "Anuluj nagrywanie głosu",
   "composer.voice.preparing": "Pobieranie modelu głosowego",
+  "composer.voice.starting": "Uruchamianie nagrywania głosu",
   "composer.voice.requesting": "Prośba o dostęp do mikrofonu",
   "composer.voice.transcribing": "Transkrypcja promptu głosowego",
   "composer.voice.start": "Utwórz prompt głosem",
@@ -102,7 +103,7 @@ export const messages = {
   "composer.voice.recording": "Nagrywanie głosu",
   "composer.voice.limitSoon": "Nagrywanie zatrzyma się za {seconds} sekund.",
   "composer.voice.limitReached":
-    "Nagrywanie zatrzymało się po osiągnięciu limitu 2 minut. Nagrana treść jest w wiadomości.",
+    "Nagrywanie zatrzymało się po osiągnięciu limitu 10 minut. Nagrana treść jest w wiadomości.",
   "composer.send.saveQueued": "Zapisz wiadomość z kolejki",
   "composer.send.voice": "Wyślij wiadomość głosową",
   "composer.send.message": "Wyślij wiadomość",

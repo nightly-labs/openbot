@@ -60,6 +60,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Das gewählte Agentenmodell ist nicht verfügbar.",
   "error.agent.modelProviderNotConnected":
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} ist nicht verbunden.",
+  "error.agent.modelProviderSignInRequired":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} braucht eine Anmeldung. Melde dich bei {provider} an und versuche es erneut.",
+  "error.agent.modelProviderNotInstalled":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} ist nicht installiert.",
+  "error.agent.modelProviderOutdated":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} braucht ein Update.",
   "error.agent.modelListEmpty":
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} hat keine Modelle aufgeführt. Letzter Fehler: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -174,6 +180,8 @@ export const messages = {
     "Das Verhalten von Nachrichten während der Arbeit des Agenten kann nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
   "error.agent.backupModelsLocalOnly":
     "Ersatzmodelle können nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
+  "error.agent.backupModelsAtLimit":
+    "Kein Ersatzmodell kann jetzt übernehmen: Jedes hat sein Nutzungslimit erreicht oder ist vor Kurzem fehlgeschlagen. Modelle eines Kontos können sich ein Limit teilen. Um jetzt weiterzumachen, füge ein Ersatzmodell eines anderen Anbieters oder Kontos hinzu, oder warte auf das Zurücksetzen.",
   "error.agent.taskLimitLocalOnly":
     "Das Aufgabenlimit lässt sich nur auf dem Computer festlegen, auf dem der Agent läuft.",
   "error.agent.localScriptsOff": "Dieser Agent erlaubt keine lokalen Skripte.",

@@ -5,6 +5,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, type AcpRetryCause, shownFailureDetail } from "./acp-flavor";
 import {
+  isContextTooSmallFailure,
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
@@ -46,7 +47,7 @@ function openCodeRetryUpdate(update: SessionUpdate): { attempt: number; cause: A
   return { attempt: Math.max(1, retry.attempt - 1), cause };
 }
 
-function isOpenCodeStarting(error: unknown): boolean {
+export function isOpenCodeStarting(error: unknown): boolean {
   return (
     error instanceof RequestError &&
     error.code === -32603 &&
@@ -103,17 +104,22 @@ function openCodeAuthRequired(
     : sourceText("error.provider.opencodeAuthRequired", { provider });
 }
 
-const OPENCODE_CONTEXT_TOO_SMALL =
-  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
-
 const NVIDIA_MODEL_NOT_SERVED = /\bFunction '[^']*': Not found for account\b/u;
 const NVIDIA_MODEL_DEGRADED = /\bDEGRADED function cannot be invoked\b/iu;
+const NVIDIA_SAFETY_SCREENING = /\binput rejected by content safety screening\b/iu;
+
+function isOpenCodeSafetyRefusal(error: unknown): boolean {
+  return (
+    error === "refusal" ||
+    (error instanceof RequestError && error.code === -32603 && NVIDIA_SAFETY_SCREENING.test(error.message))
+  );
+}
 
 function isReasoningEffortRefusal(error: unknown): boolean {
   if (!(error instanceof RequestError) || error.code !== -32603) return false;
   return (
     /\breasoning[_ .]?effort\b/iu.test(error.message) &&
-    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|invalid|not allowed|not permitted)\b/iu.test(
+    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|unexpected|invalid|not allowed|not permitted)\b/iu.test(
       error.message,
     )
   );
@@ -144,6 +150,10 @@ function openCodeRequestFailure(
   log: (text: string) => void,
   endpoint: AcpCustomEndpoint | null,
 ): string {
+  if (isOpenCodeSafetyRefusal(error)) {
+    logger.warn("A model provider's safety rules refused an OpenCode turn.", { detail });
+    return sourceText("error.provider.opencodeSafetyBlocked");
+  }
   if (!(error instanceof RequestError) || error.code !== -32603) return detail;
   const reason = error.message.replace(/^Internal error:\s*/u, "");
   if (isRecord(error.data) && error.data.errorName === "provider.free-limit")
@@ -169,7 +179,7 @@ function openCodeRequestFailure(
     logger.warn("A model server ran out of memory for an OpenCode request.", { reason: redact(reason) });
     return sourceText("error.provider.opencodeOutOfMemory");
   }
-  if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
+  if (isContextTooSmallFailure(reason)) {
     log(`OpenCode request does not fit the model's context window: ${reason}`);
     return sourceText("error.provider.opencodeContextTooSmall");
   }
@@ -214,6 +224,7 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
 
 function openCodeFailureCause(error: unknown): CauseCode | null {
   if (!(error instanceof RequestError)) return null;
+  if (isOpenCodeSafetyRefusal(error)) return "content_blocked";
   if (NVIDIA_MODEL_NOT_SERVED.test(error.message)) return "model_not_found";
   if (NVIDIA_MODEL_DEGRADED.test(error.message)) return "provider_unavailable";
   if (!isRecord(error.data)) return null;
@@ -251,6 +262,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   serverLost: isOpenCodeServerLost,
   emptyAnswerFailure: ({ reasoned }) =>
     sourceText(reasoned ? "error.provider.opencodeReasoningWithoutAnswer" : "error.provider.opencodeNoAnswer"),
+  stillStarting: isOpenCodeStarting,
   restoreFailure: (error, method) => {
     if (method === "resume" && isOpenCodeStarting(error)) return "wait-for-start";
     return isOpenCodeServiceFailure(error) ? "list-sessions" : null;

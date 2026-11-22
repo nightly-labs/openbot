@@ -1,0 +1,41 @@
+.keyboard-shortcut-recorder {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.keyboard-shortcut-button {
+  justify-content: flex-end;
+  min-width: 112px;
+  color: var(--openbot-text-secondary);
+}
+
+.keyboard-shortcut-button[aria-pressed="true"] {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+}
+
+.keyboard-shortcut-button[data-refused="true"] {
+  box-shadow: inset 0 0 0 1px var(--openbot-danger-border);
+}
+
+.keyboard-shortcut-caps,
+.keyboard-shortcut-fixed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.keyboard-shortcut-fixed {
+  padding-inline: var(--openbot-space-3);
+}
+
+.keyboard-shortcut-prompt,
+.keyboard-shortcut-separator {
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.ui-item-description.keyboard-shortcut-refusal {
+  color: var(--openbot-danger-text);
+}

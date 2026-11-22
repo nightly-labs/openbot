@@ -22,6 +22,8 @@ export const messages = {
   "server.connection.loadingHint": "Vous pouvez sélectionner un autre serveur pendant le chargement de celui-ci.",
   "server.connection.cachedHint":
     "Le contenu chargé et les brouillons sont conservés. Les actions du serveur reprendront après la reconnexion.",
+  "server.connection.computerOffline":
+    "{name} est hors ligne. Vérifiez que son ordinateur est allumé, qu'OpenBot est ouvert et que Publier ce serveur est activé dans Réglages du serveur > Membres.",
   "server.connection.conversationFailed": "Impossible de charger la conversation. Réessayez.",
   "server.connection.panelsFailed": "Certains panneaux de l’espace de travail n’ont pas pu se charger. Réessayez.",
   "server.connection.retry": "Réessayer",
@@ -237,7 +239,7 @@ export const messages = {
   "server.plan.deletedOn": "Supprimé le {date}",
   "server.plan.dialogTitle": "Ne laissez pas partir vos agents",
   "server.plan.dialogDescription":
-    "{name} s'est arrêté, car son forfait n'a pas été payé. Le {date}, OpenBot supprime ses agents, avec tous leurs chats et fichiers.",
+    "{name} s'est arrêté, car son forfait a pris fin. Le {date}, OpenBot supprime ses agents, avec tous leurs chats et fichiers.",
   "server.plan.dialogDaysLeft": {
     one: "{count} jour restant",
     other: "{count} jours restants",
@@ -246,6 +248,24 @@ export const messages = {
   "server.plan.keepAgents": "Garder mes agents",
   "server.plan.ownerRenews":
     "Les agents de {name} ne sont pas disponibles tant que le propriétaire du serveur n'a pas renouvelé le forfait.",
+  "server.paywall.ready": "{name} est prêt",
+  "server.paywall.wakeUp": "Vos agents se réveillent quand vous vous abonnez.",
+  "server.paywall.yourPlan": "Votre offre",
+  "server.paywall.vcpu": "{value} vCPU",
+  "server.paywall.memory": "{value} Go de mémoire",
+  "server.paywall.storage": "{value} Go de stockage",
+  "server.paywall.support": "Support personnalisé",
+  "server.paywall.perYear": "par an",
+  "server.paywall.subscribe": "S’abonner",
+  "server.paywall.checkoutFailed": "Le paiement ne s’est pas ouvert",
+  "server.paywall.checkoutTitle": "Terminez le paiement dans votre navigateur",
+  "server.paywall.checkoutDescription": "Vos agents se préparent.",
+  "server.paywall.openCheckoutAgain": "Rouvrir le paiement",
+  "server.paywall.active": "{name} est actif",
+  "server.paywall.activeDescription": "Merci. Vos agents sont réveillés.",
+  "server.paywall.open": "Ouvrir {name}",
+  "server.paywall.almostReady": "{name} est presque prêt",
+  "server.paywall.ownerSubscribes": "Le propriétaire de {name} doit s’abonner avant que vos agents puissent démarrer.",
   "server.select.failedTitle": "Impossible de sélectionner le serveur",
   "server.select.failedDescription": "Impossible de changer de serveur. Réessayez.",
   "server.select.openAgentFailed": "Impossible d’ouvrir {name}. Retrouvez-le dans la barre latérale.",
@@ -376,6 +396,12 @@ export const messages = {
     "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
+  "server.settings.voiceModel.section": "Reconnaissance vocale",
+  "server.settings.voiceModel.description":
+    "Les agents de ce serveur utilisent ce modèle pour transcrire le son des vidéos sans sous-titres.",
+  "server.settings.voiceModel.loadFailed": "Impossible de charger le modèle de reconnaissance vocale du serveur.",
+  "server.settings.voiceModel.group": "Sur ce serveur",
+  "server.settings.voiceModel.removeLabel": "Supprimer {name} de ce serveur",
   "server.settings.turnLimit": "Fils en même temps",
   "server.settings.turnLimitDescription":
     "Le nombre de fils d’agents qui peuvent s’exécuter en même temps sur ce serveur. Plus de fils utilisent plus de mémoire.",
@@ -533,6 +559,7 @@ export const messages = {
     "Il n’y a pas de mot de passe distinct pour le bureau à distance. Les réglages ci-dessous choisissent qui peut contrôler cet ordinateur.",
   "server.desktop.componentInstalled": "Composant hôte installé",
   "server.desktop.componentNotInstalled": "Composant hôte non installé",
+  "server.desktop.needsX11Session": "Session X11 requise",
   "server.desktop.sessions": "Sans surveillance : {unattended} · Sessions actives : {active}/{max}",
   "server.desktop.unattendedEnabled": "activé",
   "server.desktop.unattendedUnavailable": "non disponible",

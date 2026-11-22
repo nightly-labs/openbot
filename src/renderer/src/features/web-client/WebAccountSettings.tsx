@@ -12,6 +12,7 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
+  Keyboard,
   SettingsSection,
   SlidersHorizontal,
   SwitchField,
@@ -37,7 +38,7 @@ import { SoundChoiceSelect } from "@openbot/ui/features/settings/SoundChoiceSele
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { TalkKeyRecorder } from "@openbot/ui/features/settings/TalkKeyRecorder";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { readActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
 import { setChatBubbleStyle, useChatBubbleStyle } from "../../chat-bubble-style-preference";
@@ -48,14 +49,16 @@ import { useLayout } from "../../layout";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { setVoiceTalkKey, useVoiceTalkKey } from "../conversation/voice-talk-key";
 import { ChatBackdropSetting } from "../settings/ChatBackdropSetting";
+import { type LiveVoiceAccountChoice, LiveVoiceAccountRow } from "../settings/LiveVoiceAccountRow";
 import { MotionSwitches } from "../settings/MotionSwitches";
+import { SettingsKeyboardTab } from "../settings/SettingsKeyboardTab";
 import type { WebAccountCalls } from "./web-account";
 import { sendWebAnalyticsChoice, setWebAnalyticsEnabled } from "./web-analytics";
 import { setWebChatBackground, useWebChatBackground } from "./web-chat-background";
 import { setWebLiveVoice, useWebLiveVoice } from "./web-live-voice";
 import type { WebNotificationSettings } from "./web-notification-settings";
 
-const TABS = ["profile", "preferences", "referral"] as const;
+const TABS = ["profile", "preferences", "keyboard", "referral"] as const;
 type WebAccountSettingsTab = (typeof TABS)[number];
 
 const TAB_ITEMS = {
@@ -68,6 +71,11 @@ const TAB_ITEMS = {
     titleKey: "webClient.settings.preferences.title",
     descriptionKey: "webClient.settings.preferences.description",
     icon: SlidersHorizontal,
+  },
+  keyboard: {
+    titleKey: "settings.tab.keyboard.title",
+    descriptionKey: "settings.tab.keyboard.description",
+    icon: Keyboard,
   },
   referral: {
     titleKey: "settings.tab.referral.title",
@@ -85,6 +93,7 @@ export interface WebAccountSettingsProps {
   page: SettingsPagePlacement | undefined;
   account: CentralAuthUser;
   calls: WebAccountCalls;
+  liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   language: AppLanguage;
   onChangeLanguage: (language: AppLanguage) => void;
   appearance: AppAppearance;
@@ -94,6 +103,7 @@ export interface WebAccountSettingsProps {
   onSignOut: () => Promise<void>;
   notifications: WebNotificationSettings;
   notificationFocusRequest?: { serverId: string; nonce: number } | null | undefined;
+  keyboardFocusRequest?: number | null | undefined;
 }
 
 export default function WebAccountSettings(props: WebAccountSettingsProps) {
@@ -146,6 +156,12 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
     () => (props.open ? props.notificationFocusRequest : null),
     (request) => {
       if (request) setActiveTab("preferences");
+    },
+  );
+  createEffect(
+    () => (props.open ? props.keyboardFocusRequest : null),
+    (request) => {
+      if (request) setActiveTab("keyboard");
     },
   );
 
@@ -211,6 +227,10 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
             canRevokeSession
             onSignOut={props.onSignOut}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="keyboard" class="settings-modal-tab-panel" data-tab="keyboard">
+          <SettingsKeyboardTab />
         </Tabs.Content>
 
         <Tabs.Content value="referral" class="settings-modal-tab-panel" data-tab="referral">
@@ -356,6 +376,11 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 label={t("settings.voice.speech.codexLive.title")}
                 description={t("settings.voice.speech.codexLive.serverDescription")}
               />
+              <Show when={props.liveVoiceAccount}>
+                {(choice) => (
+                  <LiveVoiceAccountRow choice={choice()} disabled={!webLiveVoice()} selectMount={modalElement} />
+                )}
+              </Show>
             </ItemGroup>
           </SettingsSection>
           <SettingsSection title={t("settings.analytics.title")}>

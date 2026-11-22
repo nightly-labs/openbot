@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "استجابة تسجيل الدخول غير صالحة.",
   "webClient.pane.navigation": "التنقل في مساحة العمل",
   "webClient.pane.chat": "الدردشة",
-  "webClient.pane.routines": "المهام الدورية",
   "webClient.pane.workspace": "مساحة العمل",
   "webClient.phoneApp.title": "استخدم تطبيق OpenBot",
   "webClient.phoneApp.description":
@@ -38,7 +37,7 @@ export const messages = {
     "أنشئ خادمًا مستضافًا للدردشة مع وكلائك من هذا المتصفح. يمكنك أيضًا تشغيل OpenBot على حاسوبك، أو الانضمام إلى خادم بدعوة.",
   "webClient.connect.stepInstall": "ثبّت OpenBot وافتحه على حاسوبك.",
   "webClient.connect.stepSignIn": "سجّل الدخول ببريدك الإلكتروني.",
-  "webClient.connect.stepRemote": "فعّل الوصول عن بُعد.",
+  "webClient.connect.stepRemote": "في OpenBot، افتح إعدادات الخادم > الأعضاء وفعّل نشر هذا الخادم.",
   "webClient.notice.download": "تنزيل OpenBot",
   "webClient.notice.createServer": "إنشاء خادم مستضاف",
   "webClient.notice.join": "الانضمام بدعوة",

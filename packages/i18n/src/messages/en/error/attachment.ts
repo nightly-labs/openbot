@@ -6,6 +6,8 @@ export const messages = defineMessages("error.attachment", {
   "error.attachment.namedFileTooLarge": "{name} is larger than the 100 MB limit.",
   "error.attachment.totalTooLarge": "Attachments exceed the 250 MB total limit.",
   "error.attachment.unavailable": "This file is no longer available.",
+  "error.attachment.noApp":
+    "No app on this computer opened this file. Download it, then open it from your file manager.",
   "error.attachment.tooMany": "Choose at most {limit} files.",
   "error.attachment.mediaUnsupported":
     "This server does not support MP3 or MOV attachments. Update OpenBot on the host and retry.",

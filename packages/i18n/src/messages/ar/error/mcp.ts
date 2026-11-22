@@ -5,7 +5,7 @@ export const messages = {
   "error.mcp.redirectByName": "لا يمكن الوصول إلى هذا العنوان بالاسم.",
   "error.mcp.redirectNotSignIn": "هذا العنوان ليس جزءًا من عملية تسجيل دخول.",
   "error.mcp.redirectRefused": "رُفض تسجيل الدخول. ارجع إلى OpenBot وأعد المحاولة.",
-  "error.mcp.redirectNoSignIn": "لا يوجد تسجيل دخول ينتظر هذا. ربما انتهى.",
+  "error.mcp.redirectNoSignIn": "لم يعد تسجيل الدخول هذا نشطًا. ارجع إلى OpenBot وابدأ تسجيل الدخول مرة أخرى.",
   "error.mcp.redirectSignedIn": "تم تسجيل دخول OpenBot. يمكنك إغلاق هذه النافذة.",
   "error.mcp.redirectNotSaved": "لم يكتمل تسجيل الدخول. ارجع إلى OpenBot لمعرفة السبب.",
   "error.mcp.signInFileUnreadable": "تتعذر قراءة ملف تسجيل الدخول إلى MCP.",

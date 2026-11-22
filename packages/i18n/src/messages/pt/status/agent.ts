@@ -113,7 +113,6 @@ export const messages = {
     "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas, {notChanged} não alteradas porque outro tópico as alterou antes.",
   "status.agent.mcpToolCall": "Executar a ferramenta {tool} do servidor MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Fechado por uma nova mensagem",
-  "status.agent.finishCheckContinues": "O pedido ainda não está concluído. O agente continua ({current} de {limit}).",
   "status.agent.nextStepContinues": "O agente parou antes da próxima etapa. Ele continua ({current} de {limit}).",
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
   "status.agent.planStopped": "O agente parou com etapas abertas no plano. Envie uma mensagem para continuar.",

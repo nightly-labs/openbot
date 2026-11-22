@@ -7,6 +7,7 @@ export const messages = {
   "error.attachment.namedFileTooLarge": "{name} 超过了 100 MB 上限。",
   "error.attachment.totalTooLarge": "附件总量超过了 250 MB 上限。",
   "error.attachment.unavailable": "该文件已不可用。",
+  "error.attachment.noApp": "这台电脑上没有应用打开此文件。请先下载，然后在文件管理器中打开。",
   "error.attachment.tooMany": "最多只能选择 {limit} 个文件。",
   "error.attachment.mediaUnsupported": "该服务器不支持 MP3 或 MOV 附件。请更新主机上的 OpenBot 后重试。",
   "error.attachment.emlUnsupported": "该服务器不支持 EML 附件。请更新主机上的 OpenBot 后重试。",

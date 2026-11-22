@@ -11,8 +11,68 @@
 }
 
 .tab-shape {
+  --tab-shape-curve: var(--openbot-radius-md);
+
+  position: absolute;
+  z-index: -1;
+  top: var(--tab-shape-top, 0);
+  left: var(--tab-shape-left, 0);
+  right: var(--tab-shape-right, 100%);
   display: none;
+  height: var(--tab-shape-height, 0);
+  border: 1px solid var(--openbot-border);
+  border-bottom: 0;
+  border-start-start-radius: var(--openbot-radius-md);
+  border-start-end-radius: var(--openbot-radius-md);
+  background: var(--tab-shape-fill);
+  pointer-events: none;
+  transition:
+    left var(--openbot-duration-overlay) var(--openbot-ease-out) var(--tab-shape-start-delay, 0ms),
+    right var(--openbot-duration-overlay) var(--openbot-ease-out) var(--tab-shape-end-delay, 0ms);
   -webkit-app-region: initial;
+}
+
+.tab-shape:is([data-hidden], [data-instant]) {
+  transition: none;
+}
+
+.tab-shape[data-hidden] {
+  visibility: hidden;
+}
+
+.tab-shape::before,
+.tab-shape::after {
+  position: absolute;
+  bottom: 0;
+  width: calc(var(--tab-shape-curve) + 1px);
+  height: calc(var(--tab-shape-curve) + 1px);
+  content: "";
+}
+
+.tab-shape::before {
+  left: calc(-1 * var(--tab-shape-curve) - 1px);
+  background:
+    radial-gradient(
+      circle at 0 0,
+      transparent var(--tab-shape-curve),
+      var(--openbot-border) var(--tab-shape-curve),
+      var(--openbot-border) calc(var(--tab-shape-curve) + 1px),
+      transparent calc(var(--tab-shape-curve) + 1px)
+    ),
+    radial-gradient(circle at 0 0, transparent var(--tab-shape-curve), var(--tab-shape-fill) var(--tab-shape-curve));
+}
+
+.tab-shape::after {
+  right: calc(-1 * var(--tab-shape-curve) - 1px);
+  background:
+    radial-gradient(
+      circle at 100% 0,
+      transparent var(--tab-shape-curve),
+      var(--openbot-border) var(--tab-shape-curve),
+      var(--openbot-border) calc(var(--tab-shape-curve) + 1px),
+      transparent calc(var(--tab-shape-curve) + 1px)
+    ),
+    radial-gradient(circle at 100% 0, transparent var(--tab-shape-curve), var(--tab-shape-fill) var(--tab-shape-curve));
 }
 
 .conversation-heading-group {

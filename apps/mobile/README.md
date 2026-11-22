@@ -285,6 +285,37 @@ recent apps show a blank card. The lock screen draws in `FullWindowOverlay` on i
 Android, above sheets. Notification, Live Activity, quick action and share navigation waits until
 the user unlocks. Expo Go does not have the module: it measures with the phone clock and cannot see a phone lock.
 
+## Background refresh
+
+While the user is signed in, the phone asks the system for a background refresh at most once every
+15 minutes. The system decides when it runs. In a refresh, the workspace makes the server connections
+active for at most 25 seconds. It waits until each server loads with its channels and open chats, or
+stops at the retry cooldown, then saves the encrypted workspace copy and makes the connections
+inactive again. The app stays "away" for the hosts, so they continue to send notifications, and a
+chat on screen is not marked as read. A refresh sends no connection analytics.
+
+- iOS uses `BGAppRefreshTask` with the identifier `run.openbot.mobile.refresh` (`UIBackgroundModes`
+  `fetch` in `app.json`). The local `modules/background-refresh` module registers the task at launch
+  and gives each run to JavaScript. iOS lists the app in Settings > General > Background App Refresh.
+- Android uses `expo-background-task` (WorkManager). `package.json` excludes it, `expo-task-manager`
+  and `unimodules-app-loader` from iOS autolinking, because that package schedules only an idle
+  processing task on iOS.
+- The server connections run in a web view, so a refresh needs the React tree. When the system
+  starts the app in the background with no window, React Native does not start (iOS) or no component
+  mounts (Android). The run then ends with no network work, and the refresh stops until the user
+  opens the app again.
+- The support log shows `Background refresh: available` (or the iOS status), and for each run the
+  number of servers that loaded, or why the run did nothing (`Background refresh skipped: ...`). On
+  iOS, the device log (subsystem `run.openbot.mobile`, category `BackgroundRefresh`) shows when iOS
+  started the task and when it ended.
+- Test on a device. iOS has no background tasks in the Simulator. Attach Xcode to `OpenBot`, put
+  the app in the background and pause it. Select a thread that is not the main thread
+  (`thread select <n>`): on the main thread the command does not return. Then run
+  `e -l objc -- @import Foundation`, `e -l objc -- @import BackgroundTasks` and
+  `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] performSelector:NSSelectorFromString(@"_simulateLaunchForTaskWithIdentifier:") withObject:@"run.openbot.mobile.refresh"]`,
+  and continue. Wait before you open the app: a run with the app in the foreground does nothing.
+  On Android, `adb shell cmd jobscheduler run -f run.openbot.mobile <job id>` starts the job.
+
 ## iOS shortcuts
 
 The Shortcuts app of iOS 26 and later has three OpenBot shortcuts: List Agents, Send Message and

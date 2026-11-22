@@ -7,6 +7,8 @@ export const messages = {
   "error.attachment.namedFileTooLarge": "{name} 100 MB sınırını aşıyor.",
   "error.attachment.totalTooLarge": "Ekler 250 MB toplam sınırını aşıyor.",
   "error.attachment.unavailable": "Bu dosya artık kullanılamıyor.",
+  "error.attachment.noApp":
+    "Bu bilgisayardaki hiçbir uygulama bu dosyayı açmadı. Dosyayı indirin, ardından dosya yöneticinizden açın.",
   "error.attachment.tooMany": "En fazla {limit} dosya seçin.",
   "error.attachment.mediaUnsupported":
     "Bu sunucu MP3 veya MOV eklerini desteklemiyor. Ana makinedeki OpenBot'u güncelleyin ve tekrar deneyin.",

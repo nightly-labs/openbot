@@ -45,6 +45,11 @@ export const messages = {
   "update.idleRestart.description": "Le nuove esecuzioni delle routine attendono il riavvio.",
   "update.idleRestart.waitingFor": "In attesa di {reasons}.",
   "update.idleRestart.cancel": "Annulla riavvio",
+  "update.idleRestart.restartNow": "Riavvia ora",
+  "update.idleRestart.restartNowTitle": "Riavviare OpenBot ora?",
+  "update.idleRestart.restartNowDescription":
+    "I turni degli agenti e le esecuzioni delle routine non finiti si fermano ora.",
+  "update.idleRestart.keepWaiting": "Continua ad attendere",
   "update.idleRestart.cancelFailed": "Impossibile annullare il riavvio.",
   "update.idleRestart.requestFailed": "Impossibile programmare il riavvio.",
   "update.idleRestart.failedTitle": "OpenBot non si è riavviato",

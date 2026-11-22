@@ -11,9 +11,10 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
-import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
+import type { BrowserWindow } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentFolders } from "../agent-folders";
+import { pickFolder } from "../folder-dialog";
 import {
   decodeRemoteAgentExclusionChange,
   decodeRemoteAgentFolderBrowse,
@@ -56,20 +57,6 @@ export function agentFolderIpcHandlers({
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
 
-  let picking = false;
-
-  async function pick(options: OpenDialogOptions): Promise<string | undefined> {
-    if (picking) return undefined;
-    picking = true;
-    const parent = getMainWindow();
-    const result = await (parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options)).finally(
-      () => {
-        picking = false;
-      },
-    );
-    return result.canceled ? undefined : result.filePaths[0];
-  }
-
   return {
     agentFolders: {
       listAgentFolders: scopedHandler(parseAgentId, {
@@ -79,7 +66,7 @@ export function agentFolderIpcHandlers({
       }),
       chooseAgentFolder: payloadHandler(parseChooseAgentFolderInput, async ({ agentId, replace }) => {
         const agent = folders.requireAgent(agentId);
-        const picked = await pick({
+        const picked = await pickFolder(getMainWindow(), {
           title: translate("dialog.chooseAgentFolder", { agent: agent.name }),
           properties: ["openDirectory", "createDirectory"],
           ...(replace === undefined ? {} : { defaultPath: join(replace, "..") }),
@@ -93,7 +80,7 @@ export function agentFolderIpcHandlers({
       }),
       chooseAgentExclusion: payloadHandler(parseAgentId, async (agentId): Promise<AgentExclusionChange> => {
         const agent = folders.requireAgent(agentId);
-        const picked = await pick({
+        const picked = await pickFolder(getMainWindow(), {
           title: translate("dialog.chooseAgentExclusion", { agent: agent.name }),
           properties: ["openDirectory"],
           defaultPath: agent.additionalFolders?.[0] ?? agent.workspacePath,

@@ -285,6 +285,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "السماح للوكيل ببدء دردشة جديدة عندما تطول دردشته. يحفظ ملاحظات أولًا.",
   "agentSettings.quickAcknowledgement.title": "عرض الخطة قبل المهام الطويلة",
   "agentSettings.quickAcknowledgement.description": "قبل مهمة طويلة، يعرض الوكيل خطته.",
+  "agentSettings.builtinMemory.title": "ذاكرة OpenBot",
+  "agentSettings.builtinMemory.description":
+    "يحفظ الوكيل ذكرياته ويقرؤها. أوقفها لاستخدام تطبيق ذاكرة فقط، مثل Mem0. تبقى الذكريات المحفوظة.",
   "agentSettings.browserProfile.label": "ملف تعريف المتصفح",
   "agentSettings.browserProfile.shared": "مشترك",
   "agentSettings.browserProfile.agent": "هذا الوكيل فقط",

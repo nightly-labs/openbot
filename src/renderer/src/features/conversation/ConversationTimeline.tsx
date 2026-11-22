@@ -661,6 +661,38 @@ export function ConversationTimeline() {
   });
   const showAgentSteps = useShowAgentSteps();
   const compactActions = useCompactMessageActions();
+  const rowDayMarker = (current: AgentMessage, previous: AgentMessage | undefined) => {
+    if (current.createdAt)
+      return dayMarkerLabel(previous?.createdAt, current.createdAt, {
+        t,
+        format,
+        ...(channel || !compactActions() ? {} : { gapMs: CHAT_TIME_GAP_MS }),
+      });
+    return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
+  };
+  const rowContinuesRun = (current: AgentMessage, previous: AgentMessage | undefined, startsDay: boolean) => {
+    if (current.id === unreadBoundaryMessageId() || current.actionMarker) return false;
+    return continuesSenderRun(previous && senderRunRow(previous), senderRunRow(current), {
+      previousDrawsTime: previous !== undefined && rowDrawsTime(previous),
+      startsDay,
+    });
+  };
+  const nextRowGroupedEntry = (current: AgentMessage, next: AgentMessage): "agent" | "user" | undefined => {
+    if (next.actionMarker || next.questionPrompt || next.id === compactionBefore()) return undefined;
+    if (
+      next.kind === "plan" ||
+      next.kind === "subagents" ||
+      next.kind === "memory-changes" ||
+      next.kind === "thinking" ||
+      shownVisualReply(next, runtime.visualPage)
+    )
+      return undefined;
+    if (!rowContinuesRun(next, current, rowDayMarker(next, current) !== null)) return undefined;
+    const agentEntry = next.author !== "you";
+    const stepsInRow = agentEntry && (Boolean(channel) || !showAgentSteps());
+    if (!stepsInRow && turnSteps.stepsAbove(next.id)) return undefined;
+    return agentEntry ? "agent" : "user";
+  };
   const bubbleStyle = useChatBubbleStyle();
   const turnTrace = useTurnTrace({ turnSteps, agentName: () => props.agent?.name, agents: () => props.agents });
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
@@ -848,25 +880,17 @@ export function ConversationTimeline() {
                     : arrives;
                 const dayMarker = createMemo(() => {
                   const current = message();
-                  if (!current) return null;
-                  const previous = previousMessage();
-                  if (current.createdAt)
-                    return dayMarkerLabel(previous?.createdAt, current.createdAt, {
-                      t,
-                      format,
-                      ...(channel || !compactActions() ? {} : { gapMs: CHAT_TIME_GAP_MS }),
-                    });
-                  return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
+                  return current ? rowDayMarker(current, previousMessage()) : null;
                 });
                 const continuesRun = createMemo(() => {
                   const current = message();
-                  if (!current) return false;
-                  if (current.id === unreadBoundaryMessageId() || current.actionMarker) return false;
-                  const previous = previousMessage();
-                  return continuesSenderRun(previous && senderRunRow(previous), senderRunRow(current), {
-                    previousDrawsTime: previous !== undefined && rowDrawsTime(previous),
-                    startsDay: dayMarker() !== null,
-                  });
+                  return current ? rowContinuesRun(current, previousMessage(), dayMarker() !== null) : false;
+                });
+                const nextGroupedEntry = createMemo(() => {
+                  const current = message();
+                  const currentIndex = index();
+                  const next = currentIndex === undefined ? undefined : timelineMessages()[currentIndex + 1];
+                  return current && next ? nextRowGroupedEntry(current, next) : undefined;
                 });
                 const author = createMemo((): ChatMessageAuthor => {
                   const current = message();
@@ -1424,6 +1448,7 @@ export function ConversationTimeline() {
                   <div
                     data-index={virtualRow.index}
                     data-grouped={groupedWithMarker() ? "marker" : continuesRun() ? "sender" : undefined}
+                    data-next-grouped={nextGroupedEntry()}
                     ref={messageVirtualizer.measureElement}
                     class="virtual-chat-row"
                     style={{

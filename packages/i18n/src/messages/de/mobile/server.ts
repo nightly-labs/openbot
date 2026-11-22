@@ -231,6 +231,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Warten. Der Host führt so viele Durchläufe aus, wie sein Speicher erlaubt.",
   "mobile.server.threads.hold.agentBusy": "Warten, bis andere Arbeit dieses Agenten abgeschlossen ist.",
   "mobile.server.threads.hold.oneTurn": "Warten. Der Anbieter dieses Agenten führt immer nur einen Durchlauf aus.",
+  "mobile.server.threads.hold.signIn": "Warten. Der Anbieter dieses Agenten muss angemeldet werden.",
   "mobile.server.threads.offline": "Verbinde dich mit diesem Server, um seine Threads zu sehen.",
   "mobile.server.threads.loading": "Threads werden geladen…",
   "mobile.server.threads.loadFailed": "Die Threads einiger Agenten konnten nicht geladen werden.",
@@ -344,6 +345,7 @@ export const messages = {
   "mobile.server.route.timezone": "Zeitzone",
   "mobile.server.route.personality": "Agent-Persönlichkeit",
   "mobile.server.route.agents": "Agenten",
+  "mobile.server.route.voiceModel": "Spracherkennung",
   "mobile.server.settings.storage": "Speicher",
   "mobile.server.route.storage": "Speicher",
   "mobile.server.route.storageFiles": "Alle Dateien",
@@ -473,6 +475,20 @@ export const messages = {
     "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Zeitzone zu ändern.",
   "mobile.server.settings.timezoneUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seine Zeitzone hier zu ändern.",
+  "mobile.server.settings.voiceModelDescription":
+    "Agenten auf diesem Server verwenden dieses Modell, um den Ton von Videos ohne Untertitel zu transkribieren.",
+  "mobile.server.settings.voiceModelLoading": "Spracherkennung wird geladen …",
+  "mobile.server.settings.voiceModelLoadFailed": "Das Spracherkennungsmodell des Servers konnte nicht geladen werden.",
+  "mobile.server.settings.voiceModelSaveFailed":
+    "Das Spracherkennungsmodell konnte nicht geändert werden. Versuche es erneut.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um seine Spracherkennung hier zu ändern.",
+  "mobile.server.settings.voiceModelReady": "Bereit",
+  "mobile.server.settings.voiceModelDownloading": "Wird geladen: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} Download",
+  "mobile.server.settings.voiceModelDownload": "Laden",
+  "mobile.server.settings.voiceModelCancel": "Download stoppen",
+  "mobile.server.settings.voiceModelRemove": "Entfernen",
   "mobile.server.settings.keySection": "Serverschlüssel",
   "mobile.server.settings.keyChanged": "Letzte Änderung",
   "mobile.server.settings.keyChange": "Schlüssel ändern",
@@ -928,7 +944,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "Die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
+    "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp hat diesen Server aus den verknüpften Geräten entfernt. Verknüpfe die Nummer erneut.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1171,10 +1187,15 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Die Modelle konnten nicht geändert werden. Versuche es erneut.",
   "mobile.server.providers.promptCache": "Prompt-Cache",
   "mobile.server.providers.promptCacheHint":
-    "Wie lange Claude den Kontext eines Agenten zwischen Antworten im Cache hält. Eine Änderung gilt, wenn Claude neu startet.",
-  "mobile.server.providers.promptCacheDefault": "Claude-Code-Standard",
+    "Wie lange Claude und Pi den Kontext eines Agenten zwischen Antworten im Cache halten. Eine Änderung gilt, wenn der Anbieter neu startet.",
+  "mobile.server.providers.promptCacheDefault": "Anbieter-Standard",
   "mobile.server.providers.promptCacheHour": "1 Stunde",
   "mobile.server.providers.promptCacheLoadFailed": "Die Prompt-Cache-Dauer dieses Servers konnte nicht geladen werden.",
+  "mobile.server.providers.cacheExpiryCompaction": "Vor Ablauf des Caches komprimieren",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Wenn ein Chat mit 200K oder mehr Tokens Kontext mit einem 1-Stunden-Cache inaktiv ist, komprimiert der Agent den Kontext, bevor der Cache abläuft. Dann liest die nächste Nachricht nicht den ganzen Kontext erneut ohne Cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Die Komprimierungseinstellung dieses Servers konnte nicht geladen werden.",
   "mobile.server.providers.compactWindow": "Chats komprimieren bei",
   "mobile.server.providers.compactWindowHint":
     "Claude Code fasst die älteren Runden eines Chats zusammen, wenn der Chat diese Größe erreicht. Weniger hält Runden schnell und günstig. Mehr behält mehr Details. Ein Modell mit kleinerem Fenster komprimiert an seiner eigenen Grenze.",
@@ -1231,6 +1252,8 @@ export const messages = {
     "ChatGPT nutzt diesen Schlüssel, nicht dein ChatGPT-Abo. OpenAI rechnet jede Anfrage über den Schlüssel ab. Die Nutzung des Abos wird nicht angezeigt.",
   "mobile.server.providers.codexKeyAlternative":
     "Oder melde dich mit einem OpenAI-API-Schlüssel an. OpenAI rechnet jede Anfrage über den Schlüssel ab.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse nutzt diesen Schlüssel, nicht deine Anmeldung. Entferne den Schlüssel, um deine Anmeldung zu nutzen.",
   "mobile.server.providers.sectionUse": "Verwendung",
   "mobile.server.providers.unused": "Kein Agent nutzt ihn",
   "mobile.server.providers.usedByCount": { one: "1 Agent nutzt ihn", other: "{count} Agenten nutzen ihn" },
@@ -1730,4 +1753,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Übertragung nicht angenommen",
   "mobile.server.ownerTransfer.declineFailed": "Übertragung nicht abgelehnt",
   "mobile.server.ownerTransfer.tryAgain": "Versuche es später erneut.",
+  "mobile.server.providers.updateAll": "Alle aktualisieren",
+  "mobile.server.providers.updateAllFailed": "Einige Updates wurden nicht gestartet. Versuche es erneut.",
 } as const satisfies PartialTranslation<typeof source>;

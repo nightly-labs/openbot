@@ -1,5 +1,82 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze zadania uruchamiane równocześnie, konto głosu na żywo, przełącznik pamięci OpenBot, foldery przepływów pracy, typowane odpowiedzi w przepływach pracy i więcej niż 10 kont jednego dostawcy działają tylko wtedy, gdy serwer ma tę wersję.",
+      "Po tej aktualizacji starsza wersja OpenBot nie może otworzyć twoich danych."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agent może podzielić niezwiązaną pracę na zadania uruchamiane równocześnie. Każdy wynik wraca do głównego czatu, a agent łączy wyniki dla ciebie.",
+          "Zobacz wszystkie otwarte wątki agenta na nowej karcie Wątki w panelu bocznym. Karta pokazuje liczbę wątków, które czekają na ciebie.",
+          "Zmień skróty klawiszowe na nowej karcie Klawiatura w Ustawienia. Nowe skróty rozpoczynają wątek i przechodzą do następnego oraz poprzedniego wątku.",
+          "Przepływy pracy otwierają się w kartach, a kroki przepływów pracy mogą przyjmować typowane odpowiedzi. Wpisz {{name}}, aby użyć odpowiedzi w późniejszym kroku.",
+          "Prześlij wideo MP4 lub WebM jako tło okna w Ustawienia > Wygląd.",
+          "Wybierz konto ChatGPT, którego używa głos na żywo GPT, w Ustawienia > Głos."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Dostawca może mieć do 20 kont. Wcześniej limit wynosił 10.",
+          "Dyktowanie nagrywa do 10 minut. Wcześniej zatrzymywało się po 2 minutach.",
+          "Wątek wczytuje starsze wiadomości, gdy przewiniesz blisko góry. Nie musisz klikać przycisku."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Zaplanowana rutyna nie wyłącza się już po cichu, gdy przebieg nie ma nic do zgłoszenia.",
+          "Długi czat zachowuje wszystkie wiadomości, we właściwej kolejności, podczas gdy odpowiedź napływa.",
+          "Połączony numer WhatsApp nie przestaje już odbierać wiadomości, choć nadal pokazuje „Połączono”.",
+          "W systemie Windows agenci OpenCode znów uruchamiają polecenia. Wcześniej często kończyli się błędem „opencode-pty request timed out”.",
+          "Agent, którego wyciszyłeś, nie wysyła już powiadomienia, gdy odpowiada w kanale."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze ustawienia kroków przepływu pracy, Uruchom od tego kroku, przekazanie właściciela, przycisk Aktualizuj wszystkie i wiele poprawek dla agentów działają tylko wtedy, gdy serwer ma tę wersję.",
+      "Po tej aktualizacji starsza wersja OpenBot nie może otworzyć twoich danych."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Rozmawiaj z agentem w trybie „Naciśnij, aby mówić”. Przytrzymaj przycisk mówienia albo klawisz mówienia, gdy mówisz. OpenBot wysyła to, co powiedziałeś, gdy puścisz. Zmień klawisz w Ustawienia > Głos.",
+          "Uruchom przepływ pracy ponownie od jednego kroku. W menu kroku wybierz Uruchom od tego kroku. Kroki przed nim zachowują swoje odpowiedzi i nie uruchamiają się ponownie.",
+          "Zobacz ustawienia i dane wejściowe, które dały wynik kroku przepływu pracy. Wybierz Ustawienia przy kroku, a potem Użyj tych ustawień, aby uruchomić go ponownie w ten sam sposób.",
+          "Przekaż swój serwer innemu kontu OpenBot. W sekcji Ustawienia serwera > Członkowie wpisz e-mail nowego właściciela. Serwer zmienia właściciela, gdy on go przyjmie.",
+          "Zaktualizuj wszystkich dostawców naraz. Ustawienia > Dostawcy pokazuje przycisk Aktualizuj wszystkie, gdy jeden lub więcej dostawców ma aktualizację."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot co godzinę aktualizuje CLI dostawców, które pobrał, gdy dostępna jest nowa wersja. Aktualizacja czeka, aż agenci będą bezczynni.",
+          "Każdy wątek agenta może używać kart przeglądarki, które otworzył główny czat albo inny wątek tego agenta.",
+          "Karta Rutyny zniknęła z paska bocznego. Rutyny nadal działają. Zarządzaj nimi w ustawieniach agenta, na stronie Harmonogram i w sekcji Ustawienia serwera > Rutyny."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Restart po pobraniu aktualizacji czeka teraz, aż agenci będą bezczynni, z przyciskiem Anuluj restart. Wcześniej OpenBot zamykał się od razu i zatrzymywał zadanie agenta.",
+          "Agent nie zostaje już w stanie „pracuje” z czekającymi wiadomościami po restarcie ani po limicie użycia. Zatrzymana tura jest pokazywana jako przerwana, a czekające wiadomości zaczynają działać.",
+          "Zajęty serwer z wieloma agentami i dołączonymi urządzeniami nie wyczerpuje już pamięci i nie zawiesza się, gdy wybiera następną turę.",
+          "Wiadomość wysłana po przerwie nie zostaje już w stanie „Nie wysłano” z komunikatem „Połącz Claude, aby kontynuować.”, gdy Claude jest zalogowany.",
+          "Karty przeglądarki agentów, z których nikt nie korzysta, przestają obciążać procesor po 2 minutach."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

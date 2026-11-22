@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { ConversationMessage, ConversationSnapshot, ImageGenerationInfo } from "@openbot/contracts/ipc";
 import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { perfTimed } from "../perf-probe-hooks";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
 import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
@@ -202,12 +203,9 @@ export class ConversationWriter {
     if (threadId && isDeletedThreadMessage(this.#core.connection, threadId, messageId)) {
       return this.#threadRevision(threadId);
     }
-    const ordinal = threadId ? snapshot.messages.findIndex((message) => message.id === messageId) : -1;
-    if (!threadId || ordinal < 0) {
-      return this.persistConversation(snapshot, input.eventType, input.detail ?? {}, input.commandId).revision;
-    }
-    const message = snapshot.messages[ordinal];
-    if (!message) throw new Error(`Streamed message is missing from the snapshot: ${messageId}`);
+    if (!threadId) return snapshot.revision;
+    const message = snapshot.messages.find((candidate) => candidate.id === messageId);
+    if (!message) return this.#threadRevision(threadId);
     return this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       [
@@ -228,9 +226,12 @@ export class ConversationWriter {
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
         const streamedEvent = { threadId, messageId, eventType: input.eventType };
-        supersedeStreamedMessageEvents(this.#core, streamedEvent, sequence, this.#streamedEvents.get(streamedEvent));
+        perfTimed("db.supersedeStreamed", () =>
+          supersedeStreamedMessageEvents(this.#core, streamedEvent, sequence, this.#streamedEvents.get(streamedEvent)),
+        );
         this.#streamedEvents.set(streamedEvent, sequence);
         const orderBefore = readOrderInputs(db, threadId, [message.id]);
+        const ordinal = storedOrNextOrdinal(db, threadId, message.id);
         this.#core
           .statement(`
           INSERT INTO projection_thread_messages (
@@ -831,6 +832,21 @@ export function keptUnsavedImage(
       ? {}
       : { imageGeneration: { ...(imageGeneration ?? stored), error: stored.error } }),
   };
+}
+
+function storedOrNextOrdinal(db: DatabaseSync, threadId: string, messageId: string): number {
+  const stored = databaseRow(
+    db
+      .prepare("SELECT ordinal FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?")
+      .get(threadId, messageId),
+  );
+  if (stored) return requiredNumberColumn(stored, "ordinal");
+  const next = databaseRow(
+    db
+      .prepare("SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal FROM projection_thread_messages WHERE thread_id = ?")
+      .get(threadId),
+  );
+  return next ? requiredNumberColumn(next, "ordinal") : 0;
 }
 
 function mergeImportedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {

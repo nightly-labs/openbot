@@ -4,6 +4,7 @@ import { currentText } from "@openbot/ui/text";
 import { onCleanup } from "solid-js";
 import type { ChannelsPort } from "../channels/channels-port";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
+import { webChannelFoldersApi } from "./web-agent-settings";
 import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
@@ -93,6 +94,7 @@ export function createWebChannelsPort(
       clearChannelContext: (channelId) => remote.clearChannelContext?.(channelId) ?? unavailable(),
       compactChannelContext: (channelId) => remote.compactChannelContext?.(channelId) ?? unavailable(),
       deleteChannelHistory: (channelId) => remote.deleteHistory?.({ kind: "channel", channelId }) ?? unavailable(),
+      ...(admin ? webChannelFoldersApi(() => admin.request) : {}),
     },
     get eventRoutines() {
       return eventsEnabled() ? eventRoutines : undefined;

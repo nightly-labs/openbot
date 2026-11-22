@@ -135,7 +135,13 @@ tokens. They keep the installed Chromium major version and host platform, and gi
 parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
 Electron sends. The `Accept-Language` header adds the base language of each regional language
 (`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
-a page sets on its own request stays: a site can sign that header. Requests to `accounts.google.com`
+a page sets on its own request stays: a site can sign that header. The header leaves out a system
+language that is not a valid language tag. On Linux, Electron gives `c` for the `C.UTF-8` locale and
+`posix` for `POSIX`, and adds them to `navigator.languages` of each page, where `Intl` throws on them.
+When the system list has such a value, the main process sets `LANGUAGE` at `ready`, before the
+first window, to the valid languages of the list, or to the app locale (`en_US`) when none is valid.
+A `C.UTF-8` server then gives pages `["en-US","en"]`. A list with only valid languages stays as it
+is. Child processes inherit the new `LANGUAGE`. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
@@ -453,10 +459,11 @@ task takes fewer turns.
 
 `run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
 `type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
-`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
-helper sends one step to the host. The script returns a JSON value of at most 64 KB. An `evaluate`
-step gives its value to the script, not to the model, so it can return up to 1 MB, such as the whole
-text of a page.
+`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. `action`
+is the name of a helper in snake_case, such as `select_option`, or `sleep`. Other tools, such as
+`screenshot`, do not work in a script. Each helper sends one step to the host. The script returns
+a JSON value of at most 64 KB. An `evaluate` step gives its value to the script, not to the model,
+so it can return up to 1 MB, such as the whole text of a page.
 
 An earlier `run_steps` tool took a fixed list of steps. A benchmark with Claude Haiku 5.5 on 10 public
 site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 correct answers, and

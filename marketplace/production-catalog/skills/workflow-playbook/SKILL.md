@@ -14,8 +14,8 @@ description: "Track a recurring operations list (shipments, facilities issues, k
 ## Inputs
 
 1. **Tracked items.** First check the signed-in tabs with `openbot_browser.list_tabs`: a spreadsheet, a ticket
-   page or a shared list that the user names. An installed plugin such as Airtable, Notion or Trello also works;
-   find it with `tool_search`. Else ask the user to paste the list or upload a spreadsheet export.
+   page or a shared list that the user names. The tools of an installed plugin such as Airtable, Notion or
+   Trello also work; `openbot.tool_search` does not list them. Else ask the user to paste the list or upload a spreadsheet export.
 2. **Item types.** Use the types the user names. Defaults: `shipment`, `issue`, `date`.
 3. **Owners.** Use the names in the source. Do not assign an owner the source does not give.
 

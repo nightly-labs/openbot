@@ -116,6 +116,33 @@ type RemoteTeamCommandInput =
       downloadSize?: number;
     };
 
+const partialFile = (uri: string) => new File(`${uri}.part`);
+
+function removePartialFile(uri: string) {
+  try {
+    const part = partialFile(uri);
+    if (part.exists) part.delete();
+  } catch {}
+}
+
+async function keepDownloadedFile(uri: string, size: number) {
+  const file = new File(uri);
+  if (file.exists && file.size === size) return removePartialFile(uri);
+  try {
+    const part = partialFile(uri);
+    if (part.size !== size) throw new Error(sourceText("error.remote.downloadIncompleteRetry"));
+    await part.move(file, { overwrite: true });
+  } catch (error) {
+    removePartialFile(uri);
+    throw error;
+  }
+}
+
+function savedTo(result: RemoteTeamCommandResult, uri: string) {
+  const file = isDynamicRecord(result.body) ? result.body.file : undefined;
+  return result.ok && isDynamicRecord(file) && file.ref === uri;
+}
+
 function liveVoiceErrorText(path: string, status: number, body: unknown): string | null {
   if (path === LIVE_VOICE_ROUTES.start && status >= 500) return sourceText("error.voice.live.hostFailed");
   if (path !== LIVE_VOICE_ROUTES.start && path !== LIVE_VOICE_ROUTES.stop) return null;
@@ -182,6 +209,7 @@ export const RemoteTeamTransport = memo(
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
     const downloadListeners = useRef(new Map<string, (received: number, total: number) => void>());
     const uploadFiles = useRef(new Map<string, number>());
+    const downloadFiles = useRef(new Set<string>());
     const enqueue = useCallback(
       (
         next: RemoteTeamCommandInput,
@@ -210,13 +238,33 @@ export const RemoteTeamTransport = memo(
                 }
               : { id, type: "disconnect" };
         const fileRef = command.type === "request" ? command.upload?.file?.ref : undefined;
-        if (!onUploadProgress && !onDownloadProgress && !fileRef) return mailbox.send(command);
+        const saved = command.type === "request" ? command.largeDownload : undefined;
+        const savedFile = saved?.file;
+        if (!onUploadProgress && !onDownloadProgress && !fileRef && !savedFile) return mailbox.send(command);
         if (onUploadProgress) uploadListeners.current.set(id, onUploadProgress);
         if (onDownloadProgress) downloadListeners.current.set(id, onDownloadProgress);
         if (fileRef) uploadFiles.current.set(fileRef, (uploadFiles.current.get(fileRef) ?? 0) + 1);
-        return mailbox.send(command).finally(() => {
+        if (savedFile) downloadFiles.current.add(savedFile);
+        const sent =
+          saved && savedFile
+            ? mailbox.send(command).then(
+                async (result) => {
+                  downloadFiles.current.delete(savedFile);
+                  if (savedTo(result, savedFile)) await keepDownloadedFile(savedFile, saved.maxBytes);
+                  else removePartialFile(savedFile);
+                  return result;
+                },
+                (error: unknown) => {
+                  downloadFiles.current.delete(savedFile);
+                  removePartialFile(savedFile);
+                  throw error;
+                },
+              )
+            : mailbox.send(command);
+        return sent.finally(() => {
           uploadListeners.current.delete(id);
           downloadListeners.current.delete(id);
+          if (savedFile) downloadFiles.current.delete(savedFile);
           if (!fileRef) return;
           const count = (uploadFiles.current.get(fileRef) ?? 1) - 1;
           if (count > 0) uploadFiles.current.set(fileRef, count);
@@ -396,6 +444,10 @@ export const RemoteTeamTransport = memo(
     };
     const [actions] = useState(() => ({
       digestUploadFile: async (ref: string) => uploadFile(ref).digest("SHA-256"),
+      writeDownloadFile: async ({ ref, base64, append }: { ref: string; base64: string; append: boolean }) => {
+        if (!downloadFiles.current.has(ref)) throw new Error("The file is not part of a download.");
+        await partialFile(ref).write(base64, { encoding: "base64", append });
+      },
       readUploadFile: async ({ ref, offset, length }: { ref: string; offset: number; length: number }) => {
         const handle = uploadFile(ref).open(FileMode.ReadOnly);
         try {
@@ -451,7 +503,18 @@ export const RemoteTeamTransport = memo(
         latest.current.props.onDiagnostic?.(step, detail);
       },
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
-      onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
+      onTeamEvents: async (hostId: string, events: RemoteTeamEvent[]) => {
+        const { onTeamEvent } = latest.current.props;
+        let failure: { error: unknown } | null = null;
+        for (const event of events) {
+          try {
+            onTeamEvent(hostId, event);
+          } catch (error) {
+            failure ??= { error };
+          }
+        }
+        if (failure) throw failure.error;
+      },
     }));
 
     return (

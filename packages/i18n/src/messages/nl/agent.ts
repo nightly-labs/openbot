@@ -60,6 +60,7 @@ export const messages = {
   "agent.dock.closeOnLeave": "Sluiten bij klikken ernaast",
   "agent.dock.openInMain": "Openen in het hoofdvenster",
   "agent.dock.openWindow": "Openen in nieuw venster",
+  "agent.dock.openPage": "{title} openen",
   "agent.dock.remove": "Uit het dock verwijderen",
   "agent.dock.send": "Versturen",
   "agent.dock.working": "Bezig…",

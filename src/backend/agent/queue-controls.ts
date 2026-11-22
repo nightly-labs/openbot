@@ -264,7 +264,8 @@ export class QueueControls {
           throw new Error(sourceText("error.backend.steerQueuedOnly"));
         const turnId = snapshot.activeTurnId;
         const turnModel = this.#drain.modelForTurn(agent.id, turnId) ?? agent.model;
-        if (!this.#endpoints.serves(turnModel, client.provider)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+        if (!this.#endpoints.servesClient(turnModel, client.provider, this.#providers.configRevision(client)))
+          throw new Error(REMOVED_ENDPOINT_MESSAGE);
         return { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel };
       },
     );
@@ -284,6 +285,8 @@ export class QueueControls {
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
     const note = steerNoteFor(providerForAgent(agent), context.delivery.sender, context.delivery.text);
+    const routineRun =
+      context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null;
     const turnDeliveries = this.#mailbox
       .findDeliveriesByTurn(agent.id, turnId)
       .filter(({ delivery }) => delivery.id !== input.deliveryId);
@@ -304,16 +307,20 @@ export class QueueControls {
             ...deliveryPromptInput(context, {
               agentNames: agentNamesById(this.#store.list()),
               snapshot,
-              routineRun:
-                context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
+              routineRun: routineRun ?? this.#routines.linkedRunForDelivery(input.deliveryId),
+              skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 context.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(input.deliveryId) : null,
               wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
+              continuesWait:
+                context.delivery.sender.kind === "routine" && this.#routines.continuesWait(input.deliveryId),
               routineTimezone:
                 context.delivery.sender.kind === "routine"
                   ? this.#routines.timezoneForDelivery(input.deliveryId)
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
+              taskReport: this.#drain.taskReport(context),
+              taskReportWaiting: this.#drain.taskReportWaiting(context),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
               liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
               steerFramedAsUser: providerForAgent(agent) === "claude",

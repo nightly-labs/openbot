@@ -51,6 +51,10 @@ import {
   AGENT_ACTIVE_QUEUES_ROUTES,
   decodeAgentActiveQueues,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import {
+  AGENT_ARCHIVED_THREADS_CAPABILITY,
+  AGENT_ARCHIVED_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import {
@@ -157,6 +161,12 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import {
+  decodePendingPromptsResponse,
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+  pendingPromptsWithinLimits,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
+import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -164,6 +174,7 @@ import {
   decodeSideQuestionResponse,
   SIDE_QUESTION_CAPABILITY,
   SIDE_QUESTION_ROUTES,
+  SIDE_QUESTION_THREADS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/side-question-v1";
 import {
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -206,6 +217,7 @@ import {
   decodeRemoteAgentThreadBranches,
   decodeRemoteAgentThreadQueues,
   decodeRemoteAgentThreadRequests,
+  decodeRemoteArchivedAgentTasks,
   decodeRemoteTaskConversation,
   decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
@@ -236,6 +248,7 @@ import {
   parseDeleteChannelMessage,
   parseDeleteConversationMessage,
   parseInterrupt,
+  parseListArchivedAgentTasks,
   parseMarkAgentTaskRead,
   parseMarkConversationRead,
   parseMarkConversationUnread,
@@ -764,7 +777,11 @@ export function agentIpcHandlers({
       askSideQuestion: scopedHandler(parseAskSideQuestion, {
         local: (input) => runCauseEffect(service.askSideQuestion(input)),
         remote: (input, serverId) => {
-          if (!remoteServers.supportsCapability(serverId, SIDE_QUESTION_CAPABILITY))
+          if (
+            !remoteServers.supportsCapability(serverId, SIDE_QUESTION_CAPABILITY) ||
+            (input.taskId !== undefined &&
+              !remoteServers.supportsCapability(serverId, SIDE_QUESTION_THREADS_CAPABILITY))
+          )
             throw new Error(sourceText("error.team.sideQuestionUnsupported"));
           return runCauseEffect(
             remoteServers.request(serverId, SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
@@ -773,6 +790,7 @@ export function agentIpcHandlers({
                 agentId: input.agentId,
                 question: input.question,
                 earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+                ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
               },
               timeoutMs: 150_000,
             }),
@@ -866,7 +884,7 @@ export function agentIpcHandlers({
           if (input.quickAcknowledgement !== undefined) {
             throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
           }
-          if (input.fastMode !== undefined || input.ultrafast !== undefined) {
+          if (input.fastMode !== undefined || input.ultrafast !== undefined || input.memory !== undefined) {
             throw new Error(sourceText("error.agent.settingsLocalOnly"));
           }
           if (input.busyMessageMode !== undefined) {
@@ -1297,6 +1315,18 @@ export function agentIpcHandlers({
         remote: (parsed, serverId) =>
           remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.read, decodeRemoteTaskConversation, agentTaskBody(parsed)),
       }),
+      listArchivedTasks: scopedHandler(parseListArchivedAgentTasks, {
+        local: (input) => service.listArchivedTasks(input),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_ARCHIVED_THREADS_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_ARCHIVED_THREADS_ROUTES.list, decodeRemoteArchivedAgentTasks, {
+              method: "POST",
+              body: { agentId: input.agentId, before: input.before },
+            }),
+          );
+        },
+      }),
       readTaskPage: scopedHandler(parseReadAgentTaskPage, {
         local: (parsed) => service.readTaskPage(parsed),
         remote: (parsed, serverId) => {
@@ -1549,7 +1579,10 @@ export function agentIpcHandlers({
           remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId }),
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
-        local: (parsed) => runCauseEffect(service.respondToPrompt(parsed)),
+        local: (parsed) => {
+          const sender = host.conversationSender();
+          return runCauseEffect(service.respondToPrompt(parsed, { ...(sender ? { sender } : {}), privileged: true }));
+        },
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {
@@ -1579,6 +1612,18 @@ export function agentIpcHandlers({
             remoteServers.request(serverId, PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, {
               method: "POST",
               body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      listPendingPrompts: scopedQueryHandler({
+        local: () => pendingPromptsWithinLimits(service.pendingPrompts()),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PENDING_PROMPTS_CAPABILITY)) return [];
+          return runCauseEffect(
+            remoteServers.request(serverId, PENDING_PROMPTS_ROUTES.list, decodePendingPromptsResponse, {
+              method: "POST",
+              body: {},
             }),
           );
         },

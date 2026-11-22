@@ -27,7 +27,11 @@ import {
   ROUTINE_RUN_COMMAND_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-command-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
-import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import {
+  decodeSideQuestionResponse,
+  SIDE_QUESTION_ROUTES,
+  SIDE_QUESTION_THREADS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { runTeamEffect } from "@openbot/team-client";
@@ -367,7 +371,8 @@ export function createWebConversationRuntime(
       openSharedFile: ({ path }) => files.saveShared(path),
       openWorkspaceFile: ({ agentId, path }) => files.saveWorkspace(agentId, path),
       previewSharedFile: ({ path }) => files.previewShared(path),
-      previewWorkspaceFile: ({ agentId, path }) => files.previewWorkspace(agentId, path),
+      previewWorkspaceFile: ({ agentId, path, exactPath }) =>
+        files.previewWorkspace(agentId, path, exactPath ? { exactPath } : {}),
       respondToBrowserSecret: remote.respondToBrowserSecret
         ? (input) => remote.respondToBrowserSecret?.(input) ?? Promise.resolve()
         : unavailable,
@@ -376,10 +381,15 @@ export function createWebConversationRuntime(
     browser: {
       capturePreview: remote.browserPreview ?? unavailable,
       closePictureInPicture: async () => {},
+      closeWindow: async () => {},
+      focusWindow: async () => {},
       navigate: (input) => remote.navigateBrowserTab(input),
       onPictureInPictureEvent: () => () => {},
+      onWindowEvent: () => () => {},
       open: (input) => remote.openBrowserTab(input),
       openPictureInPicture: unavailable,
+      openWindow: unavailable,
+      publishWindowModel: async () => {},
       reload: (tabId) => remote.reloadBrowserTab(tabId),
       stop: (tabId) => remote.stopBrowserTab(tabId),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
@@ -411,12 +421,19 @@ export function createWebConversationRuntime(
     },
     get askSideQuestion() {
       if (!adminRequest || sideQuestionEnabled?.() !== true) return undefined;
-      return async (input: AskSideQuestionInput) =>
-        adminRequest()("POST", SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
+      return async (input: AskSideQuestionInput) => {
+        if (input.taskId !== undefined && hasCapability?.(SIDE_QUESTION_THREADS_CAPABILITY) !== true)
+          throw new Error(currentText().t("error.team.sideQuestionUnsupported"));
+        return adminRequest()("POST", SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
           agentId: input.agentId,
           question: input.question,
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+          ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
         });
+      };
+    },
+    get sideQuestionThreads() {
+      return hasCapability?.(SIDE_QUESTION_THREADS_CAPABILITY) === true;
     },
     get withdrawFeedback() {
       if (!adminRequest || hasCapability?.(FEEDBACK_WITHDRAW_CAPABILITY) !== true) return undefined;

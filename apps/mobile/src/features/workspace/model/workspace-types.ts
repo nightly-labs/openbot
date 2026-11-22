@@ -10,6 +10,7 @@ import type {
   AgentAnalyticsInput,
   AgentBackupModelSettings,
   AgentBrowserProfile,
+  AgentBuiltinMemorySettings,
   AgentDefaultsOverview,
   AgentExclusionChange,
   AgentFolderBrowse,
@@ -52,6 +53,9 @@ import type {
   BrowserProfileSummary,
   BrowserProxyList,
   BrowserProxySummary,
+  ChannelFolderChange,
+  ChannelFolderInput,
+  ChannelFolderList,
   ClearableStorageCategory,
   ClearBrowserDataInput,
   ConnectorMessagingPlatform,
@@ -84,6 +88,8 @@ import type {
   HostTimezoneSettings,
   HostUpdateSettingsChange,
   HostUpdateStatus,
+  HostVoiceModel,
+  HostVoiceModelChange,
   InstallAgentTemplateInput,
   InstalledSkill,
   InstallMarketplaceAgentInput,
@@ -153,6 +159,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
+  UpdateAgentBuiltinMemoryInput,
   UpdateAgentDefaultsInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
@@ -404,6 +411,9 @@ export interface MobileWorkspaceContextValue {
   canManageServerTimezone: (serverId: string) => boolean;
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  canManageServerVoiceModel: (serverId: string) => boolean;
+  loadServerVoiceModel: (serverId: string) => Promise<HostVoiceModel>;
+  changeServerVoiceModel: (change: HostVoiceModelChange, serverId: string) => Promise<HostVoiceModel>;
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
@@ -630,6 +640,12 @@ export interface MobileWorkspaceContextValue {
   canManageAgentPlanCard: (serverId: string) => boolean;
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  canManageAgentBuiltinMemory: (serverId: string) => boolean;
+  loadAgentBuiltinMemory: (agentId: string, serverId: string) => Promise<AgentBuiltinMemorySettings | null>;
+  updateAgentBuiltinMemory: (
+    input: UpdateAgentBuiltinMemoryInput,
+    serverId: string,
+  ) => Promise<AgentBuiltinMemorySettings>;
   canManageAgentDefaults: (serverId: string) => boolean;
   loadAgentDefaults: (serverId: string) => Promise<AgentDefaultsOverview | null>;
   updateAgentDefaults: (input: UpdateAgentDefaultsInput, serverId: string) => Promise<AgentDefaultsOverview>;
@@ -659,6 +675,11 @@ export interface MobileWorkspaceContextValue {
   excludeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentExclusionChange>;
   includeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentExclusionChange>;
   browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
+  canManageChannelFolders: (serverId: string) => boolean;
+  loadChannelFolders: (channelId: string, serverId: string) => Promise<ChannelFolderList>;
+  addChannelFolder: (input: ChannelFolderInput, serverId: string) => Promise<ChannelFolderChange>;
+  removeChannelFolder: (input: ChannelFolderInput, serverId: string) => Promise<ChannelFolderChange>;
+  browseChannelFolders: (channelId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
   canUseLiveVoice: (serverId: string) => boolean;
   startLiveVoice: (input: LiveVoiceStartRequest, serverId: string) => Promise<LiveVoiceSessionResponse>;
@@ -823,6 +844,7 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageServerVoiceModel"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageMemoryReview"
@@ -866,6 +888,7 @@ type ServerCheckKey =
   | "canManageAgentSkills"
   | "canManageSharedTables"
   | "canManageAgentFolders"
+  | "canManageChannelFolders"
   | "canNestSidebarFolders"
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"
@@ -873,6 +896,7 @@ type ServerCheckKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentBuiltinMemory"
   | "canManageAgentDefaults"
   | "canManageBackgroundProcesses"
   | "canManageAgentInstructions"

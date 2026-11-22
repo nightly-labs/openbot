@@ -345,6 +345,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Brak dostępnych modeli dla tego dostawcy.",
   "mobile.agent.runtime.searchModels": "Szukaj modeli",
   "mobile.agent.runtime.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Żaden model nie pasuje do wyszukiwania. Twoje ustawienia prywatności, dostawców i zabezpieczeń (guardrails) w openrouter.ai mogą ukrywać modele na tej liście.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Ten dostawca nie działa z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby go użyć, najpierw zmień „Uprawnienia”.",
   "mobile.agent.runtime.usageLimit": "Osiągnięto limit użycia",
@@ -432,6 +434,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Pokaż plan przed długimi zadaniami",
   "mobile.agent.planCard.footer":
     "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
+  "mobile.agent.builtinMemory.label": "Pamięć OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "Agent zapisuje i czyta własne wspomnienia. Wyłącz, aby używać tylko aplikacji pamięci, takiej jak Mem0. Zapisane wspomnienia zostają.",
   "mobile.agent.workspace.title": "Folder obszaru roboczego",
   "mobile.agent.workspace.footer": "Folder tego agenta na komputerze hosta.",
   "mobile.agent.advanced.behavior": "Zachowanie",
@@ -525,6 +530,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Ten host nie może publikować agentów ze zdalnego urządzenia.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokeny bez odczytów z pamięci podręcznej",
   "mobile.agent.usage.estimatedCost": "Szacowany koszt",
+  "mobile.agent.usage.noCostEstimate": "Brak szacunku kosztu",
   "mobile.agent.usage.daily": "Dzienne użycie",
   "mobile.agent.usage.tokens": "Tokeny",
   "mobile.agent.usage.cost": "Koszt",
@@ -665,7 +671,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Brak otwartego czatu",
   "mobile.agent.home.noChatOpenBody": "Wybierz czat z listy.",
   "mobile.agent.home.chatListWidth": "Szerokość listy czatów",
-  "mobile.agent.home.serverTitle": "{name}, otwórz serwery",
   "mobile.agent.home.waiting": "Oczekiwanie na połączenie",
   "mobile.agent.home.waitingBody": "Lista agentów wczyta się po połączeniu z tym serwerem.",
   "mobile.agent.home.noAgents": "Brak agentów na tym serwerze",

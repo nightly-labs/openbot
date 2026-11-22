@@ -7,7 +7,7 @@ import {
   relayPageUrl,
 } from "@openbot/contracts/ipc";
 import type { ProviderAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
-import { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import type { providerSignInRelay } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { sourceText } from "@openbot/i18n/source";
 import { runTeamEffect } from "@openbot/team-client";
 import {
@@ -46,6 +46,7 @@ type RelayApi = Pick<
 export function webProviderRelay(
   request: (serverId?: string) => TeamApiRequest,
   accountRelay: () => ProviderAccountRelay | null,
+  providerRelay: (provider: AgentProviderId) => ReturnType<typeof providerSignInRelay>,
 ): RelayApi {
   const relayed = new Map<string, RelayedSignIn>();
   const keyOf = (provider: AgentProviderId, serverId: string) => `${serverId}\n${provider}`;
@@ -104,9 +105,9 @@ export function webProviderRelay(
 
   return {
     startRelaySignIn: (provider, serverId) => {
-      const relayProvider = SIGN_IN_RELAY_PROVIDERS.find((candidate) => candidate === provider);
-      if (!relayProvider) return Promise.reject(new Error(sourceText("error.team.providersUnsupported")));
-      return startRelay(provider, serverId, (send) => startProviderSignInRelay(send, relayProvider));
+      const match = providerRelay(provider);
+      if (!match) return Promise.reject(new Error(sourceText("error.team.providersUnsupported")));
+      return startRelay(provider, serverId, (send) => startProviderSignInRelay(send, match.relay, match.provider));
     },
     startAccountRelaySignIn: ({ provider, accountId }, serverId) => {
       const relay = accountRelay();

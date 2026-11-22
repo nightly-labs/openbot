@@ -309,7 +309,7 @@ export const messages = {
   "connector.whatsapp.linkNumber": "번호 연결",
   "connector.whatsapp.ownNumberNote": "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요.",
   "connector.whatsapp.dedicatedNote":
-    "허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp이 연결된 기기에서 이 컴퓨터를 삭제했어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.helpError":

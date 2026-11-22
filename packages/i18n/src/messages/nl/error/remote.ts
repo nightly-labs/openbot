@@ -24,12 +24,16 @@ export const messages = {
     "De host heeft OpenBot niet toegestaan het scherm op te nemen. Geef toestemming voor schermopname op de host en probeer het opnieuw.",
   "error.remote.windowsSessionDisconnected":
     "De Windows-sessie op de host is verbroken, dus er is geen scherm om te delen. Meld je aan bij Windows op het scherm van de host en probeer het opnieuw.",
+  "error.remote.windowsCaptureDenied":
+    "Windows op de host laat OpenBot het scherm niet opnemen. Ontgrendel Windows op het scherm van de host, sluit elke beheerdersprompt en probeer het opnieuw. Blijft het probleem, start de host dan opnieuw op.",
   "error.remote.macScreenLocked":
     "De Mac is vergrendeld en kan zijn scherm dus niet delen. Ontgrendel de Mac op zijn scherm en probeer het opnieuw.",
   "error.remote.streamTooSlowLowerQuality":
     "De verbinding met de host is te traag voor het beeld. Probeer het opnieuw: de volgende verbinding gebruikt een lagere kwaliteit.",
   "error.remote.streamTooSlow":
     "De verbinding met de host is te traag voor het beeld. Gebruik een sneller netwerk en probeer het opnieuw.",
+  "error.remote.noPictureSwitchEncoder":
+    "De host heeft geen beeld gestuurd. Probeer het opnieuw: de volgende verbinding gebruikt een video-instelling die op meer computers werkt.",
   "error.remote.teamSessionExpired": "De teamsessie is verlopen.",
   "error.remote.finishTestBeforeSwitch": "Rond de test van extern bureaublad af voordat je van beeldscherm wisselt.",
   "error.remote.displayNotFound": "Extern beeldscherm niet gevonden.",
