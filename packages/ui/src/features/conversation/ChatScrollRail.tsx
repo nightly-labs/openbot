@@ -402,6 +402,15 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
     if (index === rail.active) return "active";
     return index < rail.active ? "read" : "unread";
   };
+  const openIndex = createMemo(() => {
+    const key = card()?.key;
+    return key === undefined ? -1 : props.sections().findIndex((section) => section.key === key);
+  });
+  const openDistance = (index: number) => {
+    const open = openIndex();
+    const distance = Math.abs(index - open);
+    return open >= 0 && (distance === 1 || distance === 2) ? String(distance) : undefined;
+  };
 
   return (
     <Show when={rail.shown}>
@@ -442,6 +451,7 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
                     class="chat-scroll-rail-item"
                     data-state={state(index)}
                     data-open={card()?.key === section().key ? "" : undefined}
+                    data-open-distance={openDistance(index)}
                   >
                     <Button
                       variant="link"
