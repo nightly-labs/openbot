@@ -65,6 +65,36 @@ export class ConversationQueries {
 
   readConversation(agentId: string, threadId: string | null): ConversationSnapshot {
     if (!threadId) return { agentId, threadId: null, activeTurnId: null, revision: 0, messages: [] };
+    return this.#snapshot(
+      agentId,
+      threadId,
+      databaseRows(
+        this.#core.connection
+          .prepare(
+            `SELECT message_json FROM projection_thread_messages
+             WHERE thread_id = ? ORDER BY created_at, ordinal, message_id`,
+          )
+          .all(threadId),
+      ),
+    );
+  }
+
+  readTurnConversation(agentId: string, threadId: string, turnId: string): ConversationSnapshot {
+    return this.#snapshot(
+      agentId,
+      threadId,
+      databaseRows(
+        this.#core.connection
+          .prepare(
+            `SELECT message_json FROM projection_thread_messages
+             WHERE thread_id = ? AND turn_id = ? ORDER BY created_at, ordinal, message_id`,
+          )
+          .all(threadId, turnId),
+      ),
+    );
+  }
+
+  #snapshot(agentId: string, threadId: string, rows: DynamicRecord[]): ConversationSnapshot {
     const thread = decodeConversationThreadRow(
       this.#core.connection
         .prepare(
@@ -72,14 +102,6 @@ export class ConversationQueries {
            FROM projection_threads WHERE thread_id = ? AND agent_id = ?`,
         )
         .get(threadId, agentId),
-    );
-    const rows = databaseRows(
-      this.#core.connection
-        .prepare(
-          `SELECT message_json FROM projection_thread_messages
-           WHERE thread_id = ? ORDER BY created_at, ordinal, message_id`,
-        )
-        .all(threadId),
     );
     return {
       agentId,

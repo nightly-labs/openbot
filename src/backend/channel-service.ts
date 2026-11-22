@@ -2169,8 +2169,14 @@ export class ChannelService {
   ): Effect.fn.Return<void, ChannelOperationError> {
     if (this.#scope.state._tag === "Closed") this.#scope = Scope.makeUnsafe();
     this.#stopped = false;
-    for (const context of yield* channelSync(() => this.store.executionThreads()))
-      this.capture(yield* channelSync(() => this.store.database.readConversation(context.id, context.threadId)));
+    const channelAssignments = new Map<string, ChannelAssignment[]>();
+    for (const context of yield* channelSync(() => this.store.executionThreads())) {
+      const assignments =
+        channelAssignments.get(context.channelId) ??
+        (yield* channelSync(() => this.store.assignments(context.channelId)));
+      channelAssignments.set(context.channelId, assignments);
+      yield* channelSync(() => this.#captureAfterRestart(context, assignments));
+    }
     const archived = yield* channelSync(() => this.store.archivedIds());
     for (const channelId of yield* channelSync(() => this.store.ids())) {
       for (let assignment of (yield* channelSync(() => this.store.assignments(channelId))).filter(activeAssignment)) {
@@ -2587,6 +2593,16 @@ export class ChannelService {
     if (assignment?.state !== "completed") return undefined;
     const task = this.store.tasks(channelId).find((item) => item.id === assignment.taskId);
     return task?.state === "completed" && task.revision === assignment.taskRevision ? assignment : undefined;
+  }
+
+  #captureAfterRestart(context: { id: string; threadId: string }, assignments: ChannelAssignment[]): void {
+    const own = assignments.filter((assignment) => assignment.agentId === context.id);
+    if (own.some(activeAssignment)) {
+      this.capture(this.store.database.readConversation(context.id, context.threadId));
+      return;
+    }
+    const turnId = own.findLast((assignment) => assignment.turnId !== null)?.turnId;
+    if (turnId) this.capture(this.store.database.readTurnConversation(context.id, context.threadId, turnId), turnId);
   }
 
   private capture(snapshot: ConversationSnapshot, turnId?: string): boolean {

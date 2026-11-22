@@ -210,6 +210,10 @@ export class OpenBotDatabase {
     return this.#conversations.readConversation(agentId, threadId);
   }
 
+  readTurnConversation(agentId: string, threadId: string, turnId: string): ConversationSnapshot {
+    return this.#conversations.readTurnConversation(agentId, threadId, turnId);
+  }
+
   readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
     return this.#conversations.readTurnAssistantMessages(agentId, turnId);
   }
