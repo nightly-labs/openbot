@@ -697,12 +697,16 @@
   height: var(--openbot-icon-xs);
 }
 
-.wfn-run-pill .wfn-run-credits-icon,
-.wfn-composer-generate .wfn-run-credits-icon {
+.credit-icon.wfn-run-credits-icon {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.wfn-run-credits-icon .credit-star {
   fill: currentcolor;
 }
 
-.wfn-stage .wfn-run-pill[aria-busy="true"] svg {
+.wfn-stage .wfn-run-pill[aria-busy="true"] :is(svg, .wfn-run-credits-icon) {
   display: none;
 }
 
@@ -2488,11 +2492,6 @@ fieldset.wfn-picker-group {
   overflow: visible;
   border-color: transparent;
   background: var(--wfn-glass);
-  cursor: default;
-}
-
-.wfn-strip-take:hover {
-  scale: 1;
 }
 
 .wfn-take-ring {
@@ -2591,12 +2590,6 @@ fieldset.wfn-picker-group {
   border-inline-start: 1px solid var(--wfn-ring-strong);
   color: var(--openbot-text-secondary);
   font-variant-numeric: tabular-nums;
-}
-
-.wfn-media-retry .wfn-media-retry-price svg {
-  width: var(--openbot-icon-xs);
-  height: var(--openbot-icon-xs);
-  fill: currentcolor;
 }
 
 :is(.wfn-menu-icon, .wfn-picker-tile, .wfn-node, .wfn-minimap-node)[data-kind="text"] {

@@ -180,6 +180,7 @@ import {
   decodeBusyMessageModePreference,
   decodeCentralAuthState,
   decodeChatWindowTargets,
+  decodeCreditsState,
   decodeCustomAgentCheckResult,
   decodeCustomAgentResult,
   decodeCustomAgents,
@@ -1147,6 +1148,11 @@ const openbotApi: OpenBotDesktopApi = {
     setUsers: decodeLicenseState,
     changePlan: decodeLicenseState,
     setRenewal: decodeLicenseState,
+  }),
+  credits: bridgeGroup(IPC_ENDPOINTS.credits, {
+    getState: decodeCreditsState,
+    openCheckout: decodeVoid,
+    transfer: decodeCreditsState,
   }),
   hostedServers: bridgeGroup(IPC_ENDPOINTS.hostedServers, {
     lifecycle: decodeVoid,

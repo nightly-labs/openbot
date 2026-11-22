@@ -83,6 +83,8 @@ export interface WorkflowImageModel {
   voices?: boolean;
   aspects?: readonly WorkflowMediaAspect[];
   durations?: readonly number[];
+  defaultDuration?: number;
+  frameCount?: number;
   resolutions?: readonly string[];
   transparent?: boolean;
   options?: readonly WorkflowMediaOption[];
@@ -102,6 +104,7 @@ export interface WorkflowCatalogs {
   channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
   mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
+  creditBalance?: number | null | undefined;
   mediaSize?: boolean | undefined;
   agentFiles?: boolean | undefined;
   answers?: boolean | undefined;

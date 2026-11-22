@@ -26,6 +26,7 @@ import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/fe
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { CreditIcon } from "../credits/CreditIcon";
 
 interface RailMenuItem {
   label: string;
@@ -309,6 +310,36 @@ function mediaCreditsTone(row: MediaCreditsRailRow) {
   return row.available > 0 ? "neutral" : "critical";
 }
 
+const EXACT_CREDITS_LIMIT = 10_000;
+
+function CreditsRailButton(props: { balance: number | undefined; current: boolean; onOpen: () => void }) {
+  const { t, format } = useText();
+  const amount = (credits: number) =>
+    credits < EXACT_CREDITS_LIMIT
+      ? format.number(credits, { maximumFractionDigits: 0, roundingMode: "trunc" })
+      : format.number(credits, { notation: "compact", maximumFractionDigits: 1, roundingMode: "trunc" });
+  const balance = () => props.balance;
+  const label = () => {
+    const credits = balance();
+    return credits === undefined
+      ? t("app.rail.credits")
+      : t("app.rail.creditsBalance", { count: credits, amount: format.number(credits) });
+  };
+  const layout = () => (balance() === undefined ? "credit-rail-icon" : "credit-rail-icon window-rail-credits");
+  return (
+    <RailButton label={label()} class={layout()} current={props.current} onClick={props.onOpen}>
+      <span class="credit-rail-tile">
+        <CreditIcon />
+      </span>
+      <Show when={balance() !== undefined}>
+        <span class="window-rail-credits-count" data-empty={(balance() ?? 0) <= 0 ? "" : undefined} aria-hidden="true">
+          {amount(balance() ?? 0)}
+        </span>
+      </Show>
+    </RailButton>
+  );
+}
+
 function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
   const { t, format } = useText();
   const percent = () => mediaCreditsPercent(props.row);
@@ -387,6 +418,7 @@ export type PageRailPage =
   | "providers"
   | "crm"
   | "marketplace"
+  | "credits"
   | "settings";
 
 export const PAGE_RAIL_PINNABLE_PAGES = [
@@ -420,6 +452,8 @@ export interface PageRailProps {
   onCrm?: ((button: HTMLElement) => void) | undefined;
   onCrmConnectors?: ((button: HTMLElement) => void) | undefined;
   onMarketplace?: (() => void) | undefined;
+  onCredits?: (() => void) | undefined;
+  creditBalance?: number | undefined;
   onSettings: (button: HTMLElement) => void;
   settingsNotice?: string | undefined;
   help: JSX.Element;
@@ -680,6 +714,15 @@ export function PageRail(props: PageRailProps) {
           <For each={props.mediaCredits ?? []} keyed={(row) => row.key}>
             {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
           </For>
+          <Show when={props.onCredits}>
+            {(onCredits) => (
+              <CreditsRailButton
+                balance={props.creditBalance}
+                current={props.current === "credits"}
+                onOpen={() => onCredits()()}
+              />
+            )}
+          </Show>
           <Show when={props.onMarketplace}>
             {(onMarketplace) => (
               <RailButton
