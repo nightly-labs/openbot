@@ -288,6 +288,8 @@ export const messages = {
     "De processor van deze computer kan deze aanbieder niet uitvoeren. Gebruik een andere aanbieder.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode kon de database niet openen, omdat een nieuwere versie van OpenCode deze heeft gewijzigd. Werk OpenCode bij naar versie 2 of nieuwer en probeer het opnieuw.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok is niet gestart, omdat de instelling allowed_models in de configuratie het standaardmodel niet bevat. Voeg het standaardmodel toe aan allowed_models, of verwijder allowed_models, en probeer het daarna opnieuw.",
   "error.provider.opencodeNoAnswer":
     "Het OpenCode-model beëindigde de beurt zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.opencodeReasoningWithoutAnswer":

@@ -205,6 +205,8 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
 const ILLEGAL_INSTRUCTION = /\(signal SIGILL\)/u;
+const GROK_DEFAULT_MODEL_NOT_ALLOWED =
+  /\(your default\) isn't allowed by allowed_models\b|\bNone of your models are allowed by allowed_models\b/u;
 const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "grok",
   "opencode",
@@ -3076,6 +3078,10 @@ export class ProviderRuntime implements ProviderPort {
       return new AgentProcessExitError(sourceText("error.provider.opencodeDatabaseNewer"), null, { cause: detailed });
     if (CODEX_STATE_BUSY.test(detailed.message))
       return new AgentProcessExitError(sourceText("error.provider.codexStateBusy"), null, { cause: detailed });
+    if (GROK_DEFAULT_MODEL_NOT_ALLOWED.test(detailed.message))
+      return new AgentProcessExitError(sourceText("error.provider.grokDefaultModelNotAllowed"), null, {
+        cause: detailed,
+      });
     if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
     if (reportsMissingProcessorFeature(detailed.message, ILLEGAL_INSTRUCTION.test(error.message)))

@@ -303,6 +303,8 @@ export const messages = {
     "Le processeur de cet ordinateur ne peut pas exécuter ce fournisseur. Utilisez un autre fournisseur.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode n’a pas pu ouvrir sa base de données, car une version plus récente d’OpenCode l’a modifiée. Mettez OpenCode à jour vers la version 2 ou ultérieure, puis réessayez.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok n’a pas démarré, car le paramètre allowed_models de sa configuration n’inclut pas son modèle par défaut. Ajoutez le modèle par défaut à allowed_models, ou supprimez allowed_models, puis réessayez.",
   "error.provider.opencodeNoAnswer":
     "Le modèle OpenCode a terminé le tour sans réponse. Réessayez ou choisissez un autre modèle.",
   "error.provider.opencodeReasoningWithoutAnswer":
