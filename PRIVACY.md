@@ -1579,6 +1579,9 @@ message. The answers go from the computer to the Slack Web API directly.
   files from its workspace or the OpenBot shared directory to a channel that OpenBot is a member of,
   and list those channels' names. A new post can ping a user that it mentions, never a channel,
   `@here`, `@everyone` or a user group.
+  In answers, status posts and posts, redacted means that text in a known key format, such as an
+  API key, a token or a private key, is removed. A password that the agent writes, also a saved
+  one, is sent as written. Approval requests have all known secrets and email addresses removed.
 
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
 agents work. The agents run on the host with the access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,

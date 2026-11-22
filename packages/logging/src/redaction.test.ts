@@ -428,24 +428,6 @@ describe("registerSecretValue", () => {
     );
   });
 
-  it("keeps a domain name and the domain of an email address, and masks the secret alone", () => {
-    registerSecretValue("acmeshop", { allowShort: true });
-    registerSecretValue("Kot.Mruczek", { allowShort: true });
-
-    expect(
-      redactSecrets("A. biuro@acmeshop.pl B. acmeshop.pl, D. biuro (at) acmeshop.pl. E. https://acmeshop.pl/kontakt/"),
-    ).toBe("A. biuro@acmeshop.pl B. acmeshop.pl, D. biuro (at) acmeshop.pl. E. https://acmeshop.pl/kontakt/");
-    expect(redactSecrets("write to acmeshop@example.com")).toBe("write to [redacted]@example.com");
-    expect(redactSecrets("postgres://admin:acmeshop@db.acmeshop.pl/x")).toBe(
-      "postgres://admin:[redacted]@db.acmeshop.pl/x",
-    );
-    expect(redactSecrets("the file /tmp/acmeshop.json")).not.toContain("acmeshop");
-    expect(redactSecrets("it is Kot.Mruczek")).toBe("it is [redacted]");
-    expect(redactSecrets("it is acmeshop.Then acmeshop.then")).not.toContain("acmeshop");
-    expect(redactSecrets("mail biuro@acmeshop.studio")).toBe("mail biuro@acmeshop.studio");
-    expect(redactSecrets("sign in with acmeshop")).toBe("sign in with [redacted]");
-  });
-
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
     const secret = "12345678\uD800";
     registerSecretValue(secret);

@@ -6,5 +6,3 @@
   in a known key format, such as an API key, a private key or a token. A password that you ask your
   agent for is shown. A joined server sends the chat posts of its agents, so the server must also be
   on this version.
-- Email addresses and site names stay readable in a Pi agent's chat and in chat history that agents
-  read when a saved password is part of the site name.
