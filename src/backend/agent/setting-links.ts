@@ -1,4 +1,9 @@
-import { SETTING_LINK_IDS, type SettingLinkId } from "@openbot/contracts/ipc";
+import {
+  AGENT_PERMISSION_LEVELS,
+  type AgentPermissionLevel,
+  SETTING_LINK_IDS,
+  type SettingLinkId,
+} from "@openbot/contracts/ipc";
 
 interface SettingLinkEntry {
   title: string;
@@ -337,6 +342,24 @@ export interface SettingLinkSummary {
 export function settingLinkSummary(id: SettingLinkId): SettingLinkSummary {
   const { title, place, about } = SETTING_LINKS[id];
   return { id, title, place, about };
+}
+
+const ACCESS_LEVEL_NAMES: Record<AgentPermissionLevel, string> = {
+  workspace: "Workspace only",
+  ask: "Ask first",
+  full: "Full access",
+};
+
+export function agentAccessSummary(
+  summary: SettingLinkSummary,
+  levels: readonly AgentPermissionLevel[],
+): SettingLinkSummary {
+  if (summary.id !== "agent.access" || levels.length === AGENT_PERMISSION_LEVELS.length) return summary;
+  const choices = levels.map((level) => ACCESS_LEVEL_NAMES[level]).join(" or ");
+  return {
+    ...summary,
+    about: `What the agent can do without approval. The provider of this agent offers only ${choices}.`,
+  };
 }
 
 const terms = (text: string) =>

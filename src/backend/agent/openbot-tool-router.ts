@@ -53,6 +53,7 @@ import type {
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import {
+  type AgentPermissionLevel,
   agentAccessRank,
   agentComputerUseEnabled,
   agentMemoryEnabled,
@@ -220,7 +221,14 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
-import { searchChatPlaces, searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
+import {
+  agentAccessSummary,
+  type SettingLinkSummary,
+  searchChatPlaces,
+  searchServerPlaces,
+  searchSettingLinks,
+  settingLinkSummary,
+} from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -1674,6 +1682,19 @@ export class OpenBotToolRouter {
     return agent === undefined || agentMemoryEnabled(agent);
   }
 
+  #permissionLevel(agent: AgentSummary): AgentPermissionLevel {
+    return agentPermissionLevel({
+      access: workspaceAccessEnforced(agent) ? "workspace" : "full",
+      autoApprove: this.#approvalAutomation.autoApproves(agent.id),
+    });
+  }
+
+  #settingForCaller(summary: SettingLinkSummary, callerId: string): SettingLinkSummary {
+    const caller = this.#hooks.listAgents().find((candidate) => candidate.id === callerId);
+    if (!caller) return summary;
+    return agentAccessSummary(summary, agentPermissionLevels(caller.provider, this.#permissionLevel(caller)));
+  }
+
   #requireAgent(agentId: string): AgentSummary {
     const agents = this.#hooks.listAgents();
     const agent = agents.find((candidate) => candidate.id === agentId);
@@ -1711,10 +1732,7 @@ export class OpenBotToolRouter {
       skillsError = error instanceof Error ? error.message : String(error);
     }
     const access = workspaceAccessEnforced(agent) ? "workspace" : "full";
-    const permissions = agentPermissionLevel({
-      access,
-      autoApprove: this.#approvalAutomation.autoApproves(agent.id),
-    });
+    const permissions = this.#permissionLevel(agent);
     return {
       id: agent.id,
       name: agent.name,
@@ -2381,7 +2399,7 @@ export class OpenBotToolRouter {
       if (!isRecord(args) || !isString(args.setting)) throw new Error("setting must be a setting id or words.");
       const setting = args.setting.trim();
       if (!isSettingLinkId(setting)) {
-        const matches = searchSettingLinks(setting);
+        const matches = searchSettingLinks(setting).map((match) => this.#settingForCaller(match, senderAgentId));
         const serverPlaces = searchServerPlaces(setting);
         const chatPlaces = searchChatPlaces(setting);
         const found = matches.length > 0 || serverPlaces.length > 0 || chatPlaces.length > 0;
@@ -2411,7 +2429,7 @@ export class OpenBotToolRouter {
             : `No setting matches. ${apps} For a setting, try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.`,
         });
       }
-      const shown = settingLinkSummary(setting);
+      const shown = this.#settingForCaller(settingLinkSummary(setting), senderAgentId);
       this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
         itemType: settingLinkItemType(setting),
         text: sourceText("status.agent.settingShown", { setting: shown.title }),
