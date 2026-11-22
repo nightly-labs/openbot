@@ -532,6 +532,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "현재 제공자 세션에서는 이 설정을 사용할 수 없어요.",
   "error.provider.sessionSettingInvalid": "이 설정에 사용할 수 없는 값이에요.",
   "error.provider.sessionSettingsBusy": "세션 설정을 변경하기 전에 현재 턴이 끝날 때까지 기다려 주세요.",
+  "error.provider.sessionSettingsTimedOut": "에이전트 세션이 제시간에 응답하지 않았어요. 다시 시도하세요.",
   "error.provider.piOutdated":
     "Pi {version}이(가) 너무 오래되었어요. 네이티브 RPC 및 MCP 지원을 위해 Pi 1.1.0 이상을 설치하세요.",
   "error.provider.nativeMissing": "{provider} CLI가 설치되어 있지 않아요. 설정에서 다운로드하세요.",

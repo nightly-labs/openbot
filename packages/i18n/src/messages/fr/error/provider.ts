@@ -559,6 +559,7 @@ export const messages = {
     "Ce réglage n’est pas disponible dans la session actuelle du fournisseur.",
   "error.provider.sessionSettingInvalid": "Cette valeur n’est pas disponible pour ce réglage.",
   "error.provider.sessionSettingsBusy": "Attendez la fin du tour en cours avant de modifier un réglage de session.",
+  "error.provider.sessionSettingsTimedOut": "La session de l’agent n’a pas répondu à temps. Réessayez.",
   "error.provider.piOutdated":
     "Pi {version} est trop ancien. Installez Pi 1.1.0 ou une version ultérieure pour la prise en charge native de RPC et MCP.",
   "error.provider.nativeMissing": "La CLI {provider} n’est pas installée. Téléchargez-la dans les Réglages.",

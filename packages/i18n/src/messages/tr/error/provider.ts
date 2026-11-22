@@ -541,6 +541,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Bu ayar mevcut sağlayıcı oturumunda kullanılamıyor.",
   "error.provider.sessionSettingInvalid": "Bu değer bu ayar için kullanılamıyor.",
   "error.provider.sessionSettingsBusy": "Bir oturum ayarını değiştirmeden önce mevcut turun bitmesini bekleyin.",
+  "error.provider.sessionSettingsTimedOut": "Ajanın oturumu zamanında yanıt vermedi. Tekrar deneyin.",
   "error.provider.piOutdated": "Pi {version} çok eski. Yerel RPC ve MCP desteği için Pi 1.1.0 veya sonrasını yükleyin.",
   "error.provider.nativeMissing": "{provider} CLI yüklü değil. Ayarlar'dan indirin.",
   "error.provider.nativeNotStarted": "{provider} CLI başlatılamadı.",

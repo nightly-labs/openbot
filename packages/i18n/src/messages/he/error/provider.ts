@@ -503,6 +503,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "ההגדרה הזו אינה זמינה בסשן הנוכחי של הספק.",
   "error.provider.sessionSettingInvalid": "הערך הזה אינו זמין עבור ההגדרה.",
   "error.provider.sessionSettingsBusy": "יש להמתין לסיום הפעולה הנוכחית לפני שינוי הגדרת סשן.",
+  "error.provider.sessionSettingsTimedOut": "הסשן של הסוכן לא הגיב בזמן. יש לנסות שוב.",
   "error.provider.piOutdated": "Pi {version} ישן מדי. יש להתקין Pi 1.1.0 ומעלה לתמיכה מקורית ב-RPC וב-MCP.",
   "error.provider.nativeMissing": "ה-CLI של {provider} אינו מותקן. יש להוריד אותו בהגדרות.",
   "error.provider.nativeNotStarted": "לא ניתן להפעיל את ה-CLI של {provider}.",
