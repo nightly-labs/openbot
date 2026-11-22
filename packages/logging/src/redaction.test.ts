@@ -441,6 +441,9 @@ describe("registerSecretValue", () => {
     expect(redactPostText("https://x.example/cb?next=%2Fa%3Ftoken%3Dmt4f9a2c7e1b3d5f60%26b%3D1")).toBe(
       "https://x.example/cb?next=%2Fa%3Ftoken%3D[redacted]%26b%3D1",
     );
+    expect(redactPostText("git clone https://mt4f9a2c7e1b3d5f60@git.example.com/repo.git")).toBe(
+      "git clone https://[redacted]@git.example.com/repo.git",
+    );
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {

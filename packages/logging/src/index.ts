@@ -127,7 +127,12 @@ function endsWithPercentEscape(value: string, end: number): boolean {
   return PERCENT_ESCAPE_BEFORE.test(value.slice(Math.max(0, end - 3), end));
 }
 
+function isLinkUser(value: string, start: number, end: number): boolean {
+  return value.charAt(end) === "@" && value.slice(Math.max(0, start - 3), start) === "://";
+}
+
 function isWholeToken(value: string, start: number, end: number): boolean {
+  if (isLinkUser(value, start, end)) return true;
   if (start > 0 && POST_TOKEN_CHARACTER.test(value.charAt(start - 1)) && !endsWithPercentEscape(value, start))
     return false;
   return SENTENCE_DOTS.test(POST_TOKEN_TAIL.exec(value.slice(end))?.[0] ?? "");
