@@ -198,7 +198,6 @@ export class MessagingService {
   readonly #stops: Map<string, StopButton>;
   readonly #settleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #finalFailures = new Map<string, number>();
-  readonly #lostAnswers = new Set<string>();
   readonly #chains = new Map<string, Deferred.Deferred<void>>();
   readonly #recent = new Set<string>();
   readonly #unsubscribe: Array<() => void> = [];
@@ -1967,7 +1966,7 @@ export class MessagingService {
           const cause = failure instanceof MessagingOperationFailed ? failure.cause : null;
           const partlySent = cause instanceof WhatsAppAnswerPartlySent;
           if ((partlySent ? cause.cause : cause) instanceof WhatsAppRefusedError) {
-            if (final.answer || this.#lostAnswers.has(key)) this.#noteUndelivered(key, final.answer && partlySent);
+            if (final.answer || final.replacesAnswer) this.#noteUndelivered(key, final.answer && partlySent);
             return yield* this.#forgetPost(key, post);
           }
           const quiet = final.answer && this.#quietEnd(live.record.connectionId, post.target);
@@ -1976,10 +1975,14 @@ export class MessagingService {
           this.#finalFailures.set(key, failures);
           let current = post;
           if (final.answer) {
-            this.#lostAnswers.add(key);
             current = {
               ...post,
-              final: { answer: false, text: quiet ? "" : sourceText("status.messaging.failed"), reaction: null },
+              final: {
+                answer: false,
+                text: quiet ? "" : sourceText("status.messaging.failed"),
+                reaction: null,
+                replacesAnswer: true,
+              },
             };
             this.#posts.set(key, current);
             yield* this.#status.save();
@@ -2009,7 +2012,6 @@ export class MessagingService {
     post: StatusPost,
   ) {
     this.#finalFailures.delete(key);
-    this.#lostAnswers.delete(key);
     if (this.#posts.get(key) === post) this.#posts.delete(key);
     if (post.stopToken) this.#stops.delete(post.stopToken);
     yield* this.#status.save();
