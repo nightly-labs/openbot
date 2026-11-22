@@ -1,9 +1,9 @@
 const FIRE_AT_TTL_SHARE = 0.9;
 const LATE_LIMIT_MS = 60_000;
-export const CACHE_EXPIRY_COMPACTION_MIN_TOKENS = 200_000;
-export const CACHE_EXPIRY_COMPACTION_MIN_TTL_MS = 60 * 60_000;
+const CACHE_EXPIRY_COMPACTION_MIN_TOKENS = 200_000;
+const CACHE_EXPIRY_COMPACTION_MIN_TTL_MS = 60 * 60_000;
 
-export interface CacheExpiryCompactionOptions {
+interface CacheExpiryCompactionOptions {
   usedTokens(threadId: string): number | null;
   start(agentId: string, threadId: string): void;
   delayMs?: number | undefined;

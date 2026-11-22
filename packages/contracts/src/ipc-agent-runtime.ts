@@ -134,7 +134,7 @@ function isRuntimePathList(value: unknown): value is string[] {
   );
 }
 
-export const AGENT_CONTEXT_COMPACTION_REASONS = ["cacheExpiry"] as const;
+const AGENT_CONTEXT_COMPACTION_REASONS = ["cacheExpiry"] as const;
 export type AgentContextCompactionReason = (typeof AGENT_CONTEXT_COMPACTION_REASONS)[number];
 
 export const AGENT_CONTEXT_CATEGORIES = [
