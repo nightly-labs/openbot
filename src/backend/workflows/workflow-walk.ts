@@ -108,6 +108,7 @@ export function nextActions(
   const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const reasons = { before, loops, latest };
   const due = new Set<string>();
+  const thisRound = new Set<string>();
   const actions: WalkAction[] = [];
   for (const nodeId of graphOrder(graph.nodes, forward, scope)) {
     const current = latest.get(nodeId);
@@ -123,8 +124,10 @@ export function nextActions(
       const source = latest.get(edge.from);
       return source !== undefined && edgeActive(edge, source) && newer(edge);
     });
-    if (current && !nextPass && !ahead.some(newer)) continue;
+    const inputChanges = ahead.some((edge) => newer(edge) || thisRound.has(edge.from));
+    if (current && !nextPass && !inputChanges) continue;
     due.add(nodeId);
+    if (!current || inputChanges) thisRound.add(nodeId);
     if (ahead.some((edge) => due.has(edge.from) || isWaiting(latest.get(edge.from)))) continue;
     const outside = (before.get(nodeId) ?? []).length > edges.length;
     const answered = edges.some((edge) => {

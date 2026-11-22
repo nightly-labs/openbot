@@ -382,6 +382,7 @@ export const messages = {
     "Alleen de OpenBot-app op de telefoon kan dit rapport sturen, omdat die de versie en het ondersteuningslog van de telefoon toevoegt. Open deze chat op de telefoon. Zie je dit bericht daar, werk dan de telefoon-app bij.",
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
+  "error.backend.apiKeyListFailed": "OpenBot kon de opgeslagen API-sleutels niet lezen.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
   "error.backend.apiKeyAnswerUnreadable":

@@ -373,6 +373,7 @@ export const messages = {
     "Этот отчёт может отправить только приложение OpenBot на телефоне: оно добавляет версию и журнал поддержки телефона. Откройте этот чат на телефоне. Если вы видите это сообщение там, обновите приложение на телефоне.",
   "error.backend.takeoverInactive": "Этот перехват браузера больше не активен.",
   "error.backend.authSubmitting": "Отправка аутентификации уже выполняется.",
+  "error.backend.apiKeyListFailed": "OpenBot не удалось прочитать сохранённые ключи API.",
   "error.backend.apiKeySaveFailed": "OpenBot не удалось сохранить ключ API. Повторите попытку.",
   "error.backend.apiKeySaving": "Ключ API уже сохраняется.",
   "error.backend.apiKeyAnswerUnreadable":

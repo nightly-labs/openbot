@@ -383,6 +383,7 @@ export const messages = {
     "このレポートを送信できるのは OpenBot のスマートフォンアプリだけです。スマートフォンのバージョンとサポートログを追加するためです。スマートフォンでこのチャットを開いてください。そこでもこのメッセージが表示される場合は、スマートフォンアプリを更新してください。",
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
+  "error.backend.apiKeyListFailed": "保存された API キーを読み込めませんでした。",
   "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",
   "error.backend.apiKeySaving": "API キーはすでに保存中です。",
   "error.backend.apiKeyAnswerUnreadable":

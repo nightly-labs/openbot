@@ -373,6 +373,7 @@
     "test:codex-capacity-retry": "bun scripts/codex-capacity-retry-e2e.ts",
     "test:codex-usage-reset": "bun scripts/codex-usage-reset-e2e.ts",
     "test:usage-read-pacing": "bun scripts/usage-read-pacing-e2e.ts",
+    "test:usage-limit-idle-recheck": "bun scripts/usage-limit-idle-recheck-e2e.ts",
     "test:routine-fresh-session": "bun scripts/routine-fresh-session-e2e.ts",
     "test:routine-report-failure": "bun scripts/routine-report-failure-e2e.ts",
     "test:routine-skipped-runs-report": "bun scripts/routine-skipped-runs-report-e2e.ts",

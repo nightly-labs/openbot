@@ -336,6 +336,7 @@ export const messages = {
     "只有 OpenBot 手机应用可以发送这份报告，因为它会附上手机的版本和支持日志。请在手机上打开此对话。如果在手机上也看到这条消息，请更新手机应用。",
   "error.backend.takeoverInactive": "该浏览器接管已不再有效。",
   "error.backend.authSubmitting": "身份验证正在提交中。",
+  "error.backend.apiKeyListFailed": "OpenBot 无法读取已保存的 API 密钥。",
   "error.backend.apiKeySaveFailed": "OpenBot 无法保存 API 密钥，请重试。",
   "error.backend.apiKeySaving": "API 密钥正在保存中。",
   "error.backend.apiKeyAnswerUnreadable":

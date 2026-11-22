@@ -288,6 +288,8 @@ export const messages = {
     "Bu bilgisayarın işlemcisi bu sağlayıcıyı çalıştıramıyor. Başka bir sağlayıcı kullanın.",
   "error.provider.opencodeDatabaseNewer":
     "Daha yeni bir OpenCode sürümü veritabanını değiştirdiği için OpenCode veritabanını açamadı. OpenCode'u 2 veya daha yeni bir sürüme güncelleyin, sonra yeniden deneyin.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok başlamadı, çünkü yapılandırmasındaki allowed_models ayarı varsayılan modelini içermiyor. Varsayılan modeli allowed_models listesine ekleyin veya allowed_models ayarını kaldırın, sonra yeniden deneyin.",
   "error.provider.opencodeNoAnswer":
     "OpenCode modeli turu yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.opencodeReasoningWithoutAnswer":

@@ -352,6 +352,7 @@ export const messages = {
     "רק אפליקציית OpenBot לטלפון יכולה לשלוח את הדיווח הזה, כי היא מוסיפה את גרסת הטלפון ואת יומן התמיכה. יש לפתוח את הצ'אט הזה בטלפון. אם ההודעה הזו מופיעה שם, יש לעדכן את אפליקציית הטלפון.",
   "error.backend.takeoverInactive": "השתלטות הדפדפן הזו אינה פעילה עוד.",
   "error.backend.authSubmitting": "שליחת האימות כבר מתבצעת.",
+  "error.backend.apiKeyListFailed": "OpenBot לא הצליח לקרוא את מפתחות ה-API השמורים.",
   "error.backend.apiKeySaveFailed": "OpenBot לא הצליח לשמור את מפתח ה-API. יש לנסות שוב.",
   "error.backend.apiKeySaving": "מפתח ה-API כבר נשמר.",
   "error.backend.apiKeyAnswerUnreadable":

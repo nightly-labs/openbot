@@ -277,6 +277,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cpuUnsupported": "The processor of this computer cannot run this provider. Use a different provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode could not open its database because a newer OpenCode version changed it. Update OpenCode to version 2 or later, then try again.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok did not start because the allowed_models setting in its config does not include its default model. Add the default model to allowed_models, or remove allowed_models, then try again.",
   "error.provider.opencodeNoAnswer":
     "The OpenCode model ended the turn with no answer. Try again, or choose another model.",
   "error.provider.opencodeReasoningWithoutAnswer":

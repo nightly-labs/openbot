@@ -158,6 +158,10 @@ const LAUNCH_START_CONCURRENCY = 2;
 const SIGN_IN_FILE_POLL_MS = 2_000;
 const SIGN_IN_RECHECK_DELAYS_MS: readonly number[] = [5_000, 10_000, 20_000];
 
+function releasedUsageKey(provider: AgentProvider, model: string): string {
+  return `${provider}\u0000${model}`;
+}
+
 function signInFileVersion(paths: readonly string[]): string {
   return paths
     .map((path) => {
@@ -182,7 +186,8 @@ function userMustFixStart(reason: string | null | undefined): reason is string {
     reason === sourceText("error.provider.realtimeLimitZero") ||
     reason === sourceText("error.provider.cpuUnsupported") ||
     reason === sourceText("error.provider.geminiSettingsUnreadable") ||
-    reason === sourceText("error.provider.geminiAccountSettingsUnreadable")
+    reason === sourceText("error.provider.geminiAccountSettingsUnreadable") ||
+    reason === sourceText("error.provider.grokDefaultModelNotAllowed")
   );
 }
 const CODEX_SERVICE_UNREACHABLE = new Set([
@@ -201,6 +206,8 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
 const ILLEGAL_INSTRUCTION = /\(signal SIGILL\)/u;
+const GROK_DEFAULT_MODEL_NOT_ALLOWED =
+  /\(your default\) isn't allowed by allowed_models\b|\bNone of your models are allowed by allowed_models\b/u;
 const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "grok",
   "opencode",
@@ -369,6 +376,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   readonly #usageUnreported = new Set<AgentProvider>();
   readonly #usageGates = new Map<AgentProvider, UsageReadGate>();
+  readonly #releasedUsage = new Map<string, { gate: UsageReadGate; usage: AccountUsage }>();
   readonly #customAgentUsage = new Map<string, { prompt: string; text: string | null; readAt: number }>();
   readonly #customAgentUsageLock = Semaphore.makeUnsafe(1);
   #idleCheck: NodeJS.Timeout | null = null;
@@ -1011,22 +1019,10 @@ export class ProviderRuntime implements ProviderPort {
             const codexType = provider === "codex" ? this.#accounts.get(provider)?.type : undefined;
             if (codexType === "apiKey" || codexType === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) return null;
             const released = this.#released.has(provider) && !this.#clients.has(provider);
-            const cli = this.#cli.get(provider);
             const accounts = ProviderAccounts.support(provider);
-            if (
-              released &&
-              !this.#usageUnreported.has(provider) &&
-              cli &&
-              accounts &&
-              !isKeyAccountSupport(accounts) &&
-              !accounts.usageLeavesSession
-            ) {
-              usage = yield* Effect.acquireUseRelease(
-                this.#authenticateClient(provider, cli, { interruptibleStart: true }),
-                ({ client }) => this.#refreshUsage(client, defaultUsageModel(provider), false),
-                ({ client }) =>
-                  client.stop().pipe(Effect.ignore, Effect.andThen(this.#hooks.onClientStopped(client)), Effect.ignore),
-              ).pipe(deadline);
+            const releasedCli = this.#releasedUsageCli(provider);
+            if (releasedCli) {
+              usage = yield* this.#readReleasedUsage(provider, releasedCli, defaultUsageModel(provider)).pipe(deadline);
             } else {
               const kept = released ? this.#lastUsage.get(provider) : undefined;
               if (kept && !usageWindowHasReset(kept)) return kept;
@@ -1107,12 +1103,73 @@ export class ProviderRuntime implements ProviderPort {
         .usageFor(scope.provider, account.id, scope.model)
         .pipe(toProviderOperationFailed);
     const client = this.#clients.get(scope.provider);
-    if (!client) return { limits: [] };
+    const releasedCli = client ? undefined : this.#releasedUsageCli(scope.provider);
+    const read = client
+      ? this.#refreshUsage(client, scope.model, false)
+      : releasedCli
+        ? this.#pacedReleasedUsage(
+            scope.provider,
+            scope.model,
+            this.#readReleasedUsage(scope.provider, releasedCli, scope.model).pipe(deadline),
+          )
+        : undefined;
+    if (!read) return { limits: [] };
     return yield* this.#usageGate(scope.provider).unlessWaiting({
-      read: this.#refreshUsage(client, scope.model, false),
+      read,
       waiting: (): AccountUsage => ({ limits: [] }),
     });
   }).bind(this);
+
+  #releasedUsageCli(provider: AgentProvider): AgentCliInfo | undefined {
+    const cli = this.#cli.get(provider);
+    const accounts = ProviderAccounts.support(provider);
+    const codexType = provider === "codex" ? this.#accounts.get(provider)?.type : undefined;
+    return this.#released.has(provider) &&
+      !this.#clients.has(provider) &&
+      !this.#usageUnreported.has(provider) &&
+      agentProviderDescriptor(provider).reportsUsage &&
+      codexType !== "apiKey" &&
+      codexType !== CODEX_MODEL_PROVIDER_ACCOUNT_TYPE &&
+      accounts &&
+      !isKeyAccountSupport(accounts) &&
+      !accounts.usageLeavesSession
+      ? cli
+      : undefined;
+  }
+
+  #pacedReleasedUsage<E, R>(
+    provider: AgentProvider,
+    model: string,
+    read: Effect.Effect<AccountUsage, E, R>,
+  ): Effect.Effect<AccountUsage, E, R> {
+    const key = releasedUsageKey(provider, model);
+    const paced = this.#releasedUsage.get(key) ?? { gate: new UsageReadGate(), usage: { limits: [] } };
+    this.#releasedUsage.set(key, paced);
+    return paced.gate.run({
+      read: read.pipe(
+        Effect.tap((usage) =>
+          Effect.sync(() => {
+            paced.usage = usage;
+          }),
+        ),
+      ),
+      kept: () => structuredClone(paced.usage),
+    });
+  }
+
+  readonly #readReleasedUsage = Effect.fn("ProviderRuntime.readReleasedUsage")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    cli: AgentCliInfo,
+    model: string | undefined,
+  ) {
+    return yield* Effect.acquireUseRelease(
+      this.#authenticateClient(provider, cli, { interruptibleStart: true }),
+      ({ client }) => this.#refreshUsage(client, model, false),
+      ({ client }) =>
+        client.stop().pipe(Effect.ignore, Effect.andThen(this.#hooks.onClientStopped(client)), Effect.ignore),
+    );
+  });
 
   readonly accountUsage = Effect.fn("ProviderRuntime.accountUsage")(function* (this: ProviderRuntime) {
     const providers = (this.status().providers ?? [])
@@ -1290,6 +1347,8 @@ export class ProviderRuntime implements ProviderPort {
     this.#usageGate(provider).reset();
     this.#lastUsage.delete(provider);
     this.#ownResetCredits.delete(provider);
+    for (const key of [...this.#releasedUsage.keys()])
+      if (key.startsWith(releasedUsageKey(provider, ""))) this.#releasedUsage.delete(key);
   }
 
   #usageGate(provider: AgentProvider): UsageReadGate {
@@ -3020,6 +3079,10 @@ export class ProviderRuntime implements ProviderPort {
       return new AgentProcessExitError(sourceText("error.provider.opencodeDatabaseNewer"), null, { cause: detailed });
     if (CODEX_STATE_BUSY.test(detailed.message))
       return new AgentProcessExitError(sourceText("error.provider.codexStateBusy"), null, { cause: detailed });
+    if (GROK_DEFAULT_MODEL_NOT_ALLOWED.test(detailed.message))
+      return new AgentProcessExitError(sourceText("error.provider.grokDefaultModelNotAllowed"), null, {
+        cause: detailed,
+      });
     if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
     if (reportsMissingProcessorFeature(detailed.message, ILLEGAL_INSTRUCTION.test(error.message)))

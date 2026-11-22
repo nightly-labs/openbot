@@ -267,6 +267,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "המעבד של המחשב הזה לא יכול להריץ את הספק הזה. השתמש בספק אחר.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode לא הצליח לפתוח את מסד הנתונים שלו כי גרסה חדשה יותר של OpenCode שינתה אותו. יש לעדכן את OpenCode לגרסה 2 ומעלה ואז לנסות שוב.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok לא הופעל כי ההגדרה allowed_models בקובץ התצורה שלו לא כוללת את מודל ברירת המחדל שלו. הוסיפו את מודל ברירת המחדל ל-allowed_models, או הסירו את allowed_models, ואז נסו שוב.",
   "error.provider.opencodeNoAnswer": "מודל OpenCode סיים את הפעולה בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",

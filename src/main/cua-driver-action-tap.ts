@@ -310,6 +310,7 @@ export class CuaDriverActionTap {
   #now: () => number;
   #logger: Logger;
   #onAccessibilityRefused: (() => void) | null = null;
+  #onToolCall: (() => void) | null = null;
 
   constructor(now: () => number = Date.now, logger: Logger = defaultLogger) {
     this.#now = now;
@@ -318,6 +319,10 @@ export class CuaDriverActionTap {
 
   onAccessibilityRefused(listener: () => void): void {
     this.#onAccessibilityRefused = listener;
+  }
+
+  onToolCall(listener: () => void): void {
+    this.#onToolCall = listener;
   }
 
   get address(): string | null {
@@ -425,6 +430,7 @@ export class CuaDriverActionTap {
           const at = this.#now();
           const { tool, list, action, pointer } = readRequest(line, at, (windowId) => this.#screenshotWidth(windowId));
           answers.expect(list ? "list" : tool === null ? null : { tool, at });
+          if (tool !== null) this.#onToolCall?.();
           if (action) this.#action = action;
           if (pointer) this.#pointer = pointer === "unplaced" ? null : pointer;
         }

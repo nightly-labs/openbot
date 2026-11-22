@@ -113,6 +113,7 @@ interface MessagingPostPing {
 }
 
 export interface MessagingOutbound {
+  keysUnreadable(connectionId: string): boolean;
   places(connectionId: string): Effect.Effect<{ places: MessagingPlace[]; note?: string } | { error: string }>;
   history(
     connectionId: string,
@@ -329,6 +330,10 @@ export class MessagingThreads {
 
   setOutbound(outbound: MessagingOutbound | null): void {
     this.#outbound = outbound;
+  }
+
+  keysUnreadable(connectionId: string): boolean {
+    return this.#outbound?.keysUnreadable(connectionId) === true;
   }
 
   setMentionHandler(

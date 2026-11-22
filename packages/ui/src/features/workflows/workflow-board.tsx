@@ -93,6 +93,11 @@ export interface WfnResult {
   branch?: string;
 }
 
+export interface WfnPending {
+  id: string;
+  at: string;
+}
+
 export const resultValue = (result: WfnResult | undefined) => (result?.failed ? undefined : result?.value);
 
 export interface WfnEdge {
@@ -202,6 +207,7 @@ export interface WfnBoard {
   progress: (id: string) => WorkflowAgentProgress | undefined;
   error: (id: string) => string | undefined;
   retry?: ((id: string) => void) | undefined;
+  retryResult?: ((id: string, result: string) => void) | undefined;
   catalogs: () => WorkflowCatalogs;
   features: () => WorkflowFeatures | undefined;
   github: () => WorkflowGitHubCanvas | undefined;
@@ -224,7 +230,9 @@ export interface WfnBoard {
   stretch: (id: string) => WfnStretch;
   resetSize?: ((id: string) => void) | undefined;
   results: (id: string) => readonly WfnResult[];
+  pending: (id: string) => readonly WfnPending[];
   shown: (id: string) => WfnResult | undefined;
+  newest: (id: string) => WfnResult | undefined;
   pick: (id: string, result: string) => void;
   record: (id: string, value: string, run?: number) => void;
   recordFailure: (id: string, message: string, run?: number) => void;
@@ -270,6 +278,7 @@ export interface BoardOptions {
   progress?: (id: string) => WorkflowAgentProgress | undefined;
   error?: (id: string) => string | undefined;
   retry?: (id: string) => void;
+  retryResult?: (result: string) => void;
   runFrom?: (id: string) => void;
   schedule?: (id: string) => RoutineSchedule | undefined;
   setSchedule?: (id: string, schedule: RoutineSchedule) => void;
@@ -289,6 +298,7 @@ export interface BoardOptions {
   focus?: () => string | null;
   results?: Record<string, readonly WfnResult[]> | undefined;
   resultsOf?: (id: string) => readonly WfnResult[];
+  pendingOf?: (id: string) => readonly WfnPending[];
   fields?: Record<string, WfnFields> | undefined;
   features?: () => WorkflowFeatures | undefined;
   github?: () => WorkflowGitHubCanvas | undefined;
@@ -423,6 +433,10 @@ export function inCanvas(root: Element | undefined, element: Element | null): bo
 }
 
 const NO_ANSWER_PROBLEMS: readonly WorkflowAnswerProblem[] = [];
+
+const NO_PENDING: readonly WfnPending[] = [];
+
+export const showsStrip = (board: WfnBoard, id: string) => board.results(id).length + board.pending(id).length > 1;
 
 export function createBoard(options: BoardOptions) {
   const { t } = useText();
@@ -753,6 +767,15 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  const unpick = (id: string) =>
+    setState((draft) => {
+      delete draft.picked[id];
+    });
+  const retryResultOf = (retry: (result: string) => void) => (id: string, result: string) => {
+    unpick(id);
+    retry(result);
+  };
+
   const add = (id: string, value: string, run: number | undefined, failed: boolean) => {
     const result: WfnResult = { id: crypto.randomUUID(), at: new Date().toISOString(), value };
     if (run !== undefined) result.run = run;
@@ -863,12 +886,16 @@ export function createBoard(options: BoardOptions) {
     progress: (id) => options.progress?.(id),
     error: (id) => options.error?.(id),
     retry: options.retry,
+    retryResult: options.retryResult && retryResultOf(options.retryResult),
     runFrom: options.runFrom,
     schedule: (id) => options.schedule?.(id),
     setSchedule: (id, schedule) => options.setSchedule?.(id, schedule),
     endScheduleEdit: () => options.endScheduleEdit?.(),
     rotateWebhookSecret: options.rotateWebhookSecret,
-    runStep: (id) => options.runStep?.(id),
+    runStep: (id) => {
+      unpick(id);
+      options.runStep?.(id);
+    },
     stopStep: options.stopStep,
     running: () => options.running?.() ?? false,
     toolbarBelow: (id, bar) => options.toolbarBelow?.(id, bar) ?? false,
@@ -882,6 +909,7 @@ export function createBoard(options: BoardOptions) {
     stretch: (id) => options.stretch?.(id) ?? "x",
     resetSize: options.resetSize,
     results: (id) => resultsOf(id),
+    pending: (id) => options.pendingOf?.(id) ?? NO_PENDING,
     shown: (id) => {
       const latest = latestOf(id);
       const picked = state.picked[id];
@@ -889,6 +917,7 @@ export function createBoard(options: BoardOptions) {
       if (!stillNewest) return latest;
       return resultsOf(id).find((result) => result.id === picked.result) ?? latest;
     },
+    newest: latestOf,
     pick: (id, result) => {
       const newest = latestOf(id)?.id;
       setState((draft) => {

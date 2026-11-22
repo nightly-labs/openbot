@@ -58,6 +58,7 @@ const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_WAIT_LIMIT_MS = 60_000;
 const REDIRECT_LIMIT = 3;
 const CDN_HOSTS = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
+const POSSIBLY_POSTED_CODES = new Set(["unreachable", "invalid_answer", "discord_failed"]);
 
 const { io: adapterIo } = causeHelpers(MessagingAdapterError);
 
@@ -250,6 +251,33 @@ class DiscordAdapter implements MessagingAdapter {
       if (Result.isFailure(attempt) || !attempt.success) skipped.push(file.name);
     }
     return { skipped, firstId: null };
+  });
+
+  readonly postFileWithText = Effect.fnUntraced(function* (
+    this: DiscordAdapter,
+    target: MessageTarget,
+    markdown: string,
+    file: MessagingAnswerFile,
+  ) {
+    const chunks = chunkMarkdown(markdown, CHUNK_CHARACTERS);
+    const content = chunks.length === 1 ? (chunks[0] ?? "") : "";
+    if (!content.trim()) return null;
+    const bytes = yield* readAtMost(file.path, DISCORD_UPLOAD_BYTES_LIMIT).pipe(
+      Effect.catch(() => Effect.succeed(null)),
+    );
+    if (bytes === null || bytes.byteLength === 0) return null;
+    return yield* this.#call(
+      {
+        op: "upload",
+        guildId: this.#guildId,
+        channelId: target.platformChannelId,
+        replyTo: target.replyThreadId,
+        filename: file.name,
+        content,
+      },
+      decodeDiscordMessageId,
+      { bytes, mimeType: file.mimeType },
+    ).pipe(Effect.catch((failure) => (refusedBeforePost(failure.cause) ? Effect.succeed(null) : Effect.fail(failure))));
   });
 
   readonly history = Effect.fnUntraced(function* (
@@ -551,6 +579,10 @@ function compareSnowflakes(left: string, right: string): number {
 }
 
 function ignoreAnswer(): void {}
+
+function refusedBeforePost(cause: unknown): boolean {
+  return cause instanceof DiscordApiError && !POSSIBLY_POSTED_CODES.has(cause.code) && !cause.code.startsWith("http_5");
+}
 
 function trustedCdnUrl(value: string): boolean {
   try {

@@ -124,6 +124,7 @@ import {
   MOD_KEY,
   type PortRef,
   resizeCursor,
+  showsStrip,
   takesKeys,
   type WfnAnchor,
   type WfnEdge,
@@ -180,6 +181,7 @@ import {
   union,
 } from "./workflow-ink";
 import { workflowLoops } from "./workflow-loops";
+import { mediaTakes } from "./workflow-media-step";
 import { mergeWorkflowGraphs } from "./workflow-merge";
 import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
 import {
@@ -226,7 +228,7 @@ export interface WorkflowCanvasProps {
   agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
   onGraphChange: (graph: WorkflowGraph) => void;
   onRun: (input: { fromNodeId?: string }) => void;
-  onRunStep: (nodeId: string) => void;
+  onRunStep: (nodeId: string, takes?: number) => void;
   onStopStep: (stepId: string) => void;
   onStopRun: (runId: string) => void;
   onRetry: (stepId: string) => void;
@@ -589,7 +591,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const at = positions[id];
       const rendered = slotSizes[id];
       if (!at || !rendered) return undefined;
-      const strip = board.results(id).length > 1 ? STRIP_ROOM / camera.scale : 0;
+      const strip = showsStrip(board, id) ? STRIP_ROOM / camera.scale : 0;
       return { ...at, width: rendered.width, height: rendered.height + strip };
     },
     loops: () => loops(),
@@ -605,6 +607,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
     error: (id) => runIndex().get(id)?.error,
     resultsOf: (id) => runIndex().get(id)?.results ?? [],
+    pendingOf: (id) => (kindOf(id) === "image" ? (runIndex().get(id)?.pending ?? []) : []),
     duplicate: (id) => duplicateNodes([id]),
     resetSize: (id) => resetSize(id),
     beforeChange: () => commit(),
@@ -614,6 +617,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const step = stepOf(id);
       if (step) props.onRetry(step);
     },
+    retryResult: (result) => props.onRetry(result),
     runFrom: (id) => props.onRun({ fromNodeId: id }),
     schedule: (id) => nodes().find((node) => node.id === id)?.schedule,
     setSchedule: (id, schedule) => {
@@ -627,10 +631,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       scheduleEdit = undefined;
     },
     rotateWebhookSecret: untrack(() => props.onRotateWebhookSecret),
-    runStep: (id) => props.onRunStep(id),
+    runStep: (id) => runNode(id),
     stopStep: (id) => {
-      const step = stepOf(id);
-      if (step) props.onStopStep(step);
+      const pending = runIndex().get(id)?.pending ?? [];
+      if (pending.length === 0) {
+        const step = stepOf(id);
+        if (step) props.onStopStep(step);
+        return;
+      }
+      for (const take of pending) props.onStopStep(take.id);
     },
     running,
     toolbarBelow: (id, bar) => toolbarBelow(id, bar),
@@ -2173,7 +2182,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const blocked = (area: Box) =>
       area.y < top || area.y + area.height > bottom || hud.some((other) => overlaps(area, other));
     const above = zone(box.y - (TOOLBAR_GAP / camera.scale + height));
-    const room = board.results(id).length > 1 ? STRIP_ROOM : TOOLBAR_GAP;
+    const room = showsStrip(board, id) ? STRIP_ROOM : TOOLBAR_GAP;
     const below = zone(box.y + box.height + room / camera.scale);
     if (blocked(above)) return !blocked(below);
     if (!onNode(above)) return false;
@@ -2369,8 +2378,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   const runNode = (id: string) => {
     if (kindOf(id) === "trigger") props.onRun({ fromNodeId: id });
-    else props.onRunStep(id);
+    else props.onRunStep(id, takesOf(id));
   };
+  const takesOf = (id: string) => (kindOf(id) === "image" ? mediaTakes(board.field(id, "batch")) : 1);
 
   const showNode = (id: string) => {
     const entry = groupIndex().get(id);
@@ -3584,7 +3594,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 {(id) => (
                   <>
                     <Show when={runnable(id())}>
-                      <ContextMenu.Item onSelect={() => runNode(id())}>
+                      <ContextMenu.Item onSelect={() => board.runStep(id())}>
                         <Play aria-hidden="true" />
                         <span class="wfn-menu-text">
                           {kindOf(id()) === "trigger"

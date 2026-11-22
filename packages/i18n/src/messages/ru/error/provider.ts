@@ -281,6 +281,8 @@ export const messages = {
     "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode не смог открыть свою базу данных, потому что её изменила более новая версия OpenCode. Обновите OpenCode до версии 2 или новее и повторите попытку.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok не запустился, потому что параметр allowed_models в его настройках не включает его модель по умолчанию. Добавьте модель по умолчанию в allowed_models или удалите allowed_models, затем повторите попытку.",
   "error.provider.opencodeNoAnswer":
     "Модель OpenCode завершила ход без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.opencodeReasoningWithoutAnswer":
