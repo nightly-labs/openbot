@@ -313,6 +313,7 @@
     "./team-protocol/thread-message-search-v1": "./src/team-protocol/thread-message-search-v1.ts",
     "./team-protocol/agent-waits-v1": "./src/team-protocol/agent-waits-v1.ts",
     "./team-protocol/message-pins-v1": "./src/team-protocol/message-pins-v1.ts",
+    "./team-protocol/agent-archived-threads-v1": "./src/team-protocol/agent-archived-threads-v1.ts",
     "./team-protocol/agent-queue-task-v1": "./src/team-protocol/agent-queue-task-v1.ts",
     "./team-protocol/background-processes-v1": "./src/team-protocol/background-processes-v1.ts",
     "./team-protocol/routines-once-v1": "./src/team-protocol/routines-once-v1.ts",

@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "채팅에서 열기",
   "conversation.threads.archive": "보관",
   "conversation.threads.archived": "보관됨",
+  "conversation.threads.archivedOlder": "이전 스레드 보기",
   "conversation.threads.restore": "복원",
   "conversation.threads.deleteUndo.title": "{title}을(를) 삭제했어요",
   "conversation.threads.hold.threadLimit": {

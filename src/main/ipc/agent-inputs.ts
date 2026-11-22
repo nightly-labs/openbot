@@ -32,6 +32,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAgentTaskLimit,
+  isArchivedAgentTasksCursor,
   isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
@@ -41,6 +42,7 @@ import {
   isProviderAccountId,
   isReasoningEffort,
   isRoutineSchedule,
+  type ListArchivedAgentTasksInput,
   type ListChannelRoutineRunsInput,
   type ListRoutineRunsInput,
   type MarkAgentTaskReadInput,
@@ -626,6 +628,16 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     taskId: requireString(value.taskId, "taskId"),
+  };
+}
+
+export function parseListArchivedAgentTasks(value: unknown): ListArchivedAgentTasksInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  if (value.before !== null && !isArchivedAgentTasksCursor(value.before))
+    throw new Error("Invalid archived thread place.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    before: value.before === null ? null : { updatedAt: value.before.updatedAt, threadId: value.before.threadId },
   };
 }
 

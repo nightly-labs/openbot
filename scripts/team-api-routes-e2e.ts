@@ -92,6 +92,10 @@ import {
   AGENT_ACTIVE_QUEUES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import {
+  AGENT_ARCHIVED_THREADS_CAPABILITY,
+  AGENT_ARCHIVED_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
+import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
@@ -1788,6 +1792,31 @@ const fakeAgentTasks: TeamApiAgentTasks = {
     return { agentId, tasks: [task("task-queued", queue), asking], limit: 10 };
   },
   readTask: unused("readTask"),
+  listArchivedTasks: (input) => {
+    record("listArchivedTasks", input);
+    return {
+      tasks: [
+        {
+          id: "task-archived",
+          agentId: input.agentId,
+          threadId: "thread-task-archived",
+          origin: "agent",
+          title: "Archived thread",
+          state: "closed",
+          outcome: "completed",
+          hold: null,
+          activeTurnId: null,
+          progress: null,
+          error: null,
+          queuedMessages: [],
+          createdAt: "2026-11-01T07:00:00.000Z",
+          updatedAt: "2026-11-01T08:00:00.000Z",
+          closedAt: "2026-11-01T08:00:00.000Z",
+        },
+      ],
+      hasMore: input.before === null,
+    };
+  },
   readTaskPage: (input) => {
     record("readTaskPage", input);
     return {
@@ -7467,6 +7496,79 @@ try {
         errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("readTaskPage").length === 1,
       [summary(hidden), summary(missing)],
+    );
+  }
+
+  {
+    const capabilities = [AGENT_ARCHIVED_THREADS_CAPABILITY];
+    const v10 = { capabilities, protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises agent-archived-threads-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_ARCHIVED_THREADS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_ARCHIVED_THREADS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const first = { agentId: "agent-ada", before: null };
+    const unsupported = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, json: first });
+    check(
+      "the archived thread route without the capability gets 400 threadRemoteUnsupported, and reads nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("listArchivedTasks").length === 0,
+      summary(unsupported),
+    );
+    const page = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, ...v10, json: first });
+    const next = {
+      agentId: "agent-ada",
+      before: { updatedAt: "2026-11-01T08:00:00.000Z", threadId: "thread-task-archived" },
+    };
+    const after = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, ...v10, json: next });
+    const tasks = list(field(page.body, "tasks"));
+    check(
+      "a member reads the archived threads page by page: the host gets the place, and answers archived tasks and hasMore",
+      page.status === 200 &&
+        tasks.length === 1 &&
+        field(tasks[0], "id") === "task-archived" &&
+        field(tasks[0], "state") === "closed" &&
+        field(page.body, "hasMore") === true &&
+        after.status === 200 &&
+        field(after.body, "hasMore") === false &&
+        isDeepStrictEqual(callsOf("listArchivedTasks"), [[first], [next]]),
+      [summary(page), summary(after), callsOf("listArchivedTasks")],
+    );
+    const extra = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { ...first, limit: 100 },
+    });
+    const noPlace = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada" },
+    });
+    const badPlace = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", before: { updatedAt: "2026-11-01T08:00:00.000Z", threadId: "" } },
+    });
+    check(
+      "the frozen codec refuses an unknown field, a missing place, and a place with an empty thread id",
+      extra.status === 400 &&
+        noPlace.status === 400 &&
+        badPlace.status === 400 &&
+        callsOf("listArchivedTasks").length === 2,
+      [summary(extra), summary(noPlace), summary(badPlace)],
+    );
+    const missing = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { ...first, agentId: "agent-none" },
+    });
+    check(
+      "an unknown agent gets 404 and reads nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) && callsOf("listArchivedTasks").length === 2,
+      summary(missing),
     );
   }
 

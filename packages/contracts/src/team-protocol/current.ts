@@ -6,6 +6,7 @@ import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
+import { AGENT_ARCHIVED_THREADS_CAPABILITY } from "./agent-archived-threads-v1";
 import { AGENT_BACKGROUND_WORK_CAPABILITY } from "./agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
 import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "./agent-builtin-memory-v1";
@@ -799,6 +800,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [STORAGE_WORKFLOW_FILES_CAPABILITY, V10],
   [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
   [CHANNEL_FOLDERS_CAPABILITY, V10],
+  [AGENT_ARCHIVED_THREADS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

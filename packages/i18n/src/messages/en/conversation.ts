@@ -80,6 +80,7 @@ export const messages = defineMessages("conversation", {
   "conversation.threads.toChat": "Open in the chat",
   "conversation.threads.archive": "Archive",
   "conversation.threads.archived": "Archived",
+  "conversation.threads.archivedOlder": "Show older threads",
   "conversation.threads.restore": "Restore",
   "conversation.threads.deleteUndo.title": "{title} deleted",
   "conversation.threads.hold.threadLimit": {

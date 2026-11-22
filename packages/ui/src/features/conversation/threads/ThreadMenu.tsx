@@ -100,6 +100,7 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
 
 export function ThreadMenu(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
   const { t, format } = useText();
+  let archivedMenu: HTMLDivElement | undefined;
   return (
     <DropdownMenu.Root placement="bottom-start" gutter={4}>
       <ThreadMenuTrigger {...props} />
@@ -113,7 +114,7 @@ export function ThreadMenu(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
             <DropdownMenu.Separator />
             <ThreadMenuList {...props} />
           </Show>
-          <Show when={props.archived.length > 0}>
+          <Show when={props.archived.length > 0 || props.olderArchived}>
             <DropdownMenu.Separator />
             <DropdownMenu.Sub>
               <DropdownMenu.SubTrigger>
@@ -122,7 +123,12 @@ export function ThreadMenu(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
                 <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
               </DropdownMenu.SubTrigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.SubContent class="ui-action-menu agent-context-menu agent-context-submenu agent-threads-archived">
+                <DropdownMenu.SubContent
+                  ref={(element: HTMLDivElement) => {
+                    archivedMenu = element;
+                  }}
+                  class="ui-action-menu agent-context-menu agent-context-submenu agent-threads-archived"
+                >
                   <For each={props.archived}>
                     {(thread) => (
                       <DropdownMenu.Item
@@ -136,6 +142,21 @@ export function ThreadMenu(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
                       </DropdownMenu.Item>
                     )}
                   </For>
+                  <Show when={props.olderArchived}>
+                    {(older) => (
+                      <DropdownMenu.Item
+                        class="agent-threads-menu-item"
+                        closeOnSelect={false}
+                        disabled={older().loading}
+                        onSelect={() => {
+                          archivedMenu?.focus();
+                          props.onShowOlderArchived?.();
+                        }}
+                      >
+                        {t("conversation.threads.archivedOlder")}
+                      </DropdownMenu.Item>
+                    )}
+                  </Show>
                 </DropdownMenu.SubContent>
               </DropdownMenu.Portal>
             </DropdownMenu.Sub>
