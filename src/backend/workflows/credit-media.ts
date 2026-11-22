@@ -130,7 +130,7 @@ function chosen<T>(values: readonly T[], value: T, fallback: T | null): T | null
   return fallback !== null && values.includes(fallback) ? fallback : (values[0] ?? null);
 }
 
-export function creditJobRequest(
+function creditJobRequest(
   model: CreditMediaModel,
   request: Pick<CreditMediaRequest, "prompt" | "specs">,
   jobId: string,
@@ -157,7 +157,7 @@ interface UploadPick {
   role: CreditMediaInputRole;
 }
 
-export function creditUploadPicks(model: CreditMediaModel, images: CreditMediaRequest["images"]): UploadPick[] {
+function creditUploadPicks(model: CreditMediaModel, images: CreditMediaRequest["images"]): UploadPick[] {
   const ofRole = (role: MediaPictureRole) =>
     images.filter((image) => image.role === role).map((image) => image.attachmentId);
   const frames = model.kind === "video" ? model.frames : 0;

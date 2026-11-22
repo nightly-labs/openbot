@@ -4,7 +4,7 @@ import { sourceText } from "@openbot/i18n/source";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
-export function previewCreditsState(): CreditsState {
+function previewCreditsState(): CreditsState {
   return {
     available: true,
     currency: "eur",

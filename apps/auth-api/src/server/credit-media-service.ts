@@ -57,7 +57,7 @@ const NOT_ACCEPTED_STATUSES = new Set([401, 402, 403, 429]);
 
 export type CreditMediaPayer = { wallet: "personal"; userId: string } | { wallet: "server"; serverId: string };
 
-export interface CreditMediaInput {
+interface CreditMediaInput {
   role: CreditMediaInputRole;
   bytes: Uint8Array;
   mimeType: string;
