@@ -96,7 +96,12 @@ export function isCodexThreadInUse(error: unknown): boolean {
 }
 
 function isForeignReasoningError(message: string): boolean {
-  return /\bencrypted_content\b.*\bnot issued to this caller\b/i.test(message);
+  return (
+    /\bencrypted_content\b.*\bnot issued to this caller\b/i.test(message) ||
+    /\binvalid_encrypted_content\b/.test(message) ||
+    /\bencrypted[ _]content\b.*\bcould not be (?:verified|decrypted)\b/i.test(message) ||
+    /\bcould not decrypt the provided encrypted_content\b/i.test(message)
+  );
 }
 
 function isBlankHistoryText(message: string): boolean {
