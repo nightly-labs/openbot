@@ -26,7 +26,7 @@ export type CreditJobCheck =
   | { status: "running" }
   | { status: "completed"; charged?: number }
   | { status: "failed" | "canceled" };
-export type CreditJobChecker = (providerJobId: string) => Effect.Effect<CreditJobCheck, Failure>;
+export type CreditJobChecker = (providerJobId: string, jobId: string) => Effect.Effect<CreditJobCheck, Failure>;
 
 export interface CreditHoldInput {
   jobId: string;
@@ -378,7 +378,7 @@ export class CreditSpending {
           .all<DueRow>(),
       );
       for (const row of due.results) {
-        const check = yield* Effect.exit(checkJob(row.provider_job_id));
+        const check = yield* Effect.exit(checkJob(row.provider_job_id, row.job_id));
         const result = Exit.isSuccess(check) ? checkResult(check.value) : null;
         if (result) {
           yield* this.settle(row.job_id, result);

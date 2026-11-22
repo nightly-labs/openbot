@@ -722,6 +722,72 @@ async function fakeUpstreamFlow() {
       logs.every((line) => !line.includes(API_KEY) && !line.includes("lighthouse") && !line.includes("upstream.test")),
     { logs: logs.length },
   );
+
+  const trail = database
+    .prepare(
+      `SELECT event, result, code, user_id, server_id, actor_user_id, credits_tenths / 10.0 AS credits, model_id,
+              reference, detail
+         FROM credit_audit ORDER BY created_at, rowid`,
+    )
+    .all();
+  const audited = (match: Readonly<Record<string, string | number | null>>) =>
+    trail.filter((row) => Object.entries(match).every(([key, value]) => row[key] === value));
+  const upstreamDetail = (status: number) =>
+    trail.filter((row) => {
+      const detail = typeof row.detail === "string" ? JSON.parse(row.detail) : null;
+      return isDynamicRecord(detail) && detail.operation === "submit" && detail.upstream_status === status;
+    });
+  const holds = Number(database.prepare("SELECT COUNT(*) AS count FROM credit_holds").get()?.count);
+  check(
+    "the credit audit has one row for each hold and start, and a charge or release for each settled generation",
+    audited({ event: "hold" }).length === holds &&
+      audited({ event: "charged", result: "ok", code: "completed" }).length === ledgerSpends().length &&
+      audited({ event: "released", code: "refused" }).length === refusedStatuses.length &&
+      audited({ event: "charged", server_id: SERVER_ID, model_id: "video-one", credits: 35 }).length === 1 &&
+      audited({ event: "released", result: "failed", code: "failed", model_id: "video-one", credits: 155 }).length ===
+        1,
+    trail,
+  );
+  check(
+    "the credit audit records each refused upstream submit with the upstream status and the model",
+    [422, 401, 402, 429, 500].every(
+      (status) =>
+        upstreamDetail(status).filter(
+          (row) =>
+            row.event === "media_submit" &&
+            row.result === "failed" &&
+            row.model_id === "image-one" &&
+            row.user_id === OWNER &&
+            row.actor_user_id === OWNER,
+        ).length === 1,
+    ) &&
+      audited({ event: "media_submit", code: "media_request_refused" }).length === 1 &&
+      audited({ event: "media_submit", code: "media_busy" }).length === 2,
+    trail,
+  );
+  check(
+    "the credit audit records invalid, unaffordable and conflicting jobs, and jobs that a wallet cannot see",
+    audited({ event: "media_submit", code: "media_request_invalid" }).length === invalidCases.length &&
+      audited({ event: "media_submit", code: "media_model_unavailable", model_id: "no-such-model" }).length === 1 &&
+      audited({ event: "media_submit", code: "media_unavailable", user_id: OWNER }).length === 3 &&
+      audited({
+        event: "media_submit",
+        code: "credits_spend_not_enough",
+        user_id: OUTSIDER,
+        model_id: "video-one",
+        credits: 80,
+      }).length === 1 &&
+      audited({ event: "media_submit", code: "credits_job_conflict", reference: reused.request.jobId }).length === 1 &&
+      audited({ event: "media_job", code: "media_job_not_found", reference: image.jobId }).length === 2 &&
+      audited({ event: "media_output", code: "media_job_not_found", reference: image.jobId }).length === 3,
+    trail,
+  );
+  const trailText = JSON.stringify(trail);
+  check(
+    "the credit audit never keeps a prompt, the API key or an upstream address",
+    trail.length > 0 && [API_KEY, "lighthouse", "upstream.test"].every((value) => !trailText.includes(value)),
+    trail.length,
+  );
 }
 
 async function liveFlow() {

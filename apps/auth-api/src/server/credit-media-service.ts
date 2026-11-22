@@ -33,6 +33,14 @@ import { Effect, Result } from "effect";
 import type { AccountAnalytics } from "./account-analytics";
 import { BillingError, BillingOperationError, billingCall } from "./billing-errors";
 import {
+  CreditAudit,
+  type CreditAuditEvent,
+  type CreditAuditTrace,
+  creditAuditCode,
+  creditAuditTrace,
+  upstreamDetail,
+} from "./credit-audit";
+import {
   availableTenthsSql,
   type CreditHold,
   type CreditHoldOutcome,
@@ -251,8 +259,15 @@ function notFound(): BillingError {
   return new BillingError(404, "media_job_not_found", sourceText("error.billing.mediaJobNotFound"));
 }
 
-function logUpstream(operation: string, error: MediaUpstreamError): void {
+function logUpstream(operation: string, error: MediaUpstreamError, trace: CreditAuditTrace): void {
   console.error("media: upstream request failed", { operation, status: error.status, code: error.code });
+  trace.upstream = { operation, status: error.status, code: error.code };
+}
+
+function payerWallet(payer: CreditMediaPayer) {
+  return payer.wallet === "personal"
+    ? { userId: payer.userId, serverId: null }
+    : { userId: null, serverId: payer.serverId };
 }
 
 function readFile(value: FormDataEntryValue): Effect.Effect<Uint8Array | null, Failure> {
@@ -284,6 +299,7 @@ export class CreditMediaService {
   readonly #database: D1Database;
   readonly #upstream: MediaUpstream | null;
   readonly #spending: CreditSpending;
+  readonly #audit: CreditAudit;
 
   constructor(options: CreditMediaServiceOptions) {
     this.#database = options.database;
@@ -293,6 +309,31 @@ export class CreditMediaService {
       now: options.now,
       ...(options.analytics ? { analytics: options.analytics } : {}),
     });
+    this.#audit = new CreditAudit(options.database, options.now);
+  }
+
+  #audited<A>(
+    event: CreditAuditEvent,
+    payer: CreditMediaPayer,
+    run: (trace: CreditAuditTrace) => Effect.Effect<A, Failure>,
+    entry: { actorUserId?: string | null; modelId?: string; reference?: string; credits?: () => number | undefined },
+  ): Effect.Effect<A, Failure> {
+    const trace = creditAuditTrace();
+    return run(trace).pipe(
+      Effect.tapError((error) => {
+        const credits = entry.credits?.();
+        return this.#audit.failed({
+          event,
+          code: creditAuditCode(error),
+          wallet: payerWallet(payer),
+          ...(entry.actorUserId === undefined ? {} : { actorUserId: entry.actorUserId }),
+          ...(entry.modelId === undefined ? {} : { modelId: entry.modelId }),
+          ...(entry.reference === undefined ? {} : { reference: entry.reference }),
+          ...(credits === undefined ? {} : { credits }),
+          detail: upstreamDetail(trace),
+        });
+      }),
+    );
   }
 
   #models(modelId: string | null): Effect.Effect<StoredModel[], Failure> {
@@ -374,11 +415,27 @@ export class CreditMediaService {
     return this.#spending.settle(hold.jobId, result).pipe(Effect.map((settled) => settled ?? hold));
   }
 
-  readonly submit = Effect.fn("CreditMedia.submit")(function* (
+  submit(
+    payer: CreditMediaPayer,
+    actorUserId: string | null,
+    submission: CreditMediaSubmission,
+  ): Effect.Effect<CreditMediaJob, Failure> {
+    const quote: { credits?: number } = {};
+    return this.#audited("media_submit", payer, (trace) => this.#submit(payer, actorUserId, submission, trace, quote), {
+      actorUserId,
+      modelId: submission.request.model,
+      reference: submission.request.jobId,
+      credits: () => quote.credits,
+    });
+  }
+
+  readonly #submit = Effect.fn("CreditMedia.submit")(function* (
     this: CreditMediaService,
     payer: CreditMediaPayer,
     actorUserId: string | null,
     submission: CreditMediaSubmission,
+    trace: CreditAuditTrace,
+    quote: { credits?: number },
   ): Effect.fn.Return<CreditMediaJob, Failure> {
     const upstream = yield* this.#upstreamOrFail();
     const { request } = submission;
@@ -389,6 +446,7 @@ export class CreditMediaService {
       return yield* invalidRequest();
     const credits = creditMediaCost(stored.model, request);
     if (credits === null) return yield* unavailable();
+    quote.credits = credits;
     const hold = yield* this.#spending.hold({
       jobId: request.jobId,
       wallet: walletOf(payer),
@@ -397,14 +455,14 @@ export class CreditMediaService {
       credits,
     });
     if (hold.status === "released") return this.#releasedView(hold);
-    if (hold.status === "charged" || hold.providerJobId) return yield* this.job(payer, hold.jobId);
+    if (hold.status === "charged" || hold.providerJobId) return yield* this.#job(payer, hold.jobId, trace);
     yield* this.#spending.submitting(hold.jobId);
     const submitted = yield* Effect.result(
       upstream.submit(stored.model.kind, hold.jobId, upstreamBody(stored, submission)),
     );
     if (Result.isFailure(submitted)) {
       const error = submitted.failure;
-      logUpstream("submit", error);
+      logUpstream("submit", error, trace);
       if (REFUSED_STATUSES.has(error.status)) {
         yield* this.#settle(hold, { outcome: "refused" });
         return yield* new BillingError(400, "media_request_refused", sourceText("error.billing.mediaRequestRefused"));
@@ -426,31 +484,40 @@ export class CreditMediaService {
     return this.#view(started, job.status, job.pollAfterSeconds, []);
   }).bind(this);
 
-  #artifacts(upstream: MediaUpstream, providerJobId: string): Effect.Effect<MediaUpstreamArtifact[], BillingError> {
+  #artifacts(
+    upstream: MediaUpstream,
+    providerJobId: string,
+    trace: CreditAuditTrace,
+  ): Effect.Effect<MediaUpstreamArtifact[], BillingError> {
     return upstream.result(providerJobId).pipe(
       Effect.mapError((error) => {
-        logUpstream("result", error);
+        logUpstream("result", error, trace);
         return new BillingError(503, "media_result_unavailable", sourceText("error.billing.mediaResultUnavailable"));
       }),
     );
   }
 
-  readonly job = Effect.fn("CreditMedia.job")(function* (
+  job(payer: CreditMediaPayer, jobId: string): Effect.Effect<CreditMediaJob, Failure> {
+    return this.#audited("media_job", payer, (trace) => this.#job(payer, jobId, trace), { reference: jobId });
+  }
+
+  readonly #job = Effect.fn("CreditMedia.job")(function* (
     this: CreditMediaService,
     payer: CreditMediaPayer,
     jobId: string,
+    trace: CreditAuditTrace,
   ): Effect.fn.Return<CreditMediaJob, Failure> {
     const hold = yield* this.#owned(payer, jobId);
     if (hold.status === "released") return this.#releasedView(hold);
     const upstream = yield* this.#upstreamOrFail();
     if (!hold.providerJobId) return this.#view(hold, "queued", QUEUED_POLL_SECONDS, []);
     if (hold.status === "charged") {
-      const artifacts = yield* this.#artifacts(upstream, hold.providerJobId);
+      const artifacts = yield* this.#artifacts(upstream, hold.providerJobId, trace);
       return this.#view(hold, "completed", 0, outputsOf(artifacts));
     }
     const checked = yield* Effect.result(upstream.status(hold.providerJobId));
     if (Result.isFailure(checked)) {
-      logUpstream("status", checked.failure);
+      logUpstream("status", checked.failure, trace);
       if (checked.failure.status === 404) return this.#releasedView(yield* this.#settle(hold, { outcome: "failed" }));
       return yield* busy();
     }
@@ -458,26 +525,33 @@ export class CreditMediaService {
     if (state.status === "failed" || state.status === "canceled")
       return this.#releasedView(yield* this.#settle(hold, { outcome: state.status }));
     if (state.status !== "completed") return this.#view(hold, state.status, state.pollAfterSeconds, []);
-    const artifacts = yield* this.#artifacts(upstream, hold.providerJobId);
+    const artifacts = yield* this.#artifacts(upstream, hold.providerJobId, trace);
     if (artifacts.length === 0) return this.#releasedView(yield* this.#settle(hold, { outcome: "failed" }));
     const charged = yield* this.#settle(hold, { outcome: "completed" });
     return this.#view(charged, "completed", 0, outputsOf(artifacts));
   }).bind(this);
 
-  readonly output = Effect.fn("CreditMedia.output")(function* (
+  output(payer: CreditMediaPayer, jobId: string, index: number): Effect.Effect<Response, Failure> {
+    return this.#audited("media_output", payer, (trace) => this.#output(payer, jobId, index, trace), {
+      reference: jobId,
+    });
+  }
+
+  readonly #output = Effect.fn("CreditMedia.output")(function* (
     this: CreditMediaService,
     payer: CreditMediaPayer,
     jobId: string,
     index: number,
+    trace: CreditAuditTrace,
   ): Effect.fn.Return<Response, Failure> {
     const hold = yield* this.#owned(payer, jobId);
     if (hold.status !== "charged" || !hold.providerJobId) return yield* notFound();
     const upstream = yield* this.#upstreamOrFail();
-    const artifact = (yield* this.#artifacts(upstream, hold.providerJobId))[index];
+    const artifact = (yield* this.#artifacts(upstream, hold.providerJobId, trace))[index];
     if (!artifact) return yield* notFound();
     const response = yield* upstream.download(artifact.url).pipe(
       Effect.mapError((error) => {
-        logUpstream("download", error);
+        logUpstream("download", error, trace);
         return new BillingError(503, "media_result_unavailable", sourceText("error.billing.mediaResultUnavailable"));
       }),
     );
@@ -495,8 +569,9 @@ export class CreditMediaService {
   checker(): CreditJobChecker | null {
     const upstream = this.#upstream;
     if (!upstream) return null;
-    return (providerJobId) =>
-      upstream.status(providerJobId).pipe(
+    return (providerJobId, jobId) => {
+      const trace = creditAuditTrace();
+      return upstream.status(providerJobId).pipe(
         Effect.flatMap((state) => {
           if (state.status === "completed")
             return upstream
@@ -515,8 +590,14 @@ export class CreditMediaService {
           (error) => error.status === 404,
           () => Effect.succeed<CreditJobCheck>({ status: "failed" }),
         ),
+        Effect.tapError((error) =>
+          Effect.sync(() => logUpstream("check", error, trace)).pipe(
+            Effect.andThen(this.#audit.failedHold("media_check", jobId, "check_failed", trace)),
+          ),
+        ),
         Effect.mapError(() => new BillingOperationError({})),
       );
+    };
   }
 
   readonly sweep = Effect.fn("CreditMedia.sweep")(function* (this: CreditMediaService) {

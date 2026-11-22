@@ -6,6 +6,7 @@ import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
 import { captureBillingSnapshot } from "./billing-snapshots";
 import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
+import { CreditAudit } from "./credit-audit";
 import { CreditGrants } from "./credit-grants";
 import { CreditMediaService } from "./credit-media-service";
 import { runApiEffect } from "./effect-runtime";
@@ -229,7 +230,9 @@ const tickCreditHolds = Effect.fn("CreditHolds.tick")(function* (
   })
     .sweep()
     .pipe(Effect.ensuring(flush));
-  if (Object.values(result).some(Boolean)) console.info("Credit hold sweep completed.", result);
+  const auditPruned = yield* new CreditAudit(bindings.DB, () => now).prune();
+  if (Object.values(result).some(Boolean) || auditPruned > 0)
+    console.info("Credit hold sweep completed.", { ...result, auditPruned });
 });
 
 const tickCreditGrants = Effect.fn("CreditGrants.tick")(function* (bindings: AnalyticsBindings, now: number) {

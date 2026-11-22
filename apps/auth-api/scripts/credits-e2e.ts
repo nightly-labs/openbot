@@ -13,6 +13,7 @@ import {
 import { Effect } from "effect";
 import { createAccountAnalytics } from "../src/server/account-analytics";
 import { BillingError, type BillingOperationError } from "../src/server/billing-errors";
+import { CREDIT_AUDIT_RETENTION_MS, CreditAudit } from "../src/server/credit-audit";
 import { CreditGrants, licenseCreditSlot } from "../src/server/credit-grants";
 import type { CreditService } from "../src/server/credit-service";
 import {
@@ -182,6 +183,44 @@ function fakeStripe() {
     return Response.json({ error: { type: "api_error" } }, { status: 500 });
   };
   return { sessions, unknown, outside, tracked, fetch };
+}
+
+interface AuditRow {
+  event: string;
+  result: string;
+  code: string | null;
+  user_id: string | null;
+  server_id: string | null;
+  actor_user_id: string | null;
+  credits_tenths: number | null;
+  model_id: string | null;
+  reference: string | null;
+  detail: string | null;
+}
+
+function auditRows(database: DatabaseSync): AuditRow[] {
+  return database
+    .prepare(
+      `SELECT event, result, code, user_id, server_id, actor_user_id, credits_tenths, model_id, reference, detail
+         FROM credit_audit ORDER BY created_at, rowid`,
+    )
+    .all()
+    .map((row) => ({
+      event: String(row.event),
+      result: String(row.result),
+      code: row.code === null ? null : String(row.code),
+      user_id: row.user_id === null ? null : String(row.user_id),
+      server_id: row.server_id === null ? null : String(row.server_id),
+      actor_user_id: row.actor_user_id === null ? null : String(row.actor_user_id),
+      credits_tenths: row.credits_tenths === null ? null : Number(row.credits_tenths),
+      model_id: row.model_id === null ? null : String(row.model_id),
+      reference: row.reference === null ? null : String(row.reference),
+      detail: row.detail === null ? null : String(row.detail),
+    }));
+}
+
+function audited(rows: readonly AuditRow[], match: Partial<AuditRow>): AuditRow[] {
+  return rows.filter((row) => JSON.stringify({ ...row, ...match }) === JSON.stringify(row));
 }
 
 async function failure(effect: Effect.Effect<unknown, BillingError | BillingOperationError>) {
@@ -631,6 +670,71 @@ async function walletsAndTransfers() {
   check("each delivered event is recorded once", events === sent(), { events, sent: sent() });
   const plans = database.prepare("SELECT COUNT(*) AS count FROM billing_subscriptions").get()?.count;
   check("credit checkouts make no server plan", plans === 0, plans);
+  const trail = auditRows(database);
+  const ledgerNotSpend = Number(
+    database.prepare("SELECT COUNT(*) AS count FROM credit_ledger WHERE kind <> 'spend'").get()?.count,
+  );
+  check(
+    "the credit audit has one row for each purchase, move and reversal in the ledger",
+    trail.filter((row) => ["purchase", "transfer", "reversal"].includes(row.event) && row.result === "ok").length ===
+      ledgerNotSpend &&
+      audited(trail, { event: "purchase", user_id: OWNER.id, credits_tenths: 20_000, reference: "cs_1" }).length ===
+        1 &&
+      audited(trail, { event: "purchase", server_id: SERVER_ID, actor_user_id: MEMBER.id, credits_tenths: 1_670 })
+        .length === 1,
+    trail,
+  );
+  check(
+    "the credit audit records each checkout that opens and each checkout that expires",
+    audited(trail, { event: "checkout", result: "ok", user_id: OWNER.id, actor_user_id: OWNER.id, reference: "cs_1" })
+      .length === 1 &&
+      audited(trail, {
+        event: "checkout",
+        result: "ok",
+        user_id: null,
+        server_id: SERVER_ID,
+        actor_user_id: MEMBER.id,
+        credits_tenths: 1_670,
+        reference: "cs_2",
+      }).length === 1 &&
+      audited(trail, { event: "checkout", result: "failed", code: "expired", reference: "cs_3", credits_tenths: 9_400 })
+        .length === 1,
+    trail,
+  );
+  check(
+    "the credit audit records each refused checkout and move with its error code and the account",
+    audited(trail, { event: "checkout", result: "failed", code: "credits_server_member", actor_user_id: OUTSIDER.id })
+      .length === 1 &&
+      audited(trail, { event: "checkout", result: "failed", code: "credits_unavailable", actor_user_id: OWNER.id })
+        .length === 3 &&
+      audited(trail, {
+        event: "transfer",
+        result: "failed",
+        code: "credits_server_owner",
+        actor_user_id: MEMBER.id,
+        server_id: SERVER_ID,
+        credits_tenths: 1_000,
+      }).length === 1 &&
+      audited(trail, { event: "transfer", result: "failed", code: "credits_not_enough", actor_user_id: OWNER.id })
+        .length === 2,
+    trail,
+  );
+  check(
+    "the credit audit records a refund that could not take back all its credits",
+    audited(trail, {
+      event: "reversal",
+      result: "failed",
+      code: "credits_spent",
+      user_id: OWNER.id,
+      detail: JSON.stringify({ refunded_tenths: 10_000, reversed_tenths: 4_000 }),
+    }).length === 1 && audited(trail, { event: "reversal", result: "failed" }).length === 1,
+    trail,
+  );
+  check(
+    "the credit audit has no email address",
+    trail.every((row) => !JSON.stringify(row).includes("@example.test")),
+    trail,
+  );
   check(
     "credit flows call no other Stripe endpoint than the invoice lookup of the refund and dispute",
     stripe.unknown.length === 3 && stripe.unknown.every((call) => call === "GET /v1/invoice_payments"),
@@ -698,6 +802,16 @@ async function walletsAndTransfers() {
     wrongPack.balance === 0 && dollarPack.balance === 145,
     { wrongPack, dollarPack },
   );
+  check(
+    "the credit audit records a paid checkout that could not add credits",
+    audited(auditRows(database), {
+      event: "purchase",
+      result: "failed",
+      code: "target_invalid",
+      reference: "cs_usd_wrong",
+    }).length === 1,
+    audited(auditRows(database), { result: "failed", event: "purchase" }),
+  );
 
   const plane = await controlPlane(database);
   const ledgerRows = () => Number(database.prepare("SELECT COUNT(*) AS count FROM credit_ledger").get()?.count);
@@ -760,6 +874,21 @@ async function walletsAndTransfers() {
     rowsBefore,
     rowsAfter: ledgerRows(),
   });
+
+  const auditCount = () => Number(database.prepare("SELECT COUNT(*) AS count FROM credit_audit").get()?.count);
+  const kept = auditCount();
+  const now = Date.now();
+  database
+    .prepare(
+      "INSERT INTO credit_audit(audit_id, created_at, event, result, code, user_id) VALUES (?, ?, 'transfer', 'failed', 'old', ?)",
+    )
+    .run("old-audit", now - CREDIT_AUDIT_RETENTION_MS - 1, OWNER.id);
+  const pruned = await Effect.runPromise(new CreditAudit(sqliteD1(database), () => now).prune());
+  check(
+    "the credit audit deletes rows older than its retention and keeps the others",
+    pruned === 1 && auditCount() === kept,
+    { pruned, kept, after: auditCount() },
+  );
 }
 
 async function holdsAndSpending() {
@@ -1022,6 +1151,39 @@ async function holdsAndSpending() {
     "generation events name no server or job",
     keepsPrivate(media, [SERVER_ID, "job-", "p-1", "p-a-late"]),
     readable(media),
+  );
+  const holdTrail = auditRows(database);
+  check(
+    "the credit audit has one row for each hold, start, charge and release",
+    audited(holdTrail, { event: "started" }).length === 6 &&
+      audited(holdTrail, { event: "charged" }).length === 6 &&
+      audited(holdTrail, { event: "released" }).length === 7 &&
+      audited(holdTrail, { event: "hold" }).length ===
+        Number(database.prepare("SELECT COUNT(*) AS count FROM credit_holds").get()?.count),
+    holdTrail,
+  );
+  check(
+    "the credit audit keeps the outcome, model and charged credits of each generation",
+    audited(holdTrail, {
+      event: "charged",
+      result: "ok",
+      code: "completed",
+      user_id: OWNER.id,
+      credits_tenths: 1_200,
+      model_id: "seedance-2.5",
+      reference: "job-p",
+    }).length === 1 &&
+      audited(holdTrail, { event: "released", result: "failed", code: "refused", reference: "job-f" }).length === 1 &&
+      audited(holdTrail, {
+        event: "released",
+        result: "failed",
+        code: "abandoned",
+        server_id: SERVER_ID,
+        actor_user_id: MEMBER.id,
+        reference: "job-a",
+      }).length === 1 &&
+      audited(holdTrail, { event: "started", reference: "job-a" }).length === 0,
+    holdTrail,
   );
 
   addOwnedServer(database, LAB_ID);

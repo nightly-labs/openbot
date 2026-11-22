@@ -38,3 +38,8 @@
   credits, and the model, kind and outcome of each generation that uses credits. The events have the
   account ID and fixed values only, with no prompt, file, job or server ID. The Privacy Policy
   describes them.
+- The account service keeps a credit audit log of each credit change and each failed credit action:
+  checkouts, purchases, moves, refunds, free credits, and the hold, charge or release of each
+  generation, with the error code and the processor status of a failure. It keeps no prompt or file,
+  and deletes a record after 400 days. `bun apps/auth-api/scripts/credit-audit.ts` lists and sums the
+  records for an account, a server or a job.

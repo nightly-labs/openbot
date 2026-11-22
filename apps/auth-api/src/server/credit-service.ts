@@ -27,6 +27,7 @@ import {
 } from "./billing-errors";
 import { paymentReversal } from "./billing-sales";
 import { checkoutTax } from "./billing-tax";
+import { CreditAudit, creditAuditCode } from "./credit-audit";
 import { consumeGrantsSql, creditExpiring, expiringGrantsSql, moveGrantsSql } from "./credit-grants";
 import { availableTenthsSql } from "./credit-spending";
 import {
@@ -161,6 +162,7 @@ export class CreditService {
   readonly #now: () => number;
   readonly #ensureCustomer: CreditServiceOptions["ensureCustomer"];
   readonly #analytics: AccountAnalytics;
+  readonly #audit: CreditAudit;
 
   constructor(options: CreditServiceOptions) {
     this.#database = options.database;
@@ -170,6 +172,7 @@ export class CreditService {
     this.#now = options.now;
     this.#ensureCustomer = options.ensureCustomer;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
+    this.#audit = new CreditAudit(options.database, options.now);
   }
 
   readonly getState = Effect.fn("CreditService.getState")(function* (
@@ -236,7 +239,23 @@ export class CreditService {
     return state;
   }).bind(this);
 
-  readonly createCheckout = Effect.fn("CreditService.createCheckout")(function* (
+  createCheckout(input: CreditCheckoutInput): Effect.Effect<{ url: string }, Failure> {
+    const { user, request } = input;
+    return this.#checkout(input).pipe(
+      Effect.tapError((error) =>
+        this.#audit.failed({
+          event: "checkout",
+          code: creditAuditCode(error),
+          wallet: { userId: request.serverId === undefined ? user.id : null, serverId: request.serverId ?? null },
+          actorUserId: user.id,
+          ...(Number.isFinite(request.credits) && request.credits > 0 ? { credits: request.credits } : {}),
+          detail: { currency: request.currency },
+        }),
+      ),
+    );
+  }
+
+  readonly #checkout = Effect.fn("CreditService.createCheckout")(function* (
     this: CreditService,
     input: CreditCheckoutInput,
   ): Effect.fn.Return<{ url: string }, Failure> {
@@ -295,7 +314,22 @@ export class CreditService {
     return { url: session.url };
   }).bind(this);
 
-  readonly transfer = Effect.fn("CreditService.transfer")(function* (
+  transfer(userId: string, request: CreditTransferRequest): Effect.Effect<CreditsState, Failure> {
+    return this.#transfer(userId, request).pipe(
+      Effect.tapError((error) =>
+        this.#audit.failed({
+          event: "transfer",
+          code: creditAuditCode(error),
+          wallet: { userId: null, serverId: request.serverId },
+          actorUserId: userId,
+          credits: request.credits,
+          detail: { direction: request.direction },
+        }),
+      ),
+    );
+  }
+
+  readonly #transfer = Effect.fn("CreditService.transfer")(function* (
     this: CreditService,
     userId: string,
     request: CreditTransferRequest,
@@ -434,6 +468,18 @@ export class CreditService {
         .all<{ amount_tenths: number }>(),
     );
     const entry = reversed.results[0];
+    const reversedTenths = entry ? -entry.amount_tenths : 0;
+    const duplicate = !entry && (yield* this.#hasEntry(`reversal:${reversal.objectId}`));
+    if (!duplicate && reversedTenths < share)
+      yield* this.#audit.failed({
+        event: "reversal",
+        code: "credits_spent",
+        wallet: { userId: purchase.user_id, serverId: purchase.server_id },
+        actorUserId: purchase.buyer_id,
+        credits: creditsFromTenths(share - reversedTenths),
+        reference: reversal.objectId,
+        detail: { refunded_tenths: share, reversed_tenths: reversedTenths },
+      });
     if (!entry) return;
     this.#analytics.track(purchase.buyer_id, {
       name: "credit_action",
@@ -450,7 +496,15 @@ export class CreditService {
   ): Effect.fn.Return<void, Failure> {
     const sessionId = session.id;
     const target = creditTarget(session);
-    if (!target) return;
+    if (!target) {
+      console.error("credits: paid checkout has no valid credit target");
+      return yield* this.#audit.failed({
+        event: "purchase",
+        code: "target_invalid",
+        reference: sessionId,
+        detail: { currency: session.currency ?? null, amount: session.amount_total ?? null },
+      });
+    }
     const paymentIntent = session.payment_intent ?? null;
     const amount =
       session.amount_total !== undefined && session.amount_total !== null && session.amount_total >= 0
@@ -489,7 +543,19 @@ export class CreditService {
       ]),
     );
     const entry = credited?.results[0];
-    if (!entry) return;
+    if (!entry) {
+      if (yield* this.#hasEntry(`purchase:${sessionId}`)) return;
+      console.error("credits: paid checkout was not credited");
+      return yield* this.#audit.failed({
+        event: "purchase",
+        code: "account_missing",
+        wallet: { userId: target.serverId === null ? target.userId : null, serverId: target.serverId },
+        actorUserId: target.userId,
+        credits: target.credits,
+        reference: sessionId,
+        detail: { currency, amount },
+      });
+    }
     this.#analytics.track(target.userId, {
       name: "credit_action",
       action: "purchased",
@@ -523,6 +589,19 @@ export class CreditService {
       });
     }
   }).bind(this);
+
+  readonly #hasEntry = Effect.fn("CreditService.hasEntry")(function* (
+    this: CreditService,
+    entryId: string,
+  ): Effect.fn.Return<boolean, Failure> {
+    const row = yield* billingCall(() =>
+      this.#database
+        .prepare("SELECT 1 AS present FROM credit_ledger WHERE entry_id = ?")
+        .bind(entryId)
+        .first<{ present: number }>(),
+    );
+    return row !== null;
+  });
 
   readonly #isMember = Effect.fn("CreditService.isMember")(function* (
     this: CreditService,

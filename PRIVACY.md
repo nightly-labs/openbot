@@ -473,6 +473,14 @@ The service stores:
   monthly credits of a paid license, it keeps a grant record: the license, the account or server that
   has them, the credits given and left, and the start and end times. Deleting the account removes the
   grant records of its own balance.
+  The service also keeps a credit audit record for each credit change and each failed credit action:
+  checkouts that open or expire, purchases, moves, reversals, free credits, holds, starts, charges and
+  releases, and refused checkouts, moves and generations. A record has the action, the result and the
+  error code, the account or server, the account that acted, the credits, the model, the job, Checkout
+  Session or Stripe object ID, and for a generation that the processor refused, the HTTP status and error
+  code of the processor. It keeps no prompt, picture, result file, card data or email address. The
+  service deletes a record after 400 days. Deleting the account removes the records of its own balance,
+  and removes the account from the records of a server.
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
   Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
   deletes them after the end of the next year.
