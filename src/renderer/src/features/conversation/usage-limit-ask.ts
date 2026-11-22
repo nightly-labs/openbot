@@ -6,7 +6,6 @@ import {
   sameAgentModelChoice,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import { findModelOption } from "@openbot/ui/components/provider-accounts";
 import type { AgentProfile } from "@openbot/ui/data";
 import {
   type BackupModelSource,
@@ -74,23 +73,25 @@ export function usageLimitAskFrom(source: UsageLimitAskSource) {
       return undefined;
     const agentId = agent.id;
     const reasoningEffort = agent.reasoningEffort;
+    /** A model of the provider's list, or one that only this account serves (#12627). */
+    const modelOf = (choiceProvider: string, model: string, accountId: string | null | undefined) =>
+      source.modelOptions().find((option) => option.provider === choiceProvider && option.id === model) ??
+      source
+        .providers()
+        ?.find((row) => row.id === choiceProvider)
+        ?.accounts?.find((account) => account.id === accountId)
+        ?.models?.find((option) => option.id === model);
     return {
       provider,
       // A limit can cover one model only, so the card names the model that the limit holds.
-      model: findModelOption(source.modelOptions(), source.providers(), provider, agent.model)?.name,
+      model: modelOf(provider, agent.model, agent.providerAccountId)?.name,
       agentName: inChannel ? agent.name : undefined,
       resetsAt,
       options,
       rememberable: source.rememberable(),
       onSend: async (option, remember) => {
-        // The agent keeps its reasoning effort where the other model has it. A model that only an
-        // account serves is in that account's list (#12627).
-        const model = findModelOption(
-          source.modelOptions(),
-          source.providers(),
-          option.choice.provider,
-          option.choice.model,
-        );
+        // The agent keeps its reasoning effort where the other model has it.
+        const model = modelOf(option.choice.provider, option.choice.model, option.choice.providerAccountId);
         await source.update(agentId, {
           provider: option.choice.provider,
           model: option.choice.model,
