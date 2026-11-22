@@ -560,6 +560,8 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "この設定は現在のプロバイダーセッションでは利用できません。",
   "error.provider.sessionSettingInvalid": "この値はこの設定では利用できません。",
   "error.provider.sessionSettingsBusy": "セッションの設定を変更する前に、現在のターンが終わるまでお待ちください。",
+  "error.provider.sessionSettingsTimedOut":
+    "エージェントのセッションが時間内に応答しませんでした。もう一度お試しください。",
   "error.provider.piOutdated":
     "Pi {version} は古すぎます。ネイティブ RPC と MCP に対応するには、Pi 1.1.0 以降をインストールしてください。",
   "error.provider.nativeMissing": "{provider} CLI がインストールされていません。設定でダウンロードしてください。",

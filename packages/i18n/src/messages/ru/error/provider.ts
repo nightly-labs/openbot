@@ -531,6 +531,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Этот параметр недоступен в текущей сессии провайдера.",
   "error.provider.sessionSettingInvalid": "Это значение недоступно для параметра.",
   "error.provider.sessionSettingsBusy": "Дождитесь окончания текущего хода, прежде чем менять параметр сессии.",
+  "error.provider.sessionSettingsTimedOut": "Сессия агента не ответила вовремя. Попробуйте ещё раз.",
   "error.provider.piOutdated":
     "Pi {version} слишком старый. Установите Pi 1.1.0 или новее для поддержки нативного RPC и MCP.",
   "error.provider.nativeMissing": "CLI {provider} не установлен. Скачайте его в настройках.",

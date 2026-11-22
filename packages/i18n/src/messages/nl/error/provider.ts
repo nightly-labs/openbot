@@ -541,6 +541,7 @@ export const messages = {
     "Deze instelling is niet beschikbaar in de huidige sessie van de aanbieder.",
   "error.provider.sessionSettingInvalid": "Deze waarde is niet beschikbaar voor de instelling.",
   "error.provider.sessionSettingsBusy": "Wacht tot de huidige beurt klaar is voordat je een sessie-instelling wijzigt.",
+  "error.provider.sessionSettingsTimedOut": "De sessie van de agent reageerde niet op tijd. Probeer het opnieuw.",
   "error.provider.piOutdated":
     "Pi {version} is te oud. Installeer Pi 1.1.0 of nieuwer voor native ondersteuning van RPC en MCP.",
   "error.provider.nativeMissing": "De {provider} CLI is niet geïnstalleerd. Download hem in Instellingen.",

@@ -502,6 +502,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "هذا الإعداد غير متاح في جلسة المزوّد الحالية.",
   "error.provider.sessionSettingInvalid": "هذه القيمة غير متاحة لهذا الإعداد.",
   "error.provider.sessionSettingsBusy": "انتظر حتى ينتهي الدور الحالي قبل تغيير إعداد الجلسة.",
+  "error.provider.sessionSettingsTimedOut": "لم تستجب جلسة الوكيل في الوقت المحدد. حاول مرة أخرى.",
   "error.provider.piOutdated": "إصدار Pi {version} قديم جدًا. ثبّت Pi 1.1.0 أو أحدث لدعم RPC وMCP الأصلي.",
   "error.provider.nativeMissing": "واجهة {provider} CLI غير مثبتة. نزّلها في الإعدادات.",
   "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",

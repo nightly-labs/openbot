@@ -547,6 +547,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Este ajuste no está disponible en la sesión actual del proveedor.",
   "error.provider.sessionSettingInvalid": "Este valor no está disponible para el ajuste.",
   "error.provider.sessionSettingsBusy": "Espera a que termine el turno actual antes de cambiar un ajuste de la sesión.",
+  "error.provider.sessionSettingsTimedOut": "La sesión del agente no respondió a tiempo. Inténtalo de nuevo.",
   "error.provider.piOutdated":
     "Pi {version} es demasiado antiguo. Instala Pi 1.1.0 o posterior para la compatibilidad nativa con RPC y MCP.",
   "error.provider.nativeMissing": "La CLI de {provider} no está instalada. Descárgala en Ajustes.",

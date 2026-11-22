@@ -471,6 +471,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "当前服务商会话不支持该设置。",
   "error.provider.sessionSettingInvalid": "该值不适用于该设置。",
   "error.provider.sessionSettingsBusy": "请等待当前对话结束后再更改会话设置。",
+  "error.provider.sessionSettingsTimedOut": "助手会话未及时响应。请重试。",
   "error.provider.piOutdated": "Pi {version} 版本过低。请安装 Pi 1.1.0 或更高版本以支持原生 RPC 与 MCP。",
   "error.provider.nativeMissing": "未安装 {provider} CLI。请在设置中下载。",
   "error.provider.nativeNotStarted": "{provider} CLI 无法启动。",
