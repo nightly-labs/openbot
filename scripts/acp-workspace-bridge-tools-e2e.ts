@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AcpAgentClient } from "../src/backend/acp-client";
+import { type AcpFlavor, DEFAULT_ACP_FLAVOR } from "../src/backend/acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "../src/backend/acp-flavor-antigravity";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -13,7 +14,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-workspace-bridge
 
 const BRIDGE_CALLS = [
   { toolCallId: "agy-title", title: "Run mcp_openbot_send_message", kind: "other" },
-  { toolCallId: "agy-title-execute", title: "Run mcp_openbot_browser_navigate?", kind: "execute" },
+  { toolCallId: "agy-browser-title", title: "Run mcp_openbot_browser_navigate?", kind: "other" },
   {
     toolCallId: "agy-server-name",
     title: "MCP Tool send_message",
@@ -25,6 +26,7 @@ const BRIDGE_CALLS = [
 
 const OTHER_CALLS = [
   { toolCallId: "no-server", title: "Running send_message", kind: "other" },
+  { toolCallId: "title-command", title: "Run mcp_openbot_send_message", kind: "execute" },
   { toolCallId: "other-server", title: "Run mcp_github_create_issue", kind: "other" },
   {
     toolCallId: "other-server-name",
@@ -43,6 +45,12 @@ const OTHER_CALLS = [
     title: "Run mcp_openbot_send_message",
     kind: "execute",
     rawInput: { CommandLine: "Run mcp_openbot_send_message" },
+  },
+  {
+    toolCallId: "server-name-command-line",
+    title: "MCP Tool send_message",
+    kind: "execute",
+    rawInput: { ServerName: "openbot", ToolName: "send_message", CommandLine: "rm -rf build" },
   },
   { toolCallId: "shell", title: "rm -rf build", kind: "execute" },
 ];
@@ -73,6 +81,7 @@ interface Report {
   passed: boolean;
   confined?: Run;
   unconfined?: Run;
+  otherFlavor?: Run;
   failure?: string;
 }
 
@@ -81,7 +90,7 @@ process.env.GEMINI_HOME = join(root, "gemini");
 const report: Report = { passed: false };
 const clients: AgentClient[] = [];
 
-async function run(name: string, confined: boolean): Promise<Run> {
+async function run(name: string, confined: boolean, flavor: AcpFlavor = ANTIGRAVITY_ACP_FLAVOR): Promise<Run> {
   const executable = join(root, name, "bin", "antigravity");
   const log = join(root, name, "agent.jsonl");
   await installFakeAgent(executable, "antigravity-bridge-permission", {
@@ -90,7 +99,7 @@ async function run(name: string, confined: boolean): Promise<Run> {
   });
   const client = new AcpAgentClient({ executable, version: "1.5.10", source: "managed" }, 10_000, {
     provider: "antigravity",
-    flavor: ANTIGRAVITY_ACP_FLAVOR,
+    flavor,
     argv: ["acp"],
     env: {},
     signInMessage: "Sign in to the fake agent.",
@@ -143,6 +152,16 @@ try {
     BRIDGE_CALLS.length + OTHER_CALLS.length,
     "An agent without Workspace only keeps a card for each request.",
   );
+
+  const otherFlavor = await run("other-flavor", true, DEFAULT_ACP_FLAVOR);
+  report.otherFlavor = otherFlavor;
+  assert.equal(otherFlavor.status, "completed", "The turn of another confined flavor completes.");
+  for (const call of BRIDGE_CALLS)
+    assert.equal(
+      otherFlavor.outcomes[call.toolCallId],
+      call.rawInput === undefined ? "allow" : "reject",
+      `${call.toolCallId} on another flavor reads only the title.`,
+    );
 
   report.passed = true;
 } catch (error) {

@@ -152,6 +152,7 @@ export interface AcpFlavor {
   planUsedUpChunk?: RegExp;
   connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
+  mcpCallInputNamesServer?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };

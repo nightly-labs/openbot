@@ -4187,7 +4187,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      ((this.options.confine && callsBridgeTool(thread, params.toolCall)) ||
+      ((this.options.confine &&
+        callsBridgeTool(thread, params.toolCall, kind === "permissions", this.#flavor.mcpCallInputNamesServer)) ||
         (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
@@ -4488,14 +4489,20 @@ function bestPermissionOption(options: PermissionOption[], accepted: boolean): P
   return kinds.flatMap((kind) => options.filter((option) => option.kind === kind))[0] ?? null;
 }
 
-function callsBridgeTool(thread: AcpThread, toolCall: RequestPermissionRequest["toolCall"]): boolean {
-  const input = toolCall.rawInput;
-  if (isRecord(input) && input.ServerName !== undefined)
+function callsBridgeTool(
+  thread: AcpThread,
+  toolCall: RequestPermissionRequest["toolCall"],
+  titleNamesTool: boolean,
+  inputNamesServer: true | undefined,
+): boolean {
+  const input = isRecord(toolCall.rawInput) ? toolCall.rawInput : null;
+  if (input && Object.hasOwn(input, "CommandLine")) return false;
+  if (inputNamesServer && input && Object.hasOwn(input, "ServerName"))
     return thread.dynamicTools.some(
       (namespace) =>
         namespace.name === input.ServerName && namespace.tools.some((tool) => tool.name === input.ToolName),
     );
-  if (getString(input, "CommandLine") !== null) return false;
+  if (!titleNamesTool) return false;
   const title = toolCall.title?.trim().replace(/\?$/u, "");
   return thread.dynamicTools.some((namespace) =>
     namespace.tools.some(
