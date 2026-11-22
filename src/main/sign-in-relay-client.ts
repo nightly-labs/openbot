@@ -55,6 +55,12 @@ interface Waiting {
   accepted: () => boolean;
 }
 
+interface SharedListener {
+  id: string;
+  users: number;
+  server: Promise<LoopbackCallbackServer | null>;
+}
+
 export interface ChosenSignInPage {
   page: string;
   onWaiting: (page: McpSignInRelayPage) => void;
@@ -62,20 +68,24 @@ export interface ChosenSignInPage {
 
 export class SignInRelayClient {
   readonly #dependencies: SignInRelayClientDependencies;
-  readonly #waiting = new Map<string, Waiting>();
-  readonly #earlier = new Set<Waiting>();
+  readonly #waiting = new Map<string, Waiting[]>();
+  readonly #listeners = new Map<string, SharedListener>();
 
   constructor(dependencies: SignInRelayClientDependencies) {
     this.#dependencies = dependencies;
   }
 
+  #newest(key: string): Waiting | undefined {
+    return this.#waiting.get(key)?.at(-1);
+  }
+
   page(key: string): McpSignInRelayPage | null {
-    const waiting = this.#waiting.get(key);
+    const waiting = this.#newest(key);
     return waiting && !waiting.accepted() ? waiting.page : null;
   }
 
   deliver(state: string, query: string): boolean {
-    for (const waiting of [...this.#waiting.values(), ...this.#earlier]) {
+    for (const waiting of [...this.#waiting.values()].flat()) {
       if (waiting.state === null || waiting.state !== state) continue;
       waiting.receive(query);
       return true;
@@ -88,19 +98,21 @@ export class SignInRelayClient {
   }
 
   open(key: string): Promise<void> {
-    const waiting = this.#waiting.get(key);
+    const waiting = this.#newest(key);
     if (!waiting) return Promise.reject(new Error(sourceText("error.mcp.relayEnded")));
     return this.#dependencies.openExternal(waiting.url);
   }
 
   paste(key: string, address: string): void {
-    const waiting = this.#waiting.get(key);
-    if (!waiting) throw new Error(sourceText("error.mcp.relayEnded"));
-    if (waiting.state === null) throw new Error(sourceText("error.mcp.relayAddressInvalid"));
-    const query = relayCallbackQuery(address, waiting.state);
-    if (query === null) throw new Error(sourceText("error.mcp.relayAddressInvalid"));
-    if (waiting.accepted()) return;
-    waiting.receive(query);
+    const waiting = this.#waiting.get(key) ?? [];
+    if (waiting.length === 0) throw new Error(sourceText("error.mcp.relayEnded"));
+    for (const candidate of waiting.toReversed()) {
+      const query = candidate.state === null ? null : relayCallbackQuery(address, candidate.state);
+      if (query === null) continue;
+      if (!candidate.accepted()) candidate.receive(query);
+      return;
+    }
+    throw new Error(sourceText("error.mcp.relayAddressInvalid"));
   }
 
   run<E>(key: string, remote: SignInRelayRemote<E>, chosen: ChosenSignInPage | null = null) {
@@ -118,14 +130,12 @@ export class SignInRelayClient {
     let own: Waiting | null = null;
     const wait = (waiting: Waiting) => {
       own = waiting;
-      const earlier = self.#waiting.get(key);
-      if (earlier) self.#earlier.add(earlier);
-      self.#waiting.set(key, waiting);
+      self.#waiting.set(key, [...(self.#waiting.get(key) ?? []), waiting]);
     };
     const forget = () => {
-      if (own === null) return;
-      self.#earlier.delete(own);
-      if (self.#waiting.get(key) === own) self.#waiting.delete(key);
+      const rest = (self.#waiting.get(key) ?? []).filter((waiting) => waiting !== own);
+      if (rest.length > 0) self.#waiting.set(key, rest);
+      else self.#waiting.delete(key);
     };
     return yield* Effect.gen(function* () {
       const first = yield* awaitPage(remote, flowId);
@@ -153,10 +163,8 @@ export class SignInRelayClient {
 
       const query = yield* Deferred.make<string>();
       const listener = yield* Effect.acquireRelease(
-        Effect.promise(() =>
-          self.#listen(callback, state, (value) => Deferred.doneUnsafe(query, Effect.succeed(value))),
-        ),
-        (server) => Effect.promise(() => server?.close() ?? Promise.resolve()),
+        Effect.promise(() => self.#acquireListener(callback)),
+        (shared) => Effect.promise(() => self.#releaseListener(shared)),
       );
       const own = self.#dependencies.ownListener();
       const deepLink =
@@ -189,7 +197,7 @@ export class SignInRelayClient {
   });
 
   #openPage(key: string, chosen: ChosenSignInPage | null) {
-    const waiting = this.#waiting.get(key);
+    const waiting = this.#newest(key);
     if (!waiting) return Effect.void;
     return Effect.tryPromise(() => this.#dependencies.openExternal(waiting.url)).pipe(
       Effect.as(true),
@@ -205,33 +213,44 @@ export class SignInRelayClient {
     );
   }
 
-  async #listen(
-    callback: SignInRelayCallback | null,
-    state: string,
-    receive: (query: string) => void,
-  ): Promise<LoopbackCallbackServer | null> {
+  async #acquireListener(callback: SignInRelayCallback | null): Promise<SharedListener | null> {
     const own = this.#dependencies.ownListener();
     if (!callback || (own?.port === callback.port && own.paths.includes(callback.path))) return null;
-    return startLoopbackCallbackServer({
+    const id = `${callback.port}${callback.path}`;
+    const shared = this.#listeners.get(id) ?? this.#startListener(id, callback);
+    shared.users += 1;
+    if ((await shared.server) !== null) return shared;
+    await this.#releaseListener(shared);
+    return null;
+  }
+
+  #startListener(id: string, callback: SignInRelayCallback): SharedListener {
+    const server = startLoopbackCallbackServer({
       paths: [callback.path],
       port: { exact: callback.port },
       language: this.#dependencies.language,
       noPort: () => new Error("The sign-in relay listener was given no port."),
       receive: (url) => {
-        const returned = url.searchParams.get("state");
-        if (returned !== state) {
-          const delivered = returned !== null && this.deliver(returned, url.search.slice(1));
-          return delivered
-            ? { status: 200, message: "error.mcp.redirectRelayed" }
-            : { status: 400, message: "error.mcp.redirectNoSignIn" };
-        }
-        receive(url.search.slice(1));
-        return { status: 200, message: "error.mcp.redirectRelayed" };
+        const state = url.searchParams.get("state");
+        return state !== null && this.deliver(state, url.search.slice(1))
+          ? { status: 200, message: "error.mcp.redirectRelayed" }
+          : { status: 400, message: "error.mcp.redirectNoSignIn" };
       },
     }).catch((error: unknown) => {
       logger.warn("OpenBot could not listen for a relayed sign-in, so only a pasted address works:", toLogValue(error));
       return null;
     });
+    const shared: SharedListener = { id, users: 0, server };
+    this.#listeners.set(id, shared);
+    return shared;
+  }
+
+  async #releaseListener(shared: SharedListener | null): Promise<void> {
+    if (shared === null) return;
+    shared.users -= 1;
+    if (shared.users > 0) return;
+    if (this.#listeners.get(shared.id) === shared) this.#listeners.delete(shared.id);
+    await (await shared.server)?.close();
   }
 }
 

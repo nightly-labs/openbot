@@ -18,6 +18,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-two-page
 const MEMBER = "member-1";
 const TOOLS = ["search_profiles", "read_posts"];
 const CANCELLED = "The sign-in was cancelled.";
+const REFUSED = "The sign-in page refused access. Sign in again.";
 
 interface Registration {
   clientId: string;
@@ -30,6 +31,7 @@ interface FakeServer {
   tokenClients: Map<string, string>;
   approve: (page: string) => { code: string; state: string; redirectUri: string };
   refusals: string[];
+  holdNextRegistration: () => { arrived: Promise<void>; release: () => void };
   close: () => Promise<void>;
 }
 
@@ -105,6 +107,7 @@ async function fakeServer(): Promise<FakeServer> {
   const accessTokens = new Map<string, string>();
   const refreshTokens = new Map<string, string>();
   const refusals: string[] = [];
+  let held: { arrive: () => void; released: Promise<void> } | null = null;
   const issue = (clientId: string) => {
     const access = `access-${randomUUID()}`;
     const refresh = `refresh-${randomUUID()}`;
@@ -134,6 +137,12 @@ async function fakeServer(): Promise<FakeServer> {
         });
       if (path.startsWith("/.well-known/")) return json(response, 404, { error: "not found" });
       if (path === "/register" && request.method === "POST") {
+        const hold = held;
+        held = null;
+        if (hold) {
+          hold.arrive();
+          await hold.released;
+        }
         const registration = {
           clientId: `client-${registrations.length + 1}`,
           redirectUris: redirectUris(JSON.parse(await body(request))),
@@ -217,6 +226,18 @@ async function fakeServer(): Promise<FakeServer> {
       return { code, state: url.searchParams.get("state") ?? "", redirectUri };
     },
     refusals,
+    holdNextRegistration: () => {
+      let arrive = () => {};
+      let release = () => {};
+      const arrived = new Promise<void>((done) => {
+        arrive = done;
+      });
+      const released = new Promise<void>((done) => {
+        release = done;
+      });
+      held = { arrive, released };
+      return { arrived, release };
+    },
     close: () => new Promise<void>((done) => server.close(() => done())),
   };
 }
@@ -336,6 +357,43 @@ async function localCase(name: string, finish: 0 | 1 | "cancel"): Promise<CaseRe
   }
 }
 
+async function settledWhileRegistering(name: string): Promise<CaseResult> {
+  const server = await fakeServer();
+  const browser = fakeBrowser();
+  const setup = newOAuth(server, browser, "http://127.0.0.1:28417/mcp-auth");
+  const authority = {
+    accessToken: (url: string) => setup.oauth.accessToken(url),
+    signIn: (url: string) => setup.oauth.signIn(url),
+  };
+  const press = () => Effect.runFork(testMcpServer(httpConfig(server.url), 20_000, undefined, authority, "here"));
+  try {
+    const first = press();
+    await browser.opened(1, first);
+    const registration = server.holdNextRegistration();
+    const second = press();
+    await registration.arrived;
+    const page = browser.pages[0];
+    assert.ok(page, "the page opened");
+    const approved = server.approve(page.url);
+    assert.ok(setup.oauth.receiveAuthorizationCode(approved.state, approved.code), "a sign-in waited for the page");
+    const firstResult = await Effect.runPromise(Fiber.join(first));
+    registration.release();
+    const results = [firstResult, await Effect.runPromise(Fiber.join(second))];
+    const state = await finalState(server, setup);
+    return {
+      name,
+      pages: browser.pages.map(({ url, clientId, redirectUri }) => ({ url, clientId, redirectUri })),
+      results,
+      ...state,
+      refusals: [...server.refusals],
+      failures: [],
+    };
+  } finally {
+    await runCauseEffect(setup.oauth.close());
+    await server.close();
+  }
+}
+
 async function freePort(): Promise<number> {
   const probe = createServer();
   await new Promise<void>((done) => probe.listen(0, "127.0.0.1", done));
@@ -344,7 +402,13 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-async function joinedCase(name: string, finish: 0 | 1): Promise<CaseResult> {
+interface JoinedAction {
+  finish: 0 | 1;
+  via: "browser" | "paste";
+  refuseFirst?: true;
+}
+
+async function joinedCase(name: string, action: JoinedAction): Promise<CaseResult> {
   const server = await fakeServer();
   const browser = fakeBrowser();
   const hostPort = await freePort();
@@ -380,6 +444,7 @@ async function joinedCase(name: string, finish: 0 | 1): Promise<CaseResult> {
     accounts: { startRelay: unused, relayStatus: () => ({ pageUrl: null, result: null }), cancelSignIn: unused },
     receiveMcpGrant: (state, code) => setup.oauth.receiveAuthorizationCode(state, code),
     receiveMcpRefusal: (state) => setup.oauth.refuseAuthorization(state),
+    cancelMcpSignInPage: (state) => setup.oauth.cancelSignInPage(state),
     printedLink: () => false,
   });
   const client = new SignInRelayClient({
@@ -401,18 +466,37 @@ async function joinedCase(name: string, finish: 0 | 1): Promise<CaseResult> {
     await browser.opened(1, first);
     const second = Effect.runFork(client.run(key, remote));
     await browser.opened(2, second);
-    const page = browser.pages[finish];
+    const refused = browser.pages[0];
+    let refusedResult: McpTestResult | null = null;
+    if (action.refuseFirst && refused) {
+      const back = new URL(refused.redirectUri);
+      await (
+        await fetch(`http://127.0.0.1:${back.port}${back.pathname}?error=access_denied&state=${refused.state}`)
+      ).text();
+      refusedResult = await Effect.runPromise(Fiber.join(first));
+    }
+    const page = browser.pages[action.finish];
     assert.ok(page, "the page opened");
     const approved = server.approve(page.url);
     const back = new URL(approved.redirectUri);
-    const returned = await fetch(
-      `http://127.0.0.1:${back.port}${back.pathname}?code=${approved.code}&state=${approved.state}`,
-    );
-    const text = (await returned.text())
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const results = [await Effect.runPromise(Fiber.join(first)), await Effect.runPromise(Fiber.join(second))];
+    let status = 200;
+    let text = "";
+    if (action.via === "paste")
+      client.paste(key, `${approved.redirectUri}?code=${approved.code}&state=${approved.state}`);
+    else {
+      const returned = await fetch(
+        `http://127.0.0.1:${back.port}${back.pathname}?code=${approved.code}&state=${approved.state}`,
+      );
+      status = returned.status;
+      text = (await returned.text())
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    const results = [
+      refusedResult ?? (await Effect.runPromise(Fiber.join(first))),
+      await Effect.runPromise(Fiber.join(second)),
+    ];
     const state = await finalState(server, setup);
     const entry: CaseResult = {
       name,
@@ -422,7 +506,7 @@ async function joinedCase(name: string, finish: 0 | 1): Promise<CaseResult> {
       refusals: [...server.refusals],
       failures: [],
     };
-    check(entry, returned.status === 200, `the return page answered ${returned.status}: ${text}`);
+    check(entry, status === 200, `the return page answered ${status}: ${text}`);
     return entry;
   } finally {
     await runCauseEffect(signIns.close());
@@ -431,20 +515,22 @@ async function joinedCase(name: string, finish: 0 | 1): Promise<CaseResult> {
   }
 }
 
-function checkSignedIn(entry: CaseResult, finished: 0 | 1): void {
+function checkSignedIn(entry: CaseResult, finished: 0 | 1, pages = 2, signedInPresses = [0, 1]): void {
   const page = entry.pages[finished];
-  check(entry, entry.pages.length === 2, `${entry.pages.length} pages opened, not 2`);
-  check(
-    entry,
-    entry.pages[0]?.redirectUri !== entry.pages[1]?.redirectUri,
-    "the second page did not use the next return address",
-  );
-  for (const [index, result] of entry.results.entries())
+  check(entry, entry.pages.length === pages, `${entry.pages.length} pages opened, not ${pages}`);
+  if (pages === 2)
     check(
       entry,
-      result.error === null && result.toolCount === TOOLS.length,
-      `press ${index + 1} ended with ${JSON.stringify(result)}`,
+      entry.pages[0]?.redirectUri !== entry.pages[1]?.redirectUri,
+      "the second page did not use the next return address",
     );
+  for (const [index, result] of entry.results.entries())
+    if (signedInPresses.includes(index))
+      check(
+        entry,
+        result.error === null && result.toolCount === TOOLS.length,
+        `press ${index + 1} ended with ${JSON.stringify(result)}`,
+      );
   check(entry, entry.signedIn, "the sign-in was not saved");
   check(
     entry,
@@ -473,11 +559,29 @@ async function main(): Promise<void> {
       check(cancelled, result.error === CANCELLED, `press ${index + 1} ended with ${JSON.stringify(result)}`);
     check(cancelled, !cancelled.signedIn, "a cancelled sign-in was saved");
     report.cases.push(cancelled);
+    const settled = await settledWhileRegistering("this computer: page 1 signs in while press 2 registers");
+    checkSignedIn(settled, 0, 1);
+    report.cases.push(settled);
     for (const finish of [0, 1] as const) {
-      const entry = await joinedCase(`joined server: finish page ${finish + 1}`, finish);
+      const entry = await joinedCase(`joined server: finish page ${finish + 1}`, { finish, via: "browser" });
       checkSignedIn(entry, finish);
       report.cases.push(entry);
     }
+    const pasted = await joinedCase("joined server: paste the address of page 1", { finish: 0, via: "paste" });
+    checkSignedIn(pasted, 0);
+    report.cases.push(pasted);
+    const refusedFirst = await joinedCase("joined server: refuse page 1, then finish page 2", {
+      finish: 1,
+      via: "browser",
+      refuseFirst: true,
+    });
+    checkSignedIn(refusedFirst, 1, 2, [1]);
+    check(
+      refusedFirst,
+      refusedFirst.results[0]?.error === REFUSED,
+      `press 1 ended with ${JSON.stringify(refusedFirst.results[0])}, not the refusal`,
+    );
+    report.cases.push(refusedFirst);
   } catch (error) {
     report.failures.push(error instanceof Error ? (error.stack ?? error.message) : String(error));
   }

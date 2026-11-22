@@ -3047,6 +3047,7 @@ export async function createApplicationServices({
     accounts: providerAccountsHost,
     receiveMcpGrant: (state, code) => mcpOAuth.receiveAuthorizationCode(state, code),
     receiveMcpRefusal: (state) => mcpOAuth.refuseAuthorization(state),
+    cancelMcpSignInPage: (state) => mcpOAuth.cancelSignInPage(state),
     printedLink: (agentId, url) =>
       agentPrintedLink(
         service.searchConversationMessages(url, agentId, undefined, 20).results.map(({ message }) => message),

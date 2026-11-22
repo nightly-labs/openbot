@@ -64,6 +64,7 @@ async function signIn(name: string, fake: string, origin: string): Promise<SignI
     accounts: { startRelay: unused, relayStatus: noPage, cancelSignIn: unused },
     receiveMcpGrant: () => false,
     receiveMcpRefusal: () => false,
+    cancelMcpSignInPage: () => false,
     printedLink: () => false,
   });
   let finished = false;

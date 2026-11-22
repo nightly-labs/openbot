@@ -106,8 +106,11 @@ There is no configuration for a developer or for a packaged build:
   client: the client that its page named, also when the other attempt registered another client
   since then. Its exchange sends that client and the address of its page, and its tokens are saved
   with that client. The first attempt that signs in ends the others as signed in. Cancel ends them
-  all. On a joined server, each relay flow follows its own attempt, and the client keeps the
-  earlier page until its run ends, so its callback still reaches the host.
+  all. An attempt that is still before its page when another one signs in opens no page. On a
+  joined server, each relay flow follows its own attempt, and a cancel of the flow cancels only
+  that attempt, by its `state`. The client keeps the earlier page until its run ends, so its
+  callback and a pasted address still reach the host. Runs that return to the same port share one
+  listener, which closes when the last of them ends.
 - Some firewalls block both loopback names (TradingView, #7230). After `localhost` gets no grant
   back, a sign-in in this computer's browser registers `openbot://mcp-auth`, and the next one after
   that starts again at `127.0.0.1`. A refusal of the deep link at registration gets `127.0.0.1`,

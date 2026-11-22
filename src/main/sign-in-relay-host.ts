@@ -60,6 +60,7 @@ export interface SignInRelayHostDependencies {
   accounts: Pick<ProviderAccountsHost, "startRelay" | "relayStatus" | "cancelSignIn">;
   receiveMcpGrant: (state: string, code: string) => boolean;
   receiveMcpRefusal: (state: string) => boolean;
+  cancelMcpSignInPage: (state: string) => boolean;
   printedLink: (agentId: string, url: string) => boolean;
   atHost?: (sessionId: string) => boolean;
   now?: () => number;
@@ -89,7 +90,7 @@ export class SignInRelayHost {
     input: TestMcpServerInput,
     deepLinkRedirectUrl?: string,
   ) {
-    const { mcp, receiveMcpGrant, receiveMcpRefusal } = this.#dependencies;
+    const { mcp, receiveMcpGrant, receiveMcpRefusal, cancelMcpSignInPage } = this.#dependencies;
     const signIn = yield* mcp.startRelay(input, deepLinkRedirectUrl);
     const url = input.config.url;
     return this.#open(memberId, {
@@ -109,7 +110,14 @@ export class SignInRelayHost {
           const state = query.get("state");
           return state ? receiveMcpRefusal(state) : false;
         }),
-      cancel: () => signIn.cancel,
+      cancel: () =>
+        Effect.suspend(() => {
+          const page = signIn.status().pageUrl;
+          const state = page ? new URL(page).searchParams.get("state") : null;
+          if (state === null) return signIn.cancel;
+          cancelMcpSignInPage(state);
+          return Effect.void;
+        }),
     });
   });
 

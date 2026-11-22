@@ -322,7 +322,15 @@ export class McpOAuth implements McpOAuthAuthority {
     let settled = false;
     let exchangeFailed = false;
     const resource = mcpOAuthServerUrl(key);
-    const provider = this.#provider(key, state, () => abandoned, open, unanswered, deepLinkRedirectUrl);
+    const provider = this.#provider(
+      key,
+      state,
+      () => abandoned,
+      open,
+      unanswered,
+      deepLinkRedirectUrl,
+      () => settled,
+    );
     const abandon = () => {
       const unansweredNow = provider.openedRedirectUrl ?? unanswered;
       if (!abandoned && !settled && this.#waiting.has(state) && unansweredNow) this.#unanswered.set(key, unansweredNow);
@@ -341,6 +349,7 @@ export class McpOAuth implements McpOAuthAuthority {
       abandon();
     };
     const attempt: SignInAttempt = {
+      state,
       cancel,
       settle: () => {
         settled = true;
@@ -455,6 +464,16 @@ export class McpOAuth implements McpOAuthAuthority {
     const attempts = [...(this.#attempts.get(key) ?? [])];
     for (const attempt of attempts) attempt.cancel();
     return attempts.length > 0;
+  }
+
+  cancelSignInPage(state: string): boolean {
+    for (const attempts of this.#attempts.values())
+      for (const attempt of attempts) {
+        if (attempt.state !== state) continue;
+        attempt.cancel();
+        return true;
+      }
+    return false;
   }
 
   signInLink(url: string): string | null {
@@ -632,6 +651,7 @@ export class McpOAuth implements McpOAuthAuthority {
     open?: McpSignInOpener,
     unansweredRedirectUrl?: string,
     openedDeepLinkRedirectUrl?: string,
+    isSettled: () => boolean = () => false,
   ): McpOAuthClientProvider {
     const generation = this.#generations.get(key) ?? 0;
     const storage = this.#options.storage;
@@ -663,6 +683,7 @@ export class McpOAuth implements McpOAuthAuthority {
       deepLinkRedirectUrl: open ? () => openedDeepLinkRedirectUrl : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
+      isSettled,
       legacyIssuer: legacyIssuer(stored),
       hasUnboundCredentials: hasUnboundCredentials(stored),
       unansweredRedirectUrl,
@@ -671,6 +692,7 @@ export class McpOAuth implements McpOAuthAuthority {
 }
 
 interface SignInAttempt {
+  state: string;
   cancel: () => void;
   settle: () => void;
   unanswered: () => string | undefined;
@@ -686,6 +708,7 @@ interface ClientProviderOptions {
   deepLinkRedirectUrl?: (() => string | undefined) | undefined;
   openExternal: (url: string) => Promise<void>;
   isAbandoned: () => boolean;
+  isSettled: () => boolean;
   legacyIssuer: string | undefined;
   hasUnboundCredentials: boolean;
   unansweredRedirectUrl?: string | undefined;
@@ -1078,7 +1101,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
-        if (this.#options.isAbandoned()) return;
+        if (this.#options.isAbandoned() || this.#options.isSettled()) return;
         if (!this.#options.state) return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNoBrowser")));
         if (!isAuthorizationUrlSafe(authorizationUrl))
           return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNotWebPage")));
