@@ -123,7 +123,7 @@ export function WorkflowImportDialog(props: WorkflowImportDialogProps) {
                       optionValue="id"
                       optionTextValue="name"
                       placeholder={t("workflow.file.import.choose")}
-                      value={options[row.kind].find((option) => option.id === (choices[row.key] ?? ""))}
+                      value={options[row.kind].find((option) => option.id === (choices[row.key] ?? "")) ?? null}
                       onChange={(choice) => {
                         const id = choice?.id ?? "";
                         if (id !== (choices[row.key] ?? ""))

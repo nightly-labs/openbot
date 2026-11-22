@@ -137,7 +137,7 @@ export interface WorkflowFileTargets {
 export interface WorkflowFileCandidate {
   id: string;
   name: string;
-  title?: string;
+  title?: string | undefined;
 }
 
 const REFERENCE_PREFIX: Readonly<Record<WorkflowFileReferenceKind, string>> = { agent: "agent-", channel: "channel-" };
