@@ -1,15 +1,3 @@
-// Checks that the model list of a running Antigravity CLI is read again, so a Gemini model that Google
-// releases while OpenBot runs shows in the picker without a restart (#12308). Runs the real
-// `antigravity` driver and the real `ModelCatalog` over a fake `agy acp`
-// (`provider-fakes/agents/antigravity-model-list.ts`) whose list changes while it runs. Checks:
-//   1. The Antigravity catalog asks for the quiet reread of a running provider (`relistWhileRunning`),
-//      the condition that `ProviderRuntime.#rereadModels` reads.
-//   2. That reread (`ModelCatalog.relist` with `quiet`) gives the new model.
-//   3. The reread resumes the kept probe session and opens no new one: Antigravity keeps about 100 MB
-//      for each session until its process ends (#3925).
-// The 10-minute timer itself is not driven here. A real CLI was not checked: whether `agy acp` lists a
-// new model on a resume of a session that it opened before the release.
-// `bun scripts/antigravity-model-reread-e2e.ts`. Writes .openbot-build/antigravity-model-reread-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -75,23 +63,19 @@ try {
       .filter((model) => model.provider === "antigravity")
       .map((model) => model.id);
 
-  // 1. The reread of a running provider includes Antigravity.
   report.relistWhileRunning = requireProviderDriver("antigravity").catalog?.relistWhileRunning === true;
   assert.ok(report.relistWhileRunning, "The Antigravity list is read again while the CLI runs.");
 
-  // The list at the start of the provider.
   await runCauseEffect(catalog.refresh());
   report.atStart = listed();
   assert.deepEqual(report.atStart, BEFORE, "The start lists the models that the account has.");
 
-  // 2. Google releases a model while the CLI runs, and the quiet reread lists it.
   await writeFile(control, JSON.stringify({ models: [RELEASED, ...BEFORE] }));
   report.rereadFresh = await runCauseEffect(catalog.relist("antigravity", { quiet: true }));
   report.afterReread = listed();
   assert.ok(report.rereadFresh, "The reread gives a fresh list.");
   assert.deepEqual(report.afterReread, [RELEASED, ...BEFORE], "The reread lists the released model.");
 
-  // 3. Each read after the first resumes the one probe session.
   const setups = (await readJsonl<SetupLine>(log)).filter((line) => line.event === "setup");
   report.setups = setups.map(({ method, sessionId, models }) => ({ method, sessionId, models }));
   const opened = setups.filter((line) => line.method === "session/new");

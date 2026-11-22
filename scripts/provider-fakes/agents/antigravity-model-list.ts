@@ -1,7 +1,3 @@
-// The Antigravity agent of `antigravity-model-reread-e2e.ts`. Each session setup, new or resumed, lists
-// the models in the JSON file `FAKE_CONTROL`, read again at each request, so the test can give the
-// running process a model that Google released after it started. Each setup is logged with its method,
-// session and models.
 import { readFileSync } from "node:fs";
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
