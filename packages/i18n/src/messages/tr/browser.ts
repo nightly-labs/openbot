@@ -70,6 +70,8 @@ export const messages = {
   "browser.liveView.copyTooLarge": "Seçim kopyalamak için çok uzun. Daha az metin seçin.",
   "browser.liveView.copyFailed": "Metin kopyalanamadı. Sayfaya tıklayıp yeniden deneyin.",
   "browser.liveView.pageCopied": "Sayfa metin kopyaladı. Panonuza almak için Kopyala'yı seçin.",
+  "browser.liveView.dialog.title": "Sayfa bir mesaj gösteriyor",
+  "browser.liveView.dialog.ok": "Tamam",
   "browser.previews.label": "Tarayıcı önizlemeleri",
   "browser.previews.resize": "Sağ paneli yeniden boyutlandır",
   "browser.previews.empty": "Tarayıcı sekmesi yok",

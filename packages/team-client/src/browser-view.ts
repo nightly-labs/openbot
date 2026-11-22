@@ -2,6 +2,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   BROWSER_VIEW_CONTEXT_MENU_QUERY,
   BROWSER_VIEW_CURSOR_QUERY,
+  BROWSER_VIEW_DIALOG_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
   BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
   BROWSER_VIEW_PAGE_COPY_QUERY,
@@ -55,6 +56,7 @@ export interface RemoteBrowserViewFeatures {
   contextMenu: boolean;
   viewport: BrowserViewViewport | null;
   pageCopy?: boolean;
+  dialog?: boolean;
 }
 const NO_FEATURES: RemoteBrowserViewFeatures = { cursor: false, contextMenu: false, viewport: null };
 export function createRemoteBrowserView(
@@ -131,6 +133,7 @@ export function createRemoteBrowserView(
     if (asked.cursor && message) path.searchParams.set(BROWSER_VIEW_CURSOR_QUERY, "1");
     if (asked.contextMenu && message) path.searchParams.set(BROWSER_VIEW_CONTEXT_MENU_QUERY, "1");
     if (asked.pageCopy && message) path.searchParams.set(BROWSER_VIEW_PAGE_COPY_QUERY, "1");
+    if (asked.dialog && message) path.searchParams.set(BROWSER_VIEW_DIALOG_QUERY, "1");
     if (asked.viewport) path.searchParams.set(BROWSER_VIEW_VIEWPORT_QUERY, browserViewViewportQuery(asked.viewport));
     yield* sendFrame(
       encodeRemoteDesktopSignalControl({

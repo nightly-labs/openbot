@@ -71,6 +71,8 @@ export const messages = {
   "browser.liveView.copyFailed": "Impossible de copier le texte. Cliquez sur la page et réessayez.",
   "browser.liveView.pageCopied":
     "La page a copié du texte. Choisissez Copier pour le mettre dans votre presse-papiers.",
+  "browser.liveView.dialog.title": "La page affiche un message",
+  "browser.liveView.dialog.ok": "OK",
   "browser.previews.label": "Aperçus du navigateur",
   "browser.previews.resize": "Redimensionner le panneau de droite",
   "browser.previews.empty": "Aucun onglet de navigateur",

@@ -67,6 +67,8 @@ export const messages = {
   "browser.liveView.copyTooLarge": "선택한 영역이 너무 길어서 복사할 수 없어요. 더 적은 텍스트를 선택해 주세요.",
   "browser.liveView.copyFailed": "텍스트를 복사할 수 없어요. 페이지를 클릭한 후 다시 시도해 주세요.",
   "browser.liveView.pageCopied": "페이지에서 텍스트를 복사했어요. 클립보드에 넣으려면 복사를 선택하세요.",
+  "browser.liveView.dialog.title": "페이지에 메시지가 표시됩니다",
+  "browser.liveView.dialog.ok": "확인",
   "browser.previews.label": "브라우저 미리보기",
   "browser.previews.resize": "오른쪽 패널 크기 조절",
   "browser.previews.empty": "브라우저 탭 없음",

@@ -1,9 +1,10 @@
 import {
   BROWSER_LIVE_VIEW_MAX_PASTE_TEXT,
   type BrowserDesktopApi,
+  type BrowserLiveViewDialog,
   type BrowserLiveViewInput,
 } from "@openbot/contracts/ipc";
-import { ErrorReference, toast } from "@openbot/ui";
+import { ConfirmDialog, ErrorReference, MessageSquareText, toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
@@ -43,6 +44,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   });
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
   const [frame, setFrame] = createSignal<{ sequence: number; width: number; height: number }>();
+  const [dialog, setDialog] = createSignal<BrowserLiveViewDialog | null>(null);
   let pendingFrame: Promise<void> | undefined;
   let queuedFrame: LiveViewFrame | undefined;
   let stream = 0;
@@ -52,6 +54,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     pendingFrame = undefined;
     queuedFrame = undefined;
     setFrame(undefined);
+    setDialog(null);
   };
 
   const draw = async (next: LiveViewFrame) => {
@@ -102,6 +105,10 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     }
     if (event.type === "copyTooLarge") {
       settleCopy("tooLarge");
+      return;
+    }
+    if (event.type === "dialog") {
+      setDialog(event.dialog);
       return;
     }
     if (event.type === "stopped") {
@@ -156,6 +163,13 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
 
   const send = (input: BrowserLiveViewInput) => {
     void runtime.sendLiveViewInput(input).catch(() => undefined);
+  };
+
+  const answerDialog = (accept: boolean) => {
+    const open = dialog();
+    if (!open) return;
+    setDialog(null);
+    send({ type: "dialog", id: open.id, accept });
   };
 
   createEffect(
@@ -310,6 +324,17 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
           <ErrorReference reference={state.reference} />
         </div>
       </Show>
+      <ConfirmDialog
+        open={dialog() !== null}
+        tone="default"
+        icon={<MessageSquareText />}
+        title={t("browser.liveView.dialog.title")}
+        description={dialog()?.message}
+        confirmLabel={t("browser.liveView.dialog.ok")}
+        hideCancel={dialog()?.type === "alert"}
+        onConfirm={() => answerDialog(true)}
+        onCancel={() => answerDialog(false)}
+      />
     </div>
   );
 }

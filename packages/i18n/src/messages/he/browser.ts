@@ -71,6 +71,8 @@ export const messages = {
   "browser.liveView.copyTooLarge": "הבחירה ארוכה מדי להעתקה. יש לבחור פחות טקסט.",
   "browser.liveView.copyFailed": "לא ניתן להעתיק את הטקסט. יש ללחוץ על הדף ולנסות שוב.",
   "browser.liveView.pageCopied": "הדף העתיק טקסט. יש לבחור „העתקה” כדי לשים אותו בלוח.",
+  "browser.liveView.dialog.title": "הדף מציג הודעה",
+  "browser.liveView.dialog.ok": "אישור",
   "browser.previews.label": "תצוגות מקדימות של הדפדפן",
   "browser.previews.resize": "שינוי גודל הלוח הימני",
   "browser.previews.empty": "אין לשוניות דפדפן",

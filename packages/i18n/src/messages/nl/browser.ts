@@ -70,6 +70,8 @@ export const messages = {
   "browser.liveView.copyTooLarge": "De selectie is te lang om te kopiëren. Selecteer minder tekst.",
   "browser.liveView.copyFailed": "Kan de tekst niet kopiëren. Klik op de pagina en probeer het opnieuw.",
   "browser.liveView.pageCopied": "De pagina heeft tekst gekopieerd. Kies Kopiëren om die op je klembord te zetten.",
+  "browser.liveView.dialog.title": "De pagina toont een bericht",
+  "browser.liveView.dialog.ok": "OK",
   "browser.previews.label": "Browservoorbeelden",
   "browser.previews.resize": "Grootte van rechterpaneel wijzigen",
   "browser.previews.empty": "Geen browsertabbladen",

@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "페이지에 입력",
   "mobile.browser.reconnect": "다시 연결",
   "mobile.browser.status.connecting": "브라우저에 연결하는 중…",
+  "mobile.browser.dialog.title": "페이지에 메시지가 표시됩니다",
+  "mobile.browser.dialog.ok": "확인",
   "mobile.browser.status.ended": "실시간 보기가 종료되었어요.",
   "mobile.browser.status.offline": "서버가 연결되어 있지 않아요.",
   "mobile.browser.status.noTab": "{name}에 열린 브라우저 탭이 없어요.",

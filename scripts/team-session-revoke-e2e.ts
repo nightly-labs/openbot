@@ -113,6 +113,7 @@ async function runHost(root: string, configure: boolean): Promise<void> {
     startView: unused,
     dispatchViewInput: unused,
     copyViewSelection: unused,
+    answerViewDialog: unused,
     importSignIn: unused,
   };
   const send = (message: HostMessage) => process.stdout.write(`${HOST_LINE}${JSON.stringify(message)}\n`);

@@ -72,6 +72,8 @@ export const messages = {
   "browser.liveView.copyTooLarge": "Zaznaczenie jest za długie do skopiowania. Zaznacz mniej tekstu.",
   "browser.liveView.copyFailed": "Nie udało się skopiować tekstu. Kliknij stronę i spróbuj ponownie.",
   "browser.liveView.pageCopied": "Strona skopiowała tekst. Wybierz Kopiuj, aby umieścić go w schowku.",
+  "browser.liveView.dialog.title": "Strona wyświetla komunikat",
+  "browser.liveView.dialog.ok": "OK",
   "browser.previews.label": "Podglądy przeglądarki",
   "browser.previews.resize": "Zmień rozmiar prawego panelu",
   "browser.previews.empty": "Brak kart przeglądarki",

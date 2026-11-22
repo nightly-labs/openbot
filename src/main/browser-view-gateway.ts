@@ -7,6 +7,7 @@ import {
   BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
   BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
   type BrowserViewContextMenu,
+  type BrowserViewDialog,
   type BrowserViewHostMessage,
   type BrowserViewSessionResponse,
   type BrowserViewViewport,
@@ -14,6 +15,7 @@ import {
   browserViewClientViewport,
   browserViewClientWantsContextMenu,
   browserViewClientWantsCursor,
+  browserViewClientWantsDialog,
   browserViewClientWantsPageCopy,
   browserViewStreamPath,
   browserViewStreamSessionId,
@@ -41,6 +43,7 @@ const MAX_FRAMES_IN_FLIGHT = 4;
 const HELD_FRAME_DEADLINE_MS = 1_000;
 const MAX_UNACKNOWLEDGED_FRAMES = 120;
 const MAX_ACK_MESSAGE_BYTES = 128;
+const MAX_DIALOG_ANSWER_BYTES = 256;
 
 function forgetFramesBefore(sizes: Map<number, { width: number; height: number }>, drawn: number): void {
   for (const sequence of sizes.keys()) {
@@ -59,7 +62,7 @@ const MAX_SESSIONS = 4;
 const MAX_INPUT_MESSAGE_BYTES = 6 * BROWSER_VIEW_MAX_CLIPBOARD_TEXT + 4 * 1024;
 
 export interface BrowserViewGatewayOptions {
-  browser: Pick<BrowserHost, "startView" | "dispatchViewInput" | "copyViewSelection">;
+  browser: Pick<BrowserHost, "startView" | "dispatchViewInput" | "copyViewSelection" | "answerViewDialog">;
   authenticate: (token: string) => { id: string } | null;
   onInput?: () => void;
   maxSessions?: number;
@@ -73,6 +76,7 @@ class BrowserViewPort extends Context.Service<
     ): Effect.Effect<Effect.Success<ReturnType<BrowserHost["startView"]>>, RemoteWorkflowError>;
     input(...args: Parameters<BrowserHost["dispatchViewInput"]>): Effect.Effect<void, RemoteWorkflowError>;
     copy(...args: Parameters<BrowserHost["copyViewSelection"]>): Effect.Effect<string | null, RemoteWorkflowError>;
+    answerDialog(...args: Parameters<BrowserHost["answerViewDialog"]>): Effect.Effect<void, RemoteWorkflowError>;
   }
 >()("openbot/main/BrowserViewPort") {
   static layer(browser: BrowserViewGatewayOptions["browser"]) {
@@ -85,6 +89,8 @@ class BrowserViewPort extends Context.Service<
           browser.dispatchViewInput(...args).pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
         copy: (...args) =>
           browser.copyViewSelection(...args).pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
+        answerDialog: (...args) =>
+          browser.answerViewDialog(...args).pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
       }),
     );
   }
@@ -114,6 +120,8 @@ interface ManagedViewSession {
   reportContextMenu: boolean;
   viewport: BrowserViewViewport | null;
   reportPageCopy: boolean;
+  reportDialog: boolean;
+  dialog: BrowserViewDialog | null;
   lastActionAt: number;
 }
 
@@ -157,6 +165,8 @@ export class BrowserViewGateway {
       reportContextMenu: false,
       viewport: null,
       reportPageCopy: false,
+      reportDialog: false,
+      dialog: null,
       lastActionAt: 0,
     });
     return { id, tabId: input.tabId, streamPath: browserViewStreamPath(id) };
@@ -246,6 +256,7 @@ export class BrowserViewGateway {
     session.reportCursor = browserViewClientWantsCursor(url);
     session.reportContextMenu = browserViewClientWantsContextMenu(url);
     session.reportPageCopy = browserViewClientWantsPageCopy(url);
+    session.reportDialog = browserViewClientWantsDialog(url);
     session.viewport = browserViewClientViewport(url);
     this.#webSockets.handleUpgrade(request, socket, head, (client) => this.#dispatch(this.#connect(session, client)));
   }
@@ -272,9 +283,11 @@ export class BrowserViewGateway {
     session.frameSizes.clear();
     session.drawnSequence = 0;
     this.#forgetHeldFrame(session);
+    session.dialog = null;
     recordRestartActivity();
     client.on("message", (data, binary) => {
       if (binary || session.socket !== client) return;
+      if (this.#answerDialog(session, data)) return;
       this.#noteDrawnFrame(session, client, data);
       session.waiting += 1;
       this.#dispatch(
@@ -314,6 +327,11 @@ export class BrowserViewGateway {
             ? { onCursor: (cursor) => this.#send(session, client, { type: "cursor", cursor }) }
             : {}),
           ...(session.viewport ? { viewport: session.viewport } : {}),
+          onDialog: (dialog) => {
+            if (session.socket !== client) return;
+            session.dialog = dialog;
+            if (session.reportDialog) this.#send(session, client, { type: "dialog", dialog });
+          },
           ...(session.reportPageCopy
             ? {
                 onPageCopy: (text: string) => {
@@ -355,6 +373,12 @@ export class BrowserViewGateway {
     if (input.type === "ack") {
       if (!session.frameSizes.has(input.sequence)) return;
       forgetFramesBefore(session.frameSizes, input.sequence);
+      return;
+    }
+    if (input.type === "dialog") return;
+    if (session.dialog) {
+      if (input.type === "copy" && session.socket.readyState === webSockets.WebSocket.OPEN)
+        session.socket.send(encodeBrowserViewCopied({ type: "copied", text: "" }));
       return;
     }
     this.#options.onInput?.();
@@ -405,7 +429,7 @@ export class BrowserViewGateway {
     const move = session.heldMove;
     if (!move || (!beforeInput && session.waiting > 0)) return;
     session.heldMove = null;
-    if (!session.socket) return;
+    if (!session.socket || session.dialog) return;
     const browser = yield* BrowserViewPort;
     yield* browser.input(session.tabId, move).pipe(Effect.catch(() => Effect.void));
   });
@@ -460,6 +484,27 @@ export class BrowserViewGateway {
     if (input.type !== "ack" || !session.frameSizes.has(input.sequence)) return;
     session.drawnSequence = Math.max(session.drawnSequence, input.sequence);
     this.#releaseHeldFrame(session, client, false);
+  }
+
+  #answerDialog(session: ManagedViewSession, data: Ws.RawData): boolean {
+    if (rawDataSize(data) > MAX_DIALOG_ANSWER_BYTES) return false;
+    let input: ReturnType<typeof decodeBrowserViewInput>;
+    try {
+      input = decodeBrowserViewInput(rawDataText(data));
+    } catch {
+      return false;
+    }
+    if (input.type !== "dialog") return false;
+    const { id, accept } = input;
+    if (session.dialog?.id !== id) return true;
+    this.#options.onInput?.();
+    this.#dispatch(
+      Effect.gen(function* () {
+        const browser = yield* BrowserViewPort;
+        yield* browser.answerDialog(session.tabId, id, accept).pipe(Effect.catch(() => Effect.void));
+      }),
+    );
+    return true;
   }
 
   #send(session: ManagedViewSession, client: Ws.WebSocket, message: BrowserViewHostMessage): void {

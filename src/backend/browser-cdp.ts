@@ -173,6 +173,7 @@ export interface BrowserScreencastOptions {
   maxHeight: number;
   viewport?: { width: number; height: number };
   onPageCopy?: (text: string) => void;
+  watchDialogs?: boolean;
 }
 
 export interface BrowserScreencastFrame {
@@ -932,6 +933,8 @@ export class BrowserCdpEngine {
   readonly #dialogWatches = new Set<DialogWatch>();
   #dialog: (BrowserDialog & { owner: BrowserDialogOwner | undefined }) | undefined;
   #dialogChanged = Deferred.makeUnsafe<void>();
+  readonly #dialogListeners = new Set<() => void>();
+  #viewDialogWatches = 0;
   #pageEnabled = false;
   #dialogBoxPending = false;
   #cancelDialogBox = false;
@@ -2190,6 +2193,28 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<void, BrowserOperationError> {
     if (this.#dialog?.id !== id) return yield* browserFailure(new Error(DIALOG_CLOSED_ERROR));
     if (!this.dialogOwnedBy(owner)) return yield* browserFailure(new Error(DIALOG_FOR_PERSON_ERROR));
+    yield* this.#sendDialogAnswer(id, accept);
+  });
+
+  readonly answerPersonDialog = Effect.fn("BrowserCdp.answerPersonDialog")(function* (
+    this: BrowserCdpEngine,
+    id: string,
+    accept: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    if (this.#dialog?.id !== id) return yield* browserFailure(new Error(DIALOG_CLOSED_ERROR));
+    yield* this.#sendDialogAnswer(id, accept);
+  });
+
+  onDialogChange(listener: () => void): () => void {
+    this.#dialogListeners.add(listener);
+    return () => this.#dialogListeners.delete(listener);
+  }
+
+  readonly #sendDialogAnswer = Effect.fn("BrowserCdp.sendDialogAnswer")(function* (
+    this: BrowserCdpEngine,
+    id: string,
+    accept: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
     const answered = yield* browserCall(() =>
       this.#contents.debugger.sendCommand("Page.handleJavaScriptDialog", { accept }).then(() => {
         this.#contents.emit(CANCEL_DIALOGS_EVENT);
@@ -2272,6 +2297,7 @@ export class BrowserCdpEngine {
     const changed = this.#dialogChanged;
     this.#dialogChanged = Deferred.makeUnsafe<void>();
     Deferred.doneUnsafe(changed, Effect.void);
+    for (const listener of [...this.#dialogListeners]) listener();
   }
 
   cancelPendingCommands(): boolean {
@@ -2453,6 +2479,13 @@ export class BrowserCdpEngine {
       this.#viewViewports.splice(this.#viewViewports.indexOf(viewport), 1);
       return true;
     };
+    let watchesDialogs = options.watchDialogs === true;
+    if (watchesDialogs) this.#viewDialogWatches += 1;
+    const releaseDialogWatch = () => {
+      if (!watchesDialogs) return;
+      watchesDialogs = false;
+      this.#viewDialogWatches -= 1;
+    };
     let sequence = 0;
     const pacer = createFramePacer<Omit<BrowserScreencastFrame, "sequence">>((frame) => {
       sequence += 1;
@@ -2525,6 +2558,7 @@ export class BrowserCdpEngine {
             Effect.sync(() => {
               pacer.stop();
               releaseViewport();
+              releaseDialogWatch();
             }),
           ),
         );
@@ -3744,7 +3778,7 @@ export class BrowserCdpEngine {
         return result;
       });
     return yield* Effect.gen({ self: this }, function* () {
-      if (this.#dialogWatches.size > 0 && this.#ownsDebugger && !this.#pageEnabled) {
+      if ((this.#dialogWatches.size > 0 || this.#viewDialogWatches > 0) && this.#ownsDebugger && !this.#pageEnabled) {
         yield* send("Page.enable");
         this.#pageEnabled = true;
       }

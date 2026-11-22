@@ -352,6 +352,7 @@ try {
       startView: unused,
       dispatchViewInput: unused,
       copyViewSelection: unused,
+      answerViewDialog: unused,
       importSignIn: unused,
     },
     sidebarLayout: sidebar,

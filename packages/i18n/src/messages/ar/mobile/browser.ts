@@ -44,6 +44,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "الكتابة في الصفحة",
   "mobile.browser.reconnect": "إعادة الاتصال",
   "mobile.browser.status.connecting": "جارٍ الاتصال بالمتصفح…",
+  "mobile.browser.dialog.title": "تعرض الصفحة رسالة",
+  "mobile.browser.dialog.ok": "حسنًا",
   "mobile.browser.status.ended": "انتهى العرض المباشر.",
   "mobile.browser.status.offline": "الخادم غير متصل.",
   "mobile.browser.status.noTab": "لا توجد علامة تبويب مفتوحة في متصفح {name}.",

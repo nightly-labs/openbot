@@ -74,6 +74,8 @@ export const messages = {
   "browser.liveView.copyTooLarge": "التحديد أطول من أن يُنسخ. حدّد نصًا أقل.",
   "browser.liveView.copyFailed": "تعذّر نسخ النص. انقر الصفحة وحاول مرة أخرى.",
   "browser.liveView.pageCopied": "نسخت الصفحة نصًا. اختر «نسخ» لوضعه في الحافظة.",
+  "browser.liveView.dialog.title": "تعرض الصفحة رسالة",
+  "browser.liveView.dialog.ok": "حسنًا",
   "browser.previews.label": "معاينات المتصفح",
   "browser.previews.resize": "تغيير حجم اللوحة اليمنى",
   "browser.previews.empty": "لا علامات تبويب",

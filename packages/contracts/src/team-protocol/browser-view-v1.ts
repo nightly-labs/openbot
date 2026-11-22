@@ -62,6 +62,20 @@ export function browserViewClientWantsPageCopy(url: URL): boolean {
 }
 export const BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS = 5_000;
 
+export const TEAM_BROWSER_VIEW_DIALOG_CAPABILITY = "browser-view-dialog-v1";
+export const BROWSER_VIEW_DIALOG_QUERY = "dialog";
+export const BROWSER_VIEW_DIALOG_MESSAGE_MAX = 2_000;
+
+export function browserViewClientWantsDialog(url: URL): boolean {
+  return url.searchParams.get(BROWSER_VIEW_DIALOG_QUERY) === "1";
+}
+
+export interface BrowserViewDialog {
+  id: string;
+  type: "alert" | "confirm";
+  message: string;
+}
+
 export const BROWSER_VIEW_CONTEXT_MENU_ITEMS = [
   "copy-link",
   "copy-image-address",
@@ -109,7 +123,8 @@ export type BrowserViewHostMessage =
   | BrowserViewCopied
   | { type: "cursor"; cursor: BrowserViewCursor }
   | ({ type: "context-menu" } & BrowserViewContextMenu)
-  | { type: "pageCopied"; text: string };
+  | { type: "pageCopied"; text: string }
+  | { type: "dialog"; dialog: BrowserViewDialog | null };
 
 export function encodeBrowserViewHostMessage(message: BrowserViewHostMessage): string {
   return JSON.stringify(message);
@@ -131,6 +146,18 @@ function decodeHostMessageValue(message: unknown): BrowserViewHostMessage | null
     if (!isBoundedString(message.text, BROWSER_VIEW_MAX_CLIPBOARD_TEXT) || message.text.length === 0)
       throw new Error("Invalid browser view message.");
     return { type: "pageCopied", text: message.text };
+  }
+  if (message.type === "dialog") {
+    const dialog = message.dialog;
+    if (dialog === null) return { type: "dialog", dialog: null };
+    if (
+      !isDynamicRecord(dialog) ||
+      !isIdentifier(dialog.id) ||
+      (dialog.type !== "alert" && dialog.type !== "confirm") ||
+      !isBoundedString(dialog.message, BROWSER_VIEW_DIALOG_MESSAGE_MAX)
+    )
+      throw new Error("Invalid browser view message.");
+    return { type: "dialog", dialog: { id: dialog.id, type: dialog.type, message: dialog.message } };
   }
   if (message.type === "context-menu") {
     const listed = message.items;
@@ -199,7 +226,8 @@ export type BrowserViewInput =
   | { type: "ack"; sequence: number }
   | { type: "paste"; text: string }
   | { type: "copy" }
-  | { type: "cut"; text: string };
+  | { type: "cut"; text: string }
+  | { type: "dialog"; id: string; accept: boolean };
 
 export function isBrowserViewUserAction(input: BrowserViewInput): boolean {
   return input.type === "key" || (input.type === "pointer" && (input.action === "down" || input.action === "up"));
@@ -304,6 +332,11 @@ export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput 
     return { type: message.type, text: message.text };
   }
   if (message.type === "copy") return { type: "copy" };
+  if (message.type === "dialog") {
+    if (!isIdentifier(message.id) || typeof message.accept !== "boolean")
+      throw new Error("Invalid browser view input.");
+    return { type: "dialog", id: message.id, accept: message.accept };
+  }
   const modifiers = isNumber(message.modifiers) ? message.modifiers : 0;
   if (!Number.isInteger(modifiers) || modifiers < 0 || modifiers > 15) throw new Error("Invalid browser view input.");
   if (message.type === "pointer") {

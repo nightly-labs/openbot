@@ -328,7 +328,8 @@ export type BrowserLiveViewInput =
   | { type: "ack"; sequence: number }
   | { type: "paste"; text: string }
   | { type: "copy" }
-  | { type: "cut"; text: string };
+  | { type: "cut"; text: string }
+  | { type: "dialog"; id: string; accept: boolean };
 
 export const BROWSER_LIVE_VIEW_MAX_PASTE_TEXT = 100_000;
 
@@ -336,4 +337,11 @@ export type BrowserLiveViewEvent =
   | { type: "frame"; tabId: string; sequence: number; width: number; height: number; image: Uint8Array }
   | { type: "stopped"; tabId: string; reason: string }
   | { type: "copied"; tabId: string; text: string }
-  | { type: "copyTooLarge"; tabId: string };
+  | { type: "copyTooLarge"; tabId: string }
+  | { type: "dialog"; tabId: string; dialog: BrowserLiveViewDialog | null };
+
+export interface BrowserLiveViewDialog {
+  id: string;
+  type: "alert" | "confirm";
+  message: string;
+}

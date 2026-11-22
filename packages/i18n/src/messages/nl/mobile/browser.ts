@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Typen op de pagina",
   "mobile.browser.reconnect": "Verbind opnieuw",
   "mobile.browser.status.connecting": "Verbinden met de browser…",
+  "mobile.browser.dialog.title": "De pagina toont een bericht",
+  "mobile.browser.dialog.ok": "OK",
   "mobile.browser.status.ended": "De live weergave is beëindigd.",
   "mobile.browser.status.offline": "De server is niet verbonden.",
   "mobile.browser.status.noTab": "{name} heeft geen browsertabblad open.",
