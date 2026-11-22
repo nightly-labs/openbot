@@ -84,12 +84,35 @@ const compact = (message) => {
   write(frame({ type: "system", subtype: "status", status: null, compact_result: "success", uuid: randomUUID() }));
   result(message, "Compacted.");
 };
+let background = false;
+const usageLimit = (message) => {
+  const uuid = randomUUID();
+  const text = "You've hit your limit · resets 3pm";
+  const resetsAt = Math.floor(Date.now() / 1000) + 3600;
+  write(frame({ type: "assistant", uuid, user_message_uuid: message.uuid, error: "rate_limit",
+    api_error: "usage_limit_reached", api_error_params: { rate_limit_info: { status: "rejected", resetsAt } },
+    message: { id: "msg_" + uuid, type: "message", role: "assistant", model: ${JSON.stringify(CLAUDE_MODEL)},
+      content: [{ type: "text", text }], stop_reason: "stop_sequence", usage: { input_tokens: 0, output_tokens: 0 } } }));
+  write(frame({ type: "result", subtype: "success", is_error: true, result: text, uuid: randomUUID(),
+    user_message_uuid: message.uuid, user_message_uuids: [message.uuid], terminal_reason: "completed",
+    duration_ms: 1, duration_api_ms: 1, num_turns: 1, total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0 },
+    permission_denials: [] }));
+};
 const turn = (message) => {
   const text = typeof message.message.content === "string" ? message.message.content : JSON.stringify(message.message);
   log({ prompt: text });
   if (text === "/compact") {
     compact(message);
     return;
+  }
+  if (text.includes("USAGE-LIMIT")) {
+    usageLimit(message);
+    return;
+  }
+  if (background || text.includes("BACKGROUND")) {
+    background = text.includes("BACKGROUND");
+    write(frame({ type: "system", subtype: "background_tasks_changed", uuid: randomUUID(),
+      tasks: background ? [{ id: "background-shell", type: "local_bash" }] : [] }));
   }
   save({ type: "user", uuid: message.uuid, message: message.message });
   contextTokens = text.includes("SMALL") ? ${SMALL_TOKENS} : ${LARGE_TOKENS};
@@ -222,6 +245,8 @@ const report: {
     };
     small?: { compactPrompts: number };
     switchedOff?: { compactPrompts: number };
+    backgroundWork?: { compactPrompts: number };
+    usageLimit?: { compactPrompts: number; limitedBeforeTimer: boolean };
     fiveMinutes?: { compactPrompts: number };
     cancelled?: { compactPrompts: number };
     errors?: string[];
@@ -371,10 +396,42 @@ try {
   await quietPeriod();
   report.cases.switchedOff = { compactPrompts: compactions() };
   if (compactions() !== 2) report.failures.push("A thread was compacted while the setting was off.");
+  compactionSwitch = true;
+
+  const beforeBackground = compactions();
+  await runTurn("Large context while BACKGROUND work runs.");
+  await quietPeriod();
+  report.cases.backgroundWork = { compactPrompts: compactions() };
+  if (compactions() !== beforeBackground)
+    report.failures.push("A thread was compacted while Claude ran background work.");
 
   const agentErrors = errors.filter((error) => error.agentId === agent.id).map((error) => error.message);
   report.cases.errors = agentErrors;
   if (agentErrors.length > 0) report.failures.push(`Errors: ${JSON.stringify(agentErrors)}.`);
+
+  const helper = await runCauseEffect(
+    agents.createAgent({
+      name: "Helper",
+      description: "Uses the same Claude account until it reaches the usage limit.",
+      avatarSeed: "helper",
+      avatarHue: null,
+      initialMessage: "SMALL first message.",
+      provider: "claude",
+      model: CLAUDE_MODEL,
+    }),
+  );
+  await waitFor("the first turn of the helper to end", () => idle(helper.id) && idle(agent.id));
+  await runTurn("Large context, then the other agent reaches the usage limit.");
+  const beforeLimit = compactions();
+  await runCauseEffect(agents.sendMessage({ agentId: helper.id, text: "USAGE-LIMIT reached." }));
+  await waitFor("the usage limit", () =>
+    agents.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === helper.id),
+  );
+  const limitedBeforeTimer = compactions() === beforeLimit;
+  await quietPeriod();
+  report.cases.usageLimit = { compactPrompts: compactions(), limitedBeforeTimer };
+  if (!limitedBeforeTimer) report.failures.push("The usage limit came after the timer, so this check did not run.");
+  else if (compactions() !== beforeLimit) report.failures.push("A thread was compacted during a usage limit.");
   report.passed = report.failures.length === 0;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

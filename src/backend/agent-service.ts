@@ -4620,6 +4620,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     agentId: string,
     externalThreadId: string,
   ) {
+    if (yield* this.#holdsBackgroundWork(externalThreadId)) return;
     const reserved = yield* lifecycleStep("compact before cache expiry", () =>
       this.#reserveCacheExpiryCompaction(agentId, externalThreadId),
     ).pipe(
@@ -4632,6 +4633,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
     if (reserved) yield* this.#compaction.request(agentId, externalThreadId);
   }, Effect.uninterruptible).bind(this);
+
+  readonly #holdsBackgroundWork = Effect.fn("AgentService.holdsBackgroundWork")(function* (
+    this: AgentService,
+    externalThreadId: string,
+  ) {
+    const client = this.#conversation.openClientFor(externalThreadId);
+    if (!client?.holdsBackgroundWork) return false;
+    const background = yield* Effect.result(client.holdsBackgroundWork(externalThreadId));
+    return Result.isFailure(background) || background.success;
+  }).bind(this);
 
   #reserveCacheExpiryCompaction(agentId: string, externalThreadId: string): boolean {
     const agent = this.#store.get(agentId);
@@ -4653,6 +4664,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const channel = this.channels.store.channelForThread(threadId) !== null;
     if (!main && !task && !channel) return false;
     if (
+      !this.#usageLimits.mayDrain(agentId) ||
       this.#mailbox.hasUnfinishedDelivery(agentId) ||
       this.#compaction.heldThreads(agentId).length > 0 ||
       this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
