@@ -994,9 +994,9 @@ Before, the task stopped until the person clicked Continue (#11425). The turn di
 repeats nothing. A second empty run, or an empty turn from the person outside a channel, shows the
 error. A Codex channel task shows `error.provider.channelNoAnswer`, which names Continue and Reassign
 on its card.
-A turn that a failed sign-in or a provider that does not answer ended after work started continues
-on the backup model, with the work steps of the turn, as after a usage limit, when the agent is set
-to switch without asking (#8406).
+A turn that a failed sign-in, a rate limit, a provider that does not answer, a dropped connection or
+a timeout ended after work started continues on the backup model, with the work steps of the turn,
+as after a usage limit, when the agent is set to switch without asking (#8406, #14512).
 
 Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
 answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the

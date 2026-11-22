@@ -190,7 +190,13 @@ function isRefusedGeminiToken(provider: string | undefined, message: string): bo
   return provider === "antigravity" && GEMINI_INVALID_CREDENTIALS.test(message);
 }
 
-const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable", "rate_limit"]);
+const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "authentication",
+  "provider_unavailable",
+  "rate_limit",
+  "network",
+  "timeout",
+]);
 const POOL_PASS_OVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "usage_limit",
   "provider_unavailable",
