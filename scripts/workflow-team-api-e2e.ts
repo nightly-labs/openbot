@@ -223,6 +223,9 @@ const STEP_DEADLINE_MS = 30_000;
 const WEBHOOK_URL = "https://relay.example.test/hooks/e2e";
 const SECRET = "whsec-e2e-not-a-real-secret";
 const LONG_ANSWER = "a".repeat(40_000);
+const NO_MODEL = "No model step runs in this check.";
+const modelReplies: string[] = [];
+const modelPrompts: string[] = [];
 
 plugin({
   name: "workflow-team-api-electron-boundary",
@@ -448,7 +451,13 @@ async function startHost(): Promise<Host> {
       filePath: (attachmentId) =>
         Effect.succeed(attachmentId === MISSING_FILE ? null : join(userData, "e2e-files", attachmentId)),
       stopDelivery: () => Effect.void,
-      generateText: () => Effect.fail({ message: "No model step runs in this check." }),
+      generateText: (request) =>
+        Effect.suspend(() => {
+          const reply = modelReplies.shift();
+          if (reply === undefined) return Effect.fail({ message: NO_MODEL });
+          modelPrompts.push(request.prompt);
+          return Effect.succeed(reply);
+        }),
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
       sizePicture: (attachmentId, size) => {
@@ -1581,6 +1590,76 @@ try {
     );
     const stop = await refused(WORKFLOWS_ROUTES.stopRun, member, { runId: run.id }, 404, "error.workflow.runMissing");
     return { member: mine, owner: ["agent", "prompt"], retry, stop };
+  });
+
+  await step("typed answer: a run keeps the checked JSON, and a retry uses the spec of the run", async () => {
+    const typedGraph = (answer: string): WorkflowGraph => ({
+      nodes: [
+        promptNode,
+        { id: "rate", kind: "llm", at: at(300), fields: { prompt: "Rate it.", answer } },
+        { id: "gate", kind: "condition", at: at(600), fields: { check: "priority = high and count > 2" } },
+      ],
+      edges: [
+        { id: "prompt-rate", from: "prompt", to: "rate", type: "text" },
+        { id: "rate-gate", from: "rate", to: "gate", type: "text" },
+      ],
+      strokes: [],
+    });
+    const spec = "priority: high|low\ncount: number";
+    const workflow = await hostWorkflow("Typed answer", typedGraph(spec));
+    const newest = (detail: JsonObject, nodeId: string) =>
+      list(detail.steps, "steps")
+        .map((row) => record(row, "step"))
+        .filter((row) => row.nodeId === nodeId)
+        .sort((first, second) => Number(second.attempt) - Number(first.attempt))[0];
+    const readEnded = async (runId: string, nodeId: string) => {
+      for (;;) {
+        await Effect.runPromise(current().workflows.sweep());
+        const detail = await ok(WORKFLOWS_ROUTES.run, ownerToken, { runId });
+        const found = newest(detail, nodeId);
+        if (found && found.status !== "running") return detail;
+        await new Promise((done) => setImmediate(done));
+      }
+    };
+
+    modelReplies.push('{"priority":"high","count":"3"}');
+    const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+      workflowId: workflow.id,
+      requestId: requestId(),
+    });
+    const first = await readEnded(text(record(started.run, "run").id, "run id"), "gate");
+    const rate = newest(first, "rate");
+    const gate = newest(first, "gate");
+    assert.equal(rate?.output, '{"priority":"high","count":3}', JSON.stringify(rate));
+    assert.equal(gate?.branch, "yes", JSON.stringify(gate));
+
+    modelReplies.push("no JSON", "still no JSON");
+    const second = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, { workflowId: workflow.id, requestId: requestId() });
+    const secondRunId = text(record(second.run, "run").id, "run id");
+    const failed = newest(await readEnded(secondRunId, "rate"), "rate");
+    assert.equal(failed?.status, "failed", JSON.stringify(failed));
+    const stored = await runCauseEffect(current().workflows.get(workflow.id));
+    const resaved = await runCauseEffect(
+      current().workflows.saveGraph({
+        workflowId: workflow.id,
+        baseRevision: stored.revision,
+        graph: typedGraph(`${spec}\nreason: text`),
+      }),
+    );
+    assert.ok(resaved.ok);
+    const promptsBefore = modelPrompts.length;
+    modelReplies.push('{"priority":"high","count":4}');
+    await ok(WORKFLOWS_ROUTES.retryStep, ownerToken, { stepId: text(failed?.id, "step id"), requestId: requestId() });
+    const retried = await readEnded(secondRunId, "gate");
+    const retriedRate = newest(retried, "rate");
+    const retryPrompt = modelPrompts.at(-1) ?? "";
+    assert.equal(retriedRate?.status, "done", JSON.stringify(retriedRate));
+    assert.equal(retriedRate?.output, '{"priority":"high","count":4}');
+    assert.equal(newest(retried, "gate")?.branch, "yes");
+    assert.equal(modelPrompts.length, promptsBefore + 1);
+    assert.ok(!retryPrompt.includes("reason"), retryPrompt);
+    assert.equal(modelReplies.length, 0);
+    return { first: rate?.output, retried: retriedRate?.output };
   });
 
   await step("provider: a model step on a local-only provider answers as missing to a peer", async () => {
