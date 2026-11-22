@@ -636,6 +636,7 @@ import type {
   VoiceTranscriptionInput,
   VoiceTranscriptionResult,
 } from "./ipc-voice";
+import type { WorkflowFileSaveResult } from "./ipc-workflow-file";
 import type { WorkflowFolderAction, WorkflowFoldersSnapshot } from "./ipc-workflow-folders";
 import type {
   WorkflowGitHubCatalog,
@@ -1654,6 +1655,7 @@ export const IPC_ENDPOINTS = {
     create: scopedRequest<CreateWorkflowInput, WorkflowDetail>()("workflows:create"),
     rename: scopedRequest<RenameWorkflowInput, WorkflowSummary>()("workflows:rename"),
     setPaused: scopedRequest<SetWorkflowPausedInput, WorkflowSummary>()("workflows:setPaused"),
+    exportFile: scopedRequest<string, WorkflowFileSaveResult>()("workflows:export-file"),
     delete: scopedRequest<string, void>()("workflows:delete"),
     saveGraph: scopedRequest<SaveWorkflowGraphInput, WorkflowSaveResult>()("workflows:save-graph"),
     versions: scopedRequest<string, WorkflowVersion[]>()("workflows:versions"),

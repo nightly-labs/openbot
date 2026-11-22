@@ -627,6 +627,20 @@ manages the agents of the workflow can pause or resume it. With the capability, 
 client strips `paused` from `create` when the host does not have the capability. The capability goes
 to protocol 10 peers. The state is in the `paused` column of `workflows` (migration 68).
 
+`workflows-portable-v1` exports a workflow as an `openbot.workflow` file
+(`packages/contracts/src/ipc-workflow-file.ts`). `POST /v1/workflows/export { workflowId }` answers
+`{ text, assets, problem }`. Only a member who manages the agents of the workflow can export it. The
+host writes the file with the names of its agents and channels, not their ids, and with each asset
+file empty. `assets` lists the asset files to download: the key in the file, the attachment id and
+the step. The client downloads each one with the attachment route and fills it in
+(`fillWorkflowFileText`), because one Team API frame cannot hold the asset bytes. A text field with
+a secret (`redactSecrets`), a missing asset file or a file that is too large gives a `problem` and no
+`text`, and the secret does not leave the host. Import has no route: the client reads the file, the
+person chooses an agent or channel for each name, the client uploads the assets as attachments, and
+`create` makes a paused copy. The desktop app and the web client show Export and Import in the
+workflow menu only when the host has the capability. The phone does not edit workflow graphs, so it
+does not export or import. The capability goes to protocol 10 peers.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 

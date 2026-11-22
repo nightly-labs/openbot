@@ -494,6 +494,7 @@ import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process"
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WebhookRelay } from "./webhook-relay";
 import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
+import { createWorkflowFileExporter, type WorkflowFileExporter } from "./workflow-file-export";
 import { WorkflowFoldersService } from "./workflow-folders-service";
 import { sizeWorkflowPicture } from "./workflow-picture-size";
 
@@ -656,6 +657,7 @@ export interface ApplicationServiceContext {
 export interface ApplicationServices {
   service: AgentService;
   workflows: WorkflowsHandle;
+  workflowFiles: WorkflowFileExporter;
   workflowGitHub: WorkflowGitHubDirectory;
   crm: CrmHandle;
   routineResults: RoutineResultsHandle;
@@ -2387,6 +2389,14 @@ export async function createApplicationServices({
     }),
   );
   const workflowFoldersService = new WorkflowFoldersService({ store: workflowFolders, workflows: workflowRuntime });
+  const workflowFiles = createWorkflowFileExporter({
+    agents: () => service.listAgents(),
+    channelName: (channelId) =>
+      service.channels.store.ids().includes(channelId) ? service.channels.store.get(channelId).name : null,
+    attachment: (fileId) => mailbox.resolveAttachment(fileId).pipe(Effect.orElseSucceed(() => null)),
+    timezone: () => serverTimezone.effective(),
+    appVersion: app.getVersion(),
+  });
   workflowTriggers = new WorkflowTriggers({
     store: workflowStore,
     timezone: () => serverTimezone.effective(),
@@ -3193,6 +3203,7 @@ export async function createApplicationServices({
       ...workflowRuntime,
       rotateWorkflowSecret: (input) => events.rotateWorkflowSecret(input),
       github: workflowGitHub,
+      files: workflowFiles,
     },
     crm,
     hiddenAgents: service,
@@ -4246,6 +4257,7 @@ export async function createApplicationServices({
   return {
     service,
     workflows: workflowRuntime,
+    workflowFiles,
     workflowGitHub,
     crm,
     routineResults: routineResultRuntime,

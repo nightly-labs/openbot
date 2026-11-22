@@ -1,10 +1,14 @@
 import {
+  decodeWorkflowFile,
   isWorkflowStepKind,
   type StoredFileRow,
+  WORKFLOW_FILE_MAX_BYTES,
   WORKFLOW_GROUP_FIELDS,
   WORKFLOW_PICTURE_TYPES,
   WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
+  type WorkflowFile,
+  type WorkflowFileSaveResult,
   type WorkflowFolderAction,
   type WorkflowFoldersSnapshot,
   type WorkflowGraph,
@@ -33,6 +37,7 @@ import {
   Group as GroupIcon,
   Hand,
   Highlighter,
+  Input,
   Kbd,
   Lock,
   LockOpen,
@@ -49,6 +54,7 @@ import {
   Spinner,
   Trash2,
   Type,
+  toast,
   Undo2,
   Ungroup,
   Zap,
@@ -92,6 +98,7 @@ import {
 import { ConditionNode } from "./WorkflowConditionNode";
 import { showWorkflowDeleteToast } from "./WorkflowDeleteUndoToast";
 import { ImageNode } from "./WorkflowImageNode";
+import { WorkflowImportDialog } from "./WorkflowImportDialog";
 import { LlmNode } from "./WorkflowLlmNode";
 import { WorkflowMediaComposer } from "./WorkflowMediaComposer";
 import { minimapLayout, WorkflowMinimap } from "./WorkflowMinimap";
@@ -140,6 +147,7 @@ import {
 import { type WorkflowBuild, workflowBuildPlan } from "./workflow-build";
 import { type Camera, type CameraMotion, glideCamera } from "./workflow-camera";
 import { CLIP_TYPE, type Clip, copied, setCopied } from "./workflow-clipboard";
+import { workflowExportProblemText, workflowImportProblemText } from "./workflow-file-text";
 import type { WorkflowGitHubCanvas } from "./workflow-github";
 import {
   type CanvasGroup,
@@ -241,6 +249,7 @@ export interface WorkflowCanvasProps {
   onCreate: (input: { title: string; graph?: WorkflowGraph; paused?: true }) => void;
   onRename: (workflowId: string, title: string) => void;
   onSetPaused?: ((workflowId: string, paused: boolean) => void) | undefined;
+  onExport?: ((workflowId: string) => Promise<WorkflowFileSaveResult>) | undefined;
   onDelete: (workflowId: string) => Promise<unknown>;
   tabs?: WorkflowCanvasTabs | undefined;
   folders?: WorkflowFoldersSnapshot | undefined;
@@ -526,7 +535,7 @@ const savedJson = (graph: WorkflowGraph) => stableJson(asSaved(graph));
 const SENT_LIMIT = 200;
 
 export function WorkflowCanvas(props: WorkflowCanvasProps) {
-  const { t, format } = useText();
+  const { t, format, errorMessage } = useText();
   const initial = untrack(() => snapshotFromGraph(props.workflow.graph));
   const [nodes, setNodes] = createSignal<readonly CanvasItem[]>(initial.nodes);
   const [positions, setPositions] = createStore<Record<string, WfnPoint>>(initial.positions);
@@ -1153,8 +1162,48 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         ...(props.onSetPaused ? { paused: true } : {}),
       });
     else if (action === "pause" || action === "resume") props.onSetPaused?.(openId(), action === "pause");
+    else if (action === "export") exportWorkflow();
+    else if (action === "import") importInput?.click();
     else if (action === "delete") deleteWorkflow();
     else if (action !== `open:${openId()}`) props.onSelect(action.slice("open:".length));
+  };
+  let importInput: HTMLInputElement | undefined;
+  const [importing, setImporting] = createSignal<WorkflowFile>();
+  const [exporting, setExporting] = createSignal(false);
+  const exportWorkflow = () => {
+    const run = props.onExport;
+    if (!run || exporting()) return;
+    setExporting(true);
+    run(openId())
+      .then(
+        (result) => {
+          if (result.problem) toast.error(workflowExportProblemText(t, result.problem));
+        },
+        (cause: unknown) => {
+          toast.error(errorMessage(cause, t("workflow.file.export.failed")));
+        },
+      )
+      .finally(() => setExporting(false));
+  };
+  const chooseImport = (file: File) => {
+    if (file.size > WORKFLOW_FILE_MAX_BYTES) {
+      toast.error(t("workflow.file.import.invalid"));
+      return;
+    }
+    file.text().then(
+      (text) => {
+        const decoded = decodeWorkflowFile(text);
+        if (decoded.ok) setImporting(decoded.file);
+        else toast.error(workflowImportProblemText(t, decoded.problem));
+      },
+      (cause: unknown) => {
+        toast.error(errorMessage(cause, t("workflow.file.import.failed")));
+      },
+    );
+  };
+  const finishImport = (input: { title: string; graph: WorkflowGraph }) => {
+    setImporting(undefined);
+    props.onCreate({ ...input, ...(props.onSetPaused ? { paused: true } : {}) });
   };
   const startRename = () => {
     setFolderEdit(undefined);
@@ -1264,6 +1313,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           versionsDisabled={running()}
           readOnly={props.readOnly === true}
           paused={switcherPaused()}
+          portable={props.onExport !== undefined}
           folders={switcherFolders()}
           onAction={onSwitcher}
           onFolder={onFolderMenu}
@@ -3807,6 +3857,36 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           </div>
         </Show>
         <Show when={props.frame === "window"}>{corner()}</Show>
+        <Show when={props.onExport && !props.readOnly}>
+          <Input
+            ref={(element) => {
+              importInput = element;
+            }}
+            class="sr-only"
+            type="file"
+            accept=".json,application/json"
+            tabindex={-1}
+            aria-label={t("workflow.canvas.switcher.import")}
+            onChange={(event) => {
+              const chosen = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              if (chosen) chooseImport(chosen);
+            }}
+          />
+        </Show>
+        <Show when={importing()}>
+          {(file) => (
+            <WorkflowImportDialog
+              file={file()}
+              agents={props.catalogs.agents}
+              channels={props.catalogs.channels ?? []}
+              paused={props.onSetPaused !== undefined}
+              upload={props.catalogs.upload}
+              onCancel={() => setImporting(undefined)}
+              onImport={finishImport}
+            />
+          )}
+        </Show>
         <Show when={deleted()}>
           <WorkflowsEmpty
             next={nextWorkflowAfterDelete(listed(), openId())}

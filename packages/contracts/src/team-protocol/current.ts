@@ -265,6 +265,7 @@ import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "./workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
 import { WORKFLOWS_PAUSE_CAPABILITY } from "./workflows-pause-v1";
+import { WORKFLOWS_PORTABLE_CAPABILITY } from "./workflows-portable-v1";
 import { WORKFLOWS_STEP_SETTINGS_CAPABILITY } from "./workflows-step-settings-v1";
 import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
@@ -506,6 +507,7 @@ export {
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PORTABLE_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
@@ -817,6 +819,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [TEAM_USAGE_READ_FAILED_CAPABILITY, V10],
   [WORKFLOWS_FORMAT_CAPABILITY, V10],
   [WORKFLOWS_PAUSE_CAPABILITY, V10],
+  [WORKFLOWS_PORTABLE_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

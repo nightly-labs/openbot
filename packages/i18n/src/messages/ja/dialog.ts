@@ -19,6 +19,8 @@ export const messages = {
   "dialog.saveTransfer": "移行ファイルを保存",
   "dialog.chooseTransfer": "移行ファイルを選択",
   "dialog.filter.transfer": "OpenBot 移行ファイル",
+  "dialog.saveWorkflow": "ワークフローファイルを保存",
+  "dialog.filter.workflow": "OpenBot ワークフローファイル",
   "dialog.chooseExternalLinkApp": "ブラウザーを選択",
   "dialog.filter.applications": "アプリケーション",
 } as const satisfies PartialTranslation<typeof source>;

@@ -7,6 +7,7 @@ import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   decodeWorkflowFile,
   encodeWorkflowFile,
+  fillWorkflowFileText,
   matchWorkflowFileReferences,
   serializeWorkflowFile,
   WORKFLOW_FILE_FORMAT,
@@ -17,6 +18,7 @@ import {
   type WorkflowGraph,
   type WorkflowNode,
   workflowFileAssetBytes,
+  workflowFileHostExport,
   workflowFileNeeds,
   workflowFromFile,
   workflowGraphFormat,
@@ -161,12 +163,47 @@ try {
     needs,
   );
 
-  const logoAsset = { name: "logo.png", type: "image/png", bytes: logo };
+  const logoAsset = { name: "logo.png", type: "image/png", size: logo.byteLength };
   const assets = new Map([["file-on-host-a", logoAsset]]);
   const exported = encodeWorkflowFile(source(saved.summary.title, saved.graph, assets));
   assert.ok(exported.ok, JSON.stringify(exported));
-  const file = exported.file;
-  const text = serializeWorkflowFile(file);
+  check(
+    "the host names the files to add and sends no bytes",
+    JSON.stringify(exported.assets) ===
+      JSON.stringify([{ key: "file-1", fileId: "file-on-host-a", node: "asset", step: "asset" }]) &&
+      exported.file.assets["file-1"]?.data === "",
+    exported.assets,
+  );
+  const hostText = workflowFileHostExport(exported).text ?? "";
+  check("a file without asset data does not decode", !decodeWorkflowFile(hostText).ok);
+  const unfilled = fillWorkflowFileText(hostText, exported.assets, new Map());
+  check(
+    "a file id that the client cannot read stops the export",
+    !unfilled.ok && unfilled.problem.kind === "asset-missing" && unfilled.problem.node === "asset",
+    unfilled,
+  );
+  const overfilled = fillWorkflowFileText(
+    hostText,
+    exported.assets,
+    new Map([["file-1", new Uint8Array(ATTACHMENT_LIMITS.fileBytes + 1)]]),
+  );
+  check(
+    "bytes over the file limit stop the export",
+    !overfilled.ok && overfilled.problem.kind === "asset-too-large",
+    !overfilled.ok && overfilled.problem,
+  );
+  const newerHost = fillWorkflowFileText(
+    JSON.stringify({ ...exported.file, graphFormat: WORKFLOW_FORMAT + 1 }),
+    exported.assets,
+    new Map([["file-1", logo]]),
+  );
+  check("a client fills the pictures of a file from a newer host", newerHost.ok);
+  const filled = fillWorkflowFileText(hostText, exported.assets, new Map([["file-1", logo]]));
+  assert.ok(filled.ok, JSON.stringify(filled));
+  const filledFile = decodeWorkflowFile(filled.text);
+  assert.ok(filledFile.ok, JSON.stringify(filledFile));
+  const file = filledFile.file;
+  const text = filled.text;
   mkdirSync(OUT, { recursive: true });
   const path = join(OUT, "daily-note.openbot-workflow.json");
   writeFileSync(path, text);
@@ -214,7 +251,10 @@ try {
 
   const decoded = decodeWorkflowFile(readFileSync(path, "utf8"));
   assert.ok(decoded.ok, JSON.stringify(decoded));
-  check("the written file decodes", JSON.stringify(decoded.file) === JSON.stringify(file));
+  check(
+    "the written file decodes",
+    JSON.stringify(decoded.file) === JSON.stringify(file) && serializeWorkflowFile(file) === text,
+  );
 
   const matches = matchWorkflowFileReferences(decoded.file, {
     agent: [
@@ -280,10 +320,18 @@ try {
     channels: new Map([["channel-on-host-b", { name: "news" }]]),
   });
   assert.ok(again.ok, JSON.stringify(again));
-  const tellAgain = again.file.graph.nodes.find((candidate) => candidate.id === "tell");
+  const againFilled = fillWorkflowFileText(
+    workflowFileHostExport(again).text ?? "",
+    again.assets,
+    new Map([["file-1", logo]]),
+  );
+  assert.ok(againFilled.ok, JSON.stringify(againFilled));
+  const againFile = decodeWorkflowFile(againFilled.text);
+  assert.ok(againFile.ok, JSON.stringify(againFile));
+  const tellAgain = againFile.file.graph.nodes.find((candidate) => candidate.id === "tell");
   check(
     "export after import gives the same file, apart from the link that is still to make",
-    serializeWorkflowFile({ ...again.file, links: file.links }) === text && tellAgain?.fields.connectionId === "",
+    serializeWorkflowFile({ ...againFile.file, links: file.links }) === text && tellAgain?.fields.connectionId === "",
   );
 
   const secretGraph: WorkflowGraph = {
@@ -324,9 +372,7 @@ try {
     source(
       "Daily note",
       saved.graph,
-      new Map([
-        ["file-on-host-a", { name: "big.bin", type: "", bytes: new Uint8Array(ATTACHMENT_LIMITS.fileBytes + 1) }],
-      ]),
+      new Map([["file-on-host-a", { name: "big.bin", type: "", size: ATTACHMENT_LIMITS.fileBytes + 1 }]]),
     ),
   );
   check(
@@ -382,6 +428,10 @@ try {
     JSON.stringify({ ...file, assets: { "file-1": { name: "logo.png", type: "image/png", data: "not base64!" } } }),
   );
   check("import refuses asset data that is not base64", !badAsset.ok && badAsset.problem.kind === "invalid");
+  const emptyAsset = decodeWorkflowFile(
+    JSON.stringify({ ...file, assets: { "file-1": { name: "logo.png", type: "image/png", data: "" } } }),
+  );
+  check("import refuses a file without asset data", !emptyAsset.ok && emptyAsset.problem.kind === "invalid");
   const notFile = [decodeWorkflowFile("{"), decodeWorkflowFile("[]"), decodeWorkflowFile('{"format":"other"}')];
   check(
     "other files are not workflow files",

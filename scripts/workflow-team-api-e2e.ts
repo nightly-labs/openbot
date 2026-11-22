@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type AgentAccessChange,
+  decodeWorkflowFile,
+  fillWorkflowFileText,
   type StorageUsage,
   type StoredFileRow,
   WORKFLOW_FORMAT,
@@ -17,6 +19,7 @@ import {
   type WorkflowMediaOptionValue,
   type WorkflowMediaPriceRequest,
   type WorkflowNode,
+  workflowFileAssetBytes,
   workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -79,6 +82,11 @@ import {
   WORKFLOWS_PAUSE_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import {
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_PORTABLE_CODECS,
+  WORKFLOWS_PORTABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_CODECS,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
@@ -121,6 +129,7 @@ import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-trigger
 import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/workflows";
 import { LibraryFoldersService } from "../src/main/library-folders-service";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
+import { createWorkflowFileExporter } from "../src/main/workflow-file-export";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
 let sunraSignedIn = false;
@@ -505,6 +514,18 @@ async function startHost(): Promise<Host> {
           ),
         ),
       rotateWorkflowSecret: () => Effect.succeed({ secret: SECRET }),
+      files: createWorkflowFileExporter({
+        agents: () => agents.listAgents(),
+        channelName: () => null,
+        attachment: (fileId) =>
+          Effect.succeed(
+            fileId === MISSING_FILE
+              ? null
+              : { path: join(userData, "e2e-files", fileId), mimeType: "image/png", name: "picture.png" },
+          ),
+        timezone: () => "UTC",
+        appVersion: "0.0.0-e2e",
+      }),
     },
     admin: {
       routineResults: {
@@ -2558,6 +2579,149 @@ try {
       );
       assert.equal((await runCauseEffect(current().workflows.get(workflow.id))).summary.paused, undefined);
       return { paused: true, resumed: true, createdPaused: true, chat, hidden, old };
+    },
+  );
+
+  await step(
+    "export: the host advertises workflows-portable-v1 to a protocol 10 peer; a member who manages the agent gets the file text and the list of files to download, a secret or a missing file is refused, a chat member is refused, and an old peer is told the server is too old",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_PORTABLE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_PORTABLE_CAPABILITY));
+      const codec = WORKFLOWS_PORTABLE_CODECS.get(WORKFLOWS_PORTABLE_ROUTES.export);
+      assert.ok(codec, "No workflows-portable-v1 codec for export.");
+      const raw = (
+        token: string,
+        workflowId: string,
+        capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10),
+      ) => {
+        const body = { workflowId };
+        codec.request(body);
+        return call("POST", WORKFLOWS_PORTABLE_ROUTES.export, {
+          token,
+          body,
+          protocol: TEAM_PROTOCOL_V10,
+          capabilities,
+        });
+      };
+      const exported = async (token: string, workflowId: string) => {
+        const response = await raw(token, workflowId);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return record(codec.response(response.status, response.body), "export");
+      };
+      const refusal = async (
+        response: { status: number; body: unknown },
+        status: number,
+        key: "error.workflow.serverTooOld" | "error.workflow.missing" | "error.team.agentManageDenied",
+      ) => {
+        assert.equal(response.status, status, JSON.stringify(response.body));
+        assert.ok(JSON.stringify(response.body).includes(sourceText(key)), JSON.stringify(response.body));
+        return response.status;
+      };
+      const withAsset = (agentId: string, fileId: string, task = "Describe the picture."): WorkflowGraph => ({
+        nodes: [
+          promptNode,
+          { id: "asset", kind: "asset", at: { x: 0, y: 200 }, fields: { fileId } },
+          { id: "agent", kind: "agent", at: at(300), fields: { agentId, task } },
+        ],
+        edges: [
+          { id: "edge", from: "prompt", to: "agent", type: "text" },
+          { id: "edge-asset", from: "asset", to: "agent", type: "image" },
+        ],
+        strokes: [],
+      });
+
+      const assetId = "e2e-export-asset";
+      mkdirSync(join(userData, "e2e-files"), { recursive: true });
+      const assetBytes = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+      writeFileSync(join(userData, "e2e-files", assetId), assetBytes);
+      const workflow = await hostWorkflow("Portable", withAsset(open, assetId));
+      const good = await exported(member, workflow.id);
+      assert.equal(good.problem, null);
+      const assets = list(good.assets, "assets").map((asset) => record(asset, "asset"));
+      assert.equal(assets.length, 1);
+      assert.equal(assets[0]?.fileId, assetId);
+      const fileText = text(good.text, "file text");
+      assert.ok(!fileText.includes(open), "The file text names the agent by its id.");
+      assert.ok(!fileText.includes(assetId), "The file text names the file by its id.");
+      assert.ok(!decodeWorkflowFile(fileText).ok, "The host text is a file before the client fills the files.");
+      const sources = assets.map((asset) => ({
+        key: text(asset.key, "asset key"),
+        fileId: text(asset.fileId, "asset file id"),
+        node: text(asset.node, "asset node"),
+        step: text(asset.step, "asset step"),
+      }));
+      const unfilled = fillWorkflowFileText(fileText, sources, new Map());
+      assert.ok(!unfilled.ok && unfilled.problem.kind === "asset-missing", JSON.stringify(unfilled));
+      const filled = fillWorkflowFileText(
+        fileText,
+        sources,
+        new Map(sources.map((source) => [source.key, assetBytes])),
+      );
+      assert.ok(filled.ok, JSON.stringify(filled));
+      assert.equal(filled.name, "Portable.openbot-workflow.json");
+      const decoded = decodeWorkflowFile(filled.text);
+      assert.ok(decoded.ok, JSON.stringify(decoded));
+      assert.equal(decoded.file.title, "Portable");
+      const references = Object.values(decoded.file.references);
+      assert.deepEqual(
+        references.map((reference) => [reference.kind, reference.name]),
+        [["agent", "Open"]],
+      );
+      const fileAssets = Object.values(decoded.file.assets);
+      assert.equal(fileAssets.length, 1);
+      assert.deepEqual(fileAssets[0] && [...workflowFileAssetBytes(fileAssets[0])], [...assetBytes]);
+      assert.equal(fileAssets[0]?.type, "image/png");
+      assert.equal(fileAssets[0]?.name, "picture.png");
+
+      const secretKey = "sk-ant-abcdefghijklmnopqrstuvwx";
+      const secretWorkflow = await hostWorkflow("Secret", withAsset(open, assetId, `Use ${secretKey} to call.`));
+      const secretResponse = await raw(member, secretWorkflow.id);
+      assert.equal(secretResponse.status, 200, JSON.stringify(secretResponse.body));
+      assert.ok(!JSON.stringify(secretResponse.body).includes(secretKey), "The export response sends the secret.");
+      const secret = record(codec.response(secretResponse.status, secretResponse.body), "secret export");
+      assert.equal(secret.text, null);
+      const secretProblem = record(secret.problem, "secret problem");
+      assert.equal(secretProblem.kind, "secret");
+      assert.deepEqual(
+        list(secretProblem.fields, "secret fields").map((field) => record(field, "field").node),
+        ["agent"],
+      );
+
+      const missingWorkflow = await hostWorkflow("Missing file", withAsset(open, MISSING_FILE));
+      const missing = await exported(member, missingWorkflow.id);
+      assert.equal(missing.text, null);
+      assert.equal(record(missing.problem, "missing problem").kind, "asset-missing");
+
+      const chatWorkflow = await hostWorkflow("Chat export", agentGraph(chatter));
+      const chat = await refusal(await raw(member, chatWorkflow.id), 403, "error.team.agentManageDenied");
+      const hiddenWorkflow = await hostWorkflow("Hidden export", agentGraph(closed));
+      const hidden = await refusal(await raw(member, hiddenWorkflow.id), 404, "error.workflow.missing");
+      const old = await refusal(
+        await raw(
+          member,
+          workflow.id,
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+            (capability) => capability !== WORKFLOWS_PORTABLE_CAPABILITY,
+          ),
+        ),
+        400,
+        "error.workflow.serverTooOld",
+      );
+      return {
+        exported: true,
+        assets: assets.length,
+        references: references.length,
+        secret: secretProblem.kind,
+        missing: record(missing.problem, "missing problem").kind,
+        chat,
+        hidden,
+        old,
+      };
     },
   );
 

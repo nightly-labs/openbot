@@ -39,6 +39,10 @@ import {
   WORKFLOWS_PAUSE_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import {
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_PORTABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
@@ -86,6 +90,7 @@ const WORKFLOW_MEDIA_CATALOG_V2_PATHS = new Set<string>(Object.values(WORKFLOWS_
 const WORKFLOW_MEDIA_ACCOUNT_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES));
 const WORKFLOW_STEP_SETTINGS_PATHS = new Set<string>(Object.values(WORKFLOWS_STEP_SETTINGS_ROUTES));
 const WORKFLOW_PAUSE_PATHS = new Set<string>(Object.values(WORKFLOWS_PAUSE_ROUTES));
+const WORKFLOW_PORTABLE_PATHS = new Set<string>(Object.values(WORKFLOWS_PORTABLE_ROUTES));
 
 function catalogV1(catalog: WorkflowMediaCatalog): WorkflowMediaCatalog {
   return {
@@ -173,6 +178,7 @@ export async function routeWorkflows(
   const accountPath = WORKFLOW_MEDIA_ACCOUNT_PATHS.has(path);
   const settingsPath = WORKFLOW_STEP_SETTINGS_PATHS.has(path);
   const pausePath = WORKFLOW_PAUSE_PATHS.has(path);
+  const portablePath = WORKFLOW_PORTABLE_PATHS.has(path);
   if (
     method !== "POST" ||
     !(
@@ -185,6 +191,7 @@ export async function routeWorkflows(
       accountPath ||
       settingsPath ||
       pausePath ||
+      portablePath ||
       WORKFLOW_PATHS.has(path)
     )
   )
@@ -209,6 +216,9 @@ export async function routeWorkflows(
   if (settingsPath && !capabilities.has(WORKFLOWS_STEP_SETTINGS_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (pausePath && !capabilities.has(WORKFLOWS_PAUSE_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  const files = workflows.files;
+  if (portablePath && (!files || !capabilities.has(WORKFLOWS_PORTABLE_CAPABILITY)))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const body = await readJson(request);
   const { admin, listed, visibleAgents, visibleGraph, requireUsable, visibleDetail, usableDetail } = workflowVisibility(
@@ -393,6 +403,10 @@ export async function routeWorkflows(
     const input = parse(parseSetWorkflowPaused, body);
     await usableDetail(input.workflowId, "manage");
     return json(200, await run(workflows.setPaused(input)));
+  }
+  if (path === WORKFLOWS_PORTABLE_ROUTES.export && files) {
+    const detail = await usableDetail(stringField(body, "workflowId"), "manage");
+    return json(200, fitted(await run(files.source(detail))));
   }
   if (path === WORKFLOWS_STEP_SETTINGS_ROUTES.read) {
     const stepId = stringField(body, "stepId");

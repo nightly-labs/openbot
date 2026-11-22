@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   CopyPlus,
+  Download,
   DropdownMenu,
   Folder,
   FolderInput,
@@ -19,6 +20,7 @@ import {
   Play,
   Plus,
   Trash2,
+  Upload,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
@@ -29,6 +31,8 @@ export type SwitcherAction =
   | "new"
   | "rename"
   | "duplicate"
+  | "export"
+  | "import"
   | "pause"
   | "resume"
   | "delete"
@@ -104,6 +108,7 @@ export function WorkflowSwitcher(props: {
   versionsDisabled: boolean;
   readOnly: boolean;
   paused: boolean | undefined;
+  portable: boolean;
   folders: SwitcherFolders | undefined;
   onAction: (action: SwitcherAction) => void;
   onFolder: (action: FolderMenuAction) => void;
@@ -182,6 +187,12 @@ export function WorkflowSwitcher(props: {
           </span>
           <span>{t("workflow.canvas.switcher.new")}</span>
         </DropdownMenu.Item>
+        <Show when={props.portable}>
+          <DropdownMenu.Item onSelectAfterClose={() => props.onAction("import")}>
+            <Upload class="agent-context-icon" aria-hidden="true" />
+            <span>{t("workflow.canvas.switcher.import")}</span>
+          </DropdownMenu.Item>
+        </Show>
         <DropdownMenu.Separator />
         <Show when={props.versions.length > 0}>
           <DropdownMenu.Sub>
@@ -266,6 +277,12 @@ export function WorkflowSwitcher(props: {
           <CopyPlus class="agent-context-icon" aria-hidden="true" />
           <span>{t("workflow.canvas.switcher.duplicate")}</span>
         </DropdownMenu.Item>
+        <Show when={props.portable}>
+          <DropdownMenu.Item onSelectAfterClose={() => props.onAction("export")}>
+            <Download class="agent-context-icon" aria-hidden="true" />
+            <span>{t("workflow.canvas.switcher.export")}</span>
+          </DropdownMenu.Item>
+        </Show>
         <DropdownMenu.Item class="ui-action-menu-danger" onSelect={() => props.onAction("delete")}>
           <Trash2 aria-hidden="true" />
           <span>{t("workflow.canvas.switcher.delete")}</span>

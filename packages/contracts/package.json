@@ -231,6 +231,7 @@
     "./team-protocol/workflows-media-service-account-v1": "./src/team-protocol/workflows-media-service-account-v1.ts",
     "./team-protocol/workflows-step-settings-v1": "./src/team-protocol/workflows-step-settings-v1.ts",
     "./team-protocol/workflows-pause-v1": "./src/team-protocol/workflows-pause-v1.ts",
+    "./team-protocol/workflows-portable-v1": "./src/team-protocol/workflows-portable-v1.ts",
     "./team-protocol/workflows-media-account-v1": "./src/team-protocol/workflows-media-account-v1.ts",
     "./team-protocol/workflows-media-catalog-v1": "./src/team-protocol/workflows-media-catalog-v1.ts",
     "./team-protocol/workflows-media-catalog-v2": "./src/team-protocol/workflows-media-catalog-v2.ts",

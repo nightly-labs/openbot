@@ -2,8 +2,10 @@ import {
   type AgentEvent,
   type AttachmentSummary,
   decodeWorkflowFoldersSnapshot,
+  fillWorkflowFileText,
   STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
+  type WorkflowFileSaveResult,
   type WorkflowFolderAction,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
@@ -51,6 +53,10 @@ import {
   WORKFLOWS_PAUSE_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import {
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_PORTABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
@@ -60,7 +66,7 @@ import {
 } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { runTeamEffect } from "@openbot/team-client";
-import { bytesToBase64 } from "@openbot/team-client/base64";
+import { base64ToBytes, bytesToBase64 } from "@openbot/team-client/base64";
 import {
   getHostAgentAccess,
   getStorageUsage,
@@ -79,6 +85,7 @@ import {
   decodeRemoteMediaServiceAccounts,
   decodeRemoteMediaServiceCredits,
   decodeRemoteWorkflowDetail,
+  decodeRemoteWorkflowFileExport,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
@@ -118,6 +125,8 @@ export interface WebWorkflowHostOptions {
   githubConnector: GitHubConnectorPort;
   attachmentMedia: AttachmentMediaSource | undefined;
   previewMedia: AttachmentMediaSource | undefined;
+  download: (attachmentId: string) => Promise<{ base64: string }>;
+  saveFile: (file: { name: string; blob: Blob }) => void;
 }
 
 function mediaSummary(id: string, kind: WorkflowMediaKind): AttachmentSummary {
@@ -178,6 +187,24 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     return post(path, decodeWorkflowFoldersSnapshot, body);
   };
   const folders = () => postFolders(WORKFLOW_FOLDERS_ROUTES.read, {});
+  const exportFile = async (workflowId: string): Promise<WorkflowFileSaveResult> => {
+    if (!has(WORKFLOWS_PORTABLE_CAPABILITY)) throw tooOld();
+    const source = await post(WORKFLOWS_PORTABLE_ROUTES.export, decodeRemoteWorkflowFileExport, { workflowId });
+    if (source.problem || source.text === null)
+      return { saved: false, problem: source.problem ?? { kind: "too-large" } };
+    const data = new Map<string, Uint8Array>();
+    for (const asset of source.assets) {
+      const found = await options.download(asset.fileId).then(
+        (file) => base64ToBytes(file.base64),
+        () => null,
+      );
+      if (found) data.set(asset.key, found);
+    }
+    const filled = fillWorkflowFileText(source.text, source.assets, data);
+    if (!filled.ok) return { saved: false, problem: filled.problem };
+    options.saveFile({ name: filled.name, blob: new Blob([filled.text], { type: "application/json" }) });
+    return { saved: true, problem: null };
+  };
   const folderAction = (action: WorkflowFolderAction) => postFolders(WORKFLOW_FOLDERS_ROUTES.actions, action);
   const empty = () => undefined;
   const run = <T>(effect: (request: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
@@ -205,6 +232,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         if (!has(WORKFLOWS_PAUSE_CAPABILITY)) throw tooOld();
         return post(WORKFLOWS_PAUSE_ROUTES.pause, decodeRemoteWorkflowSummary, input);
       },
+      exportFile,
       delete: (workflowId) => post(WORKFLOWS_ROUTES.delete, empty, { workflowId }),
       saveGraph: (input) => post(WORKFLOWS_ROUTES.saveGraph, decodeRemoteWorkflowSaveResult, input),
       versions: (workflowId) => post(WORKFLOWS_ROUTES.versions, decodeRemoteWorkflowVersions, { workflowId }),
@@ -380,6 +408,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     answersSupported: () => has(WORKFLOWS_ANSWERS_CAPABILITY),
     stepSettingsSupported: () => has(WORKFLOWS_STEP_SETTINGS_CAPABILITY),
     pauseSupported: () => has(WORKFLOWS_PAUSE_CAPABILITY),
+    portableSupported: () => has(WORKFLOWS_PORTABLE_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl(attachmentId) {
       const previews = options.previewMedia;
