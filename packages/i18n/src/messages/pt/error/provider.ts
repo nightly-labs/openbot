@@ -250,6 +250,7 @@ export const messages = {
     "O OpenCode Go recusou a solicitação. Uma nova chave de API não resolve isso. Seu plano do OpenCode Go pode não estar ativo, ou o OpenCode Go pode bloquear sua rede: alguns serviços bloqueiam VPNs, proxies ou alguns países. Verifique se o seu plano está ativo no OpenCode Console ou desative a VPN e tente novamente. Você também pode escolher outro modelo.",
   "error.provider.opencodeServiceFailure":
     "O OpenCode não conseguiu concluir este turno porque seu serviço local falhou. Tente novamente. Se o erro continuar, reconecte o OpenCode em Configurações.",
+  "error.provider.opencodeStillStarting": "O OpenCode não terminou de carregar a tempo. O OpenBot vai tentar de novo.",
   "error.provider.opencodeRateLimited":
     "O provedor do modelo recusou a solicitação por causa do limite de requisições. Aguarde alguns minutos ou escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.opencodeBilling":

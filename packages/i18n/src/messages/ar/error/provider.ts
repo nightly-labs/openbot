@@ -228,6 +228,7 @@ export const messages = {
     "رفض OpenCode Go الطلب. لا يحل مفتاح API جديد هذه المشكلة. قد لا تكون خطة OpenCode Go نشطة، أو قد يحظر OpenCode Go شبكتك: بعض الخدمات تحظر شبكات VPN أو الخوادم الوكيلة أو بعض البلدان. تأكد من أن خطتك نشطة في OpenCode Console، أو أوقف VPN، ثم حاول مرة أخرى. يمكنك أيضًا اختيار نموذج آخر.",
   "error.provider.opencodeServiceFailure":
     "تعذّر على OpenCode إكمال هذا الدور لأن خدمته المحلية فشلت. أعد المحاولة. إذا استمر الخطأ، أعد ربط OpenCode في الإعدادات.",
+  "error.provider.opencodeStillStarting": "لم ينتهِ OpenCode من التحميل في الوقت المحدد. سيحاول OpenBot مرة أخرى.",
   "error.provider.opencodeRateLimited":
     "رفض مزوّد النموذج الطلب بسبب حد المعدل. انتظر بضع دقائق أو اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.opencodeBilling":

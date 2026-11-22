@@ -1044,7 +1044,7 @@ export class DrainScheduler {
                 input: inputForThread(providerThreadId),
                 cwd: agent.workspacePath,
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
-                approvalPolicy: "on-request",
+                approvalPolicy: this.#threads.approvalPolicy(agent),
                 approvalsReviewer: "user",
                 sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
                 ...(client.provider === "codex" || client.provider === "claude"

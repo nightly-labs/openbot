@@ -46,7 +46,7 @@ function openCodeRetryUpdate(update: SessionUpdate): { attempt: number; cause: A
   return { attempt: Math.max(1, retry.attempt - 1), cause };
 }
 
-function isOpenCodeStarting(error: unknown): boolean {
+export function isOpenCodeStarting(error: unknown): boolean {
   return (
     error instanceof RequestError &&
     error.code === -32603 &&
@@ -251,6 +251,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   serverLost: isOpenCodeServerLost,
   emptyAnswerFailure: ({ reasoned }) =>
     sourceText(reasoned ? "error.provider.opencodeReasoningWithoutAnswer" : "error.provider.opencodeNoAnswer"),
+  stillStarting: isOpenCodeStarting,
   restoreFailure: (error, method) => {
     if (method === "resume" && isOpenCodeStarting(error)) return "wait-for-start";
     return isOpenCodeServiceFailure(error) ? "list-sessions" : null;

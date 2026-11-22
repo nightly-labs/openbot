@@ -127,9 +127,10 @@ export async function whatsAppInbound(
   const quotedId = contextInfo?.stanzaId ?? null;
   const mentioned = (contextInfo?.mentionedJid ?? []).map((jid) => jidNormalizedUser(jid));
   const namesMe = mentioned.some((jid) => isMe(jid, context.me));
+  const repliesToPost = quotedId !== null && context.isOwnPost(quotedId);
   const repliesToMe =
     quotedId !== null &&
-    (context.isOwnPost(quotedId) ||
+    (repliesToPost ||
       (contextInfo?.participant ? isMe(jidNormalizedUser(contextInfo.participant), context.me) : false));
   const text = textOf(content);
   if (isSelfChat && isOtherOpenBotPost(text)) return historyOnly ? null : { type: "otherOpenBot", chatJid };
@@ -190,7 +191,7 @@ export async function whatsAppInbound(
     target,
     platformMessageId: id,
     isDirect: !isGroup,
-    requiresLink: isGroup && !namesMe,
+    requiresLink: isGroup && !namesMe && !repliesToPost,
     authorId,
     text: withMentions(text, mentioned, context.me),
     mentionedUserIds: mentioned.filter((jid) => !isMe(jid, context.me)).flatMap((jid) => userOf(jid) ?? []),

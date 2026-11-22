@@ -152,7 +152,7 @@ import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-displa
 import { AgentDockFailed, AgentDockWindowController, toAgentDockFailed } from "./agent-dock-window";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
-import { fitImageForAgent } from "./agent-image-fit";
+import { compactScreenshot, fitImageForAgent } from "./agent-image-fit";
 import { AgentImportService } from "./agent-import-service";
 import { AgentInitializationGate } from "./agent-initialization";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
@@ -219,6 +219,7 @@ import {
   pointerOnDesktop,
 } from "./computer-use-target-window";
 import { createCrmPreferenceStore, crmSettingsStore } from "./crm-preference-store";
+import { CuaDriverActionTap } from "./cua-driver-action-tap";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
 import {
@@ -1841,6 +1842,7 @@ export async function createApplicationServices({
     });
   };
   const cuaDriver = new CuaDriverRuntime({
+    actionTap: new CuaDriverActionTap(Date.now, undefined, compactScreenshot),
     executable: await Effect.runPromise(resolveCuaDriverExecutable()),
     resolveExecutable: resolveCuaDriverExecutable,
     commandAlias: cuaDriverCommandAlias({

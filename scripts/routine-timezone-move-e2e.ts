@@ -71,6 +71,7 @@ const scheduler = new RoutineScheduler({
     usageLimited: () => false,
     routineThread: () => null,
     waitThread: () => null,
+    queueHold: () => null,
     routineDeleted: () => Effect.void,
   },
 });
