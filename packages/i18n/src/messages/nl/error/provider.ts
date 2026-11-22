@@ -143,6 +143,7 @@ export const messages = {
     "De sleutel van de aanbieder bevat een spatie of een teken dat een sleutel niet kan bevatten.",
   "error.provider.noModel": "De gekozen aanbieder heeft geen beschikbaar model.",
   "error.provider.noModelNamed": "{provider} heeft geen model beschikbaar.",
+  "error.provider.acpModelsNotLoaded": "{provider} kon zijn modellen niet laden. Stuur je bericht opnieuw.",
   "error.provider.acpNoModels": "ACP CLI heeft geen ACP-modellen aangeboden. OpenBot raadt geen reservemodel.",
   "error.provider.endpointRemoveBusy":
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je dit endpoint verwijdert.",

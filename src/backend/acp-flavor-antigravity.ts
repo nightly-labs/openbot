@@ -384,5 +384,6 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   contextCompaction: "handoff",
   closeKeepsSession: true,
   sessionProcesses: true,
+  modelsLoadWithSession: true,
   keepModelsOnRefreshFailure: true,
 };
