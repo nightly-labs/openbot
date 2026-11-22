@@ -1106,8 +1106,10 @@ stop, or an exit of the provider process), the sender gets an OpenBot note (`Mai
 never comes. Routine runs, channel work and messages from Slack, Telegram or
 WhatsApp do not steer automatically: each starts a turn of its own. A question back (a reply that
 expects a reply) asks for no `send_message` reply, so it stays queued and its own turn's answer goes
-back. Channel, messaging and task work, and each answer to a request that went to two or more teammates, stay queued
-(`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that
+back. Channel and messaging work, and each answer to a request that went to two or more teammates, stay queued
+(`MailboxStore.joinsRunningTurn`), so those answers still start together. An answer to a thread (a
+branched chat, a side thread or a task) steers the running turn of that thread, not of the main chat
+(`AgentService.#runningTask`). A message from an agent that
 cannot steer gets no fallback reason on its row. A message from an agent also stays queued while a
 turn that only the person's messages started runs, and starts as a turn of its own after it: the tools
 that only a person's message can start check each message of the turn, and a message from an agent

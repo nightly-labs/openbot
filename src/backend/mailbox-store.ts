@@ -2098,11 +2098,11 @@ export class MailboxStore {
       .map((delivery) => delivery.recipientAgentId);
   }
 
-  joinsChatTurn(deliveryId: string): boolean {
+  joinsRunningTurn(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (delivery?.status !== "queued") return false;
     const message = this.#requireMessage(delivery.messageId);
-    if (message.channelId || message.messaging || message.taskId) return false;
+    if (message.channelId || message.messaging) return false;
     if (message.replyToMessageId !== null && message.expectsReply !== false) return false;
     return (
       !isAnswer(message) ||
