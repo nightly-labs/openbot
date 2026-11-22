@@ -1,7 +1,7 @@
 import { isAgentTaskOpen } from "@openbot/team-client/agent-tasks";
 import { addCalendarDays, calendarDayOf } from "@openbot/team-client/routine-calendar-dates";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { lastUsageDays } from "@/features/agents/components/usage-range-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useServerThreadReads } from "@/features/chat/components/use-agent-thread-reads";
@@ -18,6 +18,7 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -73,7 +74,17 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
     retry: false,
     staleTime: 60_000,
   });
-  const range = lastUsageDays();
+  const foreground = useAppForeground();
+  const [range, setRange] = useState(lastUsageDays);
+  useEffect(() => {
+    if (!open && !foreground) return;
+    const today = lastUsageDays();
+    setRange((current) =>
+      current.startDate === today.startDate && current.endDate === today.endDate && current.timeZone === today.timeZone
+        ? current
+        : today,
+    );
+  }, [open, foreground]);
   const usage = useQuery({
     queryKey: queryKeys.serverUsage(queryScope, serverId, range),
     queryFn: () => loadHostAnalytics(range, serverId),
