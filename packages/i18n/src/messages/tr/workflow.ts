@@ -282,6 +282,8 @@ export const messages = {
   "workflow.output.target.slack": "Slack",
   "workflow.output.target.telegram": "Telegram",
   "workflow.output.notifyTitleRow": "Başlık",
+  "workflow.output.message": "Mesaj",
+  "workflow.output.messagePlaceholder": "Boşsa girdiyi gönderir",
 
   "workflow.discord.server": "Sunucu",
   "workflow.discord.chooseServer": "Sunucu seç",

@@ -279,6 +279,8 @@ export const messages = {
   "workflow.output.target.slack": "Slack",
   "workflow.output.target.telegram": "Telegram",
   "workflow.output.notifyTitleRow": "タイトル",
+  "workflow.output.message": "メッセージ",
+  "workflow.output.messagePlaceholder": "空の場合は入力を送信",
 
   "workflow.discord.server": "サーバー",
   "workflow.discord.chooseServer": "サーバーを選択",

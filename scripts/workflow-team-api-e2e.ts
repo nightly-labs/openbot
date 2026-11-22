@@ -1300,7 +1300,7 @@ try {
       });
       const target = await hostWorkflow("Format", graph);
       const read = await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: target.id });
-      assert.deepEqual([read.format, read.hostFormat], [WORKFLOW_FORMAT, WORKFLOW_FORMAT]);
+      assert.deepEqual([read.format, read.hostFormat], [1, WORKFLOW_FORMAT]);
       const save = (next: WorkflowGraph) => ({ workflowId: target.id, baseRevision: target.revision, graph: next });
       await refused(
         WORKFLOWS_ROUTES.saveGraph,

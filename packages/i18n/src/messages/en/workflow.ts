@@ -280,6 +280,8 @@ export const messages = defineMessages("workflow", {
   "workflow.output.target.slack": "Slack",
   "workflow.output.target.telegram": "Telegram",
   "workflow.output.notifyTitleRow": "Title",
+  "workflow.output.message": "Message",
+  "workflow.output.messagePlaceholder": "Sends the input when empty",
 
   "workflow.discord.server": "Server",
   "workflow.discord.chooseServer": "Choose server",

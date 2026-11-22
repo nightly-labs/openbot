@@ -8,6 +8,7 @@ import {
   type WorkflowAnswerField,
   type WorkflowAnswerProblem,
   type WorkflowAnswerSource,
+  type WorkflowAnswerValue,
   type WorkflowAnswerValueProblem,
   type WorkflowFields,
   type WorkflowGraph,
@@ -62,7 +63,17 @@ export function stepAnswer(
   return Object.fromEntries(givenAnswers(graph, nodeId, latest).flatMap(({ answer }) => Object.entries(answer)));
 }
 
-export type TemplateReader = "model" | "person";
+export type TemplateReader = "model" | "person" | "lines";
+
+function readerText(
+  reader: TemplateReader,
+  field: WorkflowAnswerField,
+  value: WorkflowAnswerValue | undefined,
+): string {
+  if (reader === "model") return workflowAnswerTemplateText(field, value);
+  if (reader === "lines" && Array.isArray(value)) return value.join("\n");
+  return workflowAnswerValueText(value);
+}
 
 export function templateValues(
   graph: WorkflowGraph,
@@ -76,10 +87,7 @@ export function templateValues(
     for (const field of source.fields) {
       if (!Object.hasOwn(answer, field.name)) continue;
       const value = answer[field.name];
-      values.set(
-        field.name,
-        reader === "person" ? workflowAnswerValueText(value) : workflowAnswerTemplateText(field, value),
-      );
+      values.set(field.name, readerText(reader, field, value));
     }
   return values;
 }

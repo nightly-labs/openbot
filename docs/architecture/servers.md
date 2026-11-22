@@ -529,6 +529,10 @@ or changes a step value that it does not know (`error.workflow.unknownValue`), a
 is already saved. A server transfer copies saved values as they are. A client shows content of a
 newer format only when `hostFormat` is at least that format.
 
+Format 2 adds the output `message` and `{{name}}` in the output title, labels and person. A host of
+format 1 sends the input and keeps `{{...}}` text as it is, so a client shows the message field only
+when `hostFormat` is 2 or higher, or when the field already has a value.
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes

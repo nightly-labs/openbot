@@ -279,6 +279,8 @@ export const messages = {
   "workflow.output.target.slack": "Slack",
   "workflow.output.target.telegram": "Telegram",
   "workflow.output.notifyTitleRow": "제목",
+  "workflow.output.message": "메시지",
+  "workflow.output.messagePlaceholder": "비어 있으면 입력을 보냄",
 
   "workflow.discord.server": "서버",
   "workflow.discord.chooseServer": "서버 선택",

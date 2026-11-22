@@ -1,4 +1,5 @@
 import {
+  WORKFLOW_FORMAT,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_TRIGGER_TYPES,
@@ -30,6 +31,7 @@ export const STORY_ALL_FEATURES: WorkflowFeatures = {
   outputs: WORKFLOW_OUTPUT_TARGETS,
   uploads: true,
   presence: false,
+  format: WORKFLOW_FORMAT,
 };
 
 const newestFirst = (left: string | null, right: string | null) => (right ?? "").localeCompare(left ?? "");

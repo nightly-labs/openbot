@@ -279,6 +279,8 @@ export const messages = {
   "workflow.output.target.slack": "Slack",
   "workflow.output.target.telegram": "Telegram",
   "workflow.output.notifyTitleRow": "标题",
+  "workflow.output.message": "消息",
+  "workflow.output.messagePlaceholder": "为空时发送输入",
 
   "workflow.discord.server": "服务器",
   "workflow.discord.chooseServer": "选择服务器",

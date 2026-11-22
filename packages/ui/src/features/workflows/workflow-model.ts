@@ -29,6 +29,7 @@ export interface WorkflowFeatures {
   outputs: readonly WorkflowOutputTarget[];
   uploads: boolean;
   presence: boolean;
+  format: number;
 }
 
 export const WORKFLOW_FEATURES_V1: WorkflowFeatures = {
@@ -37,6 +38,7 @@ export const WORKFLOW_FEATURES_V1: WorkflowFeatures = {
   outputs: ["notify", "channel"],
   uploads: false,
   presence: false,
+  format: 1,
 };
 
 export interface WorkflowPlace {

@@ -237,6 +237,7 @@ export function WorkflowsCanvas(props: {
       uploads: media,
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
       outputs: [...outputs, ...added],
+      format: workflows.detail()?.hostFormat ?? WORKFLOW_FEATURES_V1.format,
     };
   });
   return (

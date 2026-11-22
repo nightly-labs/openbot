@@ -282,6 +282,8 @@ export const messages = {
   "workflow.output.target.slack": "Slack",
   "workflow.output.target.telegram": "Telegram",
   "workflow.output.notifyTitleRow": "Titolo",
+  "workflow.output.message": "Messaggio",
+  "workflow.output.messagePlaceholder": "Vuoto: invia l’input",
 
   "workflow.discord.server": "Server",
   "workflow.discord.chooseServer": "Scegli server",

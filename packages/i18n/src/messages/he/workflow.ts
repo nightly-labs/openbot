@@ -278,6 +278,8 @@ export const messages = {
   "workflow.output.target.slack": "Slack",
   "workflow.output.target.telegram": "Telegram",
   "workflow.output.notifyTitleRow": "כותרת",
+  "workflow.output.message": "הודעה",
+  "workflow.output.messagePlaceholder": "ריק: שולח את הקלט",
   "workflow.discord.server": "שרת",
   "workflow.discord.chooseServer": "בחירת שרת",
   "workflow.discord.event": "אירוע",

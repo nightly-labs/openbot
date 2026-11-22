@@ -841,7 +841,11 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
   const people = (): Choice<string>[] => [
     { value: "agent", label: t("workflow.row.agentChooses"), icon: () => <Bot aria-hidden="true" /> },
     ...withValues(options.people(), fields.person() && fields.person() !== "agent" ? [fields.person()] : []).map(
-      (login) => ({ value: login, label: `@${login}`, icon: () => <UserPlus aria-hidden="true" /> }),
+      (login) => ({
+        value: login,
+        label: login.includes("{{") ? login : `@${login}`,
+        icon: () => <UserPlus aria-hidden="true" />,
+      }),
     ),
   ];
   const reasons = (): Choice<WorkflowGitHubCloseReason>[] => [

@@ -106,6 +106,7 @@ import {
   workflowGitHubPayload,
 } from "./github-matching";
 import {
+  type GitHubOutputFill,
   type GitHubOutputPlan,
   githubChangeKeys,
   githubChoicePrompt,
@@ -1045,6 +1046,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             run?.triggerNodeId ?? null,
             step.runId ? github.runItem(step.runId) : null,
             run?.source === "discord" ? discordTriggerFiles(run.payload) : null,
+            fillOf(step, run),
           );
           if (plan.kind === "failed") {
             settle(step, { status: "failed", error: plan.error });
@@ -1198,7 +1200,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               dependencies.notify({
                 kind: "output",
                 workflowId: step.workflowId,
-                workflowTitle: titleOf(step.workflowId),
+                workflowTitle: fillOf(step, run)(fieldText(node, "title"), "person").trim() || titleOf(step.workflowId),
                 text: step.input,
               });
               settle(step, { status: "done", output: step.input });
@@ -1235,6 +1237,15 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const found = stepGraph(step, run);
           return found ? templateValues(found.graph, step.nodeId, found.latest, reader) : new Map<string, string>();
         };
+        const fillOf = (step: StoredWorkflowStep, run: StoredWorkflowRun | null): GitHubOutputFill => {
+          const values = new Map<TemplateReader, ReadonlyMap<string, string>>();
+          return (text, reader) => {
+            if (!text.includes("{{")) return text;
+            const known = values.get(reader) ?? templateValuesOf(step, run, reader);
+            values.set(reader, known);
+            return fillWorkflowTemplate(text, known);
+          };
+        };
 
         const stepInput = (
           node: WorkflowNode,
@@ -1243,8 +1254,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           graph: WorkflowGraph,
           latest: ReadonlyMap<string, StoredWorkflowStep>,
         ) => {
-          if (node.kind === "output" && fieldText(node, "target") === "github") return githubOutputInput(inputs);
-          if (node.kind === "output") return inputText(readableAnswerInputs(graph, node.id, latest, inputs));
+          if (node.kind === "output") {
+            const message = fieldText(node, "message");
+            const filled = message.trim()
+              ? fillWorkflowTemplate(message, templateValues(graph, node.id, latest, "person"))
+              : null;
+            if (fieldText(node, "target") === "github") return githubOutputInput(inputs, filled);
+            return filled ?? inputText(readableAnswerInputs(graph, node.id, latest, inputs));
+          }
           const text = inputText(inputs);
           if (node.kind !== "agent") return text;
           const task = fillWorkflowTemplate(fieldText(node, "task"), templateValues(graph, node.id, latest));

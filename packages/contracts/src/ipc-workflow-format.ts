@@ -1,14 +1,29 @@
 import type { WorkflowEdge, WorkflowGraph, WorkflowNode, WorkflowNodeSize, WorkflowStroke } from "./ipc-workflows";
 import { isDynamicRecord } from "./runtime-values";
 
-export const WORKFLOW_FORMAT = 1;
+export const WORKFLOW_FORMAT = 2;
 
 interface WorkflowFormatRule {
   readonly since: number;
   readonly uses: (graph: WorkflowGraph) => boolean;
 }
 
-const WORKFLOW_FORMAT_RULES: readonly WorkflowFormatRule[] = [];
+const NAME_TEMPLATE = /\{\{\s*[A-Za-z_][A-Za-z0-9_]{0,39}\s*\}\}/u;
+const OUTPUT_NAME_FIELDS = ["title", "labels", "person"] as const;
+
+function outputUsesNames(node: WorkflowNode): boolean {
+  if (node.kind !== "output") return false;
+  const message = node.fields.message;
+  if (typeof message === "string" && message.trim()) return true;
+  return OUTPUT_NAME_FIELDS.some((name) => {
+    const value = node.fields[name];
+    return typeof value === "string" && NAME_TEMPLATE.test(value);
+  });
+}
+
+const WORKFLOW_FORMAT_RULES: readonly WorkflowFormatRule[] = [
+  { since: 2, uses: (graph) => graph.nodes.some(outputUsesNames) },
+];
 
 export function workflowGraphFormat(graph: WorkflowGraph): number {
   return WORKFLOW_FORMAT_RULES.reduce((format, rule) => (rule.uses(graph) ? Math.max(format, rule.since) : format), 1);

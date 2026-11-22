@@ -352,7 +352,7 @@ const SEARCH_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   image: ["prompt"],
   condition: ["rule"],
   approval: ["question"],
-  output: ["path", "title"],
+  output: ["path", "title", "message"],
   text: ["text"],
   note: ["text"],
   shape: ["text"],
