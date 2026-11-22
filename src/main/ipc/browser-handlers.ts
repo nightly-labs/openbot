@@ -37,12 +37,13 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
-import type { WebContents } from "electron";
+import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type { BrowserHost } from "../../backend/browser-host";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
 import { isBrowserSignedInPage } from "../browser-sign-in-page";
 import type { BrowserViewClient } from "../browser-view-client";
+import type { DetachedBrowserWindow } from "../detached-browser-window";
 import type { LocalSignInWindows } from "../local-sign-in-window";
 import {
   decodeBrowserControlState,
@@ -58,16 +59,37 @@ import {
   parseBrowserNavigate,
   parseBrowserOpen,
   parseBrowserTeachStop,
+  parseBrowserWindowAction,
+  parseBrowserWindowModel,
   parseLocalSignIn,
   parseLocalSignInFinish,
   parseVisibility,
 } from "./browser-inputs";
-import { eventHandler, eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import {
+  authorizedHandler,
+  eventHandler,
+  eventPayloadHandler,
+  handler,
+  type IpcGroupHandlers,
+  payloadHandler,
+} from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import { optionalPayload, stringPayload } from "./validation";
 
 export interface BrowserIpcDependencies {
   browserPictureInPicture: Pick<BrowserPictureInPicture, "open" | "close" | "dock" | "hide">;
+  detachedBrowserWindow: Pick<
+    DetachedBrowserWindow,
+    | "open"
+    | "close"
+    | "focus"
+    | "dock"
+    | "publishModel"
+    | "model"
+    | "sendAction"
+    | "requireMainRenderer"
+    | "requireWindowRenderer"
+  >;
   browser: Pick<
     BrowserHost,
     | "open"
@@ -94,11 +116,14 @@ export interface BrowserIpcDependencies {
 
 export function browserIpcHandlers({
   browserPictureInPicture,
+  detachedBrowserWindow,
   browser,
   remoteServers,
   browserView,
   localSignIn,
 }: BrowserIpcDependencies): Pick<IpcGroupHandlers, "browser" | "browserInput"> {
+  const fromMainRenderer = (event: IpcMainInvokeEvent) => detachedBrowserWindow.requireMainRenderer(event.sender.id);
+  const fromBrowserWindow = (event: IpcMainInvokeEvent) => detachedBrowserWindow.requireWindowRenderer(event.sender.id);
   const liveViewOwners = new WeakSet<WebContents>();
   const watchLiveViewOwner = (owner: WebContents) => {
     if (liveViewOwners.has(owner)) return;
@@ -391,8 +416,9 @@ export function browserIpcHandlers({
         return runCauseEffect(browserView.start(tabId, event.sender.id));
       }),
       stopLiveView: eventHandler((event) => runCauseEffect(browserView.stop(event.sender.id))),
-      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
-        routeToServer(remoteServers.activeServerId, {
+      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) => {
+        detachedBrowserWindow.close();
+        return routeToServer(remoteServers.activeServerId, {
           local: () => runCauseEffect(browserPictureInPicture.open(bounds)),
           remote: (serverId) =>
             runCauseEffect(
@@ -403,11 +429,25 @@ export function browserIpcHandlers({
                   : undefined,
               ),
             ),
-        }),
-      ),
+        });
+      }),
       closePictureInPicture: handler(() => browserPictureInPicture.close()),
       dockPictureInPicture: handler(() => browserPictureInPicture.dock()),
       hidePictureInPicture: handler(() => browserPictureInPicture.hide()),
+      openWindow: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) => {
+        browserPictureInPicture.close();
+        return runCauseEffect(detachedBrowserWindow.open(bounds));
+      }),
+      closeWindow: handler(() => detachedBrowserWindow.close()),
+      focusWindow: handler(() => detachedBrowserWindow.focus()),
+      dockWindow: eventHandler((event) => detachedBrowserWindow.dock(event.sender.id)),
+      publishWindowModel: authorizedHandler(fromMainRenderer, parseBrowserWindowModel, (_event, model) =>
+        detachedBrowserWindow.publishModel(model),
+      ),
+      getWindowModel: eventHandler((event) => detachedBrowserWindow.model(event.sender.id)),
+      sendWindowAction: authorizedHandler(fromBrowserWindow, parseBrowserWindowAction, (_event, action) =>
+        detachedBrowserWindow.sendAction(action),
+      ),
     },
     browserInput: {
       sendLiveViewInput: payloadHandler(decodeBrowserViewInputValue, async (input) => browserView.sendInput(input)),

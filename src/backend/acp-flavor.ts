@@ -79,6 +79,7 @@ export interface AcpFlavor {
     error: unknown,
     method: "load" | "resume",
   ): "wait-for-start" | "list-sessions" | "confirm-missing" | null;
+  stillStarting?(error: unknown): boolean;
   lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
   refusesUntilRestart?(error: unknown): boolean;
   lostServerUntilRestart?(error: unknown): boolean;
@@ -95,6 +96,7 @@ export interface AcpFlavor {
   probeCloseDelayMs?: number;
   effortCategories?: readonly string[];
   sessionProcesses?: true;
+  modelsLoadWithSession?: true;
   sessionProcessesBefore?: string;
   sdkHarness?: {
     failedSession(stderrLine: string): string | undefined;
@@ -152,6 +154,7 @@ export interface AcpFlavor {
   planUsedUpChunk?: RegExp;
   connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
+  mcpCallInputNamesServer?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };

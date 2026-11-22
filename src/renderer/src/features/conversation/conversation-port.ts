@@ -30,8 +30,10 @@ export interface ConversationPort {
   browser: Pick<
     OpenBotDesktopApi["browser"],
     | "capturePreview"
+    | "closeWindow"
     | "finishLocalSignIn"
     | "onLiveViewEvent"
+    | "onWindowEvent"
     | "openLocalSignIn"
     | "sendLiveViewInput"
     | "startLiveView"

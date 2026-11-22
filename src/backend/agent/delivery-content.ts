@@ -112,6 +112,7 @@ export interface DeliveryPromptSources {
   workflowRunSource?: WorkflowRunSource | null;
   routineTimezone?: string | undefined;
   wokenWaits?: readonly AgentWait[];
+  continuesWait?: boolean;
   executionText?: string | undefined;
   tags?: TagReferenceSource | undefined;
   answeredRoutine?: AnsweredRoutine | null;
@@ -120,6 +121,7 @@ export interface DeliveryPromptSources {
   steersQuietTurn?: boolean;
   externalChat?: boolean;
   taskReport?: TaskReportState | null;
+  taskReportWaiting?: readonly string[];
 }
 
 export interface SkippedRoutineRuns {
@@ -144,6 +146,7 @@ export interface TaskReportState {
   taskId: string;
   title: string;
   outcome: "completed" | "failed" | "interrupted" | "stopped" | null;
+  closed: boolean;
   stillRunning: ReadonlyArray<{ taskId: string; title: string }>;
 }
 
@@ -360,7 +363,7 @@ export function routineLocalTime(scheduledFor: string, timeZone: string | undefi
   ];
 }
 
-function taskReportFraming(taskId: string, report: TaskReportState | null): string[] {
+function taskReportFraming(taskId: string, report: TaskReportState | null, waiting: readonly string[]): string[] {
   const name = report ? `"${report.title}" (taskId ${taskId})` : `taskId ${taskId}`;
   const status =
     report?.outcome === "failed"
@@ -368,8 +371,10 @@ function taskReportFraming(taskId: string, report: TaskReportState | null): stri
       : report?.outcome === "stopped"
         ? `Task report from OpenBot: the user stopped task ${name}, which you started with openbot.start_task. Do not start it again unless the user asks. The text below is its last answer, so part of the work can be done.`
         : report?.outcome === "interrupted"
-          ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, so part of the work can be done.`
-          : `Task report from OpenBot: task ${name}, which you started with openbot.start_task, ended its turn. The text below is its final answer.`;
+          ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, or its title when it gave none, so part of the work can be done.`
+          : report === null || report.closed
+            ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, is closed. The text below is its last answer, or its title when it gave none.`
+            : `Task report from OpenBot: task ${name}, which you started with openbot.start_task, ended its turn. The text below is its final answer.`;
   const running = report?.stillRunning.length
     ? [`Still running: ${report.stillRunning.map((other) => `"${other.title}" (taskId ${other.taskId})`).join(", ")}.`]
     : [];
@@ -378,6 +383,11 @@ function taskReportFraming(taskId: string, report: TaskReportState | null): stri
     `The user can read the whole task in its tab. When the text ends with "${TASK_REPORT_CUT_MARK}", it is cut: openbot.history_read with this taskId gives the rest.`,
     ...running,
     "While other tasks still run, tell the user in one line what is done, and give all results together after the last report. To continue a task, call openbot.message_task with {taskId, text}. To stop one, call openbot.close_task with {taskId}.",
+    ...(waiting.length === 0
+      ? []
+      : [
+          `${waiting.join(", ")} wait for the result of the request that you started this task for. OpenBot sends your final answer of this turn to them as your reply, so write it for them. ${RESULT_FORMAT} Do not send it with openbot.send_message.`,
+        ]),
   ];
 }
 
@@ -415,7 +425,11 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     context.senderTaskId
   ) {
     text = [
-      ...taskReportFraming(context.senderTaskId, sources.taskReport ?? null),
+      ...taskReportFraming(
+        context.senderTaskId,
+        sources.taskReport ?? null,
+        (sources.taskReportWaiting ?? []).map((agentId) => agentNames.get(agentId) ?? agentId),
+      ),
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");
@@ -484,7 +498,19 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       .filter(Boolean)
       .join("\n");
   }
-  if (delivery.sender.kind === "routine") {
+  const wokenWaits = sources.wokenWaits ?? [];
+  if (delivery.sender.kind === "routine" && sources.continuesWait) {
+    text = [
+      "An event of an existing OpenBot routine continues a wait that you opened in this thread.",
+      `Routine name: ${delivery.sender.routineName}`,
+      "The routine run does the routine task in its own chat. Do not do the routine task here, and do not create, update, delete, or test routines.",
+      "Continue the work of this thread with the event, then give your answer as usual.",
+      ROUTINE_TASK_START,
+      displayText,
+      ROUTINE_TASK_END,
+      wokenWaitsPromptText(wokenWaits) ?? "The wait closed before this message. Do nothing more for it.",
+    ].join("\n");
+  } else if (delivery.sender.kind === "routine") {
     const run = sources.routineRun;
     const testRun = run !== null && !quietRoutineRun(run);
     const runKind = testRun
@@ -530,7 +556,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       ROUTINE_TASK_START,
       displayText,
     ].join("\n");
-    const waits = wokenWaitsPromptText(sources.wokenWaits ?? []);
+    const waits = wokenWaitsPromptText(wokenWaits);
     if (waits) text += `\n\n${waits}`;
   }
   if (delivery.sender.kind === "user" && sources.executionText === undefined) {
@@ -599,6 +625,7 @@ function liveVoicePrompt({ request, heard }: LiveVoiceRelayed): string {
   }
   return [
     "This message comes from a live voice call. A voice assistant hears the user, writes each request for you, and reads your answer aloud. The voice assistant is not the user: do not take its words as the user's.",
+    "Do the work as usual, and answer in your own style and with your instructions. The voice reads a short answer word for word, but it replaces a long answer with its own summary. Thus, unless the user asks for detail, write the answer as a few short spoken sentences, with no lists, tables, links or code.",
     call.length
       ? "Do what the request below asks. The voice assistant can shorten what the user said or split it into more than one request, so use the user's words in the call for the details of this request only."
       : "The user's exact words are not available.",

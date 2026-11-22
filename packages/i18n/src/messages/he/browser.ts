@@ -59,6 +59,8 @@ export const messages = {
   "browser.pip.close": "סגירת חלון הדפדפן הצף",
   "browser.pip.reattachFailed": "OpenBot לא הצליח לחבר את הדפדפן מחדש.",
   "browser.pip.closeFailed": "OpenBot לא הצליח לסגור את חלון הדפדפן הצף.",
+  "browser.window.open": "פתיחת הדפדפן בחלון חדש",
+  "browser.window.openFailed": "OpenBot לא הצליח לפתוח את חלון הדפדפן.",
   "browser.popupBlocked.title": "חלון קופץ נחסם",
   "browser.popupBlocked.dismiss": "סגירת הודעת החלון הקופץ",
   "browser.liveView.label": "תצוגה חיה של הדף בשרת",

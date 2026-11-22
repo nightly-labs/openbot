@@ -910,6 +910,7 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostVoiceModel={{}}
           hostTurnLimits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
@@ -1013,7 +1014,12 @@ function AppSettings(props: AccountProps) {
     const choose = providerAccounts()?.setLiveVoiceAccount;
     const codex = agentStatus().providers?.find((row) => row.id === "codex");
     if (!choose || !codex?.accounts) return undefined;
-    return { accounts: codex.accounts, accountId: codex.liveVoiceAccount ?? null, choose };
+    return {
+      accounts: codex.accounts,
+      accountId: codex.liveVoiceAccount ?? null,
+      defaultUsesKey: codex.apiKeyInUse === true,
+      choose,
+    };
   };
   const {
     appSettingsOpen,
@@ -1021,6 +1027,8 @@ function AppSettings(props: AccountProps) {
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
+    mobileInstallRequest,
+    clearMobileInstallRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -1077,6 +1085,9 @@ function AppSettings(props: AccountProps) {
         billingApi={appPort().billing}
         referralApi={appPort().referral}
         licenseApi={appPort().license}
+        creditsApi={appPort().credits}
+        onCreditsChange={windowPage.adoptCredits}
+        onBuyCredits={(serverId) => windowPage.openCredits(serverId)}
         onContactUs={() => void appPort().openExternal("hosted-server-contact")}
         hostedServersApi={appPort().hostedServers}
         onAddHostedServer={() => {
@@ -1097,6 +1108,8 @@ function AppSettings(props: AccountProps) {
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
+        mobileInstallRequest={mobileInstallRequest()}
+        onMobileInstallRequestHandled={clearMobileInstallRequest}
       />
     </Loading>
   );

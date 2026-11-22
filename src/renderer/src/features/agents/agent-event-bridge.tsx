@@ -45,7 +45,7 @@ import { usePresence } from "../team/team-context";
 import {
   agentErrorDetails,
   claimErrorToast,
-  createRetryNotices,
+  createTurnErrorBanners,
   providerErrorTitle,
   readableAgentError,
   remoteAgentError,
@@ -159,7 +159,9 @@ export function AgentEventBridge() {
     (agentId) =>
       soundLevel(agentId) !== "nothing" && agentList().some((agent) => agent.id === agentId && agent.notifications),
   );
-  const retryNotices = createRetryNotices();
+  const errorBanners = createTurnErrorBanners();
+  const isMainThread = (agentId: string, threadId: string) =>
+    agentList().some((agent) => agent.id === agentId && agent.threadId === threadId);
   let readRefresh = 0;
   let snapshotReceived = false;
   let promptListRead: "idle" | "reading" | "again" = "idle";
@@ -315,6 +317,8 @@ export function AgentEventBridge() {
         return;
       case "turn-started":
         completedTurnByAgent.delete(event.agentId);
+        if (isMainThread(event.agentId, event.threadId))
+          errorBanners.noteTurnStarted(composerDraftKey({ agentId: event.agentId, serverId: activeServerId() }));
         setTurnProgress((current) => {
           delete current[event.agentId];
         });
@@ -329,7 +333,12 @@ export function AgentEventBridge() {
         completedTurnByAgent.set(event.agentId, event.turnId);
         if (promptListRead !== "idle") endedDuringPromptListRead.add(`turn:${event.turnId}`);
         const bannerKey = composerDraftKey({ agentId: event.agentId, serverId: activeServerId() });
-        retryNotices.clearAtTurnEnd(bannerKey, setConversationErrors, setConversationErrorRuns);
+        errorBanners.clearAtTurnEnd(
+          bannerKey,
+          event.status === "completed" && !event.quiet && isMainThread(event.agentId, event.threadId),
+          setConversationErrors,
+          setConversationErrorRuns,
+        );
         setTurnProgress((current) => {
           if (current[event.agentId]?.turnId === event.turnId) delete current[event.agentId];
         });
@@ -467,7 +476,7 @@ export function AgentEventBridge() {
         if (agentId) {
           const key = composerDraftKey({ agentId, serverId: activeServerId() });
           const message = readableAgentError(shownError);
-          retryNotices.noteError(key, event.message, message);
+          errorBanners.noteError(key, event.message, message);
           setConversationErrors((current) => ({ ...current, [key]: message }));
           const provider = event.provider ? providerDisplayName(event.provider) : null;
           const run =

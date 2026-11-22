@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "v5",
+  "catalogVersion": "v6",
   "sources": {
     "openai": {
       "repository": "https://github.com/openai/skills",
@@ -12,7 +12,7 @@
     },
     "cursor": {
       "repository": "https://github.com/cursor/plugins",
-      "commit": "1b6d44ff26d4e242f4e8f68c391e6d2f7ca16def"
+      "commit": "792440e8a560a4a3f63748cdee70491ecd412982"
     }
   },
   "skills": [
@@ -249,7 +249,7 @@
       "upstreamPath": "pstack",
       "aliasPrefixes": ["principle-"],
       "category": "coding",
-      "description": "poteto's pstack agent workflows: rigorous playbooks, engineering principles, deliberate subagents, and verified work. Installs all 52 pstack skills. Call one with $pstack-<name>, such as $pstack-poteto-mode, $pstack-how or $pstack-why."
+      "description": "poteto's pstack agent workflows: rigorous playbooks, engineering principles, deliberate subagents, and verified work. Installs all 58 pstack skills. Call one with $pstack-<name>, such as $pstack-poteto-mode, $pstack-how or $pstack-why."
     }
   ],
   "agents": [

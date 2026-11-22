@@ -10,6 +10,7 @@ interface PromptState {
   index: number;
   answers: Record<string, string[]>;
   drafts: Record<string, string>;
+  picks: Record<string, string[]>;
   pending: boolean;
   failedAnswers: Record<string, string[]> | null;
   resolution: AgentPromptResolution | null;
@@ -22,6 +23,7 @@ function initialState(scope: string): PromptState {
     index: 0,
     answers: {},
     drafts: {},
+    picks: {},
     pending: false,
     failedAnswers: null,
     resolution: null,
@@ -55,6 +57,11 @@ export function useQuestionPrompt(
   const messageId = message?.id;
 
   return useMemo(() => {
+    const picked = question?.multiSelect
+      ? (question.options ?? [])
+          .map((option) => option.label)
+          .filter((label) => state.picks[question.id]?.includes(label))
+      : [];
     function update(change: Partial<PromptState>): void {
       setState((current) => (current.scope === scope ? { ...current, ...change } : current));
     }
@@ -68,7 +75,7 @@ export function useQuestionPrompt(
       unsentPreview.current = undefined;
       try {
         await respond(agentId, { requestId: prompt.requestId, answers });
-        update({ resolution: answeredPromptResolution(prompt.questions, answers), answers: {}, drafts: {} });
+        update({ resolution: answeredPromptResolution(prompt.questions, answers), answers: {}, drafts: {}, picks: {} });
       } catch (error) {
         unsentPreview.current ??= unsent;
         throw error;
@@ -103,6 +110,18 @@ export function useQuestionPrompt(
       if (next === null) void submit(answers);
     }
 
+    function togglePick(label: string): void {
+      if (disabled || !question?.multiSelect) return;
+      void haptics.selection();
+      const current = state.picks[question.id] ?? [];
+      const picks = current.includes(label) ? current.filter((item) => item !== label) : [...current, label];
+      update({ picks: { ...state.picks, [question.id]: picks }, failedAnswers: null });
+    }
+
+    function answerText(text: string): void {
+      answer([...picked, text]);
+    }
+
     return {
       messageId,
       index: state.index,
@@ -129,7 +148,10 @@ export function useQuestionPrompt(
         void haptics.selection();
         update({ index, replyInChat: false });
       },
+      picked,
+      togglePick,
       answer,
+      answerText,
       submit,
       send,
     };

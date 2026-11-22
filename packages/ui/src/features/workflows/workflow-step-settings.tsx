@@ -85,6 +85,10 @@ function settingLines(
         return line(key, t("workflow.llm.system"), value, true);
       case "rule":
         return line(key, t("workflow.condition.rule"), value, true);
+      case "answer":
+        return line(key, t("workflow.answer.title"), value, true);
+      case "check":
+        return line(key, t("workflow.check.title"), value, true);
       case "aspect":
         return line(key, t("workflow.image.aspect"), value === "custom" ? undefined : value);
       case "width": {

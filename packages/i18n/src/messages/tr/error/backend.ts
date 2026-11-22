@@ -88,6 +88,8 @@ export const messages = {
     "Bu kanalın üyelerinin henüz sıkıştırılacak bir konuşması yok. Bir üye kanalda yanıt verdikten sonra sıkıştırın.",
   "error.backend.channelCompactNotSupported":
     "Bu kanalın hiçbir üyesi istek üzerine sıkıştıramaz. Bunu destekleyen üyeler, bağlamları neredeyse dolduğunda otomatik olarak sıkıştırır.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Kanal üyelerinin sağlayıcısı şu anda çalışmıyor. Sağlayıcıları yenileyin, ardından kanalı yeniden sıkıştırın.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",
   "error.backend.channelArchiveRunning": "Bu kanaldaki devam eden işi durdurun, ardından kanalı silin.",
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
@@ -221,7 +223,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Bu bekleme açık değil. Ajan onu kapattı veya biri iptal etti.",
   "error.backend.agentWaitNoRequest": "Beklemenin devam etmesi için bir mesaj gerekir. Bu turda mesaj yok.",
   "error.backend.agentWaitOwnChatOnly":
-    "Beklemeyi yalnızca kendi sohbetinizde açın. Bir kanal veya mesajlaşma görevi bekleyemez.",
+    "Beklemeyi kendi sohbetinizde veya bir yan ileti dizisinde açın. Bir kanal veya mesajlaşma konuşması bekleyemez.",
   "error.backend.agentWaitNoteRequired": "Beklemenin ne için olduğunu belirten kısa bir not yazın.",
   "error.backend.agentWaitRoutineGone": "Bu ajanın bu kimliğe sahip bir rutini yok.",
   "error.backend.agentWaitNoRoutine":
@@ -264,6 +266,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Bu sunucu oturum açılmasını istiyor. Ana makinedeki OpenBot'ta oturum açın.",
   "error.backend.mcpSignInNeedsHttps":
     "Bu sunucu oturum açılmasını istiyor ve OpenBot yalnızca https üzerinden oturum açar. URL'yi {url} olarak değiştirin.",
+  "error.backend.mcpSignInOtherAddress":
+    "Bu sunucu yalnızca {url} adresinde oturum açar. URL'yi bu adresle değiştirin, sonra yeniden oturum açın.",
   "error.backend.mcpSignInCancelled": "Oturum açma iptal edildi.",
   "error.backend.mcpSignInTimedOut": "Oturum açma tarayıcıda tamamlanmadı.",
   "error.backend.mcpSignInRefused": "Oturum açma sayfası erişimi reddetti. Yeniden oturum açın.",
@@ -363,6 +367,7 @@ export const messages = {
     "Bu raporu yalnızca OpenBot telefon uygulaması gönderebilir, çünkü telefonun sürümünü ve destek günlüğünü ekler. Bu sohbeti telefonda açın. Bu mesajı orada görürseniz telefon uygulamasını güncelleyin.",
   "error.backend.takeoverInactive": "Bu tarayıcı devralması artık etkin değil.",
   "error.backend.authSubmitting": "Kimlik doğrulama gönderimi zaten devam ediyor.",
+  "error.backend.apiKeyListFailed": "OpenBot kayıtlı API anahtarlarını okuyamadı.",
   "error.backend.apiKeySaveFailed": "OpenBot API anahtarını kaydedemedi. Yeniden deneyin.",
   "error.backend.apiKeySaving": "API anahtarı zaten kaydediliyor.",
   "error.backend.apiKeyAnswerUnreadable":

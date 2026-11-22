@@ -9,6 +9,7 @@ import {
   isCustomProviderHarness,
   isReasoningEffort,
   PICKER_PROVIDERS,
+  savedCustomModelId,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Schema, Semaphore } from "effect";
@@ -36,7 +37,7 @@ export interface CustomEndpointsHooks {
 
 interface SavedEndpoint {
   readonly harness: CustomProviderHarness;
-  readonly models: readonly string[];
+  readonly modelIds: readonly string[];
 }
 
 function choiceKey(provider: string, model: string): string {
@@ -94,8 +95,10 @@ export class CustomEndpoints {
       if (!isCustomProviderHarness(option.provider)) continue;
       const separator = option.id.indexOf("/");
       if (separator <= 0) continue;
-      const endpoint = endpoints.get(option.id.slice(0, separator));
-      if (endpoint?.harness !== option.provider || savesModel(endpoint.models, option.id)) continue;
+      const endpointId = option.id.slice(0, separator);
+      const endpoint = endpoints.get(endpointId);
+      if (endpoint?.harness !== option.provider) continue;
+      if (savesModel(listedModelIds(endpointId, endpoint.harness, endpoint.modelIds), option.id)) continue;
       inUse ??= this.#modelsInUse();
       if (!inUse.has(choiceKey(option.provider, option.id))) added.add(option);
     }
@@ -115,10 +118,21 @@ export class CustomEndpoints {
   }
 
   serves(modelId: string, provider: AgentProvider): boolean {
-    if (!isCustomProviderHarness(provider)) return true;
+    return this.#releasedAt(modelId, provider) === null;
+  }
+
+  servesClient(modelId: string, provider: AgentProvider, configRevision: number | null): boolean {
+    const releasedAt = this.#releasedAt(modelId, provider);
+    if (releasedAt === null) return true;
+    if (this.#hooks.endpointHarness(modelId.slice(0, modelId.indexOf("/"))) !== provider) return false;
+    return (configRevision ?? this.#committedRevision) >= releasedAt;
+  }
+
+  #releasedAt(modelId: string, provider: AgentProvider): number | null {
+    if (!isCustomProviderHarness(provider)) return null;
     const separator = modelId.indexOf("/");
-    if (separator <= 0) return true;
-    return !this.#released[provider].has(modelId.slice(0, separator));
+    if (separator <= 0) return null;
+    return this.#released[provider].get(modelId.slice(0, separator)) ?? null;
   }
 
   pending(harness: CustomProviderHarness): boolean {
@@ -231,18 +245,14 @@ export class CustomEndpoints {
   ) {
     if (removed.size === 0) return;
     const prefix = `${providerId}/`;
-    const remaining = this.available().filter(
-      (option) => !(option.id.startsWith(prefix) && removed.has(option.id.slice(prefix.length))),
+    const removedIds = new Set(
+      CUSTOM_PROVIDER_HARNESSES.flatMap((harness) => listedModelIds(providerId, harness, [...removed])),
     );
+    const remaining = this.available().filter((option) => !removedIds.has(option.id));
     for (const harness of CUSTOM_PROVIDER_HARNESSES) {
       const affected = this.#store
         .list()
-        .filter(
-          (agent) =>
-            providerForAgent(agent) === harness &&
-            agent.model.startsWith(prefix) &&
-            removed.has(agent.model.slice(prefix.length)),
-        );
+        .filter((agent) => providerForAgent(agent) === harness && removedIds.has(agent.model));
       if (affected.length === 0) continue;
       const fallback =
         remaining.find((option) => option.provider === harness && option.id.startsWith(prefix)) ??
@@ -387,7 +397,8 @@ export class CustomEndpoints {
   ) {
     const models = this.available().filter((model) => model.provider === harness);
     for (const agent of this.#waitingFor(harness)) {
-      const target = models.find((model) => model.id === agent.model);
+      const moved = this.#modelOnHarness(agent, harness);
+      const target = models.find((model) => model.id === moved);
       if (!target) continue;
       this.#pendingMoves.delete(agent.id);
       yield* this.#hooks
@@ -421,6 +432,15 @@ export class CustomEndpoints {
 
   waitsForHarness(harness: CustomProviderHarness): boolean {
     return this.#waitingFor(harness).length > 0;
+  }
+
+  #modelOnHarness(agent: AgentSummary, harness: CustomProviderHarness): string {
+    const from = providerForAgent(agent);
+    const endpointId = endpointOfModel(agent.model);
+    const endpoint = endpointId ? this.#hooks.savedEndpoints().get(endpointId) : undefined;
+    if (!endpointId || !endpoint || !isCustomProviderHarness(from)) return agent.model;
+    const id = endpoint.modelIds.find((modelId) => savedCustomModelId(endpointId, from, modelId) === agent.model);
+    return id === undefined ? agent.model : savedCustomModelId(endpointId, harness, id);
   }
 
   #waitingFor(harness: CustomProviderHarness): AgentSummary[] {
@@ -551,6 +571,10 @@ export class CustomEndpoints {
       (agent.threadId ? this.#store.database.readConversationRuntime(agent.id, agent.threadId).activeTurnId : null);
     return Boolean(active);
   }
+}
+
+function listedModelIds(endpointId: string, harness: CustomProviderHarness, modelIds: readonly string[]): string[] {
+  return modelIds.map((modelId) => savedCustomModelId(endpointId, harness, modelId));
 }
 
 function endpointOfModel(model: string): string | null {

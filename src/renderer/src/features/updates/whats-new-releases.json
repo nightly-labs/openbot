@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Update each joined server to this version too. On a server, tasks that run at the same time, the live voice account, the OpenBot memory switch, workflow folders, typed workflow answers and more than 10 accounts of one provider work only when the server has this version.",
+      "After this update, an older version of OpenBot cannot open your data."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "An agent can split unrelated work into tasks that run at the same time. Each result comes back to the main chat, and the agent combines the results for you.",
+          "See all open threads of an agent in the new Threads tab of the side panel. The tab shows the number of threads that wait for you.",
+          "Change your keyboard shortcuts in the new Keyboard tab of Settings. New shortcuts start a thread and go to the next and previous thread.",
+          "Workflows open in tabs, and workflow steps can give typed answers. Write {{name}} to put an answer in a later step.",
+          "Upload an MP4 or WebM video as the window backdrop in Settings > Appearance.",
+          "Choose the ChatGPT account that GPT live voice uses in Settings > Voice."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A provider keeps up to 20 accounts. Before, the limit was 10.",
+          "Dictation records for up to 10 minutes. Before, it stopped at 2 minutes.",
+          "A thread loads older messages when you scroll near the top. You do not need to click a button."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A scheduled routine no longer turns itself off in silence when a run has nothing to report.",
+          "A long chat keeps all its messages, in the correct order, while a reply streams in.",
+          "A linked WhatsApp number no longer stops receiving messages while it still shows \"Connected\".",
+          "On Windows, OpenCode agents run commands again. Before, they often failed with \"opencode-pty request timed out\".",
+          "An agent that you muted no longer sends you a notification when it replies in a channel."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

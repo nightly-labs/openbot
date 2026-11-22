@@ -129,10 +129,12 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
             const url = URL.parse(text.slice(0, end).trim());
             if (!url || !SIGN_IN_PAGES[signInPage.site](url) || url.username || url.password) return browserFailed();
             opened = true;
+            const page = SIGN_IN_PAGE_LINKS[signInPage.site](url);
             registerSecretValue(url.toString());
+            registerSecretValue(page);
             void Promise.resolve()
               .then(() => {
-                if (!settled) return signInPage.open(url.toString());
+                if (!settled) return signInPage.open(page);
               })
               .catch(browserFailed);
           },
@@ -267,6 +269,23 @@ export function devinSignInPageRelayed(): boolean {
 const SIGN_IN_PAGES: Record<SignInPageSite, (url: URL) => boolean> = {
   google: (url) => url.origin === "https://accounts.google.com" && GOOGLE_SIGN_IN_PATHS.has(url.pathname),
   devin: (url) => url.origin === "https://app.devin.ai",
+};
+
+const GOOGLE_ACCOUNT_CHOOSER = "select_account";
+
+const GOOGLE_SILENT_SIGN_IN = "none";
+
+function withGoogleAccountChooser(url: URL): string {
+  const prompts = (url.searchParams.get("prompt") ?? "").split(" ").filter(Boolean);
+  if (prompts.includes(GOOGLE_ACCOUNT_CHOOSER) || prompts.includes(GOOGLE_SILENT_SIGN_IN)) return url.toString();
+  const page = new URL(url);
+  page.searchParams.set("prompt", [...prompts, GOOGLE_ACCOUNT_CHOOSER].join(" "));
+  return page.toString();
+}
+
+const SIGN_IN_PAGE_LINKS: Record<SignInPageSite, (url: URL) => string> = {
+  google: withGoogleAccountChooser,
+  devin: (url) => url.toString(),
 };
 
 async function makeOpenerFolder(): Promise<string> {

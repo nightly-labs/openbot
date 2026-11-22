@@ -17,6 +17,7 @@ import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePath
 import type { ConversationRuntime } from "./conversation-runtime";
 import { type AgentLibraryFolders, placeInLibraryFolder } from "./library-folder-tools";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
+import { effectiveAgentFolders } from "./workspace-sandbox";
 
 export interface AttachmentGatewayHooks {
   emit(event: AgentEvent): void;
@@ -321,7 +322,7 @@ export class AttachmentGateway {
       Promise.all([realpath(agent.workspacePath), realpath(this.#sharedRoot)]),
     );
     const folderRoots = yield* attachmentCall(async () =>
-      (await Promise.allSettled((agent.additionalFolders ?? []).map((folder) => realpath(folder)))).flatMap((result) =>
+      (await Promise.allSettled(effectiveAgentFolders(agent).map((folder) => realpath(folder)))).flatMap((result) =>
         result.status === "fulfilled" ? [result.value] : [],
       ),
     );

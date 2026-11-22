@@ -27,6 +27,7 @@ import {
   decodeCustomAgentResult,
   decodeCustomAgents,
   decodeCustomAgentUsage,
+  decodeCustomServerCheckoutResult,
   decodeDetectedModelServers,
   decodeDiscoverModelsResult,
   decodeHostedServer,
@@ -113,6 +114,8 @@ const voiceServer = {
 };
 
 const valid: [string, (value: unknown) => unknown, unknown][] = [
+  ["an opened custom server checkout", decodeCustomServerCheckoutResult, { opened: true }],
+  ["a custom server checkout with no link", decodeCustomServerCheckoutResult, { opened: false }],
   [
     "app behavior with a quit guard",
     decodeAppBehaviorPreference,
@@ -383,6 +386,8 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  ["a custom server checkout without a result", decodeCustomServerCheckoutResult, {}],
+  ["a custom server checkout with a text result", decodeCustomServerCheckoutResult, { opened: "yes" }],
   [
     "an unknown quit guard",
     decodeAppBehaviorPreference,

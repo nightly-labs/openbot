@@ -566,14 +566,13 @@ try {
   };
   const textRequest = await requestTurnOf("Check the docs build. TEAMMATE-REQUEST-TEXT");
   pass(
-    "An answered teammate request ends quiet without the no-update tool",
+    "An answered teammate request keeps the agent's text answer in the chat without the no-update tool",
     toolResults(textRequest.turn.turnId, "send_message")[0]?.result?.success === true &&
       toolResults(textRequest.turn.turnId, "routine_no_update").length === 0 &&
       textRequest.event.type === "turn-completed" &&
-      textRequest.event.quiet === true &&
-      textRequest.answers.some((message) => message.text === "The result went to the teammate.") &&
-      textRequest.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
-      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId) === undefined,
+      textRequest.event.quiet !== true &&
+      textRequest.answers.every((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId)?.text === "The result went to the teammate.",
     textRequest,
   );
   const noticeRequest = await requestTurnOf("Check the notice build. TEAMMATE-REQUEST-TEXT NOTICE NO-FINAL");
@@ -605,12 +604,11 @@ try {
   });
   const unansweredDelivery = mailbox.completedDeliveriesOfTurn(checker.id, unanswered.turn.turnId)[0]?.delivery;
   pass(
-    "A teammate request with no reply ends quiet after OpenBot sent its answer to the teammate",
+    "A teammate request with no reply keeps its answer in the chat after OpenBot sent it to the teammate",
     unanswered.event.type === "turn-completed" &&
-      unanswered.event.quiet === true &&
-      unanswered.answers.some((message) => message.text === "All good.") &&
-      unanswered.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
-      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId) === undefined &&
+      unanswered.event.quiet !== true &&
+      unanswered.answers.every((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId)?.text === "All good." &&
       sentResults.length === 1 &&
       sentResults[0]?.text.includes("All good.") === true &&
       unansweredDelivery !== undefined &&
@@ -1021,6 +1019,47 @@ try {
     linkedPrompt?.includes("Do not create, update, delete, or test routines during this run.") === true &&
       !linkedPrompt.includes(`routineId "${relayed.id}"`),
     linkedPrompt,
+  );
+  pass(
+    "A linked step of a Test run reads as a Test run",
+    linkedPrompt?.includes("Run type: manual Test run") === true,
+    linkedPrompt,
+  );
+
+  const quietRelay = createRoutine(
+    relay.id,
+    "Quiet relay",
+    `Report and hand on. <<NEXT${JSON.stringify([noUpdate])}NEXT>>`,
+  );
+  await connect(quietRelay.id, relay.id, responder.id);
+  await connect(quietRelay.id, responder.id, finisher.id);
+  await runCauseEffect(agents.updateAgent({ agentId: relay.id, allowAutomation: true }));
+  const quietRelayRun = await settledRun(
+    "Quiet relay",
+    await runCauseEffect(agents.runRoutineFromAutomation({ agentId: relay.id, routineId: quietRelay.id, payload: "" })),
+  );
+  const quietRelaySteps = await steps("Quiet relay", quietRelayRun.run.id, 3);
+  const quietLinked = quietRelaySteps.find((step) => step.agentId === responder.id);
+  const quietLinkedTurnId = quietLinked?.deliveryId
+    ? (mailbox.getDelivery(quietLinked.deliveryId)?.delivery.turnId ?? null)
+    : null;
+  const quietLinkedResult = toolResults(quietLinkedTurnId, "routine_no_update")[0]?.result;
+  const quietLinkedAnswers = quietLinkedTurnId
+    ? store.database.readTurnAssistantMessages(responder.id, quietLinkedTurnId)
+    : [];
+  pass(
+    "A linked step of a script run ends quiet after routine_no_update (#14510)",
+    quietLinked?.status === "succeeded" &&
+      quietLinkedResult?.success === true &&
+      quietLinkedResult.contentItems.some((item) => item.text.includes('"quiet"')) &&
+      quietLinkedAnswers.length > 0 &&
+      quietLinkedAnswers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE),
+    { steps: report.flowSteps["Quiet relay"], quietLinkedResult, quietLinkedAnswers },
+  );
+  pass(
+    "The agent after a quiet linked step is skipped",
+    quietRelaySteps.find((step) => step.agentId === finisher.id)?.status === "skipped",
+    report.flowSteps["Quiet relay"],
   );
 
   const selfPausing = async (name: string, routineCalls: (routineId: string) => FakeCall[]) => {

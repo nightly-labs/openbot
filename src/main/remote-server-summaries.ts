@@ -53,6 +53,8 @@ export function remoteServerSummaries(
         ...(server.hosted === undefined ? {} : { hosted: server.hosted }),
         ...(server.restartAvailable === undefined ? {} : { restartAvailable: server.restartAvailable }),
         ...(server.storageGb === undefined ? {} : { storageGb: server.storageGb }),
+        ...(server.paymentRequired ? { paymentRequired: true as const } : {}),
+        ...(server.customPlan ? { customPlan: server.customPlan } : {}),
         ...(changedAt === undefined ? {} : { keyChangedAt: changedAt }),
         ...(isThisComputer(server.id) ? { thisComputer: true as const } : {}),
         compatibility: status.compatibility,

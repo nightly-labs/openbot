@@ -36,7 +36,8 @@ export const messages = {
     "Bu tarayıcıdan ajanlarınızla sohbet etmek için barındırılan bir sunucu oluşturun. OpenBot'u bilgisayarınızda da çalıştırabilir veya bir davetle bir sunucuya katılabilirsiniz.",
   "webClient.connect.stepInstall": "Bilgisayarınıza OpenBot'u yükleyin ve açın.",
   "webClient.connect.stepSignIn": "E-posta adresinizle oturum açın.",
-  "webClient.connect.stepRemote": "Uzaktan erişimi açın.",
+  "webClient.connect.stepRemote":
+    "OpenBot'ta Sunucu ayarları > Üyeler bölümünü açın ve Bu sunucuyu yayımla seçeneğini etkinleştirin.",
   "webClient.notice.download": "OpenBot'u indir",
   "webClient.notice.createServer": "Barındırılan sunucu oluştur",
   "webClient.notice.join": "Davet ile katıl",

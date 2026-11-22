@@ -22,6 +22,8 @@ export interface DiagnosticOrigin {
 export interface AgentClient {
   readonly provider: AgentProvider;
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
+  readonly compactsOnDemand?: boolean;
+  promptCacheTtlMs?(externalThreadId: string): number | null;
   readonly compactsItself?: boolean;
   readonly provisionalAnswers?: boolean;
   readonly turnContext?: boolean;
@@ -33,7 +35,9 @@ export interface AgentClient {
   readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
   readonly catalogAsMcpTools?: (model: string) => boolean;
   readonly imageInput?: (externalThreadId: string) => boolean;
+  readonly structuredOutput?: boolean;
   readonly canReleaseProcess?: () => boolean;
+  readonly runsBackgroundWork?: () => boolean;
   readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;

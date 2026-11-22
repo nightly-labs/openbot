@@ -229,6 +229,7 @@ function profile(name: string) {
     ownerNotificationLevel: ServerNotificationLevel | null;
     browsingMemory: { enabled: boolean };
     claudeUserSetup: boolean;
+    cacheExpiryCompaction: boolean;
     claudeCompactWindow: number | null;
     machineAlerts: MachineAlertSettings;
     modelVisibility: { provider: string; hidden: string[] }[];
@@ -245,6 +246,7 @@ function profile(name: string) {
     ownerNotificationLevel: null,
     browsingMemory: { enabled: true },
     claudeUserSetup: false,
+    cacheExpiryCompaction: true,
     claudeCompactWindow: null,
     machineAlerts: DEFAULT_MACHINE_ALERT_SETTINGS,
     modelVisibility: [],
@@ -309,6 +311,7 @@ function profile(name: string) {
       ownerNotificationLevel: preference("ownerNotificationLevel"),
       browsingMemory: preference("browsingMemory"),
       claudeUserSetup: preference("claudeUserSetup"),
+      cacheExpiryCompaction: preference("cacheExpiryCompaction"),
       claudeCompactWindow: preference("claudeCompactWindow"),
       machineAlerts: preference("machineAlerts"),
       modelVisibility: preference("modelVisibility"),
@@ -361,7 +364,7 @@ function profile(name: string) {
       workflows: {
         workflows: () =>
           Effect.sync(() => workflows.listWithGraphs().map(({ summary, graph }) => ({ title: summary.title, graph }))),
-        createWorkflow: (input) => Effect.try(() => workflows.create(input)),
+        createWorkflow: (input) => Effect.try(() => workflows.create(input, new Date(), "saved")),
       },
       signedInProviders: () => [],
     },
@@ -578,27 +581,31 @@ try {
   ]);
 
   const at = { x: 0, y: 0 };
-  source.workflows.create({
-    title: "Paper pipeline",
-    graph: {
-      nodes: [
-        { id: "hook", kind: "trigger", at, fields: { trigger: "webhook" } },
-        {
-          id: "slack",
-          kind: "trigger",
-          at,
-          fields: { trigger: "slack", connectionId: "messaging-1", event: "message" },
-        },
-        { id: "write", kind: "agent", at, fields: { agentId: writer.id, task: "Write it." } },
-        { id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } },
-      ],
-      edges: [
-        { id: "e1", from: "hook", to: "write", type: "text" },
-        { id: "e2", from: "write", to: "post", type: "text" },
-      ],
-      strokes: [],
+  source.workflows.create(
+    {
+      title: "Paper pipeline",
+      graph: {
+        nodes: [
+          { id: "hook", kind: "trigger", at, fields: { trigger: "webhook" } },
+          {
+            id: "slack",
+            kind: "trigger",
+            at,
+            fields: { trigger: "slack", connectionId: "messaging-1", event: "message" },
+          },
+          { id: "write", kind: "agent", at, fields: { agentId: writer.id, task: "Write it." } },
+          { id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } },
+        ],
+        edges: [
+          { id: "e1", from: "hook", to: "write", type: "text" },
+          { id: "e2", from: "write", to: "post", type: "text" },
+        ],
+        strokes: [],
+      },
     },
-  });
+    new Date(),
+    "saved",
+  );
 
   source.workflows.create({
     title: "Channel digest",
@@ -629,6 +636,7 @@ try {
     ownerNotificationLevel: "needs-me",
     browsingMemory: { enabled: false },
     claudeUserSetup: true,
+    cacheExpiryCompaction: false,
     claudeCompactWindow: 400_000,
     machineAlerts: { diskPercent: 70, memoryPercent: 75, cpuPercent: 80, responsibleMemberId: "member-on-old-server" },
     modelVisibility: [{ provider: "codex", hidden: ["gpt-old-model"] }],
@@ -1010,6 +1018,7 @@ try {
     JSON.stringify(newWorkflow?.graph.nodes.map((item) => item.fields)),
   );
   pass("the workflow's messaging connection is left empty", node("slack")?.connectionId === "");
+  pass("a saved value that this OpenBot does not know moves as it is", node("slack")?.event === "message");
   pass(
     "the user is told to make the webhook address and choose the connection again",
     result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("webhook")) &&

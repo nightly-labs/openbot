@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@openbot/ui/data";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, onCleanup } from "solid-js";
+import { matchesShortcut } from "../../../keyboard-shortcut-preference";
 import type { ChatSearchMatch } from "../chat-search";
 import { clearChatSearchHighlights, findChatSearchMatches, renderChatSearchHighlights } from "../chat-search";
 import type { ConversationProps } from "../conversation-types";
@@ -187,7 +188,7 @@ export function createSearchStore(deps: SearchStoreDeps) {
     if (event.defaultPrevented) return;
     const primaryModifier = event.metaKey || event.ctrlKey;
     const key = event.key.toLocaleLowerCase();
-    if (primaryModifier && !event.altKey && !event.shiftKey && key === "f") {
+    if (matchesShortcut(event, "searchChat")) {
       event.preventDefault();
       event.stopPropagation();
       openChatSearch();

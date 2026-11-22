@@ -122,7 +122,8 @@
   cursor: grabbing;
 }
 
-.wfn-slot :is(textarea, input.wfn-input, input.wfn-step-name):not(:focus, [readonly]) {
+.wfn-slot
+  :is(textarea, input.wfn-input, input.wfn-step-name, .wfn-name-field):not(:focus, [readonly], [aria-readonly="true"]) {
   cursor: grab;
 }
 
@@ -130,7 +131,7 @@
   cursor: text;
 }
 
-.wfn-viewport[data-dragging] .wfn-slot :is(textarea, input.wfn-input, input.wfn-step-name) {
+.wfn-viewport[data-dragging] .wfn-slot :is(textarea, input.wfn-input, input.wfn-step-name, .wfn-name-field) {
   cursor: grabbing;
 }
 
@@ -927,7 +928,7 @@
   color: var(--wfn-kind);
 }
 
-:is(.wfn-menu, .wfn-search) .wfn-menu-icon svg {
+:is(.wfn-menu, .wfn-search, .wfn-name-popover) .wfn-menu-icon svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   color: inherit;

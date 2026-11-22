@@ -9,6 +9,7 @@ import {
 } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
@@ -1362,14 +1363,4 @@ function linkFileTarget(href: string): FileDirectoryContext | null {
   const { shared, workspace } = linkFileTargets(href);
   if (shared) return { path: shared, kind: "shared" };
   return workspace ? { path: workspace, kind: "workspace" } : null;
-}
-
-export function markdownImageName(alt: string, url: string): string {
-  if (alt.trim()) return alt.trim();
-  try {
-    const path = new URL(url).pathname;
-    const name = decodeURIComponent(path.slice(path.lastIndexOf("/") + 1));
-    if (name) return name;
-  } catch {}
-  return url;
 }

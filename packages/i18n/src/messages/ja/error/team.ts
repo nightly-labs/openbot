@@ -123,6 +123,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
+  "error.team.hostVoiceModelUnsupported": "この接続はサーバーの音声認識モデルに対応していません。",
   "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
   "error.team.ownerTransferUnsupported": "このサーバーは所有権の移転に対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
@@ -130,6 +131,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",
   "error.team.agentMemoryLimitUnsupported": "この接続はエージェントのメモリー上限に対応していません。",
   "error.team.agentFoldersUnsupported": "この接続はエージェントのフォルダーに対応していません。",
+  "error.team.channelFoldersUnsupported": "この接続はチャンネルのフォルダーに対応していません。",
   "error.team.folderUnavailable": "このフォルダーはホストのコンピューターで使用できません。",
   "error.team.memoryReviewUnsupported": "この接続はメモリーの見直しに対応していません。",
   "error.team.skillLearningUnsupported": "この接続はスキル学習に対応していません。",
@@ -137,6 +139,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
   "error.team.claudeUserSetupUnsupported": "この接続は Claude Code 設定のスイッチに対応していません。",
   "error.team.claudeCompactWindowUnsupported": "この接続は Claude の圧縮サイズに対応していません。",
+  "error.team.cacheExpiryCompactionUnsupported": "この接続はキャッシュの期限切れ前の圧縮に対応していません。",
   "error.team.providerEnvironmentUnsupported": "この接続はプロバイダーの変数に対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",
@@ -149,6 +152,8 @@ export const messages = {
   "error.team.mcpUnsupported": "この接続では MCP サーバーを利用できません。",
   "error.team.mcpServerListNeedsUpdate":
     "このサーバーで {limit} 個を超える MCP サーバーを使うには、このデバイスの OpenBot を更新してください。",
+  "error.team.providerAccountListNeedsUpdate":
+    "このサーバーで 1 つのプロバイダーのアカウントを {limit} 個より多く使うには、このデバイスの OpenBot を更新してください。",
   "error.team.storageUnsupported": "この接続ではストレージを利用できません。",
   "error.team.machineResourcesUnsupported": "この接続ではマシンの使用状況を利用できません。",
   "error.team.machineAlertMemberInvalid":

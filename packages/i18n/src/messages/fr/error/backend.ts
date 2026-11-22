@@ -93,6 +93,8 @@ export const messages = {
     "Les membres de ce canal n’ont pas encore de conversation à compacter. Compactez-le après la réponse d’un membre dans le canal.",
   "error.backend.channelCompactNotSupported":
     "Aucun membre de ce canal ne peut compacter à la demande. Les membres qui le prennent en charge compactent leur contexte automatiquement quand il est presque plein.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Le fournisseur des membres du canal ne fonctionne pas pour le moment. Actualisez les fournisseurs, puis compactez à nouveau le canal.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
   "error.backend.channelArchiveRunning": "Arrêtez le travail en cours dans ce canal, puis supprimez-le.",
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
@@ -241,7 +243,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Cette attente n’est pas ouverte. L’agent l’a fermée, ou quelqu’un l’a annulée.",
   "error.backend.agentWaitNoRequest": "Une attente a besoin d’un message pour continuer. Ce tour n’a pas de message.",
   "error.backend.agentWaitOwnChatOnly":
-    "Ouvrez une attente uniquement dans votre propre discussion. Une tâche de canal ou de messagerie ne peut pas attendre.",
+    "Ouvrez une attente dans votre propre discussion ou dans un fil secondaire. Une conversation de canal ou de messagerie ne peut pas attendre.",
   "error.backend.agentWaitNoteRequired": "Indiquez une courte note qui précise l’objet de l’attente.",
   "error.backend.agentWaitRoutineGone": "Cet agent n’a pas de routine avec cet identifiant.",
   "error.backend.agentWaitNoRoutine":
@@ -285,6 +287,8 @@ export const messages = {
     "Ce serveur demande une connexion. Connectez-vous-y dans OpenBot sur l’ordinateur hôte.",
   "error.backend.mcpSignInNeedsHttps":
     "Ce serveur demande une connexion, et OpenBot ne se connecte qu’en https. Remplacez l’URL par {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Ce serveur ne permet la connexion qu’à {url}. Remplace l’URL par cette adresse, puis connecte-toi à nouveau.",
   "error.backend.mcpSignInCancelled": "La connexion a été annulée.",
   "error.backend.mcpSignInTimedOut": "La connexion n’a pas été terminée dans le navigateur.",
   "error.backend.mcpSignInRefused": "La page de connexion a refusé l’accès. Reconnectez-vous.",
@@ -391,6 +395,7 @@ export const messages = {
     "Seule l'app OpenBot du téléphone peut envoyer ce rapport, car elle ajoute la version et le journal d'assistance du téléphone. Ouvre cette discussion sur le téléphone. Si tu y vois ce message, mets à jour l'app du téléphone.",
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
+  "error.backend.apiKeyListFailed": "OpenBot n’a pas pu lire les clés d’API enregistrées.",
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
   "error.backend.apiKeySaving": "La clé d’API est déjà en cours d’enregistrement.",
   "error.backend.apiKeyAnswerUnreadable":

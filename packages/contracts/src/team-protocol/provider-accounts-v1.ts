@@ -43,7 +43,7 @@ const finite: AdminDecoder = (value) => {
   return value;
 };
 
-const account = fields({
+export const providerAccountWire = fields({
   id: accountId,
   label: nullable(string(PROVIDER_ACCOUNTS_LABEL_LIMIT)),
   email: nullable(string(254)),
@@ -62,7 +62,10 @@ export const PROVIDER_ACCOUNTS_CODECS: ReadonlyMap<string, OptionalRouteCodec> =
     adminRoute(
       empty,
       fields({
-        providers: list(fields({ provider, accounts: list(account, ACCOUNTS_PER_PROVIDER) }), PROVIDER_LIMIT),
+        providers: list(
+          fields({ provider, accounts: list(providerAccountWire, ACCOUNTS_PER_PROVIDER) }),
+          PROVIDER_LIMIT,
+        ),
         agents: list(fields({ agentId: identifier, accountId }), AGENT_LIMIT),
       }),
     ),

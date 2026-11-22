@@ -37,7 +37,7 @@ import {
   type AgentDockSeat as AgentDockUiSeat,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
-import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
+import { isDockMessage, isDockVisualReply } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
@@ -1010,6 +1010,18 @@ function dockApproval(current: { approval: AgentApproval; attempt: number }): Ag
 }
 
 function dockMessage(message: AgentMessage): AgentDockMessage {
+  const attachments = (message.attachments ?? [])
+    .filter(isAttachmentSummary)
+    .slice(0, INPUT_LIMITS.attachments)
+    .map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      size: attachment.size,
+      kind: attachment.kind,
+      mimeType: attachment.mimeType,
+      previewKind: attachment.previewKind,
+      previewUrl: attachment.previewUrl,
+    }));
   return {
     id: message.id.slice(0, INPUT_LIMITS.identifier),
     author: message.author,
@@ -1017,18 +1029,8 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
     senderMember: message.senderMember ? { id: message.senderMember.id, name: message.senderMember.name } : null,
     kind: message.kind === "error" ? "error" : "text",
     body: message.body.slice(0, INPUT_LIMITS.messageText),
-    attachments: (message.attachments ?? [])
-      .filter(isAttachmentSummary)
-      .slice(0, INPUT_LIMITS.attachments)
-      .map((attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-        size: attachment.size,
-        kind: attachment.kind,
-        mimeType: attachment.mimeType,
-        previewKind: attachment.previewKind,
-        previewUrl: attachment.previewUrl,
-      })),
+    attachments,
+    ...(isDockVisualReply({ ...message, attachments }) ? { visual: true } : {}),
   };
 }
 

@@ -7,6 +7,7 @@ import type {
   DraftAttachment,
   InstalledSkill,
   QueueDelivery,
+  ResponseStyle,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
@@ -20,7 +21,11 @@ import type {
   ComposerMcpServer,
   ComposerThread,
 } from "@openbot/ui/data";
-import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
+import {
+  AgentActivityIndicator,
+  type AgentActivityLabel,
+  nextAgentActivityLabel,
+} from "@openbot/ui/features/conversation/AgentActivity";
 import {
   type AgentStep,
   AgentStepsDisclosure,
@@ -77,7 +82,18 @@ import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortc
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { children, createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import {
+  children,
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  onCleanup,
+  onSettled,
+  Show,
+  untrack,
+} from "solid-js";
 import { createComposerRowsResize } from "../createComposerRowsResize";
 import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
 import { MAIN_THREAD_ID } from "./thread-types";
@@ -223,6 +239,7 @@ export interface AgentThreadViewProps {
   copiedMessageId?: string | null | undefined;
   compactMessageActions?: boolean | undefined;
   bubbleStyle?: ChatBubbleStyle | undefined;
+  responseStyle?: ResponseStyle | undefined;
   onBranch?: ((messageId: string) => void) | undefined;
   onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
@@ -309,7 +326,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     newer.onLoad();
   }
   let shownTaskId = untrack(() => props.task?.id);
-  const activityLabel = nextAgentActivityLabel();
+  const rotatingActivityLabel = nextAgentActivityLabel();
+  const plainActivity = () => props.responseStyle === "natural";
+  const activityLabel = (): AgentActivityLabel => (plainActivity() ? "Thinking it through…" : rotatingActivityLabel);
   const fades = createScrollFades();
   createEffect(
     () => props.task?.id,
@@ -590,6 +609,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const shownRow = (message: AgentMessage) =>
     shownInThread(message) || (message.kind === "thinking" && props.stepsAbove?.(message.id) !== undefined);
   const shownRows = createMemo(() => props.messages.filter(shownRow));
+  const turnOutputShown = (turnId: string | null) =>
+    turnId !== null &&
+    shownRows().some(
+      (message) => message.turnId === turnId && message.author === "agent" && message.kind !== "thinking",
+    );
   const holdsSenderRun = (message: AgentMessage) =>
     message.kind !== "thinking" &&
     message.kind !== "plan" &&
@@ -636,6 +660,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     }
     return ids;
   });
+  const [runOpeners, setRunOpeners] = createStore<Record<string, "agent" | "user">>({});
   const branchDividerId = createMemo(() => {
     const source = props.branchSource;
     if (!source) return undefined;
@@ -768,7 +793,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             </p>
           </Show>
           <For each={shownRows()} keyed={(message) => message.id}>
-            {(message) => {
+            {(message, index) => {
               const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
               const stepsInRow = () =>
                 props.traceAbove !== undefined &&
@@ -792,10 +817,34 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   )}
                 </Show>
               );
+              const opensRun = createMemo((): "agent" | "user" | undefined => {
+                const current = message();
+                if (card() || !continuesRunIds().has(current.id)) return undefined;
+                if (!stepsInRow() && props.stepsAbove?.(current.id)) return undefined;
+                return author(current).kind === "agent" ? "agent" : "user";
+              });
+              createEffect(
+                () => ({ id: message().id, kind: opensRun() }),
+                ({ id, kind }) => {
+                  if (!kind) return;
+                  setRunOpeners((draft) => {
+                    draft[id] = kind;
+                  });
+                  return () =>
+                    setRunOpeners((draft) => {
+                      delete draft[id];
+                    });
+                },
+              );
+              const nextOpensRun = () => {
+                const next = shownRows()[index() + 1];
+                return next ? runOpeners[next.id] : undefined;
+              };
               return (
                 <div
                   class="virtual-chat-row"
                   data-grouped={!card() && continuesRunIds().has(message().id) ? "sender" : undefined}
+                  data-next-grouped={nextOpensRun()}
                 >
                   <Show when={timeMarkers().get(message().id)}>
                     {(label) => (
@@ -875,6 +924,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           actionTime={props.compactMessageActions === false}
                           actionsBeside={stepsInRow() || author(message()).kind === "you"}
                           menu={messageMenu(message())}
+                          textAtOnce={plainActivity()}
                           data-chat-search-message={message().id}
                         />
                       }
@@ -892,10 +942,12 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
-                  label={activityLabel}
+                  label={activityLabel()}
                   detail={task().progress}
                   steps={props.activeSteps}
                   stepsOpenByDefault={props.stepsOpenByDefault}
+                  plain={plainActivity()}
+                  outputShown={turnOutputShown(task().activeTurnId)}
                 />
               </div>
             )}
@@ -905,7 +957,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
-                  label={activityLabel}
+                  label={rotatingActivityLabel}
                   detail={t("chat.activity.backgroundWork")}
                   since={since()}
                 />

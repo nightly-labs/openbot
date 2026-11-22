@@ -93,6 +93,7 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.output.chatChannel": "OpenBot channel",
   "mobile.workflow.output.file": "File",
   "mobile.workflow.status.running": "Running",
+  "mobile.workflow.status.waiting": "Queued",
   "mobile.workflow.status.approval": "Waiting for you",
   "mobile.workflow.status.stopping": "Stopping",
   "mobile.workflow.status.done": "Done",

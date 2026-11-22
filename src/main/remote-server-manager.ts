@@ -2313,6 +2313,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           channelIsolation: true,
           channelPicture: true,
           channelBrowser: true,
+          providerManyAccounts: true,
         }),
       );
       if (!response.ok) {

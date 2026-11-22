@@ -134,6 +134,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "يحتوي مفتاح المزوّد على مسافة أو حرف لا يمكن أن يحتويه المفتاح.",
   "error.provider.noModel": "لا يتوفر نموذج للمزوّد المحدد.",
   "error.provider.noModelNamed": "لا يتوفر نموذج لدى {provider}.",
+  "error.provider.acpModelsNotLoaded": "تعذّر على {provider} تحميل نماذجه. أرسل رسالتك مرة أخرى.",
   "error.provider.acpNoModels": "لم تُعلن واجهة ACP CLI عن أي نماذج ACP. لن يخمّن OpenBot نموذجًا بديلًا.",
   "error.provider.endpointRemoveBusy": "انتظر حتى ينتهي الدور النشط وقائمة الانتظار قبل إزالة نقطة النهاية هذه.",
   "error.provider.codexOutdated": "إصدار Codex CLI {version} قديم جدًا. يتطلب OpenBot الإصدار 0.156.0 أو أحدث.",
@@ -228,6 +229,7 @@ export const messages = {
     "رفض OpenCode Go الطلب. لا يحل مفتاح API جديد هذه المشكلة. قد لا تكون خطة OpenCode Go نشطة، أو قد يحظر OpenCode Go شبكتك: بعض الخدمات تحظر شبكات VPN أو الخوادم الوكيلة أو بعض البلدان. تأكد من أن خطتك نشطة في OpenCode Console، أو أوقف VPN، ثم حاول مرة أخرى. يمكنك أيضًا اختيار نموذج آخر.",
   "error.provider.opencodeServiceFailure":
     "تعذّر على OpenCode إكمال هذا الدور لأن خدمته المحلية فشلت. أعد المحاولة. إذا استمر الخطأ، أعد ربط OpenCode في الإعدادات.",
+  "error.provider.opencodeStillStarting": "لم ينتهِ OpenCode من التحميل في الوقت المحدد. سيحاول OpenBot مرة أخرى.",
   "error.provider.opencodeRateLimited":
     "رفض مزوّد النموذج الطلب بسبب حد المعدل. انتظر بضع دقائق أو اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.opencodeBilling":
@@ -255,6 +257,8 @@ export const messages = {
     "تعذّر على OpenCode قراءة تفكير هذا النموذج بهذا المستوى من الجهد. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.opencodeModelNotServed":
     "لا يوفّر مزوّد النموذج هذا النموذج لحسابك الآن. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeSafetyBlocked":
+    "حظر مزوّد النموذج هذه الرسالة بسبب قواعد الأمان الخاصة به. أرسل طلبك مرة أخرى بكلمات مختلفة. إذا حظر رسائلك التالية أيضًا، فابدأ محادثة جديدة أو اختر نموذجًا آخر.",
   "error.provider.opencodeNetwork":
     "تعذّر على OpenCode الاتصال بمزوّد النموذج. تحقق من اتصال الشبكة للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.\n{detail}",
   "error.provider.codexStateBusy": "لا يزال ChatGPT يجهّز سجله المحلي بعد تشغيل سابق. انتظر بضع دقائق، ثم أعد المحاولة.",
@@ -265,6 +269,8 @@ export const messages = {
   "error.provider.cpuUnsupported": "لا يمكن لمعالج هذا الكمبيوتر تشغيل هذا المزوّد. استخدم مزوّدًا آخر.",
   "error.provider.opencodeDatabaseNewer":
     "تعذّر على OpenCode فتح قاعدة بياناته لأن إصدارًا أحدث من OpenCode غيّرها. حدّث OpenCode إلى الإصدار 2 أو أحدث، ثم أعد المحاولة.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "لم يبدأ Grok لأن الإعداد allowed_models في ملف إعداداته لا يتضمن نموذجه الافتراضي. أضف النموذج الافتراضي إلى allowed_models، أو احذف allowed_models، ثم أعد المحاولة.",
   "error.provider.opencodeNoAnswer": "أنهى نموذج OpenCode الدور بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "أنهى نموذج OpenCode الدور بعد الاستدلال، بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
@@ -395,6 +401,8 @@ export const messages = {
     "أصبحت هذه الدردشة كبيرة جدًا بحيث لا يمكن إرسالها إلى النموذج. غالبًا ما تسبب الصور في الدردشة ذلك. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.opencodeSessionRejected":
     "رفض OpenCode الطلب ولم يذكر السبب. قد يحدث هذا في دردشة طويلة أو بعد تغيير النموذج. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا مختلفًا أو مستوى جهد أقل.",
+  "error.provider.opencodeInputRefused":
+    "رفض النموذج محتوى هذه الدردشة ولم يذكر السبب. قد يسبب ذلك ملف في الدردشة، مثل ملف PDF أو صورة. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أرسل رسالتك مرة أخرى بدون الملف، أو اختر نموذجًا مختلفًا.",
   "error.provider.opencodeCompactionFailed":
     "لم يتمكن النموذج من تلخيص هذه الدردشة الطويلة لإفساح المجال في نافذة السياق. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا أقوى.",
   "error.provider.museMcpStartupFault":
@@ -496,6 +504,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "هذا الإعداد غير متاح في جلسة المزوّد الحالية.",
   "error.provider.sessionSettingInvalid": "هذه القيمة غير متاحة لهذا الإعداد.",
   "error.provider.sessionSettingsBusy": "انتظر حتى ينتهي الدور الحالي قبل تغيير إعداد الجلسة.",
+  "error.provider.sessionSettingsTimedOut": "لم تستجب جلسة الوكيل في الوقت المحدد. حاول مرة أخرى.",
   "error.provider.piOutdated": "إصدار Pi {version} قديم جدًا. ثبّت Pi 1.1.0 أو أحدث لدعم RPC وMCP الأصلي.",
   "error.provider.nativeMissing": "واجهة {provider} CLI غير مثبتة. نزّلها في الإعدادات.",
   "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",
@@ -545,6 +554,8 @@ export const messages = {
   "error.provider.museTurnFailed": "فشل دور Muse.",
   "error.provider.museModelUnavailable":
     "لا يمكن لـ Muse استخدام هذا النموذج. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل، أو قد لا يملك هذا الحساب إذنًا بالوصول إلى النموذج. اختر نموذجًا آخر، ثم حاول مرة أخرى.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "تعذّر على Muse إكمال هذا الطلب. يستخدم Muse مفتاح Meta API المحفوظ، لا تسجيل دخولك. استبدل المفتاح، أو أزله في الإعدادات لاستخدام تسجيل الدخول.\n{detail}",
   "error.provider.museProfileUnsupported":
     "لا يستطيع Muse إنشاء ملف تعريف بدون الوصول إلى أدوات خارجية. استخدم مزوّدًا آخر لإنشاء ملف التعريف، ثم اختر Muse للوكيل.",
   "error.provider.museAuthUnverified": "لم يتم التحقق من مصادقة Muse. اتصل على الحاسوب المضيف، أو عيّن مفتاح Meta API.",

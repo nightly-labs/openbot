@@ -57,6 +57,12 @@ export function isOpenStep(step: Pick<WorkflowStep, "status">): boolean {
 }
 const OPEN_RUN_STATUSES = ["running", "approval", "stopping"] as const satisfies readonly WorkflowRunStatus[];
 
+export interface WorkflowMediaOutput {
+  attachmentId: string;
+  workflowId: string;
+  endedAt: string | null;
+}
+
 export interface WorkflowWebhookReceipt {
   workflowId: string;
   nodeId: string;
@@ -271,6 +277,39 @@ export class WorkflowRunStore {
     return row ? toStep(row) : null;
   }
 
+  earlierAttempts(step: StoredWorkflowStep, limit: number): StoredWorkflowStep[] {
+    const rows =
+      step.runId === null
+        ? this.#database.connection
+            .prepare(
+              `${STEP_SELECT} WHERE run_id IS NULL AND workflow_id = ? AND node_id = ? AND rowid < ? ORDER BY rowid DESC LIMIT ?`,
+            )
+            .all(step.workflowId, step.nodeId, step.sequence, limit)
+        : this.#database.connection
+            .prepare(`${STEP_SELECT} WHERE run_id = ? AND node_id = ? AND attempt < ? ORDER BY attempt DESC LIMIT ?`)
+            .all(step.runId, step.nodeId, step.attempt, limit);
+    return databaseRows(rows).map(toStep);
+  }
+
+  runningAgentStep(deliveryId: string): StoredWorkflowStep | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare(`${STEP_SELECT} WHERE delivery_id = ? AND status = 'running' AND kind = 'agent'`)
+        .get(deliveryId),
+    );
+    return row ? toStep(row) : null;
+  }
+
+  keepAgentAnswer(stepId: string, deliveryId: string, output: string, now = new Date()): boolean {
+    return (
+      this.#database.connection
+        .prepare(
+          "UPDATE workflow_steps SET output = ?, updated_at = ? WHERE step_id = ? AND delivery_id = ? AND status = 'running'",
+        )
+        .run(output, now.toISOString(), stepId, deliveryId).changes > 0
+    );
+  }
+
   openSteps(): StoredWorkflowStep[] {
     return databaseRows(
       this.#database.connection
@@ -290,6 +329,35 @@ export class WorkflowRunStore {
         .all(workflowId),
     ).map(toStep);
     return new Map(rows.map((step) => [step.nodeId, step]));
+  }
+
+  latestSettled(workflowId: string): Map<string, StoredWorkflowStep> {
+    const rows = databaseRows(
+      this.#database.connection
+        .prepare(
+          `${STEP_SELECT} WHERE workflow_id = ? AND status IN ('done', 'failed', 'stopped')
+             AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
+           ORDER BY created_at, attempt, step_id`,
+        )
+        .all(workflowId),
+    ).map(toStep);
+    return new Map(rows.map((step) => [step.nodeId, step]));
+  }
+
+  mediaOutputs(): WorkflowMediaOutput[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `SELECT output, workflow_id, ended_at FROM workflow_steps
+           WHERE kind = 'image' AND status = 'done' AND output IS NOT NULL
+           ORDER BY created_at, step_id`,
+        )
+        .all(),
+    ).map((row) => ({
+      attachmentId: requiredStringColumn(row, "output"),
+      workflowId: requiredStringColumn(row, "workflow_id"),
+      endedAt: optionalStringColumn(row, "ended_at"),
+    }));
   }
 
   addStep(input: NewWorkflowStep, now = new Date()): StoredWorkflowStep {
@@ -363,6 +431,16 @@ export class WorkflowRunStore {
     this.#database.connection
       .prepare("UPDATE workflow_steps SET delivery_id = ?, updated_at = ? WHERE step_id = ? AND delivery_id IS NULL")
       .run(deliveryId, now.toISOString(), stepId);
+  }
+
+  replaceDelivery(stepId: string, deliveryId: string, nextDeliveryId: string, now = new Date()): boolean {
+    return (
+      this.#database.connection
+        .prepare(
+          "UPDATE workflow_steps SET delivery_id = ?, turn_id = NULL, updated_at = ? WHERE step_id = ? AND delivery_id = ? AND status = 'running'",
+        )
+        .run(nextDeliveryId, now.toISOString(), stepId, deliveryId).changes > 0
+    );
   }
 
   attachTurn(stepId: string, turnId: string, now = new Date()): void {
@@ -443,7 +521,12 @@ export class WorkflowRunStore {
       .run(status, reason, status === "sent" ? at : null, at, stepId);
   }
 
-  page(workflowId: string, before: string | undefined, limit: number): WorkflowRunPage {
+  page(
+    workflowId: string,
+    before: string | undefined,
+    limit: number,
+    shown: (step: StoredWorkflowStep) => WorkflowStep,
+  ): WorkflowRunPage {
     const db = this.#database.connection;
     const cursor = before === undefined ? null : runCursor(before);
     const rows = databaseRows(
@@ -471,8 +554,8 @@ export class WorkflowRunStore {
           ).map(toStep)
         : [];
     return {
-      runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(publicStep) })),
-      soloSteps: soloSteps.map(publicStep),
+      runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(shown) })),
+      soloSteps: soloSteps.map(shown),
       nextBefore: rows.length > limit && last ? `${last.startedAt}|${last.id}` : null,
     };
   }

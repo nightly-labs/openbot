@@ -1245,6 +1245,49 @@ try {
     return { cases: results };
   });
 
+  await check("a turn with no tool that ends on a promise gets a finish check", async () => {
+    const agent = await createAgent("Promiser");
+    const cases = [
+      { answer: "Sure, I'll research the three options now.", verdict: { verdict: "continue", missing: "Do it." } },
+      { answer: "Pode deixar, vou pesquisar isso agora.", verdict: { verdict: "continue", missing: "Faça." } },
+      { answer: "Sure, I'll research the three options now.", verdict: { verdict: "done" } },
+      { answer: "Let me know if you need anything else.", verdict: { verdict: "continue", missing: "Do more." } },
+      { answer: "I will not delete the files.", verdict: { verdict: "continue", missing: "Do more." } },
+      { answer: "Não vou apagar isso.", verdict: { verdict: "continue", missing: "Do more." } },
+    ] satisfies { answer: string; verdict: Verdict }[];
+    const results = [];
+    for (const item of cases) {
+      const mark = loggedTurns().length;
+      const checks = loggedChecks().length;
+      const id = await send(
+        agent.id,
+        `Research the options. ${verdicts(item.verdict)} ${plan(
+          { steps: [], commands: [], answer: item.answer },
+          { steps: [], commands: ["search"], answer: "Here are the results." },
+        )}`,
+      );
+      assert.equal(await settled(id), "completed");
+      results.push({
+        answer: item.answer,
+        turns: turnsSince(mark).length,
+        checks: loggedChecks().length - checks,
+      });
+    }
+    assert.deepEqual(
+      results.map(({ turns, checks }) => [turns, checks]),
+      [
+        [2, 2],
+        [2, 2],
+        [1, 1],
+        [1, 0],
+        [1, 0],
+        [1, 0],
+      ],
+      "A promise continues on a continue verdict, ends on done, and a closing or a refusal gets no check.",
+    );
+    return { results };
+  });
+
   await check("an offer question continues only on a continue verdict", async () => {
     const agent = await createAgent("Offering");
     const offer = "I fixed a.ts. Do you want me to fix b.ts too?";

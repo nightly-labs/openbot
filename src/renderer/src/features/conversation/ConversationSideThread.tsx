@@ -26,8 +26,10 @@ import type { SideThread } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
+import { naturalThreadRows } from "./narration-rows";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
+import { createTurnStreamHold } from "./turn-stream-hold";
 import { useTurnTrace } from "./turn-trace";
 
 export function ConversationSideThread(props: { threadId: string; resizer: JSX.Element }) {
@@ -77,6 +79,10 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     },
     [],
     { key: "id" },
+  );
+  const streamHeld = createTurnStreamHold(() => thread()?.task.activeTurnId);
+  const shownMessages = createMemo(() =>
+    view.responseStyle === "natural" ? naturalThreadRows(messages, view.agent?.provider, streamHeld) : messages,
   );
   const turnSteps = createTurnSteps({
     messages: () => messages,
@@ -187,7 +193,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             limit={view.threads?.limit ?? 1}
             agent={current().agent}
             agents={view.agents}
-            messages={messages}
+            messages={shownMessages()}
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
@@ -245,6 +251,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             copiedMessageId={copiedMessageId()}
             compactMessageActions={compactMessageActions()}
             bubbleStyle={bubbleStyle()}
+            responseStyle={view.responseStyle}
             onBranch={branch()}
             onDeleteMessage={deleteMessage()}
             messagePins={threadPins(current().thread.task.id)}

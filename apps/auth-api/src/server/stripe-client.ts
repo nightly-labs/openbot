@@ -2,6 +2,7 @@ import {
   BILLING_CURRENCIES,
   BILLING_METADATA,
   type BillingCurrency,
+  type BillingInterval,
   type BillingStorageTier,
   parseStorageTierPrice,
 } from "@openbot/contracts/billing";
@@ -15,7 +16,7 @@ export const STRIPE_API_VERSION = "2025-03-31.basil";
 const STRIPE_API_ORIGIN = "https://api.stripe.com";
 const STRIPE_TIMEOUT_MS = 10_000;
 const SIGNATURE_TOLERANCE_SECONDS = 300;
-const CHECKOUT_LIFETIME_SECONDS = 35 * 60;
+export const CHECKOUT_LIFETIME_SECONDS = 35 * 60;
 
 export type StripeFetch = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -106,6 +107,26 @@ const checkoutSessionListSchema = Schema.Struct({
   data: Schema.Array(Schema.Struct({ ...checkoutSessionSchema.fields, created: Schema.Int })),
 });
 export type StripeOpenCheckoutSession = (typeof checkoutSessionListSchema.Type)["data"][number];
+
+interface CheckoutInlinePrice {
+  productName: string;
+  amount: number;
+  interval: BillingInterval;
+}
+
+type CheckoutLine = { priceId: string } | { inlinePrice: CheckoutInlinePrice };
+
+function checkoutLineFields(line: CheckoutLine, currency: BillingCurrency): Record<string, string> {
+  if ("priceId" in line) return { "line_items[0][price]": line.priceId };
+  return {
+    "line_items[0][price_data][currency]": currency,
+    "line_items[0][price_data][unit_amount]": String(line.inlinePrice.amount),
+    "line_items[0][price_data][recurring][interval]": line.inlinePrice.interval,
+    "line_items[0][price_data][tax_behavior]": "exclusive",
+    "line_items[0][price_data][product_data][name]": line.inlinePrice.productName,
+  };
+}
+
 const priceSchema = Schema.Struct({
   id: Schema.String,
   lookup_key: Schema.NullOr(Schema.String),
@@ -470,9 +491,8 @@ export class StripeClient {
 
   readonly createCheckoutSession = Effect.fn("StripeClient.createCheckoutSession")(function* (
     this: StripeClient,
-    input: {
+    input: CheckoutLine & {
       customerId: string;
-      priceId: string;
       currency: BillingCurrency;
       userId: string;
       serverId?: string;
@@ -492,10 +512,10 @@ export class StripeClient {
     const body = new URLSearchParams({
       mode: "subscription",
       customer: input.customerId,
-      "line_items[0][price]": input.priceId,
+      ...checkoutLineFields(input, input.currency),
       "line_items[0][quantity]": String(input.quantity ?? 1),
       currency: input.currency,
-      allow_promotion_codes: "true",
+      allow_promotion_codes: "priceId" in input ? "true" : "false",
       ui_mode: "hosted",
       origin_context: "web",
       submit_type: "auto",
@@ -545,6 +565,64 @@ export class StripeClient {
           Effect.catchIf(isRefusedPromotionCode, () => create(fallback)),
         )
       : create(fallback);
+    if (!session.url) return yield* new StripeRequestError(200, "invalid_response", "missing_url");
+    return { id: session.id, url: session.url };
+  }).bind(this);
+
+  readonly createPaymentCheckoutSession = Effect.fn("StripeClient.createPaymentCheckoutSession")(function* (
+    this: StripeClient,
+    input: {
+      customerId: string;
+      priceId: string;
+      currency: BillingCurrency;
+      clientReferenceId: string;
+      metadata: Readonly<Record<string, string>>;
+      tax: CheckoutTax | null;
+      successUrl: string;
+      cancelUrl: string;
+      nowSeconds: number;
+    },
+  ): Effect.fn.Return<{ id: string; url: string }, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({
+      mode: "payment",
+      customer: input.customerId,
+      "line_items[0][price]": input.priceId,
+      "line_items[0][quantity]": "1",
+      currency: input.currency,
+      client_reference_id: input.clientReferenceId,
+      ui_mode: "hosted",
+      origin_context: "web",
+      submit_type: "pay",
+      billing_address_collection: "required",
+      "phone_number_collection[enabled]": "false",
+      "customer_update[name]": "auto",
+      "customer_update[address]": "auto",
+      "consent_collection[terms_of_service]": "required",
+      "name_collection[individual][enabled]": "true",
+      "name_collection[individual][optional]": "true",
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      expires_at: String(input.nowSeconds + CHECKOUT_LIFETIME_SECONDS),
+      "invoice_creation[enabled]": "true",
+    });
+    if (input.tax) {
+      if (input.tax.rateId) body.set("line_items[0][tax_rates][0]", input.tax.rateId);
+      const vat = { [VAT_METADATA.country]: input.tax.country, [VAT_METADATA.treatment]: input.tax.treatment };
+      for (const [key, value] of Object.entries(vat)) {
+        body.set(`metadata[${key}]`, value);
+        body.set(`invoice_creation[invoice_data][metadata][${key}]`, value);
+      }
+    } else {
+      body.set("automatic_tax[enabled]", "true");
+      body.set("tax_id_collection[enabled]", "true");
+      body.set("tax_id_collection[required]", "never");
+    }
+    for (const [key, value] of Object.entries(input.metadata)) {
+      body.set(`metadata[${key}]`, value);
+      body.set(`payment_intent_data[metadata][${key}]`, value);
+      body.set(`invoice_creation[invoice_data][metadata][${key}]`, value);
+    }
+    const session = yield* this.#requestEffect("POST", "/v1/checkout/sessions", body, checkoutSessionSchema);
     if (!session.url) return yield* new StripeRequestError(200, "invalid_response", "missing_url");
     return { id: session.id, url: session.url };
   }).bind(this);

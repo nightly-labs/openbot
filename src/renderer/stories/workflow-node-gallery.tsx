@@ -3,6 +3,7 @@ import {
   createBoard,
   type WfnEdge,
   type WfnFields,
+  type WfnPending,
   type WfnResult,
   type WfnRunStatus,
   type WorkflowAgentProgress,
@@ -17,6 +18,7 @@ export function NodeGallery(props: {
   selected?: string;
   edges?: readonly WfnEdge[];
   results?: Record<string, readonly WfnResult[]>;
+  pending?: Record<string, readonly WfnPending[]>;
   status?: Record<string, WfnRunStatus>;
   errors?: Record<string, string>;
   locked?: readonly string[];
@@ -73,6 +75,8 @@ export function NodeGallery(props: {
     progress: (id) => props.progress?.(id),
     error: (id) => props.errors?.[id],
     retry: runStep,
+    retryResult: () => undefined,
+    pendingOf: (id) => props.pending?.[id] ?? [],
     runStep,
     decide: (id, approved) => {
       if (!props.runOnApprove || !approved) return;
