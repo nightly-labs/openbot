@@ -390,9 +390,7 @@ export class CreditMediaWorkflows {
       existing === null
         ? yield* this.#submit(dependencies, request)
         : existing.status === "queued"
-          ? yield* this.#submit(dependencies, { ...request, jobId: existing.jobId }).pipe(
-              Effect.orElseSucceed(() => existing),
-            )
+          ? yield* this.#submit(dependencies, { ...request, jobId: existing.jobId })
           : existing;
     const done = yield* this.#wait(started);
     if (done.status === "failed" && done.failure === "refused")

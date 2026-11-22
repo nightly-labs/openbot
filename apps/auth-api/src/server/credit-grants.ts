@@ -216,9 +216,17 @@ export class CreditGrants {
     const due = yield* billingCall(() =>
       this.#database
         .prepare(
-          `SELECT grant_id FROM credit_grants
-            WHERE status = 'active' AND expires_at <= ?1
-            ORDER BY expires_at LIMIT ?2`,
+          `SELECT g.grant_id FROM credit_grants g
+            WHERE g.status = 'active' AND g.expires_at <= ?1
+              AND NOT EXISTS (
+                SELECT 1 FROM credit_holds h
+                 WHERE h.status = 'held' AND h.user_id = g.user_id AND h.created_at < g.expires_at
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM credit_holds h
+                 WHERE h.status = 'held' AND h.server_id = g.server_id AND h.created_at < g.expires_at
+              )
+            ORDER BY g.expires_at LIMIT ?2`,
         )
         .bind(now, EXPIRE_BATCH)
         .all<DueGrantRow>(),
@@ -246,7 +254,7 @@ export class CreditGrants {
                ),
                lost AS (
                  SELECT grant_id, user_id, server_id,
-                        MIN(MAX(0, remaining - held), MAX(0, ledger - held)) AS tenths
+                        MIN(remaining, MAX(0, ledger - held)) AS tenths
                    FROM wallet
                )
                INSERT INTO credit_ledger(

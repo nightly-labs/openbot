@@ -1412,12 +1412,30 @@ async function freeMonthlyCredits() {
   );
   clock = Math.max(teamEnd, year?.expires_at ?? teamEnd) + 60_000;
   const expiry = await run(grants.sweep());
+  const waiting = (await grantRows(OWNER.id)).find((row) => row.user_id === OWNER.id && row.status === "active");
+  check(
+    "free credits wait for a job that started before their end",
+    waiting?.remaining === 20 && (await grantRows(SERVER_ID))[0]?.status === "expired",
+    { expiry, waiting },
+  );
+  const overdue = await failure(
+    spending.hold({
+      jobId: "job-late",
+      wallet: { userId: OWNER.id },
+      actorUserId: OWNER.id,
+      modelId: "m",
+      credits: 1_995,
+    }),
+  );
+  check("a new job cannot use free credits after their end", overdue.code === "credits_spend_not_enough", overdue);
+  await run(spending.settle("job-open", { outcome: "failed" }));
+  const released = await run(grants.sweep());
   const after = await state(OWNER.id);
   const nextYear = await grantRows(OUTSIDER.id);
   check(
-    "at the end of the month unused free credits expire, but credits that an open job holds stay",
+    "at the end of the month unused free credits expire, also the credits that a released job held",
     after.balance === 2_000 && after.servers[0]?.balance === 0 && after.expiring === undefined,
-    { expiry, after },
+    { released, after },
   );
   check(
     "bought credits never expire",
@@ -1425,7 +1443,7 @@ async function freeMonthlyCredits() {
       .prepare(
         "SELECT COALESCE(SUM(amount_tenths), 0) / 10.0 AS total FROM credit_ledger WHERE kind = 'expiry' AND (user_id = ? OR server_id = ?)",
       )
-      .get(OWNER.id, SERVER_ID)?.total === -40,
+      .get(OWNER.id, SERVER_ID)?.total === -50,
   );
   check(
     "a yearly license starts the next month's credits when the last ones end, and a license that is not renewed gets none",
@@ -1458,7 +1476,7 @@ async function freeMonthlyCredits() {
       eventsOf(grantEvents, OWNER.id, { action: "granted", wallet: "personal", credits: 200 }).length === 2 &&
       eventsOf(grantEvents, OUTSIDER.id, { action: "granted", wallet: "personal", credits: 50 }).length === 2 &&
       eventsOf(grantEvents, OWNER.id, { action: "grant_expired", wallet: "server", credits: 30 }).length === 1 &&
-      eventsOf(grantEvents, OWNER.id, { action: "grant_expired", wallet: "personal", credits: 10 }).length === 1 &&
+      eventsOf(grantEvents, OWNER.id, { action: "grant_expired", wallet: "personal", credits: 20 }).length === 1 &&
       eventsOf(grantEvents, OUTSIDER.id, { action: "grant_expired", wallet: "personal", credits: 50 }).length === 1 &&
       keepsPrivate(grantEvents, [SERVER_ID, "sub_"]),
     readable(grantEvents),

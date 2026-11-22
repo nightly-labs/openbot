@@ -195,9 +195,9 @@ async function flow() {
     { imageText, videoBoth },
   );
   check(
-    "the catalog gives each model its inputs and an audio switch only where the model has audio",
+    "the catalog gives each model its inputs, an empty list for a model with none, and an audio switch only where the model has audio",
     imageText !== undefined &&
-      imageText.inputs === undefined &&
+      imageText.inputs?.length === 0 &&
       imageText.options === undefined &&
       entry("image-edit")?.inputs?.join(",") === "references" &&
       videoBoth?.inputs?.join(",") === "frames" &&

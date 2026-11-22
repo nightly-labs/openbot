@@ -114,6 +114,11 @@ export function availableTenthsSql(column: WalletColumn, idParam: string): strin
     - (SELECT COALESCE(SUM(credits_tenths), 0) FROM credit_holds WHERE ${column} = ${idParam} AND status = 'held'))`;
 }
 
+function overdueGrantTenthsSql(column: WalletColumn, idParam: string, nowParam: string): string {
+  return `(SELECT COALESCE(SUM(remaining_tenths), 0) FROM credit_grants
+    WHERE ${column} = ${idParam} AND status = 'active' AND expires_at <= ${nowParam})`;
+}
+
 function walletIds(wallet: CreditWallet): { userId: string | null; serverId: string | null } {
   return "userId" in wallet ? { userId: wallet.userId, serverId: null } : { userId: null, serverId: wallet.serverId };
 }
@@ -213,7 +218,7 @@ export class CreditSpending {
            )
            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
             WHERE ${spenderSql(input.wallet)}
-              AND ${availableTenthsSql(column, "?10")} >= ?6
+              AND ${availableTenthsSql(column, "?10")} - ${overdueGrantTenthsSql(column, "?10", "?7")} >= ?6
            ON CONFLICT(job_id) DO NOTHING`,
         )
         .bind(
