@@ -17,7 +17,9 @@ export const messages = {
   "error.remote.sessionCapacity": "호스트에 이미 활성 세션이 4개 있어요.",
   "error.remote.linuxNeedsX11": "Linux의 원격 데스크톱에는 X11 세션이 필요해요. Wayland는 지원하지 않아요.",
   "error.remote.runtimeMissing":
-    "Sunshine 및 Moonlight Web 런타임이 없거나 이 호스트에서 지원되지 않아요. Mac, Windows x64 호스트 또는 Linux 호스트에 전체 OpenBot 릴리스를 설치한 다음 OpenBot을 다시 시작해 주세요.",
+    "Sunshine 및 Moonlight Web 런타임이 없거나 이 호스트에서 지원되지 않아요. Mac, Windows x64 호스트 또는 Linux x64 호스트에 전체 OpenBot 릴리스를 설치한 다음 OpenBot을 다시 시작해 주세요.",
+  "error.remote.runtimeMissingOnHost":
+    "Sunshine 및 Moonlight Web 런타임이 없거나 이 호스트에서 지원되지 않아요. Mac, Windows x64 호스트 또는 Linux x64 또는 ARM64 호스트에 전체 OpenBot 릴리스를 설치한 다음 OpenBot을 다시 시작해 주세요.",
   "error.remote.testActive": "원격 데스크톱 테스트가 진행 중이에요. 테스트가 끝난 후에 다시 시도해 주세요.",
   "error.remote.screenRecordingDenied":
     "호스트에서 OpenBot의 화면 녹화를 허용하지 않았어요. 호스트에서 화면 녹화 권한을 허용한 다음 다시 시도해 주세요.",

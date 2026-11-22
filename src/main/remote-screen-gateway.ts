@@ -526,7 +526,7 @@ export class RemoteScreenGateway {
     }
     if (!this.#options.runtimePaths) {
       return yield* new RemoteWorkflowError({
-        cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.runtimeMissing")),
+        cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.runtimeMissingOnHost")),
       });
     }
     if (this.#options.platform === "win32" && this.#options.sessionDisconnected?.()) {

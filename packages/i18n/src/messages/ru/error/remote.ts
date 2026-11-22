@@ -17,7 +17,9 @@ export const messages = {
   "error.remote.sessionCapacity": "На хосте уже четыре активные сессии.",
   "error.remote.linuxNeedsX11": "Для удалённого рабочего стола в Linux нужна сессия X11. Wayland не поддерживается.",
   "error.remote.runtimeMissing":
-    "Среда Sunshine и Moonlight Web отсутствует или не поддерживается на этом хосте. Установите полный релиз OpenBot на Mac, хост Windows x64 или хост Linux и перезапустите OpenBot.",
+    "Среда Sunshine и Moonlight Web отсутствует или не поддерживается на этом хосте. Установите полный релиз OpenBot на Mac, хост Windows x64 или хост Linux x64 и перезапустите OpenBot.",
+  "error.remote.runtimeMissingOnHost":
+    "Среда Sunshine и Moonlight Web отсутствует или не поддерживается на этом хосте. Установите полный релиз OpenBot на Mac, хост Windows x64 или хост Linux x64 или ARM64 и перезапустите OpenBot.",
   "error.remote.testActive": "Идёт проверка удалённого рабочего стола. Повторите попытку, когда она закончится.",
   "error.remote.screenRecordingDenied":
     "Хост не разрешил OpenBot записывать экран. Разрешите запись экрана на хосте и повторите попытку.",
