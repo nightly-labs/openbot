@@ -1174,10 +1174,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const run = props.onExport;
     if (!run || exporting()) return;
     setExporting(true);
+    const nodes = graph().nodes;
     run(openId())
       .then(
         (result) => {
-          if (result.problem) toast.error(workflowExportProblemText(t, result.problem));
+          if (result.problem) toast.error(workflowExportProblemText(t, result.problem, nodes));
         },
         (cause: unknown) => {
           toast.error(errorMessage(cause, t("workflow.file.export.failed")));

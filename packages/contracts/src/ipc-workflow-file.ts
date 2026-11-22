@@ -164,7 +164,7 @@ function stringField(fields: WorkflowFields, name: string): string {
   return isString(value) ? value : "";
 }
 
-export function workflowFileStepName(node: Pick<WorkflowNode, "kind" | "fields">): string {
+function workflowFileStepName(node: Pick<WorkflowNode, "kind" | "fields">): string {
   return stringField(node.fields, WORKFLOW_STEP_NAME_FIELD).trim() || node.kind;
 }
 
