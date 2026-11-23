@@ -97,6 +97,7 @@ export class McpGateway {
   readonly #handoff = new McpHandoffLog();
   readonly #reportedDrops = new Set<string>();
   readonly #testedTools = new Map<string, string>();
+  readonly #providerFailedStarts = new Set<string>();
   readonly #signInFailures = new Map<string, string>();
   readonly #proxy: McpOAuthProxy;
   readonly #logger: Logger;
@@ -185,7 +186,7 @@ export class McpGateway {
   }
 
   recordFailedStart(config: McpServerConfig): void {
-    if (this.#proxied(config)) this.#proxy.recordFailedStart(mcpOAuthProxyRoute(config.id, config.url));
+    if (this.#proxied(config)) this.#providerFailedStarts.add(mcpOAuthProxyRoute(config.id, config.url));
   }
 
   readonly close = Effect.fnUntraced(function* (this: McpGateway) {
@@ -345,10 +346,13 @@ export class McpGateway {
     if (key === undefined || key !== mcpFingerprintValues([{ ...config, enabled: true }])[0]) return;
     const tools = [String(outcome.toolCount), ...[...outcome.tools].sort()].join("\u0000");
     const route = saved !== undefined && this.#proxied(saved) ? mcpOAuthProxyRoute(saved.id, saved.url) : null;
-    const failedStart = route !== null && this.#proxy.failedStart(route);
+    const failedStart = route !== null && (this.#proxy.failedStart(route) || this.#providerFailedStarts.has(route));
     if (this.#testedTools.get(key) === tools && !failedStart) return;
     yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
-    if (route !== null && failedStart) this.#proxy.reportedFailedStart(route);
+    if (route !== null && failedStart) {
+      this.#proxy.reportedFailedStart(route);
+      this.#providerFailedStarts.delete(route);
+    }
     this.#testedTools.set(key, tools);
   });
 
