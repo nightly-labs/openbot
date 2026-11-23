@@ -1,7 +1,6 @@
 import { cx } from "@openbot/ui/utils";
 import { Match, Switch } from "solid-js";
 import { pluginMonogram } from "../../lib/plugins";
-import tregWordmark from "./treg-wordmark.png";
 
 const AAVE_EYES_PATH =
   "M103.39 133.194c10.89-1.768 18.285-12.03 16.518-22.92-1.768-10.89-12.03-18.285-22.92-16.518-10.89 1.768-18.285 12.029-16.518 22.92 1.768 10.89 12.03 18.285 22.92 16.518Zm52.213 0c10.89-1.768 18.285-12.03 16.517-22.92-1.767-10.89-12.029-18.285-22.919-16.518-10.89 1.768-18.286 12.029-16.518 22.92 1.768 10.89 12.029 18.285 22.92 16.518Z";
@@ -87,7 +86,16 @@ export function PluginLogo(props: PluginLogoProps) {
       }
     >
       <Match when={props.slug === "treg"}>
-        <img class={cx("plugin-logo", "plugin-wordmark", props.class)} src={tregWordmark} alt="" />
+        <svg
+          class={cx("plugin-logo", "plugin-logo-treg", props.class)}
+          viewBox="0 0 290 290"
+          fill="currentColor"
+          aria-hidden="true"
+          data-plugin="treg"
+        >
+          <rect width="140.5" height="140.5" rx="20" />
+          <rect x="149.5" y="149.5" width="140.5" height="140.5" rx="20" />
+        </svg>
       </Match>
       <Match when={props.slug === "aave"}>
         <svg

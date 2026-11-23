@@ -8249,11 +8249,11 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   height: 34%;
 }
 
-.plugin-wordmark:is(.plugin-card-logo, .plugin-hero-logo) {
+.plugin-logo-treg:is(.plugin-card-logo, .plugin-hero-logo) {
   position: absolute;
   inset: 0;
-  width: 58%;
-  max-width: 340px;
+  width: 26%;
+  max-width: 170px;
   height: auto;
   margin: auto;
 }
