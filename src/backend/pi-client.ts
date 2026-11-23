@@ -39,7 +39,7 @@ import { PendingServerRequests } from "./pending-server-requests";
 import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
-import { piMessageItems, piPrompt, piText } from "./pi-messages";
+import { piMessageItems, piPrompt, piShellCommand, piText } from "./pi-messages";
 import { PI_REQUEST_TIMEOUT_MS, PiProcessClosedError, PiRpc } from "./pi-rpc";
 import { piWindowsShellArguments } from "./pi-windows-shell";
 import type { SpawnTarget } from "./process-confinement";
@@ -1074,12 +1074,15 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       const done = record.type === "tool_execution_end";
       if (done) turn.openTools.delete(id);
       else turn.openTools.add(id);
+      const tool = getString(record, "toolName");
+      const args = record.args ?? turn.items.get(id)?.arguments;
       const item: ThreadItem = {
         ...turn.items.get(id),
         id,
         type: "dynamicToolCall",
-        tool: getString(record, "toolName"),
-        arguments: record.args ?? turn.items.get(id)?.arguments,
+        tool,
+        arguments: args,
+        ...piShellCommand(tool, args),
         status: done ? (record.isError === true ? "failed" : "completed") : "inProgress",
         ...(done ? { contentItems: [{ type: "inputText", text: piText(getRecord(record, "result")?.content) }] } : {}),
       };
