@@ -759,11 +759,6 @@
   width: 128px;
 }
 
-/* Why the effort list stops early: a line of its own under the label and the control. */
-.provider-model-effort-note {
-  flex-basis: 100%;
-}
-
 .provider-model-effort-select .ui-select-trigger {
   border-color: transparent;
   border-radius: var(--ui-menu-item-radius);
@@ -795,6 +790,28 @@
 
 .provider-model-effort-content .ui-select-item[data-highlighted] {
   background: var(--ui-menu-item-hover);
+}
+
+/* A limited Effort list ends with why the locked levels are locked, so it is wider than the select. */
+.provider-model-effort-limited {
+  width: 240px;
+}
+
+.provider-model-effort-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.provider-model-effort-lock {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+}
+
+.provider-model-effort-note {
+  display: block;
+  padding: var(--openbot-space-1) var(--ui-menu-inset);
 }
 
 /* Each speed has a name and a description, so the list is wider than the select, and wraps. */

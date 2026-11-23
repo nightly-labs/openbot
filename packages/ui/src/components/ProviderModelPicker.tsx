@@ -36,6 +36,7 @@ import {
   KeyRound,
   Layers,
   Listbox,
+  Lock,
   Plus,
   Popover,
   Progress,
@@ -1061,42 +1062,54 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return list.find((model) => model.id === railDefaultModel(provider)) ?? list[0];
                 });
                 const effortOption = () => (ownsSelection() ? selectedModel() : pickerModelOption(effortModel()));
-                // A model list refresh gives new objects for the same efforts. The list keeps its array
-                // then: a new array makes the open Effort list close.
-                const effortOptions = createMemo<{ id: string; name: string }[]>(
-                  () => {
-                    const variants = effortModel()?.variants ?? [];
-                    if (variants.length) return variants;
-                    const option = effortOption();
-                    return showsReasoningEffort() &&
-                      option &&
-                      option.reasoningEffortConfigurable !== false &&
-                      !fixedModelSettings(option)
-                      ? option.supportedReasoningEfforts.map((effort) => ({
-                          id: effort,
-                          name: reasoningLabel(effort, t),
-                        }))
-                      : [];
-                  },
-                  {
-                    equals: (previous, next) =>
-                      previous.length === next.length &&
-                      previous.every((option, i) => option.id === next[i]?.id && option.name === next[i]?.name),
-                  },
-                );
                 /**
                  * The highest effort that Claude Code allows for the model, when a limit is set. Claude
-                 * Code lists Low to High for each model that takes an effort, and since 2.1.328 drops each
+                 * Code lists Low to High for each model that takes an effort, and since 2.1.327 drops each
                  * level above the `maxEffortLevel` of the user's Claude settings or their organization. A
                  * list with Low and without High stops at that limit (#12631).
                  */
                 const effortLimit = () => {
                   const option = effortOption();
-                  if (option?.provider !== "claude" || effortOptions().length === 0 || effortModel()?.variants.length)
-                    return;
+                  if (option?.provider !== "claude" || effortModel()?.variants.length) return;
                   const efforts = option.supportedReasoningEfforts;
                   return efforts.includes("low") && !efforts.includes("high") ? efforts.at(-1) : undefined;
                 };
+                // A model list refresh gives new objects for the same efforts. The list keeps its array
+                // then: a new array makes the open Effort list close.
+                const effortOptions = createMemo<EffortChoice[]>(
+                  () => {
+                    const variants = effortModel()?.variants ?? [];
+                    if (variants.length) return variants;
+                    const option = effortOption();
+                    if (
+                      !showsReasoningEffort() ||
+                      !option ||
+                      option.reasoningEffortConfigurable === false ||
+                      fixedModelSettings(option)
+                    )
+                      return [];
+                    const limit = effortLimit();
+                    // The levels above the limit stay in the list, locked, so the user sees what is missing.
+                    const locked = limit ? CLAUDE_EFFORT_LEVELS.slice(CLAUDE_EFFORT_LEVELS.indexOf(limit) + 1) : [];
+                    return [
+                      ...option.supportedReasoningEfforts.map((effort) => ({
+                        id: effort,
+                        name: reasoningLabel(effort, t),
+                      })),
+                      ...locked.map((effort) => ({ id: effort, name: reasoningLabel(effort, t), locked: true })),
+                    ];
+                  },
+                  {
+                    equals: (previous, next) =>
+                      previous.length === next.length &&
+                      previous.every(
+                        (option, i) =>
+                          option.id === next[i]?.id &&
+                          option.name === next[i]?.name &&
+                          option.locked === next[i]?.locked,
+                      ),
+                  },
+                );
                 const effortValue = () => {
                   const model = effortModel();
                   const queued = queuedEffort();
@@ -1376,33 +1389,53 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     <Show when={effortOptions().length > 0}>
                       <div class="provider-model-effort">
                         <span>{t("provider.picker.effort")}</span>
-                        <Select<{ id: string; name: string }>
+                        <Select<EffortChoice>
                           class="provider-model-effort-select"
                           options={effortOptions()}
                           optionValue="id"
                           optionTextValue="name"
+                          optionDisabled={(option) => option.locked === true}
+                          // The reason under a limited list needs more room than the control.
+                          sameWidth={!effortLimit()}
+                          placement={effortLimit() ? "bottom-end" : undefined}
                           value={effortOptions().find((option) => option.id === effortValue())}
                           onChange={(option) => option && chooseEffort(option.id)}
-                          itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
+                          itemComponent={(item) => (
+                            <SelectItem item={item.item}>
+                              <span class="provider-model-effort-item">
+                                {item.item.rawValue.name}
+                                <Show when={item.item.rawValue.locked}>
+                                  <Lock class="provider-model-effort-lock" aria-hidden="true" />
+                                </Show>
+                              </span>
+                            </SelectItem>
+                          )}
                         >
                           <SelectTrigger
                             size="sm"
                             aria-label={t("provider.picker.effortLabel")}
                             disabled={effortLocked()}
                           >
-                            <SelectValue<{ id: string; name: string }>>
+                            <SelectValue<EffortChoice>>
                               {(state) => state.selectedOption()?.name ?? t("provider.picker.selectEffort")}
                             </SelectValue>
                           </SelectTrigger>
-                          <SelectContent class="provider-model-effort-content" />
+                          <SelectContent
+                            class={cx(
+                              "provider-model-effort-content",
+                              effortLimit() && "provider-model-effort-limited",
+                            )}
+                            footer={
+                              effortLimit() ? (
+                                <Text variant="caption" tone="muted" class="provider-model-effort-note">
+                                  {t("provider.picker.effortLimited", {
+                                    effort: reasoningLabel(effortLimit() ?? "medium", t),
+                                  })}
+                                </Text>
+                              ) : undefined
+                            }
+                          />
                         </Select>
-                        <Show when={effortLimit()}>
-                          {(effort) => (
-                            <Text variant="caption" tone="muted" class="provider-model-effort-note">
-                              {t("provider.picker.effortLimited", { effort: reasoningLabel(effort(), t) })}
-                            </Text>
-                          )}
-                        </Show>
                       </div>
                     </Show>
                     <Show when={ownsSelection() && effortOptions().length === 0 && selectedFixed()?.effort}>
@@ -1591,6 +1624,16 @@ const SPEED_TEXT: Record<Speed, AppTextKey> = {
 function speedName(speed: Speed, t: AppTranslate): string {
   return t(SPEED_NAME[speed]);
 }
+
+/** A row of the Effort list. A locked row is a level that a limit hides: it shows, and cannot be chosen. */
+interface EffortChoice {
+  id: string;
+  name: string;
+  locked?: boolean;
+}
+
+/** Claude Code's effort levels, lowest first. */
+const CLAUDE_EFFORT_LEVELS: AgentReasoningEffort[] = ["low", "medium", "high", "xhigh", "max"];
 
 export function reasoningLabel(effort: AgentReasoningEffort, t: AppTranslate = currentText().t): string {
   return t(REASONING_LABEL[effort]);

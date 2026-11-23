@@ -40,6 +40,22 @@ export const AllEffortLevels: Story = {
   },
 };
 
+/**
+ * A Claude model whose effort Claude Code limits to Medium, from the user's Claude settings or their
+ * organization. The Effort list locks High, Extra high and Max, and says why.
+ */
+export const LimitedEffort: Story = {
+  args: {
+    provider: "claude",
+    value: "claude-opus-5-5",
+    modelOptions: STORY_MODELS.map((model) =>
+      model.id === "claude-opus-5-5" ? { ...model, supportedReasoningEfforts: ["low", "medium"] } : model,
+    ),
+    reasoningEffort: "medium",
+    onReasoningEffortChange: fn(),
+  },
+};
+
 /** A Codex model that offers Fast and Ultrafast, with Ultrafast on. */
 export const Ultrafast: Story = {
   args: {
