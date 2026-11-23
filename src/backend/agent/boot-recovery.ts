@@ -114,28 +114,40 @@ export class BootRecovery {
     for (const { delivery } of this.#mailbox.unresolvedDeliveries()) {
       const agent = agents.find((candidate) => candidate.id === delivery.recipientAgentId);
       if (agent && providerForAgent(agent) === provider && !runsOnOwnProcess(agent.id)) {
-        this.#orphanedDeliveryIds.add(delivery.id);
-        this.#lostToProviderExit.add(delivery.id);
+        this.#orphanForProviderExit(delivery.id);
       }
     }
   }
 
   orphanDeliveriesOfAgent(agentId: string): void {
     for (const { delivery } of this.#mailbox.unresolvedDeliveries()) {
-      if (delivery.recipientAgentId !== agentId) continue;
-      this.#orphanedDeliveryIds.add(delivery.id);
-      this.#lostToProviderExit.add(delivery.id);
+      if (delivery.recipientAgentId === agentId) this.#orphanForProviderExit(delivery.id);
     }
   }
 
-  #personTurnWithoutAnswer(delivery: UnresolvedDelivery, agentId: string, threadId: string, turnId: string): boolean {
-    const fromPerson = (candidate: UnresolvedDelivery, channelId: string | undefined) =>
-      candidate.sender.kind === "user" && channelId === undefined;
+  #orphanForProviderExit(deliveryId: string): void {
+    if (this.#orphanedDeliveryIds.has(deliveryId)) return;
+    this.#orphanedDeliveryIds.add(deliveryId);
+    this.#lostToProviderExit.add(deliveryId);
+  }
+
+  #personTurnWithoutAnswer(
+    delivery: UnresolvedDelivery,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    batchIds: ReadonlySet<string> | null,
+  ): boolean {
+    const fromPerson = (context: DeliveryContext | null | undefined) =>
+      context?.delivery.sender.kind === "user" && context.channelId === undefined;
+    const batch = [...(batchIds ?? [])].map((id) => this.#mailbox.getDelivery(id));
     return (
-      fromPerson(delivery, this.#mailbox.getDelivery(delivery.id)?.channelId) &&
-      this.#mailbox
-        .findDeliveriesByTurn(agentId, turnId)
-        .every((context) => fromPerson(context.delivery, context.channelId)) &&
+      fromPerson(this.#mailbox.getDelivery(delivery.id)) &&
+      this.#mailbox.findDeliveriesByTurn(agentId, turnId).every(fromPerson) &&
+      batch.every(
+        (context) =>
+          (context?.delivery.status !== "starting" && context?.delivery.status !== "running") || fromPerson(context),
+      ) &&
       !this.#conversation
         .ensureSnapshot(agentId, threadId)
         .messages.some((message) => message.turnId === turnId && isAgentAnswer(message))
@@ -284,7 +296,7 @@ export class BootRecovery {
       this.#lostToProviderExit.has(delivery.id) &&
       target?.turnId &&
       target.threadId === target.agent.threadId &&
-      this.#personTurnWithoutAnswer(delivery, target.agent.id, target.threadId, target.turnId)
+      this.#personTurnWithoutAnswer(delivery, target.agent.id, target.threadId, target.turnId, batchIds)
         ? sourceText("error.provider.acpProcessStopped", {
             provider: agentProviderDescriptor(providerForAgent(target.agent)).displayName,
           })
@@ -343,6 +355,7 @@ export class BootRecovery {
         requeued.add(id);
       else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
       if (id !== delivery.id) this.#orphanedDeliveryIds.delete(id);
+      this.#lostToProviderExit.delete(id);
     }
     if (!continuation) {
       for (const id of deliveryIds) {
