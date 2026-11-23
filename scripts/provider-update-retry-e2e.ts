@@ -179,6 +179,8 @@ try {
     withOlderCopy.retry.archiveRequests === 1 &&
     !withOlderCopy.retry.archiveKept &&
     withOlderCopy.retry.starts === 2 &&
+    onlyCopy.failedTry.phase === "download-error" &&
+    onlyCopy.failedTry.version === null &&
     onlyCopy.failedTry.archiveRequests === 1 &&
     onlyCopy.failedTry.installKept &&
     !onlyCopy.failedTry.archiveKept &&
