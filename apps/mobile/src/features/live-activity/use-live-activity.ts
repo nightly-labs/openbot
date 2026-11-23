@@ -1,5 +1,5 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
-import type { AgentEvent, DynamicIslandAgentIdentity, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import type { AgentEvent, AvatarColor, DynamicIslandAgentIdentity, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   LIVE_ACTIVITY_PUSH_ROUTES,
@@ -17,6 +17,7 @@ import {
   type LiveActivityAction,
   type LiveActivityMood,
   liveActivityBloubFile,
+  liveActivityBloubName,
   liveActivityFileName,
   liveActivityIslandText,
   liveActivityView,
@@ -56,7 +57,10 @@ const STALE_AFTER_BACKGROUND_MS = 5 * 60 * 1000;
 const PUBLISH_DELAY_MS = 1000;
 const BACKGROUND_PUBLISH_INTERVAL_MS = 1000;
 const BLOUBS_PER_PAUSE = 4;
+const AWAY_COLOR_MOOD: LiveActivityMood = "idle";
 const MAX_TIMER_MS = 2_147_483_647;
+
+type BloubAgent = Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue" | "avatarColor">;
 
 interface LiveActivityInput {
   servers: readonly Pick<MobileServer, "id" | "state">[];
@@ -151,9 +155,10 @@ export function useLiveActivity({
 
   const publishRef = useRef<() => void>(() => undefined);
   const drawBloub = useCallback(
-    async (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood) => {
+    async (agent: BloubAgent, mood: LiveActivityMood) => {
       if (!live) return;
-      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood);
+      const color = agent.avatarColor ?? null;
+      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood, color);
       if (avatars.current.has(file)) return;
       if (live.native.hasAvatar(file)) {
         avatars.current.set(file, file);
@@ -162,9 +167,9 @@ export function useLiveActivity({
       avatars.current.set(file, null);
       let written: string | null = null;
       try {
-        const dataUrl = await live.native.renderBloub(agent.avatarSeed, agent.avatarHue, mood);
+        const dataUrl = await live.native.renderBloub(agent.avatarSeed, agent.avatarHue, mood, color);
         if (disposed.current) return;
-        const base = liveActivityFileName(["bloub", agent.avatarSeed, String(agent.avatarHue ?? ""), mood]);
+        const base = liveActivityBloubName(agent.avatarSeed, agent.avatarHue, mood, color);
         written = live.native.saveAvatar(base, dataUrl);
       } catch {}
       avatars.current.set(file, written);
@@ -174,8 +179,8 @@ export function useLiveActivity({
   );
 
   const bloubFile = useCallback(
-    (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood): string => {
-      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood);
+    (agent: BloubAgent, mood: LiveActivityMood): string => {
+      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood, agent.avatarColor ?? null);
       const saved = avatars.current.get(file);
       if (saved !== undefined) return saved ?? "";
       void drawBloub(agent, mood);
@@ -206,7 +211,8 @@ export function useLiveActivity({
       const servers = new Set(shownOrder);
       const props = liveActivityView(presentation, {
         t: currentText().t,
-        agentColor: avatarHeadColor,
+        agentColor: (agent) =>
+          avatarHeadColor(agent.avatarSeed, agent.avatarHue, agentAvatarColor(presentation.serverId, agent.id)),
         avatar,
         unreadAgents: agentsRef.current
           .filter(
@@ -246,14 +252,21 @@ export function useLiveActivity({
         return working ? sideThreadOfTurnRef.current(presentation.serverId, working.agentId, working.turnId) : null;
       }
 
+      function agentAvatarColor(serverId: string, agentId: string): AvatarColor | null {
+        return (
+          agentsRef.current.find((agent) => agent.serverId === serverId && agent.id === agentId)?.avatarColor ?? null
+        );
+      }
+
       function avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string {
         if (!live) return "";
-        if (!agent.avatarUrl) return bloubFile(agent, mood);
+        const colored = { ...agent, avatarColor: agentAvatarColor(serverId, agent.id) };
+        if (!agent.avatarUrl) return bloubFile(colored, mood);
         const name = photoName(serverId, agent.id, agent.avatarUrl);
         const saved = avatars.current.get(name);
         if (saved) return saved;
         if (saved === undefined) loadPhotoRef.current(serverId, agent.id, agent.avatarUrl);
-        return bloubFile(agent, mood);
+        return bloubFile(colored, mood);
       }
     },
     [live, liveState, syncFor, bloubFile, keepAvatars],
@@ -497,8 +510,10 @@ export function useLiveActivity({
       let drawn = 0;
       for (const agent of serverAgents) {
         if (agent.avatarUrl) loadPhotoRef.current(pushServerId, agent.id, agent.avatarUrl);
+        else if (agent.avatarColor) await drawBloub(agent, AWAY_COLOR_MOOD);
         for (const mood of LIVE_ACTIVITY_MOODS) {
-          if (avatars.current.has(liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood))) continue;
+          if (avatars.current.has(liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood, agent.avatarColor)))
+            continue;
           await drawBloub(agent, mood);
           drawn += 1;
           if (drawn % BLOUBS_PER_PAUSE === 0) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -514,7 +529,13 @@ export function useLiveActivity({
         locale: currentLocale(),
         away: !foreground,
         photos: serverAgents.flatMap((agent) => {
-          const file = agent.avatarUrl ? photos[photoName(pushServerId, agent.id, agent.avatarUrl)] : undefined;
+          const file = agent.avatarUrl
+            ? photos[photoName(pushServerId, agent.id, agent.avatarUrl)]
+            : agent.avatarColor
+              ? avatars.current.get(
+                  liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, AWAY_COLOR_MOOD, agent.avatarColor),
+                )
+              : undefined;
           return file ? [{ agentId: agent.id, file }] : [];
         }),
       };
