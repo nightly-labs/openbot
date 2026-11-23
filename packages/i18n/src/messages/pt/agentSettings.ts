@@ -190,6 +190,10 @@ export const messages = {
     "Todas as mensagens e arquivos deste chat são excluídos do OpenBot e o agente os esquece. Não é possível desfazer. Threads paralelas, instruções, modelo, ferramentas, memórias, espaço de trabalho e navegador não mudam.",
   "agentSettings.deleteHistory.confirm": "Excluir histórico",
   "agentSettings.deleteHistory.failed": "Não foi possível excluir o histórico.",
+  "agentSettings.deleteAgent.title": "Excluir agente",
+  "agentSettings.deleteAgent.description":
+    "O agente, o chat, as memórias, as rotinas e o espaço de trabalho dele saem do OpenBot.",
+  "agentSettings.deleteAgent.button": "Excluir",
   "agentSettings.fullAccess.title": "Dar acesso completo a este agente?",
   "agentSettings.fullAccess.askTitle": "Deixar este agente trabalhar fora do espaço de trabalho?",
   "agentSettings.fullAccess.description":

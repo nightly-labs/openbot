@@ -2337,6 +2337,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       return undefined;
     return (taskId: string) => compactContext(agent.id, taskId);
   });
+  const agentDeleteAllowed = () =>
+    workspace.state.status === "online" && canAdministerServer(workspace.state.host?.role);
   const deleteSelectedAgentHistory = createMemo(() => {
     const agent = workspace.selected();
     const deleteHistory = workspace.runtime.deleteHistory;
@@ -3312,9 +3314,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       }
                       duplicatingAgentIds={new Set(workspace.state.duplicatingAgentIds)}
                       onDuplicateAgent={workspace.duplicateAgent}
-                      deleteSupported={
-                        workspace.state.status === "online" && canAdministerServer(workspace.state.host?.role)
-                      }
+                      deleteSupported={agentDeleteAllowed()}
                       marketplaceSupported={workspace.state.status === "online"}
                       onDeleteAgent={workspace.deleteAgent}
                       userHiddenAgents={workspace.state.userHiddenAgents}
@@ -4032,6 +4032,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onUpdateAgentPermissions={remoteAgentAdmin.settings() ? remoteAgentAdmin.update : undefined}
                   onClearAgentContext={clearSelectedAgentContext()}
                   onDeleteAgentHistory={deleteSelectedAgentHistory()}
+                  onDeleteAgent={agentDeleteAllowed() ? workspace.deleteAgent : undefined}
                   onCompactAgentContext={compactSelectedAgentContext()}
                   contextState={
                     workspace.state.selectedId ? workspace.state.contextStates[workspace.state.selectedId] : undefined

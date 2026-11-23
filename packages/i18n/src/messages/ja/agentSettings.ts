@@ -191,6 +191,10 @@ export const messages = {
     "このチャットのすべてのメッセージとファイルをOpenBotから削除し、エージェントも忘れます。元に戻せません。サイドスレッド、指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.deleteHistory.confirm": "履歴を削除",
   "agentSettings.deleteHistory.failed": "履歴を削除できませんでした。",
+  "agentSettings.deleteAgent.title": "エージェントを削除",
+  "agentSettings.deleteAgent.description":
+    "エージェントとそのチャット、メモリー、ルーティン、ワークスペースが OpenBot から削除されます。",
+  "agentSettings.deleteAgent.button": "削除",
 
   "agentSettings.fullAccess.title": "このエージェントにフルアクセスを許可しますか？",
   "agentSettings.fullAccess.askTitle": "このエージェントにワークスペースの外での作業を許可しますか？",

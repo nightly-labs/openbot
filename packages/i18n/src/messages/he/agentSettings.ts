@@ -197,6 +197,9 @@ export const messages = {
     "כל ההודעות והקבצים של הצ'אט הזה יימחקו מ-OpenBot, והסוכן ישכח אותם. אי אפשר לבטל את הפעולה. שרשורים צדדיים, הוראות, מודל, כלים, זיכרונות, סביבת עבודה ודפדפן לא משתנים.",
   "agentSettings.deleteHistory.confirm": "מחיקת היסטוריה",
   "agentSettings.deleteHistory.failed": "לא ניתן למחוק את ההיסטוריה.",
+  "agentSettings.deleteAgent.title": "מחיקת הסוכן",
+  "agentSettings.deleteAgent.description": "הסוכן, השיחה שלו, הזיכרונות, השגרות וסביבת העבודה שלו נמחקים מ-OpenBot.",
+  "agentSettings.deleteAgent.button": "מחיקה",
 
   "agentSettings.fullAccess.title": "לתת לסוכן הזה גישה מלאה?",
   "agentSettings.fullAccess.askTitle": "לאפשר לסוכן הזה לעבוד מחוץ לסביבת העבודה שלו?",

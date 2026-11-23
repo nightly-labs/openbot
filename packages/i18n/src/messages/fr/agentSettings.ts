@@ -197,6 +197,10 @@ export const messages = {
     "Tous les messages et fichiers de cette discussion sont supprimés d’OpenBot et l’agent les oublie. Cette action est irréversible. Les fils secondaires, les instructions, le modèle, les outils, les mémoires, l’espace de travail et le navigateur ne changent pas.",
   "agentSettings.deleteHistory.confirm": "Supprimer l’historique",
   "agentSettings.deleteHistory.failed": "Impossible de supprimer l’historique.",
+  "agentSettings.deleteAgent.title": "Supprimer l’agent",
+  "agentSettings.deleteAgent.description":
+    "L’agent, sa discussion, ses souvenirs, ses routines et son espace de travail sont retirés d’OpenBot.",
+  "agentSettings.deleteAgent.button": "Supprimer",
 
   "agentSettings.fullAccess.title": "Donner un accès complet à cet agent ?",
   "agentSettings.fullAccess.askTitle": "Laisser cet agent travailler hors de son espace de travail ?",

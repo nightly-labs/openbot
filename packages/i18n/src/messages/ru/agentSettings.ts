@@ -217,6 +217,10 @@ export const messages = {
     "Все сообщения и файлы этого чата будут удалены из OpenBot, и агент их забудет. Это нельзя отменить. Побочные ветки, инструкции, модель, инструменты, воспоминания, рабочая папка и браузер не изменятся.",
   "agentSettings.deleteHistory.confirm": "Удалить историю",
   "agentSettings.deleteHistory.failed": "Не удалось удалить историю.",
+  "agentSettings.deleteAgent.title": "Удалить агента",
+  "agentSettings.deleteAgent.description":
+    "Агент, его чат, память, регулярные задачи и рабочее пространство удаляются из OpenBot.",
+  "agentSettings.deleteAgent.button": "Удалить",
 
   "agentSettings.fullAccess.title": "Дать этому агенту полный доступ?",
   "agentSettings.fullAccess.askTitle": "Разрешить этому агенту работать за пределами рабочего пространства?",

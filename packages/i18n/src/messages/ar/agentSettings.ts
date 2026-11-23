@@ -221,6 +221,10 @@ export const messages = {
     "تُحذف كل رسائل هذه الدردشة وملفاتها من OpenBot وينساها الوكيل. لا يمكن التراجع عن ذلك. لا تتغير المحادثات الجانبية والتعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.deleteHistory.confirm": "حذف السجل",
   "agentSettings.deleteHistory.failed": "تعذّر حذف السجل.",
+  "agentSettings.deleteAgent.title": "حذف الوكيل",
+  "agentSettings.deleteAgent.description":
+    "يُحذف الوكيل ومحادثته وذكرياته ومهامه الدورية ومساحة العمل الخاصة به من OpenBot.",
+  "agentSettings.deleteAgent.button": "حذف",
 
   "agentSettings.fullAccess.title": "هل تريد منح هذا الوكيل وصولًا كاملًا؟",
   "agentSettings.fullAccess.askTitle": "هل تسمح لهذا الوكيل بالعمل خارج مساحة عمله؟",

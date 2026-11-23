@@ -192,6 +192,9 @@ export const messages = defineMessages("agentSettings", {
     "All messages and files of this chat go from OpenBot, and the agent forgets them. You cannot undo this. Side threads, instructions, model, tools, memories, workspace, and browser do not change.",
   "agentSettings.deleteHistory.confirm": "Delete history",
   "agentSettings.deleteHistory.failed": "Could not delete the history.",
+  "agentSettings.deleteAgent.title": "Delete agent",
+  "agentSettings.deleteAgent.description": "The agent, its chat, memories, routines, and workspace go from OpenBot.",
+  "agentSettings.deleteAgent.button": "Delete",
 
   "agentSettings.fullAccess.title": "Give this agent full access?",
   "agentSettings.fullAccess.askTitle": "Let this agent work outside its workspace?",

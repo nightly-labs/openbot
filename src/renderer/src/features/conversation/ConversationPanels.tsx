@@ -831,6 +831,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               agents={props.agents}
               onStartNewChat={props.onClearAgentContext}
               onDeleteHistory={props.onDeleteAgentHistory}
+              onDeleteAgent={props.onDeleteAgent}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&
