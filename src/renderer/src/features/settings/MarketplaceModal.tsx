@@ -201,9 +201,10 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
           <AgentUpdateDialog
             agentName={pending.agentName}
             changed={pending.changed}
+            fields={pending.fields}
             othersCount={pending.othersCount}
             onCancel={() => pending.settle(null)}
-            onConfirm={(replaceSkillIds) => pending.settle(replaceSkillIds)}
+            onConfirm={(skillIds, fields) => pending.settle({ skillIds, fields })}
           />
         )}
       </Show>

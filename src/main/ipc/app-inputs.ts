@@ -57,6 +57,7 @@ import type {
   VerifyEmailCodeInput,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_MARKETPLACE_PROFILE_FIELDS,
   decodeExternalLinkTarget,
   GITHUB_SKILL_ID_MAX_LENGTH,
   IDLE_RESTART_TARGETS,
@@ -616,7 +617,14 @@ export function parseInstallMarketplaceAgent(input: unknown): InstallMarketplace
       : { agentId: requireString(input.agentId, "agentId", INPUT_LIMITS.identifier) }),
     timezone: requireString(input.timezone, "timezone", 255),
     receiptId: requireString(input.receiptId, "receiptId", INPUT_LIMITS.identifier),
+    ...(input.replaceFields === undefined ? {} : { replaceFields: parseReplaceFields(input.replaceFields) }),
   };
+}
+
+function parseReplaceFields(value: unknown): NonNullable<InstallMarketplaceAgentInput["replaceFields"]> {
+  if (!Array.isArray(value) || !value.every((field) => isOneOf(AGENT_MARKETPLACE_PROFILE_FIELDS, field)))
+    throw new Error("Invalid agent fields to replace.");
+  return [...new Set(value)];
 }
 
 function creatorAvatarOption(input: DynamicRecord): { showCreatorAvatar?: boolean } {

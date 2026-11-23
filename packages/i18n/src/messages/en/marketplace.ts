@@ -96,6 +96,18 @@ export const messages = defineMessages("marketplace", {
     other: "{count} other skills also update.",
   },
   "marketplace.agentUpdate.confirm": "Update agent",
+  "marketplace.agentUpdate.bodyParts": {
+    one: "{count} part of this agent is different from the new version. It stays as it is unless you choose Replace.",
+    other:
+      "{count} parts of this agent are different from the new version. They stay as they are unless you choose Replace.",
+  },
+  "marketplace.agentUpdate.listLabelParts": "Parts that are different from the new version",
+  "marketplace.agentUpdate.field.name": "Name",
+  "marketplace.agentUpdate.field.title": "Title",
+  "marketplace.agentUpdate.field.description": "Instructions",
+  "marketplace.agentUpdate.field.picture": "Picture",
+  "marketplace.agentUpdate.fieldKeep": "Stays as it is",
+  "marketplace.agentUpdate.fieldReplace": "Changes to the new version",
 
   "marketplace.app.connect": "Connect",
   "marketplace.app.reconnect": "Reconnect",

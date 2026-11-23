@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type {
-  AgentSummary,
-  InstallMarketplaceAgentInput,
-  InstallMarketplaceAgentResult,
-  MarketplaceAgentDetail,
+import {
+  type AgentMarketplaceProfileField,
+  type AgentSummary,
+  agentMarketplacePictureKey,
+  type InstallMarketplaceAgentInput,
+  type InstallMarketplaceAgentResult,
+  type MarketplaceAgentDetail,
 } from "@openbot/contracts/ipc";
 import { Effect, Exit, Schema } from "effect";
 import { type AgentMarketplaceFailure, AgentMarketplaceService } from "../src/main/agent-marketplace-service";
@@ -28,6 +30,8 @@ interface ScenarioOptions {
   update?: boolean;
   modifiedSkills?: boolean;
   receiptAttempts?: number;
+  baseline?: "unedited" | "edited" | "none";
+  replaceFields?: AgentMarketplaceProfileField[];
 }
 
 interface ScenarioState {
@@ -94,6 +98,12 @@ const detail: MarketplaceAgentDetail = {
 };
 const timezone = "UTC";
 const DROPPED_SKILL_ID = "receipt-dropped-skill";
+const OLD_PROFILE = { name: "Old name", title: "Old title", description: "Old instructions" };
+const USER_EDITS = { title: "Our team title", description: "Our team instructions" };
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
 const report: { status: "running" | "pass" | "fail"; cases: CaseReport[] } = { status: "running", cases: [] };
 
 function summary(id: string, workspace: string, values: Partial<AgentSummary>): AgentSummary {
@@ -256,13 +266,27 @@ async function scenario(
     const input: InstallMarketplaceAgentInput = { listingId: detail.id, timezone, receiptId: randomUUID() };
     if (options.update) {
       const oldRoutineId = randomUUID();
+      const baseline = options.baseline ?? "unedited";
+      const listed = summary("receipt-old-agent", workspace, OLD_PROFILE);
       const old = summary("receipt-old-agent", workspace, {
+        ...OLD_PROFILE,
+        ...(baseline === "edited" ? USER_EDITS : {}),
         marketplaceSource: {
           listingId: detail.id,
           versionId: "receipt-listing-version-1",
           version: 1,
           skillIds: options.modifiedSkills ? [DROPPED_SKILL_ID] : [],
           routineIds: [oldRoutineId],
+          ...(baseline === "none"
+            ? {}
+            : {
+                profile: {
+                  name: sha256(OLD_PROFILE.name),
+                  title: sha256(OLD_PROFILE.title),
+                  description: sha256(OLD_PROFILE.description),
+                  picture: agentMarketplacePictureKey(listed),
+                },
+              }),
         },
       });
       agents.set(old.id, old);
@@ -275,6 +299,7 @@ async function scenario(
         schedule: { kind: "interval", amount: 1, unit: "hours", anchorAt: "2026-10-01T00:00:00.000Z" },
       });
       input.agentId = old.id;
+      if (options.replaceFields) input.replaceFields = options.replaceFields;
     }
     phase = "install";
     const result = await Effect.runPromiseExit(service.install(input));
@@ -328,7 +353,13 @@ function keptAfterReceiptError(state: ScenarioState): void {
 }
 
 await scenario("successful receipt", {}, async (state, input) => {
-  addedAgent(state, input);
+  const agent = addedAgent(state, input);
+  assert.deepEqual(agent.marketplaceSource?.profile, {
+    name: sha256(detail.name),
+    title: sha256(detail.title),
+    description: sha256(detail.description),
+    picture: agentMarketplacePictureKey(agent),
+  });
 });
 await scenario("failed receipt after commit", { receiptFailure: true }, async (state, input) => {
   const agent = addedAgent(state, input);
@@ -363,6 +394,52 @@ await scenario(
     assert.equal(agent.marketplaceSource?.versionId, detail.versionId);
     assert.deepEqual(state.skillInstalls, []);
     assert.deepEqual(state.skillUninstalls, []);
+  },
+);
+await scenario(
+  "update keeps the title and instructions that the user edited",
+  { update: true, baseline: "edited", receiptAttempts: 0 },
+  async (state, input) => {
+    assert.ok(Exit.isSuccess(state.result));
+    const agent = state.agents.get(input.agentId ?? "");
+    assert.ok(agent);
+    assert.equal(agent.name, detail.name);
+    assert.equal(agent.title, USER_EDITS.title);
+    assert.equal(agent.description, USER_EDITS.description);
+    assert.equal(agent.avatarSeed, detail.avatarSeed);
+    assert.equal(agent.marketplaceSource?.versionId, detail.versionId);
+    assert.equal(agent.marketplaceSource?.profile?.title, sha256(detail.title));
+    assert.equal(agent.marketplaceSource?.profile?.description, sha256(detail.description));
+  },
+);
+await scenario(
+  "update keeps each different field of an agent with no baseline",
+  { update: true, baseline: "none", receiptAttempts: 0 },
+  async (state, input) => {
+    assert.ok(Exit.isSuccess(state.result));
+    const agent = state.agents.get(input.agentId ?? "");
+    assert.ok(agent);
+    assert.equal(agent.name, OLD_PROFILE.name);
+    assert.equal(agent.title, OLD_PROFILE.title);
+    assert.equal(agent.description, OLD_PROFILE.description);
+    assert.equal(agent.avatarSeed, "receipt-old-agent");
+    assert.equal(agent.marketplaceSource?.versionId, detail.versionId);
+    assert.equal(agent.marketplaceSource?.profile?.description, sha256(detail.description));
+    assert.equal(agent.marketplaceSource?.profile?.picture, "");
+  },
+);
+await scenario(
+  "update replaces only the fields that the user chose",
+  { update: true, baseline: "none", replaceFields: ["description", "picture"], receiptAttempts: 0 },
+  async (state, input) => {
+    assert.ok(Exit.isSuccess(state.result));
+    const agent = state.agents.get(input.agentId ?? "");
+    assert.ok(agent);
+    assert.equal(agent.name, OLD_PROFILE.name);
+    assert.equal(agent.title, OLD_PROFILE.title);
+    assert.equal(agent.description, detail.description);
+    assert.equal(agent.avatarSeed, detail.avatarSeed);
+    assert.equal(agent.marketplaceSource?.profile?.picture, agentMarketplacePictureKey(agent));
   },
 );
 await scenario("receipt defect", { receiptDefect: true }, async (state) => {

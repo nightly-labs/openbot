@@ -47,6 +47,7 @@ import {
   isAgentAccess,
   isAgentAdditionalFolders,
   isAgentBackupModels,
+  isAgentMarketplaceProfile,
   isAgentModel,
   isAgentPendingRuntime,
   isAgentSessionSettingOverrides,
@@ -2090,6 +2091,7 @@ function normalizeMarketplaceSource(value: unknown): NonNullable<StoredAgent["ma
     version: value.version,
     skillIds: stringList(value.skillIds),
     routineIds: stringList(value.routineIds),
+    ...(isAgentMarketplaceProfile(value.profile) ? { profile: { ...value.profile } } : {}),
   };
 }
 

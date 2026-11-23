@@ -32,3 +32,5 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const AllChanged: Story = { args: { changed: SKILLS, othersCount: 0 } };
+
+export const AgentParts: Story = { args: { fields: ["title", "description", "picture"] } };

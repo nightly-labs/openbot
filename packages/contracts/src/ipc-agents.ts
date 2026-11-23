@@ -211,8 +211,23 @@ export function isAgentMarketplaceSource(value: unknown): value is NonNullable<A
     value.skillIds.every(isIdentifier) &&
     Array.isArray(value.routineIds) &&
     value.routineIds.length <= INPUT_LIMITS.agentRoutines &&
-    value.routineIds.every(isIdentifier)
+    value.routineIds.every(isIdentifier) &&
+    (value.profile === undefined || isAgentMarketplaceProfile(value.profile))
   );
+}
+
+export const AGENT_MARKETPLACE_PROFILE_FIELDS = ["name", "title", "description", "picture"] as const;
+export type AgentMarketplaceProfileField = (typeof AGENT_MARKETPLACE_PROFILE_FIELDS)[number];
+export type AgentMarketplaceProfile = Record<AgentMarketplaceProfileField, string>;
+
+export function agentMarketplacePictureKey(
+  agent: Pick<AgentSummary, "avatarUrl" | "avatarSeed" | "avatarHue">,
+): string {
+  return JSON.stringify([agent.avatarUrl, agent.avatarSeed, agent.avatarHue]);
+}
+
+export function isAgentMarketplaceProfile(value: unknown): value is AgentMarketplaceProfile {
+  return isDynamicRecord(value) && AGENT_MARKETPLACE_PROFILE_FIELDS.every((field) => isString(value[field]));
 }
 
 export interface AgentSummary {
@@ -261,6 +276,7 @@ export interface AgentSummary {
     version: number;
     skillIds: string[];
     routineIds: string[];
+    profile?: AgentMarketplaceProfile;
   };
 }
 
