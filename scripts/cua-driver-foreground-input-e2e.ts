@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { connect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Readable } from "node:stream";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { CuaDriverActionTap } from "../src/main/cua-driver-action-tap";
@@ -16,7 +17,6 @@ const DRIVER =
   process.env.OPENBOT_CUA_DRIVER_PATH ?? join(ROOT, "build/cua-driver", process.platform, process.arch, "cua-driver");
 const ELECTRON = join(ROOT, "node_modules/electron/dist/electron");
 const WINDOW_MANAGER = join(ROOT, "scripts/cua-driver-foreground-input-e2e-wm.py");
-const DISPLAY = `:${170 + Math.floor(Math.random() * 60)}`;
 const WINDOW_TITLE = "OpenBot foreground input e2e";
 const DEADLINE_MS = 20_000;
 
@@ -99,6 +99,38 @@ class LineClient {
   }
 }
 
+function onLines(stream: Readable | null, read: (line: string) => void): void {
+  let buffer = "";
+  stream?.on("data", (chunk: Buffer) => {
+    buffer += chunk.toString("utf8");
+    let newline = buffer.indexOf("\n");
+    while (newline >= 0) {
+      read(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf("\n");
+    }
+  });
+}
+
+async function startXvfb(children: ChildProcess[]): Promise<string> {
+  const xvfb = spawn("Xvfb", ["-displayfd", "3", "-screen", "0", "1280x800x24", "-nolisten", "tcp"], {
+    stdio: ["ignore", "ignore", "ignore", "pipe"],
+  });
+  children.push(xvfb);
+  let display: string | null = null;
+  let exited = false;
+  xvfb.once("exit", () => {
+    exited = true;
+  });
+  const displayPipe = xvfb.stdio[3];
+  onLines(displayPipe instanceof Readable ? displayPipe : null, (line) => {
+    display = `:${line.trim()}`;
+  });
+  const started = await waitFor(() => (exited ? "exited" : display), "Xvfb");
+  assert.notEqual(started, "exited", "Xvfb exited before it chose a display.");
+  return started;
+}
+
 function structured(answer: DynamicRecord): DynamicRecord {
   const result = isDynamicRecord(answer.result) ? answer.result : {};
   return isDynamicRecord(result.structuredContent) ? result.structuredContent : {};
@@ -117,10 +149,8 @@ async function main(): Promise<void> {
   const work = await mkdtemp(join(tmpdir(), "openbot-foreground-e2e-"));
   const children: ChildProcess[] = [];
   const tap = new CuaDriverActionTap(Date.now, undefined, null, true);
-  const { WAYLAND_DISPLAY: _wayland, ELECTRON_RUN_AS_NODE: _electronAsNode, ...inherited } = process.env;
-  const env = { ...inherited, DISPLAY, CUA_DRIVER_EMBEDDED: "1", CUA_DRIVER_RS_TELEMETRY_ENABLED: "0" };
   const report: Report = {
-    display: DISPLAY,
+    display: "",
     driver: DRIVER,
     hiddenTools: [],
     deliveryModeTools: [],
@@ -130,13 +160,15 @@ async function main(): Promise<void> {
   };
   let client: LineClient | null = null;
   try {
-    children.push(spawn("Xvfb", [DISPLAY, "-screen", "0", "1280x800x24", "-nolisten", "tcp"], { stdio: "ignore" }));
-    await waitFor(() => (existsSync(`/tmp/.X11-unix/X${DISPLAY.slice(1)}`) ? true : null), "Xvfb");
+    const display = await startXvfb(children);
+    report.display = display;
+    const { WAYLAND_DISPLAY: _wayland, ELECTRON_RUN_AS_NODE: _electronAsNode, ...inherited } = process.env;
+    const env = { ...inherited, DISPLAY: display, CUA_DRIVER_EMBEDDED: "1", CUA_DRIVER_RS_TELEMETRY_ENABLED: "0" };
     const windowManager = spawn("python3", ["-I", WINDOW_MANAGER], { env, stdio: ["ignore", "pipe", "ignore"] });
     children.push(windowManager);
     let managerReady = false;
-    windowManager.stdout?.on("data", (chunk: Buffer) => {
-      if (chunk.toString("utf8").includes("ready")) managerReady = true;
+    onLines(windowManager.stdout, (line) => {
+      if (line === "ready") managerReady = true;
     });
     await waitFor(() => (managerReady ? true : null), "the window manager stand-in");
 
@@ -148,10 +180,8 @@ async function main(): Promise<void> {
     });
     children.push(probe);
     let typed = "";
-    probe.stdout?.on("data", (chunk: Buffer) => {
-      for (const line of chunk.toString("utf8").split("\n")) {
-        if (line.startsWith("TEXT ")) typed = JSON.parse(line.slice(5));
-      }
+    onLines(probe.stdout, (line) => {
+      if (line.startsWith("TEXT ")) typed = JSON.parse(line.slice(5));
     });
 
     const driverSocket = join(work, "driver.sock");
@@ -196,6 +226,11 @@ async function main(): Promise<void> {
           steps: [{ tool: "type_text", args: { text: "de", delivery_mode: "background" } }],
         },
         expect: "abcde",
+      },
+      {
+        name: "run_steps",
+        args: { pid, window_id: windowId, steps: [{ tool: "type_text", args: { text: "f" } }] },
+        expect: "abcdef",
       },
     ];
     for (const call of calls) {
