@@ -126,6 +126,8 @@ export const messages = {
   "mobile.workflow.media.unsupported": "워크플로에서 이미지와 동영상을 만들려면 이 서버의 OpenBot을 업데이트하세요.",
   "mobile.workflow.media.settings": "설정",
   "mobile.workflow.media.automatic": "자동",
+  "mobile.workflow.media.modelUnavailable": "모델을 사용할 수 없음",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · 사용할 수 없음",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · {source} 크레딧",
   "mobile.workflow.media.price": "실행당 가격",

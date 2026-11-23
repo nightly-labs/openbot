@@ -370,13 +370,18 @@ export class CreditMediaService {
     this: CreditMediaService,
   ): Effect.fn.Return<CreditMediaCatalog, Failure> {
     if (this.#upstreams.size === 0) return { models: [] };
-    const models = (yield* this.#models(null)).filter(
-      (stored) => stored.route !== null && this.#upstreams.has(stored.route.upstream),
-    );
+    const stored = yield* this.#models(null);
+    const routed = (entry: StoredModel) => entry.route !== null && this.#upstreams.has(entry.route.upstream);
+    const byKind = (entries: readonly StoredModel[]) =>
+      CREDIT_MEDIA_KINDS.flatMap((kind) => entries.filter((entry) => entry.model.kind === kind));
     return {
-      models: CREDIT_MEDIA_KINDS.flatMap((kind) =>
-        models.filter((stored) => stored.model.kind === kind).map((stored) => stored.model),
-      ),
+      models: byKind(stored.filter(routed)).map((entry) => entry.model),
+      unavailable: byKind(stored.filter((entry) => !routed(entry))).map(({ model }) => ({
+        id: model.id,
+        kind: model.kind,
+        name: model.name,
+        variant: model.variant,
+      })),
     };
   }).bind(this);
 

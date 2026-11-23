@@ -125,6 +125,8 @@ export const messages = {
   "mobile.workflow.media.unsupported": "在该服务器上更新 OpenBot，即可在工作流中生成图片和视频。",
   "mobile.workflow.media.settings": "设置",
   "mobile.workflow.media.automatic": "自动",
+  "mobile.workflow.media.modelUnavailable": "模型不可用",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · 不可用",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · {source} 积分",
   "mobile.workflow.media.price": "每次运行价格",

@@ -204,6 +204,7 @@ function ComposerModel(props: { step: MediaStep; id: string }) {
       kind={props.step.kind()}
       models={props.step.models()}
       model={props.step.model()}
+      savedName={props.step.savedModelName()}
       account={props.step.account()}
       title={t(KIND_TEXT[props.step.kind()].models)}
       disabled={props.step.specsDisabled()}
@@ -556,7 +557,7 @@ function RunButton(props: { step: MediaStep; id: string; ready: boolean }) {
             aria-label={step.runLabel()}
             onClick={step.run.start}
           >
-            <RunContent credits={step.total()} takes={step.batch()} />
+            <RunContent credits={step.total()} takes={step.batch()} modelMissing={step.modelMissing()} />
           </Button>
         }
       >

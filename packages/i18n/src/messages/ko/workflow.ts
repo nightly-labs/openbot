@@ -147,6 +147,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "이미지를 설명하세요",
   "workflow.image.models": "이미지 모델",
   "workflow.image.chooseModel": "모델 선택",
+  "workflow.image.modelUnavailable": "모델을 사용할 수 없음",
   "workflow.media.subscription": "{name} 구독",
   "workflow.media.apiKey": "{name} API 키",
   "workflow.media.credits": "{name} 크레딧",

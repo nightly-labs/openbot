@@ -128,6 +128,8 @@ export const messages = {
     "Werk OpenBot bij op deze server om afbeeldingen en video's te maken in workflows.",
   "mobile.workflow.media.settings": "Instellingen",
   "mobile.workflow.media.automatic": "Automatisch",
+  "mobile.workflow.media.modelUnavailable": "Model niet beschikbaar",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · niet beschikbaar",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · {source}-credits",
   "mobile.workflow.media.price": "Prijs per run",

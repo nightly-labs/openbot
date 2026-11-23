@@ -10,6 +10,7 @@ import {
   type CreditMediaJob,
   type CreditMediaJobRequest,
   type CreditMediaModel,
+  type CreditMediaUnavailableModel,
   creditMediaCost,
   creditMediaRequiredInput,
 } from "@openbot/contracts/credit-media";
@@ -18,6 +19,7 @@ import {
   WORKFLOW_MEDIA_ASPECTS,
   WORKFLOW_MEDIA_SWITCH_VALUES,
   type WorkflowMediaAspect,
+  type WorkflowMediaCatalog,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaCreditBalance,
   type WorkflowMediaInput,
@@ -82,7 +84,10 @@ export interface CreditMediaWorkflowsOptions {
 interface Listed {
   at: number;
   models: ReadonlyMap<string, CreditMediaModel> | null;
+  unavailable: readonly CreditMediaUnavailableModel[];
 }
+
+const NOTHING_LISTED: Omit<Listed, "at"> = { models: null, unavailable: [] };
 
 export const creditWorkflowModelId = (model: string) => `${WORKFLOW_CREDIT_MODEL_PREFIX}${model}`;
 
@@ -102,6 +107,9 @@ function workflowInputs(model: CreditMediaModel): WorkflowMediaInput[] {
   return [...(model.frames > 0 ? ["frames" as const] : []), ...(model.references > 0 ? ["references" as const] : [])];
 }
 
+const creditWorkflowModelName = (model: { name: string; variant: string | null }) =>
+  (model.variant ? `${model.name} · ${model.variant}` : model.name).slice(0, NAME_MAX);
+
 export function creditWorkflowModel(model: CreditMediaModel): WorkflowMediaCatalogModel {
   const inputs = workflowInputs(model);
   const durations = model.kind === "video" ? model.durations.filter((value) => Number.isSafeInteger(value)) : [];
@@ -110,7 +118,7 @@ export function creditWorkflowModel(model: CreditMediaModel): WorkflowMediaCatal
     id: creditWorkflowModelId(model.id),
     provider: "openbot",
     providerModel: model.id,
-    name: (model.variant ? `${model.name} · ${model.variant}` : model.name).slice(0, NAME_MAX),
+    name: creditWorkflowModelName(model),
     maker: model.maker,
     kinds: [model.kind],
     aspects: workflowAspects(model),
@@ -203,34 +211,41 @@ export class CreditMediaWorkflows {
     return this.#options.gateway.available();
   }
 
-  #models(): Effect.Effect<ReadonlyMap<string, CreditMediaModel> | null> {
+  #list(): Effect.Effect<Omit<Listed, "at">> {
     return Effect.suspend(() => {
-      if (!this.available()) return Effect.succeed(null);
+      if (!this.available()) return Effect.succeed(NOTHING_LISTED);
       const kept = this.#fresh();
-      if (kept) return Effect.succeed(kept.models);
+      if (kept) return Effect.succeed(kept);
       return this.#lock.withPermit(
         Effect.suspend(() => {
           const again = this.#fresh();
-          if (again) return Effect.succeed(again.models);
+          if (again) return Effect.succeed(again);
           return this.#options.gateway.catalog().pipe(
-            Effect.map((catalog) =>
-              catalog.models.length > 0 ? new Map(catalog.models.map((model) => [model.id, model])) : null,
+            Effect.map(
+              (catalog): Omit<Listed, "at"> => ({
+                models: catalog.models.length > 0 ? new Map(catalog.models.map((model) => [model.id, model])) : null,
+                unavailable: catalog.unavailable ?? [],
+              }),
             ),
             Effect.catch((failure) =>
               Effect.sync(() => {
                 this.#options.warn("Could not read the credit media models.", { error: failure.message });
-                return null;
+                return NOTHING_LISTED;
               }),
             ),
-            Effect.tap((models) =>
+            Effect.tap((listed) =>
               Effect.sync(() => {
-                this.#listed = { at: this.#now(), models };
+                this.#listed = { at: this.#now(), ...listed };
               }),
             ),
           );
         }),
       );
     });
+  }
+
+  #models(): Effect.Effect<ReadonlyMap<string, CreditMediaModel> | null> {
+    return this.#list().pipe(Effect.map((listed) => listed.models));
   }
 
   #model(id: string) {
@@ -244,8 +259,15 @@ export class CreditMediaWorkflows {
   }
 
   readonly catalog = Effect.fn("CreditMediaWorkflows.catalog")(function* (this: CreditMediaWorkflows) {
-    const models = yield* this.#models();
-    return models ? [...models.values()].map(creditWorkflowModel) : [];
+    const { models, unavailable } = yield* this.#list();
+    return {
+      models: models ? [...models.values()].map(creditWorkflowModel) : [],
+      unavailable: unavailable.map((model) => ({
+        id: creditWorkflowModelId(model.id),
+        name: creditWorkflowModelName(model),
+        kinds: [model.kind],
+      })),
+    } satisfies WorkflowMediaCatalog;
   }).bind(this);
 
   readonly price = Effect.fn("CreditMediaWorkflows.price")(function* (

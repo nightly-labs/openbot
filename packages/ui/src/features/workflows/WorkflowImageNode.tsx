@@ -344,6 +344,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 kind={kind()}
                 models={step.models()}
                 model={model()}
+                savedName={step.savedModelName()}
                 account={step.account()}
                 title={text("models")}
                 disabled={step.specsDisabled()}
@@ -359,7 +360,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                     disabled={!step.runnable() || step.locked() || step.short() || !model()}
                     aria-label={step.runLabel()}
                   >
-                    <RunContent credits={step.total()} takes={step.batch()} />
+                    <RunContent credits={step.total()} takes={step.batch()} modelMissing={step.modelMissing()} />
                   </Button>
                 }
               >
