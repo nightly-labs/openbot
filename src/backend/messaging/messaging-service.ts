@@ -118,6 +118,7 @@ export interface MessagingAgents {
       description: string;
       avatarSeed: string;
       avatarHue: AgentSummary["avatarHue"];
+      startOnRunnableProvider: boolean;
     },
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed>;
   createMemory(input: { agentId: string; text: string }): unknown;
@@ -577,6 +578,7 @@ export class MessagingService {
         ...(input.provider ? { provider: input.provider } : {}),
         ...(input.model ? { model: input.model } : {}),
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+        startOnRunnableProvider: true,
       })
       .pipe(toMessagingOperationFailed);
     const memories = discord ? discordOrchestratorMemories() : slackOrchestratorMemories();
@@ -867,6 +869,7 @@ export class MessagingService {
         ...(input.provider ? { provider: input.provider } : {}),
         ...(input.model ? { model: input.model } : {}),
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+        startOnRunnableProvider: true,
       })
       .pipe(toMessagingOperationFailed);
     const memories = telegram ? telegramOrchestratorMemories() : whatsAppOrchestratorMemories();

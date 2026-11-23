@@ -251,6 +251,7 @@ import {
   type ModelChoice,
   modelUnavailableError,
   type ProviderPreference,
+  runnableStartingChoice,
   startingChoice,
   startingModel,
   workflowProvider,
@@ -3461,7 +3462,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
   }, Effect.uninterruptible).bind(this);
 
-  #assignNewAgentModel(agent: AgentSummary, input: Omit<CreateAgentInput, "initialMessage">, needsModel: boolean) {
+  #assignNewAgentModel(
+    agent: AgentSummary,
+    input: Omit<CreateAgentInput, "initialMessage">,
+    needsModel: boolean,
+    startOnRunnableProvider = false,
+  ) {
     return this.#endpoints
       .runExclusive(() =>
         Effect.gen({ self: this }, function* () {
@@ -3494,7 +3500,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ...(account ? { providerAccountId: account } : {}),
             });
           }
-          const starting = this.#startingChoice();
+          const starting = startOnRunnableProvider ? this.#runnableStartingChoice() : this.#startingChoice();
           if (starting) return yield* this.#landOnStartingChoice(agent, starting);
           yield* lifecycleStep("check starting model", () => {
             this.#providers.requireProviderOn(agent.provider);
@@ -3522,6 +3528,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
   }
 
+  #runnableStartingChoice(): ModelChoice | null {
+    return runnableStartingChoice(this.#endpoints.available(), this.#preference(), this.getStatus().providers ?? [], {
+      developmentDefaults: this.#developmentDefaults,
+      providerAvailable: (provider) => this.#providerAvailable(provider),
+    });
+  }
+
   readonly #landOnStartingChoice = Effect.fn("AgentService.landOnStartingChoice")(function* (
     this: AgentService,
     agent: AgentSummary,
@@ -3544,7 +3557,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   readonly createAgentProfile = Effect.fn("AgentService.createAgentProfile")(function* (
     this: AgentService,
-    input: Omit<CreateAgentInput, "initialMessage"> & { title?: string },
+    input: Omit<CreateAgentInput, "initialMessage"> & { title?: string; startOnRunnableProvider?: boolean },
   ) {
     let agent = yield* this.#store
       .createAgent(input)
@@ -3560,7 +3573,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             (failure) => new AgentLifecycleFailed({ operation: "prepare agent workspace", cause: failure.cause }),
           ),
         );
-        agent = yield* this.#assignNewAgentModel(agent, input, false);
+        agent = yield* this.#assignNewAgentModel(agent, input, false, input.startOnRunnableProvider);
         if (input.title)
           agent = yield* this.#store
             .updateAgent({ agentId: agent.id, title: input.title })
