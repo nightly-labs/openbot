@@ -832,10 +832,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }, Effect.uninterruptible);
 
   #leftoverSessionFiles(): readonly string[] {
-    const sessionFiles = this.#flavor.sessionFiles;
-    if (!sessionFiles || this.#deletesSessions) return [];
     const ids = new Set(this.#discardedSessions);
     this.#discardedSessions.clear();
+    const sessionFiles = this.#flavor.sessionFiles;
+    if (!sessionFiles || this.#deletesSessions) return [];
     for (const id of this.#threads.ids()) if (this.#threads.get(id)?.throwaway) ids.add(id);
     if (this.#privateSession) ids.add(this.#privateSession.sessionId);
     const keptProbe = this.#configuration.takeKeptProbe();
@@ -1042,6 +1042,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<string, ProviderClientOperationError> {
     const connection = yield* providerSync(() => this.#requireConnection());
     if (this.#privateSession?.connection !== connection) {
+      if (this.#privateSession) this.#discardedSessions.add(this.#privateSession.sessionId);
       const { sessionId } = yield* providerCall(() =>
         connection.newSession({
           cwd: this.options.discoveryCwd?.() ?? process.cwd(),
@@ -1060,6 +1061,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         Effect.gen({ self: this }, function* () {
           this.#privateAnswer = null;
           if (!Exit.hasInterrupts(exit)) return;
+          this.#discardedSessions.add(sessionId);
           this.#privateSession = null;
           yield* providerCall(() => connection.cancel({ sessionId })).pipe(Effect.ignore);
         }),
