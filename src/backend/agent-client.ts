@@ -126,6 +126,13 @@ export class ProviderModelNotOfferedError extends Error {
   }
 }
 
+export class ProviderModelLimitedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProviderModelLimitedError";
+  }
+}
+
 export class MissingClaudeSessionError extends Error {
   constructor(threadId: string) {
     super(`Claude session not found: ${threadId}`);
