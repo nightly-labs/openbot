@@ -1108,6 +1108,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       bundledExecutables,
       credentials: {
         ...credentials,
+        ...(options.fitImage ? { fitImage: options.fitImage } : {}),
         ...(credentials.serverEnvironment
           ? {
               agentEnvironment: (inherited) => ({

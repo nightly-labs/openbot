@@ -56,6 +56,7 @@ import {
   withoutTurnContext,
 } from "./agent/developer-instructions";
 import type { GeneratedMediaKind } from "./agent/image-generation";
+import type { ImageFitter } from "./agent/image-reader";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
 import {
@@ -151,6 +152,10 @@ const UNCLAIMED_MCP_FAILURE_LIMIT = 50;
 const ACP_HISTORY_REPLAY_QUEUE_LIMIT = 256;
 
 const ACP_PROMPT_AUDIO_BASE64_BYTES = 19 * 1024 * 1024;
+
+const ACP_PROMPT_MEDIA_BASE64_BYTES = 24 * 1024 * 1024;
+
+const ACP_PROMPT_IMAGE_FIT_BYTES = 1024 * 1024;
 
 const ACP_TURN_STALL_MS = 5 * 60_000;
 
@@ -423,6 +428,7 @@ export interface AcpProviderOptions {
   signInMessage: string;
   servesModel?: ((modelId: string) => boolean) | undefined;
   mcpServers?: McpServerSource | undefined;
+  fitImage?: ImageFitter | null | undefined;
   turnStallMs?: number;
   firstUpdateMs?: number;
   reportMcpDrops?: McpDropReporter | undefined;
@@ -1233,7 +1239,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const byPrompt = this.#steersByPrompt;
         if (!steer && !byPrompt) return yield* providerFailure(new Error(sourceText("error.backend.steerUnsupported")));
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
-        const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
+        const blocks = yield* promptBlocksEffect(params, this.#promptMedia);
         const thread = this.#threads.get(threadId);
         const turn = thread?.activeTurn;
         if (
@@ -1542,6 +1548,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   get #forcedClose(): { _meta?: { "cognition.ai/force": true } } {
     const meta = this.#initialization?.agentCapabilities?.sessionCapabilities?.close?._meta;
     return meta?.["cognition.ai/force"] === true ? { _meta: { "cognition.ai/force": true } } : {};
+  }
+
+  get #promptMedia(): PromptMedia {
+    return {
+      acceptsAudio: this.#acceptsAudio,
+      fitImage: this.options.fitImage,
+      base64Bytes: this.#flavor.promptMediaBase64Bytes ?? ACP_PROMPT_MEDIA_BASE64_BYTES,
+    };
   }
 
   get #acceptsAudio(): boolean {
@@ -2354,7 +2368,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#applyTurnSettings(thread, params, true);
     this.#publishSessionSettings(thread);
     const turnId = getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID();
-    const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
+    const blocks = yield* promptBlocksEffect(params, this.#promptMedia);
     yield* providerSync(() => this.#requireServedModel(thread));
     thread.promptsSinceInstructions += 1;
     const first = blocks[0];
@@ -4445,9 +4459,16 @@ export function isDynamicToolNamespace(value: unknown): value is DynamicToolName
   );
 }
 
-const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (params: unknown, acceptsAudio: boolean) {
+interface PromptMedia {
+  acceptsAudio: boolean;
+  fitImage: ImageFitter | null | undefined;
+  base64Bytes: number;
+}
+
+const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (params: unknown, media: PromptMedia) {
   const blocks: ContentBlock[] = [];
   let audioBase64Bytes = 0;
+  let mediaBase64Bytes = 0;
   for (const item of getArray(params, "input")) {
     if (!isRecord(item)) continue;
     if (item.type === "text" && isString(item.text)) blocks.push({ type: "text", text: item.text });
@@ -4455,26 +4476,40 @@ const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (p
       const path = item.path;
       blocks.push({ type: "text", text: `Attached local file: ${path}` });
       const mimeType = attachmentMimeTypeForName(path);
-      if (!acceptsAudio || !mimeType.startsWith("audio/")) continue;
+      if (!media.acceptsAudio || !mimeType.startsWith("audio/")) continue;
       const { size } = yield* providerCall(() => stat(path));
-      if (audioBase64Bytes + Math.ceil(size / 3) * 4 > ACP_PROMPT_AUDIO_BASE64_BYTES) continue;
+      const base64Bytes = Math.ceil(size / 3) * 4;
+      if (audioBase64Bytes + base64Bytes > ACP_PROMPT_AUDIO_BASE64_BYTES) continue;
+      if (mediaBase64Bytes + base64Bytes > media.base64Bytes) continue;
       const data = (yield* providerCall(() => readFile(path))).toString("base64");
       audioBase64Bytes += data.length;
+      mediaBase64Bytes += data.length;
       blocks.push({ type: "audio", data, mimeType });
     }
     if (item.type === "localImage" && isString(item.path)) {
       const path = item.path;
-      const data = yield* providerCall(() => readFile(path));
-      blocks.push({
-        type: "image",
-        data: data.toString("base64"),
-        mimeType: attachmentMimeTypeForName(path),
-        uri: item.path,
-      });
+      const image = promptImage(yield* providerCall(() => readFile(path)), path, media.fitImage);
+      if (mediaBase64Bytes + image.data.length > media.base64Bytes) {
+        blocks.push({ type: "text", text: `Attached local file: ${path}` });
+        continue;
+      }
+      mediaBase64Bytes += image.data.length;
+      blocks.push({ type: "image", data: image.data, mimeType: image.mimeType, uri: path });
     }
   }
   return blocks;
 });
+
+function promptImage(
+  bytes: Buffer,
+  path: string,
+  fitImage: ImageFitter | null | undefined,
+): { data: string; mimeType: string } {
+  const fitted = fitImage && bytes.length > ACP_PROMPT_IMAGE_FIT_BYTES ? fitImage(bytes) : null;
+  const dataUrl = fitted && typeof fitted === "object" ? /^data:([^;,]+);base64,(.*)$/su.exec(fitted.dataUrl) : null;
+  if (dataUrl?.[1] && dataUrl[2]) return { mimeType: dataUrl[1], data: dataUrl[2] };
+  return { data: bytes.toString("base64"), mimeType: attachmentMimeTypeForName(path) };
+}
 
 function permissionFilePaths(toolCall: RequestPermissionRequest["toolCall"], cwd: string | undefined): string[] {
   const paths = [

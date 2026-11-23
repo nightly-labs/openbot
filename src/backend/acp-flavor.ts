@@ -96,6 +96,7 @@ export interface AcpFlavor {
   closeKeepsSession?: true;
   probeCloseDelayMs?: number;
   effortCategories?: readonly string[];
+  promptMediaBase64Bytes?: number;
   sessionProcesses?: true;
   modelsLoadWithSession?: true;
   sessionProcessesBefore?: string;
