@@ -96,7 +96,14 @@ export function forceActivateX11Window(window: BrowserWindow): void {
   }
 }
 
+let compositorRunningAtFirstCheck: boolean | undefined;
+
 export function x11CompositorRunning(): boolean {
+  compositorRunningAtFirstCheck ??= askX11ForCompositor();
+  return compositorRunningAtFirstCheck;
+}
+
+function askX11ForCompositor(): boolean {
   const x = loadXlibOnce();
   if (!x) return true;
   try {
