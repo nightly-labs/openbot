@@ -297,6 +297,10 @@ export interface LocalSkillRevisionInput {
   revision?: number | undefined;
 }
 export type InstallLocalSkillInput = LocalSkillRevisionInput & { agentId: string; revision: number };
+export interface SetLocalSkillGlobalInput {
+  skillId: string;
+  global: boolean;
+}
 
 export const SKILL_LEARNING_MODES = ["automatic", "ask", "off"] as const;
 export type SkillLearningMode = (typeof SKILL_LEARNING_MODES)[number];

@@ -52,6 +52,7 @@ export interface SkillsPort {
     | "localGet"
     | "localInstall"
     | "localList"
+    | "localSetGlobal"
     | "pluginCatalog"
     | "setEnabled"
     | "uninstall"

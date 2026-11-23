@@ -2189,6 +2189,7 @@ export async function createApplicationServices({
     agents: () => service.listAgents(),
   });
   let hostedStorageGb: number | null = null;
+  let installGlobalSkills: ((agentId: string) => Effect.Effect<void>) | null = null;
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -2312,6 +2313,7 @@ export async function createApplicationServices({
         yield* managedSkills.syncAgent(agent);
         yield* skillCreator.syncAgent(agent);
         yield* dataSkill.syncAgent(agent);
+        if (installGlobalSkills) yield* installGlobalSkills(agent.id);
       }),
     hostedSites: {
       list: () => hostedSites.list().pipe(toHostedSiteOperationFailed),
@@ -2821,6 +2823,7 @@ export async function createApplicationServices({
     new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
     githubSkillSource((url, init) => fetch(url, init)),
   );
+  installGlobalSkills = (agentId) => skills.installGlobalSkills(agentId);
   const marketplaceAgents = new AgentMarketplaceService(marketplaceAuth, service, skills);
   const agentTemplates = new AgentTemplateService(
     centralAuth,

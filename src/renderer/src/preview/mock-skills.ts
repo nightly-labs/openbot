@@ -195,6 +195,25 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
       writeInstalled(agentId, [...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId), installed]);
       return clone(installed);
     },
+    localSetGlobal: async ({ skillId, global }) => {
+      const skill = localSkills.find((item) => item.id === skillId);
+      if (!skill) throw new Error("Local skill not found.");
+      skill.global = global;
+      let installed = 0;
+      let failed = 0;
+      if (global) {
+        for (const agentId of installedSkills.keys()) {
+          if (readInstalledSkills(agentId).some((item) => item.skillId === skillId)) continue;
+          try {
+            await skills.localInstall({ agentId, skillId, revision: skill.version });
+            installed += 1;
+          } catch {
+            failed += 1;
+          }
+        }
+      }
+      return { installed, failed };
+    },
     list: async (query) => mockSkillPage(marketplaceSkills, query),
     get: async (skillId) => {
       if (skillId.startsWith("local-skill-")) return skills.localGet({ skillId });
