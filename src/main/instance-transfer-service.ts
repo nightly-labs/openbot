@@ -594,7 +594,7 @@ export class InstanceTransferService {
       version: INSTANCE_TRANSFER_VERSION,
       source: { appVersion: this.options.appVersion, exportedAt: this.#now().toISOString() },
       agents: manifestAgents,
-      settings: input.includeSettings ? yield* this.#readSettings(keys, channelKeys, manifestAgents) : null,
+      settings: input.includeSettings ? yield* this.#readSettings(keys, channelKeys, manifestAgents, warnings) : null,
       ...(sharedSkills.skills.length > 0 ? { sharedSkills: sharedSkills.skills } : {}),
       shared,
       signedIn: this.options.settings.signedInProviders(),
@@ -640,6 +640,7 @@ export class InstanceTransferService {
     keys: ReadonlyMap<string, string>,
     channelKeys: ReadonlyMap<string, string>,
     agents: readonly TransferAgent[],
+    warnings: string[],
   ): Effect.fn.Return<TransferSettings, ArchiveOperationError> {
     const settings = this.options.settings;
     const layout = settings.sidebar();
@@ -666,7 +667,12 @@ export class InstanceTransferService {
           if (nodeKey) positions.push({ agentKey, nodeKey, x: position.x, y: position.y });
         }
     const workflows = settings.workflows
-      ? exportWorkflows(yield* settings.workflows.workflows().pipe(Effect.mapError(failure)), keys, channelKeys)
+      ? exportWorkflows(
+          yield* settings.workflows.workflows().pipe(Effect.mapError(failure)),
+          keys,
+          channelKeys,
+          warnings,
+        )
       : [];
     const order = [
       ...layout.agentOrder,

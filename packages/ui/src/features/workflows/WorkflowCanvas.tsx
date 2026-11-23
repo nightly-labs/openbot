@@ -1332,6 +1332,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           readOnly={props.readOnly === true}
           paused={switcherPaused()}
           portable={props.onExport !== undefined}
+          copyable={props.workflow.needsNewerApp !== true}
           folders={switcherFolders()}
           onAction={onSwitcher}
           onFolder={onFolderMenu}

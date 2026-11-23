@@ -385,6 +385,7 @@ export const messages = {
   "mobile.workflow.discord.oneChannel": "Jeden kanał",
   "mobile.workflow.discord.noChannel": "Nie wybrano",
   "mobile.workflow.discord.oneServer": "Jeden serwer",
+  "mobile.workflow.discord.chooseServer": "Wybierz serwer",
   "mobile.workflow.discord.roles": "Ma rolę",
   "mobile.workflow.discord.anyRole": "Dowolna rola",
   "mobile.workflow.discord.roleCount": {
@@ -411,6 +412,7 @@ export const messages = {
   "mobile.workflow.telegram.chat": "Czat",
   "mobile.workflow.telegram.anyChat": "Dowolny połączony czat",
   "mobile.workflow.telegram.oneChat": "Jeden czat",
+  "mobile.workflow.telegram.chooseChat": "Wybierz czat",
   "mobile.workflow.telegram.sameChat": "Jak wyzwalacz",
   "mobile.workflow.telegram.event": "Zdarzenie",
   "mobile.workflow.telegram.event.mention": "Wzmianka o OpenBot",

@@ -13,6 +13,8 @@ export const messages = {
   "error.workflow.duplicateEdge": "Bu iki adımda bu bağlantı zaten var.",
   "error.workflow.serverTooOld":
     "Bu sunucu iş akışlarını desteklemiyor. OpenBot'u sunucuyu çalıştıran bilgisayarda güncelleyin.",
+  "error.workflow.newerSteps":
+    "Bu iş akışında daha yeni bir OpenBot sürümünden adımlar var. Değiştirmek için OpenBot'u güncelleyin.",
   "error.workflow.nodeUnsupported": "OpenBot'un bu sürümü görsel, dosya ve mesaj adımlarını henüz çalıştıramaz.",
   "error.workflow.interrupted": "Bu adım çalışırken OpenBot durdu. Adımı yeniden çalıştırın.",
   "error.workflow.agentMissing": "Bu adım için bir ajan seçin.",

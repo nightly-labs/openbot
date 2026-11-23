@@ -221,7 +221,7 @@ export class WorkflowRunStore {
 
   run(runId: string): StoredWorkflowRun | null {
     const row = databaseRow(this.#database.connection.prepare(`${RUN_SELECT} WHERE run_id = ?`).get(runId));
-    return row ? toRun(row) : null;
+    return row ? strictRun(row) : null;
   }
 
   handoffSource(runId: string): WorkflowRunSource | null {
@@ -237,7 +237,17 @@ export class WorkflowRunStore {
       this.#database.connection
         .prepare(`${RUN_SELECT} WHERE status IN (${placeholders(OPEN_RUN_STATUSES)}) ORDER BY started_at, run_id`)
         .all(...OPEN_RUN_STATUSES),
-    ).map(toRun);
+    ).flatMap((row) => readableRun(row) ?? []);
+  }
+
+  unreadableOpenRunIds(): Set<string> {
+    return new Set(
+      databaseRows(
+        this.#database.connection
+          .prepare(`SELECT run_id, graph_json FROM workflow_runs WHERE status IN (${placeholders(OPEN_RUN_STATUSES)})`)
+          .all(...OPEN_RUN_STATUSES),
+      ).flatMap((row) => (runGraph(row) ? [] : [requiredStringColumn(row, "run_id")])),
+    );
   }
 
   setRunStatus(runId: string, status: WorkflowRunStatus, error: string | null, now = new Date()): boolean {
@@ -540,7 +550,7 @@ export class WorkflowRunStore {
                ORDER BY started_at DESC, run_id DESC LIMIT ?`,
             )
             .all(workflowId, cursor.startedAt, cursor.startedAt, cursor.runId, limit + 1),
-    ).map(toRun);
+    ).map((row) => toRun(row, runGraph(row) ?? { nodes: [], edges: [], strokes: [] }));
     const runs = rows.slice(0, limit);
     const last = runs.at(-1);
     const soloSteps =
@@ -611,9 +621,29 @@ const STEP_SELECT = `
     settings_json, sources_json, output, branch, error, started_at, ended_at, created_at, rowid AS sequence
   FROM workflow_steps`;
 
-function toRun(row: DynamicRecord): StoredWorkflowRun {
-  const graph = JSON.parse(requiredStringColumn(row, "graph_json"));
-  if (!isWorkflowGraph(graph)) throw new Error("Invalid SQLite column: workflow_runs.graph_json");
+function runGraph(row: DynamicRecord): WorkflowGraph | null {
+  const text = row.graph_json;
+  if (typeof text !== "string") return null;
+  try {
+    const graph = JSON.parse(text);
+    return isWorkflowGraph(graph) ? graph : null;
+  } catch {
+    return null;
+  }
+}
+
+function readableRun(row: DynamicRecord): StoredWorkflowRun | null {
+  const graph = runGraph(row);
+  return graph ? toRun(row, graph) : null;
+}
+
+function strictRun(row: DynamicRecord): StoredWorkflowRun {
+  const run = readableRun(row);
+  if (!run) throw new Error("Invalid SQLite column: workflow_runs.graph_json");
+  return run;
+}
+
+function toRun(row: DynamicRecord, graph: WorkflowGraph): StoredWorkflowRun {
   return {
     id: requiredStringColumn(row, "run_id"),
     workflowId: requiredStringColumn(row, "workflow_id"),

@@ -384,6 +384,7 @@ export const messages = {
   "mobile.workflow.discord.oneChannel": "قناة واحدة",
   "mobile.workflow.discord.noChannel": "غير محددة",
   "mobile.workflow.discord.oneServer": "خادم واحد",
+  "mobile.workflow.discord.chooseServer": "اختيار خادم",
   "mobile.workflow.discord.roles": "له دور",
   "mobile.workflow.discord.anyRole": "أي دور",
   "mobile.workflow.discord.roleCount": {
@@ -412,6 +413,7 @@ export const messages = {
   "mobile.workflow.telegram.chat": "المحادثة",
   "mobile.workflow.telegram.anyChat": "أي محادثة مرتبطة",
   "mobile.workflow.telegram.oneChat": "محادثة واحدة",
+  "mobile.workflow.telegram.chooseChat": "اختيار دردشة",
   "mobile.workflow.telegram.sameChat": "نفس محادثة المشغّل",
   "mobile.workflow.telegram.event": "الحدث",
   "mobile.workflow.telegram.event.mention": "ذُكر OpenBot",
