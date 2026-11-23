@@ -19,6 +19,7 @@ import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import { awaitingReplyEnded } from "@openbot/ui/features/conversation/AwaitingReplies";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
+import type { AgentThreadVoice } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { prefersReducedMotion, usesTouchLayout } from "@openbot/ui/utils";
@@ -916,6 +917,7 @@ export function createConversationViewScope(props: ConversationProps) {
   });
   const messagePins = createMessagePinsStore({ props });
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
+  const [besideFocusRequest, setBesideFocusRequest] = createSignal(0);
   const requestThreadFocus = () => setThreadFocusRequest((current) => current + 1);
   const voice = createVoiceStore({
     props,
@@ -948,19 +950,24 @@ export function createConversationViewScope(props: ConversationProps) {
     },
     thread: {
       openDraftKey: () => threadComposer.openDraftKey(),
+      besideDraftKey,
       appendTranscript: (key, text) => {
         threadComposer.setText(key, appendVoiceTranscript(threadComposer.draft(key).text, text));
-        if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+        requestDraftFocus(key);
       },
       send: async (key) => {
         flush();
         const threads = props.threads;
-        if (!threads || threadComposer.openDraftKey() !== key) return;
+        if (!threads) return;
+        const besideId =
+          key !== threadComposer.openDraftKey() && key === besideDraftKey() ? shownPanelThreadId() : null;
+        const destination = besideId === null ? threads : threads.side.thread(besideId);
+        if (!destination || (besideId === null && threadComposer.openDraftKey() !== key)) return;
         if (threadQueue.editsDraft(key)) {
           await threadComposer.importsEnded(key);
           await threadQueue.save(key);
-        } else await threadComposer.send(threads, threadComposer.draft(key).text.trim());
-        if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+        } else await threadComposer.send(destination, threadComposer.draft(key).text.trim(), key);
+        requestDraftFocus(key);
       },
       reportError: (message) => actionToast.error(message),
       reportLimit: () => toast.warning(currentText().t("composer.voice.limitReached")),
@@ -1017,18 +1024,22 @@ export function createConversationViewScope(props: ConversationProps) {
     event.preventDefault();
     event.stopPropagation();
   };
-  const startThreadVoiceRecording = () => {
-    const key = threadComposer.openDraftKey();
-    if (key !== undefined) void startVoiceRecording(key);
-  };
-  const threadVoiceOwned = () => {
-    const key = threadComposer.openDraftKey();
-    return key !== undefined && voicePhase() !== "idle" && voiceThreadKey() === key;
-  };
+  function besideDraftKey(): string | undefined {
+    const id = activeRightPanel() === "thread" ? shownPanelThreadId() : null;
+    return id === null ? undefined : threadComposer.sideDraftKey(id);
+  }
+  function requestDraftFocus(key: string): void {
+    if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+    else if (besideDraftKey() === key) setBesideFocusRequest((current) => current + 1);
+  }
+  const threadDraftShown = (key: string | undefined) =>
+    key === threadComposer.openDraftKey() || (key !== undefined && key === besideDraftKey());
+  const threadVoiceOwned = (key: string | undefined) =>
+    key !== undefined && voicePhase() !== "idle" && voiceThreadKey() === key;
   createEffect(
-    () => ({ key: threadComposer.openDraftKey(), owner: voiceThreadKey(), recording: voicePhase() === "recording" }),
-    ({ key, owner, recording }) => {
-      if (recording && owner !== key) stopVoiceRecording();
+    () => ({ shown: threadDraftShown(voiceThreadKey()), recording: voicePhase() === "recording" }),
+    ({ shown, recording }) => {
+      if (recording && !shown) stopVoiceRecording();
     },
   );
   const voiceLiveText = () => {
@@ -1040,10 +1051,27 @@ export function createConversationViewScope(props: ConversationProps) {
       ? live.text
       : "";
   };
-  const threadVoiceLiveText = () => {
+  const threadVoiceLiveText = (key: string | undefined) => {
     const live = voiceLiveTranscript();
-    const key = threadComposer.openDraftKey();
     return live && key !== undefined && live.threadKey === key ? live.text : "";
+  };
+  const threadVoice = (key: string | undefined): AgentThreadVoice | undefined => {
+    if (props.runtime) return undefined;
+    const owned = threadVoiceOwned(key);
+    return {
+      phase: owned ? voicePhase() : "idle",
+      blocked: !owned && voicePhase() !== "idle",
+      liveText: threadVoiceLiveText(key),
+      levels: voiceLevels(),
+      elapsedSeconds: voiceElapsedSeconds(),
+      modelProgress: voiceModelProgress(),
+      onStart: () => {
+        if (key !== undefined) void startVoiceRecording(key);
+      },
+      onCancel: cancelVoiceRecording,
+      onFinish: stopVoiceRecording,
+      onSend: stopVoiceRecordingAndSend,
+    };
   };
   const voiceLimitNotice = () => {
     const reached = voiceLimitReached();
@@ -2435,11 +2463,11 @@ export function createConversationViewScope(props: ConversationProps) {
     threadComposer,
     threadQueue,
     threadFocusRequest,
+    besideFocusRequest,
     requestThreadFocus,
     branchThread,
     startNewThread,
-    threadVoiceLiveText,
-    threadVoiceOwned,
+    threadVoice,
     replyJump,
     messagePins,
     voiceConversationAvailable,
@@ -2699,7 +2727,6 @@ export function createConversationViewScope(props: ConversationProps) {
     showComposerActions,
     showScrollToLatest,
     startVoiceRecording,
-    startThreadVoiceRecording,
     stopVoiceRecording,
     stopVoiceRecordingAndSend,
     cancelVoiceRecording,
@@ -2721,6 +2748,7 @@ export function createConversationViewScope(props: ConversationProps) {
     dismissVoiceLimitNotice,
     voiceLiveText,
     voicePhase,
+    voiceThreadKey,
     voiceModelProgress,
   };
 }

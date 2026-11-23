@@ -8,7 +8,7 @@ import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createProjection, Show } from "solid-js";
+import { createEffect, createMemo, createProjection, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
@@ -48,6 +48,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     openTaggedReference,
     threadComposer,
     threadQueue,
+    threadVoice,
+    besideFocusRequest,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
@@ -110,6 +112,11 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     },
   );
   const draftKey = () => threadComposer.sideDraftKey(props.threadId);
+  const shownAt = untrack(besideFocusRequest);
+  const focusRequest = () => {
+    const request = besideFocusRequest();
+    return request > shownAt ? request : undefined;
+  };
   const rowImages = () => {
     const key = draftKey();
     return key ? threadComposer.rowImages(key) : [];
@@ -214,6 +221,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
                 ? void previewAttachment(attachment)
                 : attachmentAction(attachment, "open")
             }
+            voice={threadVoice(draftKey())}
+            focusRequest={focusRequest()}
             mediaSource={view.runtime?.attachmentMedia}
             downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
