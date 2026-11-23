@@ -264,6 +264,10 @@ import {
   withUiBlockAutoAnswers,
 } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
 import {
+  TEAM_UI_BLOCK_LOCATION_CAPABILITY,
+  withUiBlockLocationRequests,
+} from "@openbot/contracts/team-protocol/ui-block-location-v1";
+import {
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   withUiBlockVaultRequests,
 } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
@@ -1560,7 +1564,12 @@ export class TeamApiServer {
       const withVault = capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)
         ? withUiBlockVaultRequests(answered, visible)
         : answered;
-      return capabilities.has(SKILL_LEARNING_CAPABILITY) ? withSkillSuggestionNames(withVault, visible) : withVault;
+      const withLocation = capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)
+        ? withUiBlockLocationRequests(withVault, visible)
+        : withVault;
+      return capabilities.has(SKILL_LEARNING_CAPABILITY)
+        ? withSkillSuggestionNames(withLocation, visible)
+        : withLocation;
     }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
@@ -1847,7 +1856,7 @@ export class TeamApiServer {
           !connection.capabilities.has("hosted-site-event-markers") ||
           event.snapshot.messages.some((message) => !markerSupported(message.itemType, connection.capabilities)))
       ) {
-        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered =
@@ -2390,9 +2399,12 @@ export class TeamApiServer {
     const withVault = route.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)
       ? withUiBlockVaultRequests(answered, effortValue)
       : answered;
-    const body = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
-      ? withSkillSuggestionNames(withVault, effortValue)
+    const withLocation = route.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)
+      ? withUiBlockLocationRequests(withVault, effortValue)
       : withVault;
+    const body = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
+      ? withSkillSuggestionNames(withLocation, effortValue)
+      : withLocation;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -2950,6 +2962,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  TEAM_UI_BLOCK_LOCATION_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
   QUEUE_HOLD_CAPABILITY,
   QUEUE_HOLD_SIGN_IN_CAPABILITY,

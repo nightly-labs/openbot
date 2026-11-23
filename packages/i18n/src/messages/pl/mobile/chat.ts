@@ -761,4 +761,18 @@ export const messages = {
   "mobile.chat.context.noAuto": "Ten agent nie kompaktuje swojego kontekstu.",
   "mobile.chat.context.lastCompaction": "Ostatnie kompaktowanie: {before} → {after} tokenów",
   "mobile.chat.context.unavailable": "Ten czat nie raportuje teraz swojego kontekstu.",
+  "mobile.chat.locationRequest.share": "Udostępnij raz",
+  "mobile.chat.locationRequest.decline": "Nie udostępniaj",
+  "mobile.chat.locationRequest.alwaysAllow": "Zawsze zezwalaj",
+  "mobile.chat.locationRequest.alwaysAllowed":
+    "Ten agent dostaje Twoją lokalizację bez pytania, gdy używasz aplikacji.",
+  "mobile.chat.locationRequest.askEveryTime": "Pytaj za każdym razem",
+  "mobile.chat.locationRequest.locating": "Ustalanie lokalizacji…",
+  "mobile.chat.locationRequest.private": "Bieżąca lokalizacja telefonu trafi do tego agenta jeden raz.",
+  "mobile.chat.locationRequest.shared": "Lokalizacja udostępniona",
+  "mobile.chat.locationRequest.declined": "Nie udostępniono",
+  "mobile.chat.locationRequest.unavailable": "Telefon nie znalazł Twojej lokalizacji. Spróbuj ponownie.",
+  "mobile.chat.locationRequest.deniedTitle": "Dostęp do lokalizacji jest wyłączony",
+  "mobile.chat.locationRequest.denied": "Aby udostępnić lokalizację, pozwól OpenBot jej używać w Ustawieniach.",
+  "mobile.chat.locationRequest.openSettings": "Otwórz Ustawienia",
 } as const satisfies PartialTranslation<typeof source>;

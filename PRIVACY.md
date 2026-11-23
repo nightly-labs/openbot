@@ -130,6 +130,18 @@ When a user selects "Teach a task" and saves the recording, OpenBot sends the ag
 message with the steps in an attached text file: the host, path and title of each page, and the role and name of each control
 that the user clicked. The steps have no query, no typed text and no field value. A discarded
 recording is sent to nobody.
+When a request needs where the user is, an agent can ask for the user's location with a card in the
+chat. Nothing is sent until a person answers the card. On the mobile app, **Share once** reads the
+phone's location (latitude, longitude, accuracy and the time of the measurement) one time, only while
+the app is in use ("While Using the App" permission), and sends it to the server as the answer.
+**Always allow** does the same and saves on that phone that the agent may have it: later cards from
+that agent are answered on the phone without a tap while the app is in use and the chat is open, until
+the person taps **Ask every time**. On a computer, the person can type a place instead. The server
+gives the answer to the agent's provider as the result of the agent's request, so the provider gets it
+and can keep it in its session history. The server does not store the location or the typed place in
+the SQLite database: the card keeps only that the location was shared or not. The agent's reply, which
+can name the place, is stored like any other message. The phone does not store the location, follow it
+in the background, or send it to the account service or analytics.
 Channel history keeps its existing membership and task checks. Messaging history stays within its
 current link. The full conversation stays in local SQLite storage. No history text is sent to the
 account service or analytics by these tools.

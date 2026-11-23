@@ -122,4 +122,8 @@ export const messages = {
   "status.agent.compactionContinues": "Połączenie przerwało się, gdy agent kompaktował kontekst. Agent kontynuuje.",
   "status.agent.providerExitContinues": "Agent zatrzymał się, zanim skończył odpowiedź. Agent kontynuuje.",
   "status.agent.branchTitle": "Odgałęziony czat",
+  "status.agent.location.field": "Twoja lokalizacja",
+  "status.agent.location.placeholder": "Miasto, adres lub miejsce",
+  "status.agent.location.submit": "Udostępnij",
+  "status.agent.location.shared": "Lokalizacja udostępniona",
 } as const satisfies PartialTranslation<typeof source>;

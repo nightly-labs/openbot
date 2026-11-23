@@ -127,4 +127,8 @@ export const messages = {
   "status.agent.providerExitContinues":
     "Der Agent hat aufgehört, bevor seine Antwort fertig war. Der Agent macht weiter.",
   "status.agent.branchTitle": "Abgezweigter Chat",
+  "status.agent.location.field": "Dein Standort",
+  "status.agent.location.placeholder": "Stadt, Adresse oder Ort",
+  "status.agent.location.submit": "Teilen",
+  "status.agent.location.shared": "Standort geteilt",
 } as const satisfies PartialTranslation<typeof source>;

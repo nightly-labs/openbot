@@ -120,4 +120,8 @@ export const messages = {
   "status.agent.compactionContinues": "A conexão parou enquanto o agente compactava o contexto. O agente continua.",
   "status.agent.providerExitContinues": "O agente parou antes de terminar a resposta. O agente continua.",
   "status.agent.branchTitle": "Chat ramificado",
+  "status.agent.location.field": "A sua localização",
+  "status.agent.location.placeholder": "Cidade, morada ou local",
+  "status.agent.location.submit": "Partilhar",
+  "status.agent.location.shared": "Localização partilhada",
 } as const satisfies PartialTranslation<typeof source>;

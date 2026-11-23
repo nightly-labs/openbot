@@ -91,6 +91,7 @@ export function useQuestionPrompt(
     }
 
     return {
+      agentId,
       messageId,
       index: state.index,
       question,

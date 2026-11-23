@@ -126,4 +126,8 @@ export const messages = {
   "status.agent.compactionContinues": "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겼어요. 에이전트가 계속해요.",
   "status.agent.providerExitContinues": "에이전트가 답변을 끝내기 전에 멈췄어요. 에이전트가 계속해요.",
   "status.agent.branchTitle": "분기된 채팅",
+  "status.agent.location.field": "내 위치",
+  "status.agent.location.placeholder": "도시, 주소 또는 장소",
+  "status.agent.location.submit": "공유",
+  "status.agent.location.shared": "위치를 공유했어요",
 } as const satisfies PartialTranslation<typeof source>;

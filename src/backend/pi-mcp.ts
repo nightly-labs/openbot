@@ -39,7 +39,12 @@ const EXTENSION = String.raw`export default function (pi) {
 }
 `;
 
-const PI_SEARCH_ONLY_OPENBOT_TOOLS = ["request_api_key", "suggest_marketplace_app", "show_setting"] as const;
+const PI_SEARCH_ONLY_OPENBOT_TOOLS = [
+  "request_api_key",
+  "request_location",
+  "suggest_marketplace_app",
+  "show_setting",
+] as const;
 
 function serverName(kind: "external" | "local", name: string): string {
   return `openbot_${createHash("sha256").update(`${kind}:${name}`).digest("hex").slice(0, 8)}`;

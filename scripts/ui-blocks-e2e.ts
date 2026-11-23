@@ -19,6 +19,13 @@ import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
 } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import {
+  addUiBlockLocationRequests,
+  encodeSharedLocationAnswer,
+  type SharedLocation,
+  TEAM_UI_BLOCK_LOCATION_CAPABILITY,
+  withUiBlockLocationRequests,
+} from "@openbot/contracts/team-protocol/ui-block-location-v1";
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import {
   addUiBlockVaultRequests,
@@ -51,6 +58,7 @@ import {
 import { Effect } from "effect";
 import { AttentionRegistry, type PromptResponder } from "../src/backend/agent/attention-registry";
 import { ForbiddenAttentionAnswer } from "../src/backend/agent/inactive-attention-request";
+import { locationFormSpec } from "../src/backend/agent/prompts";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { RequestId } from "../src/backend/protocol";
@@ -71,6 +79,11 @@ interface AgentAnswer {
   text?: string;
   preview?: string;
   next?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number | null;
+  capturedAt?: string;
+  place?: string;
 }
 
 class RecordingClient extends CodexAppServerClient {
@@ -148,6 +161,31 @@ function answer(requestId: number, answers: Record<string, string[]>, responder?
 }
 
 const asNewClient = (spec: UiBlockSpec, response: UiBlockResponse) => uiBlockAnswersFromResponse(spec, response);
+
+const PHONE_LOCATION: SharedLocation = {
+  latitude: 37.566535,
+  longitude: 126.977969,
+  accuracyMeters: 35,
+  capturedAt: "2026-11-20T15:40:00.000Z",
+};
+
+function askLocation(turnId: string) {
+  const spec = locationFormSpec("To find restaurants near you");
+  assert(spec, "the location card spec is invalid");
+  const id = nextRequest++;
+  registry.surfaceUiBlock(
+    client,
+    { id, method: "item/tool/call", params: { threadId: THREAD, turnId } },
+    { blockId: `block-${id}`, spec, location: true },
+  );
+  const message = snapshot.messages.find((candidate) => candidate.id === `question-prompt:${turnId}:${id}`);
+  assert.equal(message?.uiBlock?.location, true, "the location marker was not stored");
+  return { id, message };
+}
+
+function storedText(): string {
+  return JSON.stringify({ snapshot, events });
+}
 
 const steps: Array<{ step: string; result: unknown }> = [];
 async function step(name: string, run: () => unknown): Promise<void> {
@@ -227,7 +265,8 @@ const hasUiBlock = (json: string) => json.includes('"uiBlock"');
 function onV1Wire(block: ConversationUiBlock | undefined): ConversationUiBlock | undefined {
   if (!block) return block;
   const { autoAnswer: _autoAnswer, ...state } = block.state;
-  return { ...block, state };
+  const { location: _location, ...wireBlock } = block;
+  return { ...wireBlock, state };
 }
 
 function page(messages: ConversationMessage[], references: Record<string, ConversationMessage> = {}): ConversationPage {
@@ -399,6 +438,45 @@ try {
     assert.deepEqual(client.answers.get(id)?.value, { status: "skipped", blockId: `block-${id}` });
     assert.equal(message.uiBlock?.state.status, "closed");
     assert.equal(message.uiBlock?.state.outcome, undefined);
+  });
+
+  await step("a phone's location reaches the agent once and is never stored", async () => {
+    const { id, message } = askLocation("turn-location-1");
+    await answer(id, { location: [encodeSharedLocationAnswer(PHONE_LOCATION)] }, MEMBER);
+    const value = client.answers.get(id)?.value;
+    assert.equal(client.answers.get(id)?.success, true);
+    assert.equal(value?.status, "shared");
+    assert.deepEqual(
+      [value?.latitude, value?.longitude, value?.accuracyMeters, value?.capturedAt],
+      [PHONE_LOCATION.latitude, PHONE_LOCATION.longitude, PHONE_LOCATION.accuracyMeters, PHONE_LOCATION.capturedAt],
+    );
+    assert.equal(message?.uiBlock?.state.status, "answered");
+    assert.equal(message?.uiBlock?.state.outcome, "Location shared");
+    const stored = storedText();
+    assert.ok(!stored.includes(String(PHONE_LOCATION.latitude)), "the latitude is in the stored conversation");
+    assert.ok(!stored.includes(String(PHONE_LOCATION.longitude)), "the longitude is in the stored conversation");
+    assert.ok(!stored.includes(PHONE_LOCATION.capturedAt), "the capture time is in the stored conversation");
+    return message?.uiBlock?.state;
+  });
+
+  await step("a place typed on a computer reaches the agent as a place and is never stored", async () => {
+    const { id, message } = askLocation("turn-location-2");
+    await answer(id, { location: ["Gangnam Station, Exit 11"] });
+    const value = client.answers.get(id)?.value;
+    assert.equal(value?.status, "shared");
+    assert.equal(value?.place, "Gangnam Station, Exit 11");
+    assert.equal(value?.latitude, undefined);
+    assert.equal(message?.uiBlock?.state.status, "answered");
+    assert.ok(!storedText().includes("Gangnam Station"), "the typed place is in the stored conversation");
+  });
+
+  await step("Don't share declines the location card", async () => {
+    const { id, message } = askLocation("turn-location-3");
+    await answer(id, {}, MEMBER);
+    const value = client.answers.get(id)?.value;
+    assert.equal(value?.status, "declined");
+    assert.equal(message?.uiBlock?.state.status, "closed");
+    assert.equal(message?.uiBlock?.state.outcome, undefined);
   });
 
   await step("a chat message closes the block, and the card says why (#7678)", async () => {
@@ -651,6 +729,54 @@ try {
       { uiBlocks: true },
     );
     assert.ok(event && hasUiBlock(event) && !event.includes('"apiKey"'));
+  });
+
+  const locationPage = page([
+    { ...formMessage, id: "location-1", uiBlock: { ...formMessage.uiBlock, location: true } },
+  ]);
+
+  await step("ui-block-location-v1: a protocol 10 capability only", () => {
+    assert.ok(TEAM_CURRENT_CAPABILITIES.includes(TEAM_UI_BLOCK_LOCATION_CAPABILITY));
+    assert.ok(!teamCapabilitiesForProtocol(9).includes(TEAM_UI_BLOCK_LOCATION_CAPABILITY));
+    assert.ok(teamCapabilitiesForProtocol(10).includes(TEAM_UI_BLOCK_LOCATION_CAPABILITY));
+  });
+
+  await step("ui-blocks-v1 without ui-block-location-v1: the location marker stays off the wire", () => {
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, locationPage, { uiBlocks: true });
+    assert.ok(hasUiBlock(encoded) && !encoded.includes('"location":true'));
+    const event = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: locationPage },
+      { uiBlocks: true },
+    );
+    assert.ok(event && hasUiBlock(event) && !event.includes('"location":true'));
+  });
+
+  await step("ui-block-location-v1: page and event carry the location marker", () => {
+    const encoded = withUiBlockLocationRequests(
+      encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, locationPage, { uiBlocks: true }),
+      locationPage,
+    );
+    const wire = JSON.parse(encoded);
+    const decoded = decodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, wire);
+    assert(decoded && typeof decoded === "object" && !Array.isArray(decoded));
+    addUiBlockLocationRequests(decoded, wire);
+    const [message] = Array.isArray(decoded.messages) ? decoded.messages : [];
+    assert.ok(isConversationMessage(message));
+    assert.equal(message.uiBlock?.location, true);
+
+    const plain = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: locationPage },
+      { uiBlocks: true },
+    );
+    assert.ok(plain);
+    const event = JSON.parse(withUiBlockLocationRequests(plain, { type: "conversation-page", page: locationPage }));
+    const read = decodeTeamProtocolV7BaseCurrentEvent(event);
+    assert(read.kind === "known" && read.event.type === "conversation-page");
+    addUiBlockLocationRequests(read.event, event);
+    assert.equal(read.event.page.messages[0]?.uiBlock?.location, true);
+    const encodedPlain = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, vaultPage, { uiBlocks: true });
+    assert.equal(withUiBlockLocationRequests(encodedPlain, vaultPage), encodedPlain);
+    return { bytes: encoded.length };
   });
 
   await step("ui-block-vault-v1: a body without a Vault request keeps its bytes", () => {

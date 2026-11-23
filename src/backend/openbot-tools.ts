@@ -234,6 +234,12 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const requestLocationToolSchema = z.strictObject({
+  reason: uiTextSchema(UI_BLOCK_LIMITS.title).describe(
+    "Why you need the location, in the user's language, such as To find restaurants near you.",
+  ),
+});
+
 export const saveApiKeyToolSchema = z.strictObject({
   name: apiKeyNameSchema,
   key: z.string().trim().min(1).max(VAULT_API_KEY_LIMIT).describe("The value, as you got it."),
@@ -718,6 +724,16 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "Call list_api_keys first: do not ask again for a saved key. A new answer replaces the saved key. Only the server owner or an admin can answer. Not in an external chat.",
     ].join(" "),
     shape: requestApiKeyToolSchema.shape,
+  },
+  {
+    name: "request_location",
+    description: [
+      "Ask the user for their current location, and wait. Use it only when the request needs where the user is, such as places near them, directions, or local weather or time. The location of this computer is not where the user is.",
+      "The user sees your reason and chooses to share once from their phone, or types a place on a computer.",
+      'Result JSON: {"status":"shared","latitude","longitude","accuracyMeters","capturedAt"} from a phone; {"status":"shared","place"} when the user typed a place; {"status":"declined"}; or {"status":"expired"} when the turn ended first.',
+      "Ask again in a later turn when you need a new location. Do not repeat the coordinates unless the user asks for them, and do not save them to memory or files. Not in an external chat.",
+    ].join(" "),
+    shape: requestLocationToolSchema.shape,
   },
   {
     name: "list_api_keys",

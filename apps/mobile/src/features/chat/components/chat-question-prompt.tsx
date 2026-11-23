@@ -8,6 +8,7 @@ import ChevronRight from "lucide-react-native/icons/chevron-right";
 import X from "lucide-react-native/icons/x";
 import { View } from "react-native";
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
+import { ChatLocationRequest } from "@/features/chat/components/chat-location-request";
 import {
   answeredSelect,
   ChatChoicePrompt,
@@ -20,6 +21,7 @@ import {
 } from "@/features/chat/components/chat-ui-block-cards";
 import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { isLocationRequest } from "@/features/chat/model/location-request";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
@@ -54,6 +56,17 @@ export function ChatQuestionPrompt({
         prompt={prompt}
         uiBlock={uiBlock}
         request={vaultRequest}
+        controller={controller}
+        canSend={canSend}
+        onActivate={onActivate}
+      />
+    );
+  if (uiBlock && isLocationRequest(uiBlock))
+    return (
+      <ChatLocationRequest
+        serverId={serverId}
+        prompt={prompt}
+        uiBlock={uiBlock}
         controller={controller}
         canSend={canSend}
         onActivate={onActivate}

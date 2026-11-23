@@ -121,4 +121,8 @@ export const messages = {
     "La conexión se detuvo mientras el agente compactaba su contexto. El agente continúa.",
   "status.agent.providerExitContinues": "El agente se detuvo antes de terminar su respuesta. El agente continúa.",
   "status.agent.branchTitle": "Chat ramificado",
+  "status.agent.location.field": "Tu ubicación",
+  "status.agent.location.placeholder": "Ciudad, dirección o lugar",
+  "status.agent.location.submit": "Compartir",
+  "status.agent.location.shared": "Ubicación compartida",
 } as const satisfies PartialTranslation<typeof source>;

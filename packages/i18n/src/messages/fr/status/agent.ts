@@ -124,4 +124,8 @@ export const messages = {
     "La connexion s’est interrompue pendant que l’agent compactait son contexte. L’agent continue.",
   "status.agent.providerExitContinues": "L’agent s’est arrêté avant de finir sa réponse. L’agent continue.",
   "status.agent.branchTitle": "Chat dérivé",
+  "status.agent.location.field": "Votre position",
+  "status.agent.location.placeholder": "Ville, adresse ou lieu",
+  "status.agent.location.submit": "Partager",
+  "status.agent.location.shared": "Position partagée",
 } as const satisfies PartialTranslation<typeof source>;
