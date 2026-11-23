@@ -1899,7 +1899,9 @@ export class OpenBotToolRouter {
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
     if (
       isMessagingOutboundCall(params.tool, params.arguments) ||
-      (params.tool === "messaging_history" && !this.#messaging.store.linkForThread(executionThreadId))
+      (params.tool === "messaging_history" &&
+        !this.#messaging.store.linkForThread(executionThreadId) &&
+        !this.#mailbox.turnServesExternalChat(senderAgentId, params.turnId))
     )
       return yield* this.#messaging.outboundTool(
         senderAgentId,
