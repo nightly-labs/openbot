@@ -392,10 +392,11 @@ export class GitHubConnectorService {
       inherited.GH_CONFIG_DIR === undefined
         ? "unset GH_CONFIG_DIR"
         : `GH_CONFIG_DIR=${shellQuote(inherited.GH_CONFIG_DIR)}; export GH_CONFIG_DIR`;
-    const ownGitConfig =
-      inheritedGitConfig === undefined
-        ? "unset GIT_CONFIG_PARAMETERS"
-        : `GIT_CONFIG_PARAMETERS=${shellQuote(inheritedGitConfig)}; export GIT_CONFIG_PARAMETERS`;
+    const ownGitConfig = [
+      `m=$(printf '\\047%s\\047' ${GIT_USE_HTTP_PATH_KEY}=true)`,
+      `case $GIT_CONFIG_PARAMETERS in (*"$m"*) a=\${GIT_CONFIG_PARAMETERS##*"$m"};; (*) a=;; esac`,
+      `a=${shellQuote(inheritedGitConfig ?? "")}$a; GIT_CONFIG_PARAMETERS=\${a# }; export GIT_CONFIG_PARAMETERS`,
+    ].join("; ");
     const helper = [
       '!f() { test "$1" = get || exit 0; p=; s=; h=; u=',
       "while IFS='=' read -r k v; do case $k in (path) p=$v;; (protocol) s=$v;; (host) h=$v;; (username) u=$v;; esac; done",
