@@ -110,7 +110,7 @@ export function AgentDockHost() {
       if (info?.platform !== "linux") return undefined;
       return {
         on: preference().shown && preference().placement === "screen",
-        onWayland: info.aboveAppsSupport !== undefined,
+        onWayland: info.aboveAppsSupport !== undefined && info.aboveAppsSupport !== "no-compositor",
       };
     },
     (state) => {

@@ -19,6 +19,8 @@ interface Xlib {
   openDisplay: (name: null) => unknown;
   closeDisplay: (display: unknown) => number;
   defaultRootWindow: (display: unknown) => number;
+  defaultScreen: (display: unknown) => number;
+  getSelectionOwner: (display: unknown, selection: number) => number;
   internAtom: (display: unknown, name: string, onlyIfExists: number) => number;
   sendEvent: (display: unknown, window: number, propagate: number, mask: number, event: unknown) => number;
 }
@@ -49,12 +51,14 @@ function loadXlibOnce(): Xlib | null {
       openDisplay: library.func("void *XOpenDisplay(const char *name)"),
       closeDisplay: library.func("int XCloseDisplay(void *display)"),
       defaultRootWindow: library.func("unsigned long XDefaultRootWindow(void *display)"),
+      defaultScreen: library.func("int XDefaultScreen(void *display)"),
+      getSelectionOwner: library.func("unsigned long XGetSelectionOwner(void *display, unsigned long selection)"),
       internAtom: library.func("unsigned long XInternAtom(void *display, const char *name, int only_if_exists)"),
       sendEvent: library.func("XSendEvent", "int", ["void *", "unsigned long", "int", "long", koffi.pointer(event)]),
     };
   } catch (error) {
     xlibAfterFirstLoad = null;
-    logger.warn("Unable to load Xlib to focus dock windows:", toLogValue(error));
+    logger.warn("Unable to load Xlib for the dock windows:", toLogValue(error));
   }
   return xlibAfterFirstLoad;
 }
@@ -89,5 +93,23 @@ export function forceActivateX11Window(window: BrowserWindow): void {
     }
   } catch (error) {
     logger.warn("Unable to ask the X11 window manager to focus a dock window:", toLogValue(error));
+  }
+}
+
+export function x11CompositorRunning(): boolean {
+  const x = loadXlibOnce();
+  if (!x) return true;
+  try {
+    const display = x.openDisplay(null);
+    if (!display) return true;
+    try {
+      const selection = x.internAtom(display, `_NET_WM_CM_S${x.defaultScreen(display)}`, 0);
+      return Number(x.getSelectionOwner(display, selection)) !== 0;
+    } finally {
+      x.closeDisplay(display);
+    }
+  } catch (error) {
+    logger.warn("Unable to ask X11 whether a compositor runs:", toLogValue(error));
+    return true;
   }
 }

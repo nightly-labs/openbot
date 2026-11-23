@@ -195,7 +195,10 @@ export function decodeAppInfo(value: unknown): AppInfo {
   if (softwareRendering !== undefined && !isBoolean(softwareRendering))
     throw new Error("Invalid software rendering flag.");
   if (hourCycle !== undefined && !isOneOf(["h12", "h23"] as const, hourCycle)) throw new Error("Invalid hour cycle.");
-  if (aboveAppsSupport !== undefined && !isOneOf(["restart", "unsupported"] as const, aboveAppsSupport))
+  if (
+    aboveAppsSupport !== undefined &&
+    !isOneOf(["restart", "unsupported", "no-compositor"] as const, aboveAppsSupport)
+  )
     throw new Error("Invalid agent dock screen support.");
   if (dynamicIslandUnavailable !== undefined && !isBoolean(dynamicIslandUnavailable))
     throw new Error("Invalid Dynamic Island availability.");
