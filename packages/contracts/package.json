@@ -20,6 +20,7 @@
     "./avatar-images": "./src/avatar-images.ts",
     "./billing": "./src/billing.ts",
     "./billing-details": "./src/billing-details.ts",
+    "./cli-version": "./src/cli-version.ts",
     "./credits": "./src/credits.ts",
     "./credit-media": "./src/credit-media.ts",
     "./license": "./src/license.ts",

@@ -1,3 +1,4 @@
+import { olderVersion } from "@openbot/contracts/cli-version";
 import {
   type AcpRegistryEntry,
   type AcpRegistryInstallInput,
@@ -46,7 +47,6 @@ import {
   type SignInRelayStatus,
   type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
-import { compareReleaseVersions, parseReleaseVersion } from "@openbot/contracts/release-version";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY, ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
@@ -258,14 +258,8 @@ function runsSystemCli(agent: AgentProviderStatus, runtime: ProviderRuntimeStatu
   return (
     runtime.phase === "not-downloaded" &&
     agent.version !== null &&
-    olderThanOffer(agent.version, runtime.availableVersion ?? null)
+    olderVersion(agent.version, runtime.availableVersion ?? "")
   );
-}
-
-function olderThanOffer(version: string, offer: string | null): boolean {
-  const installed = parseReleaseVersion(version);
-  const offered = offer === null ? null : parseReleaseVersion(offer);
-  return installed !== null && offered !== null && compareReleaseVersions(installed, offered) < 0;
 }
 
 export function providerRows(
