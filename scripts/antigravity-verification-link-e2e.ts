@@ -37,6 +37,7 @@ const VALIDATION_LOG = `E 403 retrieveUserQuotaSummary ${JSON.stringify(
   }),
 ).replaceAll("&", "\\\\u0026")}\n`;
 const VERIFY_MESSAGE = "Google must verify your account before Gemini can answer.";
+const STOPPED_MESSAGE = "Gemini stopped because of an error.";
 
 process.env.HOME = home;
 process.env.GEMINI_HOME = join(home, ".gemini");
@@ -75,6 +76,12 @@ function handle(message) {
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Verification required for new devices. Verify your account to raise the limit." } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
+    if (text.includes("STOPPED-TURN")) {
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\\u26A0 Agent execution terminated due to error." } });
+      return write({ id: message.id, result: { stopReason: "end_turn" } });
+    }
+    if (text.includes("RPC-DENIED"))
+      return write({ id: message.id, error: { code: -32603, message: "Internal error: Error 403, Message: The caller does not have permission, Status: PERMISSION_DENIED" } });
     if (text.includes("RPC-VERIFY"))
       return write({ id: message.id, error: { code: -32603, message: "Internal error: Verification required. Please complete verification in your browser to continue." } });
     update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } });
@@ -209,7 +216,12 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-async function runCase(name: string, text: string, needsValidation: boolean): Promise<CaseReport> {
+async function runCase(
+  name: string,
+  text: string,
+  needsValidation: boolean,
+  expectedMessage = VERIFY_MESSAGE,
+): Promise<CaseReport> {
   googleNeedsValidation = needsValidation;
   const agent = await runCauseEffect(
     agents.createAgent({
@@ -245,7 +257,7 @@ async function runCase(name: string, text: string, needsValidation: boolean): Pr
   };
   report.cases.push(result);
   assert.equal(status, "failed", `${name}: the message fails`);
-  assert.ok(result.error?.message.includes(VERIFY_MESSAGE), `${name}: the error asks to verify the account`);
+  assert.ok(result.error?.message.includes(expectedMessage), `${name}: the error says "${expectedMessage}"`);
   return result;
 }
 
@@ -304,6 +316,20 @@ try {
   const rpc = await runCase("JSON-RPC error", "RPC-VERIFY", true);
   assert.equal(rpc.error?.link, GOOGLE_LINK, "A refused prompt also gets the Verify account button.");
   rpc.passed = true;
+
+  const stopped = await runCase("stopped turn, Google needs verification", "STOPPED-TURN", true);
+  assert.equal(stopped.error?.link, GOOGLE_LINK, "A turn that stops with no cause asks Google, then shows the link.");
+  assert.equal(stopped.loadCodeAssistCalls, 1, "A stopped turn asks Google one time.");
+  stopped.passed = true;
+
+  const denied = await runCase("refused prompt with no cause, Google needs verification", "RPC-DENIED", true);
+  assert.equal(denied.error?.link, GOOGLE_LINK, "A prompt refused with no cause also gets the Verify account button.");
+  denied.passed = true;
+
+  const verified = await runCase("stopped turn, account verified", "STOPPED-TURN", false, STOPPED_MESSAGE);
+  assert.equal(verified.error?.link, null, "When Google needs no verification, the stopped turn keeps its message.");
+  assert.equal(verified.loadCodeAssistCalls, 1, "A stopped turn with a verified account asks Google one time.");
+  verified.passed = true;
 
   await mkdir(join(appData, "log"), { recursive: true });
   await writeFile(join(appData, "log", "antigravity.log"), VALIDATION_LOG);

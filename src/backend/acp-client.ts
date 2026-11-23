@@ -4078,11 +4078,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#completeMessage(thread, turn, "final_answer", failureReport);
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
-      if (turn.accountVerification || this.#flavor.sdkHarness?.accountVerification?.test(detail)) {
+      const verification =
+        turn.accountVerification || this.#flavor.sdkHarness?.accountVerification?.test(detail) === true;
+      if (verification) {
         turn.accountLink = (yield* this.#readVerificationLink()) ?? turn.accountLink;
         turn.failureCause ??= "authentication";
       }
-      const message =
+      const shown =
         this.options.savedKeyLimitMessage?.(detail, error) ??
         this.#flavor.turnFailure?.(
           error,
@@ -4097,6 +4099,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           () => this.options.providerRefusalStatus?.(thread.id) ?? null,
         ) ??
         detail;
+      const verificationMessage = verification
+        ? null
+        : (this.#flavor.unexplainedFailureVerification?.(error, detail, shown) ?? null);
+      const verifiedLink = verificationMessage ? yield* this.#readVerificationLink() : null;
+      if (verifiedLink) {
+        turn.accountLink = verifiedLink;
+        turn.failureCause = "authentication";
+      }
+      const message = verifiedLink && verificationMessage ? verificationMessage : shown;
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message, answer);
       this.emit("notification", {
         method: "error",
