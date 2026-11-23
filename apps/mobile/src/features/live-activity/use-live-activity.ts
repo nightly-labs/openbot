@@ -189,6 +189,18 @@ export function useLiveActivity({
     [drawBloub],
   );
 
+  const drawAwayFace = useCallback(
+    (agent: BloubAgent) => {
+      const file = awayFaceFile(agent);
+      if (!file) return;
+      void drawBloub(agent, AWAY_COLOR_MOOD).then(() => {
+        const written = avatars.current.get(file);
+        if (written) setPhotos((current) => (current[file] === written ? current : { ...current, [file]: written }));
+      });
+    },
+    [drawBloub],
+  );
+
   const publish = useCallback(
     (force = false) => {
       if (timer.current) clearTimeout(timer.current);
@@ -212,7 +224,7 @@ export function useLiveActivity({
       const props = liveActivityView(presentation, {
         t: currentText().t,
         agentColor: (agent) =>
-          avatarHeadColor(agent.avatarSeed, agent.avatarHue, agentAvatarColor(presentation.serverId, agent.id)),
+          avatarHeadColor(agent.avatarSeed, agent.avatarHue, agentAvatarColor(presentation.serverId, agent)),
         avatar,
         unreadAgents: agentsRef.current
           .filter(
@@ -252,16 +264,18 @@ export function useLiveActivity({
         return working ? sideThreadOfTurnRef.current(presentation.serverId, working.agentId, working.turnId) : null;
       }
 
-      function agentAvatarColor(serverId: string, agentId: string): AvatarColor | null {
-        return (
-          agentsRef.current.find((agent) => agent.serverId === serverId && agent.id === agentId)?.avatarColor ?? null
-        );
+      function agentAvatarColor(serverId: string, shown: DynamicIslandAgentIdentity): AvatarColor | null {
+        const known = agentsRef.current.find((agent) => agent.serverId === serverId && agent.id === shown.id);
+        return known?.avatarColor ?? shown.avatarColor ?? null;
       }
 
       function avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string {
         if (!live) return "";
-        const colored = { ...agent, avatarColor: agentAvatarColor(serverId, agent.id) };
-        if (!agent.avatarUrl) return bloubFile(colored, mood);
+        const colored = { ...agent, avatarColor: agentAvatarColor(serverId, agent) };
+        if (!agent.avatarUrl) {
+          drawAwayFace(colored);
+          return bloubFile(colored, mood);
+        }
         const name = photoName(serverId, agent.id, agent.avatarUrl);
         const saved = avatars.current.get(name);
         if (saved) return saved;
@@ -269,7 +283,7 @@ export function useLiveActivity({
         return bloubFile(colored, mood);
       }
     },
-    [live, liveState, syncFor, bloubFile, keepAvatars],
+    [live, liveState, syncFor, bloubFile, drawAwayFace, keepAvatars],
   );
   publishRef.current = () => {
     if (!foregroundRef.current) publish();
@@ -510,11 +524,10 @@ export function useLiveActivity({
       let drawn = 0;
       for (const agent of serverAgents) {
         if (agent.avatarUrl) loadPhotoRef.current(pushServerId, agent.id, agent.avatarUrl);
-        else if (agent.avatarColor) await drawBloub(agent, AWAY_COLOR_MOOD);
+        else drawAwayFace(agent);
         for (const mood of LIVE_ACTIVITY_MOODS) {
-          if (avatars.current.has(liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood, agent.avatarColor)))
-            continue;
-          await drawBloub(agent, mood);
+          if (avatars.current.has(liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood))) continue;
+          await drawBloub({ avatarSeed: agent.avatarSeed, avatarHue: agent.avatarHue }, mood);
           drawn += 1;
           if (drawn % BLOUBS_PER_PAUSE === 0) await new Promise((resolve) => setTimeout(resolve, 0));
           if (cancelled) return;
@@ -529,12 +542,11 @@ export function useLiveActivity({
         locale: currentLocale(),
         away: !foreground,
         photos: serverAgents.flatMap((agent) => {
+          const awayFace = awayFaceFile(agent);
           const file = agent.avatarUrl
             ? photos[photoName(pushServerId, agent.id, agent.avatarUrl)]
-            : agent.avatarColor
-              ? avatars.current.get(
-                  liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, AWAY_COLOR_MOOD, agent.avatarColor),
-                )
+            : awayFace
+              ? photos[awayFace]
               : undefined;
           return file ? [{ agentId: agent.id, file }] : [];
         }),
@@ -567,6 +579,7 @@ export function useLiveActivity({
     photos,
     post,
     drawBloub,
+    drawAwayFace,
     keepAvatars,
     enqueueRegistration,
   ]);
@@ -652,6 +665,12 @@ function performAction(
         decision: action.decision,
       });
   }
+}
+
+function awayFaceFile(agent: BloubAgent): string | null {
+  return agent.avatarColor
+    ? liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, AWAY_COLOR_MOOD, agent.avatarColor)
+    : null;
 }
 
 function photoName(serverId: string, agentId: string, avatarUrl: string): string {
