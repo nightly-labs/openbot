@@ -684,9 +684,9 @@ function DrawerServerTools({
   const available = layout.order.filter((id) => tools[id] !== null);
   const shown = available.filter((id) => !layout.hidden.includes(id));
   const onToolAction = useCallback(
-    (action: string, toolId: DrawerToolId | null) => {
+    (action: string, toolId: DrawerToolId) => {
       if (action === "editSidebar") onEdit();
-      if (action === "unpin" && toolId) {
+      if (action === "unpin") {
         void haptics.selection();
         setDrawerToolPinned(toolId, false);
       }
@@ -766,22 +766,21 @@ const DrawerToolRow = memo(function DrawerToolRow({
   onAction,
   ...row
 }: DrawerRowProps & {
-  toolId: DrawerToolId | null;
+  toolId: DrawerToolId;
   width?: number;
-  onAction?: (action: string, toolId: DrawerToolId | null) => void;
+  onAction: (action: string, toolId: DrawerToolId) => void;
 }) {
   const { t } = useText();
   const { theme } = useUniwind();
   const menu = useRef<MenuComponentRef | null>(null);
-  if (!onAction) return <DrawerRow {...row} />;
   const items = [
     { name: "editSidebar", label: t("mobile.server.drawer.editSidebar") },
-    ...(toolId ? [{ name: "unpin", label: t("mobile.server.drawer.unpinTool") }] : []),
+    { name: "unpin", label: t("mobile.server.drawer.unpinTool") },
   ];
   const actions: MenuAction[] = [
     { id: "editSidebar", title: t("mobile.server.drawer.editSidebar"), image: "arrow.up.arrow.down" },
+    { id: "unpin", title: t("mobile.server.drawer.unpinTool"), image: "pin.slash" },
   ];
-  if (toolId) actions.push({ id: "unpin", title: t("mobile.server.drawer.unpinTool"), image: "pin.slash" });
   return (
     <View style={{ height: DRAWER_ROW_HEIGHT }}>
       <MenuView
@@ -945,7 +944,6 @@ interface DrawerRowProps {
   value?: string | null;
   accentValue?: boolean;
   href: Href;
-  disabled?: boolean;
   unavailable?: boolean;
   onNavigate: (href: Href) => void;
 }
@@ -956,7 +954,6 @@ const DrawerRow = memo(function DrawerRow({
   value,
   accentValue = false,
   href,
-  disabled = false,
   unavailable = false,
   onNavigate,
   width,
@@ -976,9 +973,9 @@ const DrawerRow = memo(function DrawerRow({
       accessibilityLabel={value ? `${label}, ${value}` : label}
       accessibilityActions={accessibilityActions}
       onAccessibilityAction={(event) => onAccessibilityAction?.(event.nativeEvent.actionName)}
-      accessibilityState={{ disabled: disabled || unavailable }}
+      accessibilityState={{ disabled: unavailable }}
       className="flex-row items-center gap-3 rounded-2xl px-3"
-      disabled={disabled || unavailable}
+      disabled={unavailable}
       style={({ pressed }) => ({
         height: DRAWER_ROW_HEIGHT,
         width,

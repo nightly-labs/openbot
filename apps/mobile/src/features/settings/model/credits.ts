@@ -64,6 +64,11 @@ export function useMoveCredits() {
     },
     onSuccess: (state) => {
       queryClient.setQueryData(queryKeys.credits(queryScope), state);
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.credits(queryScope) });
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.creditActivity(queryScope) });
     },
   });

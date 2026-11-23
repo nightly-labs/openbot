@@ -95,8 +95,6 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.credits.activity.minus": "−{amount}",
   "mobile.settings.credits.footer": "Agents and workflows use credits to make pictures and videos.",
   "mobile.settings.credits.steps.title": "How credits work",
-  "mobile.settings.credits.steps.buy": "Buy credits",
-  "mobile.settings.credits.steps.buyDetail": "In OpenBot on your computer",
   "mobile.settings.credits.steps.move": "Move credits to a server",
   "mobile.settings.credits.steps.moveDetail": "The agents on that server can then use them",
   "mobile.settings.credits.steps.use": "Agents make pictures and videos",

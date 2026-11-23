@@ -35,7 +35,6 @@ const ROLE_TEXT = {
 } as const satisfies Record<CreditServerRole, MobileTextKey>;
 
 const STEPS = [
-  { title: "mobile.settings.credits.steps.buy", detail: "mobile.settings.credits.steps.buyDetail" },
   { title: "mobile.settings.credits.steps.move", detail: "mobile.settings.credits.steps.moveDetail" },
   { title: "mobile.settings.credits.steps.use", detail: "mobile.settings.credits.steps.useDetail" },
 ] as const satisfies readonly { title: MobileTextKey; detail: MobileTextKey }[];
