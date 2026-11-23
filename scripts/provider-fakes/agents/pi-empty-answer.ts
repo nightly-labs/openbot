@@ -74,6 +74,10 @@ const handlers: Record<string, (command: RpcRecord) => void> = {
   prompt: (command) => {
     const text = String(command.message ?? "");
     log({ event: "prompt", text });
+    if (text.startsWith("/")) {
+      answer(command, { disposition: "handled" });
+      return;
+    }
     answer(command, { disposition: "started" });
     turn(text);
   },

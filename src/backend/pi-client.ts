@@ -860,7 +860,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           }),
         ),
         Effect.flatMap((response) =>
-          response.disposition === "handled" && thread.turn === turn ? this.#finish(thread, "completed") : Effect.void,
+          response.disposition === "handled" && thread.turn === turn
+            ? this.#finish(thread, "completed", undefined, undefined, true)
+            : Effect.void,
         ),
         Effect.catch(fail),
       ),
@@ -1090,6 +1092,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     status: string,
     failure?: string,
     causeCode?: CauseCode,
+    handledCommand = false,
   ) {
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
@@ -1138,7 +1141,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       if (Exit.isFailure(saved)) status = "failed";
     }
     if (thread.turn === turn) thread.turn = null;
-    this.#notify("turn/completed", thread, { turn: { id: turn.id, status } });
+    this.#notify("turn/completed", thread, {
+      turn: { id: turn.id, status, ...(handledCommand ? { handledCommand } : {}) },
+    });
     this.#background(this.#markIdle(thread));
   });
 

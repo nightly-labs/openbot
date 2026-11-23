@@ -1442,7 +1442,10 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         const reported = getString(turn, "status") ?? "completed";
-        const noAnswer = reported === "completed" && this.#holdNoAnswer(agentId, threadId, turnId, source);
+        const noAnswer =
+          reported === "completed" &&
+          turn?.handledCommand !== true &&
+          this.#holdNoAnswer(agentId, threadId, turnId, source);
         const status =
           ((reported === "failed" && this.#quietEmptyAnswers.has(turnId)) ||
             (reported === "interrupted" && this.#quietStops.has(turnId))) &&

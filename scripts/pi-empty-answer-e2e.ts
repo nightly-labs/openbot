@@ -243,6 +243,7 @@ try {
   expect("an empty turn", await runCase("EMPTY-TURN"), "failed", [NO_ANSWER]);
   expect("reasoning and no answer", await runCase("REASONING-ONLY"), "failed", [NO_ANSWER]);
   expect("a step and no answer", await runCase("STEP-THEN-EMPTY"), "completed", [NO_ANSWER_AFTER_STEPS]);
+  expect("a command that Pi handles", await runCase("/reload"), "completed", []);
   report.passed = report.failures.length === 0;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
