@@ -1,4 +1,4 @@
-import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, agentProviderName, KEY_ONLY_PROVIDERS } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -947,7 +947,7 @@ export class TurnLifecycle {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
       return false;
     }
-    if (source.provider !== "codex" && source.provider !== "claude") return false;
+    if (!NO_ANSWER_CHECKED_PROVIDERS.has(source.provider)) return false;
     if (deliveries.every(({ delivery }) => this.#mailbox.answersHandledRequest(delivery.id))) {
       logger.info("A turn for another teammate result to a handled request ended quietly.", {
         agentId,
@@ -3539,6 +3539,13 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown;
   if (item.failureReport === true) return false;
   return item.phase !== "commentary" && hasText(item);
 }
+
+const NO_ANSWER_CHECKED_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
+  "codex",
+  "claude",
+  "pi",
+  ...KEY_ONLY_PROVIDERS,
+]);
 
 const NARRATION_KEEPING_TOOLS = new Set([
   "messaging_history",
