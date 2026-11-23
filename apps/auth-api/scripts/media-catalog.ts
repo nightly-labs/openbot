@@ -17,6 +17,7 @@ import {
   creditUnitRate,
 } from "@openbot/contracts/credits";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { ROUTER_MEDIA_UPSTREAM } from "../src/server/media-upstream";
 
 const AUTH_API_ROOT = resolve(import.meta.dirname, "..");
 const WRANGLER = join(AUTH_API_ROOT, "..", "..", "node_modules", ".bin", "wrangler");
@@ -422,6 +423,10 @@ function seedModels(upstream: readonly UpstreamModel[]): { models: SeedModel[]; 
   return { models, skipped };
 }
 
+function routerOnly(column: "upstream_id" | "upstream_params"): string {
+  return `CASE WHEN credit_media_models.upstream = ${sql(ROUTER_MEDIA_UPSTREAM)} THEN excluded.${column} ELSE credit_media_models.${column} END`;
+}
+
 function seedStatements(models: readonly SeedModel[], reprice: boolean, now: number): string[] {
   return models.flatMap((model) => {
     const unit = model.kind === "image" ? "item" : "second";
@@ -431,9 +436,9 @@ function seedStatements(models: readonly SeedModel[], reprice: boolean, now: num
     return [
       `INSERT INTO credit_media_models(model_id, upstream_id, kind, name, maker, variant, position, enabled, specs, upstream_params, updated_at)
        VALUES (${sql(model.id)}, ${sql(model.upstreamId)}, ${sql(model.kind)}, ${sql(model.name)}, ${sql(model.maker)}, ${sql(model.variant)}, ${model.position}, 0, ${sql(JSON.stringify(model.specs))}, ${sql(JSON.stringify(model.params))}, ${now})
-       ON CONFLICT(model_id) DO UPDATE SET upstream_id = excluded.upstream_id, kind = excluded.kind, name = excluded.name,
+       ON CONFLICT(model_id) DO UPDATE SET upstream_id = ${routerOnly("upstream_id")}, kind = excluded.kind, name = excluded.name,
          maker = excluded.maker, variant = excluded.variant, position = excluded.position, specs = excluded.specs,
-         upstream_params = excluded.upstream_params, updated_at = excluded.updated_at;`,
+         upstream_params = ${routerOnly("upstream_params")}, updated_at = excluded.updated_at;`,
       ...(reprice ? [`DELETE FROM credit_media_prices WHERE model_id = ${sql(model.id)};`] : []),
       ...model.prices.map(
         (price) =>
