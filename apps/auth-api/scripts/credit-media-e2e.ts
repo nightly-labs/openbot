@@ -1351,6 +1351,34 @@ async function tasksUpstreamFlow() {
     { unroutedFirst, unroutedRetry, body: unroutedSubmit?.body, newJob },
   );
 
+  switchAll(ROUTER_MEDIA_UPSTREAM);
+  const narrowedReply = submission("video-one", { resolution: "1080p", duration: 10 });
+  router.setSubmitStatus(502);
+  const narrowedFirst = await failure(both.submit(owner, OWNER, narrowedReply));
+  router.setSubmitStatus(200);
+  addRoute(
+    "video-one",
+    TASKS_MEDIA_UPSTREAM,
+    "tasks-video-1",
+    {},
+    { resolutions: ["720p"], defaultResolution: "720p", durations: [5], defaultDuration: 5 },
+  );
+  switchAll(TASKS_MEDIA_UPSTREAM);
+  const narrowedRetry = await run(both.submit(owner, OWNER, narrowedReply));
+  const narrowedSubmit = router.submits.at(-1);
+  const narrowedNew = await failure(
+    both.submit(owner, OWNER, submission("video-one", { resolution: "1080p", duration: 10 })),
+  );
+  check(
+    "a retry of a job pinned before the switch is checked against the pinned route, not a new route that narrows the options",
+    narrowedFirst.code === "media_busy" &&
+      narrowedRetry.status === "queued" &&
+      narrowedSubmit?.idempotencyKey === narrowedReply.request.jobId &&
+      narrowedSubmit.body.model === "up-video-1" &&
+      narrowedNew.code === "media_request_invalid",
+    { narrowedFirst, narrowedRetry, body: narrowedSubmit?.body, narrowedNew },
+  );
+
   check(
     "logs never show the new upstream's key or address",
     logs.every((line) => !line.includes(TASKS_KEY) && !line.includes("tasks.test")),

@@ -186,6 +186,10 @@ function owns(payer: CreditMediaPayer, hold: CreditHold): boolean {
     : hold.serverId === payer.serverId && hold.userId === null;
 }
 
+function resumable(hold: CreditHold | null): boolean {
+  return hold !== null && (hold.status !== "held" || hold.providerJobId !== null || hold.upstream !== null);
+}
+
 function failureOf(outcome: CreditHoldOutcome | null): CreditMediaFailure {
   if (outcome === "refused" || outcome === "canceled" || outcome === "expired") return outcome;
   return "failed";
@@ -339,7 +343,7 @@ export class CreditMediaService {
     );
   }
 
-  #models(modelId: string | null): Effect.Effect<StoredModel[], Failure> {
+  #models(modelId: string | null, pinnedUpstream: string | null = null): Effect.Effect<StoredModel[], Failure> {
     return billingCall(() =>
       this.#database
         .prepare(
@@ -348,11 +352,11 @@ export class CreditMediaService {
              FROM credit_media_models m
              JOIN credit_media_prices p ON p.model_id = m.model_id
              LEFT JOIN credit_media_routes r ON r.model_id = m.model_id
-              AND r.upstream = COALESCE((SELECT upstream FROM credit_media_settings WHERE id = 1), ?2)
+              AND r.upstream = COALESCE(?3, (SELECT upstream FROM credit_media_settings WHERE id = 1), ?2)
             WHERE m.enabled = 1 AND (?1 IS NULL OR m.model_id = ?1)
             ORDER BY m.kind, m.position, m.model_id, p.resolution`,
         )
-        .bind(modelId, ROUTER_MEDIA_UPSTREAM)
+        .bind(modelId, ROUTER_MEDIA_UPSTREAM, pinnedUpstream)
         .all<ModelRow>(),
     ).pipe(Effect.map((result) => storedModels(result.results)));
   }
@@ -447,10 +451,11 @@ export class CreditMediaService {
   ): Effect.fn.Return<CreditMediaJob, Failure> {
     if (this.#upstreams.size === 0) return yield* unavailable();
     const { request } = submission;
-    const stored = (yield* this.#models(request.model))[0];
+    const earlier = yield* this.#ownedHold(payer, request.jobId);
+    const stored = (yield* this.#models(request.model, earlier?.upstream ?? null))[0];
     if (!stored) return yield* modelUnavailable();
     if (stored.route) yield* this.#upstreamOrFail(stored.route.upstream);
-    else if (!(yield* this.#resumable(payer, request.jobId))) return yield* modelUnavailable();
+    else if (!resumable(earlier)) return yield* modelUnavailable();
     if (creditMediaRequestProblem(stored.model, request) || inputsProblem(stored.model, submission.inputs))
       return yield* invalidRequest();
     const credits = creditMediaCost(stored.model, request);
@@ -498,17 +503,8 @@ export class CreditMediaService {
     return this.#view(started, job.status, job.pollAfterSeconds, []);
   }).bind(this);
 
-  #resumable(payer: CreditMediaPayer, jobId: string): Effect.Effect<boolean, Failure> {
-    return this.#spending
-      .find(jobId)
-      .pipe(
-        Effect.map(
-          (hold) =>
-            hold !== null &&
-            owns(payer, hold) &&
-            (hold.status !== "held" || hold.providerJobId !== null || hold.upstream !== null),
-        ),
-      );
+  #ownedHold(payer: CreditMediaPayer, jobId: string): Effect.Effect<CreditHold | null, Failure> {
+    return this.#spending.find(jobId).pipe(Effect.map((hold) => (hold !== null && owns(payer, hold) ? hold : null)));
   }
 
   #artifacts(
