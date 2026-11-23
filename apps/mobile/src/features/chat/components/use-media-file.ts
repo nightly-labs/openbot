@@ -1,6 +1,6 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { useQuery } from "@tanstack/react-query";
+import { hashKey, type QueryClient, type QueryKey, useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { useMemo } from "react";
 import { create } from "zustand";
@@ -59,28 +59,25 @@ export function writeMediaFile(file: File, base64: string): Promise<void> {
   return write;
 }
 
-export function createSharedDownloads<T>() {
-  const running = new Map<string, (reader: AbortSignal) => Promise<T>>();
-  return (key: string, reader: AbortSignal, start: (wanted: () => boolean) => Promise<T>): Promise<T> => {
-    let join = running.get(key);
-    if (!join) {
-      let readers = 0;
-      const result = start(() => readers > 0).finally(() => running.delete(key));
-      join = (signal) => {
-        if (signal.aborted) return result;
-        readers += 1;
-        signal.addEventListener("abort", () => {
-          readers -= 1;
-        });
-        return result;
-      };
-      running.set(key, join);
-    }
-    return join(reader);
-  };
+const requestedFiles = new Map<string, number>();
+
+export async function requestFile<T>(queryKey: QueryKey, fetch: () => Promise<T>): Promise<T> {
+  const key = hashKey(queryKey);
+  requestedFiles.set(key, (requestedFiles.get(key) ?? 0) + 1);
+  try {
+    return await fetch();
+  } finally {
+    const left = (requestedFiles.get(key) ?? 1) - 1;
+    if (left > 0) requestedFiles.set(key, left);
+    else requestedFiles.delete(key);
+  }
 }
 
-const sharedMediaFiles = createSharedDownloads<string>();
+export function fileWanted(client: QueryClient, queryKey: QueryKey): () => boolean {
+  return () =>
+    requestedFiles.has(hashKey(queryKey)) ||
+    (client.getQueryCache().find({ queryKey, exact: true })?.getObserversCount() ?? 0) > 0;
+}
 
 const useDownloadedBytes = create<{ bytes: ReadonlyMap<string, number> }>(() => ({ bytes: new Map() }));
 
@@ -111,49 +108,46 @@ export function useMediaDownloads(serverId: string, attachments: readonly Attach
 
 export function useMediaFile(serverId: string, attachment: AttachmentSummary, enabled: boolean) {
   const { downloadAttachment } = useMobileWorkspaceActions();
-  async function downloadMediaFile(file: File, wanted: () => boolean) {
-    const key = downloadKey(serverId, attachment.id);
-    const started = Date.now();
-    let arrived: number | null = null;
-    try {
-      const progress =
-        attachment.size > 0
-          ? {
-              size: attachment.size,
-              onProgress: (received: number, total: number) => {
-                if (received >= total) arrived ??= Date.now();
-                setDownloadedBytes(key, received);
-              },
-            }
-          : undefined;
-      file.parentDirectory.create({ intermediates: true, idempotent: true });
-      const data = await downloadAttachment(
-        serverId,
-        attachment.id,
-        largeDownloadOf(attachment, file.uri),
-        progress,
-        wanted,
-      );
-      const handedOver = Date.now();
-      if (!data.file) await writeMediaFile(file, data.base64);
-      const bytesMs = (arrived ?? handedOver) - started;
-      supportLog.add(
-        "info",
-        "connection",
-        `Attachment of ${attachment.size} bytes: bytes ${bytesMs} ms, hand-over ${handedOver - (arrived ?? handedOver)} ms, write ${Date.now() - handedOver} ms`,
-      );
-      return file.uri;
-    } finally {
-      setDownloadedBytes(key, null);
-    }
-  }
   return useQuery({
     enabled,
     queryKey: queryKeys.chatMediaFile(serverId, attachment.id),
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ client, queryKey }) => {
       const file = mediaFile(serverId, attachment);
       if (file.exists && file.size === attachment.size) return file.uri;
-      return sharedMediaFiles(file.uri, signal, (wanted) => downloadMediaFile(file, wanted));
+      const key = downloadKey(serverId, attachment.id);
+      const started = Date.now();
+      let arrived: number | null = null;
+      try {
+        const progress =
+          attachment.size > 0
+            ? {
+                size: attachment.size,
+                onProgress: (received: number, total: number) => {
+                  if (received >= total) arrived ??= Date.now();
+                  setDownloadedBytes(key, received);
+                },
+              }
+            : undefined;
+        file.parentDirectory.create({ intermediates: true, idempotent: true });
+        const data = await downloadAttachment(
+          serverId,
+          attachment.id,
+          largeDownloadOf(attachment, file.uri),
+          progress,
+          fileWanted(client, queryKey),
+        );
+        const handedOver = Date.now();
+        if (!data.file) await writeMediaFile(file, data.base64);
+        const bytesMs = (arrived ?? handedOver) - started;
+        supportLog.add(
+          "info",
+          "connection",
+          `Attachment of ${attachment.size} bytes: bytes ${bytesMs} ms, hand-over ${handedOver - (arrived ?? handedOver)} ms, write ${Date.now() - handedOver} ms`,
+        );
+        return file.uri;
+      } finally {
+        setDownloadedBytes(key, null);
+      }
     },
     retry: false,
     staleTime: Infinity,

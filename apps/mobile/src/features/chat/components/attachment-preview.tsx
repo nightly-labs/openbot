@@ -27,7 +27,7 @@ import {
 } from "../model/large-files";
 import { shareTypeOptions } from "../model/share-file-type";
 import { shareFilesNative } from "../model/share-files-native";
-import { createSharedDownloads, mediaFile, writeMediaFile } from "./use-media-file";
+import { fileWanted, mediaFile, requestFile, writeMediaFile } from "./use-media-file";
 
 const dimensionCache = createImageDimensionCache({
   read: () => {
@@ -219,29 +219,6 @@ async function copyImageData(data: RemoteFileUpload & { fileUri?: string }) {
 
 type DownloadAttachment = ReturnType<typeof useMobileWorkspaceActions>["downloadAttachment"];
 
-type AttachmentFile = RemoteFileUpload & { localUri?: string; fileUri?: string };
-
-const sharedAttachmentFiles = createSharedDownloads<AttachmentFile>();
-
-async function downloadAttachmentFile(
-  serverId: string,
-  attachment: AttachmentSummary,
-  downloadAttachment: DownloadAttachment,
-  wanted: () => boolean,
-): Promise<AttachmentFile> {
-  const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
-  const data = await downloadAttachment(
-    serverId,
-    attachment.id,
-    largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
-    undefined,
-    wanted,
-  );
-  if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
-  const fileUri = large || data.mimeType.startsWith("image/") ? await keepFile(serverId, attachment, data) : undefined;
-  return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };
-}
-
 function attachmentFileQuery(
   serverId: string,
   attachment: AttachmentSummary,
@@ -250,13 +227,22 @@ function attachmentFileQuery(
 ) {
   return queryOptions({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
-    queryFn: async ({ signal }): Promise<AttachmentFile> => {
+    queryFn: async ({ client, queryKey }): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
       if (attachment.size > MOBILE_LARGE_FILE_BYTES) throw new Error(tooLarge);
       const kept = keptFile(serverId, attachment);
       if (kept) return kept;
-      return sharedAttachmentFiles(`${serverId}\n${attachment.id}`, signal, (wanted) =>
-        downloadAttachmentFile(serverId, attachment, downloadAttachment, wanted),
+      const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
+      const data = await downloadAttachment(
+        serverId,
+        attachment.id,
+        largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
+        undefined,
+        fileWanted(client, queryKey),
       );
+      if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
+      const fileUri =
+        large || data.mimeType.startsWith("image/") ? await keepFile(serverId, attachment, data) : undefined;
+      return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };
     },
     retry: false,
     staleTime: Infinity,
@@ -294,6 +280,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     ),
     enabled: preview && download === "download" && !local && !pending,
   });
+  const fetchFile = () => requestFile(queryKeys.chatAttachment(serverId, attachment.id), () => query.refetch());
   const data = query.data;
   const dimensions = useMemo(() => {
     const known = dimensionCache.get(attachment.id);
@@ -311,7 +298,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     let file: File | null = null;
     try {
       if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-      const result = query.data ? { data: query.data, error: null } : await query.refetch();
+      const result = query.data ? { data: query.data, error: null } : await fetchFile();
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       const name = safeFileName(attachment.name);
@@ -337,7 +324,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       if (!MediaLibrary) throw new Error(t("mobile.chat.attachment.photosNeedUpdate"));
       if (!(await MediaLibrary.requestPermissionsAsync(true, ["photo"])).granted)
         throw new Error(t("mobile.chat.attachment.photosPermission"));
-      const result = query.data ? { data: query.data, error: null } : await query.refetch();
+      const result = query.data ? { data: query.data, error: null } : await fetchFile();
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
       const extension = imageExtension(attachment, result.data.mimeType);
@@ -357,7 +344,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     requestLargeFile(serverId, attachment.id);
     setSharing(true);
     try {
-      const result = query.data ? { data: query.data, error: null } : await query.refetch();
+      const result = query.data ? { data: query.data, error: null } : await fetchFile();
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
       await copyImageData(result.data);
@@ -390,12 +377,14 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
   const { t } = text;
   const [busy, setBusy] = useState(false);
   const load = (attachment: AttachmentSummary) =>
-    queryClient.fetchQuery(
-      attachmentFileQuery(
-        serverId,
-        attachment,
-        downloadAttachment,
-        t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+    requestFile(queryKeys.chatAttachment(serverId, attachment.id), () =>
+      queryClient.fetchQuery(
+        attachmentFileQuery(
+          serverId,
+          attachment,
+          downloadAttachment,
+          t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+        ),
       ),
     );
   const fail = (error: unknown, title: string) => showFileFailure(error, title, text);
