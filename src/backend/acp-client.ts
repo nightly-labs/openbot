@@ -2699,8 +2699,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (turn.signInLost)
         yield* this.#endAgentProcess(sourceText("error.provider.acpSignInLost", { provider: this.#label }));
     } catch (error) {
-      // A session's own process that ended names how it ended, as the agent's process does. A session
-      // on the agent's process, as each Cursor session, says only that the process stopped (#7185).
       const transport = thread.transport;
       const serverLost = !turn.stopped && !transport && this.#flavor.serverLost?.(error) === true;
       const failure = turn.stopped
