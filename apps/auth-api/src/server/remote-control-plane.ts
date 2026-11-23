@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/host-key-handover";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { isAvatarColor } from "@openbot/contracts/ipc";
+import { isSignalHomeId } from "@openbot/contracts/ipc-host-signal-home";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
@@ -338,7 +339,6 @@ interface RemoteSignalHome {
   url: string;
 }
 
-const SIGNAL_HOME_ID_PATTERN = /^[a-z0-9-]{1,32}$/u;
 const SIGNAL_COUNTRY_PATTERN = /^[A-Z][A-Z0-9]$/u;
 const NEAR_SIGNAL_HOME_MARGIN_KM = 1_000;
 const EARTH_RADIUS_KM = 6_371;
@@ -3700,7 +3700,7 @@ export function remoteSignalPlan(
     const id = entry.slice(0, separator).trim();
     const url = entry.slice(separator + 1).trim();
     const protocol = urlProtocol(url);
-    if (!SIGNAL_HOME_ID_PATTERN.test(id) || homes.has(id)) return null;
+    if (!isSignalHomeId(id) || homes.has(id)) return null;
     if (protocol !== "wss:" && !(permitsWs && protocol === "ws:")) return null;
     homes.set(id, url);
   }
