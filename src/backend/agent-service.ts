@@ -279,7 +279,7 @@ import { isBalanceDiagnostic, isPlanLimitDiagnostic, providerResetDelayMs } from
 import { type AgentClientFactory, ProviderRuntime, toProviderOperationFailed } from "./agent/provider-runtime";
 import { ProviderSignInWaits } from "./agent/provider-sign-in-waits";
 import { QueueControls } from "./agent/queue-controls";
-import { quietRoutineRun } from "./agent/routine-quiet-runs";
+import { quietRoutineRun, quietTeammateDelivery, quietTeammateTurnDelivery } from "./agent/routine-quiet-runs";
 import { type RoutineMutationOptions, RoutineScheduler, toRoutineOperationFailed } from "./agent/routine-scheduler";
 import { localTimezone } from "./agent/routine-tools";
 import { buildRuntimeSnapshot } from "./agent/runtime-snapshot";
@@ -6982,9 +6982,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const task = taskId === null ? null : this.#runningTask(recipientAgentId, taskId);
     const snapshot = taskId === null ? this.#conversation.snapshotToUpdate(recipientAgentId) : task?.snapshot;
     if (!snapshot) return Effect.succeed(null);
-    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId, taskId))
+    if (
+      snapshot.activeTurnId &&
+      (this.#personTurn(recipientAgentId, snapshot.activeTurnId, taskId) ||
+        this.#noticeWaitsForQuietTurn(recipientAgentId, snapshot.activeTurnId, taskId, deliveryId))
+    )
       return Effect.succeed(null);
     return this.#steerWhenBusy(agent, task, snapshot, deliveryId, false, wait);
+  }
+
+  #turnDeliveries(agentId: string, turnId: string, taskId: string | null) {
+    const linked = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    return linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, taskId);
+  }
+
+  #noticeWaitsForQuietTurn(agentId: string, turnId: string, taskId: string | null, deliveryId: string): boolean {
+    const notice = this.#mailbox.getDelivery(deliveryId)?.delivery;
+    if (!notice || !quietTeammateDelivery(notice)) return false;
+    const deliveries = this.#turnDeliveries(agentId, turnId, taskId);
+    return (
+      deliveries.length > 0 &&
+      deliveries.every(({ delivery }) =>
+        quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id)),
+      )
+    );
   }
 
   #runningTask(
@@ -7000,8 +7021,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #personTurn(agentId: string, turnId: string, taskId: string | null): boolean {
-    const linked = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, taskId);
+    const deliveries = this.#turnDeliveries(agentId, turnId, taskId);
     return (
       deliveries.length > 0 &&
       deliveries.every(({ delivery }) => {
