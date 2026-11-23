@@ -1443,6 +1443,12 @@
       "detailSha256": "922c3535a34bcbea524bfc867c63dc3d8cec86aa1b28034bfb9abf59b1f92723"
     },
     {
+      "slug": "vet-office",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "b5b0bce1200aceebe0c0b5841b0d8d79052293adce329f35a6de6330e42419c6"
+    },
+    {
       "slug": "videogen",
       "version": "1.0.0",
       "featured": false,

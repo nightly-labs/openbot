@@ -8167,6 +8167,41 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "vet-office",
+    name: "Vet Office",
+    tagline: "Clinic schedules, patient records and appointment totals",
+    description:
+      "Read the schedule, patient records and appointment totals for a veterinary clinic in Vet Office. Choose a clinic if your account has access to more than one. Each request uses your current clinic permissions and the modules in your subscription. Access is read-only.",
+    category: "productivity",
+    creatorName: "Vet Office",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-list-clinics", text: "Which Vet Office clinics can I access?" },
+      { id: "prompt-clinic-schedule", text: "Show me today's appointments for the clinic I selected." },
+      {
+        id: "prompt-weekly-totals",
+        text: "How many appointments and distinct patients did this clinic have last week?",
+      },
+    ],
+    websiteUrl: "https://www.vetoffice.com.br",
+    privacyPolicyUrl: "https://www.vetoffice.com.br/privacidade",
+    termsUrl: "https://www.vetoffice.com.br/termos-de-uso",
+    featured: false,
+    apps: [
+      {
+        id: "app-vet-office-mcp",
+        name: "Vet Office",
+        description: "Read schedules, patient records and totals for the selected clinic.",
+        server: {
+          name: "vet-office",
+          transport: "http",
+          url: "https://www.vetoffice.com.br/api/mcp",
+          auth: [{ id: "vet-office-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "videogen",
     name: "VideoGen",
     tagline: "AI video creation",

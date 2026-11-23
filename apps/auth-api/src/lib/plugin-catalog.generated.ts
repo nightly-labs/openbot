@@ -1459,6 +1459,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "922c3535a34bcbea524bfc867c63dc3d8cec86aa1b28034bfb9abf59b1f92723",
     },
     {
+      slug: "vet-office",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "b5b0bce1200aceebe0c0b5841b0d8d79052293adce329f35a6de6330e42419c6",
+    },
+    {
       slug: "videogen",
       version: "1.0.0",
       featured: false,
@@ -10238,6 +10244,43 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.upwork.com",
     privacyPolicyUrl: "https://www.upwork.com/legal#privacy",
     termsUrl: "https://www.upwork.com/legal#terms",
+    skills: [],
+  },
+  "vet-office": {
+    slug: "vet-office",
+    name: "Vet Office",
+    tagline: "Clinic schedules, patient records and appointment totals",
+    description:
+      "Read the schedule, patient records and appointment totals for a veterinary clinic in Vet Office. Choose a clinic if your account has access to more than one. Each request uses your current clinic permissions and the modules in your subscription. Access is read-only.",
+    category: "productivity",
+    creatorName: "Vet Office",
+    iconUrl: "https://www.google.com/s2/favicons?domain=www.vetoffice.com.br&sz=48",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-list-clinics", text: "Which Vet Office clinics can I access?" },
+      { id: "prompt-clinic-schedule", text: "Show me today's appointments for the clinic I selected." },
+      {
+        id: "prompt-weekly-totals",
+        text: "How many appointments and distinct patients did this clinic have last week?",
+      },
+    ],
+    apps: [
+      {
+        id: "app-vet-office-mcp",
+        name: "Vet Office",
+        description: "Read schedules, patient records and totals for the selected clinic.",
+        iconUrl: "https://www.google.com/s2/favicons?domain=www.vetoffice.com.br&sz=48",
+        server: {
+          name: "vet-office",
+          transport: "http",
+          url: "https://www.vetoffice.com.br/api/mcp",
+          auth: [{ id: "vet-office-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.vetoffice.com.br",
+    privacyPolicyUrl: "https://www.vetoffice.com.br/privacidade",
+    termsUrl: "https://www.vetoffice.com.br/termos-de-uso",
     skills: [],
   },
   videogen: {

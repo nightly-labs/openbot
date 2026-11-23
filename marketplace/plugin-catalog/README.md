@@ -453,3 +453,37 @@ Troubleshooting:
 
 - Connect shows "The server answered 401": the token is wrong or was deleted. Create a
   new token and connect again.
+
+## Vet Office
+
+The app reads schedules, patient records and totals from the clinic the user selects.
+Vet Office checks the subscription, clinic membership and permissions on each request.
+The protected resource at <https://www.vetoffice.com.br/api/mcp> requests `openid`.
+
+**Publication is pending.** The production issuer supports authorization code with PKCE S256
+and public clients. Its metadata lists neither a registration endpoint nor client ID metadata
+documents. A catalog `link` flow has no client ID or scope field. The catalog smoke therefore
+fails for a fresh install. A saved **Sign-in app** can test a dedicated OpenBot public client
+ID with an empty secret and the exact scope `openid`. That setting applies to one host.
+
+The icon URL serves a PNG copy of the official Vet Office favicon. Its 48 px image matches
+the pixels in the publisher's favicon. The publisher's image host returned HTTP 429 to the
+OpenBot icon proxy during verification.
+
+Before publication:
+
+1. Vet Office must enable its OpenBot client in the production issuer and the MCP service.
+   Register the exact callback `http://127.0.0.1:28417/mcp-auth`. Keep port 28417 free when
+   OpenBot starts. A different port does not match this registration. On a joined server,
+   the client returns the callback query to the host that started sign-in.
+2. Verify that a fresh Marketplace install can select the approved client and request only
+   `openid`. The current options are an issuer that supports automatic registration of OpenBot
+   or a built-in public client bound to this resource and issuer. For a built-in client,
+   the catalog smoke must also verify that registration path.
+3. From Marketplace > Apps, search for **Vet Office**, connect and verify that the consent
+   page names OpenBot. Use a test account with fictional records. List its clinics, select
+   one and compare the appointment and distinct-patient totals for a known week with the
+   fixture. Verify that the available tools are read-only and that a restricted clinic is
+   inaccessible. Repeat sign-in from a joined server.
+4. Revoke OpenBot in Vet Office and verify that the next read fails. Verify that another
+   authorized test client can still read. Disconnect in OpenBot and repeat the sign-in.
