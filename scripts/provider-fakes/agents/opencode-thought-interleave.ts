@@ -1,7 +1,3 @@
-// The `opencode acp` of `opencode-thought-interleave-e2e.ts`. OpenCode 1.18.31 and 2.1.4 pass on the
-// reasoning that an endpoint streams between answer tokens as `agent_thought_chunk` (#3351). A prompt
-// with `interleave` answers in sub-word tokens with a thought after some of them. A prompt with
-// `harness` sends a partial answer, the harness error report of #1471, and the retried answer.
 import { serveFakeAcpAgent } from "../acp-agent";
 
 const MODEL = "opencode/big-pickle";

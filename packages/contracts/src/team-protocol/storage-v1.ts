@@ -1,16 +1,5 @@
-// Frozen optional storage-v1 wire contract. Keep IPC types and limits out of this file: every bound
-// is written as a literal, so a change to `STORAGE_LIMITS` or `INPUT_LIMITS` cannot move a shipped
-// wire contract.
-//
-// What this contract grants was a product decision and is recorded here because freezing it makes
-// it permanent: every member of a server can read the host's storage - category sizes, per-agent and
-// per-chat totals, and the names and sizes of the files sent in chats. An owner or admin can delete
-// one of those files and clear the host's caches and logs; `requireAdmin` on those two routes is the
-// only gate. Rows never carry a path, and workspace files and downloads travel only as category
-// totals: the wire `source` is `attachment` or `generated`. Widening any of it needs a second
-// capability string, never an edit to this one.
 import { isDynamicRecord, isString } from "../runtime-values";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const STORAGE_ROUTES = {
   usage: "/v1/storage/usage",
@@ -30,7 +19,6 @@ function identifierText(value: unknown): string {
   return value;
 }
 function byteCount(value: unknown): number {
-  // 2^53 - 1 bytes is 8 PiB, far past any disk, and it is the largest count JSON keeps exact.
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) throw new Error("Invalid storage size.");
   return value;
 }
@@ -64,8 +52,6 @@ function record(value: unknown, fields: Fields): Record<string, TeamProtocolV2Js
   if (!isDynamicRecord(value)) throw new Error("Invalid storage record.");
   return Object.fromEntries(Object.entries(fields).map(([key, decode]) => [key, decode(value[key])]));
 }
-// A request drops an absent optional field instead of sending null, so the IPC parser on the far
-// side sees the same shape the client built.
 function sparseRecord(value: unknown, required: Fields, optionalFields: Fields): Record<string, TeamProtocolV2Json> {
   if (!isDynamicRecord(value)) throw new Error("Invalid storage record.");
   const decoded = record(value, required);
@@ -125,7 +111,6 @@ const usageRequest: Decoder = (value) =>
     { scope: oneOf("host", "agent", "conversation") },
     { agentId: identifier, conversationId: identifier, force: boolean },
   );
-// Delete and clear answer with nothing: the client measures again when it wants the new sizes.
 const empty: Decoder = (value) => record(value, {});
 
 const STORAGE_ROUTE_PATHS: ReadonlySet<string> = new Set(Object.values(STORAGE_ROUTES));

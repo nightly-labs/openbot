@@ -14,8 +14,8 @@ description: "Build an inventory of software spend from bills, invoices, card ex
 ## Inputs
 
 1. **Bills.** First check the signed-in tabs (`openbot_browser.list_tabs`) for a vendor billing page or an
-   accounting tool. For the user's own subscriptions in Stripe, use the installed Stripe plugin
-   (`tool_search`). Else ask the user to upload invoices or a CSV export of bills or card spend.
+   accounting tool. For the user's own subscriptions in Stripe, use the tools of the installed Stripe
+   plugin; `openbot.tool_search` does not list them. Else ask the user to upload invoices or a CSV export of bills or card spend.
 2. **Usage.** Seat lists with last-active dates from the vendor admin page, or an export. Without usage data
    you can report seat counts, but not "unused".
 3. **Owner.** Who owns each tool. Use the source; else write "no owner".

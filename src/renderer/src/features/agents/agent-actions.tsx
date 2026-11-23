@@ -3,46 +3,36 @@ import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@o
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
-import { AgentDeleteUndoToast, startUndoCountdown } from "@openbot/ui/features/agents/AgentDeleteUndoToast";
+import {
+  AGENT_DELETE_UNDO_MS,
+  AgentDeleteUndoToast,
+  startUndoCountdown,
+  type UndoCountdown,
+} from "@openbot/ui/features/agents/AgentDeleteUndoToast";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { duplicateSection as duplicateSectionWith } from "@openbot/ui/features/sidebar/duplicate-section";
 import { currentText } from "@openbot/ui/text";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
 import { useNavigation } from "../../navigation";
+import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { useConversation } from "../conversation/conversation-context";
 import { agentConversationKey } from "../conversation/conversation-keys";
-import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { type NewAgentDraft, newAgentInput } from "./agent-create-input";
 import { attentionAgentId, withoutAttention } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
 import { agentsPort } from "./agents-port";
+import { forgetPendingAgentDelete, readPendingAgentDeletes, rememberPendingAgentDelete } from "./pending-agent-deletes";
 
-/**
- * Creating, editing, duplicating and deleting an agent.
- *
- * A leaf, and it has to be one: `deleteAgent` alone writes to agents,
- * conversation, turns, sidebar and navigation, so no domain can own it without
- * reaching into one nested under itself. This is the shape the dependency rule
- * pushes every multi-domain command into - state lives outward, the command
- * that spans several domains lives at the bottom and reads all of them.
- *
- * The four share one guard, `agentSetupOpen() && creatingAgent()`: while the
- * first-agent form is mid-submit there is no agent to act on yet, and letting a
- * second write through would race the one in flight.
- *
- * Conversation cleanup belongs to its domain. This command removes the agent
- * and asks each domain to remove the state that it owns.
- */
 const AgentActions = createSimpleContext({
   name: "Agent actions",
   init: () => {
@@ -50,9 +40,9 @@ const AgentActions = createSimpleContext({
     const scopeIsCurrent = createScopeGuard();
     const {
       agentList,
+      agentListSettled,
       setAgentList,
       agentSetupOpen,
-      setAgentSetupOpen,
       agentSetupDraft,
       setAgentSetupError,
       creatingAgent,
@@ -77,11 +67,9 @@ const AgentActions = createSimpleContext({
     const { setActiveTurns, setFailedTurns, setQueues, setPendingPrompts } = useTurns();
     const { sidebarLayout, setSidebarLayout, applySidebarLayoutAction, removePinnedSidebarItemEverywhere } =
       useSidebar();
-    const { clearDirectSelection } = useDirectMessages();
-    const { selectAgent } = useNavigation();
+    const { selectAgent, openCreatedAgent } = useNavigation();
     const [duplicatingSectionIds, setDuplicatingSectionIds] = createSignal<Set<string>>(new Set());
 
-    /** Asks the host for the agent. */
     function requestNewAgent(draft: NewAgentDraft) {
       const local = activeServer()?.kind !== "remote";
       const createModelSupported = local || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
@@ -89,26 +77,11 @@ const AgentActions = createSimpleContext({
       return agentsPort().agent.createAgent(newAgentInput(draft, createModelSupported, welcomeSupported));
     }
 
-    /** Synchronous, so a caller that also selects the agent does both in the same update. */
     function addNewAgent(stored: ClientAgentSummary): AgentProfile {
       const newAgent = createStoredProfile(toAgentProfile(stored));
       setAgentList((current) => [newAgent, ...current.filter((item) => item.id !== newAgent.id)]);
       initializeConversation(newAgent.id);
       return newAgent;
-    }
-
-    /** An agent made from another view, such as the routine canvas: the user stays where they are. */
-    async function createAgentInPlace(draft: Parameters<typeof requestNewAgent>[0]) {
-      const analytics = desktopAnalytics.scope();
-      try {
-        const newAgent = addNewAgent(await requestNewAgent(draft));
-        const properties = analyticsAgentProperties(newAgent.id);
-        analytics.track("agent_action", { action: "create", result: "succeeded", ...(properties ?? {}) });
-        return newAgent;
-      } catch (error) {
-        analytics.track("agent_action", { action: "create", result: "failed", failure_code: "create_failed" });
-        throw error;
-      }
     }
 
     async function createAgent(draft: FirstAgentDraft = agentSetupDraft()) {
@@ -119,9 +92,7 @@ const AgentActions = createSimpleContext({
       setAgentSetupError(null);
       try {
         const newAgent = addNewAgent(await requestNewAgent(submitted));
-        setAgentSetupOpen(false);
-        clearDirectSelection();
-        setActiveAgentId(newAgent.id);
+        openCreatedAgent(newAgent.id);
         const properties = analyticsAgentProperties(newAgent.id);
         analytics.track("agent_action", { action: "create", result: "succeeded", ...(properties ?? {}) });
       } catch (error) {
@@ -139,7 +110,6 @@ const AgentActions = createSimpleContext({
       setSettingsRequest({ agentId, nonce: Date.now() });
     }
 
-    /** Copies one agent into the roster and the layout, and leaves the selection alone. `null`: the scope ended. */
     async function copyAgent(agentId: string) {
       const result = await agentsPort().agent.duplicateAgent(agentId);
       if (!scopeIsCurrent()) return null;
@@ -184,7 +154,6 @@ const AgentActions = createSimpleContext({
       }
     }
 
-    /** Copies a custom section and each of its agents. The user stays on the agent that is open. */
     async function duplicateSection(sectionId: string): Promise<void> {
       if (agentSetupOpen() && creatingAgent()) return;
       if (!activeServerSupportsCapability("agent-duplication") || !activeServerSupportsCapability("sidebar-layout")) {
@@ -200,7 +169,6 @@ const AgentActions = createSimpleContext({
             agentIds: agentList()
               .filter((agent) => !hidden.has(agent.id))
               .map((agent) => agent.id),
-            // The agent's own Duplicate item waits too: the host refuses a second copy of one agent.
             duplicateAgent: async (agentId) => {
               if (!scopeIsCurrent()) return null;
               setDuplicatingAgentIds((current) => new Set(current).add(agentId));
@@ -215,7 +183,6 @@ const AgentActions = createSimpleContext({
                 });
               }
             },
-            // A server switch during the call ends the chain: the next call would reach the other server.
             mutateLayout: async (action) => {
               if (!scopeIsCurrent()) return null;
               const layout = await applySidebarLayoutAction(action);
@@ -240,20 +207,33 @@ const AgentActions = createSimpleContext({
       }
     }
 
-    /**
-     * Deletes that wait for the undo time to end, by agent. A server switch ends this scope, and with it
-     * the time to undo: each delete then runs at once, against the server it was made on.
-     */
     const pendingDeletes = new Map<string, () => void>();
     onCleanup(() => {
       for (const commit of [...pendingDeletes.values()]) commit();
     });
 
-    /**
-     * The agent leaves the roster at once, and a toast offers Undo. Main deletes the agent only when the
-     * time is over, so an undo has nothing to restore. If the app quits before then, the agent stays.
-     */
-    async function deleteAgent(agentId: string) {
+    let pendingDeletesResumed = Boolean(usePlatform().chatWindow);
+    createEffect(
+      () => (!pendingDeletesResumed && agentListSettled() ? agentList().map((agent) => agent.id) : null),
+      (listedIds) => {
+        if (!listedIds || pendingDeletesResumed) return;
+        pendingDeletesResumed = true;
+        const serverId = untrack(activeServerId);
+        for (const [agentId, savedAt] of Object.entries(readPendingAgentDeletes(serverId))) {
+          if (!listedIds.includes(agentId)) {
+            forgetPendingAgentDelete(serverId, agentId);
+            continue;
+          }
+          const resume = () => {
+            if (scopeIsCurrent() && readPendingAgentDeletes(serverId)[agentId] === savedAt)
+              void deleteAgent(agentId, true);
+          };
+          window.setTimeout(resume, Math.max(0, savedAt + AGENT_DELETE_UNDO_MS - Date.now()));
+        }
+      },
+    );
+
+    async function deleteAgent(agentId: string, resumed = false) {
       if (agentSetupOpen() && creatingAgent()) return;
       if (pendingDeletes.has(agentId)) return;
       const agent = agentList().find((candidate) => candidate.id === agentId);
@@ -263,7 +243,6 @@ const AgentActions = createSimpleContext({
       const properties = analyticsAgentProperties(agentId);
       const marketplaceAgent = Boolean(agent.marketplaceSource);
       const wasActive = activeAgentId() === agentId;
-      // Read before the roster changes: a read after a write returns the old value until the flush.
       const others = agentList().filter((candidate) => candidate.id !== agentId);
       const userHidden = userHiddenAgentIds();
       const nextAgentId = (others.find((candidate) => !userHidden.has(candidate.id)) ?? others[0])?.id ?? "";
@@ -272,22 +251,24 @@ const AgentActions = createSimpleContext({
       const showAgent: () => void = hidden;
       if (wasActive) setActiveAgentId(nextAgentId);
       setSettingsRequest((current) => (current?.agentId === agentId ? null : current));
+      rememberPendingAgentDelete(serverId, agentId);
 
       const toastId = `agent-delete-${serverId}-${agentId}`;
       let settled = false;
-      /** Undo and delete each end the same wait, so only the first of them runs. */
+      let countdown: UndoCountdown | null = null;
       function settle(): boolean {
         if (settled) return false;
         settled = true;
-        countdown.stop();
+        countdown?.stop();
         pendingDeletes.delete(agentId);
-        // A scope cleanup can call this, and a write to the Toaster from there stops the reactive system.
         queueMicrotask(() => toast.dismiss(toastId));
         return true;
       }
 
       function undo(): void {
-        if (!settle() || !scopeIsCurrent()) return;
+        if (!settle()) return;
+        forgetPendingAgentDelete(serverId, agentId);
+        if (!scopeIsCurrent()) return;
         showAgent();
         if (wasActive) setActiveAgentId(agentId);
       }
@@ -310,15 +291,11 @@ const AgentActions = createSimpleContext({
 
       async function commit(): Promise<void> {
         if (!settle()) return;
-        // Before the wait: a server switch reads the stored pins when the next scope starts. If the delete
-        // fails, the agent comes back without its pin.
         removePinnedSidebarItemEverywhere({ kind: "agent", id: agentId });
         try {
           await agentsPort().agent.deleteAgent(agentId, serverId);
           forgetDeletedAgent();
         } catch (error) {
-          // A step after the delete can fail, such as the sidebar write. Main then no longer has the
-          // agent, and putting it back would show an agent that comes back only until a restart.
           const stillListed = await agentsPort()
             .agent.listAgents(serverId)
             .then(
@@ -349,12 +326,19 @@ const AgentActions = createSimpleContext({
             description: errorMessage(error, t("sidebar.delete.failed")),
             report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
           });
+        } finally {
+          forgetPendingAgentDelete(serverId, agentId);
         }
       }
 
-      const countdown = startUndoCountdown(() => void commit());
+      if (resumed) {
+        void commit();
+        return;
+      }
+      const undoCountdown = startUndoCountdown(() => void commit());
+      countdown = undoCountdown;
       pendingDeletes.set(agentId, () => void commit());
-      toast(() => <AgentDeleteUndoToast agent={agent} countdown={countdown} onUndo={undo} />, {
+      toast(() => <AgentDeleteUndoToast agent={agent} countdown={undoCountdown} onUndo={undo} />, {
         id: toastId,
         duration: Number.POSITIVE_INFINITY,
         unstyled: true,
@@ -364,21 +348,14 @@ const AgentActions = createSimpleContext({
       });
     }
 
-    /** The Undo toasts of hides on this server. A server switch removes them with this scope. */
     const hideToastIds = new Set<string>();
     onCleanup(() => {
       const ids = [...hideToastIds];
-      // A write to the Toaster from a scope cleanup stops the reactive system.
       queueMicrotask(() => {
         for (const id of ids) toast.dismiss(id);
       });
     });
 
-    /**
-     * Hides or restores an agent. The sidebar moves the agent at once, and the server's answer then
-     * replaces the hidden list. If the server refuses, only this agent goes back. The open chat stays
-     * open: the user can read it, and the sidebar shows the agent in its Hidden group.
-     */
     async function setAgentHiddenByUser(agentId: string, hidden: boolean): Promise<void> {
       if (agentSetupOpen() && creatingAgent()) return;
       const agent = agentList().find((candidate) => candidate.id === agentId);
@@ -417,11 +394,6 @@ const AgentActions = createSimpleContext({
       }
     }
 
-    /**
-     * Mutes an agent for the user, or gives it the server level again. The menu shows the change at
-     * once, and the server's answer then replaces the levels. If the server refuses, the level of
-     * this agent goes back. The server keeps the level for all devices of the user.
-     */
     async function setAgentMuted(agentId: string, muted: boolean): Promise<void> {
       const previous = ownAgentLevels().get(agentId) ?? null;
       const level = muted ? "nothing" : null;
@@ -449,7 +421,6 @@ const AgentActions = createSimpleContext({
 
     return {
       createAgent,
-      createAgentInPlace,
       editAgent,
       duplicateAgent,
       duplicateSection,

@@ -23,7 +23,7 @@ computer of the user who signs in. A sign-in uses one of these kinds:
 | Loopback callback | URL MCP servers (`McpOAuth`), Codex browser sign-in, a page that an agent's CLI prints | The page sends the browser to `http://127.0.0.1:<port>/...`. The MCP listener uses port 28417 and path `/mcp-auth` ([`mcp-oauth-redirect-server.ts`](../../src/main/mcp-oauth-redirect-server.ts)). | The [callback relay](#remote-sign-in-the-callback-relay) (`sign-in-relay-v1`). MCP on an older host: the host's live view (`mcp-sign-in-v1`). |
 | Device code | Codex (`codex-device`), Grok, Cline, Kimi, Muse, the GitHub connector | The user types a short code on the provider's page. Nothing comes back to OpenBot. | The host starts it and the client shows the code (`providers-v1` to `providers-v5`; Kimi `providers-v8` only). Muse: the relay opens its device page with no callback. GitHub: `connectors-v1`. |
 | Pasted code | Claude on Linux (`cli` / `paste`), Cursor (`cli` / `link`) | The page shows a code, and the user pastes it into OpenBot. | The host starts it and the client takes the code (`providers-v3` to `providers-v5`). |
-| CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. |
+| CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. Mistral: the host takes the page from Vibe (`acp-delegated`) and the client shows it as a link (`providers-v8` with `mistral-code-sign-in-v1`). |
 | Deep link | Slack, Discord (`openbot://slack-workspace`, `openbot://discord-guild`), MCP fallback (`openbot://mcp-auth`) | A hosted page ends in an `openbot://` link, which reaches only the computer that opened it. | Slack and Discord: `connectors-v1`. The client sends the sealed grant on to the host that started the install. The browser client gets the grant from a return page of its own origin (`web-messaging-install.ts`). |
 | Terminal | Pi | OpenBot opens the CLI in a terminal on the host ([`provider-terminal-login.ts`](../../src/backend/provider-terminal-login.ts)). | Sign in on the host. |
 | Key or local session | API keys, 1Password, Bitwarden, Proton Pass | The user types a key or gives a CLI session. Proton Pass also signs in on Proton's web page. | Keys go to the host over the encrypted channel. Vault approval stays on the host. A Bitwarden session key works only on the computer that made it; a joined server gets an API key and the master password. Proton Pass: `password-managers-v1`; the client opens the host's sign-in page. |
@@ -98,6 +98,25 @@ The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api
 
 Run `bun run test:mcp-member-access` to check these rules on a real host.
 
+### Who gets each MCP server
+
+A host with `mcp-access-v1` keeps one entry for each MCP server in
+[`mcp-access-store.ts`](../../src/main/mcp-access-store.ts), a preference file with no migration.
+
+| Part | Rule |
+| --- | --- |
+| Agents | `agents: null` gives the server to each agent, also to a new one. A list gives it only to those agents. `AgentService` applies the list when it gives the enabled servers to a provider session. |
+| Members | `everyone` and each role have a level: `none` hides the server and refuses it, `use` gives the rights on a server of another person, `manage` gives the rights of the person who added it. A member gets the highest level. An owner, an admin and the person who added the server always manage. |
+| `none` | The host leaves the server out of the list and out of the sign-in states, and it refuses a change, a test, a sign-in and a sign-in status for the server. The sign-in belongs to the address, so the host also refuses the member each saved row (new or moved), test, sign-in status and sign-in state on that address, the member's own rows included. |
+| Routes | `POST /v1/mcp-access` reads and `POST /v1/mcp-access/set` replaces one entry ([`route-mcp-access.ts`](../../src/main/team-api/route-mcp-access.ts)). Only an owner or admin reads the entries and sets them; a member reads `mine`. |
+| Revision | The snapshot has a `revision`, and a replace names the one that the client read. Each replace adds 1. When another admin saved first, the host answers 409 `error.team.mcpAccessStale` and changes nothing; the client reads again. |
+| Sessions | A replace that changes the agents of a server gives each agent a new provider session. A replace of the levels only does not. |
+| Client | The Marketplace page of a connected app or custom server shows the Agents and Roles sections when `serverCanAdminister(server, "mcp-access-v1")` is true. |
+| Damaged file | Each server is closed to agents and members until an owner or admin saves its access. |
+| Not covered | Access for each tool. The built-in entries (Computer Use, the GitHub connector) have no MCP row, so each agent gets them, also after a damaged file. The MCP management tools of an agent do not apply the agent list. |
+
+Run `bun run test:mcp-member-access` to check the routes and the levels through the Team API.
+
 ### How many MCP servers a host keeps
 
 A computer keeps up to 100 MCP servers (`INPUT_LIMITS.mcpServers`). Disabled rows count too. The
@@ -159,11 +178,13 @@ three start routes, and `provider-account-relay-v1` and `-v2` add one more each.
 
 | Start route | What it signs in | How the host delivers the callback |
 | --- | --- | --- |
-| `mcp/start` | A URL MCP server, from server settings or the Marketplace | It gives the code to `McpOAuth` (owned flow). |
+| `mcp/start` | A URL MCP server, from the Marketplace | It gives the code to `McpOAuth` (owned flow). |
 | `provider/start` | The CLI of a provider in `SIGN_IN_RELAY_PROVIDERS`: Codex, Claude, Gemini (`antigravity`) and Muse | It replays the query to the CLI's own loopback listener on the host. A Muse device page has no callback: the client only opens it. |
+| `provider/v2/start` | The CLI of a provider in `PROVIDER_SIGN_IN_RELAY_V2_PROVIDERS`: Devin. The separate capability `provider-sign-in-relay-v2` adds this route ([`provider-sign-in-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-sign-in-relay-v2.ts)). Only a Linux host advertises it, with v1: on macOS the CLI runs `/usr/bin/open` by its absolute path, and on Windows OpenBot has no `open` command that the CLI uses, so OpenBot cannot take the page there. `provider-sign-in-relays.ts` gives a client the route that takes a provider | As for `provider/start`. |
 | `link/start` | A sign-in page that an agent of the host printed in its conversation | It replays the query to the loopback address of that page. |
 | `provider-account/start` | An account after the first of Codex or Claude (`PROVIDER_ACCOUNT_RELAY_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v1` adds this route ([`provider-account-relay-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v1.ts)) | It replays the query to the loopback listener of the account's CLI on the host, as for `provider/start`. |
 | `provider-account/v2/start` | An account after the first of Codex, Claude or Gemini (`PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v2` adds this route ([`provider-account-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v2.ts)). A host advertises it with v1, and a client uses the newest one that the host advertises | As for `provider-account/start`. |
+| `mcp/start-deep-link` | As `mcp/start`. The separate capability `sign-in-relay-deep-link-v1` adds this route ([`sign-in-relay-deep-link-v1.ts`](../../packages/contracts/src/team-protocol/sign-in-relay-deep-link-v1.ts)). A desktop client sends it only while its operating system opens `openbot://` in OpenBot. After two sign-ins of the same address got no grant back on `127.0.0.1` and on `localhost`, the host registers `openbot://mcp-auth`: TradingView's firewall blocks a page that returns to a loopback name (#9209) | The client takes the callback from `openbot://mcp-auth` by `state` and sends it with `complete`; the host gives the code to `McpOAuth`. |
 
 ### Sequence
 
@@ -406,6 +427,25 @@ also lists a custom scheme such as `openbot://mcp-auth` (#5748). A server that
 offers registration keeps it. ElevenLabs accepts only the document. When port 28417 is in use, the
 loopback address has another port, and a server that compares ports refuses it.
 
+A server that registers only the clients it approved, and that approved OpenBot's own app, gets a
+**built-in client** (`BUILT_IN_MCP_CLIENTS` in
+[`mcp-oauth-provider.ts`](../../src/backend/mcp-oauth-provider.ts)), chosen by the MCP server
+address and the issuer that discovery finds. Both must match: any server can name an issuer in its
+metadata, and the token goes to the server that asked for it. Meta Ads (`https://www.facebook.com/ads`) is one: its registration endpoint answers
+"Dynamic registration is not available for this client", and it refuses every `http` redirect,
+loopback too. Its client is the OpenBot Meta app 1479376854168579, with no secret. Its redirect is
+`https://openbot.run/oauth/mcp-callback`
+([`mcp-callback.ts`](../../apps/auth-api/src/routes/oauth/mcp-callback.ts)), which answers 302 to
+`http://127.0.0.1:28417/mcp-auth` with the query unchanged. So the grant still arrives at the MCP
+listener of the computer where the browser runs, and a joined server uses the
+[callback relay](#remote-sign-in-the-callback-relay) as before. The relay always names port 28417:
+when another program holds that port, the sign-in cannot finish. A sign-in app that the admin saves
+replaces the built-in client, but it keeps the built-in client's redirect: Meta refuses the loopback
+address for every app (#13663). The "Sign-in app" section shows that redirect as its callback URL.
+The Meta app must list the relay address in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
+App Review puts the app in Live mode. `bun run test:mcp-sign-in-https-relay` checks the Meta page,
+the relay, and that another server that names Meta's issuer does not get the app.
+
 A server that does not register OpenBot by itself needs a **sign-in app**: an OAuth app that the
 admin registers with the provider. The user enters its client ID in the "Sign-in app" section of the
 MCP server ([`McpSignInAppSection.tsx`](../../src/renderer/src/features/servers/McpSignInAppSection.tsx)).
@@ -525,6 +565,34 @@ client uses the same WhatsApp page through `hostWhatsAppPort`
 ([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
 carries a stored key; the QR code text holds the one-use secret of its link.
 
+The optional capability `whatsapp-working-message-v1`
+([`whatsapp-working-message-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-working-message-v1.ts),
+host route [`route-whatsapp-working-message.ts`](../../src/main/team-api/route-whatsapp-working-message.ts))
+reads and sets, for each WhatsApp number, whether OpenBot posts “Working on it…” while the agent
+works. The setting is on by default and is kept with the number's connection values, so it needs no
+migration. With the setting off, `MessagingService` posts no “Waiting” and no “Working on it…” line
+and edits no progress into one: the reaction shows that OpenBot read the message, and the answer is
+the only post. A request that is given to a teammate or stopped, or that ends without an answer,
+posts no line and leaves only its reaction. An error still posts its line (“Too many requests are
+waiting”, “OpenBot could not finish this request”), so the person knows that it did not succeed.
+A reply of `stop` still stops the request; in a group, the person replies to their own request,
+because there is no status post to reply to. The released `whatsapp-connector-v1` overview cannot
+carry the value, so a client reads this list and merges it (`withWhatsAppWorkingMessages`). A client
+hides the switch while the host does not have the capability. Only protocol 9 peers get it.
+
+The optional capability `whatsapp-status-reactions-v1`
+([`whatsapp-status-reactions-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-status-reactions-v1.ts),
+host route [`route-whatsapp-status-reactions.ts`](../../src/main/team-api/route-whatsapp-status-reactions.ts))
+reads and sets, for each WhatsApp number, whether OpenBot puts status reactions on a message: 👀 when
+it arrives, then ✅, ❌ or 🫡 when the request ends. The setting is on by default and is kept with the
+number's connection values, so it needs no migration. `MessagingService` reads it at each reaction,
+so with the setting off a WhatsApp message gets no reaction, and the posts do not change. A removal
+still goes out, so a request that started before the setting went off loses its 👀 at its end. In a
+quiet chat of a personal number, a failed or stopped request then shows nothing to the other person. With both this setting and “Working on it…”
+off, only the answer shows that OpenBot read the message. A client reads this list and merges it into
+the released overview (`withWhatsAppStatusReactions`), and hides the switch while the host does not
+have the capability. Only protocol 9 peers get it.
+
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a
 pairing code, because the WhatsApp app on the same phone cannot scan a QR code on its own screen. The
@@ -601,23 +669,21 @@ user removes it there.
 ## Add a Team API capability
 
 A new remote feature is a new optional capability. Do not change a shipped capability: released
-Team API adapters are permanent (see [Team API compatibility](team-api.md)). Worked example:
+Team API adapters stay while a release in the support window speaks them (see [Team API compatibility](team-api.md)). Worked example:
 `sign-in-relay-v1`, which follows `mcp-sign-in-app-v1`.
 
 1. **Frozen codec.** Add `packages/contracts/src/team-protocol/<name>-v1.ts`. Build each route with
    the helpers of [`admin-wire.ts`](../../packages/contracts/src/team-protocol/admin-wire.ts)
    (`adminRoute`, `fields`, `string(max)`, `nullable`). Export the capability name, the routes and
-   the codec map. Write the header comment as the contract: what each route does and who can use it.
+   the codec map. Write the contract in the PR: what each route does and who can use it.
 2. **Package export.** Add `"./team-protocol/<name>-v1"` to
    [`packages/contracts/package.json`](../../packages/contracts/package.json).
 3. **Codecs.** Spread the codec map into `CODECS` in
    [`optional-routes.ts`](../../packages/contracts/src/team-protocol/optional-routes.ts).
-4. **Capability list.** Add the capability to `TEAM_CURRENT_CAPABILITIES` in
-   [`current.ts`](../../packages/contracts/src/team-protocol/current.ts), and exclude it from
-   `TEAM_BOOTSTRAP_CAPABILITIES` and `legacyTeamCapabilities`. Older peers read a limited number of
-   bootstrap capabilities, so a new optional one stays out of bootstrap. Protocols 7 and 8 read at
-   most 128 capabilities and their lists are full, so add it to `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`
-   too: only a protocol 9 peer then sends or gets it.
+4. **Capability list.** Add the capability at the end of `TEAM_CAPABILITY_REGISTRY` in
+   [`current.ts`](../../packages/contracts/src/team-protocol/current.ts), with the `V10` placement.
+   Every capability list comes from this table. Protocols 7 to 9 read a limited number of
+   capabilities and their lists are full, so only a protocol 10 peer sends or gets a new capability.
 5. **Host route.** Add `src/main/team-api/route-<name>.ts`. Return `"unmatched"` for other paths,
    refuse with `400` when the capability is off, and call `requireAdmin` for admin routes. Register
    it in `TeamApiServer.#handle` in [`team-api-server.ts`](../../src/main/team-api-server.ts), and

@@ -19,7 +19,12 @@ export const messages = {
   "computerUse.ready.title": "Управление компьютером готово",
   "computerUse.ready.description":
     "OpenBot может видеть приложения на этом компьютере и работать с ними. Эта система не запрашивает дополнительных разрешений.",
+  "computerUse.limited.title": "Управление компьютером на этом рабочем столе ограничено",
   "computerUse.openSettingsFailed.title": "Не удалось открыть «Системные настройки»",
+  "computerUse.restartRequired.title": "Нужен перезапуск",
+  "computerUse.restartRequired.description":
+    "macOS по-прежнему блокирует нажатия и ввод текста. Если это повторится после перезапуска, удалите OpenBot из «Универсального доступа» и добавьте его снова.",
+  "computerUse.restartRequired.action": "Перезапустить OpenBot",
   "computerUse.compact.title": "Включить управление компьютером",
   "computerUse.compact.description": "Позвольте OpenBot видеть приложения на этом компьютере и работать с ними.",
   "computerUse.granted": "Разрешено",

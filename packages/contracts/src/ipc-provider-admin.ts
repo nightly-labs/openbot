@@ -1,9 +1,3 @@
-/**
- * The replies of a host's `providers-v1` to `providers-v4` and `provider-host-sign-in-v1` routes, as the
- * desktop main process and the browser client both read them. The route codec has already checked
- * their fields; these give them their IPC types and fail closed on anything else.
- */
-
 import { isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AgentModelOption, isAgentModelOption, isReasoningEffort } from "./ipc-agent-identity";
@@ -13,9 +7,12 @@ import {
   type HostProviderAccounts,
   isAccountUsage,
   isProviderAccountId,
+  isProviderAccountPool,
   isProviderAccountStatus,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_USAGE_RESET_OUTCOMES,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
@@ -40,9 +37,9 @@ import {
 } from "./ipc-custom-providers";
 import { decodeMcpSignInRelayPage } from "./ipc-mcp-servers";
 import { isDynamicRecord, isHttpsUrl, isNumber, isOneOf, isString } from "./runtime-values";
+import { PROVIDER_ACCOUNTS_MESSAGE_LIMIT } from "./team-protocol/provider-accounts-v1";
 import { PROVIDER_HOST_SIGN_IN_ERROR_LIMIT } from "./team-protocol/provider-host-sign-in-v1";
 
-/** Each URL becomes a link the admin opens, so it is held to https here as well. */
 export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginStart {
   if (!isDynamicRecord(value)) throw new Error("Invalid code login.");
   if (value.kind === "connected") return { kind: "connected" };
@@ -64,6 +61,20 @@ export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginS
   };
 }
 
+export function decodeProviderAccountCodeLoginStart(value: unknown): ProviderAccountCodeLoginStart {
+  if (!isDynamicRecord(value) || !isProviderAccountId(value.accountId)) throw new Error("Invalid code login.");
+  return { accountId: value.accountId, start: decodeProviderCodeLoginStart(value.start) };
+}
+
+export function decodeProviderAccountCodeLoginStatus(value: unknown): ProviderAccountCodeLoginStatus {
+  const invalid = () => new Error("Invalid sign-in response.");
+  if (!isDynamicRecord(value)) throw invalid();
+  if (value.result === null) return { result: null };
+  if (!isDynamicRecord(value.result) || !isNullableBoundedString(value.result.error, PROVIDER_ACCOUNTS_MESSAGE_LIMIT))
+    throw invalid();
+  return { result: { error: value.result.error } };
+}
+
 export function decodeProviderHostSignInStatus(value: unknown): ProviderHostSignInStatus {
   const invalid = () => new Error("Invalid sign-in response.");
   if (!isDynamicRecord(value) || (value.tabId !== null && !isBoundedString(value.tabId, INPUT_LIMITS.identifier)))
@@ -74,7 +85,6 @@ export function decodeProviderHostSignInStatus(value: unknown): ProviderHostSign
   return { tabId: value.tabId, result: { error: value.result.error } };
 }
 
-/** A provider this client does not know is left out, as the host's status leaves it out. */
 export function decodeHostProviderAccounts(value: unknown): HostProviderAccounts {
   const invalid = () => new Error("Invalid provider accounts.");
   if (!isDynamicRecord(value) || !Array.isArray(value.providers) || !Array.isArray(value.agents)) throw invalid();
@@ -95,11 +105,6 @@ export function decodeHostProviderAccounts(value: unknown): HostProviderAccounts
   return { providers, agents };
 }
 
-/**
- * The models of a `provider-account-models-v1` list. The route codec has checked the fields. A
- * provider this client does not know is left out, and so is a model whose default reasoning effort
- * it does not know; an unknown effort is left out of the supported ones.
- */
 export function decodeHostProviderAccountModels(value: unknown): HostProviderAccountModels {
   const invalid = () => new Error("Invalid provider account models.");
   if (!isDynamicRecord(value) || !Array.isArray(value.providers)) throw invalid();
@@ -127,7 +132,17 @@ export function decodeHostProviderAccountModels(value: unknown): HostProviderAcc
   return { providers };
 }
 
-/** The accounts with the models that `models` gives for each. An account it does not name keeps its own. */
+export function decodeHostProviderAccountPools(value: unknown): NonNullable<HostProviderAccounts["pools"]> {
+  const invalid = () => new Error("Invalid provider account pools.");
+  if (!isDynamicRecord(value) || !Array.isArray(value.pools)) throw invalid();
+  return value.pools.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row)) throw invalid();
+    const pool = { leftOut: row.leftOut, inUse: row.inUse };
+    if (!isProviderAccountPool(pool)) throw invalid();
+    return isAgentProvider(row.provider) ? [{ provider: row.provider, pool }] : [];
+  });
+}
+
 export function withHostProviderAccountModels(
   accounts: HostProviderAccounts,
   models: HostProviderAccountModels,
@@ -149,17 +164,12 @@ export function withHostProviderAccountModels(
   };
 }
 
-/** Each reading names its account: the released usage routes give the provider's own sign-in. */
 export function decodeHostProviderAccountUsage(value: unknown): AccountUsage {
   if (!isAccountUsage(value) || value.limits.some((limit) => limit.accountId === undefined))
     throw new Error("Invalid provider account usage.");
   return value;
 }
 
-/**
- * The `accounts` of a `provider-usage-reset-v1` list, and the IPC answer. A provider this client
- * does not know is left out, as the host's status leaves it out.
- */
 export function decodeProviderUsageResets(value: unknown): ProviderUsageResets[] {
   const invalid = () => new Error("Invalid provider usage resets.");
   if (!Array.isArray(value)) throw invalid();
@@ -178,7 +188,6 @@ export function decodeProviderUsageResets(value: unknown): ProviderUsageResets[]
   });
 }
 
-/** The `outcome` of a `provider-usage-reset-v1` consume, and the IPC answer. */
 export function decodeProviderUsageResetOutcome(value: unknown): ProviderUsageResetOutcome {
   if (!isOneOf(PROVIDER_USAGE_RESET_OUTCOMES, value)) throw new Error("Invalid provider usage reset.");
   return value;
@@ -220,7 +229,6 @@ function decodeProviderRuntimeStatus(value: unknown): ProviderRuntimeStatus {
   };
 }
 
-/** A managed runtime that `providers-v1` did not send. */
 function decodeLaterRuntime(value: unknown): ProviderRuntimeStatus {
   return value === undefined
     ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
@@ -237,9 +245,6 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
     throw new Error("Invalid provider runtimes.");
   }
   const { providers, toolRuntimes } = value;
-  // `providers-v1` sends Codex, Claude, Grok and OpenCode. A runtime that a later route set added
-  // reads as not downloaded where the host sends none: this client cannot download it there. The
-  // record is closed, so a runtime added to `ManagedProviderId` without a line here does not compile.
   return {
     revision: value.revision,
     providers: {
@@ -256,20 +261,12 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       mistral: decodeLaterRuntime(providers.mistral),
       pi: decodeLaterRuntime(providers.pi),
       muse: decodeLaterRuntime(providers.muse),
-      // Only a `providers-v8` host that can install Hermes sends a Hermes row. Without one the row
-      // shows the install guide, as it does for a host before the Hermes installer.
       ...(providers.hermes === undefined ? {} : { hermes: decodeProviderRuntimeStatus(providers.hermes) }),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };
 }
 
-/**
- * The `providers-v8` snapshot, in which each runtime is a row keyed by `id`. The rows become the
- * record that the IPC snapshot has, and `decodeProviderRuntimeSnapshot` checks them. The IPC record
- * is closed, so a row for a provider that this build does not know is not kept: this client cannot
- * download it. The host status still names that provider.
- */
 export function decodeProviderRuntimeSnapshotV8(value: unknown): ProviderRuntimeSnapshot {
   if (!isDynamicRecord(value) || !Array.isArray(value.providers) || !Array.isArray(value.toolRuntimes))
     throw new Error("Invalid provider runtimes.");
@@ -289,13 +286,11 @@ function runtimeRows(rows: readonly unknown[]): Map<string, unknown> {
   return byId;
 }
 
-// The contract guard asserts that a summary carries no key, and fails closed on the whole list.
 export function decodeCustomProviderSummaries(value: unknown): CustomProviderSummary[] {
   if (!Array.isArray(value) || !value.every(isCustomProviderSummary)) throw new Error("Invalid custom providers.");
   return value;
 }
 
-/** `custom-agents-v1`: the list fails closed, as the local list does. */
 export function decodeCustomAgentSummaries(value: unknown): CustomAgentSummary[] {
   if (!Array.isArray(value) || value.length > CUSTOM_AGENT_LIMITS.agents || !value.every(isCustomAgentSummary))
     throw new Error("Invalid custom agents.");

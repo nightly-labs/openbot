@@ -11,6 +11,13 @@ export const messages = {
     "{provider} kan geen verbinding maken met zijn server. Poging {attempt} van {maxAttempts}.",
   "status.provider.retryServerError":
     "De server van {provider} is bezet of heeft een fout. Poging {attempt} van {maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "{provider} kan geen verbinding maken met de modelaanbieder. Nieuwe poging: {attempt}.",
+  "status.provider.modelRetryServerError":
+    "De modelaanbieder is bezet of heeft een fout. {provider} probeert het opnieuw: poging {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "De modelserver heeft niet genoeg geheugen voor deze chat. {provider} probeert het opnieuw: poging {attempt}. Een nieuwe chat heeft minder geheugen nodig.",
+  "status.provider.modelRetryRecovered": "De modelaanbieder antwoordt weer.",
   "status.provider.retryRecovered": "{provider} krijgt weer antwoorden van zijn server.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude antwoordde op de standaardsnelheid. Met een Claude-abonnement gebruikt de snelle modus gebruikstegoed. Schakel het in je Claude-account in.",
@@ -24,4 +31,6 @@ export const messages = {
     "Claude antwoordde op de standaardsnelheid. De snelle modus is uitgeschakeld in de instellingen van Claude Code of door je organisatie.",
   "status.provider.claudeFastModeUnavailable":
     "Claude antwoordde op de standaardsnelheid. Claude Code kon de snelle modus niet gebruiken voor deze beurt.",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code is ingesteld om een Anthropic API-sleutel te gebruiken. Anthropic rekent elke aanvraag af op het API-tegoed van de sleutel, niet op je Claude-abonnement. Verwijder de sleutel uit de Claude Code-instellingen of de omgevingsvariabelen om je abonnement te gebruiken, en start OpenBot daarna opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

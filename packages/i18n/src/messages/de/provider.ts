@@ -121,9 +121,17 @@ export const messages = {
   "provider.picker.download": "Download von {name}",
   "provider.picker.search": "Modelle suchen",
   "provider.picker.noMatches": "Keine Modelle entsprechen deiner Suche.",
+  "provider.picker.openrouterNoMatches":
+    "Keine Modelle entsprechen deiner Suche. Deine Einstellungen für Datenschutz, Anbieter und Guardrails auf openrouter.ai können Modelle aus dieser Liste ausblenden.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Diese Modelle funktionieren unter Windows und Linux nicht mit „Nur Arbeitsbereich“. Ändere dafür „Zugriff“ in den Agenteneinstellungen.",
   "provider.picker.olderModels": "Ältere Modelle",
   "provider.picker.olderModelsList": "Ältere {name}-Modelle",
-  "provider.picker.noModels": "Keine Modelle von {name} verfügbar.",
+  "provider.picker.noModels":
+    "Hier werden keine Modelle von {name} angezeigt. Wenn sie ausgeschaltet sind, kann ein Administrator sie unter Servereinstellungen > Anbieter > {name} > Modelle einschalten.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} führt deine eigenen Endpunkte aus. Ihre Modelle sind im Tab Benutzerdefiniert.",
+  "provider.picker.showCustomModels": "Modelle zeigen",
   "provider.picker.museNoModels":
     "Muse hat für dieses Konto keine Modelle gesendet. Muse ist im Land, in dem dieser Agent läuft, möglicherweise nicht verfügbar. Wähle ein Modell eines anderen Anbieters.",
   "provider.picker.customEmpty":
@@ -151,6 +159,8 @@ export const messages = {
   "provider.picker.selectEffort": "Aufwand auswählen",
   "provider.picker.custom": "Benutzerdefiniert",
   "provider.picker.cliReady": "{cli} bereit",
+  "provider.picker.modelSourceProvider": "Nutzt {name} aus deinen {cli}-Einstellungen",
+  "provider.picker.modelSourceCatalog": "Nutzt eine Modellliste aus deinen {cli}-Einstellungen",
   "provider.status.signInRequired": "Anmeldung erforderlich",
   "provider.model.free": "Kostenlos",
   "provider.model.new": "Neu",
@@ -170,22 +180,36 @@ export const messages = {
   "provider.geminiKey.title": "Gemini-API-Schlüssel",
   "provider.geminiKey.description":
     "Speichere einen Gemini-API-Schlüssel auf diesem Computer. Ein gespeicherter Schlüssel wird statt deines Google-Kontos verwendet. Um dich mit Google anzumelden, entferne den Schlüssel und wähle „Verbinden“ in der Gemini-Zeile.",
+  "provider.geminiKey.descriptionHost":
+    "Speichere einen Gemini-API-Schlüssel auf dem Host. Ein gespeicherter Schlüssel wird statt deines Google-Kontos verwendet. Um dich mit Google anzumelden, entferne den Schlüssel und wähle „Verbinden“ in der Gemini-Zeile.",
   "provider.geminiKey.label": "Gemini-API-Schlüssel",
   "provider.claudeKey.title": "Anthropic-API-Schlüssel",
   "provider.claudeKey.description":
     "Speichere einen Anthropic-API-Schlüssel auf dem Host. Anthropic berechnet jede Anfrage über das API-Guthaben des Schlüssels, nicht über dein Claude-Abo. Um ihn für einen Agenten zu verwenden, wähle das Konto „API-Schlüssel“ im Modellmenü des Agenten. Wenn Claude nicht angemeldet ist, verwenden alle Agenten den Schlüssel.",
   "provider.claudeKey.label": "Anthropic-API-Schlüssel",
+  "provider.cursorKey.title": "Cursor-API-Schlüssel",
+  "provider.cursorKey.description":
+    "Jedes Cursor-Konto nach dem ersten verwendet einen API-Schlüssel. Erstelle einen Schlüssel im Cursor-Dashboard unter Integrations und füge ihn hier ein. Der Schlüssel wird auf diesem Computer gespeichert.",
+  "provider.cursorKey.descriptionHost":
+    "Jedes Cursor-Konto nach dem ersten verwendet einen API-Schlüssel. Erstelle einen Schlüssel im Cursor-Dashboard unter Integrations und füge ihn hier ein. Der Schlüssel wird auf dem Host gespeichert.",
+  "provider.cursorKey.label": "Cursor-API-Schlüssel",
   "provider.inceptionKey.title": "Inception-API-Schlüssel",
   "provider.inceptionKey.description":
     "Speichere einen Inception-API-Schlüssel auf diesem Computer, um die Mercury-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
+  "provider.inceptionKey.descriptionHost":
+    "Speichere einen Inception-API-Schlüssel auf dem Host, um die Mercury-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
   "provider.inceptionKey.label": "Inception-API-Schlüssel",
   "provider.deepseekKey.title": "DeepSeek-API-Schlüssel",
   "provider.deepseekKey.description":
     "Speichere einen DeepSeek-API-Schlüssel auf diesem Computer, um die DeepSeek-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
+  "provider.deepseekKey.descriptionHost":
+    "Speichere einen DeepSeek-API-Schlüssel auf dem Host, um die DeepSeek-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
   "provider.deepseekKey.label": "DeepSeek-API-Schlüssel",
   "provider.openrouterKey.title": "OpenRouter-API-Schlüssel",
   "provider.openrouterKey.description":
     "Speichere einen OpenRouter-API-Schlüssel auf diesem Computer, um die Modelle von OpenRouter zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
+  "provider.openrouterKey.descriptionHost":
+    "Speichere einen OpenRouter-API-Schlüssel auf dem Host, um die Modelle von OpenRouter zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
   "provider.openrouterKey.label": "OpenRouter-API-Schlüssel",
   "provider.openCodeKey.title": "Bei OpenCode Go anmelden",
   "provider.openCodeKey.description":
@@ -203,6 +227,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Die Verbindung konnte nicht wiederhergestellt werden.",
   "provider.account.add": "Konto hinzufügen",
   "provider.account.addLabel": "Weiteres {name}-Konto hinzufügen",
+  "provider.account.addWithCode": "Konto mit Code hinzufügen",
   "provider.account.count": { one: "{count} Konto", other: "{count} Konten" },
   "provider.account.numbered": "Konto {number}",
   "provider.account.apiKey": "API-Schlüssel",
@@ -231,20 +256,46 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} hat kein Guthaben zum Zurücksetzen der Nutzung mehr.",
   "provider.account.resetUsageAlreadyRedeemed": "Dieses Guthaben von {name} wurde bereits verwendet.",
   "provider.account.resetUsageFailed": "Die Nutzung von {name} konnte nicht zurückgesetzt werden.",
+  "provider.account.pool": "Konten bündeln",
+  "provider.account.poolDescription":
+    "Agenten nutzen ein Konto, bis es fast ein Nutzungslimit erreicht, dann das Konto, dessen Limit zuerst zurückgesetzt wird.",
+  "provider.account.inUse": "Aktiv",
+  "provider.account.notInPool": "Nicht im Pool",
+  "provider.account.leaveOutOfPool": "Aus Pool nehmen",
+  "provider.account.putBackInPool": "Zurück in Pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool aus {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} aktiv",
+  "provider.settings.accountsPooledDescription": "{count} von {max}. Agenten teilen sich diese Konten.",
   "provider.settings.disconnectTitle": "{name} trennen?",
   "provider.settings.disconnectOthers": "Die anderen {provider}-Konten warten, bis du {provider} wieder verbindest.",
   "provider.settings.disconnectLocal":
     "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal wird auch abgemeldet.",
   "provider.settings.disconnectHost": "OpenBot meldet {provider} auf dem Server ab.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Ein gespeicherter Gemini-API-Schlüssel wird statt einer Google-Anmeldung verwendet. Entferne den Schlüssel, um einen Google-Plan und seine Modelle zu nutzen.",
+  "provider.settings.museKeyInUse":
+    "Muse nutzt diesen Schlüssel, nicht deine Anmeldung. Entferne den Schlüssel, um deine Anmeldung zu nutzen.",
   "provider.settings.versionInstalledByUser": "{version} · von dir installiert",
   "provider.settings.versionDownloaded": "{version} · von OpenBot geladen",
+  "provider.settings.otherVersionInstalledByUser": "Nicht in Gebrauch: {version} · von dir installiert",
+  "provider.settings.otherVersionDownloaded": "Nicht in Gebrauch: {version} · von OpenBot geladen",
+  "provider.settings.installedVersionIncomplete":
+    "Einige Modelle brauchen einen Teil, der dieser Version fehlt. Lade die Version von OpenBot, um sie zu nutzen.",
+  "provider.settings.useInstalledVersion": "Installierte nutzen",
+  "provider.settings.useDownloadedVersion": "OpenBot-Version nutzen",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt-Cache",
   "provider.settings.promptCacheDescription":
-    "Wie lange Claude den Kontext eines Agenten zwischen den Zügen im Cache behält.",
+    "Wie lange Claude und Pi den Kontext eines Agenten zwischen den Zügen im Cache behalten.",
   "provider.settings.promptCacheHour": "1 Stunde",
-  "provider.settings.promptCacheDefault": "Claude Code-Standard",
+  "provider.settings.promptCacheDefault": "Anbieter-Standard",
   "provider.settings.promptCacheLoadFailed": "Die Prompt-Cache-Dauer dieses Servers konnte nicht geladen werden.",
+  "provider.settings.cacheExpiryCompaction": "Vor Ablauf des Caches komprimieren",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Wenn ein Chat mit 200K oder mehr Tokens Kontext mit einem 1-Stunden-Cache inaktiv ist, komprimiert der Agent den Kontext, bevor der Cache abläuft. Dann liest die nächste Nachricht nicht den ganzen Kontext erneut ohne Cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "Die Komprimierungseinstellung dieses Servers konnte nicht geladen werden.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Mein Claude-Code-Setup verwenden",
   "provider.settings.claudeUserSetupDescription":
@@ -259,6 +310,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Claude Code-Standard",
   "provider.settings.compactWindowTokens": "{size} Tokens",
   "provider.settings.compactWindowLoadFailed": "Die Komprimierungsgröße dieses Servers konnte nicht geladen werden.",
+  "provider.settings.environment": "Umgebung",
+  "provider.settings.environmentVariables": "Variablen",
+  "provider.settings.environmentDescription":
+    "API-Schlüssel, Basis-URLs und andere Einstellungen, die jeder {name}-Prozess erhält. Eine Änderung gilt, wenn die laufenden Durchgänge enden.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL sendet mit OPENAI_API_KEY als Schlüssel die Modellanfragen von ChatGPT an diese Adresse.",
+  "provider.settings.environmentShellNote": "Die Befehle, die Agenten ausführen, können diese Werte lesen.",
+  "provider.settings.environmentAdd": "Variable hinzufügen",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Wert",
+  "provider.settings.environmentSaved": "Gespeichert",
+  "provider.settings.environmentSensitive": "Vertraulich",
+  "provider.settings.environmentNameLabel": "Variablenname {index}",
+  "provider.settings.environmentValueLabel": "Wert von {name}",
+  "provider.settings.environmentSensitiveLabel": "{name} geheim halten",
+  "provider.settings.environmentRemoveLabel": "{name} entfernen",
+  "provider.settings.environmentUnnamed": "Variable {index}",
+  "provider.settings.environmentPending":
+    "Speichern startet {name} neu, wenn die laufenden Durchgänge enden. Vertrauliche Werte bleiben auf dem Server.",
+  "provider.settings.environmentDone": "Gespeichert. {name} startet neu, wenn die laufenden Durchgänge enden.",
+  "provider.settings.environmentDiscard": "Verwerfen",
+  "provider.settings.environmentSave": "Speichern",
+  "provider.settings.environmentLoadFailed": "Die Variablen von {name} konnten nicht geladen werden.",
   "provider.settings.models": "Modelle",
   "provider.settings.modelsDescription": {
     one: "{shown} von {count} Modell erscheint in der Modellauswahl.",
@@ -277,4 +351,7 @@ export const messages = {
   "provider.settings.deleteOff":
     "Löscht die CLI, die OpenBot für {name} heruntergeladen hat ({size}). Konten, Anmeldungen und Agenten bleiben.",
   "provider.settings.removeDownloadFailed": "Der Download konnte nicht entfernt werden.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal bleibt angemeldet.",
+  "provider.settings.updateAll": "Alle aktualisieren",
 } as const satisfies PartialTranslation<typeof source>;

@@ -28,19 +28,13 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { SERVER_MUTE_CHOICES, serverMuteDescription } from "../servers/ServerActionItems";
 import { ServerMark } from "../servers/ServerRail";
 
-/** One agent of a server: the user's own level, or null when the agent uses the level of its server. */
 export interface NotificationMatrixAgent extends Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarUrl"> {
   id: string;
   name: string;
-  /** The role or the description of the agent, under its name. */
   detail: string;
   level: ServerNotificationLevel | null;
 }
 
-/**
- * The agents of a server. `unsupported`: the server cannot keep a level for each agent, so the user
- * must update OpenBot on it first.
- */
 export type NotificationMatrixAgents =
   | { status: "loading" }
   | { status: "failed" }
@@ -51,49 +45,35 @@ export interface NotificationMatrixServer {
   id: string;
   name: string;
   logoUrl: string | null;
-  /** The level that applies now: the level for all devices of the user, else the level of this device. */
   level: ServerNotificationLevel;
   muted: boolean;
-  /** When a timed mute ends, in epoch milliseconds. Null for no mute or a mute without an end. */
   mutedUntil: number | null;
   offline: boolean;
-  /** The server cannot keep the level of the user, so a change applies to this device only. */
   deviceOnly: boolean;
   agents: NotificationMatrixAgents;
 }
 
 export interface NotificationMatrixProps {
   servers: readonly NotificationMatrixServer[];
-  /** The device that keeps the level of a server that cannot keep it. */
   device: "computer" | "browser";
-  /** Resolves after the new level shows in `servers`. A rejection shows the previous level again. */
   onSetServerLevel: (serverId: string, level: ServerNotificationLevel) => Promise<void>;
-  /** `null` gives the agent the level of its server again. */
   onSetAgentLevel: (serverId: string, agentId: string, level: ServerNotificationLevel | null) => Promise<void>;
-  /** `durationMs` null mutes until the user unmutes. */
   onMute: (serverId: string, durationMs: number | null) => Promise<void>;
   onUnmute: (serverId: string) => Promise<void>;
-  /** Reads the agents of a server again after a failed read. */
   onRetry?: ((serverId: string) => void) | undefined;
-  /** Scrolls to a server card and moves the focus to it. Each nonce moves once. */
   focusRequest?: { serverId: string; nonce: number } | null | undefined;
-  /** Where the menus show. Without it, the menus show in the document body. */
   menuMount?: HTMLElement | undefined;
-  /** The anchor of the settings search. */
   "data-settings-row"?: string | undefined;
 }
 
-/** The level shown while a save runs. `server` shows the level of the server again. */
 type PendingAgentLevel = ServerNotificationLevel | "server";
 
-/** Short labels, so the three levels fit in one segmented control. */
 const SHORT_LEVEL_LABELS = {
   all: "settings.notificationMatrix.levelAll",
   "needs-me": "settings.notificationMatrix.levelNeedsMe",
   nothing: "settings.notificationMatrix.levelNothing",
 } as const satisfies Record<ServerNotificationLevel, AppTextKey>;
 
-/** The title of a notification section, with a badge that names the devices it applies to. */
 export function NotificationScopeTitle(props: { title: JSX.Element; scope?: AppTextKey | undefined }) {
   const { t } = useText();
   return (
@@ -104,14 +84,8 @@ export function NotificationScopeTitle(props: { title: JSX.Element; scope?: AppT
   );
 }
 
-/**
- * One card for each server, with the level of the server. Under it show only the agents that have
- * their own level; the last row of the card gives one more agent its own level. The levels apply on
- * all devices of the user; mute applies on this device only.
- */
 export function NotificationMatrix(props: NotificationMatrixProps) {
   const { t } = useText();
-  // Apart from the props, so that a failed save shows the value of the props again.
   const [pending, setPending] = createStore<{
     servers: Record<string, ServerNotificationLevel>;
     agents: Record<string, PendingAgentLevel>;
@@ -173,10 +147,6 @@ export function NotificationMatrix(props: NotificationMatrixProps) {
     }
   }
 
-  /**
-   * A row of an agent goes with its X button, and the last row goes when the last agent gets its own
-   * level. Then the focus moves to the last row of the card, so that it does not go to the page.
-   */
   function keepFocusInCard(serverId: string): void {
     requestAnimationFrame(() => {
       const card = serverCards.get(serverId);
@@ -197,12 +167,10 @@ export function NotificationMatrix(props: NotificationMatrixProps) {
     (request) => {
       if (!request || request.nonce === handledFocus) return;
       handledFocus = request.nonce;
-      // The card renders with the tab, so it can come one frame after the request.
       requestAnimationFrame(() => {
         const card = serverCards.get(request.serverId);
         if (!card) return;
         card.scrollIntoView({ block: "start" });
-        // The selected level comes first: the Retry or Mute button of a card can come before it in the DOM.
         const target =
           card.querySelector<HTMLElement>('.notification-matrix-level[aria-selected="true"]:not(:disabled)') ??
           card.querySelector<HTMLElement>("button:not(:disabled)");
@@ -213,13 +181,11 @@ export function NotificationMatrix(props: NotificationMatrixProps) {
 
   return (
     <div class="notification-matrix" data-settings-row={props["data-settings-row"]}>
-      {/* Keyed by id: a new summary of a server keeps its controls, and the focus stays on them. */}
       <For each={props.servers} keyed={(server) => server.id}>
         {(server) => {
           const serverId = untrack(() => server().id);
           onCleanup(() => serverCards.delete(serverId));
           const agents = () => readyAgents(server().agents) ?? [];
-          // An offline server answers nothing, and a server set to Nothing is silent for every agent.
           const agentsOpen = () => !server().offline && serverLevel(server()) !== "nothing";
           const ownLevels = () => agents().filter((agent) => agentLevel(server(), agent) !== null);
           const serverLevelAgents = () => agents().filter((agent) => agentLevel(server(), agent) === null);
@@ -321,7 +287,6 @@ function readyAgents(agents: NotificationMatrixAgents): readonly NotificationMat
   return agents.status === "ready" ? agents.agents : undefined;
 }
 
-/** The first level that is not the level of the server, for an agent that gets its own level. */
 function firstOtherLevel(level: ServerNotificationLevel): ServerNotificationLevel {
   return level === "all" ? "needs-me" : "all";
 }
@@ -330,7 +295,6 @@ function isLevel(value: string): value is ServerNotificationLevel {
   return SERVER_NOTIFICATION_LEVELS.some((level) => level === value);
 }
 
-/** The state of a server that changes what its card can do. */
 function ServerNotes(props: { server: NotificationMatrixServer; device: NotificationMatrixProps["device"] }) {
   const { t, format } = useText();
   const notes = (): string[] => {
@@ -350,7 +314,6 @@ function ServerNotes(props: { server: NotificationMatrixServer; device: Notifica
       if (server.agents.status === "unsupported") keys.push("settings.notificationMatrix.updateServer");
     }
     const texts = keys.map((key) => t(key));
-    // "Muted until 3:41 PM" comes first: it is why the server is silent now.
     if (server.muted) texts.unshift(serverMuteDescription({ notificationsMutedUntil: server.mutedUntil }, t, format));
     return texts;
   };
@@ -371,7 +334,6 @@ function AgentFace(props: { agent: NotificationMatrixAgent }) {
   );
 }
 
-/** The three levels as one segmented control. */
 function LevelSegments(props: {
   name: string;
   value: ServerNotificationLevel;
@@ -401,10 +363,8 @@ function LevelSegments(props: {
   );
 }
 
-/** The last row of a server card: the agents that use the server level. A choice gives one its own level. */
 function AddAgentMenu(props: {
   agents: readonly NotificationMatrixAgent[];
-  /** Some agents have their own level already. */
   another: boolean;
   menuMount: HTMLElement | undefined;
   onChoose: (agent: NotificationMatrixAgent) => void;
@@ -422,7 +382,6 @@ function AddAgentMenu(props: {
             : t("settings.notificationMatrix.chooseAgent")}
         </span>
       </DropdownMenu.Trigger>
-      {/* A portal without a mount uses the document body. */}
       <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
         <DropdownMenu.Content>
           <For each={props.agents} keyed={(agent) => agent.id}>
@@ -439,7 +398,6 @@ function AddAgentMenu(props: {
   );
 }
 
-/** Mute on this device only, with the choices of the server menu. The server notes name the end of a mute. */
 function MuteMenu(props: {
   name: string;
   muted: boolean;
@@ -458,7 +416,6 @@ function MuteMenu(props: {
           <BellOff aria-hidden="true" />
         </Show>
       </DropdownMenu.Trigger>
-      {/* A portal without a mount uses the document body. */}
       <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
         <DropdownMenu.Content>
           <Show when={props.muted}>

@@ -1,44 +1,39 @@
-import { type VaultSaveInput, vaultExpiryText } from "@openbot/contracts/ipc";
+import { type VaultItemKind, type VaultSaveInput, vaultExpiryText } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
+  isSecretFormField,
   UI_API_KEY_SCOPE_FIELD_ID,
   UI_BLOCK_SUBMIT_ACTION_ID,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
   type UiBlockState,
-  type UiVaultRequestKind,
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
   uiBlockOutcomeText,
+  uiConfirmAnswersWithPreview,
 } from "@openbot/contracts/ui-blocks";
 import type { AgentProfile } from "@openbot/ui/data";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { UiBlockingBlock } from "@openbot/ui/features/conversation/ui-blocks/UiBlockingBlock";
+import type { VaultRequestScope } from "@openbot/ui/features/vault/VaultPanel";
 import { VaultRequestCard } from "@openbot/ui/features/vault/VaultRequestCard";
 import { useText } from "@openbot/ui/text";
-import { createSignal, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, onCleanup, Show } from "solid-js";
 import type { PromptAnswerOptions } from "./conversation-types";
 
 export interface UiBlockPromptProps {
-  /** A block the person answers through the prompt it sits beside. */
   block: ConversationUiBlock;
   agents: AgentProfile[];
-  /** The agent that asks, which a Vault request names. */
   agentId?: string | undefined;
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
-  /**
-   * Sends the answers to the block's fallback questions through the prompt route. Absent for a block
-   * in the history, which only shows its stored state.
-   */
   onAnswer?: ((answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>) | undefined;
-  /** The answer went through and the card shows it. */
+  canEditPreview?: boolean | undefined;
+  onUnsentPreviewChange?: ((text: string | undefined) => void) | undefined;
   onAnswered?: (() => void) | undefined;
-  /** Gets the card's element, and undefined once the card is gone. */
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
 
-/** The form values of a Vault item, keyed by the field ids of `UI_VAULT_REQUEST_FIELDS`. */
 function vaultFormValues(input: VaultSaveInput): Record<string, string> {
   switch (input.kind) {
     case "login":
@@ -52,7 +47,7 @@ function vaultFormValues(input: VaultSaveInput): Record<string, string> {
         securityCode: input.securityCode ?? "",
       };
     case "contact": {
-      const { kind: _kind, id: _id, ...fields } = input;
+      const { kind: _kind, id: _id, agents: _agents, ...fields } = input;
       return fields;
     }
     case "apiKey":
@@ -60,23 +55,42 @@ function vaultFormValues(input: VaultSaveInput): Record<string, string> {
   }
 }
 
-/**
- * An agent's blocking block as a card. The card's response goes out as the answers to the block's
- * fallback questions, the same way a client that only knows the questions answers, so the host
- * reads both alike. A skip answers every question with nothing.
- */
+interface ApiKeyRequest {
+  keyFieldId: string;
+  name: string;
+  placeholder: string | undefined;
+  submit: string | undefined;
+  scope: VaultRequestScope;
+}
+
+function apiKeyRequestOf(block: ConversationUiBlock): ApiKeyRequest | undefined {
+  const spec = block.spec;
+  if (!block.apiKey || spec.type !== "form") return undefined;
+  const key = spec.fields.find(isSecretFormField);
+  const scope = spec.fields.find((field) => field.id === UI_API_KEY_SCOPE_FIELD_ID);
+  if (!key || (scope?.kind !== "segmented" && scope?.kind !== "select")) return undefined;
+  const [first] = scope.options;
+  if (first === undefined) return undefined;
+  return {
+    keyFieldId: key.id,
+    name: key.label ?? key.id,
+    placeholder: "placeholder" in key ? key.placeholder : undefined,
+    submit: spec.submit,
+    scope: { label: scope.label ?? scope.id, options: scope.options, value: scope.value ?? first },
+  };
+}
+
 export function UiBlockPrompt(props: UiBlockPromptProps) {
-  const { t, format, errorMessage } = useText();
+  const { t, format, errorMessage, sourceText } = useText();
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
-  // What this client sent, shown frozen until the host's stored state replaces it.
   const [sent, setSent] = createSignal<UiBlockState>();
   onCleanup(() => props.elementRef?.(undefined));
   const stored = (): UiBlockState =>
     props.block.state.status === "pending" ? (sent() ?? props.block.state) : props.block.state;
-  // The host stores the outcome with English list commas; draw it again in the reader's language.
   const state = (): UiBlockState => {
     const current = stored();
+    if (current.status === "closed" && current.outcome) return { ...current, outcome: sourceText(current.outcome) };
     if (current.status !== "answered" || !current.response) return current;
     const outcome = uiBlockOutcomeText(props.block.spec, current.response, format.list);
     return outcome.trim() ? { ...current, outcome } : current;
@@ -106,13 +120,27 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
-  function respond(response: UiBlockResponse): void {
+  let previewDraft: string | undefined;
+  const unsentPreview = () => {
+    const spec = props.block.spec;
+    return spec.type === "confirm" && previewDraft?.trim() && previewDraft !== spec.preview ? previewDraft : undefined;
+  };
+
+  function changePreviewDraft(draft: string | undefined): void {
+    previewDraft = draft;
+    props.onUnsentPreviewChange?.(unsentPreview());
+  }
+
+  function respond(response: UiBlockResponse, preview?: string): void {
     const spec = props.block.spec;
     const outcome = uiBlockOutcomeText(spec, response);
-    void send(uiBlockAnswersFromResponse(spec, response), {
+    props.onUnsentPreviewChange?.(undefined);
+    void send(uiConfirmAnswersWithPreview(spec, response, preview), {
       status: "answered",
       response,
       ...(outcome.trim() ? { outcome } : {}),
+    }).then(() => {
+      if (state().status === "pending") props.onUnsentPreviewChange?.(unsentPreview());
     });
   }
 
@@ -121,8 +149,11 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     void send(answers, { status: "closed" });
   }
 
-  /** The fields that the agent filled in. */
+  const apiKeyRequest = createMemo(() => apiKeyRequestOf(props.block));
+
   const prefill = () => {
+    const apiKey = apiKeyRequest();
+    if (apiKey) return { name: apiKey.name };
     const spec = props.block.spec;
     if (spec.type !== "form") return {};
     return Object.fromEntries(
@@ -130,18 +161,23 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     );
   };
 
-  /**
-   * Sends the item as the form's answer. The host saves it to the Vault and gives the agent only its
-   * name. The frozen state keeps no secret value. A failure goes to the dialog.
-   */
-  async function saveVaultItem(input: VaultSaveInput): Promise<void> {
+  function itemAnswer(input: VaultSaveInput, scope: string | undefined): [Record<string, string>, readonly string[]] {
+    const apiKey = apiKeyRequest();
+    if (apiKey && input.kind === "apiKey")
+      return [
+        { [apiKey.keyFieldId]: input.key ?? "", [UI_API_KEY_SCOPE_FIELD_ID]: scope ?? apiKey.scope.value },
+        [apiKey.keyFieldId],
+      ];
+    return [vaultFormValues(input), UI_VAULT_SECRET_FIELDS];
+  }
+
+  async function saveVaultItem(input: VaultSaveInput, scope?: string): Promise<void> {
     const answer = props.onAnswer;
     if (!answer || state().status !== "pending") return;
-    const values = Object.fromEntries(Object.entries(vaultFormValues(input)).filter(([, value]) => value !== ""));
+    const [answerValues, secrets] = itemAnswer(input, scope);
+    const values = Object.fromEntries(Object.entries(answerValues).filter(([, value]) => value !== ""));
     const response: UiBlockResponse = { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values };
-    const kept = Object.fromEntries(
-      Object.entries(values).filter(([id]) => !UI_VAULT_SECRET_FIELDS.some((secret) => secret === id)),
-    );
+    const kept = Object.fromEntries(Object.entries(values).filter(([id]) => !secrets.includes(id)));
     let failure: unknown;
     setBusy(true);
     setError(undefined);
@@ -159,7 +195,8 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
-  const vaultRequest = (): UiVaultRequestKind | undefined => props.block.vault?.kind;
+  const vaultRequest = (): VaultItemKind | undefined =>
+    props.block.vault?.kind ?? (apiKeyRequest() ? "apiKey" : undefined);
 
   return (
     <Show when={vaultRequest()} fallback={uiBlockCard()}>
@@ -169,7 +206,11 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
           title={props.block.spec.title ?? ""}
           agentName={props.agents.find((agent) => agent.id === props.agentId)?.name}
           prefill={prefill()}
+          scope={apiKeyRequest()?.scope}
+          keyPlaceholder={apiKeyRequest()?.placeholder}
+          submitLabel={apiKeyRequest()?.submit}
           status={state().status}
+          closedOutcome={state().outcome}
           saved={props.block.vault?.saved}
           values={state().response?.values}
           error={error()}
@@ -182,22 +223,17 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     </Show>
   );
 
-  /** The `request_api_key` form shows its choice of who can use the key small, next to the submit button. */
-  function footerFieldId() {
-    if (props.block.apiKey) return UI_API_KEY_SCOPE_FIELD_ID;
-    return undefined;
-  }
-
   function uiBlockCard() {
     return (
       <UiBlockingBlock
         spec={props.block.spec}
-        footerFieldId={footerFieldId()}
         state={state()}
         busy={busy()}
         error={error()}
         disabled={!props.onAnswer}
         onRespond={respond}
+        canEditPreview={props.canEditPreview}
+        onPreviewDraftChange={changePreviewDraft}
         onSkip={props.onAnswer ? skip : undefined}
         elementRef={(element) => props.elementRef?.(element)}
         renderPreview={(markdown) => (

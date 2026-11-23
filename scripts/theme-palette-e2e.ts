@@ -1,10 +1,3 @@
-// Writes a theme palette file into a running dev app's `themes` folder, as the Omarchy theme
-// script does, and checks the full path: the app finds the file with no restart, Settings lists it
-// by its name, choosing it puts its colors on the window, a rewrite of the file (a theme switch)
-// reaches the window, a file with a color that is not hex is refused, and choosing Dark again
-// removes the palette colors. Removes the file and restores the saved preference at the end.
-// Writes .openbot-build/theme-palette/report.json and a screenshot per step. Needs
-// `--allow-mutations`, because it changes the theme setting.
 import assert from "node:assert/strict";
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -17,7 +10,6 @@ import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-cli
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -27,12 +19,10 @@ declare global {
 const OUT = resolve(import.meta.dirname, "../.openbot-build/theme-palette");
 const PALETTE_ID = "e2e-omarchy";
 const PALETTE_NAME = "E2E Omarchy";
-// The dark canvas of tokens.css: the window shows it again when no palette is selected.
 const DARK_CANVAS = "#1a1a1a";
 
 type PaletteColors = Record<AppThemePaletteColor, string>;
 
-// Tokyo Night and Catppuccin Latte, as the Omarchy template makes them from each theme's colors.toml.
 const TOKYO_NIGHT: PaletteColors = {
   canvas: "#1a1b26",
   frame: "#13141c",
@@ -83,7 +73,6 @@ const session = await connectToDevApp(instance.remoteDebuggingPort, logger, {
 const themes = join(resolveDevelopmentAppDataRoot(), instance.profile, "themes");
 const paletteFile = join(themes, `${PALETTE_ID}.json`);
 
-/** Replaces the file with a rename, as `omarchy-theme-set-openbot` does, so no reader sees half a file. */
 function publishPalette(appearance: "light" | "dark", colors: Record<string, string>) {
   mkdirSync(themes, { recursive: true });
   const temporary = `${paletteFile}.tmp`;
@@ -95,26 +84,23 @@ function settingsTitle(page: Page) {
   return page.getByRole("heading", { level: 1, name: en["app.settingsPage.title"], exact: true });
 }
 
-/** The Theme button. Its name is the title and then the selected theme. */
 function themeButton(page: Page) {
   return page.getByRole("button", { name: new RegExp(`^${en["settings.appearance.theme.title"]} `) });
 }
 
 async function openSettings(page: Page) {
-  // The keyboard shortcut is a native menu item, which CDP key events do not reach.
   if (!(await settingsTitle(page).isVisible()))
     await page
       .getByRole("navigation", { name: en["app.rail.label"] })
       .getByRole("button", { name: en["app.rail.settings"], exact: true })
       .click();
   await settingsTitle(page).waitFor();
-  const general = page.getByRole("tab", { name: en["settings.tab.general.title"], exact: true });
-  if (await general.isVisible()) await general.click();
+  const appearance = page.getByRole("tab", { name: en["settings.appearance.title"], exact: true });
+  if (await appearance.isVisible()) await appearance.click();
   await themeButton(page).waitFor();
 }
 
 async function closeSettings(page: Page) {
-  // A focused settings tab keeps Escape for itself, so Escape goes from the title.
   await settingsTitle(page).focus();
   await page.keyboard.press("Escape");
   await settingsTitle(page).waitFor({ state: "hidden" });
@@ -126,7 +112,6 @@ async function chooseTheme(page: Page, label: string) {
   await page.getByRole("option", { name: label, exact: true }).click();
 }
 
-/** Waits until main lists the palette (or no longer lists it), which the folder watch causes. */
 async function waitForListed(page: Page, listed: boolean) {
   await page.waitForFunction(
     async ([id, expected]) =>
@@ -135,7 +120,6 @@ async function waitForListed(page: Page, listed: boolean) {
   );
 }
 
-/** What the window shows: the root attribute, the canvas and accent tokens and the page background. */
 function shownColors(page: Page) {
   return page.evaluate(() => {
     const root = document.documentElement;
@@ -165,14 +149,11 @@ const original = await page.evaluate(() => window.openbot.getAppAppearancePrefer
 type ShownColors = Awaited<ReturnType<typeof shownColors>>;
 const steps: Partial<Record<"chosen" | "rewritten" | "refused" | "restored" | "cleared", ShownColors>> = {};
 try {
-  // The checks below name the base under a refused palette, so the saved base must be known.
   await page.evaluate(() => window.openbot.setAppAppearancePreference({ appearance: "dark", palette: null }));
 
-  // 1. A new file reaches main with no restart.
   publishPalette("dark", TOKYO_NIGHT);
   await waitForListed(page, true);
 
-  // 2. Settings lists it by name, and choosing it gives the window its colors over the dark base.
   await chooseTheme(page, PALETTE_NAME);
   await page.waitForFunction(
     async (id) => (await window.openbot.getAppAppearancePreference()).palette === id,
@@ -187,7 +168,6 @@ try {
   await page.screenshot({ path: resolve(OUT, "workspace-tokyo-night.png") });
   steps.chosen = shown;
 
-  // 3. A theme switch rewrites the file. The window follows, the light base included.
   publishPalette("light", CATPPUCCIN_LATTE);
   shown = await waitForCanvas(page, CATPPUCCIN_LATTE.canvas);
   await page.waitForFunction(() => document.documentElement.dataset.openbotColorScheme === "light");
@@ -196,11 +176,8 @@ try {
   await page.screenshot({ path: resolve(OUT, "workspace-catppuccin-latte.png") });
   steps.rewritten = shown;
 
-  // 4. A color that is not hex never reaches CSS: the whole file is refused, and the window shows
-  // the saved appearance under it. The saved id stays, so a valid file brings the palette back.
   publishPalette("dark", { ...TOKYO_NIGHT, accent: "red; background: url(https://example.com)" });
   await waitForListed(page, false);
-  // The event that clears the colors can reach the window after the answer to the poll above.
   await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--openbot-bg-canvas") === "", {
     timeout: 10_000,
   });
@@ -211,7 +188,6 @@ try {
   shown = await waitForCanvas(page, TOKYO_NIGHT.canvas);
   steps.restored = shown;
 
-  // 5. Choosing Dark clears the palette and its colors.
   await chooseTheme(page, en["settings.appearance.theme.dark"]);
   shown = await waitForCanvas(page, DARK_CANVAS);
   assert.equal(shown.inlineCanvas, "", "Dark left the palette colors on the window.");

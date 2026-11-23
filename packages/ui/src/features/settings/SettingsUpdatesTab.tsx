@@ -8,12 +8,14 @@ import {
   AlertTitle,
   Button,
   Clock3,
+  ConfirmDialog,
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemGroup,
   ItemTitle,
+  RotateCcw,
   Select,
   SelectContent,
   SelectItem,
@@ -22,7 +24,7 @@ import {
   SettingsSection,
   SwitchField,
 } from "@openbot/ui";
-import { Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { restartReasonKey } from "../updates/restart-reasons";
 import type { GeneralSettingsValue } from "./app-settings";
@@ -40,7 +42,6 @@ interface SettingsUpdatesTabProps {
   onOpenWhatsNew?: (() => void) | undefined;
   value: GeneralSettingsValue;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
-  /** The dialog element the Select popover portals into, captured when this tab was created. */
   selectMount: HTMLElement | undefined;
 }
 
@@ -83,41 +84,70 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
         )}
       </Show>
       <Show when={props.store.idleRestart()}>
-        {(restart) => (
-          <Alert tone={restart().error === undefined ? "neutral" : "danger"} role="status">
-            <AlertIcon>
-              <Clock3 />
-            </AlertIcon>
-            <AlertContent>
-              <AlertTitle>
-                {restart().error !== undefined
-                  ? t("update.idleRestart.failedTitle")
-                  : restart().target === "update"
-                    ? t("update.idleRestart.updateTitle")
-                    : t("update.idleRestart.relaunchTitle")}
-              </AlertTitle>
-              <AlertDescription>
-                {restart().error !== undefined
-                  ? errorMessage(restart().error, t("update.idleRestart.failedTitle"))
-                  : t("update.idleRestart.description")}
-              </AlertDescription>
-              <Show when={restart().error === undefined && restart().waitingFor.length > 0}>
-                <AlertDescription>{idleRestartWaitingFor(restart().waitingFor)}</AlertDescription>
-              </Show>
-            </AlertContent>
-            <AlertActions>
-              <Button
-                variant="outline"
-                type="button"
-                size="sm"
-                loading={props.store.idleRestartBusy()}
-                onClick={() => void props.store.cancelIdleRestart()}
-              >
-                {restart().error === undefined ? t("update.idleRestart.cancel") : t("common.close")}
-              </Button>
-            </AlertActions>
-          </Alert>
-        )}
+        {(restart) => {
+          const [confirmingRestartNow, setConfirmingRestartNow] = createSignal(false);
+          return (
+            <Alert tone={restart().error === undefined ? "neutral" : "danger"} role="status">
+              <AlertIcon>
+                <Clock3 />
+              </AlertIcon>
+              <AlertContent>
+                <AlertTitle>
+                  {restart().error !== undefined
+                    ? t("update.idleRestart.failedTitle")
+                    : restart().target === "update"
+                      ? t("update.idleRestart.updateTitle")
+                      : t("update.idleRestart.relaunchTitle")}
+                </AlertTitle>
+                <AlertDescription>
+                  {restart().error !== undefined
+                    ? errorMessage(restart().error, t("update.idleRestart.failedTitle"))
+                    : t("update.idleRestart.description")}
+                </AlertDescription>
+                <Show when={restart().error === undefined && restart().waitingFor.length > 0}>
+                  <AlertDescription>{idleRestartWaitingFor(restart().waitingFor)}</AlertDescription>
+                </Show>
+              </AlertContent>
+              <AlertActions>
+                <Show when={restart().error === undefined && props.store.restartNowOffered()}>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    size="sm"
+                    disabled={props.store.idleRestartBusy()}
+                    onClick={() => setConfirmingRestartNow(true)}
+                  >
+                    {t("update.idleRestart.restartNow")}
+                  </Button>
+                </Show>
+                <Button
+                  variant="outline"
+                  type="button"
+                  size="sm"
+                  loading={props.store.idleRestartBusy()}
+                  onClick={() => void props.store.cancelIdleRestart()}
+                >
+                  {restart().error === undefined ? t("update.idleRestart.cancel") : t("common.close")}
+                </Button>
+              </AlertActions>
+              <ConfirmDialog
+                open={confirmingRestartNow() && restart().error === undefined}
+                initialFocus="cancel"
+                tone="default"
+                icon={<RotateCcw />}
+                title={t("update.idleRestart.restartNowTitle")}
+                description={t("update.idleRestart.restartNowDescription")}
+                confirmLabel={t("update.idleRestart.restartNow")}
+                cancelLabel={t("update.idleRestart.keepWaiting")}
+                onCancel={() => setConfirmingRestartNow(false)}
+                onConfirm={() => {
+                  setConfirmingRestartNow(false);
+                  void props.store.restartNow();
+                }}
+              />
+            </Alert>
+          );
+        }}
       </Show>
       <Show when={props.onOpenWhatsNew}>
         <Button type="button" variant="outline" size="sm" onClick={() => props.onOpenWhatsNew?.()}>
@@ -135,7 +165,7 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
           </ItemContent>
           <ItemActions>
             <Select<UpdateTrack>
-              class="settings-modal-update-track-select"
+              class="settings-modal-select"
               options={updateTrackOptions}
               value="Stable"
               onChange={() => undefined}
@@ -159,7 +189,6 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
             </Show>
             <ItemDescription class={props.store.messageClass()}>{props.store.message()}</ItemDescription>
           </ItemContent>
-          {/* The host installs the shared application itself, so a tenant has no action to take. */}
           <Show when={!managed()}>
             <ItemActions class="settings-modal-update-actions">
               <Button
@@ -232,7 +261,6 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
             </>
           }
         >
-          {/* Host management is machine state an administrator owns. Report it; never offer it. */}
           <Item data-settings-row="settings.updates.managed.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{t("settings.updates.managed.title")}</ItemTitle>

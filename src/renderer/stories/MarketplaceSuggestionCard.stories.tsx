@@ -10,12 +10,6 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
-/*
- * Issue #1291: an agent suggests a Marketplace app or skill in the conversation. The person
- * connects it from the chat, opens its listing, or dismisses it. The connect step itself, with its
- * approval and sign-in dialogs, stays in the renderer.
- */
-
 const chief = requireFixture(STORY_AGENTS[0], "Story agent 0");
 
 function tile(svg: string): string {
@@ -63,15 +57,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The compact card, as in the issue reference. */
 export const Available: Story = {};
 
-/** The connect step runs. Sign-in and approval dialogs open from the renderer. */
 export const Connecting: Story = { args: { state: "busy" } };
 
 export const Connected: Story = { args: { state: "connected" } };
 
-/** The app was connected before, and its sign-in has expired. */
 export const NeedsAttention: Story = {
   args: {
     kind: "app",
@@ -82,7 +73,6 @@ export const NeedsAttention: Story = {
   },
 };
 
-/** A skill installs on the agent instead of connecting a service. */
 export const Skill: Story = {
   args: {
     kind: "skill",
@@ -94,10 +84,6 @@ export const Skill: Story = {
 
 export const SkillInstalled: Story = { args: { ...Skill.args, state: "connected" } };
 
-/**
- * A memory review asks to save what the chat taught as a skill. The question can be up to 600
- * characters, so it takes the width of the card and Save goes under it.
- */
 export const SkillQuestion: Story = {
   args: {
     kind: "skill",
@@ -116,10 +102,8 @@ export const SkillQuestion: Story = {
   ),
 };
 
-/** The agent saved the skill. */
 export const SkillQuestionSaved: Story = { args: { ...SkillQuestion.args, state: "connected" } };
 
-/** The question in a narrow chat: Save takes the full width. */
 export const SkillQuestionNarrow: Story = {
   args: SkillQuestion.args,
   render: (args) => (
@@ -129,7 +113,6 @@ export const SkillQuestionNarrow: Story = {
   ),
 };
 
-/** A member of a joined server can see the suggestion but cannot connect apps. */
 export const Unavailable: Story = {
   args: {
     state: "unavailable",
@@ -138,10 +121,8 @@ export const Unavailable: Story = {
   },
 };
 
-/** A dismissed card stays as one line, so the person can undo. */
 export const Dismissed: Story = { args: { dismissed: true } };
 
-/** No icon, a long name and a long description, in a narrow chat. */
 export const NarrowNoIcon: Story = {
   args: {
     name: "Company password manager for the finance team",
@@ -155,7 +136,6 @@ export const NarrowNoIcon: Story = {
   ),
 };
 
-/** Holds the card state, so Connect, Dismiss and Undo can be tried. Connect takes a moment. */
 function CardStage(props: MarketplaceSuggestionCardProps) {
   const [card, setCard] = createStore<{ state: MarketplaceSuggestionState; dismissed: boolean }>({
     state: untrack(() => props.state),
@@ -215,7 +195,6 @@ const reply = message(
   "2:39 PM",
 );
 
-/** The card under the agent's reply, at the width of a chat. */
 export const InConversation: Story = {
   parameters: { layout: "fullscreen" },
   render: (args) => (

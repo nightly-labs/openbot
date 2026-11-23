@@ -1,6 +1,3 @@
-// The dock over a local page: the main renderer publishes it, and the overlay view above the page shows
-// it, sends its actions back, and reports the space it needs.
-
 import type { IpcMainInvokeEvent } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type BrowserDockOverlay, requireBrowserDockSender } from "../browser-dock-overlay";

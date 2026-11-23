@@ -13,10 +13,8 @@ import { writeJsonFileAtomically } from "../atomic-json-file";
 import { causeHelpers } from "../effect-boundary";
 import { isMissingFileError } from "../file-errors";
 
-/** A provider that can hold accounts: every built-in one. */
 type AccountProvider = Exclude<AgentProviderId, "acp">;
 
-/** A provider account after the first. Its credentials stay in its folder, never in this list. */
 export interface StoredProviderAccount {
   id: string;
   provider: AccountProvider;
@@ -24,6 +22,7 @@ export interface StoredProviderAccount {
 }
 
 const ACCOUNT_ID = /^a[0-9a-f]{16}$/u;
+const POOL_ACCOUNT_ID = /^(?:default|a[0-9a-f]{16})$/u;
 const Provider = Schema.Literals(AGENT_PROVIDERS.filter((provider) => provider !== "acp"));
 const LabelText = Schema.String.check(Schema.isMaxLength(PROVIDER_ACCOUNT_LABEL_MAX_LENGTH));
 const Label = Schema.NullOr(LabelText);
@@ -32,8 +31,18 @@ const ProviderAccountsFile = Schema.Struct({
   accounts: Schema.Array(
     Schema.Struct({ id: Schema.String.check(Schema.isPattern(ACCOUNT_ID)), provider: Provider, label: Label }),
   ),
-  /** The names the user gave the first account of each provider. */
   defaultLabels: Schema.Record(Schema.String, LabelText),
+  pools: Schema.optionalKey(
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({
+        leftOut: Schema.Array(Schema.String.check(Schema.isPattern(POOL_ACCOUNT_ID))).check(
+          Schema.isMaxLength(MAX_PROVIDER_ACCOUNTS),
+        ),
+      }),
+    ),
+  ),
+  liveVoiceAccount: Schema.optionalKey(Schema.String.check(Schema.isPattern(POOL_ACCOUNT_ID))),
 });
 type ProviderAccountsFile = typeof ProviderAccountsFile.Type;
 const decodeProviderAccountsFile = Schema.decodeUnknownSync(ProviderAccountsFile);
@@ -44,12 +53,6 @@ export class ProviderAccountStoreFailed extends Schema.TaggedError<ProviderAccou
 ) {}
 const { rewrap: toStoreFailed } = causeHelpers(ProviderAccountStoreFailed);
 
-/**
- * The provider accounts after the first, and the folder each one signs in to. A folder is made
- * before its account is saved and removed after its account is removed, so the list never names a
- * folder that does not exist. A file this build cannot read stays unchanged, and the store is then
- * read-only.
- */
 export class ProviderAccountStore {
   readonly #path: string;
   readonly #root: string;
@@ -57,7 +60,6 @@ export class ProviderAccountStore {
   #file: ProviderAccountsFile = { version: 1, accounts: [], defaultLabels: {} };
   #readOnly = false;
 
-  /** `path` is the list; `root` holds one folder for each account. */
   constructor(path: string, root: string) {
     this.#path = path;
     this.#root = root;
@@ -77,7 +79,6 @@ export class ProviderAccountStore {
     try {
       this.#file = decodeProviderAccountsFile(JSON.parse(text));
     } catch {
-      // A newer build's file, or a damaged one: keep it for that build, and change nothing.
       this.#readOnly = true;
     }
   }).bind(this);
@@ -94,16 +95,46 @@ export class ProviderAccountStore {
     return this.#file.defaultLabels[provider] ?? null;
   }
 
-  /** The folder an account signs in to. Only ids this store made reach a path. */
+  pool(provider: AgentProviderId): { leftOut: readonly string[] } | null {
+    return this.#file.pools?.[provider] ?? null;
+  }
+
+  readonly setPool = Effect.fn("ProviderAccountStore.setPool")(function* (
+    this: ProviderAccountStore,
+    provider: AccountProvider,
+    pool: { leftOut: readonly string[] } | null,
+  ) {
+    return yield* this.#change((file) => {
+      const { [provider]: _previous, ...pools } = file.pools ?? {};
+      return Effect.succeed({
+        file: { ...file, pools: pool ? { ...pools, [provider]: { leftOut: [...new Set(pool.leftOut)] } } : pools },
+        result: undefined,
+      });
+    });
+  }).bind(this);
+
+  liveVoiceAccount(): string | null {
+    return this.#file.liveVoiceAccount ?? null;
+  }
+
+  readonly setLiveVoiceAccount = Effect.fn("ProviderAccountStore.setLiveVoiceAccount")(function* (
+    this: ProviderAccountStore,
+    accountId: string | null,
+  ) {
+    return yield* this.#change((file) => {
+      const { liveVoiceAccount: _previous, ...rest } = file;
+      return Effect.succeed({
+        file: accountId ? { ...rest, liveVoiceAccount: accountId } : rest,
+        result: undefined,
+      });
+    });
+  }).bind(this);
+
   home(account: StoredProviderAccount): string {
     if (!ACCOUNT_ID.test(account.id)) throw new Error("Invalid provider account.");
     return join(this.#root, account.id);
   }
 
-  /**
-   * Makes an empty, private folder and saves the account that signs in to it. Null when the provider
-   * already has `MAX_PROVIDER_ACCOUNTS`, checked in the same write so that two requests cannot pass it.
-   */
   readonly create = Effect.fn("ProviderAccountStore.create")(function* (
     this: ProviderAccountStore,
     provider: AgentProviderId,
@@ -115,7 +146,6 @@ export class ProviderAccountStore {
     return yield* this.#add(provider, `a${randomBytes(8).toString("hex")}`);
   }).bind(this);
 
-  /** The account with this fixed id, made as `create` makes one when it does not exist yet. */
   readonly ensure = Effect.fn("ProviderAccountStore.ensure")(function* (
     this: ProviderAccountStore,
     provider: AccountProvider,
@@ -172,18 +202,23 @@ export class ProviderAccountStore {
     });
   }).bind(this);
 
-  /** Forgets the account, then removes its folder with the credentials in it. */
   readonly remove = Effect.fn("ProviderAccountStore.remove")(function* (
     this: ProviderAccountStore,
     account: StoredProviderAccount,
   ) {
     const home = this.home(account);
-    yield* this.#change((file) =>
-      Effect.succeed({
-        file: { ...file, accounts: file.accounts.filter((candidate) => candidate.id !== account.id) },
+    yield* this.#change((file) => {
+      const { liveVoiceAccount, ...rest } = file;
+      return Effect.succeed({
+        file: {
+          ...rest,
+          accounts: file.accounts.filter((candidate) => candidate.id !== account.id),
+          ...(file.pools ? { pools: withoutPoolAccount(file.pools, account.id) } : {}),
+          ...(liveVoiceAccount && liveVoiceAccount !== account.id ? { liveVoiceAccount } : {}),
+        },
         result: undefined,
-      }),
-    );
+      });
+    });
     yield* Effect.tryPromise({
       try: () => rm(home, { recursive: true, force: true }),
       catch: (cause) => new ProviderAccountStoreFailed({ cause }),
@@ -209,4 +244,16 @@ export class ProviderAccountStore {
       }).pipe(Effect.uninterruptible),
     );
   }
+}
+
+function withoutPoolAccount(
+  pools: NonNullable<ProviderAccountsFile["pools"]>,
+  accountId: string,
+): NonNullable<ProviderAccountsFile["pools"]> {
+  return Object.fromEntries(
+    Object.entries(pools).map(([provider, pool]) => [
+      provider,
+      { leftOut: pool.leftOut.filter((id) => id !== accountId) },
+    ]),
+  );
 }

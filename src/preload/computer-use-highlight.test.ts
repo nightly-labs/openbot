@@ -3,7 +3,6 @@ import { IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { expect, it, vi } from "vitest";
 
 const bridge = vi.hoisted(() => {
-  // The main window: the preload reads its URL for the server of a chat window.
   vi.stubGlobal("window", { addEventListener: () => {}, location: { search: "" } });
   const api: { current: OpenBotDesktopApi | null } = { current: null };
   return { api, listeners: new Map<string, Set<(event: null, payload: unknown) => void>>() };
@@ -44,8 +43,6 @@ const placement = {
   covered: [{ x: 100, y: 200, width: 300, height: 400 }],
 };
 
-// The overlay draws this over another application's window, and it arrives on a channel the
-// renderer cannot answer on, so a payload that is not a placement must not reach the surface.
 it("delivers a placement and refuses one that is not a placement", () => {
   if (!bridge.api.current) throw new Error("The preload API was not exposed.");
   const drawn = vi.fn();
@@ -57,15 +54,12 @@ it("delivers a placement and refuses one that is not a placement", () => {
   expect(() => send({ ...placement, width: "wide" })).toThrow("Invalid Computer Use highlight placement.");
   expect(() => send({ ...placement, windowTitle: undefined })).toThrow("Invalid Computer Use highlight placement.");
   expect(() => send({ ...placement, cursor: { x: 40 } })).toThrow("Invalid Computer Use highlight placement.");
-  // The covered areas cut the rim away, so an entry that is not a rectangle would leave the rim
-  // drawn whole over the window in front of the one it marks.
   expect(() => send({ ...placement, covered: {} })).toThrow("Invalid Computer Use highlight placement.");
   expect(() => send({ ...placement, covered: [{ x: 100, y: 200, width: 300 }] })).toThrow(
     "Invalid Computer Use highlight placement.",
   );
   expect(drawn).toHaveBeenCalledTimes(1);
 
-  // No cursor is the ordinary case: the driver draws its own on a desktop of one display.
   send({ ...placement, cursor: null });
   expect(drawn).toHaveBeenLastCalledWith({ ...placement, cursor: null });
 

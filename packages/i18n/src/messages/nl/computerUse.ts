@@ -19,7 +19,12 @@ export const messages = {
   "computerUse.ready.title": "Computerbesturing is klaar",
   "computerUse.ready.description":
     "OpenBot kan apps op deze computer zien en bedienen. Dit systeem vraagt geen extra machtiging.",
+  "computerUse.limited.title": "Computerbesturing is beperkt op dit bureaublad",
   "computerUse.openSettingsFailed.title": "Kan Systeeminstellingen niet openen",
+  "computerUse.restartRequired.title": "Opnieuw starten nodig",
+  "computerUse.restartRequired.description":
+    "macOS blokkeert nog steeds klikken en typen. Gebeurt dit na een herstart weer, verwijder OpenBot dan uit Toegankelijkheid en voeg het opnieuw toe.",
+  "computerUse.restartRequired.action": "OpenBot opnieuw starten",
   "computerUse.compact.title": "Computerbesturing inschakelen",
   "computerUse.compact.description": "Laat OpenBot apps op deze computer zien en bedienen.",
   "computerUse.granted": "Verleend",

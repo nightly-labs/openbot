@@ -5,19 +5,34 @@ import { SKILL_DESCRIPTION_MAX_LENGTH, type SkillPackagePreview } from "@openbot
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
-import { unzipSync, zipSync } from "fflate";
+import { strFromU8, unzipSync, type Zippable, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 
-/** The YAML frontmatter at the start of a `SKILL.md`; group 1 is the YAML. */
 export const SKILL_FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
 
 export const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
-/** The file macOS Finder writes into each folder it opens. A package made from a folder leaves it out. */
 export const FINDER_METADATA_FILE = ".DS_Store";
+const EXECUTABLE_ENTRY = { os: 3, attrs: 0o100755 * 0x10000 } as const;
+
+export function skillZippable(files: Record<string, Uint8Array>, executable: ReadonlySet<string>): Zippable {
+  return Object.fromEntries(
+    Object.entries(files).map(([name, bytes]) => [name, executable.has(name) ? [bytes, EXECUTABLE_ENTRY] : bytes]),
+  );
+}
+
+const RUNTIME_CACHE_FOLDERS = new Set(["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+export function isRuntimeCacheFolder(name: string): boolean {
+  return RUNTIME_CACHE_FOLDERS.has(name);
+}
+export function isRuntimeCacheFile(path: string): boolean {
+  return path.split("/").slice(0, -1).some(isRuntimeCacheFolder);
+}
+
 export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};
+  const executable = new Set<string>();
   let expandedSize = 0;
   function visit(directory: string): Effect.Effect<void, SkillArchiveFailure> {
     return Effect.gen(function* () {
@@ -26,10 +41,13 @@ export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(funct
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink())
           return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
-        if (entry.isDirectory()) yield* visit(path);
-        else if (entry.isFile()) {
+        if (entry.isDirectory()) {
+          if (!isRuntimeCacheFolder(entry.name)) yield* visit(path);
+        } else if (entry.isFile()) {
           const name = relative(root, path).replaceAll("\\", "/");
-          expandedSize += (yield* archiveIO(() => lstat(path))).size;
+          const stats = yield* archiveIO(() => lstat(path));
+          expandedSize += stats.size;
+          if (stats.mode & 0o111) executable.add(name);
           if (expandedSize > MAX_BYTES)
             return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.expandedTooLarge")) });
           files[name] = new Uint8Array(yield* archiveIO(() => readFile(path)));
@@ -43,7 +61,7 @@ export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(funct
   }
   yield* visit(root);
   const bytes = yield* Effect.try({
-    try: () => zipSync(files, { level: 6 }),
+    try: () => zipSync(skillZippable(files, executable), { level: 6 }),
     catch: (cause) => new SkillArchiveFailure({ cause }),
   });
   if (bytes.byteLength > MAX_BYTES)
@@ -51,7 +69,6 @@ export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(funct
   return bytes;
 });
 
-/** One `SKILL.md` on its own, as an agent template carries it; publish and install both read it here. */
 export function inspectSkillMarkdown(markdown: string): Omit<SkillPackagePreview, "draftId" | "size"> {
   return inspectArchive(zipSync({ "SKILL.md": new TextEncoder().encode(markdown) }));
 }
@@ -73,6 +90,13 @@ export function inspectArchive(bytes: Uint8Array): Omit<SkillPackagePreview, "dr
 }
 
 export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
+  return readSkillArchive(bytes).files;
+}
+
+export function readSkillArchive(bytes: Uint8Array): {
+  files: Record<string, Uint8Array>;
+  executable: Set<string>;
+} {
   if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new Error(sourceText("error.skill.packageTooLarge"));
   let raw: Record<string, Uint8Array>;
   try {
@@ -89,11 +113,13 @@ export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
   } catch {
     throw new Error(sourceText("error.skill.zipInvalid"));
   }
+  const executableEntries = executableArchiveEntries(bytes);
   const entries = Object.entries(raw).filter(([name]) => !name.endsWith("/"));
   if (!entries.length || entries.length > MAX_FILES) throw new Error(sourceText("error.skill.fileCountInvalid"));
   const roots = new Set(entries.map(([name]) => name.replaceAll("\\", "/").split("/")[0]));
   const wrapper = roots.size === 1 && entries.every(([name]) => name.includes("/")) ? [...roots][0] : null;
   const result: Record<string, Uint8Array> = {};
+  const executable = new Set<string>();
   let size = 0;
   for (const [rawName, data] of entries) {
     const name = (wrapper ? rawName.slice((wrapper?.length ?? 0) + 1) : rawName).replaceAll("\\", "/");
@@ -101,11 +127,34 @@ export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
     size += data.byteLength;
     if (size > MAX_BYTES) throw new Error(sourceText("error.skill.expandedTooLarge"));
     result[name] = data;
+    if (executableEntries.has(rawName)) executable.add(name);
   }
-  return result;
+  return { files: result, executable };
 }
 
-/** A path that escapes its folder, or a file that must not travel: secrets, VCS data, nested archives. */
+function executableArchiveEntries(bytes: Uint8Array): Set<string> {
+  const u16 = (at: number) => (bytes[at] ?? 0) | ((bytes[at + 1] ?? 0) << 8);
+  const u32 = (at: number) => (u16(at) | (u16(at + 2) << 16)) >>> 0;
+  const names = new Set<string>();
+  let end = bytes.byteLength - 22;
+  while (end > 0 && u32(end) !== 0x06054b50) end -= 1;
+  let count = u16(end + 8);
+  let offset = u32(end + 16);
+  if (u32(end - 20) === 0x07064b50 && u32(u32(end - 12)) === 0x06064b50) {
+    const zip64End = u32(end - 12);
+    count = u32(zip64End + 32);
+    offset = u32(zip64End + 48);
+  }
+  for (let index = 0; index < count && u32(offset) === 0x02014b50; index += 1) {
+    const os = bytes[offset + 5];
+    const nameLength = u16(offset + 28);
+    const name = strFromU8(bytes.subarray(offset + 46, offset + 46 + nameLength), !(u16(offset + 8) & 0x800));
+    if ((os === 3 || os === 19) && (u32(offset + 38) >>> 16) & 0o111) names.add(name);
+    offset += 46 + nameLength + u16(offset + 30) + u16(offset + 32);
+  }
+  return names;
+}
+
 export function isUnsafeArchivePath(name: string): boolean {
   const parts = name.split("/");
   const file = parts.at(-1)?.toLowerCase() ?? "";
@@ -129,7 +178,6 @@ function slugify(name: string): string {
     .replace(/^-|-$/gu, "")
     .slice(0, 64);
   if (value) return value;
-  // A name with no Latin letter or digit, such as one in Japanese, gets a slug from its hash.
   const trimmed = name.trim();
   if (!trimmed) throw new Error(sourceText("error.skill.slugInvalid"));
   return `skill-${createHash("sha256").update(trimmed).digest("hex").slice(0, 12)}`;

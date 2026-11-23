@@ -1,13 +1,6 @@
 import * as Network from "expo-network";
 import { AppState } from "react-native";
 
-/**
- * Tells when the phone moves to another kind of network, such as from Wi-Fi to mobile data, so the
- * connections can start again on the new network. The WebView's `online` event does not fire
- * for that move, and a connection on the old network can stay open with no data. A return to the
- * app reads the network again, because a move in the background reports no change on some phones.
- * A loss of the network is not a move: the next connected network is compared with the one before it.
- */
 const listeners = new Set<() => void>();
 let subscriptions: { remove(): void }[] = [];
 let previous: Network.NetworkStateType | undefined;
@@ -28,7 +21,6 @@ function read(): void {
     .catch(() => undefined);
 }
 
-/** Calls `listener` at each move to another kind of network. Returns the function that stops it. */
 export function subscribeNetworkMoves(listener: () => void): () => void {
   listeners.add(listener);
   if (subscriptions.length === 0) {
@@ -38,7 +30,6 @@ export function subscribeNetworkMoves(listener: () => void): () => void {
         if (state === "active") read();
       }),
     ];
-    // The listener reports only changes: without the current network, it would miss the first move.
     read();
   }
   return () => {

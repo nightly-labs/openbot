@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("connector", {
-  // Marketplace > Apps > GitHub: the built-in GitHub connection.
   "connector.github.title": "GitHub",
   "connector.github.description":
     "Every agent on this computer can use your GitHub repositories, issues and pull requests, and gh and git.",
@@ -21,9 +20,7 @@ export const messages = defineMessages("connector", {
   "connector.github.repositoriesLoading": "Reading the repositories from GitHub",
   "connector.github.repositoriesFailed": "OpenBot could not read the repositories from GitHub.",
   "connector.github.noRepositories": "The OpenBot GitHub App is not installed on a repository yet.",
-  // {count} is a number, such as 12.
   "connector.github.moreRepositories": { one: "And {count} more repository", other: "And {count} more repositories" },
-  // A badge next to a repository that only its members can see.
   "connector.github.private": "Private",
   "connector.github.disconnect": "Disconnect",
   "connector.github.disconnectTitle": "Disconnect GitHub",
@@ -32,38 +29,30 @@ export const messages = defineMessages("connector", {
   "connector.github.expiredDescription": "Connect again as @{login} to give agents GitHub again.",
   "connector.github.reconnect": "Reconnect",
   "connector.github.actionFailed": "OpenBot could not change the GitHub connection.",
-  // The status next to the name at the top of the GitHub page.
   "connector.github.statusConnected": "Connected",
   "connector.github.statusConnecting": "Connecting",
   "connector.github.statusExpired": "Expired",
   "connector.github.accountTitle": "Account",
-  // {count} is the number of repositories in the list, such as 12.
   "connector.github.filterPlaceholder": { one: "Filter {count} repository", other: "Filter {count} repositories" },
   "connector.github.filterLabel": "Filter repositories",
-  // {query} is the text the user typed in the filter.
   "connector.github.noMatch": "No repository matches “{query}”.",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.github.stepSignIn": "Sign in",
   "connector.github.stepConnected": "Connected",
   "connector.github.requestingCode": "OpenBot asks GitHub for a code.",
-  // {code} is the code to type on GitHub, such as WDJB-MJHT.
   "connector.github.codeLabel": "Code {code}",
   "connector.github.failedTitle": "GitHub did not connect",
   "connector.github.cancelConnecting": "Cancel connecting GitHub",
-  // {count} is the number of repositories that agents can use.
   "connector.github.connectedSummary": {
     one: "{count} repository · every agent on this computer",
     other: "{count} repositories · every agent on this computer",
   },
   "connector.github.done": "Done",
   "connector.github.later": "Later",
-  // The confirmation before Disconnect. {login} is the GitHub account name, such as octocat.
   "connector.github.disconnectConfirmTitle": "Disconnect GitHub?",
   "connector.github.disconnectConfirmDescription": "Disconnect removes the sign-in of @{login} from this computer.",
   "connector.github.disconnectEffectTools": "Every agent loses the GitHub tools, gh and git.",
   "connector.github.disconnectEffectRevoke": "Then GitHub opens, where you can revoke OpenBot.",
   "connector.github.disconnectEffectKept": "Chats, files and agent memory stay on this computer.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Every agent on {host} can use your GitHub repositories, issues and pull requests, and gh and git.",
   "connector.github.connectedSummaryHost": {
@@ -74,19 +63,15 @@ export const messages = defineMessages("connector", {
   "connector.github.disconnectEffectKeptHost": "Chats, files and agent memory stay on {host}.",
   "connector.github.keepConnected": "Keep connected",
   "connector.github.close": "Close",
-  // The last section of an integration page, with the action that removes it.
   "connector.dangerZone": "Danger zone",
   "connector.statusUnknown": "Unknown",
   "connector.readFailed": "OpenBot could not read the state of this connection.",
 
-  // Marketplace > Apps > Slack: a workspace installs the one OpenBot app, and the Slack
-  // Orchestrator agent receives each request, asks the team and answers.
   "connector.slack.title": "Slack",
   "connector.slack.description":
     "People mention @OpenBot in Slack or send it a direct message. The Slack Orchestrator asks the right agent and answers.",
   "connector.slack.statusConnected": "Connected",
   "connector.slack.statusAttention": "Needs attention",
-  // {workspace} is the Slack workspace name.
   "connector.slack.summaryConnected": "{workspace} · Slack Orchestrator answers",
   "connector.slack.summaryNoAgent": "{workspace} · No agent answers yet",
   "connector.slack.attentionTitle": {
@@ -111,7 +96,6 @@ export const messages = defineMessages("connector", {
   "connector.slack.reconnect": "Reconnect",
   "connector.slack.pause": "Pause",
   "connector.slack.resume": "Resume",
-  // {action} is a button, such as Pause; {name} is the workspace name.
   "connector.slack.rowAction": "{action}: {name}",
   "connector.slack.orchestratorTitle": "Slack Orchestrator",
   "connector.slack.orchestratorDescription":
@@ -120,7 +104,6 @@ export const messages = defineMessages("connector", {
   "connector.slack.orchestratorNoneDescription": "Add the Slack Orchestrator, or Slack gets no answer.",
   "connector.slack.inviteNote":
     "OpenBot joins every public channel by itself, and each new one. For a private channel, invite it: /invite @OpenBot.",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.slack.stepWorkspace": "Workspace",
   "connector.slack.stepAgent": "Agent",
   "connector.slack.connectTitle": "Connect a Slack workspace",
@@ -132,7 +115,6 @@ export const messages = defineMessages("connector", {
   "connector.slack.connectInSlack": "Connect in Slack",
   "connector.slack.connectWaiting": "Waiting for Slack. Finish the install in your browser.",
   "connector.slack.agentStepTitle": "Add the Slack Orchestrator",
-  // {workspace} is the Slack workspace name.
   "connector.slack.agentStepDescription":
     "This new agent answers everything that people send to @OpenBot in {workspace}.",
   "connector.slack.orchestratorName": "Slack Orchestrator",
@@ -155,26 +137,20 @@ export const messages = defineMessages("connector", {
   "connector.slack.keep": "Keep connected",
   "connector.slack.close": "Close",
   "connector.slack.addWorkspace": "Add workspace",
-  // Shown when the page has the maximum number of workspaces.
   "connector.slack.limitReached": {
     one: "You can connect a maximum of {count} workspace.",
     other: "You can connect a maximum of {count} workspaces.",
   },
-  // {count} is the number of Slack workspaces: two or more.
   "connector.slack.summaryMany": {
     one: "{count} workspace · Slack Orchestrator answers",
     other: "{count} workspaces · Slack Orchestrator answers",
   },
 
-  // Marketplace > Apps > Discord: a Discord server (a guild) adds the one OpenBot bot, and
-  // the Discord Orchestrator agent receives each request, asks the team and answers. Always write
-  // "Discord server": "server" alone is an OpenBot server.
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "People mention @OpenBot in a channel of a Discord server. The Discord Orchestrator asks the right agent and answers.",
   "connector.discord.statusConnected": "Connected",
   "connector.discord.statusAttention": "Needs attention",
-  // {workspace} is the Discord server name.
   "connector.discord.summaryConnected": "{workspace} · Discord Orchestrator answers",
   "connector.discord.summaryNoAgent": "{workspace} · No agent answers yet",
   "connector.discord.attentionTitle": {
@@ -199,7 +175,6 @@ export const messages = defineMessages("connector", {
   "connector.discord.reconnect": "Reconnect",
   "connector.discord.pause": "Pause",
   "connector.discord.resume": "Resume",
-  // {action} is a button, such as Pause; {name} is the Discord server name.
   "connector.discord.rowAction": "{action}: {name}",
   "connector.discord.orchestratorTitle": "Discord Orchestrator",
   "connector.discord.orchestratorDescription":
@@ -207,7 +182,6 @@ export const messages = defineMessages("connector", {
   "connector.discord.orchestratorNone": "No agent answers yet",
   "connector.discord.orchestratorNoneDescription": "Add the Discord Orchestrator, or Discord gets no answer.",
   "connector.discord.channelsNote": "OpenBot sees the channels that its role can view.",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.discord.stepWorkspace": "Discord server",
   "connector.discord.stepAgent": "Agent",
   "connector.discord.connectTitle": "Connect a Discord server",
@@ -218,7 +192,6 @@ export const messages = defineMessages("connector", {
   "connector.discord.connectInDiscord": "Connect in Discord",
   "connector.discord.connectWaiting": "Waiting for Discord. Finish the authorization in your browser.",
   "connector.discord.agentStepTitle": "Add the Discord Orchestrator",
-  // {workspace} is the Discord server name.
   "connector.discord.agentStepDescription":
     "This new agent answers everything that people send to @OpenBot in {workspace}.",
   "connector.discord.orchestratorName": "Discord Orchestrator",
@@ -245,39 +218,30 @@ export const messages = defineMessages("connector", {
     one: "You can connect a maximum of {count} Discord server.",
     other: "You can connect a maximum of {count} Discord servers.",
   },
-  // {count} is the number of Discord servers: two or more.
   "connector.discord.summaryMany": {
     one: "{count} Discord server · Discord Orchestrator answers",
     other: "{count} Discord servers · Discord Orchestrator answers",
   },
-  // Who can use OpenBot in one Discord server: the members with one of the chosen Discord roles.
   "connector.discord.accessTitle": "Who can use OpenBot",
   "connector.discord.accessDescription": "OpenBot answers only these people. It ignores mentions from others.",
   "connector.discord.accessEveryone": "Everyone in the server",
   "connector.discord.accessEveryoneDescription": "Anyone who can post in a channel that OpenBot sees can mention it.",
-  // {roles} is a list of Discord role names, such as "Admin and Moderator".
   "connector.discord.accessRoles": "Members with {roles}",
   "connector.discord.accessChoose": "Choose roles",
-  // {workspace} is the Discord server name.
   "connector.discord.accessDialogTitle": "Who can use OpenBot in {workspace}?",
   "connector.discord.accessDialogDescription": "With no role selected, everyone can mention OpenBot.",
   "connector.discord.accessLoading": "Loading roles…",
   "connector.discord.accessLoadFailed": "Discord roles did not load",
   "connector.discord.accessNoRoles": "This server has no roles to pick.",
-  // {role} is the name of a Discord role that the server no longer has.
   "connector.discord.accessRoleDeleted": "{role} (deleted)",
   "connector.discord.accessSave": "Save",
-  // {host} is the joined server's name.
   "connector.discord.accessHostUpdate": "Update OpenBot on {host} to choose roles.",
 
-  // Marketplace > Apps > Telegram: each chat adds the one OpenBot bot, and the Telegram
-  // Orchestrator agent receives the messages of all chats, asks the team and answers.
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "Add the OpenBot bot to a Telegram group or open a direct chat with it. The Telegram Orchestrator asks the right agent and answers.",
   "connector.telegram.statusConnected": "Connected",
   "connector.telegram.statusAttention": "Needs attention",
-  // {count} is the number of linked Telegram chats.
   "connector.telegram.summaryConnected": {
     one: "{count} chat · Telegram Orchestrator answers",
     other: "{count} chats · Telegram Orchestrator answers",
@@ -304,6 +268,7 @@ export const messages = defineMessages("connector", {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot on {host} cannot receive Telegram messages. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
   "connector.telegram.helpError": "OpenBot cannot reach this chat. Reconnect, or disconnect the chat.",
+  "connector.telegram.helpNotLinked": "This chat is not linked to this server. Select Reconnect to link it.",
   "connector.telegram.retryAt": "Telegram asked OpenBot to wait. It tries again at {time}.",
   "connector.telegram.pause": "Pause",
   "connector.telegram.resume": "Resume",
@@ -314,7 +279,6 @@ export const messages = defineMessages("connector", {
     "Every chat disconnects. People can no longer reach your agents through the OpenBot bot.",
   "connector.telegram.disconnectAllSummaryOrchestrator":
     "Every chat disconnects. The Telegram Orchestrator and its conversations are deleted from OpenBot.",
-  // {action} is a button, such as Pause; {name} is the chat name.
   "connector.telegram.rowAction": "{action}: {name}",
   "connector.telegram.linkChat": "Link a chat",
   "connector.telegram.addToGroup": "Add to a group",
@@ -326,7 +290,6 @@ export const messages = defineMessages("connector", {
   "connector.telegram.orchestratorNoneDescription": "Add the Telegram Orchestrator, or Telegram gets no answer.",
   "connector.telegram.mentionNote":
     "In a group, mention the bot or reply to its messages. In a direct chat, every message goes to the bot.",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.telegram.stepChat": "Chat",
   "connector.telegram.stepAgent": "Agent",
   "connector.telegram.connectTitle": "Link a Telegram chat",
@@ -337,7 +300,6 @@ export const messages = defineMessages("connector", {
   "connector.telegram.connectStepReturn": "This dialog continues when the chat is linked",
   "connector.telegram.connectWaiting": "Waiting for Telegram. Select the chat in Telegram.",
   "connector.telegram.agentStepTitle": "Add the Telegram Orchestrator",
-  // {chat} is the Telegram chat name.
   "connector.telegram.agentStepDescription":
     "This new agent answers the messages for OpenBot in {chat} and in each chat that you link later.",
   "connector.telegram.orchestratorName": "Telegram Orchestrator",
@@ -356,8 +318,6 @@ export const messages = defineMessages("connector", {
     "This is the last chat, so the Telegram Orchestrator and its conversations are deleted from OpenBot.",
   "connector.telegram.keep": "Keep connected",
   "connector.telegram.close": "Close",
-  // Marketplace > Apps > WhatsApp: a WhatsApp number links this computer as a device, and the
-  // WhatsApp Orchestrator agent receives the messages of all numbers, asks the team and answers.
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Link a WhatsApp number to this computer. The WhatsApp Orchestrator asks the right agent and answers.",
@@ -365,7 +325,6 @@ export const messages = defineMessages("connector", {
     "Link a WhatsApp number to this server. The WhatsApp Orchestrator asks the right agent and answers.",
   "connector.whatsapp.statusConnected": "Connected",
   "connector.whatsapp.statusAttention": "Needs attention",
-  // {count} is the number of linked WhatsApp numbers.
   "connector.whatsapp.summaryConnected": {
     one: "{count} number · WhatsApp Orchestrator answers",
     other: "{count} numbers · WhatsApp Orchestrator answers",
@@ -385,11 +344,13 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.numbersTitle": "Numbers",
   "connector.whatsapp.linkNumber": "Link a number",
   "connector.whatsapp.ownNumberNote": "Your “Message yourself” chat and the people you allow reach OpenBot.",
-  "connector.whatsapp.dedicatedNote": "The people you allow reach OpenBot. Other people get a code to give you.",
+  "connector.whatsapp.dedicatedNote":
+    "Your “Message yourself” chat and the people you allow reach OpenBot. Other people get a code to give you.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp removed this computer from the linked devices. Link the number again.",
   "connector.whatsapp.helpLoggedOutHost":
     "WhatsApp removed this server from the linked devices. Link the number again.",
   "connector.whatsapp.helpError": "OpenBot cannot reach WhatsApp on this number. Reconnect, or disconnect the number.",
+  "connector.whatsapp.helpKeysUnreadable": "OpenBot cannot read the saved keys of this number. Link the number again.",
   "connector.whatsapp.retryAt": "WhatsApp asked OpenBot to wait. It tries again at {time}.",
   "connector.whatsapp.pause": "Pause",
   "connector.whatsapp.resume": "Resume",
@@ -401,11 +362,16 @@ export const messages = defineMessages("connector", {
     "Every number disconnects. People can no longer reach your agents through WhatsApp.",
   "connector.whatsapp.disconnectAllSummaryOrchestrator":
     "Every number disconnects. The WhatsApp Orchestrator and its conversations are deleted from OpenBot.",
-  // {action} is a button, such as Pause; {name} is the WhatsApp number or a person's name.
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Personal number",
   "connector.whatsapp.ownNumberDescription":
-    "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+    "Only your “Message yourself” chat and the people you allow can write. Other people get no reply. When it is off, OpenBot replies to unknown people with a code.",
+  "connector.whatsapp.workingMessage": "“Working on it…” message",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. Turn off to post only the answer.",
+  "connector.whatsapp.statusReactions": "Status reactions",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",
@@ -413,7 +379,6 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.orchestratorNoneDescription": "Add the WhatsApp Orchestrator, or WhatsApp gets no answer.",
   "connector.whatsapp.note":
     "On your personal number, write in your “Message yourself” chat. The people you allow write to the number.",
-  // The link dialog. The steps show as numbers; screen readers read the names.
   "connector.whatsapp.stepNumber": "Number",
   "connector.whatsapp.stepAgent": "Agent",
   "connector.whatsapp.connectTitle": "Link WhatsApp",
@@ -422,9 +387,10 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.kindLabel": "Number",
   "connector.whatsapp.kindPersonal": "My personal number",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot answers only your “Message yourself” chat and the people you allow.",
+    "OpenBot answers only your “Message yourself” chat and the people you allow. Other people get no reply.",
   "connector.whatsapp.kindDedicated": "A number only for OpenBot",
-  "connector.whatsapp.kindDedicatedDescription": "Unknown people get a code to give you. You approve them here.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot replies from this number to each unknown person, with a code to give you. You approve them here.",
   "connector.whatsapp.methodLabel": "How to link",
   "connector.whatsapp.methodQr": "QR code",
   "connector.whatsapp.methodCode": "Pairing code",
@@ -442,7 +408,6 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.codeStepDevices": "In WhatsApp, open Linked devices and tap Link a device",
   "connector.whatsapp.codeStepPhone": "Tap Link with phone number instead",
   "connector.whatsapp.codeStepType": "Type this code on the phone",
-  // {code} is the pairing code, read one character at a time.
   "connector.whatsapp.codeLabel": "Pairing code {code}",
   "connector.whatsapp.copyCode": "Copy code",
   "connector.whatsapp.codeWaiting": "Waiting for the phone.",
@@ -453,7 +418,6 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.failedUnavailable": "OpenBot cannot reach WhatsApp. Check the internet connection.",
   "connector.whatsapp.tryAgain": "Try again",
   "connector.whatsapp.agentStepTitle": "Add the WhatsApp Orchestrator",
-  // {number} is the WhatsApp number or its name.
   "connector.whatsapp.agentStepDescription":
     "This new agent answers the messages for OpenBot on {number} and on each number that you link later.",
   "connector.whatsapp.orchestratorName": "WhatsApp Orchestrator",
@@ -473,7 +437,6 @@ export const messages = defineMessages("connector", {
     "This is the last number, so the WhatsApp Orchestrator and its conversations are deleted from OpenBot.",
   "connector.whatsapp.keep": "Keep linked",
   "connector.whatsapp.close": "Close",
-  // Who can give work through one number: contacts by phone number, and groups.
   "connector.whatsapp.sendersTitle": "Who can write to {number}",
   "connector.whatsapp.sendersDescription": "These contacts and groups can give work to your agents.",
   "connector.whatsapp.sendersEmpty": "Only you can write. Add a contact or a group.",
@@ -488,35 +451,31 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.contactNameDescription": "Optional. Empty, the list shows the phone number.",
   "connector.whatsapp.add": "Add",
   "connector.whatsapp.groupTitle": "Add a group",
-  "connector.whatsapp.groupDescription": "People in this group can give work to your agents.",
+  "connector.whatsapp.groupDescription":
+    "People in this group can give work to your agents when they mention the number or reply to its messages.",
   "connector.whatsapp.groupSearch": "Search groups",
   "connector.whatsapp.groupsLoading": "Reading the groups…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot could not read the groups",
   "connector.whatsapp.groupsEmpty": "This number is in no group.",
   "connector.whatsapp.groupsNoMatch": "No group has this name.",
   "connector.whatsapp.groupAdded": "Added",
-  // People who wrote to a number only for OpenBot and got a code to give the owner.
   "connector.whatsapp.requestsTitle": "Requests for {number}",
   "connector.whatsapp.requestsDescription":
     "These people wrote to the number and got a code. Approve a person only when they gave you the same code.",
   "connector.whatsapp.requestsEmpty": "No requests.",
-  // {code} is the 6-character code; {number} is the person's phone number, partly hidden.
   "connector.whatsapp.requestDetail": "Code {code} · {number}",
   "connector.whatsapp.approve": "Approve",
   "connector.whatsapp.deny": "Deny",
-  // Marketplace > 1Password: a vault that the user shares with OpenBot through a service account.
   "connector.onePassword.title": "1Password",
   "connector.onePassword.description":
     "Share a dedicated 1Password vault with OpenBot through a service account, so agents can sign in to sites in the OpenBot browser.",
   "connector.onePassword.howItWorks":
     "Connecting sets up a “Shared with OpenBot” vault in your 1Password account and a service account that can read only that vault. OpenBot fills saved logins in its browser on this computer, so only the items you move into that vault are ever shared. Agents never see a password.",
   "connector.onePassword.connect": "Connect 1Password",
-  // The three setup steps before a connection, each with the one button it needs.
   "connector.onePassword.setupTitle": "Set up",
   "connector.onePassword.stepCliTitle": "Install the 1Password CLI",
   "connector.onePassword.stepCliChecking": "Looking for the 1Password CLI on this computer",
   "connector.onePassword.stepCliInstalling": "Downloading the 1Password CLI from 1Password",
-  // {version} is a version number, such as 2.39.0.
   "connector.onePassword.stepCliReady": "Version {version} is installed.",
   "connector.onePassword.stepCliMissing":
     "OpenBot downloads it from 1Password into its own folder. It needs no administrator password.",
@@ -533,7 +492,6 @@ export const messages = defineMessages("connector", {
   "connector.onePassword.stepVaultTitle": "Create the shared vault",
   "connector.onePassword.stepVaultDescription":
     "OpenBot creates the vault “Shared with OpenBot” and a service account that can only read it. 1Password asks you to approve.",
-  // The last row of the setup steps: the other way to connect, without the CLI.
   "connector.onePassword.useTokenDescription":
     "Instead of these steps, paste a service account token from 1Password.com.",
   "connector.onePassword.useTokenAction": "Use token",
@@ -549,7 +507,6 @@ export const messages = defineMessages("connector", {
   "connector.onePassword.vaultDescription":
     "Move a login into this vault in 1Password to let agents sign in with it. Remove it to stop.",
   "connector.onePassword.loginsLoading": "Reading the logins from 1Password",
-  // {count} is a number, such as 3.
   "connector.onePassword.loginCount": { one: "{count} login", other: "{count} logins" },
   "connector.onePassword.disconnect": "Disconnect",
   "connector.onePassword.disconnectTitle": "Disconnect 1Password",
@@ -558,7 +515,6 @@ export const messages = defineMessages("connector", {
   "connector.onePassword.actionFailed": "OpenBot could not change the 1Password connection.",
   "connector.onePassword.statusConnected": "Connected",
   "connector.onePassword.statusConnecting": "Connecting",
-  // The same page for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.onePassword.descriptionHost":
     "Share a dedicated 1Password vault with OpenBot on {host} through a service account, so agents on {host} can sign in to sites in its browser.",
   "connector.onePassword.howItWorksHost":
@@ -594,7 +550,6 @@ export const messages = defineMessages("connector", {
   "connector.bitwarden.folderTitle": "Shared folder",
   "connector.bitwarden.folderDescription":
     "Move a login into this folder in Bitwarden to let agents sign in with it. Remove it to stop.",
-  // The exact folder name that OpenBot looks for in the vault. Keep it in English.
   "connector.bitwarden.folderName": "Shared with OpenBot",
   "connector.bitwarden.folderKind": "Folder in Bitwarden",
   "connector.bitwarden.clientId": "API key client_id",
@@ -609,14 +564,12 @@ export const messages = defineMessages("connector", {
   "connector.protonPass.moreWays": "More ways to connect",
   "connector.protonPass.useKey": "Use an access key",
   "connector.protonPass.keyLabel": "Access key",
-  // A Proton Pass access key starts with pst_.
   "connector.protonPass.keyPlaceholder": "pst_…",
   "connector.protonPass.setupTitle": "Set up",
   "connector.protonPass.setupDescription":
     "Connect opens the Proton sign-in in your browser. Then OpenBot makes the shared vault and keeps only a read-only key for it.",
   "connector.protonPass.setupDescriptionHost":
     "Connect opens the Proton sign-in in your browser. Then {host} makes the shared vault and keeps only a read-only key for it.",
-  // The exact vault name that OpenBot makes in Proton Pass. Keep it in English.
   "connector.protonPass.vaultName": "Shared with OpenBot",
   "connector.protonPass.vaultSetup": "OpenBot makes this vault when you connect. Move logins into it to share them.",
   "connector.protonPass.showSteps": "Show steps",
@@ -651,9 +604,9 @@ export const messages = defineMessages("connector", {
   "connector.protonPass.expiredTitle": "The Proton Pass key expired",
   "connector.protonPass.expiredDescription": "Agents cannot sign in with your shared logins until you sign in again.",
   "connector.protonPass.reconnect": "Reconnect",
-  "connector.protonPass.planTitle": "Proton Pass needs a paid plan",
+  "connector.protonPass.planTitle": "Proton Pass needs a plan with Pass Plus",
   "connector.protonPass.planDescription":
-    "The Proton Pass CLI works only with a paid Proton plan. Change your plan, then connect again.",
+    "The Proton Pass CLI needs a Proton plan that includes Pass Plus. Other paid plans, such as Mail Plus, do not include it. Change your plan, then connect again.",
   "connector.protonPass.vaultTitle": "Shared vault",
   "connector.protonPass.vaultDescription":
     "Agents can sign in with the logins in this vault. Move a login into it to share it.",

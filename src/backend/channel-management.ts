@@ -30,10 +30,6 @@ const ROUTINE_TOOLS: ReadonlySet<string> = new Set([
   "channel_delete_routine",
 ]);
 
-/**
- * The tools a member agent changes its channel with. Only a person's request may start them, so a
- * routine run or a message that only an agent wrote cannot change who is in the channel.
- */
 export const CHANNEL_MANAGEMENT_TOOLS: ReadonlySet<string> = new Set([
   "channel_add_member",
   "channel_remove_member",
@@ -51,32 +47,26 @@ export const PERSON_REQUEST_REQUIRED =
 export const PERSON_CANCEL_REQUIRED =
   "Only a person's request in this channel can cancel a run. This task started from a routine run or from an agent.";
 
-/** The schedule routines of the channels, as the channel settings change them. */
 export interface ChannelRoutineToolPort {
   list(channelId: string): ChannelRoutine[];
   create(input: CreateChannelRoutineInput): ChannelRoutine;
   update(input: UpdateChannelRoutineInput): ChannelRoutine;
   delete(input: DeleteChannelRoutineInput): void;
-  /** The server timezone, for a routine that the call gives no timezone. */
   timezone(): string;
 }
 
-/** The text of the note a change leaves in the channel, from the agent that made it and the person who asked. */
 export type ChannelChangeNote = (agent: string, person: string) => string;
 
-/**
- * The person whose message started the work of `task`. A routine run is written as a member with a
- * `routine:` id, and a request that an agent sent from another conversation with an `agent:` id
- * (`ChannelService.apply`), so the id tells them from a person. A subtask that an agent assigned
- * counts as the person's request that its root task answers.
- */
 export function channelRequester(
   task: ChannelTask,
   tasks: readonly ChannelTask[],
   message: (messageId: string) => ChannelMessage | null,
 ): { id: string; name: string } | null {
   const root = tasks.find((item) => item.id === task.rootTaskId);
-  const request = root ? message(root.requestMessageId) : null;
+  return requestPerson(root ? message(root.requestMessageId) : null);
+}
+
+export function requestPerson(request: ChannelMessage | null): { id: string; name: string } | null {
   if (
     request?.author.kind !== "member" ||
     request.author.id.startsWith("routine:") ||
@@ -86,7 +76,6 @@ export function channelRequester(
   return { id: request.author.id, name: request.author.name };
 }
 
-/** The owners of `task` and of each task above it: the work that the call runs inside. */
 export function channelWorkOwners(task: ChannelTask, tasks: readonly ChannelTask[]): Set<string> {
   const owners = new Set<string>();
   const seen = new Set<string>();
@@ -99,21 +88,13 @@ export function channelWorkOwners(task: ChannelTask, tasks: readonly ChannelTask
   return owners;
 }
 
-/**
- * The draft that a member or instructions tool saves, from the channel as it is stored when the
- * save's turn in the command queue comes. The person who asked must be able to chat with an agent
- * they add, and see one they remove, as for their own save through the Team API.
- *
- * A removal pauses every open task of the member and the tasks under them, so it cannot remove an
- * owner of the work that runs this call (`workOwners`): the save would stop the caller's own turn.
- */
 export function channelDraftChange(
   channel: Channel,
   tool: string,
   args: DynamicRecord,
   callerAgentId: string,
   agents: readonly AgentSummary[],
-  access: { hidden(agentId: string): boolean; level(agentId: string): AgentAccessLevel },
+  access: { level(agentId: string): AgentAccessLevel },
   workOwners: ReadonlySet<string>,
 ): { draft: ChannelDraft; note: ChannelChangeNote } {
   const draft: ChannelDraft = {
@@ -141,7 +122,6 @@ export function channelDraftChange(
       throw new Error("No agent has that id. Get the id from openbot.list_agents.");
     if (agentAccessRank(access.level(agentId)) < agentAccessRank("chat"))
       throw new Error(`The person who asked cannot chat with ${name}, so it stays out.`);
-    if (access.hidden(agentId)) throw new Error(`${name} is hidden. Ask a person to show it again first.`);
     if (channel.members.length >= INPUT_LIMITS.agents)
       throw new Error(`A channel has at most ${INPUT_LIMITS.agents} members.`);
     return {
@@ -164,7 +144,6 @@ export function channelDraftChange(
   };
 }
 
-/** Runs one routine tool on `channelId`. A change returns the note it leaves in the channel. */
 export function channelRoutineTool(
   routines: ChannelRoutineToolPort,
   channelId: string,
@@ -173,8 +152,6 @@ export function channelRoutineTool(
   remotePerson: boolean,
 ): { result: unknown; note?: ChannelChangeNote } {
   const all = routines.list(channelId);
-  // A one-time routine stays on this computer: the Team API neither lists nor changes it, so a team
-  // member's request works only with the routines their own app has.
   const visible = remotePerson ? all.filter((routine) => isReleasedRoutineSchedule(routine.trigger.schedule)) : all;
   const schedule = (input: unknown) => {
     const parsed = routineToolSchedule(input);

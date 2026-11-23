@@ -143,8 +143,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "에이전트 접근 권한",
   "agentSettings.runtime.busyMessage": "작업 중일 때",
   "agentSettings.runtime.busyMessageLabel": "에이전트가 작업 중일 때의 메시지",
-  "agentSettings.runtime.taskLimit": "병렬 스레드",
-  "agentSettings.runtime.taskLimitLabel": "동시에 실행되는 스레드",
   "agentSettings.runtime.workingDirectory": "작업 디렉터리",
   "agentSettings.runtime.notAvailable": "아직 사용할 수 없음",
   "agentSettings.runtime.fullAccessNote": "에이전트가 워크스페이스와 공유 폴더에서 컴퓨터 전체 접근 권한으로 실행돼요.",
@@ -162,21 +160,20 @@ export const messages = {
   "agentSettings.busyMessage.steer": "방향 지시",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider}은(는) 실행 중인 턴에 방향을 지시할 수 없어요. 작업 중에 보낸 메시지는 대기열에서 기다려요.",
-  "agentSettings.taskLimit.default": "기본값({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider}은(는) 한 번에 한 턴씩 실행해요. 이 에이전트의 스레드는 서로를 기다려요.",
   "agentSettings.notificationLevel.title": "내 알림",
   "agentSettings.notificationLevel.server": "서버 기본값 ({level})",
   "agentSettings.notificationLevel.note":
     "이 설정은 나에게만 적용되며 내 모든 기기에 적용돼요. 서버가 음소거되었거나 '없음'으로 설정되면 이 에이전트도 알리지 않아요.",
   "agentSettings.newChat.title": "새 채팅",
-  "agentSettings.newChat.description": "에이전트가 이 채팅을 잊어요. 설정은 그대로 유지돼요.",
+  "agentSettings.newChat.description":
+    "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 설정은 그대로 유지돼요.",
   "agentSettings.newChat.button": "시작",
   "agentSettings.newChat.confirmTitle": "{name}과(와) 새 채팅을 시작할까요?",
   "agentSettings.newChat.confirmDescription":
-    "에이전트가 이 채팅을 잊어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
+    "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
   "agentSettings.newChat.confirm": "새 채팅 시작",
   "agentSettings.newChat.failed": "새 채팅을 시작할 수 없어요.",
+  "agentSettings.newChat.busy": "에이전트가 작업 중이에요. 새 채팅을 시작하려면 끝날 때까지 기다리거나 중지하세요.",
   "agentSettings.deleteHistory.title": "기록 삭제",
   "agentSettings.deleteHistory.description": "이 채팅의 메시지가 삭제되고 에이전트도 잊어요. 설정은 그대로예요.",
   "agentSettings.deleteHistory.button": "삭제",
@@ -194,6 +191,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "전체 접근 허용",
   "agentSettings.fullAccess.askConfirm": "먼저 묻기 사용",
   "agentSettings.links.usage": "사용량",
+  "agentSettings.links.apps": "앱",
+  "agentSettings.links.appsScope": "모든 에이전트",
   "agentSettings.links.memories": "메모리",
   "agentSettings.links.memoriesCount": { other: "{count}개 저장됨" },
   "agentSettings.links.skills": "스킬",
@@ -220,6 +219,9 @@ export const messages = {
     "채팅이 길어지면 에이전트가 새 채팅을 시작하도록 허용해요. 먼저 메모를 저장해요.",
   "agentSettings.quickAcknowledgement.title": "긴 작업 전에 계획 표시",
   "agentSettings.quickAcknowledgement.description": "긴 작업 전에 에이전트가 계획을 보여줘요.",
+  "agentSettings.builtinMemory.title": "OpenBot 메모리",
+  "agentSettings.builtinMemory.description":
+    "에이전트가 자신의 메모리를 저장하고 읽어요. Mem0 같은 메모리 앱만 쓰려면 끄세요. 저장된 메모리는 그대로 남아요.",
   "agentSettings.browserProfile.label": "브라우저 프로필",
   "agentSettings.browserProfile.shared": "공유",
   "agentSettings.browserProfile.agent": "이 에이전트만",
@@ -229,6 +231,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "각 프로필은 자체 로그인 정보와 쿠키를 유지해요. 변경하면 에이전트의 열린 탭이 닫혀요.",
   "agentSettings.browserProfile.manage": "관리",
+  "agentSettings.browserProfile.movedNote":
+    "사이트 로그인 정보는 이전 프로필에 남아요. 에이전트가 이 사이트에 다시 로그인해야 해요.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "{provider} 프로세스 전체가 샌드박스에서 실행되므로 밖에 쓰면 실패해요. macOS에서만 사용할 수 있어요.",
 } as const satisfies PartialTranslation<typeof source>;

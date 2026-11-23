@@ -1,13 +1,13 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
-import * as Clipboard from "expo-clipboard";
 import * as Crypto from "expo-crypto";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
-import { useUniwind } from "uniwind";
+import { memo, type ReactNode, useMemo, useRef, useState } from "react";
+import { Alert, View } from "react-native";
+import { AndroidRowMenu, OpenRowMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
@@ -21,10 +21,11 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
-import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import type { MenuAction } from "@/shared/components/menu-view";
+import { copyWithHaptic } from "@/shared/lib/clipboard";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
@@ -39,7 +40,7 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
-    canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const online = useMobileWorkspaceSelector(({ servers }) =>
     servers.some((server) => server.id === serverId && showsOnline(server)),
@@ -48,6 +49,7 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
     ({ servers }) => servers.find((server) => server.id === serverId)?.role === "member",
   );
   const canDelete = online && !isMember && !channel.archived;
+  const deleteBlocked = channel.activeTasks > 0;
   const deleting = useRef(false);
   const handlePin = (withHaptic = true) => toggleChannelPinAnimated(channel, serverId, { haptic: withHaptic });
   const handleHide = () => {
@@ -55,9 +57,7 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   };
   const handleInfo = () =>
     router.push({ pathname: "/channel-info/[channelId]", params: { channelId: channel.id, serverId } });
-  const handleCopyId = () => {
-    void Clipboard.setStringAsync(channel.id).then(() => haptics.notification());
-  };
+  const handleCopyId = () => copyWithHaptic(channel.id);
   const handleDelete = () =>
     Alert.alert(t("mobile.channel.list.deleteTitle", { name: channel.name }), t("mobile.channel.list.deleteBody"), [
       { text: t("common.cancel"), style: "cancel" },
@@ -90,10 +90,20 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
         },
       },
     ]);
-  return { isPinned, canPin, canDelete, sectionMenu, handlePin, handleHide, handleInfo, handleCopyId, handleDelete };
+  return {
+    isPinned,
+    canPin,
+    canDelete,
+    deleteBlocked,
+    sectionMenu,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDelete,
+  };
 }
 
-/** The chat link of a channel on iOS, with its context menu. Android uses `ChannelAndroidMenu`. */
 function ChannelContextMenuLink({
   channel,
   serverId,
@@ -104,8 +114,18 @@ function ChannelContextMenuLink({
   children: ReactNode;
 }) {
   const { t } = useText();
-  const { isPinned, canPin, canDelete, sectionMenu, handlePin, handleHide, handleInfo, handleCopyId, handleDelete } =
-    useChannelMenuActions(channel, serverId);
+  const {
+    isPinned,
+    canPin,
+    canDelete,
+    deleteBlocked,
+    sectionMenu,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDelete,
+  } = useChannelMenuActions(channel, serverId);
   return (
     <Link href={{ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } }} asChild>
       <Link.Trigger>{children}</Link.Trigger>
@@ -130,7 +150,7 @@ function ChannelContextMenuLink({
             {t("mobile.agent.menu.copyId")}
           </Link.MenuAction>
           {canDelete ? (
-            <Link.MenuAction destructive icon="trash" onPress={handleDelete}>
+            <Link.MenuAction destructive icon="trash" disabled={deleteBlocked} onPress={handleDelete}>
               {t("common.delete")}
             </Link.MenuAction>
           ) : null}
@@ -140,7 +160,6 @@ function ChannelContextMenuLink({
   );
 }
 
-/** The long-press menu of a channel on Android. It opens when it mounts, as `AgentAndroidMenu` does. */
 function ChannelAndroidMenu({
   channel,
   serverId,
@@ -150,16 +169,10 @@ function ChannelAndroidMenu({
   serverId: string;
   onClose: () => void;
 }) {
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
-    <View
-      // The open menu draws in a portal. The row under it keeps its touches.
-      pointerEvents="none"
-      style={StyleSheet.absoluteFill}
-      onLayout={({ nativeEvent }) => setSize({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
-    >
-      {size ? <OpenChannelMenu channel={channel} serverId={serverId} size={size} onClose={onClose} /> : null}
-    </View>
+    <AndroidRowMenu>
+      {(size) => <OpenChannelMenu channel={channel} serverId={serverId} size={size} onClose={onClose} />}
+    </AndroidRowMenu>
   );
 }
 
@@ -175,13 +188,18 @@ function OpenChannelMenu({
   onClose: () => void;
 }) {
   const { t } = useText();
-  const { theme } = useUniwind();
-  const menu = useRef<MenuComponentRef>(null);
-  useEffect(() => {
-    menu.current?.show();
-  }, []);
-  const { isPinned, canPin, canDelete, sectionMenu, handlePin, handleHide, handleInfo, handleCopyId, handleDelete } =
-    useChannelMenuActions(channel, serverId);
+  const {
+    isPinned,
+    canPin,
+    canDelete,
+    deleteBlocked,
+    sectionMenu,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDelete,
+  } = useChannelMenuActions(channel, serverId);
   const actions: MenuAction[] = [
     {
       id: "pin",
@@ -202,7 +220,7 @@ function OpenChannelMenu({
           id: "delete",
           title: t("common.delete"),
           image: "trash",
-          attributes: { destructive: true, hidden: !canDelete },
+          attributes: { destructive: true, hidden: !canDelete, disabled: deleteBlocked },
         },
       ],
     },
@@ -215,24 +233,18 @@ function OpenChannelMenu({
     delete: handleDelete,
   };
   return (
-    <MenuView
-      ref={menu}
-      colorScheme={theme === "dark" ? "dark" : "light"}
-      shouldOpenOnLongPress
+    <OpenRowMenu
       actions={actions}
-      onCloseMenu={onClose}
-      onPressAction={({ nativeEvent }) => {
-        sectionMenu.onAction(nativeEvent.event);
-        handlers[nativeEvent.event]?.();
+      size={size}
+      onClose={onClose}
+      onAction={(id) => {
+        sectionMenu.onAction(id);
+        handlers[id]?.();
       }}
-    >
-      {/* The anchor of the menu: the size of the row it covers. */}
-      <View style={size} />
-    </MenuView>
+    />
   );
 }
 
-/** A channel in the home list, or in the pinned grid, with the look and menus of an agent chat. */
 export const ChannelListRow = memo(function ChannelListRow({
   channel,
   serverId,
@@ -248,18 +260,17 @@ export const ChannelListRow = memo(function ChannelListRow({
   leftInset?: number;
   rightInset?: number;
 }) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const [background, accent] = useThemeColor(["background", "accent"]);
   const rowBackground = useChatRowBackground(channel.id);
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const pinBlocked = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const disconnected = useMobileWorkspaceSelector(
     ({ servers }) => !servers.some((server) => server.id === serverId && showsOnline(server)),
   );
-  // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag(pinned ? "pin" : "row", () => ({
     chat: { kind: "channel", id: channel.id },
@@ -277,8 +288,11 @@ export const ChannelListRow = memo(function ChannelListRow({
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const previewLine = useMemo(
-    () => (channel.lastMessage ? markdownPreviewText(channel.lastMessage.text) : t("mobile.channel.list.noMessages")),
-    [channel.lastMessage, t],
+    () =>
+      channel.lastMessage
+        ? markdownPreviewText(coordinatorText(channel.lastMessage.author, channel.lastMessage.text, sourceText))
+        : t("mobile.channel.list.noMessages"),
+    [channel.lastMessage, t, sourceText],
   );
   const title = channel.title.trim();
   const unread = channel.unreadCount > 0;

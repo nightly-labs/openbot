@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="OpenBot">
+    <item label="Terminal">
+      <action name="Execute"><command>lxterminal</command></action>
+    </item>
+    <item label="Files">
+      <action name="Execute"><command>pcmanfm ~</command></action>
+    </item>
+    <separator />
+    <menu id="client-list-combined-menu" />
+  </menu>
+</openbox_menu>

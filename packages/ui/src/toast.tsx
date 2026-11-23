@@ -1,7 +1,7 @@
 import { classifyFailure, type FailureProperties, type NotificationMetadata } from "@openbot/telemetry";
 import { errorReference } from "@openbot/user-errors";
 import type { ComponentProps, JSX } from "@solidjs/web";
-import { createEffect, createSignal, omit, onSettled } from "solid-js";
+import { createEffect, omit, onSettled } from "solid-js";
 import {
   Toaster as Sonner,
   type ExternalToast as SonnerExternalToast,
@@ -16,15 +16,11 @@ import { cx } from "./utils";
 
 export type ToasterProps = ComponentProps<typeof Sonner> & {
   onToastShown?: (metadata: FailureProperties) => void;
+  hidden?: boolean;
 };
 export type ExternalToast = SonnerExternalToast & {
   report?: NotificationMetadata;
-  /**
-   * The failure the toast reports. The toast shows its code under the description, so a user can
-   * copy it. Without a `description`, the toast shows `errorMessage(error, fallback)`.
-   */
   error?: unknown;
-  /** The translated sentence for an `error` with no readable message of its own. */
   fallback?: string;
 };
 const reports = new Map<string | number, NotificationMetadata>();
@@ -89,20 +85,16 @@ export const toast = Object.assign((...args: Parameters<typeof sonnerToast>) => 
   promise: promiseToast,
 });
 
-/** Toast lifetime; exported so manual timers settle on the same count. */
 export const TOAST_DURATION = 6_000;
 
-const [hasVisibleToasts, setHasVisibleToasts] = createSignal(false);
-
 export function Toaster(props: ToasterProps): JSX.Element {
-  // The desktop app mounts the Toaster outside its text provider, so it follows the active locale.
   const { t } = currentText();
   const notifications = useSonner();
-  const sonnerProps = omit(props, "onToastShown");
+  const sonnerProps = omit(props, "onToastShown", "hidden");
   createEffect(
-    () => notifications.toasts(),
-    (toasts) => {
-      if (!props.onToastShown) return;
+    () => ({ toasts: notifications.toasts(), hidden: props.hidden }),
+    ({ toasts, hidden }) => {
+      if (!props.onToastShown || hidden) return;
       const current = new Set(sonnerToast.getToasts().map((item) => item.id));
       for (const id of shown)
         if (!current.has(id)) {
@@ -129,32 +121,26 @@ export function Toaster(props: ToasterProps): JSX.Element {
   let layer: HTMLDivElement | undefined;
   onSettled(() => {
     if (!layer) return;
-    const updateVisibility = () => {
-      setHasVisibleToasts(Boolean(layer?.querySelector("[data-sonner-toast]")));
-      // solid-sonner renders the close button, so mark it here for the close cue.
+    const markCloseButtons = () => {
       for (const button of layer?.querySelectorAll("[data-close-button]:not([data-cuelume-close])") ?? []) {
         button.setAttribute("data-cuelume-close", "");
         button.setAttribute("data-cuelume-emphasis", "subtle");
       }
     };
-    // Track mounted toasts so native content stays behind their exit animation too.
-    const observer = new MutationObserver(updateVisibility);
+    const observer = new MutationObserver(markCloseButtons);
     observer.observe(layer, { childList: true, subtree: true });
-    updateVisibility();
+    markCloseButtons();
     return () => {
       observer.disconnect();
-      setHasVisibleToasts(false);
     };
   });
   return (
-    <div ref={layer} data-kb-top-layer="" class="ui-toast-layer">
+    <div ref={layer} data-kb-top-layer="" class={cx("ui-toast-layer", props.hidden && "ui-toast-layer-hidden")}>
       <Sonner
         {...sonnerProps}
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
         theme={props.theme ?? documentColorScheme()}
         position={props.position ?? "top-right"}
-        // A toast past the visible count stays hidden even when hover expands the stack, so an update
-        // offer would wait behind another. Six providers can offer an update at once.
         visibleToasts={props.visibleToasts ?? 6}
         duration={props.duration ?? TOAST_DURATION}
         gap={props.gap ?? 8}
@@ -177,4 +163,3 @@ export function Toaster(props: ToasterProps): JSX.Element {
 }
 
 export type { ToastT } from "solid-sonner";
-export { hasVisibleToasts };

@@ -1,17 +1,14 @@
-/**
- * The run tables of workflows: runs and the steps of each run, and steps that ran alone. Rows are
- * written directly, like the graph tables. Each change of a step is conditional on the status it
- * leaves, so two sweeps, or a sweep and a user action, never both settle one step.
- */
-
 import {
+  isWorkflowFields,
   isWorkflowGraph,
+  isWorkflowStepSource,
   WORKFLOW_BRANCHES,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_RUN_SOURCES,
   WORKFLOW_RUN_STATUSES,
   WORKFLOW_STEP_STATUSES,
   type WorkflowBranch,
+  type WorkflowFields,
   type WorkflowGraph,
   type WorkflowNodeKind,
   type WorkflowRun,
@@ -19,6 +16,7 @@ import {
   type WorkflowRunSource,
   type WorkflowRunStatus,
   type WorkflowStep,
+  type WorkflowStepSource,
   type WorkflowStepStatus,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
@@ -35,7 +33,6 @@ import type { OpenBotDatabase } from "../openbot-database";
 import { webhookReceiptCutoff } from "../webhook-route-store";
 import { workflowTransaction } from "./workflow-transaction";
 
-/** A run as the runtime reads it: the public row and the graph it started from. */
 export interface StoredWorkflowRun extends WorkflowRun {
   graph: WorkflowGraph;
   fromNodeId: string | null;
@@ -43,25 +40,29 @@ export interface StoredWorkflowRun extends WorkflowRun {
   payload: string | null;
 }
 
-/** A step as the runtime reads it: the public row and what the runtime alone needs. */
 export interface StoredWorkflowStep extends WorkflowStep {
   kind: WorkflowNodeKind;
   input: string;
+  settings: WorkflowFields | null;
+  sources: readonly WorkflowStepSource[] | null;
   deliveryId: string | null;
   turnId: string | null;
   createdAt: string;
-  /** The order in which the steps of a run were added: a later step has a larger number. */
   sequence: number;
 }
 
 const OPEN_STEP_STATUSES = ["running", "approval"] as const satisfies readonly WorkflowStepStatus[];
-/** Whether a step has not ended yet. */
 export function isOpenStep(step: Pick<WorkflowStep, "status">): boolean {
   return isOneOf(OPEN_STEP_STATUSES, step.status);
 }
 const OPEN_RUN_STATUSES = ["running", "approval", "stopping"] as const satisfies readonly WorkflowRunStatus[];
 
-/** One delivery that a webhook trigger received: the run it started, or why it started none. */
+export interface WorkflowMediaOutput {
+  attachmentId: string;
+  workflowId: string;
+  endedAt: string | null;
+}
+
 export interface WorkflowWebhookReceipt {
   workflowId: string;
   nodeId: string;
@@ -75,10 +76,6 @@ export interface WorkflowWebhookReceipt {
 const OUTPUT_STATUSES = ["pending", "sending", "sent", "failed", "uncertain"] as const;
 export type WorkflowOutputEnd = Exclude<(typeof OUTPUT_STATUSES)[number], "pending" | "sending">;
 
-/**
- * The post of an output step to a messaging place. `sending` is set before the post starts, so a
- * post that a stop or a crash cut off becomes `uncertain`: part of it can be in the place.
- */
 export interface WorkflowOutputDelivery {
   stepId: string;
   connectionId: string;
@@ -109,6 +106,8 @@ export interface NewWorkflowStep {
   agentId: string | null;
   status: WorkflowStepStatus;
   input: string;
+  settings?: WorkflowFields | null;
+  sources?: readonly WorkflowStepSource[] | null;
   output?: string | null;
   branch?: WorkflowBranch | null;
   error?: string | null;
@@ -130,10 +129,6 @@ export class WorkflowRunStore {
     this.#createId = options.createId ?? (() => crypto.randomUUID());
   }
 
-  /**
-   * Starts a run, or answers the run that the same key already started. `created` writes what belongs
-   * to a new run, such as its version and its first steps, in the same transaction.
-   */
   startRun(
     input: NewWorkflowRun,
     now = new Date(),
@@ -186,7 +181,6 @@ export class WorkflowRunStore {
     });
   }
 
-  /** Whether the trigger received this delivery before, inside the retention window. */
   hasWebhookReceipt(receipt: Pick<WorkflowWebhookReceipt, "workflowId" | "nodeId" | "deliveryId" | "receivedAt">) {
     return (
       databaseRow(
@@ -200,7 +194,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Records one received delivery and drops the receipts past retention. */
   addWebhookReceipt(receipt: WorkflowWebhookReceipt): void {
     this.#transaction(() => {
       const db = this.#database.connection;
@@ -231,7 +224,14 @@ export class WorkflowRunStore {
     return row ? toRun(row) : null;
   }
 
-  /** Runs that can still move: running, waiting for an approval, or stopping. */
+  handoffSource(runId: string): WorkflowRunSource | null {
+    const connection = this.#database.connection;
+    const run = databaseRow(connection.prepare("SELECT source FROM workflow_runs WHERE run_id = ?").get(runId));
+    if (run) return isOneOf(WORKFLOW_RUN_SOURCES, run.source) ? run.source : null;
+    const alone = connection.prepare("SELECT 1 FROM workflow_steps WHERE step_id = ? AND run_id IS NULL").get(runId);
+    return alone === undefined ? null : "manual";
+  }
+
   openRuns(): StoredWorkflowRun[] {
     return databaseRows(
       this.#database.connection
@@ -240,7 +240,6 @@ export class WorkflowRunStore {
     ).map(toRun);
   }
 
-  /** Changes an open run's status. Answers whether it changed. */
   setRunStatus(runId: string, status: WorkflowRunStatus, error: string | null, now = new Date()): boolean {
     const at = now.toISOString();
     const ended = isOneOf(OPEN_RUN_STATUSES, status) ? null : at;
@@ -254,7 +253,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Opens an ended run again, for a retried step. */
   reopenRun(runId: string, now = new Date()): boolean {
     return (
       this.#database.connection
@@ -266,7 +264,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Every attempt of the run's steps, oldest first. */
   steps(runId: string): StoredWorkflowStep[] {
     return databaseRows(
       this.#database.connection
@@ -280,7 +277,39 @@ export class WorkflowRunStore {
     return row ? toStep(row) : null;
   }
 
-  /** Steps that have not ended, of runs and alone. */
+  earlierAttempts(step: StoredWorkflowStep, limit: number): StoredWorkflowStep[] {
+    const rows =
+      step.runId === null
+        ? this.#database.connection
+            .prepare(
+              `${STEP_SELECT} WHERE run_id IS NULL AND workflow_id = ? AND node_id = ? AND rowid < ? ORDER BY rowid DESC LIMIT ?`,
+            )
+            .all(step.workflowId, step.nodeId, step.sequence, limit)
+        : this.#database.connection
+            .prepare(`${STEP_SELECT} WHERE run_id = ? AND node_id = ? AND attempt < ? ORDER BY attempt DESC LIMIT ?`)
+            .all(step.runId, step.nodeId, step.attempt, limit);
+    return databaseRows(rows).map(toStep);
+  }
+
+  runningAgentStep(deliveryId: string): StoredWorkflowStep | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare(`${STEP_SELECT} WHERE delivery_id = ? AND status = 'running' AND kind = 'agent'`)
+        .get(deliveryId),
+    );
+    return row ? toStep(row) : null;
+  }
+
+  keepAgentAnswer(stepId: string, deliveryId: string, output: string, now = new Date()): boolean {
+    return (
+      this.#database.connection
+        .prepare(
+          "UPDATE workflow_steps SET output = ?, updated_at = ? WHERE step_id = ? AND delivery_id = ? AND status = 'running'",
+        )
+        .run(output, now.toISOString(), stepId, deliveryId).changes > 0
+    );
+  }
+
   openSteps(): StoredWorkflowStep[] {
     return databaseRows(
       this.#database.connection
@@ -289,12 +318,6 @@ export class WorkflowRunStore {
     ).map(toStep);
   }
 
-  /**
-   * The newest step of each node that ended with an answer, of runs and alone. A run from a node
-   * reads the steps before that node from here. The copy of an earlier answer that a run from a node
-   * adds is left out: the step that gave the answer has the same one, and the run of that step has
-   * the graph that it was given in.
-   */
   latestDone(workflowId: string): Map<string, StoredWorkflowStep> {
     const rows = databaseRows(
       this.#database.connection
@@ -308,10 +331,35 @@ export class WorkflowRunStore {
     return new Map(rows.map((step) => [step.nodeId, step]));
   }
 
-  /**
-   * Adds a step, or answers the step that the same request already added. The attempt is the
-   * node's next one in its run; a step alone is always the first.
-   */
+  latestSettled(workflowId: string): Map<string, StoredWorkflowStep> {
+    const rows = databaseRows(
+      this.#database.connection
+        .prepare(
+          `${STEP_SELECT} WHERE workflow_id = ? AND status IN ('done', 'failed', 'stopped')
+             AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
+           ORDER BY created_at, attempt, step_id`,
+        )
+        .all(workflowId),
+    ).map(toStep);
+    return new Map(rows.map((step) => [step.nodeId, step]));
+  }
+
+  mediaOutputs(): WorkflowMediaOutput[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `SELECT output, workflow_id, ended_at FROM workflow_steps
+           WHERE kind = 'image' AND status = 'done' AND output IS NOT NULL
+           ORDER BY created_at, step_id`,
+        )
+        .all(),
+    ).map((row) => ({
+      attachmentId: requiredStringColumn(row, "output"),
+      workflowId: requiredStringColumn(row, "workflow_id"),
+      endedAt: optionalStringColumn(row, "ended_at"),
+    }));
+  }
+
   addStep(input: NewWorkflowStep, now = new Date()): StoredWorkflowStep {
     return this.#transaction(() => {
       const db = this.#database.connection;
@@ -342,8 +390,8 @@ export class WorkflowRunStore {
       const ended = isOneOf(OPEN_STEP_STATUSES, input.status) ? null : at;
       db.prepare(
         `INSERT INTO workflow_steps (step_id, workflow_id, run_id, node_id, attempt, request_id, kind, agent_id, status,
-          input, output, branch, error, started_at, ended_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          input, settings_json, sources_json, output, branch, error, started_at, ended_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         stepId,
         input.workflowId,
@@ -355,6 +403,8 @@ export class WorkflowRunStore {
         input.agentId,
         input.status,
         input.input,
+        input.settings ? JSON.stringify(input.settings) : null,
+        input.sources ? JSON.stringify(input.sources) : null,
         input.output ?? null,
         input.branch ?? null,
         input.error ?? null,
@@ -369,10 +419,28 @@ export class WorkflowRunStore {
     });
   }
 
+  recordUsedSettings(stepId: string, used: WorkflowFields): void {
+    const settings = this.step(stepId)?.settings;
+    if (!settings) return;
+    this.#database.connection
+      .prepare("UPDATE workflow_steps SET settings_json = ? WHERE step_id = ?")
+      .run(JSON.stringify({ ...settings, ...used }), stepId);
+  }
+
   attachDelivery(stepId: string, deliveryId: string, now = new Date()): void {
     this.#database.connection
       .prepare("UPDATE workflow_steps SET delivery_id = ?, updated_at = ? WHERE step_id = ? AND delivery_id IS NULL")
       .run(deliveryId, now.toISOString(), stepId);
+  }
+
+  replaceDelivery(stepId: string, deliveryId: string, nextDeliveryId: string, now = new Date()): boolean {
+    return (
+      this.#database.connection
+        .prepare(
+          "UPDATE workflow_steps SET delivery_id = ?, turn_id = NULL, updated_at = ? WHERE step_id = ? AND delivery_id = ? AND status = 'running'",
+        )
+        .run(nextDeliveryId, now.toISOString(), stepId, deliveryId).changes > 0
+    );
   }
 
   attachTurn(stepId: string, turnId: string, now = new Date()): void {
@@ -381,7 +449,6 @@ export class WorkflowRunStore {
       .run(turnId, now.toISOString(), stepId, turnId);
   }
 
-  /** Holds a running step for a person's decision. */
   awaitApproval(stepId: string, now = new Date()): boolean {
     return (
       this.#database.connection
@@ -392,7 +459,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Ends a step that has not ended. Answers whether it ended it. */
   settleStep(stepId: string, end: WorkflowStepEnd, now = new Date()): boolean {
     const at = now.toISOString();
     return (
@@ -416,7 +482,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Keeps the post of an output step before it is sent. A second call for the step keeps the first. */
   addOutput(output: Pick<WorkflowOutputDelivery, "stepId" | "connectionId" | "placeId" | "text">, now = new Date()) {
     const at = now.toISOString();
     this.#database.connection
@@ -435,7 +500,6 @@ export class WorkflowRunStore {
     return row ? toOutput(row) : null;
   }
 
-  /** Marks a waiting post as on its way, before it starts. False when it does not wait now. */
   claimOutput(stepId: string, now = new Date()): boolean {
     return (
       this.#database.connection
@@ -447,7 +511,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Ends a post that waits or is on its way. */
   endOutput(stepId: string, status: WorkflowOutputEnd, reason: string | null, now = new Date()): void {
     const at = now.toISOString();
     this.#database.connection
@@ -458,12 +521,12 @@ export class WorkflowRunStore {
       .run(status, reason, status === "sent" ? at : null, at, stepId);
   }
 
-  /**
-   * Runs newest first, after the `before` cursor of the page before when given, and on the first page
-   * the newest steps alone. The cursor is `<started at>|<run id>`, so runs that started in the same
-   * millisecond are not skipped.
-   */
-  page(workflowId: string, before: string | undefined, limit: number): WorkflowRunPage {
+  page(
+    workflowId: string,
+    before: string | undefined,
+    limit: number,
+    shown: (step: StoredWorkflowStep) => WorkflowStep,
+  ): WorkflowRunPage {
     const db = this.#database.connection;
     const cursor = before === undefined ? null : runCursor(before);
     const rows = databaseRows(
@@ -491,8 +554,8 @@ export class WorkflowRunStore {
           ).map(toStep)
         : [];
     return {
-      runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(publicStep) })),
-      soloSteps: soloSteps.map(publicStep),
+      runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(shown) })),
+      soloSteps: soloSteps.map(shown),
       nextBefore: rows.length > limit && last ? `${last.startedAt}|${last.id}` : null,
     };
   }
@@ -502,14 +565,11 @@ export class WorkflowRunStore {
   }
 }
 
-/** The start and the id of the last run of a page. */
 function runCursor(before: string): { startedAt: string; runId: string } {
   const bar = before.lastIndexOf("|");
-  // A time alone has no id: no run id is less than the empty string, so the page starts before that time.
   return bar < 0 ? { startedAt: before, runId: "" } : { startedAt: before.slice(0, bar), runId: before.slice(bar + 1) };
 }
 
-/** The public part of a run, as IPC and the Team API carry it. */
 export function publicRun(run: StoredWorkflowRun): WorkflowRun {
   return {
     id: run.id,
@@ -524,7 +584,6 @@ export function publicRun(run: StoredWorkflowRun): WorkflowRun {
   };
 }
 
-/** The public part of a step, as IPC and the Team API carry it. */
 export function publicStep(step: StoredWorkflowStep): WorkflowStep {
   return {
     id: step.id,
@@ -548,8 +607,8 @@ const RUN_SELECT = `
   FROM workflow_runs`;
 
 const STEP_SELECT = `
-  SELECT step_id, workflow_id, run_id, node_id, attempt, kind, agent_id, status, delivery_id, turn_id, input, output,
-    branch, error, started_at, ended_at, created_at, rowid AS sequence
+  SELECT step_id, workflow_id, run_id, node_id, attempt, kind, agent_id, status, delivery_id, turn_id, input,
+    settings_json, sources_json, output, branch, error, started_at, ended_at, created_at, rowid AS sequence
   FROM workflow_steps`;
 
 function toRun(row: DynamicRecord): StoredWorkflowRun {
@@ -572,6 +631,18 @@ function toRun(row: DynamicRecord): StoredWorkflowRun {
   };
 }
 
+function isWorkflowStepSources(value: unknown): value is WorkflowStepSource[] {
+  return Array.isArray(value) && value.every(isWorkflowStepSource);
+}
+
+function jsonColumn<T>(row: DynamicRecord, column: string, valid: (value: unknown) => value is T): T | null {
+  const text = optionalStringColumn(row, column);
+  if (text === null) return null;
+  const value = JSON.parse(text);
+  if (!valid(value)) throw new Error(`Invalid SQLite column: workflow_steps.${column}`);
+  return value;
+}
+
 function toStep(row: DynamicRecord): StoredWorkflowStep {
   const branch = row.branch;
   return {
@@ -586,6 +657,8 @@ function toStep(row: DynamicRecord): StoredWorkflowStep {
     deliveryId: optionalStringColumn(row, "delivery_id"),
     turnId: optionalStringColumn(row, "turn_id"),
     input: requiredStringColumn(row, "input"),
+    settings: jsonColumn(row, "settings_json", isWorkflowFields),
+    sources: jsonColumn(row, "sources_json", isWorkflowStepSources),
     output: optionalStringColumn(row, "output"),
     branch: isOneOf(WORKFLOW_BRANCHES, branch) ? branch : null,
     error: optionalStringColumn(row, "error"),

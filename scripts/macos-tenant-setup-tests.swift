@@ -1,4 +1,3 @@
-// These tests use temporary files and a fake directory service. They never create macOS users.
 import Darwin
 import Foundation
 func expectEqual<T: Equatable>(_ actual: T, _ expected: T) {

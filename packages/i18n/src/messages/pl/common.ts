@@ -27,4 +27,8 @@ export const messages = {
   "common.download": "Pobierz",
   "common.removing": "Usuwanie…",
   "common.sending": "Wysyłanie…",
+  "common.scrollLeft": "Przewiń w lewo",
+  "common.scrollRight": "Przewiń w prawo",
+  "common.scrollUp": "Przewiń w górę",
+  "common.scrollDown": "Przewiń w dół",
 } as const satisfies PartialTranslation<typeof source>;

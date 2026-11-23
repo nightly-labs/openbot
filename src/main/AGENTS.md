@@ -81,6 +81,7 @@ Keep `index.ts` as the dispatcher and lifecycle module. Do not move these respon
 | `session-configuration.ts` | Renderer CSP, bundle protocol, permissions, attachment/avatar/logo protocols |
 | `renderer-forwarders.ts` | Service events sent to the renderer |
 | `ipc/*-handlers.ts` | IPC endpoints by domain |
+| `start.ts` | The entry: loads `index.ts` and reports a damaged installation. It imports no installed package except `electron` |
 
 Keep `createApplicationServices` as one function that only constructs services. Event wiring,
 `registerIpcHandlers`, `loadRenderer` and `app.on("activate")` stay in `index.ts`. Register each
@@ -100,7 +101,7 @@ error paths by importing each other.
 | Concern | Files |
 | --- | --- |
 | Stored server list and schema | `remote-server-store.ts`, `remote-server-stored-shape.ts` |
-| Team API requests | `remote-server-client.ts`, `remote-server-http.ts`, `remote-server-errors.ts`, `remote-attachment-cache.ts` |
+| Team API requests | `remote-server-client.ts`, `remote-server-http.ts`, `remote-server-errors.ts`, `remote-attachment-cache.ts`, `remote-picture-cache.ts` |
 | User-visible connection failures | `remote-server-connection-status.ts`, `remote-server-connections.ts` |
 | Events and reconnects | `remote-server-event-stream.ts`, `remote-server-event-refresh.ts` |
 | Team directory, presence, host reconciliation | `remote-team-directory.ts`, `remote-server-presence.ts`, `remote-server-host-directory.ts` |

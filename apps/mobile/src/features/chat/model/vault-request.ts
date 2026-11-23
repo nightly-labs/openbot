@@ -8,10 +8,6 @@ import {
 } from "@openbot/contracts/ui-blocks";
 import type { VaultDraft } from "@/features/servers/model/vault-items";
 
-/**
- * The open `request_vault_item` of one chat card, for the sheet that the card opens. The card keeps
- * it current while it is on the screen: `save` answers the prompt that the card shows.
- */
 export interface VaultRequestHandoff {
   serverId: string;
   kind: UiVaultRequestKind;
@@ -33,12 +29,10 @@ export function vaultRequestHandoff(id: string): VaultRequestHandoff | undefined
   return handoffs.get(id);
 }
 
-/** The Vault request of a block, when the host sent one (`ui-block-vault-v1`). */
 export function vaultRequestOf(block: ConversationUiBlock | undefined) {
   return block?.vault && block.spec.type === "form" ? block.vault : undefined;
 }
 
-/** The text fields of a Vault request that the agent may fill in, by their form field ids. */
 const VAULT_REQUEST_TEXT_KEYS = [
   "website",
   "username",
@@ -55,7 +49,6 @@ const VAULT_REQUEST_TEXT_KEYS = [
   "email",
 ] as const satisfies readonly (keyof VaultDraft)[];
 
-/** The fields that the agent filled in, as the text of the Vault item form. A secret field has none. */
 export function vaultRequestPrefill(spec: UiBlockSpec): Partial<VaultDraft> {
   if (spec.type !== "form") return {};
   const prefill: Partial<VaultDraft> = {};
@@ -72,7 +65,6 @@ export function vaultRequestPrefill(spec: UiBlockSpec): Partial<VaultDraft> {
   return prefill;
 }
 
-/** The form values of a Vault item, keyed by the field ids of `UI_VAULT_REQUEST_FIELDS`. */
 function vaultFormValues(input: VaultSaveInput): Record<string, string> {
   switch (input.kind) {
     case "login":
@@ -86,7 +78,7 @@ function vaultFormValues(input: VaultSaveInput): Record<string, string> {
         securityCode: input.securityCode ?? "",
       };
     case "contact": {
-      const { kind: _kind, id: _id, ...fields } = input;
+      const { kind: _kind, id: _id, agents: _agents, ...fields } = input;
       return fields;
     }
     case "apiKey":
@@ -94,7 +86,6 @@ function vaultFormValues(input: VaultSaveInput): Record<string, string> {
   }
 }
 
-/** The answers of the block's fallback questions that give the host `input`, as the desktop card sends them. */
 export function vaultRequestAnswers(spec: UiBlockSpec, input: VaultSaveInput): Record<string, string[]> {
   const values = Object.fromEntries(Object.entries(vaultFormValues(input)).filter(([, value]) => value !== ""));
   return uiBlockAnswersFromResponse(spec, { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values });

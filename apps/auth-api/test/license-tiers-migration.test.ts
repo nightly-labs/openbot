@@ -45,7 +45,6 @@ describe("license tiers migration", () => {
       before.licenses.map((row) => ({ ...row, tier: null, billing_interval: null, bundle: 0 })),
     );
 
-    // The old Worker's writes name their columns, so they still run. Its new server keeps the old member limits.
     database.exec(`
       INSERT INTO hosted_servers(
         server_id, owner_user_id, name, size, plan, billing_interval, currency, desired_state, observed_state,
@@ -71,7 +70,6 @@ describe("license tiers migration", () => {
         .get(),
     ).toEqual({ users: 9, tier: null, billing_interval: null, bundle: 0 });
 
-    // The new Worker's writes.
     database.exec(`
       INSERT INTO hosted_servers(
         server_id, owner_user_id, name, size, plan, billing_interval, currency, desired_state, observed_state,

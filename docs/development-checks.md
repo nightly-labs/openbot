@@ -89,7 +89,7 @@ an output is missing. File times do not decide: a checkout changes them, and Uni
 file whose content is the same.
 
 In CI, `check:desktop:static` (the UI check, lint, desktop typecheck, build and preload check) takes
-about a minute, and each other typecheck takes a few seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
+about a minute, and each other typecheck takes a few seconds. When `openbot-database-schema.ts`, a file in `src/backend/migrations/`, the parity test or
 `openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
 
 `check:staged` lets Biome fix the working-tree copy of each staged file, and the hook then stages
@@ -107,14 +107,14 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, then `bun run i18n:check`, `bun run types:ratchet`, `bun run check:agent-context` and `bun scripts/whats-new-translations.ts` in parallel |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, then `bun run i18n:check`, `bun run types:ratchet`, `bun run check:agent-context`, `bun run check:migrations` and `bun scripts/whats-new-translations.ts` in parallel |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser`, then `xvfb-run -a bun run test:browser-agent-session` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Signal E2E | `ubuntu-latest` | `bun run test:signal`, when `remote/` or `scripts/` changes |
 | Local scripts CLI E2E | `ubuntu-latest` | `bun run test:automation-cli` |
 | Team API routes E2E | `ubuntu-latest` | `bun run test:team-api-routes`, when desktop code changes |
-| Team API and reverse actions E2E | `ubuntu-latest` | `test:team-legacy-clients`, `test:team-session-revoke`, `test:sign-in-relay-paste`, `test:server-mute`, `test:routine-pause-resume`, `test:agent-hide-restore`, `test:messaging-pause-resume`, `test:messaging-discord-access`, `test:messaging-discord-embeds`, `test:messaging-slack-ping-reply`, `test:turn-input`, `test:provider-update-busy`, `test:provider-update-after-app-upgrade`, `test:provider-runtime-remove`, `test:provider-exit-session`, `test:acp-subagents`, `test:codex-subagent-steps`, `test:subagent-status`, `test:codex-hung-app-server`, `test:codex-missing-rollout`, `test:codex-idle-thread-release`, `test:zip-attachments`, `test:mp4-attachments`, `test:svg-attachments`, `test:any-file-attachments`, `test:channel-notifications`, `test:memory-review` and `test:skill-revision`, each with `bun run` in its own step, when the `desktop` lane runs |
-| Provider fakes E2E | `ubuntu-latest` | `test:custom-agents`, `test:custom-agents:login-path`, `test:acp-directories`, `test:acp-flavors`, `test:acp-turn-stall`, `test:agent-database-host-start`, `test:acp-mcp-names`, `test:provider-conformance`, `test:opencode-expired-key`, `test:opencode-downgraded-session`, `test:cline-free-models` and `test:provider-transcript-replay`, each with `bun run` in its own step, when the `desktop` lane runs. The fake agents are in `scripts/provider-fakes/`; the replayed transcripts of released CLIs are in `scripts/provider-fakes/transcripts/`, and `bun scripts/record-provider-transcript.ts` records a new one |
+| Team API and reverse actions E2E | `ubuntu-latest` | `test:team-legacy-clients`, `test:team-protocol-v10`, `test:team-webrtc-wire-parity`, `test:remote-viewer-proxy`, `test:server-safe-mode`, `test:team-session-revoke`, `test:sign-in-relay-paste`, `test:server-mute`, `test:routine-pause-resume`, `test:agent-hide-restore`, `test:messaging-pause-resume`, `test:messaging-discord-access`, `test:messaging-discord-embeds`, `test:messaging-place-history`, `test:messaging-slack-ping-reply`, `test:turn-input`, `test:provider-update-busy`, `test:provider-update-automatic`, `test:provider-runtime-remove`, `test:provider-exit-session`, `test:acp-subagents`, `test:codex-subagent-steps`, `test:subagent-status`, `test:codex-hung-app-server`, `test:codex-missing-rollout`, `test:codex-idle-thread-release`, `test:zip-attachments`, `test:mp4-attachments`, `test:svg-attachments`, `test:any-file-attachments`, `test:channel-notifications`, `test:memory-review` and `test:skill-revision`, each with `bun run` in its own step, when the `desktop` lane runs |
+| Provider fakes E2E | `ubuntu-latest` | `test:custom-agents`, `test:custom-agents:login-path`, `test:acp-directories`, `test:acp-flavors`, `test:acp-turn-stall`, `test:agent-database-host-start`, `test:acp-mcp-names`, `test:provider-conformance`, `test:opencode-expired-key`, `test:opencode-downgraded-session`, `test:cline-free-models`, `test:cline-plan-limit-failover` and `test:provider-transcript-replay`, each with `bun run` in its own step, when the `desktop` lane runs. The fake agents are in `scripts/provider-fakes/`; the replayed transcripts of released CLIs are in `scripts/provider-fakes/transcripts/`, and `bun scripts/record-provider-transcript.ts` records a new one |
 | Surfaces | `ubuntu-latest` | Parallel groups described below, then `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api`, then, for a pull request from this repository, upload `apps/auth-api/dist` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
@@ -140,6 +140,10 @@ times on GitHub before claiming a time reduction; parallel steps share the runne
 The `Provider CLI canary` workflow is not a pull request check. It runs every six hours on the newest
 upstream provider CLIs, which reach users without an OpenBot release; see
 [Provider CLI updates](architecture/providers.md#provider-cli-updates).
+
+The `Provider live E2E` workflow is not a pull request check either. It runs only when somebody
+starts it; the release-upgrade-safety skill starts it before a release. On the Mac mini runner, it sends one real message to Codex, Claude and Gemini through the desktop app
+(`bun run test:provider-live`). See [Live provider test](provider-live-e2e.md).
 
 The `Release regression report` workflow is not a pull request check either. Once a day, it compares
 the two newest releases from production analytics and posts the result to a private Discord channel
@@ -205,8 +209,10 @@ check, the lint, the desktop typecheck, the build and `verify:preload`, followed
 smoke test. CI is
 the only caller that splits them. The smoke test starts the real Electron binary, so it runs under
 xvfb on Ubuntu rather than on a macOS runner, and reads nothing the build writes, so the order
-between the halves is free. `release.yml` keeps the whole of `check:desktop` on one macOS runner,
-where it checks the machine that builds the release.
+between the halves is free. `release.yml` keeps the whole of `check:desktop` on one macOS runner of
+the same image that builds the release. It is the `repository-check` job, which runs in parallel
+with the platform builds, so the check does not make the signed macOS build wait. The publish job
+needs it.
 
 `bun run knip:check` fails on unused files, unused exports and exported types, unused or unlisted
 dependencies, unresolved imports and unlisted binaries in every workspace. It takes about 6 seconds. `knip.config.ts` names the entry
@@ -407,6 +413,15 @@ skills, or connected vault, so the counts measure only OpenBot's own text:
 The script writes the counts to `.openbot-build/agent-context-budget/report.json`. It does not
 measure the schemas that the Claude Agent SDK makes from the Zod shapes of Claude's visible tools.
 CI runs it in the `check` job.
+
+### Frozen migrations
+
+`bun run check:migrations` compares `src/backend/migrations/` with the newest `v*` tag on origin.
+CI checks out one commit and no tags, so the script fetches only that tag commit (`--depth=1`).
+`--tag <tag>` compares with another tag. The rules and the fix for a released bug are in
+[src/backend/AGENTS.md](../src/backend/AGENTS.md#frozen-migrations); the rule fixtures are in
+`scripts/check-frozen-migrations.test.ts`. A tag from before the folder (v0.72.0 and earlier) has
+no frozen files, so only the rules on the current folder apply.
 
 ### Plugin cost
 

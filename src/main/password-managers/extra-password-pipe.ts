@@ -1,9 +1,3 @@
-// Gives the Proton Pass CLI the extra password of an account during a `browser` sign-in. The CLI
-// reads the password from the file that `PROTON_PASS_EXTRA_PASSWORD_FILE` names, so the password
-// never goes into an argument or onto the disk: the file is a FIFO on macOS and Linux, and a named
-// pipe on Windows. Each time the CLI opens it, this module calls `onRead`; the CLI opens it again
-// after an incorrect password.
-
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
@@ -16,12 +10,10 @@ export interface ExtraPasswordPipe {
   close(): Promise<void>;
 }
 
-/** Sends one password to the CLI that reads now. */
 export type ExtraPasswordAnswer = (password: string) => Promise<void>;
 
 const POLL_MS = 500;
 
-/** `directory` must belong to this user only. */
 export function openExtraPasswordPipe(
   directory: string,
   onRead: (answer: ExtraPasswordAnswer) => void,
@@ -54,13 +46,10 @@ async function fifo(directory: string, onRead: (answer: ExtraPasswordAnswer) => 
   });
   let closed = false;
   let writer: FileHandle | null = null;
-  // After an answer, the CLI can still hold the pipe while it reads. A new read counts only after the
-  // pipe had no reader.
   let armed = true;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const poll = async () => {
     if (closed || writer) return;
-    // With no reader, a non-blocking open for writing fails with ENXIO; the CLI waits in its open.
     const handle = await open(path, constants.O_WRONLY | constants.O_NONBLOCK).catch(() => null);
     if (!handle) armed = true;
     else if (closed || !armed) await handle.close().catch(() => undefined);

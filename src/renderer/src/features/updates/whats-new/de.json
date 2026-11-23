@@ -1,5 +1,318 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren Aufgaben, die gleichzeitig laufen, das Konto für Live-Sprache, der Schalter für das Gedächtnis von OpenBot, Workflow-Ordner, typisierte Workflow-Antworten und mehr als 10 Konten eines Anbieters nur, wenn der Server diese Version hat.",
+      "Nach diesem Update kann eine ältere Version von OpenBot deine Daten nicht öffnen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ein Agent kann unabhängige Arbeit in Aufgaben aufteilen, die gleichzeitig laufen. Jedes Ergebnis kommt in den Hauptchat zurück, und der Agent fasst die Ergebnisse für dich zusammen.",
+          "Sieh alle offenen Threads eines Agenten im neuen Tab Threads der Seitenleiste. Der Tab zeigt die Anzahl der Threads, die auf dich warten.",
+          "Ändere deine Tastenkürzel im neuen Tab Tastatur der Einstellungen. Neue Tastenkürzel starten einen Thread und wechseln zum nächsten und zum vorherigen Thread.",
+          "Workflows öffnen sich in Tabs, und Workflow-Schritte können typisierte Antworten geben. Schreibe {{name}}, um eine Antwort in einem späteren Schritt zu verwenden.",
+          "Lade ein MP4- oder WebM-Video als Fensterhintergrund in Einstellungen > Darstellung hoch.",
+          "Wähle das ChatGPT-Konto, das die Live-Sprache von GPT verwendet, in Einstellungen > Diktat."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ein Anbieter behält bis zu 20 Konten. Vorher lag die Grenze bei 10.",
+          "Diktat nimmt bis zu 10 Minuten auf. Vorher hörte es nach 2 Minuten auf.",
+          "Ein Thread lädt ältere Nachrichten, wenn du nahe an den oberen Rand scrollst. Du musst keine Schaltfläche anklicken."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Eine geplante Routine schaltet sich nicht mehr stillschweigend aus, wenn ein Lauf nichts zu melden hat.",
+          "Ein langer Chat behält alle seine Nachrichten in der richtigen Reihenfolge, während eine Antwort Stück für Stück erscheint.",
+          "Eine verknüpfte WhatsApp-Nummer hört nicht mehr auf, Nachrichten zu empfangen, während sie noch „Verbunden“ anzeigt.",
+          "Unter Windows führen OpenCode-Agenten Befehle wieder aus. Vorher scheiterten sie oft mit „opencode-pty request timed out“.",
+          "Ein Agent, den du stummgeschaltet hast, schickt dir keine Benachrichtigung mehr, wenn er in einem Kanal antwortet."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren die Einstellungen von Workflow-Schritten, Ab diesem Schritt ausführen, die Übergabe des Besitzes, die Schaltfläche Alle aktualisieren und viele Korrekturen für Agenten nur, wenn der Server diese Version hat.",
+      "Nach diesem Update kann eine ältere Version von OpenBot deine Daten nicht öffnen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sprich mit einem Agenten per Push-to-Talk. Halte die Sprechtaste oder die Push-to-Talk-Taste gedrückt, während du sprichst. OpenBot sendet, was du gesagt hast, wenn du loslässt. Ändere die Taste unter Einstellungen > Diktat.",
+          "Starte einen Workflow ab einem Schritt neu. Wähle im Menü des Schritts Ab diesem Schritt ausführen. Die Schritte davor behalten ihre Antworten und laufen nicht noch einmal.",
+          "Sieh dir die Einstellungen und Eingaben an, die das Ergebnis eines Workflow-Schritts erzeugt haben. Wähle am Schritt Einstellungen und dann Diese Einstellungen verwenden, um ihn auf die gleiche Weise erneut auszuführen.",
+          "Gib deinen Server an ein anderes OpenBot-Konto weiter. Gib unter Servereinstellungen > Mitglieder die E-Mail-Adresse des neuen Besitzers ein. Der Server wechselt den Besitzer, wenn der neue Besitzer ihn annimmt.",
+          "Aktualisiere alle Anbieter auf einmal. Einstellungen > Anbieter zeigt Alle aktualisieren, wenn ein oder mehrere Anbieter ein Update haben."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot aktualisiert die Anbieter-CLIs, die es heruntergeladen hat, jede Stunde, sobald eine neue Version verfügbar ist. Das Update wartet, bis die Agenten im Leerlauf sind.",
+          "Jeder Thread eines Agenten kann die Browser-Tabs nutzen, die der Hauptchat oder ein anderer Thread dieses Agenten geöffnet hat.",
+          "Der Tab Routinen ist aus der Seitenleiste verschwunden. Routinen laufen weiter. Verwalte sie in den Einstellungen des Agenten, auf der Seite Zeitplan und unter Servereinstellungen > Routinen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Neustart für ein heruntergeladenes Update wartet jetzt, bis die Agenten im Leerlauf sind, mit Neustart abbrechen. Vorher schloss sich OpenBot sofort und beendete die Aufgabe des Agenten.",
+          "Ein Agent bleibt nach einem Neustart oder einem Nutzungslimit nicht mehr auf „In Arbeit“ mit wartenden Nachrichten. Der beendete Durchlauf wird als unterbrochen angezeigt, und die wartenden Nachrichten starten.",
+          "Einem ausgelasteten Server mit vielen Agenten und verbundenen Geräten geht nicht mehr der Speicher aus, und er friert nicht mehr ein, wenn er den nächsten Durchlauf auswählt.",
+          "Eine Nachricht, die du nach einer Pause sendest, bleibt nicht mehr auf „Nicht gesendet“ mit „Verbinde Claude, um fortzufahren.“, wenn Claude angemeldet ist.",
+          "Ungenutzte Browser-Tabs von Agenten verbrauchen nach 2 Minuten keine Prozessorleistung mehr."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren kleine Kopien der Bilder auf dem Workflow-Canvas, benutzerdefinierte Videolängen und Agenten, die eine Anfrage ohne „Weiter“ abschließen, nur, wenn der Server diese Version hat.",
+      "Unter Linux: Wenn OpenBot nach dem Update immer noch langsam ist, lösche die Datei `~/.config/OpenBot/gpu-crash.json` und starte OpenBot neu.",
+      "Wenn du für einen Mistral-Agenten unter Anbietereinstellungen Denken festgelegt hast, wähle die Stufe im Menü Aufwand erneut aus und setze die alte Zeile Denken zurück."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Teile deinen Einladungslink unter Einstellungen > Invite friends. Der Tab zeigt dein Guthaben und die Freunde, die beigetreten sind. Ein Freund erhält 10 % Rabatt auf jede Zahlung, und du erhältst 10 % jeder bezahlten Rechnung deines Freundes als Guthaben.",
+          "Lege Knoten eines Workflow-Canvas in eine Gruppe. Wähle sie aus und drücke Gruppieren (⌘G). Klappe eine Gruppe zu einer einzigen Stapelkarte zusammen, und drücke Gruppierung aufheben (⇧⌘G), um sie zu beenden.",
+          "Gib einem Videoschritt auf dem Workflow-Canvas jede Länge, die sein Sunra- oder Higgsfield-Modell unterstützt. Wähle im Menü Länge die Option Eigene und nutze den Schieberegler.",
+          "Öffne den Marketplace über die Zeile Apps in den Einstellungen eines Agenten. Verbinde eine App, oder füge mit Eigene hinzufügen deinen eigenen MCP-Server hinzu.",
+          "Wenn du dich auf einem neuen Computer anmeldest und dein Konto bereits Server hat, zeigt der erste Schritt sie an. Öffne einen Server, um mit seinen Agenten und Chats weiterzumachen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agenten schließen deine Anfrage ohne „Weiter“ von dir ab. Wenn ein Teil der Anfrage nicht fertig ist, macht der Agent mit diesem Teil weiter, höchstens 3 Mal. Eine Frage, die deine Wahl oder Freigabe braucht, hält den Agenten weiterhin an.",
+          "Tabs der Seitenleiste behalten ihren Titel und eine einheitliche Breite. Wenn die Tabs nicht passen, scrollt die Zeile, und ein Menü am Ende der Zeile listet die anderen Tabs auf. Ein Klick mit der mittleren Maustaste schließt einen Tab.",
+          "Auf einem verbundenen Server werden die Bilder des Workflow-Canvas viel schneller angezeigt. Der Canvas erhält eine kleine Kopie jedes Bildes, und das volle Bild öffnet sich im Viewer.",
+          "Ein Thread sieht jetzt wie der Chat des Agenten aus. Nachrichten desselben Absenders wirken als ein Block, und die Schritte einer Antwort werden daneben angezeigt."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Claude- oder ChatGPT-Agent bleibt nicht mehr stundenlang bei „In Arbeit“ hängen, wenn der Anbieter nicht mehr antwortet. Nach 15 Minuten ohne Ausgabe (60 Minuten, während ein Werkzeug läuft) beendet OpenBot den Durchlauf, und die wartenden Nachrichten laufen weiter.",
+          "Wenn „Mein Claude-Code-Setup verwenden“ ausgeschaltet ist, laden Claude-Agenten deine globalen Claude-Code-Anweisungen und -Regeln nicht mehr. Jeder Durchlauf ist schneller und kostet weniger. Um sie zu behalten, schalte „Mein Claude-Code-Setup verwenden“ ein.",
+          "Deine Agenten arbeiten weiter, während OpenBot ein Update für einen Anbieter herunterlädt. Ein Download, der eine Minute lang keine Daten erhält, stoppt, und er wird beim nächsten Versuch dort fortgesetzt, wo er aufgehört hat.",
+          "Agenten senden Nachrichten wieder direkt an die anderen Agenten ihres Teams. Vorher musste eine Karte jede Übergabe bestätigen, und die Arbeit stand still, bis du zugestimmt hast.",
+          "Ein Agent mit automatischen Ersatzmodellen wechselt in mehr Fällen zu seinem nächsten Ersatzmodell, zum Beispiel nach einer Ratenbegrenzung oder wenn Gemini die Verbindung zu Google verliert."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Nachdem du diese Version installiert hast, kannst du nicht mehr zu einer älteren OpenBot-Version auf diesem Computer oder Server zurück. Diese Version macht die Datenbank kleiner, und eine ältere Version kann sie nicht öffnen.",
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren benutzerdefinierte Bildgrößen, die Modelle und Preise von Sunra und Higgsfield sowie das schnellere Laden vieler Agenten nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sieh dir die Nebenthreads jedes Agenten in der Seitenleiste an. Wähle den Pfeil am Ende einer Agentenzeile, oder lass den Zeiger auf der Zeile, um alle ihre Threads zu sehen.",
+          "Filtere die Seitenleiste mit dem Filter-Button am Ende des Suchfelds. Zeige nur Agenten oder Kanäle, nur ungelesene Chats oder Agenten, die arbeiten, oder nur die Chats in den Ordnern, die du auswählst.",
+          "Gib einem Bild-Schritt im Workflow-Canvas eine eigene Größe in Pixeln, oder wähle das Seitenverhältnis 4:5 oder 5:4.",
+          "Der Workflow-Canvas zeigt alle Bild- und Videomodelle von Sunra und Higgsfield, und die Schaltfläche Ausführen zeigt den Preis in Credits.",
+          "Schalte Hintergrundunschärfe und Bewegte Agentengesichter unter Einstellungen > Darstellung > Bewegung aus, damit OpenBot auf einem langsamen Computer schneller läuft."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Mehrere Personen können einen Workflow gleichzeitig bearbeiten. Der Canvas übernimmt die Änderungen der anderen Personen, sobald sie speichern.",
+          "OpenBot braucht viel weniger CPU, wenn viele Agenten arbeiten, und du kannst ohne Verzögerung tippen.",
+          "Agenten schließen einen Checkout ab, wenn die Bank einen 3-D-Secure-Code verlangt. Steht der Code in einer E-Mail oder SMS, die der Agent lesen kann, gibt der Agent ihn ein.",
+          "Servereinstellungen > Übertragung > Auf einen anderen Server kopieren kopiert jetzt auch die Workflows und Routine-Abläufe der Agenten."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Die OpenBot-Datenbank braucht viel weniger Platz. Nach dem Update entfernt OpenBot alte Kopien von Chatnachrichten in kleinen Schritten.",
+          "Unter Windows zeigt ein Update seinen Fortschritt wieder an.",
+          "Ein verbundener Server mit vielen Agenten und ein großer Kanal öffnen sich schneller.",
+          "Gemini-Chats mit vielen Bildern oder einem langen Verlauf funktionieren wieder, und Gemini fragt nicht mehr nach einer Anmeldung, wenn ein neuer Chat beginnt.",
+          "Die Desktop-App verbindet sich wieder mit einem Server mit OpenBot v0.34.1 oder älter."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren das CRM, Konto mit Code hinzufügen, ein Hintergrund, den ein Agent festlegt, Bibliotheksordner, die Agenten organisieren, und Nachrichten in einen laufenden Devin-Durchlauf nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zeige einen animierten Hintergrund hinter dem gesamten Fenster. Wähle eine Szene, zum Beispiel Koi-Teich oder Glühwürmchen, unter Einstellungen > Fensterhintergrund, oder bitte einen Agenten, eine für dich zu erstellen.",
+          "Verwalte Leads, Kunden und Zahlungen auf der neuen CRM-Seite. Sie ist experimentell: Ein Inhaber oder Admin schaltet sie unter Servereinstellungen > Experimentell ein. Sie kann aus Stripe importieren, und Agenten schlagen Änderungen vor, die ein Inhaber oder Admin genehmigt.",
+          "Antworte einem Agenten im Chat im Agenten-Dock. Erlaube oder verweigere einen Befehl, beantworte eine Frage oder schließe einen Browser-Schritt ab, ohne das Hauptfenster zu öffnen.",
+          "Ordne die Bibliothek mit Ordnerkacheln, Favoriten, Zuletzt und Rückgängig. Ziehe Dateien auf Neuer Ordner, um einen Ordner zu erstellen, oder bitte einen Agenten, seine Ordner zu ordnen.",
+          "Füge ein Konto für ChatGPT (Codex), Grok oder Claude mit einem Code hinzu. Öffne das Menü neben Konto hinzufügen und wähle Konto mit Code hinzufügen.",
+          "Eine Nachricht, die du sendest, während ein Devin- oder OpenCode-Agent arbeitet, geht in den laufenden Durchlauf. Dafür brauchst du Devin CLI 3000.12.57 oder OpenCode 2.3.0 oder neuer."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Einstellungen haben ein neues Layout. Die Bereiche stehen in beschrifteten Gruppen, und die Servereinstellungen haben neue Abschnitte Gedächtnis und Standardwerte für Agenten. Unter macOS nutzt OpenBot die Systemschrift.",
+          "Füge eigene MCP-Server hinzu und bearbeite sie in Marketplace > Apps. Die Servereinstellungen haben keinen MCP-Bereich mehr.",
+          "In einem Chat mit einem Agenten übernehmen deine Blasen jetzt die Farbe des Agenten-Avatars. Ändere das unter Einstellungen > Darstellung > Deine Blasen.",
+          "Ein Sprachgespräch öffnet nicht mehr die Seitenleiste. Eine kleine Leiste oben im Chat zeigt die Sprachsteuerung."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Chat, der seine gespeicherte Sitzung verliert oder zu groß wird, bleibt nicht mehr defekt. Der Agent startet eine neue Sitzung mit dem Chatverlauf und beantwortet deine Nachricht.",
+          "Mehr Agenten wechseln zu ihrem Ersatzmodell, wenn ein Nutzungslimit oder ein Anbieterfehler einen Durchlauf stoppt, darunter Grok-, Hermes- und Claude-Agenten.",
+          "Agenten können einen gespeicherten Login an mehr Stellen verwenden, zum Beispiel in einem Anmeldeformular in einem Frame.",
+          "Eine Routine bleibt nach einem fehlgeschlagenen Lauf eingeschaltet, und ein Lauf, der fällig ist, während der Anbieter nicht starten kann, läuft später.",
+          "OpenBot braucht weniger CPU und Akku: Videos im Chat und in ausgeblendeten Browser-Tabs pausieren, wenn du sie nicht siehst."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren Stoppen für Routinen-Läufe, Dateien ohne Text, die Agenten senden, und API-Schlüssel unter dem alten Pfad nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Spreize zwei Finger auf einem Trackpad oder Touchscreen, um den Bereich unter dem Zeiger zu vergrößern. Diagramme, Canvas und der Bildbetrachter behalten ihren eigenen Zoom.",
+          "Stoppe einen Routinen-Lauf auf der Routinen-Zeichenfläche: Wähle Stoppen in der oberen Leiste oder in den Routinendetails. Der Lauf endet mit dem Status Abgebrochen.",
+          "Agenten können eine Datei oder ein Bild ohne Text an einen WhatsApp-, Telegram-, Slack- oder Discord-Chat senden.",
+          "Kaufe wieder einen gehosteten Starter-Server. Er hat 25 GB Speicher.",
+          "Nutze ein ClinePass-Abo mit Cline-Agenten. Das Modellmenü zeigt die ClinePass-Modelle."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ziehe auf dem Canvas eine Notiz, einen freien Text, eine Form oder einen Schritt am Text. Ein Klick auf den Text setzt den Textcursor dorthin, wo du geklickt hast.",
+          "Eine Nachricht, die du sendest, während ein Antigravity-Agent arbeitet, geht in den laufenden Durchlauf. Dafür brauchst du Antigravity CLI 1.5.0 oder neuer.",
+          "Eine Routine, deren Aufgabe vorgibt, nach getaner Arbeit zu stoppen, pausiert jetzt von selbst. Schalte sie in deiner Routinenliste wieder ein.",
+          "Der Vault sagt jetzt, dass jeder Agent die API-Schlüsseldateien der anderen Agenten lesen kann, weil alle Agenten als derselbe Systembenutzer laufen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Skripte, MCP-Server und Anbieter-Einstellungen, die Vault-API-Schlüssel aus ihren Dateien lesen, funktionieren nach dem Update auf 0.70.0 wieder.",
+          "Ein Claude-Agent behält das Modell in seinem Profil, wenn Claude Code sein Standardmodell ändert.",
+          "Wenn Claude einen Durchlauf am monatlichen Ausgabenlimit stoppt, setzt ein Agent mit Ersatzmodellen seine Arbeit mit dem nächsten Modell fort.",
+          "Agenten erhalten das vollständige Transkript eines Videos mit Untertiteln, etwa eines YouTube-Videos.",
+          "OpenBot braucht weniger CPU: Browser-Tabs, die du nicht siehst, werden langsamer, und das bewegte Licht in der Aktivitätszeile eines Agenten braucht weniger Leistung."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Aktualisiere jeden verbundenen Server auf diese Version. Server neu starten, Agenten-Standardwerte, Thread-Limits und die neuen Workflow-Schritte funktionieren auf einem Server nur, wenn er diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Starte einen Server, den du selbst hostest, aus der App neu: Wähle als Inhaber oder Admin im Servermenü Server neu starten.",
+          "Wähle unter Servereinstellungen > Vault, welche Agenten jeden Login, jede Karte, jeden Kontakt und jeden API-Schlüssel nutzen dürfen. Ein Agent sieht und füllt nur die Einträge, die er nutzen darf.",
+          "Workflows haben Schritte für Bilder und Videos. Erstelle Bilder und kurze Videos mit den Modellen GPT Image, Grok Imagine oder Sunra und verbinde Bilder als Referenzen.",
+          "Verbinde Sunra und TryPost aus dem Marktplatz unter Apps. Agenten können dann Medien mit deinen Sunra-Credits erstellen sowie Social-Media-Beiträge entwerfen und veröffentlichen.",
+          "Inhaber und Admins können in Servereinstellungen > Allgemein festlegen, wie viele Threads gleichzeitig laufen, für den Server und für jeden Agenten.",
+          "Zeige Agenten mit neuen Nachrichten im Dock: Schalte es in Einstellungen > Agenten-Dock ein. Klicke einen solchen Agenten mit der rechten Maustaste an und wähle Zum Dock hinzufügen, damit er dort bleibt.",
+          "Füge mehr als ein Cursor-Konto hinzu. Jeder Agent kann ein anderes Konto nutzen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ein API-Schlüssel, den du nur für einen Agenten speicherst, wird jetzt im verschlüsselten Vault aufbewahrt. Die Schlüssel, die Agenten lesen, haben einen neuen Pfad. Ein Skript mit dem alten Pfad muss den neuen Pfad verwenden.",
+          "Die Agenteneinstellungen, etwa Agenten während der Arbeit steuern, stehen jetzt für jeden Server in Servereinstellungen > Agenten, auch für diesen Computer.",
+          "In der vollen Browser-Ansicht steht das Nachrichtenfeld wieder mittig unten auf der Seite.",
+          "Die Chat-Kopfzeile zeigt den Titel des Agenten nach seinem Namen, zum Beispiel „Brock · Filialleiter“."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot öffnet schneller, wenn deine Chats lang sind.",
+          "Unter Windows und Linux fragt OpenBot nach, bevor es beendet wird, während Agenten arbeiten. Wähle Weiterlaufen, um das Fenster auszublenden und die Agenten fertig arbeiten zu lassen.",
+          "Geräte verbinden sich wieder mit einem Server, wenn die Verbindung eines Geräts während der Einrichtung abbricht. Die Live-Ansicht des Browsers eines Agenten auf einem beigetretenen Server bleibt bei einer langsamen Verbindung ebenfalls geöffnet.",
+          "Wenn du einen Agenten um einen Screenshot einer Webseite bittest, hängt er das Bild jetzt an seine Antwort an.",
+          "Kostenlose OpenCode-Modelle antworten wieder, wenn ein OpenCode-Go-Schlüssel gespeichert ist."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Ausgeblendete Agenten arbeiten jetzt weiter. OpenBot hat die Routinen der Agenten ausgeschaltet, die du vor dieser Version ausgeblendet hast. Schalte die Routinen ein, die du willst."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Heft eine Nachricht in einem Agenten-Chat an: Klicke mit der rechten Maustaste darauf und wähle Anheften. Die Schaltfläche für angeheftete Nachrichten in der Kopfzeile des Chats zeigt die Anheftungen aller Chats des Agenten.",
+          "Die Bibliothek hat Ordner und drei Ansichten. Ein Agent kann außerdem die Dateien, die er anhängt, in einem Ordner speichern, den du benennst.",
+          "Aufgabe beibringen: Wähle im +-Menü Aufgabe beibringen und erledige die Aufgabe dann im Browser des Agenten. Der Agent speichert die Schritte als Fähigkeit.",
+          "Bündle die Konten eines Anbieters in den Einstellungen. Agenten nutzen ein Konto, bis es fast sein Nutzungslimit erreicht, und dann das nächste.",
+          "Füge Fähigkeiten von GitHub hinzu: Füge den Link eines öffentlichen Repositorys in die Suche nach Fähigkeiten im Marktplatz ein.",
+          "Servereinstellungen → Übertragung kann eine vollständige Kopie eines Servers exportieren und Agenten mit einem Schritt auf einen anderen Server kopieren.",
+          "Schalte einen Agenten über sein Menü in der Seitenleiste stumm. Ein stummgeschalteter Agent sendet keine Mitteilungen und spielt keinen Ton ab."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Eine Nachricht, die du während der Arbeit an einen Agenten sendest, steuert jetzt den laufenden Durchlauf. Um sie wie bisher einzureihen, schalte Agenten während der Arbeit steuern unter Einstellungen → Agenten aus.",
+          "Ein ausgeblendeter Agent arbeitet weiter. Er führt seine Routinen aus und erscheint unter Braucht dich, wenn er auf deine Antwort wartet.",
+          "Der geöffnete Server erscheint als Logo unten in der Fensterleiste. Die Schaltfläche Neu steht am Ende des Suchfelds der Seitenleiste.",
+          "OpenBot nutzt Electron 45.3.0 mit Chromium 156, und mehr Seiten mit einer Bot-Prüfung laden im Agenten-Browser."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot startet schneller, vor allem unter Windows, und ein langsamer Computer bleibt nach dem Start nutzbar.",
+          "OpenBot bleibt nach einem Neustart reaktionsschnell, wenn du viele Aufgaben oder Threads hast.",
+          "Unter Linux und Windows beendet OpenBot sich vollständig, wenn du das Hauptfenster schließt.",
+          "Routinen laufen pünktlich, nachdem die Uhrzeit des Computers korrigiert wurde.",
+          "Text, den du aus einem Chat kopierst, hat am Anfang und am Ende keine leeren Zeilen mehr."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

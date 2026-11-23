@@ -1,19 +1,8 @@
 [install]
 exact = true
-# Keep one physical copy of native Expo modules across workspace peer contexts.
 linker = "hoisted"
-# Do not resolve a version that is less than 3 days old (259200 seconds). Most
-# malicious releases are found and removed from the registry in that time.
 minimumReleaseAge = 259200
-# The OpenBot maintainer owns and publishes bloub, so a new release does not wait.
-# Effect 4.0.0 is explicitly approved for this migration before the age limit.
-minimumReleaseAgeExcludes = ["@norbert_bodziony/bloub", "effect"]
-
-# `trustedDependencies` in package.json replaces the default Bun trust list.
-# Only these packages can run install scripts. Each one downloads or selects
-# its platform binary:
-# - electron-winstaller: selects the 7-Zip binary for the host architecture.
-# - esbuild: installs the platform binary that Vite and electron-vite use.
-# - workerd: installs the Cloudflare Workers runtime that Wrangler uses.
-# `@shopify/react-native-skia` stays untrusted. CocoaPods and Gradle read its
-# prebuilt libraries from the `react-native-skia-*` packages in node_modules.
+minimumReleaseAgeExcludes = [
+  "@norbert_bodziony/bloub",
+  "effect",
+]

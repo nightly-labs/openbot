@@ -20,6 +20,11 @@ export const messages = {
   "preview.unsupported.title": "预览不可用",
   "preview.unsupported.description": "该文件类型可以用默认应用打开。",
   "preview.unsupported.openExternally": "用外部程序打开",
+  "preview.tooLarge.title": "文件太大，无法预览",
+  "preview.tooLarge.description": "预览上限为 100 MB。你可以用默认应用打开此文件。",
   "preview.spreadsheet.readFailed": "无法读取该表格。",
   "preview.spreadsheet.truncated": "预览仅限前 {rows} 行、{columns} 列。",
+  "preview.document.readFailed": "无法读取此文档。",
+  "preview.document.empty": "此文档没有可显示的文本。",
+  "preview.document.truncated": "预览仅限文档的前一部分。",
 } as const satisfies PartialTranslation<typeof source>;

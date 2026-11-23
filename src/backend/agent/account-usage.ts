@@ -18,11 +18,8 @@ export function normalizeAccountUsage(rateLimits: AccountRateLimitsReadResult | 
   const fallback: [string, AccountRateLimitResult] | null = rateLimits?.rateLimits
     ? [rateLimits.rateLimits.limitId ?? "codex", rateLimits.rateLimits]
     : null;
-  // No model means the dock's account-wide reading: one bucket per provider, not every
-  // Codex model window mixed into the same unlabeled list.
   const selectedEntries = model ? selectModelRateLimits(entries, model, fallback) : fallback ? [fallback] : entries;
   const limits = selectedEntries.map(([id, limit]) => normalizeAccountLimit(id, limit));
-  // Antigravity's groups belong to the one reading that it sends.
   const groups = rateLimits?.groups?.slice(0, MAX_USAGE_GROUPS).map(normalizeUsageGroup);
   if (groups?.length && limits.length === 1 && limits[0]) limits[0] = { ...limits[0], groups };
   if (rateLimits?.sharedQuotaWith && limits.length === 1 && limits[0])
@@ -42,10 +39,6 @@ function normalizeUsageGroup(group: AccountRateLimitGroupResult): AccountUsageGr
   };
 }
 
-/**
- * True once a window of a kept reading, or of one of its groups, has passed its reset time, so the
- * reading is stale. `resetsAt` is in seconds.
- */
 export function usageWindowHasReset(limit: AccountUsageLimit): boolean {
   const now = Date.now() / 1_000;
   return [limit, ...(limit.groups ?? [])].some((group) =>
@@ -53,10 +46,6 @@ export function usageWindowHasReset(limit: AccountUsageLimit): boolean {
   );
 }
 
-/**
- * True when a window of the reading, or of one of its groups, reset after `sinceMs` and before now. A window
- * that had already reset when the reading was taken does not count, so it cannot ask for a read each time.
- */
 export function usageWindowResetSince(limit: AccountUsageLimit, sinceMs: number): boolean {
   const now = Date.now() / 1_000;
   const since = sinceMs / 1_000;
@@ -88,6 +77,7 @@ function normalizeAccountLimit(id: string, limit: AccountRateLimitResult): Accou
     id: limit.limitId ?? id,
     primary: normalizeUsageWindow(limit.primary),
     secondary: normalizeUsageWindow(limit.secondary),
+    ...(limit.credits === undefined ? {} : { creditsAvailable: limit.credits?.available ?? false }),
   };
 }
 

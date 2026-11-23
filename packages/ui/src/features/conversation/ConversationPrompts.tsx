@@ -5,6 +5,8 @@ import type {
   BrowserTakeoverRequest,
   LocalBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
+import { type FeedbackApproval, feedbackApproval } from "@openbot/team-client/feedback-approval";
+import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import { classifyFailure } from "@openbot/telemetry";
 import { Button, LogIn, Maximize2, Monitor, toast } from "@openbot/ui";
 import { StandingApprovalConfirmation } from "@openbot/ui/components/StandingApprovalConfirmation";
@@ -12,25 +14,14 @@ import { BrowserSecretCard, type BrowserSecretVault } from "@openbot/ui/features
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { type FeedbackApproval, feedbackApproval } from "./feedback-approval";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
 export function ApprovalCard(props: {
   approval: AgentApproval;
   onApprove: () => Promise<boolean>;
   onReject: () => Promise<boolean>;
-  /**
-   * Moves this agent from Ask first to Full access, then accepts the request in hand. Absent at any
-   * other level, and where the user may not change the agent's Permissions. The card then reads
-   * exactly as it did before this option existed.
-   */
   onAlwaysAllow?: (() => Promise<boolean>) | undefined;
-  /** The agent this grant would cover, for the confirmation the grant deserves. */
   agentName?: string | undefined;
-  /**
-   * Set while approved feedback is on its way. The approval is answered at once, so the chat keeps the
-   * card with its loader until the thank-you card arrives.
-   */
   sending?: boolean | undefined;
 }) {
   const { t, errorMessage, sourceText } = useText();
@@ -39,6 +30,7 @@ export function ApprovalCard(props: {
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
   const report = createMemo(() => feedbackApproval(props.approval));
+  const cut = () => approvalIsCut(props.approval);
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
@@ -94,7 +86,7 @@ export function ApprovalCard(props: {
                 >
                   {t("prompt.approval.deny")}
                 </Button>
-                <Show when={props.onAlwaysAllow}>
+                <Show when={props.onAlwaysAllow && !cut()}>
                   <Button
                     ref={alwaysAllowButton}
                     variant="secondary"
@@ -106,15 +98,17 @@ export function ApprovalCard(props: {
                     {t("prompt.approval.alwaysAllow")}
                   </Button>
                 </Show>
-                <Button
-                  variant="default"
-                  size="sm"
-                  type="button"
-                  disabled={submitting()}
-                  onClick={() => void submit("accept")}
-                >
-                  {t("prompt.approval.allow")}
-                </Button>
+                <Show when={!cut()}>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    type="button"
+                    disabled={submitting()}
+                    onClick={() => void submit("accept")}
+                  >
+                    {t("prompt.approval.allow")}
+                  </Button>
+                </Show>
               </>
             }
           >
@@ -137,6 +131,9 @@ export function ApprovalCard(props: {
             <Show when={props.approval.kind === "permissions"}>
               <PermissionDetails permissions={props.approval.permissions} />
             </Show>
+            <Show when={cut()}>
+              <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+            </Show>
           </UiBlockCard>
           <StandingApprovalConfirmation
             open={confirmingAlways()}
@@ -151,6 +148,7 @@ export function ApprovalCard(props: {
       {(offer) => (
         <FeedbackOffer
           report={offer()}
+          cut={cut()}
           submitting={submitting()}
           sending={(submitting() && accepting()) || props.sending === true}
           onSend={() => void submit("accept")}
@@ -161,12 +159,9 @@ export function ApprovalCard(props: {
   );
 }
 
-/**
- * The agent's offer to send a bug report or an idea to the OpenBot team. It reads as a message, not
- * as a grant: the report is a quote, and Send keeps its loader until the thank-you card replaces it.
- */
 function FeedbackOffer(props: {
   report: FeedbackApproval;
+  cut: boolean;
   submitting: boolean;
   sending: boolean;
   onSend: () => void;
@@ -174,7 +169,6 @@ function FeedbackOffer(props: {
 }) {
   const { t, sourceText } = useText();
   const idea = () => props.report.kind === "idea";
-  // The host writes its notes, such as the recent errors, as source text paragraphs.
   const text = () =>
     props.report.text
       .split("\n\n")
@@ -196,6 +190,12 @@ function FeedbackOffer(props: {
         <strong>{props.report.title}</strong>
         <Show when={text()}>{(body) => <p>{body()}</p>}</Show>
       </blockquote>
+      <Show when={props.cut}>
+        <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+      </Show>
+      <Show when={props.report.phone}>
+        <p class="approval-cut-note">{t("prompt.approval.report.phoneOnly")}</p>
+      </Show>
       <div class="feedback-offer-actions">
         <Button
           variant="secondary"
@@ -208,17 +208,19 @@ function FeedbackOffer(props: {
         >
           {t("prompt.approval.report.dontSend")}
         </Button>
-        <Button
-          variant="default"
-          type="button"
-          class="approval-button"
-          disabled={props.submitting && !props.sending}
-          loading={props.sending}
-          loadingLabel={t("common.sending")}
-          onClick={() => props.onSend()}
-        >
-          {t("prompt.approval.report.send")}
-        </Button>
+        <Show when={!props.cut && !props.report.phone}>
+          <Button
+            variant="default"
+            type="button"
+            class="approval-button"
+            disabled={props.submitting && !props.sending}
+            loading={props.sending}
+            loadingLabel={t("common.sending")}
+            onClick={() => props.onSend()}
+          >
+            {t("prompt.approval.report.send")}
+          </Button>
+        </Show>
       </div>
     </section>
   );
@@ -231,19 +233,14 @@ interface BrowserTakeoverCardProps {
   preview: BrowserPreview | null;
   previewStatus: "idle" | "loading" | "ready" | "failed";
   decision?: "complete" | "cancel" | null;
-  onOpen?: () => void;
-  onComplete: () => Promise<boolean>;
+  onOpen?: (() => void) | undefined;
+  onComplete?: (() => Promise<boolean>) | undefined;
   onCancel: () => Promise<boolean>;
-  /** A sign-in on this computer for the tab, when the page refuses a sign-in from the server. */
   onSignInLocally?: (() => void) | undefined;
-  /**
-   * The agent found that the page refused the sign-in from `server`. The card then asks only for the
-   * sign-in on this computer; `signingIn` is true while that sign-in is open.
-   */
   signInBlocked?: { server: string; signingIn: boolean } | undefined;
+  signInOnDesktop?: boolean | undefined;
   browserSecret?: {
     loadPreview?: (tabId: string) => Promise<BrowserPreview>;
-    /** Offer "Save to Vault" for a password. */
     vault?: BrowserSecretVault | undefined;
     onRespond: (input: LocalBrowserSecretResponse) => Promise<void>;
   };
@@ -274,6 +271,22 @@ export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
 function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   const { t } = useText();
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
+  const [openedRequest, setOpenedRequest] = createSignal<BrowserTakeoverRequest>();
+  const opened = () => {
+    const done = openedRequest();
+    const request = props.request;
+    return (
+      done !== undefined &&
+      request !== undefined &&
+      done.requestId === request.requestId &&
+      done.agentId === request.agentId &&
+      done.threadId === request.threadId
+    );
+  };
+  const openPage = () => {
+    setOpenedRequest(props.request);
+    props.onOpen?.();
+  };
   const pageDetails = createMemo(() => browserPageDetails(props.tab, t));
   const completed = () => props.decision === "complete";
   const cancelled = () => props.decision === "cancel";
@@ -297,12 +310,14 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
     const blocked = props.signInBlocked;
     if (completed()) return t("prompt.browser.continuing", { name: props.agentName });
     if (cancelled()) return t(blocked ? "prompt.browser.signInBlocked.cancelledBody" : "prompt.browser.cancelledBody");
-    return blocked
-      ? t("prompt.browser.signInBlocked.body", {
-          host: pageDetails().host,
-          server: blocked.server,
-          name: props.agentName,
-        })
+    if (blocked)
+      return t("prompt.browser.signInBlocked.body", {
+        host: pageDetails().host,
+        server: blocked.server,
+        name: props.agentName,
+      });
+    return props.signInOnDesktop
+      ? t("prompt.browser.signInBlocked.desktopBody", { host: pageDetails().host, name: props.agentName })
       : t("prompt.browser.pendingBody", { name: props.agentName });
   };
   const pageHost = () => {
@@ -312,9 +327,10 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
       : pageDetails().host;
   };
   const submit = async (decision: "complete" | "cancel") => {
-    if (submitting() || props.decision) return;
+    const respond = decision === "complete" ? props.onComplete : props.onCancel;
+    if (submitting() || props.decision || !respond) return;
     setSubmitting(decision);
-    const completed = await (decision === "complete" ? props.onComplete() : props.onCancel());
+    const completed = await respond();
     if (!completed) setSubmitting(null);
   };
 
@@ -358,15 +374,29 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
                     </Button>
                   )}
                 </Show>
-                <Button
-                  variant="default"
-                  size="sm"
-                  type="button"
-                  disabled={Boolean(submitting())}
-                  onClick={() => void submit("complete")}
-                >
-                  {t("prompt.browser.done")}
-                </Button>
+                <Show when={props.onOpen}>
+                  <Button
+                    variant={opened() ? "secondary" : "default"}
+                    size="sm"
+                    type="button"
+                    disabled={Boolean(submitting())}
+                    onClick={openPage}
+                  >
+                    <Maximize2 data-icon="inline-start" aria-hidden="true" />
+                    {t("common.open")}
+                  </Button>
+                </Show>
+                <Show when={props.onComplete}>
+                  <Button
+                    variant={props.onOpen && !opened() ? "secondary" : "default"}
+                    size="sm"
+                    type="button"
+                    disabled={Boolean(submitting())}
+                    onClick={() => void submit("complete")}
+                  >
+                    {t("prompt.browser.done")}
+                  </Button>
+                </Show>
               </>
             }
           >
@@ -414,7 +444,7 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
             type="button"
             class="browser-takeover-preview-viewport browser-takeover-preview-open"
             aria-label={t("prompt.browser.openPage", { title: pageDetails().title })}
-            onClick={() => props.onOpen?.()}
+            onClick={openPage}
           >
             <BrowserTakeoverPreview preview={props.preview} previewStatus={props.previewStatus} page={pageDetails()} />
             <span class="browser-takeover-preview-open-label" aria-hidden="true">

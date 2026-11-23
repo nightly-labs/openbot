@@ -11,9 +11,19 @@ export const messages = {
     "工具未运行。在 tool_call 中，arguments 必须是 JSON 对象，而不是文本。请将 arguments 作为对象，再次发送调用。",
   "error.agent.toolCallDiscoveryTool":
     "工具未运行。tool_call 无法运行 openbot.tool_search 或 openbot.tool_describe。请使用相同的参数直接调用它们。",
+  "error.agent.toolCallEnvelopeKeys":
+    "工具未运行。tool_call 只接受 name 和 arguments。请将工具的参数作为对象放入 arguments，再次发送调用。",
+  "error.agent.toolCallMissingName":
+    "工具未运行。tool_call 没有 name。请在 name 中填写 tool_search 给出的完整名称，例如 openbot.history_read，然后再次发送调用。",
+  "error.agent.toolCallUnknownTool":
+    "工具未运行。tool_call 找不到此名称的工具。请使用 tool_search 给出的准确完整名称，例如 openbot_browser.snapshot。",
+  "error.agent.toolCallUnknownToolSuggest":
+    "工具未运行。tool_call 找不到此名称的工具。完整名称可能是 {name}。如果是，请使用该名称再次发送调用。",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe 未找到名为 {names} 的 OpenBot 工具。它只描述 openbot.tool_search 列出的 OpenBot 和浏览器工具，不描述 MCP 工具。",
+  "error.agent.toolDescribeDiscoveryNames": "请直接调用 {names}。tool_describe 不描述发现工具。",
   "error.agent.routineScheduleArgumentsInvalid":
     "自动化任务的时间表无效：{detail} 请更正时间表后重试。openbot.tool_describe 可提供架构。",
-  // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "助手正在删除中，无法授予批准。",
   "error.agent.accessLocalOnly": "助手访问权限只能在运行该助手的电脑上更改。",
   "error.agent.duplicateCleanupFailed": "助手复制失败，且无法移除不完整的副本。",
@@ -38,6 +48,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "助手创建失败，且无法移除不完整的助手。",
   "error.agent.modelUnavailable": "所选的助手模型不可用。",
   "error.agent.modelProviderNotConnected": "所选的助手模型“{model}”不可用：{provider} 未连接。",
+  "error.agent.modelProviderSignInRequired":
+    "所选的助手模型“{model}”不可用：{provider} 需要登录。请登录 {provider} 后重试。",
+  "error.agent.modelProviderNotInstalled": "所选的助手模型“{model}”不可用：{provider} 未安装。",
+  "error.agent.modelProviderOutdated": "所选的助手模型“{model}”不可用：{provider} 需要更新。",
   "error.agent.modelListEmpty": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。上次错误：{detail}",
   "error.agent.modelListEmptyNoError": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。",
   "error.agent.modelNotInProviderList": "所选的助手模型“{model}”不可用：{provider} 未列出该模型。",
@@ -46,6 +60,8 @@ export const messages = {
   "error.agent.modelProviderMismatch": "所选模型不属于该服务商。",
   "error.agent.modelNotListed": "模型“{model}”不可用。可用模型：{models}。",
   "error.agent.providerNotListed": "当前没有可用的 {provider} 模型，请调用 list_models 查看可用模型。",
+  "error.agent.creatorModelNotListed":
+    "你的模型“{model}”当前不在模型列表中，因此新智能体无法使用它启动。请几秒后重试，或将 provider 和 model 设为 list_models 显示的模型。",
   "error.agent.reasoningEffortUnsupported": "模型“{model}”不支持推理强度“{effort}”。支持的强度：{efforts}。",
   "error.agent.reasoningEffortNotConfigurable": "模型“{model}”没有推理强度设置，因此无法更改其推理强度。",
   "error.agent.noStartingModelInSettings":
@@ -71,8 +87,16 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot 无法生成唯一的助手副本名称。",
   "error.agent.endpointRemoved": "该助手使用的端点已被移除，请为它选择其他模型。",
   "error.agent.turnStalled": "{provider} 已停止响应，因此 OpenBot 结束了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.promptCancelled": "{provider} 在开始处理前取消了这条消息。请重新发送消息。",
+  "error.agent.toolLoopStopped":
+    "{provider} 多次重复了一个失败的步骤，因此 OpenBot 停止了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.answerCutOff": "智能体在完成回答之前停止了，因此回答不完整。请重新发送消息。",
   "error.agent.compactionConnectionLost":
     "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，然后发送消息以继续。",
+  "error.agent.compactionConnectionLostAddress":
+    "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，并确认 {provider} 设置中“变量”下的 {variable} 是模型服务的 API 地址（通常以 /v1 结尾）。然后发送一条消息。",
+  "error.agent.compactionLoopStopped":
+    "{provider} 反复压缩上下文，但每次压缩后仍然太满，无法继续，因此 OpenBot 停止了这一轮。请关闭此智能体不需要的 MCP 服务器或电脑操控，然后发送一条消息。如果你或智能体更改过 {provider} 的压缩时机，请撤销该更改。",
   "error.agent.selectedGone": "所选的助手已不存在。",
   "error.agent.profileEndpointsChanged": "生成期间自定义端点发生了变更，请重试。",
   "error.agent.profileInvalid": "服务商返回了无效的资料，请试着修改提示词。",
@@ -86,6 +110,11 @@ export const messages = {
   "error.agent.deletionBusy": "助手正在删除中。",
   "error.agent.stopBeforeDelete": "请先停止该助手并取消它的排队消息，再删除它。",
   "error.agent.deleteIncomplete": "助手数据未能完全移除，请重试删除。",
+  "error.agent.deleteFolderInUse":
+    "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
+  "error.agent.deleteFolderLocked":
+    "另一个程序（例如助手启动的程序）仍在使用此助手的文件夹。请关闭该程序或重启运行此助手的电脑，然后再次删除此助手。",
+  "error.agent.deleteWhenFolderFree": "另一个助手的工作仍在使用此助手的文件夹。该工作结束后，OpenBot 会删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",
   "error.agent.saveOtherAgent": "该保存操作属于另一个助手。",
@@ -93,7 +122,6 @@ export const messages = {
   "error.agent.storedProfileUnreadable": "某个已保存的助手资料中“{field}”的值无法读取，请先更新数据再启动 OpenBot。",
   "error.agent.storedProfileUnreadableId":
     "已保存的助手资料 {id} 中“{field}”的值无法读取，请先更新数据再启动 OpenBot。",
-  // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "队列编辑被拒绝：{reason}",
   "error.agent.computerUseLocalOnly": "Computer Use 只能在运行该助手的电脑上更改。",
   "error.agent.automationLocalOnly": "本地脚本只能在运行该助手的电脑上允许。",
@@ -106,6 +134,8 @@ export const messages = {
   "error.agent.webSearchFailed": "网页搜索未完成。请重试。",
   "error.agent.busyMessageModeLocalOnly": "忙碌时消息的处理方式只能在运行该助手的电脑上设置。",
   "error.agent.backupModelsLocalOnly": "备用模型只能在运行该助手的电脑上设置。",
+  "error.agent.backupModelsAtLimit":
+    "现在没有备用模型可以接手：每个备用模型都已达到使用上限，或刚刚失败。同一账号的模型可能共用一个上限。要现在继续，请添加来自其他服务商或其他账号的备用模型，或等待上限重置。",
   "error.agent.taskLimitLocalOnly": "任务并发数只能在运行该助手的电脑上设置。",
   "error.agent.localScriptsOff": "该助手不允许使用本地脚本。",
   "error.agent.localScriptsRateLimited":
@@ -119,16 +149,29 @@ export const messages = {
   "error.agent.lowMemoryServer": "该服务器内存不足。你的消息会在队列中等待，内存释放后自动开始。",
   "error.agent.workspaceOnlyToolMissing":
     "“仅工作区”需要 {tool}，但 OpenBot 没有找到它。请安装它，或在助手设置中选择完全访问。",
+  "error.agent.codexSandboxUnavailable":
+    "“仅工作区”需要 Codex 沙盒，但 Codex 无法在这台电脑上启动它，所以助手的命令会失败。请在助手设置中选择先询问或完全访问。",
   "error.agent.claudeSandboxUnavailable":
     "“仅工作区”需要 Claude 沙盒，但 Claude 无法在这台电脑上启动它：{reason}。请在助手设置中选择完全访问或其他服务商。",
+  "error.agent.claudeNoSandbox":
+    "Claude 无法在这台电脑上使用沙盒，因此“仅工作区”对它不可用。请在助手设置中选择完全访问或其他服务商。",
+  "error.agent.claudeSandboxBlocked":
+    "“仅工作区”需要 Claude 沙盒，但 Claude 无法在这台电脑上启动它，所以助手的命令会失败。请在助手设置中选择完全访问或其他服务商。",
   "error.agent.screenCaptureOff": "该助手的截屏功能已关闭，用户可以在助手设置中开启 Computer Use。",
   "error.agent.screenCaptureUnavailable": "这台电脑不支持截屏。",
   "error.agent.screenCaptureShared": "在 Slack、Discord、Telegram 对话中无法使用截屏，因为其他人也会收到这些文件。",
   "error.agent.screenCaptureDeclined": "用户未允许本次截屏，没有截取任何内容。",
   "error.agent.mcpServerDeclined": "用户未允许这次 MCP 服务器更改，未做任何更改。",
+  "error.agent.mcpToolDeclined": "用户未允许这次 MCP 工具调用，工具没有运行。",
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
-    "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“服务器设置 → MCP”中更改它的地址、命令、参数或传输方式。",
+    "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“市场 → 应用 → {name}”中更改它的地址、命令、参数或传输方式。",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "MCP 服务器 {name} 运行本地命令，因此不接受标头。请让用户在“市场 → 应用 → {name}”中输入它的密钥。",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "只有此 OpenBot 的用户可以在与你的聊天中提供 MCP 服务器 {name} 的密钥。请让用户在“市场 → 应用 → {name}”中输入密钥。",
+  "error.agent.mcpServerBuiltIn":
+    "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",
   "error.agent.screenCaptureWindowMissing": "该窗口当前未打开，请调用 list_capture_sources 获取当前窗口 ID。",
   "error.agent.screenCaptureDisplayMissing": "该显示器当前未连接，请调用 list_capture_sources 获取当前显示器 ID。",
@@ -136,6 +179,8 @@ export const messages = {
     "该区域不在任何单个显示器内，请使用某个显示器范围内的桌面坐标（来自 list_capture_sources）。",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot 没有屏幕录制权限。请让用户打开“系统设置 > 隐私与安全性 > 屏幕与系统音频录制”，允许 OpenBot，然后退出并重新打开 OpenBot。",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot 还没有屏幕录制权限，因此无法列出窗口。要截取显示器，请以 target screen 调用 capture_screen。用户先批准截取，然后 macOS 可能会向用户请求该权限。",
   "error.agent.screenCaptureEmptyWindows":
     "Windows 返回了空图像。请让用户解锁电脑并关闭受保护的内容；组织策略也可能阻止截屏。",
   "error.agent.screenCaptureFailed": "截屏失败，请重试。",
