@@ -1,6 +1,11 @@
 import type { ProviderLogoVariant } from "@openbot/brand";
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import { isAgentProviderRef, WORKFLOW_ANSWER_FIELD, WORKFLOW_STEP_NAME_FIELD } from "@openbot/contracts/ipc";
+import {
+  isAgentProviderRef,
+  parseWorkflowAnswerSpec,
+  WORKFLOW_ANSWER_FIELD,
+  WORKFLOW_STEP_NAME_FIELD,
+} from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
@@ -587,7 +592,7 @@ export function ResultField(props: { id: string; running: boolean }) {
   const answer = () => {
     const text = value();
     const spec = board.field(props.id, WORKFLOW_ANSWER_FIELD);
-    const givesAnswer = typeof spec === "string" && spec.trim();
+    const givesAnswer = typeof spec === "string" && parseWorkflowAnswerSpec(spec).fields.length > 0;
     return text && givesAnswer ? answerEntries(t, text) : undefined;
   };
   return (
