@@ -8249,6 +8249,15 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   height: 34%;
 }
 
+.plugin-wordmark:is(.plugin-card-logo, .plugin-hero-logo) {
+  position: absolute;
+  inset: 0;
+  width: 58%;
+  max-width: 340px;
+  height: auto;
+  margin: auto;
+}
+
 .plugin-card-icon {
   position: relative;
   height: 40%;
