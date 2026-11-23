@@ -1,12 +1,12 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { sourceText } from "@openbot/i18n/source";
 import { useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { useMemo } from "react";
 import { create } from "zustand";
 import { supportLog } from "@/features/support/model/support-log";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import { isConnectionStop } from "@/features/workspace/model/connection-waits";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileText } from "@/shared/lib/text";
 import { largeDownloadOf } from "../model/large-files";
@@ -71,23 +71,9 @@ export function messageFileCopy(serverId: string, key: string, name: string) {
   return new File(mediaFolder(), segment(serverId), folder, fileName(name));
 }
 
-/**
- * The errors of a download that a lost connection stopped. The workspace starts these downloads again
- * when the server is online.
- */
-const CONNECTION_ERRORS = new Set([
-  sourceText("error.remote.appInBackground"),
-  sourceText("error.remote.serverDisconnected"),
-  sourceText("error.remote.selectedServerOffline"),
-  sourceText("error.remote.connectionDropped"),
-  sourceText("error.remote.attachmentConnectionChanged"),
-]);
-
 /** The text of a failed download. A download that a lost connection stopped says that it starts again. */
 export function mediaFileErrorText(error: Error, text: MobileText): string {
-  return CONNECTION_ERRORS.has(error.message)
-    ? text.t("mobile.chat.attachment.downloadStopped")
-    : text.sourceText(error.message);
+  return isConnectionStop(error) ? text.t("mobile.chat.attachment.downloadStopped") : text.sourceText(error.message);
 }
 
 /** The writes that run now, by file. */

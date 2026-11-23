@@ -203,7 +203,7 @@ import {
   withHostSidebarPins,
   withPhoneSidebarPins,
 } from "@/features/workspace/model/agent-pins";
-import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
+import { ConnectionWaits, isConnectionStop } from "@/features/workspace/model/connection-waits";
 import { NO_CONTEXT_STATES, reduceContextStates } from "@/features/workspace/model/context-states";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
@@ -1536,7 +1536,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           {
             queryKey: queryKeys.chatMediaFiles(hostId),
             type: "active",
-            predicate: (query) => query.state.status === "error",
+            predicate: (query) => query.state.status === "error" && isConnectionStop(query.state.error),
           },
           { cancelRefetch: false },
         );

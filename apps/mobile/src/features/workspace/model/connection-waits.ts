@@ -1,3 +1,19 @@
+import { sourceText } from "@openbot/i18n/source";
+
+/** The errors of a request that a lost connection stopped, such as when the user left the app. */
+const CONNECTION_STOPS = new Set([
+  sourceText("error.remote.appInBackground"),
+  sourceText("error.remote.serverDisconnected"),
+  sourceText("error.remote.selectedServerOffline"),
+  sourceText("error.remote.connectionDropped"),
+  sourceText("error.remote.attachmentConnectionChanged"),
+]);
+
+/** Whether a lost connection stopped the request, so that it can go again when the server is online. */
+export function isConnectionStop(error: Error | null): boolean {
+  return error !== null && CONNECTION_STOPS.has(error.message);
+}
+
 interface ConnectionWait {
   resolve: () => void;
   reject: (error: Error) => void;
