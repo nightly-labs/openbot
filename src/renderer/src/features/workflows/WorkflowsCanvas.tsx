@@ -6,6 +6,7 @@ import {
   type WorkflowMediaCatalogModel,
   type WorkflowMediaModel,
   type WorkflowMediaServiceAccount,
+  type WorkflowMediaUnavailableModel,
   workflowCatalogMediaModel,
   workflowCatalogSource,
 } from "@openbot/contracts/ipc";
@@ -48,6 +49,9 @@ export function WorkflowsCanvas(props: {
   const [openbot, setOpenbot] = createSignal(false);
   const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
   const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
+  const [providersRead, setProvidersRead] = createSignal(false);
+  const [catalogRead, setCatalogRead] = createSignal(false);
+  const [unavailable, setUnavailable] = createSignal<readonly WorkflowMediaUnavailableModel[]>([]);
   const [creditBalance, setCreditBalance] = createSignal<number | null>(null);
   let disposed = false;
   let balanceRequest = 0;
@@ -74,13 +78,21 @@ export function WorkflowsCanvas(props: {
         setServiceAccounts(providers.accounts);
         if (providers.openbot === true) readCreditBalance();
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!disposed) setProvidersRead(true);
+      });
     void props.host.workflows
       .mediaCatalog()
       .then((answer) => {
-        if (!disposed) setCatalog(answer.models);
+        if (disposed) return;
+        setCatalog(answer.models);
+        setUnavailable(answer.unavailable ?? []);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!disposed) setCatalogRead(true);
+      });
   };
   const serviceModels = (provider: "sunra" | "higgsfield"): readonly WorkflowMediaModel[] => {
     const live = catalog()
@@ -197,6 +209,18 @@ export function WorkflowsCanvas(props: {
             .flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
         : [];
       return [...credit, ...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
+    },
+    get imageModelsReady() {
+      return !props.host.mediaSupported() || (providersRead() && catalogRead());
+    },
+    get unavailableModels() {
+      if (!props.host.mediaSupported()) return [];
+      const hidden = openbot()
+        ? []
+        : catalog()
+            .filter((entry) => entry.provider === "openbot")
+            .map(({ id, name, kinds }) => ({ id, name, kinds }));
+      return [...unavailable(), ...hidden];
     },
     get mediaPrice() {
       return props.host.mediaSupported() ? props.host.workflows.mediaPrice : undefined;

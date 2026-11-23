@@ -66,6 +66,18 @@ function modelLabel(option: WorkflowMediaModel, t: ReturnType<typeof useText>["t
     : t("mobile.workflow.media.modelLabel", { name: option.name, source: option.subscription });
 }
 
+function savedModelLabel(
+  savedModel: string,
+  model: WorkflowMediaModel | null | undefined,
+  unavailableName: string | undefined,
+  catalogLoaded: boolean,
+  t: ReturnType<typeof useText>["t"],
+): string {
+  if (model?.id === savedModel) return model.name;
+  if (unavailableName) return t("mobile.workflow.media.unavailableModelLabel", { name: unavailableName });
+  return catalogLoaded ? t("mobile.workflow.media.modelUnavailable") : savedModel;
+}
+
 export function MediaFields({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t, format } = useText();
   const setFields = useWorkflowDraft((state) => state.setFields);
@@ -73,6 +85,10 @@ export function MediaFields({ node, draft }: { node: WorkflowNode; draft: Workfl
   const { byNode, available, catalog } = useMediaCredits(draft.serverId, [node]);
   const { kind, models, model, hostAspects, specs } = mediaChoice(node, catalog.data?.models ?? [], sizeHost);
   const savedModel = fieldText(node, "model");
+  const catalogLoaded = catalog.data !== undefined && !catalog.data.partial;
+  const unavailableName = catalog.data?.unavailable?.find(
+    (entry) => entry.id === savedModel && entry.kinds.includes(kind),
+  )?.name;
   const custom = kind === "image" && sizeHost && fieldText(node, "aspect") === WORKFLOW_MEDIA_CUSTOM_ASPECT;
   const aspect = custom
     ? WORKFLOW_MEDIA_CUSTOM_ASPECT
@@ -117,7 +133,9 @@ export function MediaFields({ node, draft }: { node: WorkflowNode; draft: Workfl
               { value: "", label: t("mobile.workflow.media.automatic") },
               ...models.map((option) => ({ value: option.id, label: modelLabel(option, t) })),
             ],
-            savedModel ? { value: savedModel, label: model?.id === savedModel ? model.name : savedModel } : null,
+            savedModel
+              ? { value: savedModel, label: savedModelLabel(savedModel, model, unavailableName, catalogLoaded, t) }
+              : null,
           )}
           onChange={(next) => setFields(node.id, { model: next || undefined, account: undefined })}
         />

@@ -150,6 +150,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "Görseli tarif edin",
   "workflow.image.models": "Görsel modelleri",
   "workflow.image.chooseModel": "Model seç",
+  "workflow.image.modelUnavailable": "Model kullanılamıyor",
   "workflow.media.subscription": "{name} aboneliği",
   "workflow.media.apiKey": "{name} API anahtarı",
   "workflow.media.credits": "{name} kredisi",

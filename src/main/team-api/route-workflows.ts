@@ -11,6 +11,10 @@ import {
   workflowNeedsAdmin,
 } from "@openbot/contracts/ipc";
 import {
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-unavailable-v1";
+import {
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
@@ -93,6 +97,7 @@ const WORKFLOW_MEDIA_CATALOG_PATHS = new Set<string>(Object.values(WORKFLOWS_MED
 const WORKFLOW_MEDIA_CATALOG_V2_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES));
 const WORKFLOW_MEDIA_ACCOUNT_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES));
 const WORKFLOW_CREDIT_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_CREDIT_MEDIA_ROUTES));
+const WORKFLOW_CREDIT_UNAVAILABLE_PATHS = new Set<string>(Object.values(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES));
 const WORKFLOW_STEP_SETTINGS_PATHS = new Set<string>(Object.values(WORKFLOWS_STEP_SETTINGS_ROUTES));
 const WORKFLOW_PAUSE_PATHS = new Set<string>(Object.values(WORKFLOWS_PAUSE_ROUTES));
 const WORKFLOW_PORTABLE_PATHS = new Set<string>(Object.values(WORKFLOWS_PORTABLE_ROUTES));
@@ -188,6 +193,7 @@ export async function routeWorkflows(
   const catalogV2Path = WORKFLOW_MEDIA_CATALOG_V2_PATHS.has(path);
   const accountPath = WORKFLOW_MEDIA_ACCOUNT_PATHS.has(path);
   const creditPath = WORKFLOW_CREDIT_MEDIA_PATHS.has(path);
+  const creditUnavailablePath = WORKFLOW_CREDIT_UNAVAILABLE_PATHS.has(path);
   const settingsPath = WORKFLOW_STEP_SETTINGS_PATHS.has(path);
   const pausePath = WORKFLOW_PAUSE_PATHS.has(path);
   const portablePath = WORKFLOW_PORTABLE_PATHS.has(path);
@@ -202,6 +208,7 @@ export async function routeWorkflows(
       catalogV2Path ||
       accountPath ||
       creditPath ||
+      creditUnavailablePath ||
       settingsPath ||
       pausePath ||
       portablePath ||
@@ -225,6 +232,8 @@ export async function routeWorkflows(
   if (catalogV2Path && !capabilities.has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (creditPath && !capabilities.has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (creditUnavailablePath && !capabilities.has(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (accountPath && !capabilities.has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
@@ -436,7 +445,10 @@ export async function routeWorkflows(
   if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, catalogV1(await run(workflows.mediaCatalog())));
   if (path === WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog)
     return json(200, serviceCatalog(await run(workflows.mediaCatalog())));
-  if (path === WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog("openbot")));
+  if (path === WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog)
+    return json(200, { models: (await run(workflows.mediaCatalog("openbot"))).models });
+  if (path === WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES.list)
+    return json(200, { models: (await run(workflows.mediaCatalog("openbot"))).unavailable ?? [] });
   if (path === WORKFLOWS_CREDIT_MEDIA_ROUTES.credits)
     return json(200, { openbot: (await run(workflows.mediaCredits("openbot"))).openbot ?? null });
   if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price || path === WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price)

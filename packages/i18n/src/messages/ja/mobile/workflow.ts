@@ -131,6 +131,8 @@ export const messages = {
     "ワークフローで画像や動画を作成するには、このサーバーの OpenBot をアップデートしてください。",
   "mobile.workflow.media.settings": "設定",
   "mobile.workflow.media.automatic": "自動",
+  "mobile.workflow.media.modelUnavailable": "モデルは利用できません",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · 利用できません",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · {source} クレジット",
   "mobile.workflow.media.price": "1 回の実行の価格",

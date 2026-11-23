@@ -128,6 +128,8 @@ export const messages = {
     "İş akışlarında görsel ve video oluşturmak için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.workflow.media.settings": "Ayarlar",
   "mobile.workflow.media.automatic": "Otomatik",
+  "mobile.workflow.media.modelUnavailable": "Model kullanılamıyor",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · kullanılamıyor",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · {source} kredisi",
   "mobile.workflow.media.price": "Çalıştırma başına fiyat",

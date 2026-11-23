@@ -150,6 +150,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "描述图片",
   "workflow.image.models": "图片模型",
   "workflow.image.chooseModel": "选择模型",
+  "workflow.image.modelUnavailable": "模型不可用",
   "workflow.media.subscription": "{name} 订阅",
   "workflow.media.apiKey": "{name} API 密钥",
   "workflow.media.credits": "{name} 积分",

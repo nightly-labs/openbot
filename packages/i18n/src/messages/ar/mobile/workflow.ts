@@ -147,6 +147,8 @@ export const messages = {
   "mobile.workflow.media.unsupported": "حدّث OpenBot على هذا الخادم لإنشاء الصور والفيديوهات في مسارات العمل.",
   "mobile.workflow.media.settings": "الإعدادات",
   "mobile.workflow.media.automatic": "تلقائي",
+  "mobile.workflow.media.modelUnavailable": "النموذج غير متاح",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · غير متاح",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · أرصدة {source}",
   "mobile.workflow.media.price": "سعر كل تشغيل",

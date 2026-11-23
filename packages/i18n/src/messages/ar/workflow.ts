@@ -175,6 +175,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "صِف الصورة",
   "workflow.image.models": "نماذج الصور",
   "workflow.image.chooseModel": "اختيار نموذج",
+  "workflow.image.modelUnavailable": "النموذج غير متاح",
   "workflow.media.subscription": "اشتراك {name}",
   "workflow.media.apiKey": "مفتاح API من {name}",
   "workflow.media.credits": "أرصدة {name}",

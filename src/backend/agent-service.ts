@@ -3075,14 +3075,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const credit =
       this.#creditMedia && (only === undefined || only === "openbot")
         ? this.#creditMedia.catalog()
-        : Effect.succeed([]);
+        : Effect.succeed({ models: [], unavailable: [] } satisfies WorkflowMediaCatalog);
     const services =
       only === "openbot"
         ? Effect.succeed({ models: [] } satisfies WorkflowMediaCatalog)
         : this.#mediaCatalog.catalog(only);
     const [listed, credits] = yield* Effect.all([services, credit], { concurrency: "unbounded" });
     return {
-      models: [...credits, ...listed.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
+      models: [...credits.models, ...listed.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
+      ...(credits.unavailable?.length ? { unavailable: credits.unavailable.slice(0, WORKFLOW_MEDIA_CATALOG_MAX) } : {}),
     } satisfies WorkflowMediaCatalog;
   }).bind(this);
 

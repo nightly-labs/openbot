@@ -147,6 +147,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "画像を説明してください",
   "workflow.image.models": "画像モデル",
   "workflow.image.chooseModel": "モデルを選択",
+  "workflow.image.modelUnavailable": "モデルは利用できません",
   "workflow.media.subscription": "{name} サブスクリプション",
   "workflow.media.apiKey": "{name} API キー",
   "workflow.media.credits": "{name} クレジット",

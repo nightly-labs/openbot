@@ -150,6 +150,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "Describe la imagen",
   "workflow.image.models": "Modelos de imagen",
   "workflow.image.chooseModel": "Elegir modelo",
+  "workflow.image.modelUnavailable": "Modelo no disponible",
   "workflow.media.subscription": "Suscripción de {name}",
   "workflow.media.apiKey": "Clave de API de {name}",
   "workflow.media.credits": "Créditos de {name}",

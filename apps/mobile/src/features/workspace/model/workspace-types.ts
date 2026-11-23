@@ -187,6 +187,7 @@ import type {
   WorkflowGraph,
   WorkflowMediaModel,
   WorkflowMediaPriceRequest,
+  WorkflowMediaUnavailableModel,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowSaveResult,
@@ -233,6 +234,7 @@ import type { PendingApproval } from "./pending-approvals";
 
 export interface WorkflowMediaModels {
   models: readonly WorkflowMediaModel[];
+  unavailable?: readonly WorkflowMediaUnavailableModel[];
   partial: boolean;
 }
 
