@@ -96,7 +96,7 @@ export function typedHostFolder(typed: string, place: { path: string; home: stri
   if (!value) return null;
   if (value === "~") return place.home;
   if (/^~[\\/]/.test(value)) return joinFolder(place.home, value.slice(2));
-  if (/^([\\/]|[a-zA-Z]:([\\/]|$))/.test(value)) return value;
+  if (/^([\\/]|[a-zA-Z]:)/.test(value)) return value;
   return joinFolder(place.path, value);
 }
 
