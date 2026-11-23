@@ -584,8 +584,11 @@ On a server, root runs `openbot-hosted-update`:
    [Start loop](#start-loop) describes. `stage` reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
    latest GitHub release, the manifest that the Linux desktop updater reads. When that version is newer than the installed one, it downloads the
    AppImage, checks its SHA-512 against the manifest, unpacks it in `/var/tmp`, checks that it has
-   all hosting files, installs the packages in the `packages.txt` of that release, and copies it
-   to `/opt/OpenBot/staged`.
+   all hosting files, installs the packages in the `packages.txt` and `optional-packages.txt` of
+   that release, and copies it to `/opt/OpenBot/staged`. The packages install with `--no-remove`.
+   A package of `optional-packages.txt` that needs a removal is skipped. `stage` runs the installed
+   script with the list of the new release, so a package that conflicts with a host package must
+   not be in `packages.txt`: an older script would remove the host package or stop.
    `staged.ready` comes after the last file. OpenBot keeps running. The download and unpack use
    idle CPU and disk priority.
 2. `apply` copies `staged` to `app`, and then installs the scripts, AppArmor profile and units of

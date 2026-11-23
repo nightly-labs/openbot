@@ -315,8 +315,12 @@ install steps always match the build that they install. A release before this fe
 file, and the install stops with a message.
 
 `openbot-server-setup` uses the install steps of a hosted server (`openbot-hosted-update`): it
-installs the packages in `packages.txt`, copies the release to `/opt/OpenBot/app`, and installs the
-scripts, the AppArmor profile and the units. It writes `self` to `/opt/OpenBot/hosted/mode` and
+installs the packages in `packages.txt` and `optional-packages.txt`, copies the release to
+`/opt/OpenBot/app`, and installs the scripts, the AppArmor profile and the units. apt never removes a
+package of the computer for OpenBot (`--no-remove`). When a package in `packages.txt` needs a
+removal, the install stops. A package in `optional-packages.txt` is skipped when its command
+already exists or when it needs a removal. For example, on Raspberry Pi OS `pcmanfm-pi` gives
+`pcmanfm`, and the `pcmanfm` package would remove the desktop of the Pi. It writes `self` to `/opt/OpenBot/hosted/mode` and
 links `/usr/local/bin/openbot`.
 
 The AppArmor profile (`/etc/apparmor.d/openbot-hosted`) needs AppArmor 4 (`abi <abi/4.0>` and the

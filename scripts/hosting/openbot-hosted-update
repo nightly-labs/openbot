@@ -21,7 +21,7 @@ START_LOOP_STATUS=78
 SAFE_MODE_MARKER=$REQUESTS/server-safe-mode
 STAGE_STAMP=/run/openbot-update.staged
 STAGE_INTERVAL_MINUTES=360
-RELEASE_FILES=(packages.txt openbot-hosted.apparmor openbot-boat-pre-stop "${HOSTED_FILES[@]}" "${UNITS[@]}")
+RELEASE_FILES=(packages.txt optional-packages.txt openbot-hosted.apparmor openbot-boat-pre-stop "${HOSTED_FILES[@]}" "${UNITS[@]}")
 
 fail() {
   echo "$*" >&2
@@ -78,11 +78,16 @@ available_package() {
   [ -n "$candidate" ] && [ "$candidate" != "(none)" ]
 }
 
+apt_install() {
+  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends --no-remove "$@"
+}
+
 install_packages() {
-  local package missing=() available=()
+  local optional=${2:-} package missing=() available=()
   while read -r package; do
     [[ -z $package || $package == \#* ]] && continue
     [[ $package =~ ^[a-z0-9][a-z0-9.+-]+$ ]] || fail "The package name is not valid: $package"
+    [ -n "$optional" ] && command -v "$package" >/dev/null && continue
     installed_package "$package" || installed_package "${package%t64}" || missing+=("$package")
   done <"$1"
   [ "${#missing[@]}" -eq 0 ] && return 0
@@ -98,8 +103,18 @@ install_packages() {
     fi
   done
   [ "${#available[@]}" -eq 0 ] && return 0
-  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends "${available[@]}"
+  if [ -z "$optional" ]; then
+    apt_install "${available[@]}"
+  else
+    for package in "${available[@]}"; do
+      apt_install "$package" || echo "This system cannot install $package. OpenBot continues without it." >&2
+    done
+  fi
   apt-get clean
+}
+
+install_optional_packages() {
+  install_packages "$1" optional
 }
 
 unpack() {
@@ -353,6 +368,7 @@ stage() {
   done
   prepare_release "$work/squashfs-root"
   install_packages "$work/squashfs-root/resources/hosting/packages.txt"
+  install_optional_packages "$work/squashfs-root/resources/hosting/optional-packages.txt"
   stage_release "$work/squashfs-root"
   echo "OpenBot $version starts at the next start of the server."
 }
