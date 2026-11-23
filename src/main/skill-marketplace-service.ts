@@ -898,7 +898,7 @@ const overwriteSkillFolder = Effect.fn("SkillMarketplace.overwriteFolder")(funct
           if (isRuntimeCacheFolder(entry.name)) continue;
           if (paths.some((expectedPath) => expectedPath.startsWith(`${name}/`))) yield* prune(path);
           else yield* skillIO(() => rm(path, { recursive: true, force: true, maxRetries: 5 }));
-        } else if (!(name in files)) yield* skillIO(() => rm(path, { force: true, maxRetries: 5 }));
+        } else if (!Object.hasOwn(files, name)) yield* skillIO(() => rm(path, { force: true, maxRetries: 5 }));
       }
     });
   yield* prune(root);
