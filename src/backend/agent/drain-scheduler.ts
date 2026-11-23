@@ -417,6 +417,7 @@ export class DrainScheduler {
     const key = laneKey(lane);
     if (this.#reportedHolds.get(key) === reason || !this.#mailbox.nextQueued(lane.agentId, lane.taskId)) return;
     this.#reportedHolds.set(key, reason);
+    if (reason === "endpoint-reload") this.#mailboxSync.emitQueue(lane.agentId);
     const working =
       reason === "active-turn" && lane.taskId === null ? this.#conversation.workingSnapshot(lane.agentId) : undefined;
     const channelId = laneChannelId(lane.taskId);
@@ -473,12 +474,13 @@ export class DrainScheduler {
     if (!this.#providers.isReady()) return "providers-not-ready";
     if (this.#deliveryProviders(agentId).some((provider) => this.#providers.isReplacingCli(provider)))
       return "provider-cli-replaced";
-    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    if (agent && this.#awaitsEndpointReload(agent)) return "endpoint-reload";
+    if (this.awaitsEndpointReload(agentId)) return "endpoint-reload";
     return null;
   }
 
-  #awaitsEndpointReload(agent: AgentSummary): boolean {
+  awaitsEndpointReload(agentId: string): boolean {
+    const agent = this.#store.get(agentId);
+    if (!agent) return false;
     const provider = providerForAgent(agent);
     if (!this.#providers.reloadPending(provider)) return false;
     const client = this.#providers.runningAgentClient(agent);
