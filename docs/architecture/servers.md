@@ -1124,6 +1124,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
+| `host-signal-home-v1` | Read (any member) the Signal servers of the host with the latency that the host measures, and choose (owner or admin) one or automatic. Protocol 10 only | `hostAdmin` |
 | `host-voice-model-v1` | Read the speech recognition model of the host and its downloads, and select, download, stop or remove a model. Owner or admin. Only a server in server mode, a hosted server or a server on a computer advertises it: the desktop app of a person keeps the model in its own Settings > Voice. Protocol 10 only | `hostAdmin` |
 | `host-turn-limits-v1` | Read and set the turns at the same time on the host (1 to 128, unlimited, or automatic) and the default task limit of an agent (1 to 64). Owner or admin. Protocol 9 only | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
@@ -1208,6 +1209,26 @@ downloads can be selected; a cloud model gets 400. The download route answers wh
 of the download arrives, and the download continues on the host; a client reads the route again each
 second while a model downloads. The desktop and web clients show it in Server settings > Agent
 defaults for a joined server; mobile shows it in Server settings > Agents.
+
+`host-signal-home-v1` gives the Signal server (Signal home) of the host to an owner or an admin
+(`HostSignalHomeService`, `src/main/host-signal-home.ts`). The host asks the account service for the
+homes (`POST /v2/remote/hosts/:hostId/signal-homes`, machine token) and measures the latency of each
+one: one `GET /health/ready` to open the connection, then the median of three more. A home that does
+not answer in 3 seconds has no latency. The host uses a measurement again for 60 seconds, because any
+member can read the list. The choice is in `openbot-signal-home-v1.json` (`null` is
+automatic) and does not go with an instance transfer, because the latency belongs to the computer.
+Each host ticket that asks for a home sends it as `preferredSignalHome`. The account service gives
+the chosen home when it answers, and the automatic home when it fails or does not answer. A change
+asks for a new ticket one second after the answer, so the answer reaches a remote admin first; when
+the URL changes, the host moves to the new Signal and its members connect again. While the host is on another home than the chosen one, it checks every 15 minutes that the
+chosen home answers from its own network, and only then asks again, so it goes back when the chosen
+home answers. When a move fails after the host left its old Signal, the host asks for another home
+with the failed URL, as after a Signal failure. A change made while a Signal recovery runs waits
+for the recovery to end. The desktop app shows the row in Server settings > General
+only while the host is published and the account service lists two or more homes; the web client
+shows it for a joined server. Mobile shows a Signal server row in Server settings to each member when the
+host lists two or more homes, with the colored latency of the home in use (green under 100 ms, yellow
+under 200 ms, red above or with no answer). Only an owner or an admin can open the list and choose. Safe mode reads the saved choice and sends it too.
 
 `host-timezone-v1` reads and sets the server timezone (`openbot-server-timezone-v1.json`; `null` is
 automatic, the system zone of the host). When an agent creates a routine, the zone comes from the tool

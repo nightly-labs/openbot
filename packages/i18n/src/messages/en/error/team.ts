@@ -128,6 +128,7 @@ export const messages = defineMessages("error.team", {
   "error.team.hostIdentityUnsupported": "Server identity changes are not supported by this connection.",
   "error.team.hostUpdateUnsupported": "Host updates are not supported by this connection.",
   "error.team.hostTimezoneUnsupported": "The server timezone is not supported by this connection.",
+  "error.team.hostSignalHomeUnsupported": "The Signal server choice is not supported by this connection.",
   "error.team.hostVoiceModelUnsupported":
     "The speech recognition model of the server is not supported by this connection.",
   "error.team.hostRestartUnsupported": "Restarting the server is not supported by this connection.",

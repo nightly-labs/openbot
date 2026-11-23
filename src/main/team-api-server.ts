@@ -226,6 +226,7 @@ import {
   type HostAppearanceEvent,
 } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
+import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import {
   HOST_RESTART_EVENT,
   type HostRestartEvent,
@@ -440,6 +441,7 @@ import { routeHostAppearance } from "./team-api/route-host-appearance";
 import { routeHostKeyRotation } from "./team-api/route-host-key-rotation";
 import { routeHostPersonality } from "./team-api/route-host-personality";
 import { routeHostRestart } from "./team-api/route-host-restart";
+import { routeHostSignalHome } from "./team-api/route-host-signal-home";
 import { routeHostTimezone } from "./team-api/route-host-timezone";
 import { routeHostTurnLimits } from "./team-api/route-host-turn-limits";
 import { routeHostUpdate } from "./team-api/route-host-update";
@@ -1347,6 +1349,7 @@ export class TeamApiServer {
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
       if ((await routeHostVoiceModel(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostSignalHome(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTurnLimits(context, this.#options.admin)) === "handled") return;
       if ((await routeHostRestart(context, this.#options.admin)) === "handled") return;
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
@@ -2849,6 +2852,7 @@ export class TeamApiServer {
         if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
         if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
         if (capability === HOST_VOICE_MODEL_CAPABILITY) return this.#options.admin?.voiceModel !== undefined;
+        if (capability === HOST_SIGNAL_HOME_CAPABILITY) return this.#options.admin?.signalHome !== undefined;
         if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
         if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
         if (capability === OWNER_TRANSFER_CAPABILITY) return this.#options.admin?.ownerTransfer === true;

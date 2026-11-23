@@ -334,6 +334,7 @@ export const messages = {
   "mobile.server.route.invite": "Mensen uitnodigen",
   "mobile.server.route.member": "Lid",
   "mobile.server.route.timezone": "Tijdzone",
+  "mobile.server.route.signalHome": "Signal-server",
   "mobile.server.route.personality": "Agentpersoonlijkheid",
   "mobile.server.route.agents": "Agents",
   "mobile.server.route.voiceModel": "Spraakherkenning",
@@ -465,6 +466,29 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de tijdzone te wijzigen.",
   "mobile.server.settings.timezoneUnsupported": "Werk OpenBot bij op deze server om de tijdzone hier te wijzigen.",
+  "mobile.server.settings.signalHomeAutomatic": "Automatisch",
+  "mobile.server.settings.signalHomeNearest": "De dichtstbijzijnde Signal-server",
+  "mobile.server.settings.signalHomeInUse": "In gebruik: {name}",
+  "mobile.server.settings.signalHomeLoading": "Signal-servers meten…",
+  "mobile.server.settings.signalHomeSaveFailed": "Kan de Signal-server niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Maak als eigenaar of beheerder verbinding met deze server om de Signal-server te wijzigen.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Werk OpenBot op deze server bij om de Signal-server hier te wijzigen.",
+  "mobile.server.settings.signalHomeDescription":
+    "Leden maken via deze Signal-server verbinding met deze server. Een Signal-server met een lagere latentie geeft snellere verbindingen.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} antwoordt niet. De server gebruikt {name} tot {chosen} weer antwoordt.",
+  "mobile.server.settings.signalHomeMoving":
+    "De server gaat over naar {name}. Leden maken binnen enkele seconden opnieuw verbinding.",
+  "mobile.server.settings.signalHomeLoadFailed": "Kan de Signal-servers niet laden.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Geen antwoord",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San Jose",
+  "mobile.server.settings.signalHomePlaceSydney": "Sydney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapore",
   "mobile.server.settings.voiceModelDescription":
     "Agents op deze server gebruiken dit model om het geluid van video’s zonder ondertiteling uit te schrijven.",
   "mobile.server.settings.voiceModelLoading": "Spraakherkenning laden…",

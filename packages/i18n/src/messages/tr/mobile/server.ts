@@ -341,6 +341,7 @@ export const messages = {
   "mobile.server.route.invite": "Kişileri davet et",
   "mobile.server.route.member": "Üye",
   "mobile.server.route.timezone": "Saat dilimi",
+  "mobile.server.route.signalHome": "Signal sunucusu",
   "mobile.server.route.personality": "Ajan kişiliği",
   "mobile.server.route.agents": "Ajanlar",
   "mobile.server.route.voiceModel": "Konuşma tanıma",
@@ -469,6 +470,29 @@ export const messages = {
     "Saat dilimini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.settings.timezoneUnsupported":
     "Saat dilimini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.signalHomeAutomatic": "Otomatik",
+  "mobile.server.settings.signalHomeNearest": "En yakın Signal sunucusu",
+  "mobile.server.settings.signalHomeInUse": "Kullanımda: {name}",
+  "mobile.server.settings.signalHomeLoading": "Signal sunucuları ölçülüyor…",
+  "mobile.server.settings.signalHomeSaveFailed": "Signal sunucusu değiştirilemedi. Yeniden deneyin.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Signal sunucusunu değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Signal sunucusunu buradan değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.signalHomeDescription":
+    "Üyeler bu sunucuya bu Signal sunucusu üzerinden bağlanır. Gecikmesi daha düşük bir Signal sunucusu daha hızlı bağlantı sağlar.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} yanıt vermiyor. Sunucu, {chosen} yeniden yanıt verene kadar {name} kullanır.",
+  "mobile.server.settings.signalHomeMoving":
+    "Sunucu {name} sunucusuna geçiyor. Üyeler birkaç saniye içinde yeniden bağlanır.",
+  "mobile.server.settings.signalHomeLoadFailed": "Signal sunucuları yüklenemedi.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Yanıt yok",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San Jose",
+  "mobile.server.settings.signalHomePlaceSydney": "Sidney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapur",
   "mobile.server.settings.voiceModelDescription":
     "Bu sunucudaki ajanlar, altyazısı olmayan videoların sesini yazıya dökmek için bu modeli kullanır.",
   "mobile.server.settings.voiceModelLoading": "Konuşma tanıma yükleniyor…",

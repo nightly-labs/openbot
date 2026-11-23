@@ -56,6 +56,8 @@ const LOCAL_RUNTIME_KEYS = [
   "FCM_SERVICE_ACCOUNT",
   "MEDIA_API_URL",
   "MEDIA_API_KEY",
+  "MEDIA_API_TASKS_URL",
+  "MEDIA_API_TASKS_KEY",
 ] as const;
 
 const BOOLEAN_RUNTIME_KEYS = new Set<(typeof LOCAL_RUNTIME_KEYS)[number]>([

@@ -112,6 +112,7 @@ import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
+import { HOST_SIGNAL_HOME_CAPABILITY } from "./host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
@@ -827,6 +828,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WORKFLOWS_PORTABLE_CAPABILITY, V10],
   [MODEL_VISIBILITY_KEPT_CAPABILITY, V10],
   [TEAM_UI_BLOCK_LOCATION_CAPABILITY, V10],
+  [HOST_SIGNAL_HOME_CAPABILITY, V10],
   [VOICE_TRANSCRIPTION_CAPABILITY, V10],
   [CLIENT_BROWSER_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];

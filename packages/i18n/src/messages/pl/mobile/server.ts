@@ -380,6 +380,7 @@ export const messages = {
   "mobile.server.route.invite": "Zaproś osoby",
   "mobile.server.route.member": "Członek",
   "mobile.server.route.timezone": "Strefa czasowa",
+  "mobile.server.route.signalHome": "Serwer Signal",
   "mobile.server.route.personality": "Osobowość agenta",
   "mobile.server.route.agents": "Agenci",
   "mobile.server.route.voiceModel": "Rozpoznawanie mowy",
@@ -518,6 +519,29 @@ export const messages = {
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego strefę czasową.",
   "mobile.server.settings.timezoneUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego strefę czasową.",
+  "mobile.server.settings.signalHomeAutomatic": "Automatycznie",
+  "mobile.server.settings.signalHomeNearest": "Najbliższy serwer Signal",
+  "mobile.server.settings.signalHomeInUse": "W użyciu: {name}",
+  "mobile.server.settings.signalHomeLoading": "Mierzenie serwerów Signal…",
+  "mobile.server.settings.signalHomeSaveFailed": "Nie udało się zmienić serwera Signal. Spróbuj ponownie.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego serwer Signal.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego serwer Signal.",
+  "mobile.server.settings.signalHomeDescription":
+    "Członkowie łączą się z tym serwerem przez ten serwer Signal. Serwer Signal z mniejszym opóźnieniem daje szybsze połączenia.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} nie odpowiada. Serwer używa {name}, dopóki {chosen} znowu nie odpowie.",
+  "mobile.server.settings.signalHomeMoving":
+    "Serwer przechodzi na {name}. Członkowie połączą się ponownie za kilka sekund.",
+  "mobile.server.settings.signalHomeLoadFailed": "Nie udało się wczytać serwerów Signal.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Brak odpowiedzi",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San Jose",
+  "mobile.server.settings.signalHomePlaceSydney": "Sydney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapur",
   "mobile.server.settings.voiceModelDescription":
     "Agenci na tym serwerze używają tego modelu, aby transkrybować dźwięk filmów bez napisów.",
   "mobile.server.settings.voiceModelLoading": "Wczytywanie rozpoznawania mowy…",

@@ -279,6 +279,7 @@ import {
 } from "./host-events-service";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import { HostService } from "./host-service";
+import { HostSignalHomeService, SIGNAL_HOME_PREFERENCE_FILE } from "./host-signal-home";
 import { HostTurnLimitsPreferenceStore } from "./host-turn-limits-preference-store";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { HostVoiceModelService } from "./host-voice-model";
@@ -724,6 +725,7 @@ export interface ApplicationServices {
   mcpAccess: McpAccessControl;
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
+  hostSignalHome: HostSignalHomeService;
   hostTurnLimits: HostTurnLimitsPreferenceStore;
   serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
@@ -1474,6 +1476,16 @@ export async function createApplicationServices({
     join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE),
     systemTimezone,
   );
+  const hostSignalHome = new HostSignalHomeService({
+    path: join(app.getPath("userData"), SIGNAL_HOME_PREFERENCE_FILE),
+    fetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
+    listHomes: () => {
+      const hostId = teamStore.configured ? teamStore.getIdentity()?.serverId : undefined;
+      return hostId && host.getStatus().apiOnline ? centralAuth.listRemoteSignalHomes(hostId) : Effect.succeed([]);
+    },
+    currentHome: () => host.signalHome(),
+    followHome: () => host.followSignalHome(),
+  });
   const hostTurnLimits = new HostTurnLimitsPreferenceStore(
     join(app.getPath("userData"), HOST_TURN_LIMITS_PREFERENCE_FILE),
     () => hostMemory?.turnLimit() ?? null,
@@ -1530,6 +1542,7 @@ export async function createApplicationServices({
       serverAudit.load(),
       mcpServerOwners.load(),
       serverTimezone.load(),
+      hostSignalHome.load(),
       hostTurnLimits.load(),
       serverPersonality.load(),
       promptCacheTtl.load(),
@@ -3303,6 +3316,7 @@ export async function createApplicationServices({
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
       timezone: serverTimezone,
+      signalHome: hostSignalHome,
       ...(hostedServer || serverModeEnvironment || localServerChild
         ? {
             voiceModel: {
@@ -3406,7 +3420,11 @@ export async function createApplicationServices({
       centralAuth.handOverRemoteHostKey(hostId, handover).pipe(toRemoteWorkflowError),
     onKeyRotated: () => remoteServers.requestDirectoryRefresh(),
     issueRemoteHostTicket: (hostId, home) =>
-      centralAuth.issueRemoteHostTicket(hostId, home).pipe(toRemoteWorkflowError),
+      centralAuth
+        .issueRemoteHostTicket(hostId, home && { ...home, preferredSignalHome: hostSignalHome.preferred() })
+        .pipe(toRemoteWorkflowError),
+    preferredSignalHome: () => hostSignalHome.preferred(),
+    signalHomeAnswers: (home) => hostSignalHome.answers(home),
     ...(serverModeEnvironment && !hostedServer
       ? {
           requestTransferredOwnerSession: (hostId: string) =>
@@ -4371,6 +4389,7 @@ export async function createApplicationServices({
     mcpAccess,
     serverAudit,
     serverTimezone,
+    hostSignalHome,
     hostTurnLimits,
     serverPersonality,
     promptCacheTtl,

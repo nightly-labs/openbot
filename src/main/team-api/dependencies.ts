@@ -67,6 +67,7 @@ import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
+import type { HostSignalHomeService } from "../host-signal-home";
 import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
 import type { HostVoiceModelService } from "../host-voice-model";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
@@ -466,6 +467,7 @@ export interface TeamApiAdmin {
   ownerTransfer?: true;
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
   voiceModel?: Pick<HostVoiceModelService, "snapshot" | "change">;
+  signalHome?: Pick<HostSignalHomeService, "snapshot" | "set">;
   turnLimits?: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   personality?: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };

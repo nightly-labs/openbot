@@ -403,7 +403,11 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   `remote_hosts.signal_home` keeps, and a ticket with the `signal` claim. The host keeps its home
   until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
   home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
-  `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+  `REMOTE_SIGNAL_URL`, which stays the entry Signal. A host ticket request with `signalHome: true` can
+  also send `preferredSignalHome`, the ID of the home that an owner or admin chose. The host gets that
+  home when it is not the `failedSignalUrl` and its `/health/ready` answers in 2 seconds; otherwise the
+  rules below choose. An ID that is not a home is ignored. `POST /v2/remote/hosts/:hostId/signal-homes`
+  with the machine token lists the homes (`{ homes: [{ id, url }] }`).
 - `REMOTE_SIGNAL_HOME_LOCATIONS`: the place of each home, as `id=latitude:longitude,...`, for example
   `a=60.17:24.94,us=37.34:-121.89`. Empty means no places. Otherwise it must name each home of
   `REMOTE_SIGNAL_HOMES` one time, or each ticket request fails with `503 remote_not_configured`. With

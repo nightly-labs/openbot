@@ -265,6 +265,7 @@ import { Route as V2RemoteHostsHostIdLogoRouteImport } from './routes/v2/remote/
 import { Route as V2RemoteHostsHostIdNotificationRouteImport } from './routes/v2/remote/hosts/$hostId/notification'
 import { Route as V2RemoteHostsHostIdOwnerSessionRouteImport } from './routes/v2/remote/hosts/$hostId/owner-session'
 import { Route as V2RemoteHostsHostIdOwnerTransferRouteImport } from './routes/v2/remote/hosts/$hostId/owner-transfer'
+import { Route as V2RemoteHostsHostIdSignalHomesRouteImport } from './routes/v2/remote/hosts/$hostId/signal-homes'
 import { Route as V2RemoteHostsHostIdSlackDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/slack-disconnect'
 import { Route as V2RemoteHostsHostIdSlackRouteRouteImport } from './routes/v2/remote/hosts/$hostId/slack-route'
 import { Route as V2RemoteHostsHostIdTelegramDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/telegram-disconnect'
@@ -1618,6 +1619,12 @@ const V2RemoteHostsHostIdOwnerTransferRoute =
     path: '/v2/remote/hosts/$hostId/owner-transfer',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdSignalHomesRoute =
+  V2RemoteHostsHostIdSignalHomesRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/signal-homes',
+    path: '/v2/remote/hosts/$hostId/signal-homes',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdSlackDisconnectRoute =
   V2RemoteHostsHostIdSlackDisconnectRouteImport.update({
     id: '/v2/remote/hosts/$hostId/slack-disconnect',
@@ -2007,6 +2014,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/notification': typeof V2RemoteHostsHostIdNotificationRoute
   '/v2/remote/hosts/$hostId/owner-session': typeof V2RemoteHostsHostIdOwnerSessionRoute
   '/v2/remote/hosts/$hostId/owner-transfer': typeof V2RemoteHostsHostIdOwnerTransferRoute
+  '/v2/remote/hosts/$hostId/signal-homes': typeof V2RemoteHostsHostIdSignalHomesRoute
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/telegram-disconnect': typeof V2RemoteHostsHostIdTelegramDisconnectRoute
@@ -2284,6 +2292,7 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/notification': typeof V2RemoteHostsHostIdNotificationRoute
   '/v2/remote/hosts/$hostId/owner-session': typeof V2RemoteHostsHostIdOwnerSessionRoute
   '/v2/remote/hosts/$hostId/owner-transfer': typeof V2RemoteHostsHostIdOwnerTransferRoute
+  '/v2/remote/hosts/$hostId/signal-homes': typeof V2RemoteHostsHostIdSignalHomesRoute
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/telegram-disconnect': typeof V2RemoteHostsHostIdTelegramDisconnectRoute
@@ -2566,6 +2575,7 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/notification': typeof V2RemoteHostsHostIdNotificationRoute
   '/v2/remote/hosts/$hostId/owner-session': typeof V2RemoteHostsHostIdOwnerSessionRoute
   '/v2/remote/hosts/$hostId/owner-transfer': typeof V2RemoteHostsHostIdOwnerTransferRoute
+  '/v2/remote/hosts/$hostId/signal-homes': typeof V2RemoteHostsHostIdSignalHomesRoute
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/telegram-disconnect': typeof V2RemoteHostsHostIdTelegramDisconnectRoute
@@ -2845,6 +2855,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/notification'
     | '/v2/remote/hosts/$hostId/owner-session'
     | '/v2/remote/hosts/$hostId/owner-transfer'
+    | '/v2/remote/hosts/$hostId/signal-homes'
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/telegram-disconnect'
@@ -3122,6 +3133,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/notification'
     | '/v2/remote/hosts/$hostId/owner-session'
     | '/v2/remote/hosts/$hostId/owner-transfer'
+    | '/v2/remote/hosts/$hostId/signal-homes'
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/telegram-disconnect'
@@ -3403,6 +3415,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/notification'
     | '/v2/remote/hosts/$hostId/owner-session'
     | '/v2/remote/hosts/$hostId/owner-transfer'
+    | '/v2/remote/hosts/$hostId/signal-homes'
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/telegram-disconnect'
@@ -3592,6 +3605,7 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdNotificationRoute: typeof V2RemoteHostsHostIdNotificationRoute
   V2RemoteHostsHostIdOwnerSessionRoute: typeof V2RemoteHostsHostIdOwnerSessionRoute
   V2RemoteHostsHostIdOwnerTransferRoute: typeof V2RemoteHostsHostIdOwnerTransferRoute
+  V2RemoteHostsHostIdSignalHomesRoute: typeof V2RemoteHostsHostIdSignalHomesRoute
   V2RemoteHostsHostIdSlackDisconnectRoute: typeof V2RemoteHostsHostIdSlackDisconnectRoute
   V2RemoteHostsHostIdSlackRouteRoute: typeof V2RemoteHostsHostIdSlackRouteRoute
   V2RemoteHostsHostIdTelegramDisconnectRoute: typeof V2RemoteHostsHostIdTelegramDisconnectRoute
@@ -5412,6 +5426,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdOwnerTransferRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/signal-homes': {
+      id: '/v2/remote/hosts/$hostId/signal-homes'
+      path: '/v2/remote/hosts/$hostId/signal-homes'
+      fullPath: '/v2/remote/hosts/$hostId/signal-homes'
+      preLoaderRoute: typeof V2RemoteHostsHostIdSignalHomesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/hosts/$hostId/slack-disconnect': {
       id: '/v2/remote/hosts/$hostId/slack-disconnect'
       path: '/v2/remote/hosts/$hostId/slack-disconnect'
@@ -6071,6 +6092,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteHostsHostIdNotificationRoute: V2RemoteHostsHostIdNotificationRoute,
   V2RemoteHostsHostIdOwnerSessionRoute: V2RemoteHostsHostIdOwnerSessionRoute,
   V2RemoteHostsHostIdOwnerTransferRoute: V2RemoteHostsHostIdOwnerTransferRoute,
+  V2RemoteHostsHostIdSignalHomesRoute: V2RemoteHostsHostIdSignalHomesRoute,
   V2RemoteHostsHostIdSlackDisconnectRoute:
     V2RemoteHostsHostIdSlackDisconnectRoute,
   V2RemoteHostsHostIdSlackRouteRoute: V2RemoteHostsHostIdSlackRouteRoute,
