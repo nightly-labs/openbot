@@ -106,6 +106,8 @@ const NO_CODEX_OWN_SERVERS: CodexOwnServers = { disabled: {}, transports: {}, re
 
 const RUNTIME_RELOADED_ON_RESUME: ReadonlySet<AgentProvider> = new Set(["claude"]);
 
+export type RuntimeRefreshTiming = "now" | "after-background-work";
+
 type CodexToolApprovals = Array<[string, DynamicRecord]>;
 const SESSION_NAME_PREFIX = "OpenBot · ";
 
@@ -273,10 +275,11 @@ export class ThreadLifecycle {
 
   readonly refreshAllAgentRuntimes = Effect.fn("ThreadLifecycle.refreshAllAgentRuntimes")(function* (
     this: ThreadLifecycle,
+    timing: RuntimeRefreshTiming,
   ) {
     for (const agent of this.#store.list()) {
       this.#pendingRuntimeRefreshes.add(agent.id);
-      this.#mcpRuntimeRefreshes.add(agent.id);
+      if (timing === "now") this.#mcpRuntimeRefreshes.add(agent.id);
       yield* this.applyPendingRuntimeRefresh(agent);
     }
   }, Effect.uninterruptible).bind(this);

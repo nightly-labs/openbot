@@ -356,7 +356,13 @@ import {
   showMainWindow,
 } from "./main-window";
 import { DATA_SKILL_SLUG, ManagedSkillService, SKILL_CREATOR_SKILL_SLUG } from "./managed-skill-service";
-import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore, sameMcpAgents } from "./mcp-access-store";
+import {
+  MCP_ACCESS_FILE,
+  type McpAccessControl,
+  McpAccessStore,
+  mcpAgentsOnlyAdded,
+  sameMcpAgents,
+} from "./mcp-access-store";
 import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { McpOAuthProxySettingsFile } from "./mcp-oauth-proxy-store";
 import {
@@ -2676,7 +2682,7 @@ export async function createApplicationServices({
     providerRuntimes.startUpdateChecks();
   }
   providerRuntimes.on("ready", (runtime) => {
-    if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes());
+    if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes("after-background-work"));
   });
   service.on("event", (event) => {
     if (event.type === "agents-changed") storageUsage.invalidate();
@@ -3181,7 +3187,11 @@ export async function createApplicationServices({
           .set(change, existing)
           .pipe(
             Effect.andThen(
-              sameMcpAgents(before, change.access.agents) ? Effect.void : service.refreshAllAgentRuntimes(),
+              sameMcpAgents(before, change.access.agents)
+                ? Effect.void
+                : service.refreshAllAgentRuntimes(
+                    mcpAgentsOnlyAdded(before, change.access.agents) ? "after-background-work" : "now",
+                  ),
             ),
           );
       }),
