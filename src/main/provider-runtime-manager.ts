@@ -1481,7 +1481,11 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
           env: { ...process.env, ...descriptor.versionEnvironment },
           windowsHide: true,
         }),
-      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
+      ).pipe(
+        Effect.mapError((failure) =>
+          windowsBlockedFailure(spec.runtime, unsupportedProcessorFailure(spec.runtime, failure)),
+        ),
+      )).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
@@ -1501,6 +1505,21 @@ function unsupportedProcessorFailure(
   )
     return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
+
+function windowsBlockedFailure(runtime: ManagedRuntimeId, failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
+  const { cause } = failure;
+  if (
+    process.platform !== "win32" ||
+    isManagedToolRuntime(runtime) ||
+    !(cause instanceof Error) ||
+    errorCode(cause) !== "UNKNOWN" ||
+    !("syscall" in cause) ||
+    typeof cause.syscall !== "string" ||
+    !cause.syscall.startsWith("spawn")
+  )
+    return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.windowsBlocked"), { cause }) });
 }
 
 function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailure {

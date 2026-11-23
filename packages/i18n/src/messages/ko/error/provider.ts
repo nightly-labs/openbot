@@ -288,6 +288,8 @@ export const messages = {
     "OpenBot의 실시간 CPU 제한이 0이어서 Linux가 공급자를 중지했습니다. 이 제한은 시스템에서 옵니다. rtkit을 설치하고 시작한 다음(`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal`을 실행하고 OpenBot을 다시 시작하세요. rtkit이 없으면 xdg-desktop-portal만 다시 시작해서는 해결되지 않습니다.",
   "error.provider.cpuUnsupported":
     "이 컴퓨터의 프로세서에서는 이 제공자를 실행할 수 없어요. 다른 제공자를 사용해 주세요.",
+  "error.provider.windowsBlocked":
+    "스마트 앱 컨트롤 같은 Windows 보안 설정 때문에 이 공급자를 시작할 수 없습니다. 다른 공급자를 사용하세요.",
   "error.provider.opencodeDatabaseNewer":
     "더 새로운 OpenCode 버전이 데이터베이스를 변경해서 OpenCode가 데이터베이스를 열 수 없었어요. OpenCode를 버전 2 이상으로 업데이트한 후 다시 시도해 주세요.",
   "error.provider.grokDefaultModelNotAllowed":

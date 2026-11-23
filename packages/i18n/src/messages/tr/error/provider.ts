@@ -290,6 +290,8 @@ export const messages = {
     "OpenBot'un gerçek zamanlı CPU sınırı 0 olduğu için Linux sağlayıcıyı durdurdu. Bu sınır sisteminizden geliyor. rtkit'i kurup başlatın (`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal` komutunu çalıştırın, ardından OpenBot'u yeniden başlatın. rtkit eksikken yalnızca xdg-desktop-portal'ı yeniden başlatmak işe yaramaz.",
   "error.provider.cpuUnsupported":
     "Bu bilgisayarın işlemcisi bu sağlayıcıyı çalıştıramıyor. Başka bir sağlayıcı kullanın.",
+  "error.provider.windowsBlocked":
+    "Akıllı Uygulama Denetimi gibi Windows güvenlik ayarları bu sağlayıcının başlamasını engelledi. Başka bir sağlayıcı kullanın.",
   "error.provider.opencodeDatabaseNewer":
     "Daha yeni bir OpenCode sürümü veritabanını değiştirdiği için OpenCode veritabanını açamadı. OpenCode'u 2 veya daha yeni bir sürüme güncelleyin, sonra yeniden deneyin.",
   "error.provider.grokDefaultModelNotAllowed":
