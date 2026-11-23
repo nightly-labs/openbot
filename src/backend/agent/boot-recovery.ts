@@ -1,6 +1,8 @@
 import {
+  agentProviderDescriptor,
   CONVERSATION_PLAN_ITEM_TYPE,
   type ConversationMessage,
+  isAgentAnswer,
   PLAN_CONTINUATION_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -71,6 +73,7 @@ export class BootRecovery {
   readonly #planContinuation: PlanContinuation;
   readonly #hooks: BootRecoveryHooks;
   readonly #orphanedDeliveryIds = new Set<string>();
+  readonly #lostToProviderExit = new Set<string>();
   readonly #unreadableHistory = new Set<string>();
   #historyCompacted = false;
   #threadEventsCompacted = false;
@@ -112,14 +115,31 @@ export class BootRecovery {
       const agent = agents.find((candidate) => candidate.id === delivery.recipientAgentId);
       if (agent && providerForAgent(agent) === provider && !runsOnOwnProcess(agent.id)) {
         this.#orphanedDeliveryIds.add(delivery.id);
+        this.#lostToProviderExit.add(delivery.id);
       }
     }
   }
 
   orphanDeliveriesOfAgent(agentId: string): void {
     for (const { delivery } of this.#mailbox.unresolvedDeliveries()) {
-      if (delivery.recipientAgentId === agentId) this.#orphanedDeliveryIds.add(delivery.id);
+      if (delivery.recipientAgentId !== agentId) continue;
+      this.#orphanedDeliveryIds.add(delivery.id);
+      this.#lostToProviderExit.add(delivery.id);
     }
+  }
+
+  #personTurnWithoutAnswer(delivery: UnresolvedDelivery, agentId: string, threadId: string, turnId: string): boolean {
+    const fromPerson = (candidate: UnresolvedDelivery, channelId: string | undefined) =>
+      candidate.sender.kind === "user" && channelId === undefined;
+    return (
+      fromPerson(delivery, this.#mailbox.getDelivery(delivery.id)?.channelId) &&
+      this.#mailbox
+        .findDeliveriesByTurn(agentId, turnId)
+        .every((context) => fromPerson(context.delivery, context.channelId)) &&
+      !this.#conversation
+        .ensureSnapshot(agentId, threadId)
+        .messages.some((message) => message.turnId === turnId && isAgentAnswer(message))
+    );
   }
 
   hasOrphanedOwnChatDelivery(agentId: string): boolean {
@@ -147,6 +167,9 @@ export class BootRecovery {
     const unresolvedIds = new Set(unresolved.map(({ delivery }) => delivery.id));
     for (const id of this.#orphanedDeliveryIds) {
       if (!unresolvedIds.has(id)) this.#orphanedDeliveryIds.delete(id);
+    }
+    for (const id of this.#lostToProviderExit) {
+      if (!unresolvedIds.has(id)) this.#lostToProviderExit.delete(id);
     }
     const laneOf = (delivery: { id: string; recipientAgentId: string }) =>
       `${delivery.recipientAgentId}\u0000${this.#mailbox.laneIdForDelivery(delivery.id) ?? ""}`;
@@ -255,10 +278,23 @@ export class BootRecovery {
     const cut =
       recovered.terminal === "interrupted" &&
       target?.streaming.some((message) => message.author === "assistant" && message.text.trim() !== "") === true;
-    const ownChat = cut && target !== null && target.threadId === target.agent.threadId ? target : null;
+    const stoppedBeforeAnswer = yield* recoveryStep(() =>
+      !cut &&
+      recovered.terminal === "interrupted" &&
+      this.#lostToProviderExit.has(delivery.id) &&
+      target?.turnId &&
+      target.threadId === target.agent.threadId &&
+      this.#personTurnWithoutAnswer(delivery, target.agent.id, target.threadId, target.turnId)
+        ? sourceText("error.provider.acpProcessStopped", {
+            provider: agentProviderDescriptor(providerForAgent(target.agent)).displayName,
+          })
+        : null,
+    );
+    const ended = cut || stoppedBeforeAnswer !== null;
+    const ownChat = ended && target !== null && target.threadId === target.agent.threadId ? target : null;
     const deliveryIds = yield* recoveryStep(() => {
       const ids = new Set([delivery.id]);
-      if (!cut || !target?.turnId) return [...ids];
+      if (!ended || !target?.turnId) return [...ids];
       for (const context of this.#mailbox.findDeliveriesByTurn(target.agent.id, target.turnId))
         ids.add(context.delivery.id);
       for (const id of batchIds ?? []) {
@@ -268,7 +304,11 @@ export class BootRecovery {
       return [...ids];
     });
     const continuation = yield* recoveryStep(() => {
-      if (!ownChat?.turnId || !this.#hooks.continuesAfterProviderExit?.(ownChat.agent.id, ownChat.turnId, deliveryIds))
+      if (
+        !cut ||
+        !ownChat?.turnId ||
+        !this.#hooks.continuesAfterProviderExit?.(ownChat.agent.id, ownChat.turnId, deliveryIds)
+      )
         return null;
       const { messages } = this.#conversation.ensureSnapshot(ownChat.agent.id, ownChat.threadId);
       return this.#planContinuation.afterProviderExit({
@@ -285,7 +325,9 @@ export class BootRecovery {
     const { terminal, reason } =
       cut && !continuation
         ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
-        : recovered;
+        : stoppedBeforeAnswer !== null
+          ? { terminal: "failed" as const, reason: stoppedBeforeAnswer }
+          : recovered;
     const routineRetries = yield* recoveryStep(
       () => new Set(deliveryIds.filter((id) => this.#hooks.retriesAfterRestart?.(id) === true)),
     );
