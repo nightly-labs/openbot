@@ -403,6 +403,7 @@ import { createProviderAdmin } from "@/features/servers/model/provider-admin";
 import { saveAgentAvatar, savedAgentAvatar } from "@/features/workspace/model/agent-avatar-cache";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
+import type { DownloadQueue } from "@/features/workspace/model/request-lanes";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import {
   hasCapability,
@@ -782,8 +783,8 @@ export function createHostRequestActions({
   queryClient: QueryClient;
   queryScope: QueryScope;
   capabilities: ServerCapabilities;
-  attachmentDownloads: { current: Promise<void> };
-  largeAttachmentDownloads: { current: Promise<void> };
+  attachmentDownloads: DownloadQueue;
+  largeAttachmentDownloads: DownloadQueue;
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   function capabilityApi(
@@ -1742,7 +1743,7 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload, progress) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped) => {
       const download = () =>
         request(
           "GET",
@@ -1755,13 +1756,8 @@ export function createHostRequestActions({
           largeDownload,
           progress,
         );
-      const lane = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
-      const result = lane.current.then(download);
-      lane.current = result.then(
-        () => {},
-        () => {},
-      );
-      return result;
+      const queue = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
+      return queue(download, tapped);
     },
     downloadMessageFile: (serverId, file) =>
       request(

@@ -224,6 +224,7 @@ function attachmentFileQuery(
   attachment: AttachmentSummary,
   downloadAttachment: DownloadAttachment,
   tooLarge: string,
+  tapped: boolean,
 ) {
   return queryOptions({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
@@ -236,6 +237,8 @@ function attachmentFileQuery(
         serverId,
         attachment.id,
         largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
+        undefined,
+        tapped,
       );
       if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
       const fileUri =
@@ -275,6 +278,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       attachment,
       downloadAttachment,
       t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+      !preview,
     ),
     enabled: preview && download === "download" && !local && !pending,
   });
@@ -380,6 +384,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         attachment,
         downloadAttachment,
         t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+        true,
       ),
     );
   const fail = (error: unknown, title: string) => showFileFailure(error, title, text);

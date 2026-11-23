@@ -248,6 +248,7 @@ import {
   reducePendingApprovals,
 } from "@/features/workspace/model/pending-approvals";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
+import { createDownloadQueue } from "@/features/workspace/model/request-lanes";
 import {
   hasCapability,
   requireCapability,
@@ -745,8 +746,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     };
   }, [directoryRefresh]);
 
-  const attachmentDownloads = useRef<Promise<void>>(Promise.resolve());
-  const largeAttachmentDownloads = useRef<Promise<void>>(Promise.resolve());
+  const [attachmentDownloads] = useState(createDownloadQueue);
+  const [largeAttachmentDownloads] = useState(createDownloadQueue);
   const request = useCallback(
     async <T,>(
       method: string,
@@ -1822,7 +1823,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         attachmentDownloads,
         largeAttachmentDownloads,
       }),
-    [request, teamApi, queryClient, queryScope],
+    [request, teamApi, queryClient, queryScope, attachmentDownloads, largeAttachmentDownloads],
   );
   useSyncedNotificationLevelsLoader({
     servers,

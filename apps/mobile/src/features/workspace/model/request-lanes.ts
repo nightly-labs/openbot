@@ -14,6 +14,28 @@ export function isBackgroundRead(method: string, path: string): boolean {
   return BACKGROUND_READS.some((read) => read.method === method && read.route.test(route));
 }
 
+export type DownloadQueue = <T>(task: () => Promise<T>, tapped?: boolean) => Promise<T>;
+
+export function createDownloadQueue(): DownloadQueue {
+  let running = false;
+  const tappedTasks: (() => void)[] = [];
+  const otherTasks: (() => void)[] = [];
+  function startNext() {
+    const next = tappedTasks.shift() ?? otherTasks.shift();
+    running = next !== undefined;
+    next?.();
+  }
+  return async (task, tapped = false) => {
+    if (running) await new Promise<void>((resolve) => (tapped ? tappedTasks : otherTasks).push(resolve));
+    else running = true;
+    try {
+      return await task();
+    } finally {
+      startNext();
+    }
+  };
+}
+
 export function createRequestLimiter(limit: number) {
   let running = 0;
   const waiting: (() => void)[] = [];
