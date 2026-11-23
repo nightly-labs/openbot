@@ -1517,7 +1517,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               }),
               Effect.mapError((failure) => {
                 const failed: { causeCode: CauseCode; message: string } | null = providerError;
-                const shown = background || !failed ? null : channelLeadFailureText(failed.causeCode);
+                const shown =
+                  background || selected !== lead || !failed ? null : channelLeadFailureText(failed.causeCode);
                 return shown &&
                   failure instanceof ProfileGenerationFailed &&
                   failure.cause instanceof Error &&
