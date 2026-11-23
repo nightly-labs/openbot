@@ -1455,19 +1455,22 @@ try {
           "A mention in a read-only group started work.",
         );
         assert.equal(received(agents, readerJid, direct.key.id ?? ""), false, "A read-only contact started work.");
-        const tool = (name: string, args: { place?: string; text?: string }) =>
+        const notes = join(root, "read-only-notes.txt");
+        writeFileSync(notes, "notes");
+        const tool = (name: string, args: { place?: string; text?: string; files?: string[] }) =>
           runCauseEffect(
             agents.messaging.outboundTool(
               "agent-whatsapp-e2e",
               { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
               name,
               { connection: id, ...args },
-              () => Effect.succeed([]),
+              (paths) => Effect.succeed(paths.map(() => ({ name: "notes.txt", path: notes, mimeType: "text/plain" }))),
             ),
           );
         const groupPost = await tool("messaging_post", { place: GROUP, text: "Noted." });
         const contactPost = await tool("messaging_post", { place: `+${reader}`, text: "Noted." });
-        for (const refused of [groupPost, contactPost]) {
+        const filePost = await tool("messaging_post", { place: GROUP, files: ["notes.txt"] });
+        for (const refused of [groupPost, contactPost, filePost]) {
           assert.equal(refused.success, false, "A post to a read-only chat was accepted.");
           assert.match(refused.contentItems[0]?.text ?? "", /read only/u);
         }
