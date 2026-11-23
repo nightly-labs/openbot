@@ -3076,17 +3076,11 @@ export class OpenBotToolRouter {
   }
 
   #servesTeammateRequest(agentId: string, turnId: string, executionThreadId: string): boolean {
-    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId).length;
     return (
-      deliveries.length > 0 &&
+      deliveries > 0 &&
       !this.#channels.store.channelForThread(executionThreadId) &&
-      deliveries.every(
-        ({ delivery, channelId }) =>
-          !channelId &&
-          delivery.sender.kind === "agent" &&
-          delivery.sender.agentId !== agentId &&
-          delivery.replyToMessageId === null,
-      )
+      this.#mailbox.openTeammateRequestIds(agentId, turnId).length === deliveries
     );
   }
 
