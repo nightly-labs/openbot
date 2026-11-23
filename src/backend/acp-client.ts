@@ -4253,7 +4253,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const toolKind = params.toolCall.kind ?? turn?.toolKinds.get(toolCallId);
     const toolCall = {
       ...params.toolCall,
-      locations: params.toolCall.locations ?? turn?.toolLocations.get(toolCallId),
+      locations: params.toolCall.locations ?? turn?.toolLocations.get(toolCallId) ?? null,
       rawInput: params.toolCall.rawInput ?? turn?.toolItems.get(toolCallId)?.arguments,
     };
     const kind =
