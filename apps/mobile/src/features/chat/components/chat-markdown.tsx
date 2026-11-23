@@ -49,6 +49,8 @@ import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
 import {
+  CODE_LAYOUT_STYLE,
+  CODE_TEXT_STYLE,
   type DirectionMark,
   directionMark,
   layoutDirection,
@@ -187,6 +189,8 @@ function inlineChipStyle(presentation: TextPresentation, height: number, inRow: 
 }
 
 const WORD_JOINER = "\u2060";
+const LEFT_TO_RIGHT_ISOLATE = "\u2066";
+const POP_DIRECTIONAL_ISOLATE = "\u2069";
 
 function sourceEntries<T>(values: T[], source: (value: T) => string) {
   let offset = 0;
@@ -358,19 +362,12 @@ function codePieces(text: string): string[] {
   });
 }
 
-function CodeSpan({
-  text,
-  presentation,
-  inRow = false,
-}: {
-  text: string;
-  presentation: TextPresentation;
-  inRow?: boolean;
-}) {
+function CodeSpan({ text, presentation, row }: { text: string; presentation: TextPresentation; row?: TextDirection }) {
+  const inRow = row !== undefined;
   if (isFileReference(text.trim())) return <CodeFileReference text={text} presentation={presentation} inRow={inRow} />;
   const pieces = codePieces(text);
   const chipStyle = inlineChipStyle(presentation, codeChipHeight(presentation), inRow);
-  return sourceEntries(pieces, (piece) => piece).map(({ value: piece, offset }, index) => (
+  const chips = sourceEntries(pieces, (piece) => piece).map(({ value: piece, offset }, index) => (
     <View
       key={offset}
       collapsable={false}
@@ -383,13 +380,32 @@ function CodeSpan({
         style={[
           presentation.style,
           CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"],
+          CODE_TEXT_STYLE,
           { color: presentation.codeColor, lineHeight: codeChipLineHeight(presentation) },
         ]}
       >
+        {directionMark(piece, "ltr")}
         {piece}
       </Text>
     </View>
   ));
+  if (!inRow) {
+    return (
+      <>
+        {LEFT_TO_RIGHT_ISOLATE}
+        {chips}
+        {POP_DIRECTIONAL_ISOLATE}
+      </>
+    );
+  }
+  if (row === "rtl") {
+    return (
+      <View className="min-w-0 max-w-full flex-row flex-wrap items-center gap-y-1" style={CODE_LAYOUT_STYLE}>
+        {chips}
+      </View>
+    );
+  }
+  return chips;
 }
 
 function mentionChip(presentation: TextPresentation) {
@@ -648,7 +664,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
             const [token] = run;
             if (!token) return null;
             if (tokenIs(token, "codespan")) {
-              return <CodeSpan key={offset} text={token.text} presentation={presentation} inRow />;
+              return <CodeSpan key={offset} text={token.text} presentation={presentation} row={direction} />;
             }
             if (isFileLink(token)) {
               return (
