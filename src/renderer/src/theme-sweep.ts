@@ -161,7 +161,12 @@ function createBand(className: string): Band | null {
   const ratio = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
   canvas.width = Math.max(1, Math.round(window.innerWidth * ratio));
   canvas.height = Math.max(1, Math.round(window.innerHeight * ratio));
-  const gl = canvas.getContext("webgl", { alpha: true, antialias: false, premultipliedAlpha: true });
+  const gl = canvas.getContext("webgl", {
+    alpha: true,
+    antialias: false,
+    premultipliedAlpha: true,
+    failIfMajorPerformanceCaveat: true,
+  });
   if (!gl) return null;
   const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
   const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);

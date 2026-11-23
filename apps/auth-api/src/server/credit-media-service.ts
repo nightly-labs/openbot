@@ -59,6 +59,7 @@ import {
   type MediaUpstreamError,
   type MediaUpstreams,
   type MediaUpstreamValue,
+  mediaUpstreamFields,
   ROUTER_MEDIA_UPSTREAM,
 } from "./media-upstream";
 
@@ -87,14 +88,16 @@ export interface CreditMediaServiceOptions {
 
 interface ModelRow {
   model_id: string;
-  upstream: string;
-  upstream_id: string;
+  upstream: string | null;
+  upstream_id: string | null;
   kind: string;
   name: string;
   maker: string;
   variant: string | null;
   specs: string;
-  upstream_params: string;
+  upstream_params: string | null;
+  upstream_fields: string | null;
+  route_specs: string | null;
   resolution: string;
   unit: string;
   credits: number;
@@ -103,9 +106,7 @@ interface ModelRow {
 
 interface StoredModel {
   model: CreditMediaModel;
-  upstream: string;
-  upstreamId: string;
-  upstreamParams: MediaUpstreamBody;
+  route: CreditSubmitTarget | null;
 }
 
 function parseJsonRecord(text: string): DynamicRecord | null {
@@ -115,6 +116,16 @@ function parseJsonRecord(text: string): DynamicRecord | null {
   } catch {
     return null;
   }
+}
+
+function routeOf(row: ModelRow): CreditSubmitTarget | null {
+  if (row.upstream === null || row.upstream_id === null) return null;
+  return {
+    upstream: row.upstream,
+    model: row.upstream_id,
+    params: JSON.stringify(upstreamParams(row.upstream_params ?? "{}")),
+    fields: row.upstream_fields ?? "{}",
+  };
 }
 
 function upstreamParams(text: string): MediaUpstreamBody {
@@ -127,6 +138,18 @@ function upstreamParams(text: string): MediaUpstreamBody {
   return params;
 }
 
+function withOfferedPrices(model: CreditMediaModel): CreditMediaModel | null {
+  if (model.resolutions.length === 0) return model;
+  if (model.defaultResolution !== null && !model.resolutions.includes(model.defaultResolution)) return null;
+  const prices = model.prices.filter(
+    (price) => price.resolution === null || model.resolutions.includes(price.resolution),
+  );
+  const priced = (resolution: string) =>
+    prices.some((price) => price.resolution === null || price.resolution === resolution);
+  if (!model.resolutions.every(priced)) return null;
+  return prices.length > 0 ? { ...model, prices } : model;
+}
+
 function storedModels(rows: readonly ModelRow[]): StoredModel[] {
   const grouped = new Map<string, ModelRow[]>();
   for (const row of rows) grouped.set(row.model_id, [...(grouped.get(row.model_id) ?? []), row]);
@@ -135,6 +158,7 @@ function storedModels(rows: readonly ModelRow[]): StoredModel[] {
     if (!first) return [];
     const model = parseCreditMediaModel({
       ...parseJsonRecord(first.specs),
+      ...parseJsonRecord(first.route_specs ?? "{}"),
       id: first.model_id,
       kind: first.kind,
       name: first.name,
@@ -147,16 +171,8 @@ function storedModels(rows: readonly ModelRow[]): StoredModel[] {
         silentCredits: row.silent_credits,
       })),
     });
-    return model
-      ? [
-          {
-            model,
-            upstream: first.upstream,
-            upstreamId: first.upstream_id,
-            upstreamParams: upstreamParams(first.upstream_params),
-          },
-        ]
-      : [];
+    const offered = model ? withOfferedPrices(model) : null;
+    return offered ? [{ model: offered, route: routeOf(first) }] : [];
   });
 }
 
@@ -168,6 +184,10 @@ function owns(payer: CreditMediaPayer, hold: CreditHold): boolean {
   return payer.wallet === "personal"
     ? hold.userId === payer.userId && hold.serverId === null
     : hold.serverId === payer.serverId && hold.userId === null;
+}
+
+function resumable(hold: CreditHold | null): boolean {
+  return hold !== null && (hold.status !== "held" || hold.providerJobId !== null || hold.upstream !== null);
 }
 
 function failureOf(outcome: CreditHoldOutcome | null): CreditMediaFailure {
@@ -195,6 +215,7 @@ function generationOf(
     kind: stored.model.kind,
     model: target.model,
     params: upstreamParams(target.params),
+    fields: mediaUpstreamFields(parseJsonRecord(target.fields)),
     prompt: request.prompt,
     aspect: request.aspect ?? stored.model.defaultAspect,
     resolution: request.resolution ?? stored.model.defaultResolution,
@@ -235,6 +256,10 @@ function busy(): BillingError {
 
 function invalidRequest(): BillingError {
   return new BillingError(400, "media_request_invalid", sourceText("error.billing.mediaRequestInvalid"));
+}
+
+function modelUnavailable(): BillingError {
+  return new BillingError(404, "media_model_unavailable", sourceText("error.billing.mediaModelUnavailable"));
 }
 
 function notFound(): BillingError {
@@ -318,18 +343,20 @@ export class CreditMediaService {
     );
   }
 
-  #models(modelId: string | null): Effect.Effect<StoredModel[], Failure> {
+  #models(modelId: string | null, pinnedUpstream: string | null = null): Effect.Effect<StoredModel[], Failure> {
     return billingCall(() =>
       this.#database
         .prepare(
-          `SELECT m.model_id, m.upstream, m.upstream_id, m.kind, m.name, m.maker, m.variant, m.specs, m.upstream_params,
-                  p.resolution, p.unit, p.credits, p.silent_credits
+          `SELECT m.model_id, r.upstream, r.upstream_id, m.kind, m.name, m.maker, m.variant, m.specs,
+                  r.upstream_params, r.upstream_fields, r.specs AS route_specs, p.resolution, p.unit, p.credits, p.silent_credits
              FROM credit_media_models m
              JOIN credit_media_prices p ON p.model_id = m.model_id
+             LEFT JOIN credit_media_routes r ON r.model_id = m.model_id
+              AND r.upstream = COALESCE(?3, (SELECT upstream FROM credit_media_settings WHERE id = 1), ?2)
             WHERE m.enabled = 1 AND (?1 IS NULL OR m.model_id = ?1)
             ORDER BY m.kind, m.position, m.model_id, p.resolution`,
         )
-        .bind(modelId)
+        .bind(modelId, ROUTER_MEDIA_UPSTREAM, pinnedUpstream)
         .all<ModelRow>(),
     ).pipe(Effect.map((result) => storedModels(result.results)));
   }
@@ -343,11 +370,18 @@ export class CreditMediaService {
     this: CreditMediaService,
   ): Effect.fn.Return<CreditMediaCatalog, Failure> {
     if (this.#upstreams.size === 0) return { models: [] };
-    const models = (yield* this.#models(null)).filter((stored) => this.#upstreams.has(stored.upstream));
+    const stored = yield* this.#models(null);
+    const routed = (entry: StoredModel) => entry.route !== null && this.#upstreams.has(entry.route.upstream);
+    const byKind = (entries: readonly StoredModel[]) =>
+      CREDIT_MEDIA_KINDS.flatMap((kind) => entries.filter((entry) => entry.model.kind === kind));
     return {
-      models: CREDIT_MEDIA_KINDS.flatMap((kind) =>
-        models.filter((stored) => stored.model.kind === kind).map((stored) => stored.model),
-      ),
+      models: byKind(stored.filter(routed)).map((entry) => entry.model),
+      unavailable: byKind(stored.filter((entry) => !routed(entry))).map(({ model }) => ({
+        id: model.id,
+        kind: model.kind,
+        name: model.name,
+        variant: model.variant,
+      })),
     };
   }).bind(this);
 
@@ -422,10 +456,11 @@ export class CreditMediaService {
   ): Effect.fn.Return<CreditMediaJob, Failure> {
     if (this.#upstreams.size === 0) return yield* unavailable();
     const { request } = submission;
-    const stored = (yield* this.#models(request.model))[0];
-    if (!stored)
-      return yield* new BillingError(404, "media_model_unavailable", sourceText("error.billing.mediaModelUnavailable"));
-    yield* this.#upstreamOrFail(stored.upstream);
+    const earlier = yield* this.#ownedHold(payer, request.jobId);
+    const stored = (yield* this.#models(request.model, earlier?.upstream ?? null))[0];
+    if (!stored) return yield* modelUnavailable();
+    if (stored.route) yield* this.#upstreamOrFail(stored.route.upstream);
+    else if (!resumable(earlier)) return yield* modelUnavailable();
     if (creditMediaRequestProblem(stored.model, request) || inputsProblem(stored.model, submission.inputs))
       return yield* invalidRequest();
     const credits = creditMediaCost(stored.model, request);
@@ -440,11 +475,7 @@ export class CreditMediaService {
     });
     if (hold.status === "released") return this.#releasedView(hold);
     if (hold.status === "charged" || hold.providerJobId) return yield* this.#job(payer, hold.jobId, trace);
-    const target = yield* this.#spending.claimSubmit(hold.jobId, {
-      upstream: stored.upstream,
-      model: stored.upstreamId,
-      params: JSON.stringify(stored.upstreamParams),
-    });
+    const target = yield* this.#spending.claimSubmit(hold.jobId, stored.route);
     if (!target) return yield* this.#job(payer, hold.jobId, trace);
     const upstream = this.#upstreams.get(target.upstream);
     if (!upstream) {
@@ -476,6 +507,10 @@ export class CreditMediaService {
     const started = (yield* this.#spending.start(hold.jobId, job.id, details, target.upstream)) ?? hold;
     return this.#view(started, job.status, job.pollAfterSeconds, []);
   }).bind(this);
+
+  #ownedHold(payer: CreditMediaPayer, jobId: string): Effect.Effect<CreditHold | null, Failure> {
+    return this.#spending.find(jobId).pipe(Effect.map((hold) => (hold !== null && owns(payer, hold) ? hold : null)));
+  }
 
   #artifacts(
     upstream: MediaUpstream,

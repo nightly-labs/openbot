@@ -154,6 +154,10 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
 
   canReleaseProcess = () => this.#real.canReleaseProcess();
 
+  holdsBackgroundWork(threadId: string) {
+    return this.#real.holdsBackgroundWork(threadId);
+  }
+
   releaseThread(externalThreadId: string) {
     return this.#real.releaseThread(externalThreadId);
   }
@@ -335,6 +339,12 @@ try {
   await runCauseEffect(standIn.releaseIdleThreads());
   step("the background task holds the process", () => {
     assert.deepEqual(live(), [first.pid], "The idle release must not close a thread with background work.");
+  });
+
+  await runCauseEffect(agents.refreshAllAgentRuntimes("after-background-work"));
+  step("an added MCP server waits for the background work", () => {
+    assert.deepEqual(live(), [first.pid], "An MCP addition must not close a thread with background work (#15198).");
+    assert.equal(standIn.canReleaseProcess(), false, "The client must still hold the background work.");
   });
 
   sample("ok");

@@ -765,28 +765,30 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 : [];
             const result = empty
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
-              : !generateMedia || !model
+              : !generateMedia
                 ? Result.fail({ message: sourceText("error.workflow.nodeUnsupported") })
-                : yield* (paysWithCredits(model.provider) ? creditMedia : subscriptionMedia)
-                    .withPermit(
-                      Effect.suspend(() => {
-                        if (model.provider === "openbot") paidMedia.add(step.id);
-                        return generateMedia({
-                          jobId: step.id,
-                          earlierJobIds: earlier,
-                          kind,
-                          provider: model.provider,
-                          model: model.providerModel ?? model.id,
-                          catalogId: model.id,
-                          account: mediaAccount(node.fields),
-                          specs,
-                          prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
-                          images,
-                          voice: mediaVoice(node.fields, kind, model),
-                        });
-                      }).pipe(Effect.flatMap(sized(specs))),
-                    )
-                    .pipe(Effect.result);
+                : !model
+                  ? Result.fail({ message: sourceText("error.workflow.modelUnavailable") })
+                  : yield* (paysWithCredits(model.provider) ? creditMedia : subscriptionMedia)
+                      .withPermit(
+                        Effect.suspend(() => {
+                          if (model.provider === "openbot") paidMedia.add(step.id);
+                          return generateMedia({
+                            jobId: step.id,
+                            earlierJobIds: earlier,
+                            kind,
+                            provider: model.provider,
+                            model: model.providerModel ?? model.id,
+                            catalogId: model.id,
+                            account: mediaAccount(node.fields),
+                            specs,
+                            prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
+                            images,
+                            voice: mediaVoice(node.fields, kind, model),
+                          });
+                        }).pipe(Effect.flatMap(sized(specs))),
+                      )
+                      .pipe(Effect.result);
             if (Result.isFailure(result)) settle(step, { status: "failed", error: result.failure.message });
             else settle(step, { status: "done", output: result.success });
             yield* requestSweep();

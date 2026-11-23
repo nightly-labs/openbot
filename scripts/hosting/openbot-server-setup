@@ -43,6 +43,7 @@ fi
 exec 9>"$LOCK"
 flock 9
 install_packages "$SOURCE/packages.txt"
+install_optional_packages "$SOURCE/optional-packages.txt"
 install -d -m 0755 "$INSTALL" "$INSTALL/hosted"
 recover
 prepare_release "$RELEASE"

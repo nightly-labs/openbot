@@ -410,15 +410,15 @@ export class MessagingThreads {
     args: unknown,
     openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError>,
   ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
-    const call = parseMessagingOutboundTool(tool, args);
-    if ("error" in call) return openBotToolFailure(call.error);
     if (
-      call.tool === "messaging_history" &&
+      tool === "messaging_history" &&
       (this.store.linkForThread(turn.threadId) || this.#mailbox.turnServesExternalChat(agentId, turn.turnId))
     )
       return openBotToolFailure(
         "A turn that works for an external chat cannot read a place by name. In the turn that answers the chat, call messaging_history without connection and place.",
       );
+    const call = parseMessagingOutboundTool(tool, args);
+    if ("error" in call) return openBotToolFailure(call.error);
     const enabled = this.store.connections().filter((record) => record.enabled);
     if (call.tool === "messaging_list_places" && !call.connection)
       return openBotToolResult({

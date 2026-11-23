@@ -158,6 +158,14 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   return key ? geminiRequestFailureText(key, reason) : detail;
 }
 
+function geminiUnexplainedFailureVerification(error: unknown, detail: string, message: string): string | null {
+  const unexplained =
+    error instanceof RequestError
+      ? message === detail
+      : message === sourceText("error.provider.antigravityTurnStopped");
+  return unexplained ? sourceText("error.provider.geminiVerificationRequired") : null;
+}
+
 export function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
   return env.GEMINI_HOME?.trim() || join(homedir(), ".gemini");
 }
@@ -364,6 +372,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   turnFailure: (error, detail) => geminiRequestFailure(error, detail),
   authRequiredSignsOut: true,
   failureCause: (error) => (error === "refusal" ? "usage_limit" : null),
+  unexplainedFailureVerification: geminiUnexplainedFailureVerification,
   sdkHarness: {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_FAILURE_ANSWER,

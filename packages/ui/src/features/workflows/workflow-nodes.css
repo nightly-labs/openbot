@@ -175,6 +175,27 @@
   color: var(--openbot-text-muted);
 }
 
+.wfn-result-answer,
+.wfn-result-answer-name,
+.wfn-result-answer-value {
+  display: block;
+}
+
+.wfn-result-answer + .wfn-result-answer {
+  margin-top: var(--openbot-space-1);
+}
+
+.wfn-result-answer-name {
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.wfn-result-answer-value {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .wfn-field-head {
   display: flex;
   align-items: center;

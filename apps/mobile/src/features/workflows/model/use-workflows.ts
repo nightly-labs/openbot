@@ -104,6 +104,14 @@ export function useWorkflowGitHubSupported(serverId: string) {
   return useMobileWorkspaceSelector((current) => current.canUseWorkflowGitHub(serverId));
 }
 
+export function useWorkflowMediaSupported(serverId: string) {
+  return useMobileWorkspaceSelector((current) => current.canUseWorkflowMedia(serverId));
+}
+
+export function useWorkflowAssetsSupported(serverId: string) {
+  return useMobileWorkspaceSelector((current) => current.canUseWorkflowAssets(serverId));
+}
+
 export function useWorkflowChatsSupported(serverId: string) {
   return useMobileWorkspaceSelector((current) => current.canUseWorkflowChats(serverId));
 }

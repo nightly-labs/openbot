@@ -2584,6 +2584,18 @@ export class ProviderRuntime implements ProviderPort {
     return own === null || this.#confined.get(agent.id)?.key === this.#confinedKey(provider, own);
   }
 
+  runningAgentClient(agent: AgentSummary): AgentClient | null {
+    if (!this.agentClientRunning(agent)) return null;
+    const provider = providerForAgent(agent);
+    return this.#ownProcessFor(agent)
+      ? (this.#confined.get(agent.id)?.client ?? null)
+      : (this.#clients.get(provider) ?? null);
+  }
+
+  reloadPending(provider: AgentProvider): boolean {
+    return this.#environmentReloadPending.has(provider);
+  }
+
   readonly ensureAgentClient = Effect.fn("ProviderRuntime.ensureAgentClient")(function* (
     this: ProviderRuntime,
     agent: AgentSummary,
