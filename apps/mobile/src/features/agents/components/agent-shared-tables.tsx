@@ -1,10 +1,9 @@
 import type { SharedTable } from "@openbot/contracts/ipc";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
-import Trash2 from "lucide-react-native/icons/trash";
 import { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, View } from "react-native";
+import { RowDeleteButton } from "@/features/agents/components/agent-files";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -13,11 +12,6 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/**
- * Agent info > Tables: the records that the agents of the host keep between tasks, as the desktop
- * agent settings list them. The list is the same for every agent, because the agents share one
- * database. Only an owner or admin opens it, and the host checks the role again.
- */
 export function AgentSharedTables({ agent, available }: { agent: MobileAgent; available: boolean }) {
   const { t } = useText();
   const workspace = useMobileWorkspace();
@@ -68,14 +62,11 @@ function SharedTableRow({
 }: {
   agent: MobileAgent;
   table: SharedTable;
-  /** Reads the list again after a deletion, whether it succeeded or not. */
   onChanged: () => void;
 }) {
   const { t } = useText();
   const { agents, deleteSharedTable } = useMobileWorkspace();
-  const danger = useThemeColor("danger");
   const [deleting, setDeleting] = useState(false);
-  // The owner can be an agent that was deleted, so its name is looked up and may be missing.
   const owner = table.ownerAgentId
     ? agents.find((candidate) => candidate.id === table.ownerAgentId && candidate.serverId === agent.serverId)
     : undefined;
@@ -126,16 +117,11 @@ function SharedTableRow({
       disabled={deleting}
       supportingText={`${records} · ${ownerLine}`}
       trailing={
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.agent.tables.deleteNamed", { name: table.name })}
-          accessibilityState={{ disabled: deleting }}
-          disabled={deleting}
-          hitSlop={8}
+        <RowDeleteButton
+          label={t("mobile.agent.tables.deleteNamed", { name: table.name })}
+          deleting={deleting}
           onPress={confirmDelete}
-        >
-          <Trash2 size={18} color={String(danger)} />
-        </Pressable>
+        />
       }
     >
       <Typography numberOfLines={1}>{table.name}</Typography>

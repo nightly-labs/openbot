@@ -130,7 +130,6 @@ export const messages = {
   "vault.request.addLogin": "Dodaj login",
   "vault.request.addCard": "Dodaj kartę",
   "vault.request.addContact": "Dodaj adres",
-  "vault.request.addApiKey": "Dodaj klucz API",
   "vault.request.apiKeyPrivate": "Trafi do twojego Sejfu, nie do czatu.",
   "vault.request.saved": "Zapisano w Sejfie",
   "vault.twoStep.title": "Kod weryfikacji dwuetapowej",

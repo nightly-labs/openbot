@@ -159,6 +159,7 @@ export const messages = {
   "routine.card.webhookCreated": "Rutina de webhook creada",
   "routine.card.webhookSecretNote":
     "Para obtener el secreto de firma, vuelve a generarlo. El agente no recibe el secreto.",
+  "routine.card.webhookSecretAgentNote": "Para obtener el secreto de firma, vuelve a generarlo o dáselo a {name}.",
   "routine.card.webhookUpdated": "Rutina de webhook actualizada",
   "routine.card.webhookChanged": "Cambios sin guardar",
   "routine.card.webhookSaveFailed": "No se pudieron guardar los eventos.",
@@ -322,7 +323,13 @@ export const messages = {
   "routine.webhook.senderSecretLabel": "Secreto del remitente",
   "routine.webhook.senderSecretConfirm": "Usar secreto",
   "routine.webhook.senderSecretFailed": "No se pudo guardar el secreto del remitente.",
-  "routine.webhook.statusFailed": "No se pudo comprobar si el host está conectado al servidor de retransmisión.",
+  "routine.webhook.giveSecret": "Dar el secreto de firma a {name}",
+  "routine.webhook.giveSecretTitle": "¿Dar un nuevo secreto de firma a {name}?",
+  "routine.webhook.giveSecretDescription":
+    "El secreto actual deja de funcionar de inmediato. {name} guarda el nuevo secreto como clave de API y puede añadirlo al remitente. No necesitas copiarlo.",
+  "routine.webhook.giveSecretConfirm": "Dar secreto",
+  "routine.webhook.giveSecretFailed": "No se pudo dar el secreto de firma a {name}.",
+  "routine.webhook.secretGiven": "{name} tiene el nuevo secreto de firma.",
   "routine.settings.instruction": "Instrucción",
   "routine.settings.instructionPlaceholderAgent": "Describe lo que debe hacer este agente.",
   "routine.settings.instructionPlaceholderChannel": "Describe lo que debe hacer este canal.",

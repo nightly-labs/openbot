@@ -1,19 +1,14 @@
-import type { AgentApproval } from "@openbot/contracts/ipc";
+import type { AgentApproval, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { SidebarApproval, SidebarAttention } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { attentionAgentId, type PendingAttentionPrompts } from "./agent-runtime-snapshot";
 
 export interface AgentThreadAttentionInput {
   agents: readonly Pick<AgentProfile, "id" | "threadId">[];
-  /** By `attentionKey`. */
   pendingPrompts: PendingAttentionPrompts;
   approvals: readonly AgentApproval[];
 }
 
-/**
- * The prompts and approvals of each agent's own thread, by agent. A wait in a channel or side
- * thread stays out, because the agent's chat cannot answer it.
- */
 export function agentThreadAttention(input: AgentThreadAttentionInput): {
   pendingPrompts: Record<string, SidebarAttention | undefined>;
   pendingApprovals: Record<string, SidebarApproval | undefined>;
@@ -36,4 +31,16 @@ export function agentThreadAttention(input: AgentThreadAttentionInput): {
         .map((approval) => [approval.agentId, approval]),
     ),
   };
+}
+
+export function agentTakeoverTabIds(
+  agents: readonly Pick<AgentProfile, "id" | "threadId">[],
+  takeovers: readonly Pick<BrowserTakeoverRequest, "agentId" | "threadId" | "tabId">[],
+): Record<string, string> {
+  const agentThreads = new Map(agents.map((agent) => [agent.id, agent.threadId]));
+  return Object.fromEntries(
+    takeovers
+      .filter((request) => agentThreads.get(request.agentId) === request.threadId)
+      .map((request) => [request.agentId, request.tabId]),
+  );
 }

@@ -1,8 +1,3 @@
--- A new table only. The Worker that runs before this deploy does not read it, and it ignores license
--- subscriptions because their lookup key names no server plan.
--- One row for each Stripe subscription of the commercial license. The quantity of the subscription is
--- the number of users that the account pays for. License rows never go in billing_subscriptions, so the
--- server plans, their member limits and their reports do not change.
 CREATE TABLE IF NOT EXISTS licenses (
   stripe_subscription_id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -114,7 +114,6 @@ describe("marketplace presentation migration", () => {
     const skills = new SkillMarketplace(bindings);
     expect((await runApiEffect(skills.list({ query: "Owner" }))).skills.map((item) => item.id)).toEqual(["skill-1"]);
     expect((await runApiEffect(agents.list({ query: "Owner" }))).agents.map((item) => item.id)).toEqual(["agent-1"]);
-    // A creator with no display name stays anonymous: the email is not shown and does not match a search.
     database.exec("UPDATE users SET name = NULL");
     expect((await runApiEffect(skills.list({ query: "owner@example.com" }))).skills).toEqual([]);
     expect((await runApiEffect(agents.list({ query: "owner@example.com" }))).agents).toEqual([]);

@@ -16,9 +16,18 @@ so the cost of a change is paid by code you cannot edit, for as long as the supp
 - Use capabilities for additive, optional behaviour; a missing capability disables only its own
   feature. `TEAM_PROTOCOL_CAPABILITY_LIMITS` (`src/team-protocol/capability-limits.ts`) holds the
   most capabilities that each protocol reads. Protocol 6 and older read 64, and the bootstrap list
-  goes to them too. Protocols 7 and 8 read 128, and their lists are full: a new one goes in
-  `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`. `bun run test:team-legacy-clients` fails when a list is over
-  its limit.
+  goes to them too. Protocols 7 and 8 read 128, and protocol 9 reads 256. All three lists are full.
+  `bun run test:team-legacy-clients` fails when a list is over its limit.
+- `TEAM_CAPABILITY_REGISTRY` (`src/team-protocol/current.ts`) is the one table of capabilities. Each
+  entry has a placement (`since`, `bootstrap`), and every capability list comes from it. Add a new
+  capability at the end with `V10`. Do not change the placement of a released capability, and do not
+  remove one with `since` 9 or lower: the lists of protocol 9 and older are released wire contracts.
+- Protocol 10 (`src/team-protocol/v10.ts`) does not send the protocol 9 list again. The frozen
+  protocol 9 list is the baseline (`fixtures/v10/baseline-capabilities.json`). A protocol 10 peer
+  sends `capabilities` (the names after protocol 9, and the markers) and `absent` (the baseline names
+  that it does not serve). Its full set is `(baseline - absent) + capabilities`
+  (`expandTeamCapabilitiesV10`). Check a capability with `supportsTeamCapability` on the full set, not
+  on one list. `bun run test:team-protocol-v10` checks both directions.
 - A required field, a removed field, or a semantic change needs a new protocol version. Never change
   the meaning of a protocol that a release in the support window speaks.
 - A new value in an open field is not a protocol change. From protocol 8, provider ids and auth
@@ -32,6 +41,12 @@ so the cost of a change is paid by code you cannot edit, for as long as the supp
 - A capability that every protocol in the window implies is not sent again. A new protocol version
   can make all earlier capabilities implied; when it is the minimum, delete them from the lists.
 - Malformed known payloads fail closed as `protocol_error`. Unknown optional events are ignored.
+- A workflow change that an older OpenBot cannot show or run (a new node kind, field value, limit or
+  graph rule) raises `WORKFLOW_FORMAT` and adds a rule to `WORKFLOW_FORMAT_RULES`
+  (`src/ipc-workflow-format.ts`). Put new step data in `fields`, not in a new node, edge or stroke
+  property. A client sends content of a newer format only when the host's `hostFormat` is at least
+  that format. The format needs no new capability. Add a fixture with the new data to
+  `scripts/workflow-format-e2e.ts`: it opens, saves, runs, exports and transfers each fixture.
 
 ## One channel list, two mirrors
 

@@ -7,11 +7,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireVisibleBodyAgent } from "./request-helpers";
 
-/**
- * Any member reads the hidden agents. Only an owner or an admin hides or restores one: the hide takes
- * the agent out of the list of each member. The agent keeps working. An agent that this peer cannot see
- * (`hiddenAgentIds`, a provider its protocol does not know) is not in the list and cannot be set.
- */
 export async function routeAgentHidden(
   context: TeamApiRequestContext,
   hiddenAgents: TeamApiHiddenAgents | undefined,
@@ -32,7 +27,6 @@ export async function routeAgentHidden(
   return json(200, visibleSnapshot(snapshot, hiddenAgentIds));
 }
 
-/** The snapshot without the agents that this peer cannot see. */
 export function visibleSnapshot(
   snapshot: HiddenAgentsSnapshot,
   hiddenAgentIds: ReadonlySet<string>,

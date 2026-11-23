@@ -1,4 +1,5 @@
 import type { ConversationReaction } from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
@@ -10,40 +11,35 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { type MessageChannelTargets, type MessageFiles, openMessageActions } from "../model/message-actions-sheet";
 
-/** A message that has actions: it is on the host and does not stream. */
 export interface MessageActionsInput {
   messageId: string;
-  /** The text that Copy puts on the clipboard. Empty for a message of files only. */
   copyText: string;
   createdAt?: string;
   reactions?: readonly ConversationReaction[];
-  /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => Promise<void>;
   onReply?: () => void;
-  /** Unset where the message has no branch: it is not the last answer of a finished turn. */
   onBranch?: () => void;
   onSelectText?: () => void;
-  /** The message that Read aloud reads. Unset where the message is not a reply. */
   readAloudId?: string;
-  /** The open channels that the message text can go to. Unset where the message cannot go to one. */
   sendToChannel?: MessageChannelTargets;
-  /** Deletes the message for everyone. Unset where the reader cannot delete it. */
   onDelete?: () => Promise<void>;
-  /** Marks the message and the messages after it unread for the reader. Unset where it cannot. */
   onMarkUnread?: () => void;
-  /** The message is pinned in its chat. */
   pinned?: boolean;
-  /** Pins the message, or unpins it when `pinned`. Unset where the chat cannot pin messages. */
   onTogglePin?: () => Promise<void>;
-  /** The files of the message on the host. Unset for a message without files. */
   files?: MessageFiles;
 }
 
-/**
- * The reactions of a message, and the sheet with its actions. The reader's reaction shows at once;
- * the host sends the saved list after it, and that list wins. `open` is unset for a message
- * without actions.
- */
+export function reportTeamResult(work: Promise<void>, failedTitle: MobileTextKey): Promise<void> {
+  return work.then(
+    () => void haptics.notification("success"),
+    (error: unknown) => {
+      void haptics.notification("error");
+      const title = currentText().t(failedTitle);
+      showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
+    },
+  );
+}
+
 export function useMessageActions(input: MessageActionsInput | null) {
   const { t } = useText();
   const reactions = input?.reactions;
@@ -71,7 +67,6 @@ export function useMessageActions(input: MessageActionsInput | null) {
       }
     : undefined;
   const onDelete = input?.onDelete;
-  // The sheet has closed when this runs, so the alert shows over the chat.
   const confirmDelete = onDelete
     ? () => {
         const text = currentText();
@@ -80,31 +75,13 @@ export function useMessageActions(input: MessageActionsInput | null) {
           {
             text: text.t("common.delete"),
             style: "destructive",
-            onPress: () =>
-              onDelete().then(
-                () => void haptics.notification("success"),
-                (error: unknown) => {
-                  void haptics.notification("error");
-                  const title = currentText().t("mobile.chat.message.deleteFailed");
-                  showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
-                },
-              ),
+            onPress: () => reportTeamResult(onDelete(), "mobile.chat.message.deleteFailed"),
           },
         ]);
       }
     : undefined;
   const onTogglePin = input?.onTogglePin;
-  const togglePin = onTogglePin
-    ? () =>
-        onTogglePin().then(
-          () => void haptics.notification("success"),
-          (error: unknown) => {
-            void haptics.notification("error");
-            const title = currentText().t("mobile.chat.pins.failed");
-            showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
-          },
-        )
-    : undefined;
+  const togglePin = onTogglePin ? () => reportTeamResult(onTogglePin(), "mobile.chat.pins.failed") : undefined;
   const open = input
     ? () =>
         openMessageActions({
@@ -128,22 +105,15 @@ export function useMessageActions(input: MessageActionsInput | null) {
   return { shown, react, open };
 }
 
-/**
- * The reactions of a message, in a pill on the bottom corner of its bubble toward the middle of the
- * chat, as on desktop: bottom left for the reader's own message, bottom right for an agent's. The
- * parent keeps room under the bubble for the part of the pill that hangs below it.
- */
 export function ChatMessageReactions({
   align,
   reactions,
   agentsById,
   onReact,
 }: {
-  /** The side of the chat the bubble sits on. */
   align: "start" | "end";
   reactions: readonly ConversationReaction[];
   agentsById: ReadonlyMap<string, MobileAgent>;
-  /** Unset where a reaction cannot be saved. `null` removes the reader's reaction. */
   onReact?: (emoji: string | null) => void;
 }) {
   const { t } = useText();
@@ -190,10 +160,6 @@ export function ChatMessageReactions({
   );
 }
 
-/**
- * A touch and hold on the bubble opens the message actions. A screen reader cannot find that
- * gesture, so while one runs, each message gets this button under it.
- */
 export function ChatMessageActionsButton({ align, onOpen }: { align: "start" | "end"; onOpen: () => void }) {
   const { t } = useText();
   const muted = useThemeColor("muted");

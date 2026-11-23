@@ -7,19 +7,11 @@ import {
 import { createSignal, onSettled } from "solid-js";
 import { appPort } from "./app-port";
 
-/** Sets the release logo color and its eye color in this window. */
 function applyLogoColor(color: AppLogoColor): void {
   document.documentElement.style.setProperty("--openbot-logo-production", APP_LOGO_COLOR_HEX[color]);
   document.documentElement.style.setProperty("--openbot-logo-production-eye", APP_LOGO_EYE_HEX[color]);
 }
 
-/**
- * Keeps this window on the saved logo color. Every window runs it, the Dynamic Island too, because
- * the island has no Settings of its own and main broadcasts each change to every window. Only a
- * release build applies it: some logos draw the release variant in every build, and a dev or preview
- * build keeps its own color. The preview calls the returned function when it unmounts, so the next
- * story starts from the brand tokens.
- */
 export function syncLogoColor(): () => void {
   let active = true;
   const release = appPort()
@@ -44,14 +36,12 @@ export function syncLogoColor(): () => void {
   };
 }
 
-/** The Settings control state. Set optimistically, and reverted if main refuses the write. */
 export function useLogoColorChoice() {
   const [color, setColor] = createSignal<AppLogoColor>(DEFAULT_APP_LOGO_COLOR);
   let confirmed: AppLogoColor = DEFAULT_APP_LOGO_COLOR;
   let latestRequest = 0;
   let pending = 0;
 
-  /** A saved value from main. A choice that is still in flight is newer, so it stays on screen. */
   function confirm(next: AppLogoColor): void {
     confirmed = next;
     if (pending === 0) setColor(next);

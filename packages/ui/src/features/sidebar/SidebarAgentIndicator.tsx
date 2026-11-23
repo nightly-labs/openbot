@@ -12,21 +12,14 @@ import { SidebarRowTooltip } from "./SidebarRowTooltip";
 import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_HINT, SIDEBAR_WAIT_TITLE } from "./sidebar-filtering";
 import type { SidebarAgentState, SidebarChannelWait, SidebarRoutinePhase, SidebarWaitReason } from "./sidebar-types";
 
-/** Long enough that moving the pointer down the list does not flash every waiting row's tooltip. */
 const SIDEBAR_WAIT_TOOLTIP_OPEN_DELAY = 350;
 
-/**
- * How the badge moves now. `bump` and `bump-b` take turns, so a second change during a bounce
- * starts the bounce again. `out` keeps the last badge on screen while it leaves.
- */
 type SidebarBadgePhase = "idle" | "in" | "bump" | "bump-b" | "out";
 
-/** The badges that are felt: they bounce when they change and shrink away when they close. */
 function isFeltBadge(state: SidebarAgentState | undefined): boolean {
   return state?.kind === "unread" || routinePhase(state) === "failed";
 }
 
-/** A badge enters when its kind, or the phase of a routine, changes to one of these. */
 function entersWithMotion(state: SidebarAgentState): boolean {
   return state.kind === "responded" || state.kind === "waiting" || isFeltBadge(state);
 }
@@ -35,10 +28,6 @@ function badgeKey(state: SidebarAgentState | undefined): string | undefined {
   return state?.kind === "routine" ? `routine-${state.phase}` : state?.kind;
 }
 
-/**
- * What the effect needs from a state. The state can be a store, and an effect callback does not
- * track, so the compute function reads the store and gives the callback these values.
- */
 type SidebarBadgeSnapshot = {
   state: SidebarAgentState;
   key: string | undefined;
@@ -58,10 +47,8 @@ function badgeSnapshot(state: SidebarAgentState | undefined): SidebarBadgeSnapsh
   };
 }
 
-/** The pill grows or shrinks to the width of the new count, with the digit roll. */
 const SIDEBAR_BADGE_RESIZE: KeyframeAnimationOptions = { duration: 280, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
 
-/** The steps of one badge resize. `runBadgeResizes` does each step for all badges before the next step. */
 interface BadgeResizeSteps {
   readFrom(): void;
   cancel(): void;
@@ -71,13 +58,6 @@ interface BadgeResizeSteps {
 
 let queuedResizes: BadgeResizeSteps[] = [];
 
-/**
- * A badge reads its width when its count changes, and its resize animation changes the style. When
- * many agents work, the counts change in many flushes in each frame, and a read after each flush made
- * the browser calculate the style of the page again each time. The badges therefore read and write
- * together, in steps, in the next frame: the reads use the style calculation that the frame does
- * anyway. The frame paints the new count and the start of its resize together.
- */
 function queueBadgeResize(steps: BadgeResizeSteps): void {
   queuedResizes.push(steps);
   if (queuedResizes.length === 1) requestAnimationFrame(runBadgeResizes);
@@ -92,34 +72,19 @@ function runBadgeResizes(): void {
   for (const steps of batch) steps.start();
 }
 
-/**
- * The badge on a sidebar avatar. The badge on screen follows `state` and moves with each change:
- * a badge lands, an unread count bounces and rolls its digits when it changes, and a felt badge
- * shrinks away when it closes. The badge that leaves stays until its animation ends. With reduced
- * motion, the badge changes at once.
- */
 export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | undefined }) {
   const { t } = useText();
-  /* The closed felt badge whose shrink animation has ended. */
   const [gone, setGone] = createSignal<SidebarAgentState | undefined>();
   const [phase, setPhase] = createSignal<SidebarBadgePhase>("idle");
   const [previousCount, setPreviousCount] = createSignal<number | null>(null);
-  /* A felt badge stays on screen after its state closed, until it has shrunk away. The memo keeps
-     it in the same flush, so the badge never leaves the page for a frame before it shrinks. */
   const shown = createMemo<SidebarAgentState | undefined>((previous) => {
     const state = props.state();
     if (state) return state;
     return isFeltBadge(previous) && previous !== gone() && !prefersReducedMotion() ? previous : undefined;
   });
-  /* The last badge that showed, for the reads inside the badge. When `shown` closes, Solid can run
-     the badge's effects once more before `Show` removes the badge. A read of `shown` there gave
-     undefined and threw, which stopped all updates of the window. */
   const held = createMemo<SidebarAgentState | undefined>((previous) => shown() ?? previous);
-  /* The badge that `shown` keeps while it shrinks away. */
   let leaving: SidebarBadgeSnapshot | undefined;
   let badge: HTMLSpanElement | undefined;
-  /* The width of the pill after the last change. The page already shows the new count when the
-     effect runs, so the old width comes from here. */
   let pillWidth: number | undefined;
   let resize: Animation | undefined;
   let measureRun = 0;
@@ -131,11 +96,8 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     setPreviousCount(null);
     setPhase("idle");
   };
-  /* The computed width is the layout width, which the bounce does not scale. While the pill
-     resizes, it is the width on screen, so a new change continues from there. */
   const measure = () => (badge?.isConnected ? Number.parseFloat(getComputedStyle(badge).width) : undefined);
 
-  /* What the queued resize does, as the last run of the effect before it sets. */
   let resizeQueued = false;
   let measureNext = false;
   let animateNext = false;
@@ -154,8 +116,6 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     },
     start: () => {
       resizeQueued = false;
-      /* A badge that has just appeared, or the first run, can come before the badge is in the
-         document; the next frame measures it. */
       if (measureNext && pillWidth === undefined) {
         const run = measureRun;
         requestAnimationFrame(() => {
@@ -173,7 +133,6 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     (next, previous) => {
       const leavingBadge = leaving;
       const current = previous ?? leavingBadge;
-      /* The host can send the same count again; that run must not stop the resize. */
       if (leavingBadge === undefined && current?.count !== undefined && current.count === next?.count) return;
       measureNext = next?.count !== undefined;
       animateNext = false;
@@ -199,8 +158,6 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
       }
       leaving = undefined;
       if (current?.count !== undefined && next.count !== undefined && leavingBadge === undefined) {
-        /* A count that goes to 0 is a read chat with a side thread still unread, not a new reply: the
-           digits go and the pill narrows, with no bounce. */
         if (next.count > 0) {
           setPreviousCount(current.count);
           setPhase(untrack(phase) === "bump" ? "bump-b" : "bump");
@@ -215,16 +172,11 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     },
   );
 
-  /* The animation of the badge itself has ended: the digits animate too, and their events bubble.
-     A bump or an entrance can end in the same frame that the badge starts to shrink; only the end of
-     the shrink removes the badge. */
   const animationEnded = (event: AnimationEvent) => {
     if (event.target !== event.currentTarget) return;
     if (untrack(phase) === "out" && event.animationName !== "sidebar-felt-out") return;
     stop();
   };
-  /* A class change that starts the next animation cancels the one before; only a badge with no
-     animation left, such as one in a collapsed section, settles. */
   const animationCancelled = (event: AnimationEvent) => {
     if (event.target === event.currentTarget && badge?.getAnimations().length === 0) stop();
   };
@@ -246,8 +198,6 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     <Show when={shown()}>
       {(state) => {
         const current = () => held() ?? state();
-        /* The balls of a working badge hop only on screen. With 100 working agents, about 300 balls
-           hopped, most of them in rows scrolled away, and each frame restyled all of them. */
         const [onScreen, setOnScreen] = createSignal(true);
         onSettled(() => (badge ? observeOnScreen(badge, setOnScreen) : undefined));
         return (
@@ -321,7 +271,6 @@ function waitReason(state: SidebarAgentState): SidebarWaitReason | undefined {
   return state.kind === "waiting" ? state.reason : undefined;
 }
 
-/** One icon per wait reason, shared by the badge, the action chip and the tooltip. */
 export function SidebarWaitIcon(props: { reason: SidebarWaitReason }) {
   return (
     <>
@@ -338,7 +287,6 @@ export function SidebarWaitIcon(props: { reason: SidebarWaitReason }) {
   );
 }
 
-/** The chip in the time slot of a waiting row: what the user does next. */
 export function SidebarWaitChip(props: { reason: SidebarWaitReason }) {
   const { t } = useText();
   return (
@@ -349,11 +297,6 @@ export function SidebarWaitChip(props: { reason: SidebarWaitReason }) {
   );
 }
 
-/**
- * The tooltip of a row in "Needs you": what the chat waits for, the question or the command, and what
- * selecting the row does. It stays closed while the row's context menu is open. The compact sidebar
- * shows only the avatar, so there `name` puts the chat's name first.
- */
 export function SidebarWaitTooltip(props: {
   wait: SidebarChannelWait;
   menuOpen: boolean;

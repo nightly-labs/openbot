@@ -15,7 +15,7 @@ description: "Write a dated scope document: problem, what is in, what is out, ho
 ## Inputs
 
 1. **The goal.** From the user, an issue or project (read it with `gh` or an installed plugin such as Linear or
-   Notion), meeting notes, or a pasted brief. Search the `openbot` tools with `tool_search` to find a plugin.
+   Notion), meeting notes, or a pasted brief. A plugin works through its own tools; `openbot.tool_search` does not list them.
 2. **Constraints.** Deadline, people, budget, and what is already decided.
 3. If the problem or the user it affects is not clear, ask one question with `ask_user`. Do not ask more than
    one question before the first draft. Write the rest as labeled assumptions.

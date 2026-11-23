@@ -1,7 +1,3 @@
-// The release gate for CHANGELOG.md. The public /changelog page reads the file as it is, so a
-// release that ships with an empty or malformed section ships with an empty or broken page entry.
-// No package imports: `release.yml` runs this before `bun install`.
-
 import { execFileSync } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -11,27 +7,16 @@ const PLACEHOLDER = /\b(TODO|TBD|FIXME|XXX)\b/;
 
 export const UNRELEASED = "Unreleased";
 
-/**
- * The date of a mobile release that no store has approved yet: `## [1.2.0] - In review`.
- * `/changelog` does not show it. `bun run mobile:release:published` writes the real date.
- */
 export const IN_REVIEW = "In review";
 
-/** The stores of the mobile app. Each one reviews a build on its own, so each has its own date. */
 export const MOBILE_STORES = ["ios", "android"] as const;
 export type MobileStore = (typeof MOBILE_STORES)[number];
 export const MOBILE_STORE_NAMES: Record<MobileStore, string> = { ios: "iOS", android: "Android" };
 
-/**
- * A store that will never ship the version, because a newer one replaced it before review ended:
- * `Skipped (Android)` in a heading. `/changelog` shows it as skipped, and it gets no Discord post.
- */
 export const SKIPPED = "Skipped";
 
-/** What a store did with a version: the day it made it available, or `SKIPPED`. */
 export type StoreState = string;
 
-/** The state of each store. A store that still reviews the version has no entry. */
 export type StoreDates = Partial<Record<MobileStore, StoreState>>;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -39,22 +24,11 @@ const STORE_STATE = /^(\d{4}-\d{2}-\d{2}|Skipped) \(([^)]+)\)$/;
 const isDay = (text: string) => DAY.test(text) && !Number.isNaN(Date.parse(`${text}T00:00:00Z`));
 const storeNamed = (name: string) => MOBILE_STORES.find((store) => MOBILE_STORE_NAMES[store] === name);
 
-/** The day that `store` made the version available. Undefined while it reviews it, or when it skipped it. */
 export function storeDay(dates: StoreDates, store: MobileStore): string | undefined {
   const state = dates[store];
   return state === undefined || state === SKIPPED ? undefined : state;
 }
 
-/**
- * Reads what follows `## [x.y.z] - ` in a mobile heading. Undefined when it is not one of:
- *
- *   In review                                no store has the version
- *   2026-10-14                               both stores since that day
- *   2026-10-14 (Android)                     only that store; the other one still reviews it
- *   2026-10-14 (Android), 2026-10-16 (iOS)   both stores, earlier day first
- *   2026-11-01 (iOS), Skipped (Android)      a store skipped the version; days come first
- *   Skipped (Android)                        Android skipped it; iOS still reviews it
- */
 export function parseStoreDates(text: string): StoreDates | undefined {
   if (text === IN_REVIEW) return {};
   if (isDay(text)) return { ios: text, android: text };
@@ -66,11 +40,9 @@ export function parseStoreDates(text: string): StoreDates | undefined {
     if ((state !== SKIPPED && !isDay(state)) || store === undefined || dates[store] !== undefined) return undefined;
     dates[store] = state;
   }
-  // One form for each state, so a heading that `formatStoreDates` would write differently is wrong.
   return parts.length <= 2 && formatStoreDates(dates) === text ? dates : undefined;
 }
 
-/** The heading text of `dates`. The inverse of `parseStoreDates`. */
 export function formatStoreDates(dates: StoreDates): string {
   const days = MOBILE_STORES.flatMap((store) => {
     const day = storeDay(dates, store);
@@ -86,22 +58,11 @@ export function formatStoreDates(dates: StoreDates): string {
   ].join(", ");
 }
 
-/**
- * An over-the-air (OTA) update of a store version: `1.4.8.2` is the second one of `1.4.8`. It
- * changes only the JavaScript of a build that the stores already have. Thus it is not a store
- * version: no store reviews it, it does not change `app.json`, and it gets no Discord post.
- * Undefined for a store version.
- */
 export function otaVersion(version: string): { store: string; number: number } | undefined {
   const [, store = "", number = ""] = /^(\d+\.\d+\.\d+)\.(\d+)$/.exec(version) ?? [];
   return store === "" ? undefined : { store, number: Number(number) };
 }
 
-/**
- * What is wrong with the OTA sections of the mobile changelog. Empty when each one is ready.
- * An OTA section has the heading of a store version that is available, such as
- * `## [1.4.8.1] - 2026-11-12 (Android)`, and it is directly above the section that it updates.
- */
 export function otaSectionProblems(changelog: string): string[] {
   const headings = changelog.split(/\r?\n/).flatMap((line) => {
     const [, version = ""] = /^## \[([^\]]+)\]/.exec(line) ?? [];
@@ -123,7 +84,6 @@ export function otaSectionProblems(changelog: string): string[] {
         `"${line}" is an OTA update, so it must have a date for each platform that gets it, and no "${IN_REVIEW}" or "${SKIPPED}".`,
       );
     }
-    // The first OTA update is above its store version, and each later one is above the one before it.
     const below = ota.number > 1 ? `${ota.store}.${ota.number - 1}` : ota.store;
     if (ota.number < 1 || headings[index + 1]?.version !== below) {
       problems.push(`"${line}" must be directly above the "## [${below}]" section.`);
@@ -139,11 +99,9 @@ export function otaSectionProblems(changelog: string): string[] {
 }
 
 interface ReleaseNotesOptions {
-  /** Accept the mobile heading forms of `parseStoreDates`. Only the mobile app waits for store review. */
   storeReview?: boolean;
 }
 
-/** What stops `version` from being released. Empty when its section is ready. */
 export function releaseNotesProblems(
   changelog: string,
   version: string,
@@ -160,7 +118,6 @@ export function releaseNotesProblems(
   const heading = lines[start] ?? "";
   const date = /^## \[[^\]]+\] - (\d{4}-\d{2}-\d{2})$/.exec(heading)?.[1];
   const prefix = `## [${version}] - `;
-  // The page formats the date, and an impossible one such as 2026-13-45 stops it from rendering.
   if (storeReview) {
     if (
       version !== UNRELEASED &&
@@ -212,16 +169,12 @@ export function releaseNotesProblems(
   return problems;
 }
 
-/** Where each pull request writes its own notes. The release moves them into CHANGELOG.md. */
 export const FRAGMENT_DIR = "changelog.d";
 
-/** The iPhone app has its own notes and versions. `/changelog` shows them in its Mobile tab. */
 export const MOBILE_CHANGELOG = "apps/mobile/CHANGELOG.md";
 export const MOBILE_FRAGMENT_DIR = "apps/mobile/changelog.d";
-/** `app.json` is the version that the App Store shows. The first file is where it is read. */
 export const MOBILE_VERSION_FILES = ["apps/mobile/app.json", "apps/mobile/package.json"] as const;
 
-/** The items under `## [Unreleased]`. A release moves them into its section. */
 export function unreleasedItems(changelog: string): string[] {
   const lines = changelog.split(/\r?\n/);
   const start = lines.findIndex((line) => line.startsWith(`## [${UNRELEASED}]`));
@@ -230,9 +183,7 @@ export function unreleasedItems(changelog: string): string[] {
   return lines.slice(start + 1, end === -1 ? undefined : end).filter((line) => line.startsWith("- "));
 }
 
-/** The fragments in `directory`, oldest commit first. A fragment with no commit is last. */
 export async function releaseFragments(directory: string): Promise<string[]> {
-  // Recursive, as the hook and the workflow check a fragment in a subdirectory too.
   const names = (await readdir(directory, { recursive: true })).filter(
     (name) => name.endsWith(".md") && name !== "README.md",
   );
@@ -249,7 +200,6 @@ export async function releaseFragments(directory: string): Promise<string[]> {
     .map(({ path }) => path);
 }
 
-/** What stops one fragment in `changelog.d` from being released. Empty when it is ready. */
 export function fragmentProblems(fragment: string): string[] {
   const problems = releaseNotesProblems(`## [${UNRELEASED}]\n${fragment}`, UNRELEASED);
   if (/^##? /m.test(fragment)) problems.push(`Use only "### " group headings in a fragment.`);
@@ -257,14 +207,8 @@ export function fragmentProblems(fragment: string): string[] {
   return problems;
 }
 
-/**
- * The section body that holds every item of `bodies`. The groups follow the order of
- * `RELEASE_GROUPS`, and the items in a group keep the order of `bodies`.
- */
 export function assembleSection(bodies: readonly string[]): string {
   const groups = new Map<string, string[]>();
-  // The release deletes the fragments after it writes this section, so a line that would be left
-  // out stops the release instead.
   const stray = bodies.flatMap((body) => collectGroups(body, groups));
   if (stray.length > 0) {
     throw new Error(`These release notes lines are not in a "- " item:\n${stray.join("\n")}`);
@@ -280,7 +224,6 @@ export function assembleSection(bodies: readonly string[]): string {
     .join("\n\n");
 }
 
-/** Adds the items of `body` to `groups`, with their continuation lines. Returns the other lines. */
 function collectGroups(body: string, groups: Map<string, string[]>): string[] {
   const stray: string[] = [];
   let items: string[] | undefined;

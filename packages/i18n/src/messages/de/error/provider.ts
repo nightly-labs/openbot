@@ -20,6 +20,8 @@ export const messages = {
     "{provider} meldet, dass dein Tarif aufgebraucht ist. Wähle ein anderes Modell oder wechsle zu einem höheren {provider}-Tarif.",
   "error.provider.acpMcpNotLoaded":
     "{provider} hat die OpenBot-Tools nicht geladen, daher kann dieser Agent sie nicht nutzen und seine Teammitglieder nicht erreichen. Eine Team-Richtlinie von {provider} kann lokale MCP-Server blockieren. Bitte deinen Team-Admin, sie zu erlauben, und versuche es dann erneut.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} hat diese Nachricht ohne die OpenBot-Tools ausgeführt. Der Agent konnte daher seine Teammitglieder nicht erreichen, den Browser nicht nutzen und keine Dateien anhängen. Versuche es erneut.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} konnte den MCP-Server {name} nicht starten, daher wurde die Antwort beendet. Dieser Server ist in deinen eigenen {provider}-Einstellungen, nicht in OpenBot. Entferne oder repariere ihn dort und starte dann einen neuen Chat.",
   "error.provider.endpointsReadOnly":
@@ -89,6 +91,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Die Laufzeitaktualisierung wurde nicht abgeschlossen.",
   "error.provider.downloadHttp": "Der Laufzeitdownload ist mit HTTP {status} fehlgeschlagen.",
   "error.provider.downloadNoData": "Der Laufzeitdownload hat keine Daten zurückgegeben.",
+  "error.provider.downloadStalled":
+    "Der Download wurde angehalten, weil eine Minute lang keine Daten ankamen. Prüfe die Internetverbindung und versuche es dann erneut.",
   "error.provider.downloadSize": "Der Laufzeitdownload hat eine unerwartete Größe.",
   "error.provider.downloadIntegrity": "Der Laufzeitdownload hat die Integritätsprüfung nicht bestanden.",
   "error.provider.runtimeReplacing":
@@ -143,6 +147,7 @@ export const messages = {
     "Der Anbieterschlüssel enthält ein Leerzeichen oder ein Zeichen, das in einem Schlüssel nicht vorkommen kann.",
   "error.provider.noModel": "Der gewählte Anbieter hat kein verfügbares Modell.",
   "error.provider.noModelNamed": "{provider} hat kein verfügbares Modell.",
+  "error.provider.acpModelsNotLoaded": "{provider} konnte seine Modelle nicht laden. Sende deine Nachricht erneut.",
   "error.provider.acpNoModels": "Die ACP CLI hat keine ACP-Modelle gemeldet. OpenBot wird kein Ersatzmodell erraten.",
   "error.provider.endpointRemoveBusy":
     "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du diesen Endpunkt entfernst.",
@@ -182,6 +187,8 @@ export const messages = {
     "{provider} hat nicht rechtzeitig geantwortet. Der Computer ist möglicherweise ausgelastet. Aktualisiere die Anbieter, um es erneut zu versuchen.",
   "error.provider.stoppedBeforeStart":
     "{provider} wurde beendet, bevor diese Nachricht gestartet ist. Sende die Nachricht erneut.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} hat nicht rechtzeitig einen neuen Chat geöffnet, daher ist diese Nachricht nicht gestartet. Öffne auf dem Computer, auf dem OpenBot läuft, Anbieter, wähle {provider} und klicke auf Neu starten. Versuche es dann erneut.",
   "error.provider.serviceUnreachable":
     "{provider} kann keine Verbindung zu seinem Dienst herstellen. Prüfe deine Internetverbindung. OpenBot versucht es erneut.",
   "error.provider.serviceUnreachableRefresh":
@@ -237,14 +244,22 @@ export const messages = {
     "OpenCode hat dieses kostenlose Modell abgelehnt. Manche kostenlosen Modelle sind nicht in jedem Land verfügbar. Wähle ein anderes Modell mit der Markierung „Kostenlos“ oder füge einen OpenCode-Go-Schlüssel in den OpenCode-Einstellungen ein und wähle ein OpenCode-Go-Modell.",
   "error.provider.customEndpointKeyRefused":
     "Der Endpunkt „{provider}“ hat seinen API-Schlüssel oder seine Header abgelehnt. Gib sie in Servereinstellungen → Anbieter erneut ein und versuche es dann erneut.",
+  "error.provider.customEndpointAccessRefused":
+    "Der Endpunkt „{provider}“ hat die Anfrage abgelehnt. Sein API-Schlüssel oder seine Header können falsch sein, oder sein Konto darf dieses Modell nicht nutzen. Prüfe sie in Servereinstellungen → Anbieter oder wähle ein anderes Modell. Versuche es dann erneut.",
   "error.provider.customEndpointKeyMissing":
     "Der Endpunkt „{provider}“ braucht einen API-Schlüssel. Füge den Schlüssel in Servereinstellungen → Anbieter hinzu und versuche es dann erneut.",
+  "error.provider.customEndpointEffortRefused":
+    "Der Endpunkt „{provider}“ hat den Denkaufwand dieses Modells abgelehnt. Bearbeite „{provider}“ in Servereinstellungen → Anbieter. Behalte unter Denkaufwand nur die Stufen, die dieses Modell annimmt, oder wähle Kein Nachdenken. Versuche es dann erneut.",
   "error.provider.opencodeKeyExpired":
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go hat deinen gespeicherten API-Schlüssel abgelehnt. Der Schlüssel ist vielleicht abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go hat die Anfrage abgelehnt. Ein neuer API-Schlüssel hilft hier nicht. Dein OpenCode-Go-Abo ist vielleicht nicht aktiv, oder OpenCode Go blockiert dein Netzwerk: Manche Dienste blockieren VPNs, Proxys oder bestimmte Länder. Prüfe in der OpenCode Console, ob dein Abo aktiv ist, oder schalte das VPN aus. Versuche es dann erneut. Du kannst auch ein anderes Modell wählen.",
   "error.provider.opencodeServiceFailure":
     "OpenCode konnte diesen Durchlauf nicht abschließen, da sein lokaler Dienst fehlgeschlagen ist. Versuche es erneut. Falls der Fehler weiter auftritt, verbinde OpenCode in den Einstellungen erneut.",
+  "error.provider.opencodeStillStarting":
+    "OpenCode wurde nicht rechtzeitig fertig geladen. OpenBot versucht es erneut.",
   "error.provider.opencodeRateLimited":
     "Der Modellanbieter hat die Anfrage wegen seiner Ratenbegrenzung abgelehnt. Warte einige Minuten oder wähle ein anderes Modell und versuche es erneut.\n{detail}",
   "error.provider.opencodeBilling":
@@ -253,6 +268,8 @@ export const messages = {
     "Der Modellanbieter von OpenCode hat eine ungültige Upload-Anfrage gemeldet. Wähle ein anderes Modell und fahre fort. Prüfe gespeicherte Routinen, bevor du sie erneut erstellst.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Dieses Modell kann eine Datei oder ein Bild in diesem Chat nicht lesen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht ohne die Datei erneut oder wähle ein Modell, das Dateien lesen kann. Wenn du dieses Modell zu einem eigenen Anbieter hinzugefügt hast, entferne in seinen Einstellungen bei „Akzeptiert“ die Auswahl „Bilder“.",
+  "error.provider.opencodeOutOfMemory":
+    "Dem Modellserver ist für diesen Chat der Speicher ausgegangen. Starte einen neuen Chat, oder lade das Modell mit einer kleineren Kontextlänge und trage dasselbe Fenster in OpenBot in den Einstellungen seines Anbieters ein.",
   "error.provider.opencodeContextTooSmall":
     "Dieser Chat passt nicht in das Kontextfenster des Modells. Lade das Modell in Ollama oder LM Studio mit einer größeren Kontextlänge und trage dasselbe Fenster in OpenBot in den Einstellungen seines Anbieters ein. Oder wähle ein größeres Modell.",
   "error.provider.opencodeFreeLimit":
@@ -263,8 +280,16 @@ export const messages = {
     "Dieses Modell ist für dich nicht verfügbar. Wähle ein anderes Modell für diesen Agenten.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Die Antwort des Modells wurde abgebrochen oder war ungültig. Sende deine Nachricht erneut oder wähle ein anderes Modell.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Die Antwort des Modells war dreimal länger als sein Ausgabelimit, darum wurde der Durchgang beendet. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht erneut.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Die Antwort des Modells war dreimal länger als sein Ausgabelimit, darum wurde der Durchgang beendet. Öffne in den Einstellungen Eigener Anbieter, klicke bei diesem Endpunkt auf Bearbeiten und lege für dieses Modell eine größere Max. Ausgabe fest. Oder wähle einen geringeren Aufwand oder ein anderes Modell.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode konnte das Denken dieses Modells bei diesem Aufwand nicht lesen. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht dann erneut.",
+  "error.provider.opencodeModelNotServed":
+    "Der Modellanbieter stellt dieses Modell deinem Konto gerade nicht bereit. Wähle ein anderes Modell und sende deine Nachricht dann erneut.",
+  "error.provider.opencodeSafetyBlocked":
+    "Der Modellanbieter hat diese Nachricht wegen seiner Sicherheitsregeln blockiert. Sende deine Anfrage erneut mit anderen Worten. Wenn er auch deine nächsten Nachrichten blockiert, starte einen neuen Chat oder wähle ein anderes Modell.",
   "error.provider.opencodeNetwork":
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
   "error.provider.codexStateBusy":
@@ -277,6 +302,8 @@ export const messages = {
     "Der Prozessor dieses Computers kann diesen Anbieter nicht ausführen. Verwende einen anderen Anbieter.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode konnte seine Datenbank nicht öffnen, weil eine neuere OpenCode-Version sie geändert hat. Aktualisiere OpenCode auf Version 2 oder neuer und versuche es dann erneut.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok ist nicht gestartet, weil die Einstellung allowed_models in seiner Konfiguration sein Standardmodell nicht enthält. Füge das Standardmodell zu allowed_models hinzu oder entferne allowed_models und versuche es dann erneut.",
   "error.provider.opencodeNoAnswer":
     "Das OpenCode-Modell hat den Durchlauf ohne Antwort beendet. Versuche es erneut oder wähle ein anderes Modell.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -285,6 +312,9 @@ export const messages = {
     "{provider} hat den Durchlauf ohne Antwort beendet. Sende die Nachricht erneut oder starte einen neuen Chat.",
   "error.provider.noAnswerAfterSteps":
     "{provider} hat einige Schritte ausgeführt und den Durchgang dann ohne Antwort beendet. Frag den Agenten, was er getan hat, bevor du dieselbe Anfrage noch einmal sendest.",
+  "error.provider.acpRefusedNoReason": "{provider} hat ohne Antwort aufgehört. Sende die Nachricht erneut.",
+  "error.provider.channelNoAnswer":
+    "{provider} hat den Durchlauf ohne Antwort beendet. Klicke im Kanal auf „Weiter“, um die Aufgabe erneut auszuführen, oder auf „Neu zuweisen“, um sie einem anderen Mitglied zu geben.",
   "error.provider.chatgptPageFailed": "OpenBot konnte die ChatGPT-Verbindungsseite nicht öffnen.",
   "error.provider.noneReady": "Kein Agentenanbieter ist bereit.",
   "error.provider.claudeTurnActive":
@@ -325,6 +355,8 @@ export const messages = {
     "Gemini hat diese Anfrage abgelehnt und keinen Grund genannt. Ein Element im Chatverlauf kann die Ursache sein, zum Beispiel ein Bild, das der Agent geöffnet hat. OpenBot hat eine neue Gemini-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini konnte den gespeicherten Verlauf dieses Chats nicht lesen. OpenBot hat eine neue Gemini-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
+  "error.provider.acpTurnStuck":
+    "{provider} hat seinen vorherigen Durchgang nicht beendet und diese Nachricht deshalb nicht angenommen. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
   "error.provider.antigravityLocationUnsupported":
     "Google lässt Gemini am Netzwerkstandort des Computers, auf dem dieser Agent läuft, nicht arbeiten. Nutze Gemini auf einem anderen Computer oder wähle einen anderen Anbieter für diesen Agenten.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -342,6 +374,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "Der Cursor-Agent wurde gefunden, aber seine Version kann nicht gelesen werden.",
   "error.provider.cursorVersionUnreadable": "Die Version des Cursor-Agenten konnte nicht gelesen werden.",
   "error.provider.cursorSignIn": "Melde dich mit Cursor an oder setze CURSOR_API_KEY, um Cursor zu verwenden.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor konnte sich mit deiner Anmeldung nicht mit seinem Server verbinden. Prüfe deine Internetverbindung und melde dich dann erneut bei Cursor an.",
   "error.provider.clineArchivePath": "Das Cline-Archiv hat einen unerwarteten Pfad.",
   "error.provider.clinePackageMismatch": "Das Cline-Paket stimmt nicht mit dem Laufzeitkatalog überein.",
   "error.provider.clineChecksum": "Die Prüfsumme der Cline-Laufzeit stimmt nicht überein.",
@@ -382,16 +416,24 @@ export const messages = {
     "Dieser Chat ist für Claude zu lang geworden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.claudeApiKeyNoCredit":
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
+  "error.provider.claudeAccountNoCredit":
+    "Das Guthaben deines Claude-Kontos ist zu niedrig. Manche Anfragen, zum Beispiel im Schnellmodus, nutzen Nutzungsguthaben, auch wenn dein Claude-Abo noch Nutzung übrig hat. Lade Nutzungsguthaben in deinem Claude-Konto auf, oder wähle ein anderes Modell im Modellmenü des Agenten.",
   "error.provider.claudeServiceBlocked":
     "Der Claude-Dienst hat diese Anfrage blockiert. Das ist meist ein kurzes Problem bei Claude, kein Problem mit deinem Konto. Sende die Nachricht in ein paar Minuten noch einmal.",
   "error.provider.foreignReasoning":
     "{provider} hat die früheren Überlegungen in diesem Chat nicht akzeptiert, da ein anderes Konto oder ein anderer API-Schlüssel sie erhalten hat. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.blankHistoryText":
+    "Das Modell hat diesen Chat nicht akzeptiert, da sein gespeicherter Verlauf eine leere Nachricht enthält. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.codexHistoryItemMissing":
     "Codex konnte diesen Chat nicht fortsetzen, da ein Element in seinem gespeicherten Verlauf fehlt. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.codexRequestRefused":
     "{provider} hat die Anfrage für diesen Chat abgelehnt und keinen Grund genannt. Das kann in einem langen Chat mit vielen Bildern passieren. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} hat diese Nachricht wegen seiner Sicherheitsregeln blockiert: {reason} Der Agent sieht diese Nachricht jetzt nicht mehr, daher hält sie deine nächsten Nachrichten nicht auf. Sende deine Anfrage erneut mit anderen Worten.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} hat diese Nachricht wegen seiner Sicherheitsregeln blockiert: {reason} Wenn {provider} auch deine nächsten Nachrichten blockiert, starte einen neuen Chat.",
   "error.provider.codexAudioRefused":
-    "Das Modell hat Audio in diesem Chat nicht akzeptiert. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+    "Dieses Modell kann kein Audio anhören, darum hat es den Ton in diesem Chat nicht akzeptiert. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Um fortzufahren, sende deine Anfrage erneut und bitte den Agenten, ohne den Ton zu arbeiten. Um Ton zu prüfen, wähle im Modellmenü des Agenten ein Modell, das Audio anhören kann.",
   "error.provider.imageTooSmall":
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu klein ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooLarge":
@@ -404,6 +446,8 @@ export const messages = {
     "Dieser Chat ist zu groß geworden, um ihn an das Modell zu senden. Oft sind Bilder im Chat die Ursache. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
+  "error.provider.opencodeInputRefused":
+    "Das Modell hat den Inhalt dieses Chats abgelehnt und keinen Grund genannt. Eine Datei im Chat, etwa ein PDF oder ein Bild, kann die Ursache sein. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht ohne die Datei erneut oder wähle ein anderes Modell.",
   "error.provider.opencodeCompactionFailed":
     "Das Modell konnte diesen langen Chat nicht zusammenfassen, um Platz im Kontextfenster zu schaffen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein stärkeres Modell.",
   "error.provider.museMcpStartupFault":
@@ -520,6 +564,8 @@ export const messages = {
   "error.provider.sessionSettingInvalid": "Dieser Wert ist für die Einstellung nicht verfügbar.",
   "error.provider.sessionSettingsBusy":
     "Warte, bis der aktuelle Durchlauf endet, bevor du eine Sitzungseinstellung änderst.",
+  "error.provider.sessionSettingsTimedOut":
+    "Die Sitzung des Agenten hat nicht rechtzeitig geantwortet. Versuche es erneut.",
   "error.provider.piOutdated":
     "Pi {version} ist zu alt. Installiere Pi 1.1.0 oder neuer für native RPC- und MCP-Unterstützung.",
   "error.provider.nativeMissing": "Die {provider} CLI ist nicht installiert. Lade sie in den Einstellungen herunter.",
@@ -528,6 +574,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Warte, bis der aktuelle Pi-Durchlauf endet.",
   "error.provider.acpSessionBusy":
     "{provider} beendet noch einen gestoppten Durchlauf. Versuche es gleich noch einmal.",
+  "error.provider.acpSessionStale":
+    "{provider} konnte die neueste Version dieses Chats nicht laden. Sende deine Nachricht noch einmal.",
   "error.provider.acpModelNotOffered":
     "{provider} bietet {model} gerade nicht an. Wähle ein anderes Modell für diesen Agenten und versuche es erneut.",
   "error.provider.piStopped": "Pi läuft nicht. Verbinde Pi und versuche es erneut.",
@@ -574,6 +622,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Der Muse-Durchlauf ist fehlgeschlagen.",
   "error.provider.museModelUnavailable":
     "Muse kann dieses Modell nicht verwenden. Muse ist im Land, in dem dieser Agent läuft, möglicherweise nicht verfügbar, oder dieses Konto hat keinen Zugriff auf das Modell. Wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse konnte diese Anfrage nicht abschließen. Muse nutzt deinen gespeicherten Meta-API-Schlüssel, nicht deine Anmeldung. Ersetze den Schlüssel oder entferne ihn in den Einstellungen, um deine Anmeldung zu nutzen.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse kann ohne Zugriff auf externe Werkzeuge kein Profil erstellen. Verwende einen anderen Anbieter, um das Profil zu erstellen, und wähle dann Muse für den Agenten.",
   "error.provider.museAuthUnverified":

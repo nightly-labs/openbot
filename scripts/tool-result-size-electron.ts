@@ -19,11 +19,8 @@ const fixtureRoot = argument("fixture-root");
 const reportPath = argument("report-path");
 const runId = argument("run-id");
 
-/** The marked box that the click case finds in the screenshot, in CSS pixels. */
 const BOX = { left: 300, top: 200, width: 120, height: 80 };
-/** About 50 KB of JSON: under the old 64 KB failure limit, over a model text cap. */
 const LARGE_VALUE = `Array.from({ length: 900 }, (_, id) => ({ id, name: "item " + id, text: "lorem ipsum dolor sit" }))`;
-/** About 90 KB of JSON: over the 64 KB limit. */
 const OVERSIZE_VALUE = `Array.from({ length: 1600 }, (_, id) => ({ id, name: "item " + id, text: "lorem ipsum dolor sit" }))`;
 
 const measurements: Record<string, number | boolean | string> = {};
@@ -108,7 +105,6 @@ async function main(): Promise<void> {
     measurements.cssViewport = `${viewport.width}x${viewport.height}`;
     measurements.devicePixelRatio = viewport.scale;
 
-    // Full screenshot: the size, the bytes and Claude's estimate of image tokens (width × height / 750).
     const shotUrl = image(await call("screenshot", { tabId: page.tab.id }));
     const shot = nativeImage.createFromDataURL(shotUrl);
     const shotSize = shot.getSize();
@@ -118,7 +114,6 @@ async function main(): Promise<void> {
     measurements.screenshotMatchesCssViewport =
       shotSize.width === viewport.width && shotSize.height === viewport.height;
 
-    // A point read from the image must hit the box: the image pixel is the CSS pixel of the click.
     const box = markedBox(shot);
     assert(box, "The marked box is not in the screenshot.");
     const point = { x: Math.round((box.left + box.right) / 2), y: Math.round((box.top + box.bottom) / 2) };
@@ -127,7 +122,6 @@ async function main(): Promise<void> {
     assert.equal(clicked.success, true, text(clicked));
     measurements.pointFromImageHitsBox = (await page.contents.executeJavaScript("window.boxClicks")) === 1;
 
-    // An emulated viewport: a point read from the image must still hit the box.
     const shotAndClick = async () => {
       const css = z
         .object({ width: z.number(), height: z.number() })
@@ -155,7 +149,6 @@ async function main(): Promise<void> {
     const reset = await call("set_environment", { tabId: page.tab.id, preset: "fill" });
     assert.equal(reset.success, true, text(reset));
 
-    // Element screenshot of the box.
     const read = parseBrowserToolText(text(await call("snapshot", { tabId: page.tab.id, image: "never" })));
     const boxElement = z
       .object({ elements: z.array(z.object({ ref: z.string(), name: z.string() })) })
@@ -167,12 +160,10 @@ async function main(): Promise<void> {
     measurements.elementScreenshotPixels = `${elementSize.width}x${elementSize.height}`;
     measurements.elementScreenshotBase64Bytes = elementUrl.length;
 
-    // The snapshot image, when the agent asks for it.
     const withImage = await call("snapshot", { tabId: page.tab.id, image: "always" });
     const snapshotImage = nativeImage.createFromDataURL(image(withImage)).getSize();
     measurements.snapshotImagePixels = `${snapshotImage.width}x${snapshotImage.height}`;
 
-    // Large text results.
     const evaluated = await call("evaluate", { tabId: page.tab.id, expression: LARGE_VALUE });
     measurements.evaluateValueJsonChars = JSON.stringify(await page.contents.executeJavaScript(LARGE_VALUE)).length;
     measurements.evaluateResultChars = text(evaluated).length;
@@ -183,7 +174,6 @@ async function main(): Promise<void> {
     );
     measurements.evaluateOver64KbSuccess = oversize.success;
     measurements.evaluateOver64KbResultChars = oversize.text.length;
-    // The engine gives no part of this value, so the error must say how to get it.
     measurements.evaluateOver64KbSaysHow = oversize.text.includes("JSON.stringify(value).slice(0, ");
 
     const script = await call("run_script", {
@@ -199,21 +189,17 @@ async function main(): Promise<void> {
     });
     measurements.runScriptWithSnapshotResultChars = text(scriptWithSnapshot).length;
 
-    // A value whose escaped form is much longer than its JSON: the cut must still end.
     const quoted = await call("run_script", {
       tabId: page.tab.id,
       finalSnapshot: false,
       script: `return '"'.repeat(20000);`,
     });
     measurements.runScriptQuotedResultChars = text(quoted).length;
-    // A string value is cut in its own characters, so the note counts what the script returned.
     const quotedPayload = z.object({ value: z.string(), valueCut: z.string() }).safeParse(JSON.parse(text(quoted)));
     measurements.runScriptStringNoteCountsString =
       quotedPayload.success &&
       quotedPayload.data.valueCut.includes(`first ${quotedPayload.data.value.length} of 20000 characters`);
 
-    // The agent reads a large value in slices of 16,000 characters and follows each note. The escaped
-    // form of a slice is longer than the limit, so each slice is cut again. The parts must join to the value.
     const fullJson = JSON.stringify(await page.contents.executeJavaScript(LARGE_VALUE));
     let joined = "";
     let partReads = 0;
@@ -273,7 +259,6 @@ async function main(): Promise<void> {
   }
 }
 
-/** The bounds, in image pixels, of the pure magenta pixels. */
 function markedBox(image: Electron.NativeImage) {
   const { width, height } = image.getSize();
   const bitmap = image.toBitmap();
@@ -284,7 +269,6 @@ function markedBox(image: Electron.NativeImage) {
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const offset = (y * width + x) * 4;
-      // BGRA.
       const blue = bitmap[offset] ?? 0;
       const green = bitmap[offset + 1] ?? 255;
       const red = bitmap[offset + 2] ?? 0;

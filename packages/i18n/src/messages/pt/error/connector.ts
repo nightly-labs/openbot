@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "O GitHub não reconhece o Client ID deste GitHub App.",
   "error.connector.githubUnexpected": "O GitHub enviou uma resposta inesperada: {detail}",
   "error.connector.githubUnreachable": "O OpenBot não consegue acessar o GitHub: {detail}",
+  "error.connector.githubOffline":
+    "O OpenBot não consegue acessar o GitHub. Verifique a conexão com a internet e as configurações de DNS do computador ou servidor que executa o OpenBot e tente de novo.",
   "error.connector.githubExpired": "A conexão com o GitHub expirou. Conecte o GitHub novamente.",
   "error.connector.githubFileUnreadable": "O arquivo de conexão com o GitHub não pode ser lido.",
   "error.connector.githubFileTooLarge": "O arquivo de conexão com o GitHub é muito grande.",
@@ -58,6 +60,8 @@ export const messages = {
     "Não foi possível instalar a CLI do Proton Pass. Verifique a conexão de rede e conecte novamente.",
   "error.connector.protonPassPlan":
     "Seu plano Proton não permite a CLI do Proton Pass. Mude o plano e conecte novamente.",
+  "error.connector.protonPassPlanMissing":
+    "Seu plano Proton não inclui a CLI do Proton Pass. Ela precisa de um plano do Proton que inclua o Pass Plus. Mude o plano e conecte novamente.",
   "error.connector.protonPassExpired": "O acesso ao Proton Pass terminou. Conecte novamente.",
   "error.connector.protonPassKeyInvalid": "Insira uma chave de acesso do Proton Pass que comece com pst_.",
   "error.connector.protonPassExtraPassword": "A senha adicional não está correta. Insira-a novamente.",

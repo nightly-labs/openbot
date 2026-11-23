@@ -14,7 +14,6 @@ import { useText } from "@/shared/lib/text";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 import { ChatGlassIconButton } from "./chat-glass-icon-button";
 
-// The buttons: 48 points high, 8 points under the safe area and 8 points over the video.
 const HEADER_HEIGHT = 8 + 48 + 8;
 
 interface VideoViewerProps {
@@ -26,14 +25,6 @@ interface VideoViewerProps {
   onDismissed: () => void;
 }
 
-/**
- * A video from the chat on the whole screen. It starts at once. The platform's own controls
- * play, pause, seek on the timeline, mute and open the native full screen. The buttons above it
- * close the player, share the file and save it to Photos.
- *
- * The player is dark in both appearances: the native player draws black, so a theme background
- * around it would show as bands of another colour above and below the video.
- */
 export function VideoViewer(props: VideoViewerProps) {
   return (
     <Modal
@@ -43,8 +34,6 @@ export function VideoViewer(props: VideoViewerProps) {
       navigationBarTranslucent
       onRequestClose={props.onDismissed}
     >
-      {/* The player covers the window, and the chat can be one column of it: the insets are the
-          window's, so the controls keep clear of the rail of iPhone Duo on either side. */}
       <SafeAreaProvider>
         <ScopedTheme theme="dark">
           <VideoViewerContent {...props} />
@@ -54,7 +43,6 @@ export function VideoViewer(props: VideoViewerProps) {
   );
 }
 
-/** Inside the dark theme scope, so the theme colours it reads are the dark ones. */
 function VideoViewerContent({ uri, name, busy, onShare, onSave, onDismissed }: VideoViewerProps) {
   const insets = useSafeAreaInsets();
   const text = useText();
@@ -79,7 +67,6 @@ function VideoViewerContent({ uri, name, busy, onShare, onSave, onDismissed }: V
         accessibilityActions={[{ name: "escape" }]}
         onAccessibilityEscape={close}
       >
-        {/* Close at the leading edge, where the platform puts the way out of a full-screen view. */}
         <ChatGlassIconButton
           accessibilityLabel={text.t("common.close")}
           colorScheme="dark"
@@ -101,7 +88,6 @@ function VideoViewerContent({ uri, name, busy, onShare, onSave, onDismissed }: V
             liquidGlassAvailable={liquidGlassAvailable}
             onPress={() => {
               void haptics.impact("soft");
-              // The share sheet covers the player, so the video waits for the user.
               player.pause();
               onShare();
             }}
@@ -133,11 +119,8 @@ function VideoViewerContent({ uri, name, busy, onShare, onSave, onDismissed }: V
         nativeControls
         contentFit="contain"
         fullscreenOptions={{ enable: true }}
-        // A texture draws inside the modal's window on Android; a surface view can draw under it.
         surfaceType="textureView"
         accessibilityLabel={name}
-        // The space under the video is as high as the buttons above it, so the picture is in the
-        // middle of the screen and not low on it.
         style={{ flex: 1, marginBottom: Math.max(insets.bottom, insets.top + HEADER_HEIGHT) }}
       />
     </View>

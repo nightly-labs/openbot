@@ -1,16 +1,3 @@
-// Runs an approval in the agent's own chat and one in a side thread at the same time, in this worktree's
-// running dev app, through the real UI, preload bridge, agent service and provider. It changes the data
-// of the profile, so start the app with `bun run dev` (never `--shared`), and pass an agent whose
-// provider is signed in and runs turns at the same time:
-// `bun scripts/agent-threads-parallel-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// The agent gets Workspace only access, so a write outside its workspace asks the user. The agent's own
-// chat asks first, then the side thread asks. Checks: each approval has its own thread; the agent is in
-// "Needs you"; the side thread's tab shows its approval, and Deny there leaves no file; after that the
-// agent is still in "Needs you" and its own chat still shows its approval; Deny there leaves no file and
-// takes the agent out of "Needs you". At the end it deletes the thread and the files and gives the agent
-// its access back.
-// Writes .openbot-build/agent-threads-parallel-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
@@ -61,7 +48,6 @@ const tab = (title: string) =>
     .getByRole("tablist", { name: english("conversation.threads.open") })
     .getByRole("tab", { name: new RegExp(`^${literal(title)}`) })
     .first();
-// An approval card is an article named by its title, one for each kind of approval.
 const approvalName = new RegExp(
   `^(${[
     english("prompt.approval.title.command"),
@@ -80,7 +66,6 @@ function writePrompt(): string {
   return `Create the file ${file} with the text ok. Run the shell command with escalated permissions so that I get an approval request.`;
 }
 
-/** Waits in the page for the first approval of the agent that `accept` takes. */
 function waitForApproval(label: string, accept: (approval: AgentApproval) => boolean): Promise<AgentApproval> {
   return waitFor(
     page,
@@ -142,7 +127,6 @@ try {
     .first()
     .waitFor({ timeout: UI_WAIT_MS });
 
-  // 1. The agent's own chat asks first.
   const mainThreadId = await page.evaluate(
     async ({ id, text }) => {
       await window.openbot.agent.sendMessage({ agentId: id, text, clientMessageId: crypto.randomUUID() });
@@ -158,7 +142,6 @@ try {
   report.mainApproval = { threadId: mainApproval.threadId, ownThread: mainApproval.threadId === mainThreadId };
   assert.ok(report.mainApproval.ownThread, "The first approval is not of the agent's own chat.");
 
-  // 2. Then the side thread asks.
   const task = await page.evaluate(
     (input) => window.openbot.agent.startTask({ ...input, clientMessageId: crypto.randomUUID() }),
     { agentId, text: writePrompt() },
@@ -175,11 +158,9 @@ try {
   };
   assert.ok(report.sideApproval.ownThread, "The second approval is not of the side thread.");
 
-  // 3. Both wait: the agent is in "Needs you", and the side thread's tab shows its approval.
   await waitFor(page, "the agent shows in Needs you", agentInNeedsYou, Boolean, UI_WAIT_MS);
   const current = await readTask();
   assert.ok(current);
-  // A thread that the bridge starts has no tab yet; the thread list opens one.
   await page.getByRole("button", { name: english("conversation.threads.all"), exact: true }).click();
   await page
     .getByRole("menuitem", { name: new RegExp(literal(current.title.slice(0, 40))) })
@@ -194,7 +175,6 @@ try {
   report.bothWaiting = { inNeedsYou: true, sideCardInThreadView: true };
   await page.screenshot({ path: resolve(OUT, "3-both-waiting.png") });
 
-  // 4. Deny in the side thread. The agent's own chat still waits.
   await sideCard.getByRole("button", { name: english("prompt.approval.deny"), exact: true }).click();
   await sideCard.waitFor({ state: "detached", timeout: WAIT_MS });
   await waitFor(page, "the side turn ends", readTask, (latest) => latest?.state !== "running");
@@ -217,7 +197,6 @@ try {
   assert.ok(stillInNeedsYou, "The answer in the side thread took the agent out of Needs you.");
   assert.ok(mainCardShown, "The agent's own chat lost its approval.");
 
-  // 5. Deny in the agent's own chat.
   await mainCard.getByRole("button", { name: english("prompt.approval.deny"), exact: true }).click();
   await mainCard.waitFor({ state: "detached", timeout: WAIT_MS });
   const left = await waitFor(page, "the agent leaves Needs you", agentInNeedsYou, (shown) => !shown, UI_WAIT_MS)

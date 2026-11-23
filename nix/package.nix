@@ -1,8 +1,3 @@
-# OpenBot from its GitHub release: the AppImage on Linux and the app ZIP on macOS. `sources.json`
-# names the release and its hashes; `bun scripts/nix-sources.ts` writes it after each release.
-#
-# OpenBot does not update itself from the Nix store (`isNixStoreInstall` in
-# src/main/update-service.ts). Nix replaces the whole package instead.
 {
   lib,
   stdenvNoCC,
@@ -42,15 +37,8 @@ let
     mainProgram = "openbot";
   };
 
-  # The AppImage's `AppRun` adds `--no-sandbox` when the system refuses an unprivileged user
-  # namespace, and its desktop entry passes `--no-sandbox` too. OpenBot must keep the Electron sandbox
-  # (build/linux/openbot.apparmor), so the FHS environment starts the Electron binary directly.
-  # Its libraries and the bundled cua-driver find the usual Linux paths there.
   contents = appimageTools.extract {
     inherit pname version src;
-    # The bundled Sunshine needs the Ubuntu libraries of scripts/hosting/packages.txt, and this
-    # environment was not checked against them. Without the runtime directory, OpenBot shows remote
-    # desktop as unavailable and does not try to start it.
     postExtract = ''
       rm -rf $out/resources/remote-desktop-runtime
     '';
@@ -87,7 +75,6 @@ let
 
     sourceRoot = ".";
 
-    # The app is signed and notarized. Stripping or patching it would break the signature.
     dontConfigure = true;
     dontBuild = true;
     dontFixup = true;

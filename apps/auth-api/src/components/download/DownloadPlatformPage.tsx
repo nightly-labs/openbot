@@ -18,12 +18,7 @@ export interface DownloadPlatformPageProps {
   page: DownloadPageContent;
 }
 
-// One operating system. The landing card of the system opens into a panel in its colour, with the
-// installers and the spec sheet. Under it, each topic is one row: the heading on the left and the
-// text on the right, as plain lists, so a crawler reads what a visitor reads.
 export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
-  // Tracked rather than mounted once: a card under "Other systems" stays on this route and only
-  // changes the parameter. The effect disposes the previous page's listener before it starts the new one.
   createTrackedEffect(() => {
     const path = downloadPagePath(props.page.platform);
     return landingAnalytics.start(document, window.location.hostname, path);
@@ -144,7 +139,6 @@ export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
   );
 }
 
-// The steps are a sequence, so the numbers carry meaning: they come from the list itself.
 function DownloadSteps(props: { steps: readonly DownloadStep[] }) {
   return (
     <ol class="download-steps">

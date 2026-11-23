@@ -3,17 +3,12 @@ import { useText } from "../../text";
 import type { HostedUpsellHost } from "./hosted-server-upsell-host";
 
 export interface HostedServerUpsellNoticeProps {
-  /** The active routines that stop when the computer is off. */
   count: number;
   host: HostedUpsellHost;
   onSeePlans: () => void;
   onDismiss: () => void;
 }
 
-/**
- * The glow outside the moving border. A mask applies after the filter of the same element, so the
- * blur is on this element and the masked ring is its child.
- */
 function HostedUpsellBeamGlow() {
   return (
     <span class="hosted-upsell-beam-glow" aria-hidden="true">
@@ -22,7 +17,6 @@ function HostedUpsellBeamGlow() {
   );
 }
 
-/** The offer of a hosted server at the routine list, while routines depend on a computer. */
 export function HostedServerUpsellNotice(props: HostedServerUpsellNoticeProps) {
   const { t } = useText();
   const title = () => {

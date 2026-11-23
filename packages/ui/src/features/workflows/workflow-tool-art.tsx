@@ -1,19 +1,6 @@
-/**
- * The art of the Draw, Sticky note and Shapes tools in the canvas tool bar. Each picture stands in
- * the bar: the pen stands on the bar and the bar cuts its foot, and the notes and the shapes sit in
- * the centre of the button. The viewBox of each picture puts its layers there. The picture shows the
- * current choice of its tool: the colour of the pen or the eraser, the colour of the next note, and
- * the next shape in its colour. The colours come from the palette. Light and dark faces, not shadows, give
- * the depth, and a cut in the bar colour keeps the layers apart.
- */
-
 import { createUniqueId } from "solid-js";
 import { type CanvasColor, colorVar, type NoteTone, type ShapeKind } from "./workflow-node-parts";
 
-/**
- * The fill of a front layer (light at the top left, full colour at the bottom right) and its edge,
- * which catches the light at the top left only.
- */
 function ArtGradients(props: { id: string }) {
   return (
     <defs>
@@ -29,10 +16,6 @@ function ArtGradients(props: { id: string }) {
   );
 }
 
-/**
- * A pencil with three faces in the ink colour and a sharpened wood tip with a lead in the ink
- * colour. In eraser mode the pencil turns round and shows its metal band and pink rubber.
- */
 export function DrawArt(props: { color: CanvasColor; eraser: boolean }) {
   return (
     <svg
@@ -70,7 +53,6 @@ export function DrawArt(props: { color: CanvasColor; eraser: boolean }) {
 
 const NOTE = "M14 9h24a2 2 0 0 1 2 2v18l-9 9H14a2 2 0 0 1-2-2V15a2 2 0 0 1 2-2z";
 
-/** Three notes in a stack. The front note has the colour of the next note, and a curled corner. */
 export function StickyArt(props: { tone: NoteTone }) {
   const id = createUniqueId();
   return (
@@ -96,7 +78,6 @@ export function StickyArt(props: { tone: NoteTone }) {
   );
 }
 
-/** The outline of each shape in the art, in a 22 by 22 box at the front of the picture. */
 function frontShape(shape: ShapeKind) {
   switch (shape) {
     case "rectangle":
@@ -118,7 +99,6 @@ function frontShape(shape: ShapeKind) {
   }
 }
 
-/** A square and a circle in tints of the next shape colour, behind the next shape in full colour. */
 export function ShapesArt(props: { shape: ShapeKind; color: CanvasColor }) {
   const id = createUniqueId();
   return (

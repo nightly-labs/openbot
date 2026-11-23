@@ -27,6 +27,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Het hoofdscherm vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureChannel":
     "De afbeelding verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan haar zien.",
+  "status.agent.screenCapturePermissionNext": "macOS kan je daarna vragen om schermopname toe te staan voor OpenBot.",
   "status.agent.screenCaptureDisplay":
     "Het beeldscherm {name} vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureWindow":
@@ -73,6 +74,7 @@ export const messages = {
   "status.agent.browserActing": "Gebruikt de webpagina…",
   "status.agent.browserReviewing": "Bekijkt de webpagina…",
   "status.agent.memoriesSearching": "Doorzoekt de herinneringen…",
+  "status.agent.chatsSearching": "Doorzoekt eerdere chats…",
   "status.agent.memoriesSearched": {
     one: "Herinneringen doorzocht: {count} gevonden",
     other: "Herinneringen doorzocht: {count} gevonden",
@@ -116,6 +118,7 @@ export const messages = {
     "De MCP-server {name} toevoegen: {target}. Elke agent op deze server krijgt de tools ervan. OpenBot maakt verbinding om hem te testen.",
   "status.agent.mcpServerChange":
     "De MCP-server {name} wijzigen naar {target}. Elke agent op deze server krijgt de tools ervan. OpenBot maakt verbinding om hem te testen.",
+  "status.agent.mcpServerHeaders": "Het wijzigt ook deze headers: {names}.",
   "status.agent.mcpServerEnable": "De MCP-server {name} aanzetten voor elke agent op deze server.",
   "status.agent.mcpServerDisable": "De MCP-server {name} uitzetten voor elke agent op deze server.",
   "status.agent.mcpServerRemove": "De MCP-server {name} en de inlog ervan verwijderen bij elke agent op deze server.",
@@ -150,6 +153,7 @@ export const messages = {
   "status.agent.vaultField.email": "E-mailadres",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
+  "status.agent.planStopped": "De agent is gestopt met open stappen in het plan. Stuur een bericht om verder te gaan.",
   "status.agent.compactionContinues":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.providerExitContinues": "De agent stopte voordat zijn antwoord klaar was. De agent gaat verder.",

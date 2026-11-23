@@ -1,9 +1,5 @@
 import { defineMessages } from "../../message";
 
-/**
- * Language and region names for the dictation language picker. Hermes has no
- * `Intl.DisplayNames`, so the names are in the catalog.
- */
 export const messages = defineMessages("language", {
   "language.withRegion": "{language} ({region})",
   "language.name.af": "Afrikaans",

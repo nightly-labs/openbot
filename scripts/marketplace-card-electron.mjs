@@ -1,8 +1,3 @@
-// The Electron half of the Marketplace share cards. Plain JavaScript because Electron runs this file
-// directly. It works as apps/auth-api/content-image-electron.mjs does: one hidden `about:blank`
-// window with context isolation, the bundle that marketplace-card.ts built injected into it, and one
-// PNG written per job. No file is ever loaded into the page.
-
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow } from "electron";
@@ -11,8 +6,6 @@ app.on("window-all-closed", () => app.quit());
 
 console.log("marketplace-cards: Electron started.");
 
-// No top-level await: Electron sends `ready` only after this module has loaded, so awaiting
-// `app.whenReady()` at the top level waits for itself.
 main().then(
   () => app.exit(0),
   (error) => {

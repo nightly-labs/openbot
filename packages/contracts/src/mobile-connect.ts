@@ -35,10 +35,6 @@ export interface MobileConnectTicket {
   expiresAt: number;
 }
 
-/**
- * A Mobile Connect link that does not expire. It signs in a phone each time it is used, until it is
- * replaced, revoked, or the desktop session that made it ends.
- */
 export interface MobileConnectLink {
   url: string;
   createdAt: number;
@@ -52,7 +48,6 @@ export interface MobileConnectedDevice {
   platform: MobileDevicePlatform;
   connectedAt: number;
   lastActiveAt: number;
-  /** How the phone signed in: a one-time code, or a permanent link. */
   via: "code" | "link";
 }
 
@@ -63,11 +58,6 @@ export interface AccountSession {
   current: boolean;
   connectedAt: number;
   lastActiveAt: number;
-  /**
-   * True for the session of a hosted server, with `kind` "desktop" and the server name as `name`. The
-   * owner can revoke it; the next restart of the server signs it in again. Released clients decode `kind` as a closed list, so a hosted
-   * server is not a new kind, and they drop this field. The account service sends it only when true.
-   */
   hostedServer?: boolean;
 }
 

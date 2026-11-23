@@ -7,6 +7,7 @@ import {
   libraryFolderBranch,
   libraryFolderPath,
   libraryFolderTree,
+  type StoredFileWorkflow,
 } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -14,41 +15,27 @@ import type { LibraryFoldersStore } from "../library-folders-store";
 import type { MailboxStoredFile } from "../mailbox-store";
 import { StoredStateFailure } from "../stored-state-effects";
 
-/**
- * What the agent tools use of the Library folders of this host. `delete_agent` uses `removeAgent`, as the
- * app does after it deletes an agent.
- */
 export interface AgentLibraryFolders
   extends Pick<LibraryFoldersStore, "getSnapshot" | "placeInPath" | "mutate" | "removeAgent"> {
-  /**
-   * The agent of each file of the Library, from the same host scan as the Library: a folder takes only
-   * files of its own agent. Null: the file has no agent. A file that is not in the map is unknown. A
-   * new scan runs only when one of `files` is not in the last one and was stored after it, or has no
-   * stored time.
-   */
   fileAgents(files: readonly LibraryFileStamp[]): Effect.Effect<ReadonlyMap<string, string | null>, StoredStateFailure>;
+  fileWorkflows(
+    files: readonly LibraryFileStamp[],
+  ): Effect.Effect<ReadonlyMap<string, StoredFileWorkflow>, StoredStateFailure>;
 }
 
-/** A Library file and the time it was stored (ISO 8601), or null when the time is not known. */
 export interface LibraryFileStamp {
   id: string;
   storedAt: string | null;
 }
 
-/** A folder path, such as `Autumn campaign/Images`: each level with a name of the full length. */
 const FOLDER_PATH_CHARACTERS = LIBRARY_FOLDER_LIMITS.levels * (LIBRARY_FOLDER_LIMITS.name + 1) - 1;
 
-/** The `folder` argument of `attach_files_to_response` and `list_library_folders`. */
 export const libraryFolderArgument = z.string().max(FOLDER_PATH_CHARACTERS);
 
 export const listLibraryFoldersToolSchema = z.strictObject({ folder: libraryFolderArgument.optional() });
 
 const ORGANIZE_LIBRARY_ACTIONS = ["create", "rename", "move", "delete", "place"] as const;
 
-/**
- * `organize_library`: one flat shape for each change, so the model reads one short schema. `folder`
- * is the folder that the change is about, and `to` is where the folder or the files go.
- */
 export const organizeLibraryToolSchema = z.strictObject({
   action: z.enum(ORGANIZE_LIBRARY_ACTIONS),
   folder: libraryFolderArgument.optional(),
@@ -59,14 +46,12 @@ export const organizeLibraryToolSchema = z.strictObject({
 
 type OrganizeLibraryArguments = z.infer<typeof organizeLibraryToolSchema>;
 
-/** What `organize_library` changed, by the folder paths that the agent uses. */
 export type OrganizedLibrary =
   | { folder: string; created: boolean; filesPlaced: number }
   | { folder: string; was: string }
   | { deleted: string; foldersDeleted: number; filesInNoFolder: number }
   | { to: string | null; filesPlaced: number };
 
-/** The most files that one `list_library_folders` result names. */
 const LISTED_FILES = 200;
 
 interface ListedFile {
@@ -75,24 +60,24 @@ interface ListedFile {
   path: string;
 }
 
-/** Where `attach_files_to_response` put the files, or why they are in no folder. */
 export type AttachedLibraryFolder = { path: string; created: boolean } | { placed: false; reason: string };
+
+interface WorkflowFileGroup {
+  workflow: string;
+  workflowFolder: string | null;
+  fileCount: number;
+  files: ListedFile[];
+}
 
 export interface LibraryFolderListing {
   folders: { path: string; fileCount: number; files: ListedFile[] }[];
-  /** The files of the agent that are in no folder. Only a list of all folders has them. */
   unfiled?: { fileCount: number; files: ListedFile[] };
-  /** True when `files` of a folder or of `unfiled` has fewer entries than its `fileCount`. */
+  workflowFiles?: WorkflowFileGroup[];
   truncated: boolean;
 }
 
 const pathText = (folders: readonly LibraryFolder[]) => folders.map((folder) => folder.name).join("/");
 
-/**
- * The folder names of a path, from the top level down. A model often adds a slash at an end, and a
- * refused call costs a model step, so empty names are ignored. Throws the reason for a path that
- * names no folder, has too many levels, or has a name that is too long.
- */
 function folderPathNames(path: string): string[] {
   const names = path
     .split("/")
@@ -106,13 +91,11 @@ function folderPathNames(path: string): string[] {
   return names;
 }
 
-/** The folder names of a path, or none for a path that names no folder: the top level, or no folder. */
 function optionalPathNames(path: string | undefined): string[] | null {
   if (path === undefined || path.split("/").every((name) => name.trim().length === 0)) return null;
   return folderPathNames(path);
 }
 
-/** The folder of the agent that a path names. A name matches with no regard to letter case. */
 function ownFolder(own: readonly LibraryFolder[], path: string): LibraryFolder {
   let found: LibraryFolder | undefined;
   for (const name of folderPathNames(path)) {
@@ -128,16 +111,10 @@ function ownFolder(own: readonly LibraryFolder[], path: string): LibraryFolder {
   return found;
 }
 
-/** A refusal of the store has a message for a person. An I/O error has a code, and its message can name a path. */
 function refusalReason(cause: unknown): string {
   return cause instanceof Error && !("code" in cause) ? cause.message : "OpenBot could not save the Library folders.";
 }
 
-/**
- * Puts files that the agent attached into the folder that `folder` names, and makes each folder
- * that the agent does not have. The files are attached before this runs, so it never fails: a path
- * or a limit that the store refuses gives the reason, and the files stay in no folder.
- */
 export function placeInLibraryFolder(
   store: AgentLibraryFolders | null,
   agentId: string,
@@ -156,7 +133,6 @@ export function placeInLibraryFolder(
   return store
     .placeInPath(agentId, names, fileIds, {
       agentIds: { has: (id) => id === agentId },
-      // The Library shows a file that an agent attached under that agent.
       fileAgent: (fileId) => (attached.has(fileId) ? agentId : undefined),
     })
     .pipe(
@@ -166,16 +142,11 @@ export function placeInLibraryFolder(
     );
 }
 
-/**
- * The folders of an agent with the files in each, for `list_library_folders`. `folder` limits the
- * result to one folder and the folders in it; a path that the agent does not have throws. A file is
- * in a folder by its entry in the snapshot, which the store writes only for a file of the folder's
- * agent. A file in no folder is the agent's when the Library shows it under the agent (`fileAgents`).
- */
 export function listLibraryFolders(
   snapshot: Pick<LibraryFoldersSnapshot, "folders" | "placement">,
   storedFiles: readonly MailboxStoredFile[],
   fileAgents: ReadonlyMap<string, string | null>,
+  fileWorkflows: ReadonlyMap<string, StoredFileWorkflow>,
   agentId: string,
   folder?: string,
 ): LibraryFolderListing {
@@ -188,6 +159,7 @@ export function listLibraryFolders(
   const ownIds = new Set(own.map((candidate) => candidate.id));
   const filesByFolder = new Map<string, ListedFile[]>();
   const unfiled: ListedFile[] = [];
+  const byWorkflow = new Map<string, { workflow: StoredFileWorkflow; files: ListedFile[] }>();
   const seen = new Set<string>();
   for (const stored of storedFiles) {
     const { id, name } = stored.attachment;
@@ -200,6 +172,13 @@ export function listLibraryFolders(
       if (files) files.push(file);
       else filesByFolder.set(folderId, [file]);
     } else if (folderId === undefined && fileAgents.get(id) === agentId) unfiled.push(file);
+    else if (folderId === undefined) {
+      const workflow = fileWorkflows.get(id);
+      if (!workflow) continue;
+      const group = byWorkflow.get(workflow.id);
+      if (group) group.files.push(file);
+      else byWorkflow.set(workflow.id, { workflow, files: [file] });
+    }
   }
 
   let room = LISTED_FILES;
@@ -213,19 +192,24 @@ export function listLibraryFolders(
     return { path: pathText(libraryFolderPath(own, entry.id)), fileCount: all.length, files: take(all) };
   });
   const loose = top ? undefined : { fileCount: unfiled.length, files: take(unfiled) };
+  const workflowFiles: WorkflowFileGroup[] = top
+    ? []
+    : [...byWorkflow.values()].map(({ workflow, files }) => ({
+        workflow: workflow.name,
+        workflowFolder: workflow.folder?.name ?? null,
+        fileCount: files.length,
+        files: take(files),
+      }));
   return {
     folders,
     ...(loose ? { unfiled: loose } : {}),
-    truncated: [...folders, ...(loose ? [loose] : [])].some((entry) => entry.files.length < entry.fileCount),
+    ...(workflowFiles.length > 0 ? { workflowFiles } : {}),
+    truncated: [...folders, ...(loose ? [loose] : []), ...workflowFiles].some(
+      (entry) => entry.files.length < entry.fileCount,
+    ),
   };
 }
 
-/**
- * `organize_library`: one change to the Library folders of an agent, by the paths that
- * `list_library_folders` gives. An agent changes only its own folders, and moves only the files that
- * the Library shows under it. A change moves, copies and deletes no file: a deleted folder leaves its
- * files in the Library, in no folder. A refused change fails with the reason and changes nothing.
- */
 export function organizeLibrary(
   libraryFolders: AgentLibraryFolders,
   agentId: string,
@@ -241,7 +225,6 @@ export function organizeLibrary(
     };
     const ownPath = (folders: readonly LibraryFolder[], folderId: string) =>
       pathText(libraryFolderPath(folders, folderId));
-    /** A second folder with the same name in one place makes a path name two folders. */
     const requireFreeName = (parentId: string | undefined, name: string, folderId: string) => {
       const wanted = name.trim().toLocaleLowerCase();
       const taken = own.find(
@@ -250,7 +233,6 @@ export function organizeLibrary(
       );
       if (taken) throw new Error(`You already have a Library folder "${ownPath(own, taken.id)}".`);
     };
-    /** The files, each a file that the Library shows under this agent, with the agent of each. */
     const ownFiles = Effect.fn("LibraryFolders.ownFiles")(function* () {
       const fileIds = [...new Set(required(args.files, "files"))];
       if (fileIds.length === 0) throw new Error(`${args.action} needs at least one file id in files.`);
@@ -259,13 +241,20 @@ export function organizeLibrary(
         new Error(`No Library file has the id "${fileId}". list_library_folders gives the ids of your files.`);
       const missing = fileIds.find((fileId) => !stored.has(fileId));
       if (missing !== undefined) throw unknown(missing);
-      // A generated file has no stored time, so it can also be newer than the scan.
-      const fileAgents = yield* libraryFolders.fileAgents(
-        fileIds.map((fileId) => ({ id: fileId, storedAt: stored.get(fileId)?.createdAt ?? null })),
-      );
+      const stamps = fileIds.map((fileId) => ({ id: fileId, storedAt: stored.get(fileId)?.createdAt ?? null }));
+      const fileAgents = yield* libraryFolders.fileAgents(stamps);
+      const workflowFiles = fileIds.some((fileId) => fileAgents.get(fileId) === null)
+        ? yield* libraryFolders.fileWorkflows(stamps)
+        : new Map<string, StoredFileWorkflow>();
       for (const fileId of fileIds) {
         const fileAgent = fileAgents.get(fileId);
         if (fileAgent === undefined) throw unknown(fileId);
+        if (fileAgent === null && workflowFiles.has(fileId)) {
+          const holder = snapshot.folders.find((folder) => folder.id === snapshot.placement[fileId])?.agentId;
+          if (holder !== undefined && holder !== agentId)
+            throw new Error(`The file "${fileId}" is in a Library folder of another agent.`);
+          continue;
+        }
         if (fileAgent !== agentId) throw new Error(`The file "${fileId}" is not one of your Library files.`);
       }
       const context: LibraryFolderContext = {
@@ -327,16 +316,10 @@ export function organizeLibrary(
   }).pipe(Effect.mapError(safeFailure));
 }
 
-/** The store's refusal has a message for the agent; an I/O failure gets a message with no path. */
 function safeFailure(failure: StoredStateFailure): StoredStateFailure {
   return new StoredStateFailure({ cause: new Error(refusalReason(failure.cause)) });
 }
 
-/**
- * The agent of each file that the Library shows, for `list_library_folders`. A file that an agent
- * attached a moment ago is in it too. A file with no stored time is left out of the request, so a
- * file that the scan leaves out does not start a scan on each call.
- */
 export function libraryFileAgents(
   libraryFolders: AgentLibraryFolders,
   storedFiles: readonly MailboxStoredFile[],
@@ -345,4 +328,15 @@ export function libraryFileAgents(
     file.createdAt === null ? [] : [{ id: file.attachment.id, storedAt: file.createdAt }],
   );
   return libraryFolders.fileAgents(stamped).pipe(Effect.mapError(safeFailure));
+}
+
+export function libraryFileWorkflows(
+  libraryFolders: AgentLibraryFolders,
+  storedFiles: readonly MailboxStoredFile[],
+): Effect.Effect<ReadonlyMap<string, StoredFileWorkflow>, StoredStateFailure> {
+  const generated = storedFiles.flatMap((file) =>
+    file.source === "generated" && file.agentId === null ? [{ id: file.attachment.id, storedAt: null }] : [],
+  );
+  if (generated.length === 0) return Effect.succeed(new Map());
+  return libraryFolders.fileWorkflows(generated).pipe(Effect.mapError(safeFailure));
 }

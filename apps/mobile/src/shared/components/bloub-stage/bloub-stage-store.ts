@@ -1,19 +1,8 @@
-/**
- * What the stage shows. One lilac block covers the screen, or its lower edge stops at `bottom` as a
- * header, or it fades away so a camera below it shows. The eyes always stay on the stage.
- */
 type BloubShape = { kind: "cover" } | { kind: "header"; bottom: number } | { kind: "clear" };
 
-/**
- * How the eyes behave. `think` looks around while the app works; `frame` and `found` turn the
- * eyes into the corners of a scanner frame. The rating moods go from `cry` (closed eyes with tears)
- * through `sad` and `meh` (flat eyes) to `happy` and `joy`: on a header, `joy` also makes the block
- * stretch and settle, and the eyes swing until the mood changes.
- */
 export type BloubMood = "idle" | "think" | "down" | "sad" | "happy" | "frame" | "found" | "cry" | "meh" | "joy";
 
 interface BloubCaption {
-  /** A title under the eyes. Without one, the text is a status line at the bottom of the screen. */
   title?: string;
   text: string;
 }
@@ -28,17 +17,11 @@ interface BloubBackAction {
 export interface BloubStageRequest {
   shape: BloubShape;
   mood: BloubMood;
-  /** Shows only on a cover. */
   caption?: BloubCaption;
   back?: BloubBackAction;
-  /**
-   * The app loader: the splash and the waits that cover the app. In dark mode it dims the block,
-   * so a full-screen block does not flash the user. Screens keep the bright block.
-   */
   loader?: boolean;
 }
 
-/** A higher priority wins. In one priority, the request made last wins. */
 export const BLOUB_PRIORITY = { screen: 1, loader: 2, splash: 3 } as const;
 
 interface ActiveBloubRequest {
@@ -53,15 +36,12 @@ interface Entry {
   value: ActiveBloubRequest;
 }
 
-// A screen that leaves often hands the stage to the next screen in a later commit, such as the
-// sign-in screen to the app's loader. The stage waits this long before it leaves.
 const LINGER_MS = 220;
 
 function sameShape(a: BloubShape, b: BloubShape): boolean {
   return a.kind === b.kind && (a.kind !== "header" || b.kind !== "header" || a.bottom === b.bottom);
 }
 
-/** The same request, apart from callbacks. A callback changes on every render of its screen. */
 function sameRequest(a: BloubStageRequest, b: BloubStageRequest): boolean {
   return (
     sameShape(a.shape, b.shape) &&
@@ -84,7 +64,6 @@ export interface BloubStageStore {
   active: () => ActiveBloubRequest | null;
 }
 
-/** Requests from screens. The stage shows one at a time. */
 export function createBloubStageStore(): BloubStageStore {
   const entries = new Map<string, Entry>();
   const listeners = new Set<() => void>();
@@ -121,7 +100,6 @@ export function createBloubStageStore(): BloubStageStore {
     set(id, priority, request) {
       const current = entries.get(id);
       if (current && current.priority === priority && sameRequest(current.value.request, request)) {
-        // Keep the shown object, so nothing renders again; the next press reads the new callback.
         if (current.value.request.back && request.back) current.value.request.back.onPress = request.back.onPress;
         return;
       }

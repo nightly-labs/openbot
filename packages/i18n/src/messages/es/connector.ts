@@ -64,7 +64,6 @@ export const messages = {
   "connector.github.disconnectEffectRevoke": "Después se abre GitHub, donde puedes revocar el acceso de OpenBot.",
   "connector.github.disconnectEffectKept":
     "Los chats, los archivos y la memoria de los agentes se conservan en este equipo.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Todos los agentes de {host} pueden usar tus repositorios, incidencias y solicitudes de incorporación de GitHub, además de gh y git.",
   "connector.github.connectedSummaryHost": {
@@ -364,7 +363,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Tu chat «Envíate un mensaje» y las personas que permitas pueden contactar con OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Las personas que permitas pueden contactar con OpenBot. Las demás reciben un código para dártelo.",
+    "Tu chat «Envíate un mensaje» y las personas que permitas pueden contactar con OpenBot. Las demás reciben un código para dártelo.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp quitó este equipo de los dispositivos vinculados. Vuelve a vincular el número.",
   "connector.whatsapp.helpLoggedOutHost":
@@ -477,7 +476,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Opcional. Si lo dejas vacío, la lista muestra el número de teléfono.",
   "connector.whatsapp.add": "Añadir",
   "connector.whatsapp.groupTitle": "Añadir un grupo",
-  "connector.whatsapp.groupDescription": "Las personas de este grupo pueden asignar trabajo a tus agentes.",
+  "connector.whatsapp.groupDescription":
+    "Las personas de este grupo pueden asignar trabajo a tus agentes cuando mencionan el número o responden a sus mensajes.",
   "connector.whatsapp.groupSearch": "Buscar grupos",
   "connector.whatsapp.groupsLoading": "Leyendo los grupos…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot no pudo leer los grupos",
@@ -638,9 +638,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Los agentes no pueden iniciar sesión con tus credenciales compartidas hasta que vuelvas a iniciar sesión.",
   "connector.protonPass.reconnect": "Reconectar",
-  "connector.protonPass.planTitle": "Proton Pass necesita un plan de pago",
+  "connector.protonPass.planTitle": "Proton Pass necesita un plan con Pass Plus",
   "connector.protonPass.planDescription":
-    "La CLI de Proton Pass solo funciona con un plan de pago de Proton. Cambia tu plan y vuelve a conectar.",
+    "La CLI de Proton Pass necesita un plan de Proton que incluya Pass Plus. Otros planes de pago, como Mail Plus, no la incluyen. Cambia tu plan y vuelve a conectar.",
   "connector.protonPass.vaultTitle": "Bóveda compartida",
   "connector.protonPass.vaultDescription":
     "Los agentes pueden iniciar sesión con las credenciales de esta bóveda. Mueve una credencial a ella para compartirla.",

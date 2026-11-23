@@ -5,10 +5,6 @@ import { createSignal } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 
-/**
- * Asks before the messages of the agent's own chat go. The agent settings open it. A failure stays in
- * the dialog; a delete closes it.
- */
 export function AgentDeleteHistoryDialog(props: {
   agent: Pick<AgentProfile, "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
   open: boolean;

@@ -1,13 +1,3 @@
-// Checks issue #3141: a Codex app-server that stays alive but stops answering is replaced, and the
-// agents' next turns run on the new process. Runs the real Codex client and the real agent service
-// on a temporary profile with a fake Codex app-server.
-// 1. Control: a process that does not answer `model/list`, as on a slow network, but answers the
-//    `config/read` probe, keeps running.
-// 2. A process that answers nothing is ended, with the error that says why.
-// 3. With an MCP server configured, a delivery that meets a hung process does not fail, and it does not
-//    get the `config.toml` guidance. Nothing ran, so it waits, and it runs on the new process that the
-//    runtime starts (#11843). The next turn runs on that process too.
-// `bun run test:codex-hung-app-server`. Writes .openbot-build/codex-hung-app-server-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -26,7 +16,6 @@ const modesPath = join(root, "modes.json");
 const fakeCodex = join(root, "codex");
 const REQUEST_TIMEOUT_MS = 1_000;
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -42,9 +31,6 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { decodeRecordResponse } = await import("../src/backend/protocol");
 
-// A Codex app-server whose behaviour the check sets for each process id in the modes file:
-// `slow` leaves `model/list` unanswered, and `hung` leaves every request unanswered. The process
-// stays alive in both, as the hung codex.exe of the issue did.
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -147,6 +133,7 @@ const setMode = (pid: number, mode: string) => {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -165,7 +152,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-// One server, so the thread start registers it in the Codex file as the issue's agents did.
 const MCP_SERVER: McpServerConfig = {
   id: "e2e-mcp",
   name: "e2e",
@@ -200,7 +186,6 @@ function alive(pid: number): boolean {
   }
 }
 
-/** Waits for a state of the service or of the fake Codex. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -229,7 +214,6 @@ const agents = new AgentService({
 const client = new CodexAppServerClient(fakeCodex, REQUEST_TIMEOUT_MS);
 
 try {
-  // 1. Control: a slow `model/list` alone does not end a process that answers the probe.
   let exitMessage: string | null = null;
   client.on("exit", (error) => {
     exitMessage = error.message;
@@ -251,14 +235,12 @@ try {
     answeredAfter: Result.isSuccess(after),
   };
 
-  // 2. A process that answers nothing, the probe included, is ended.
   setMode(clientPid, "hung");
   await Effect.runPromise(Effect.result(client.request("account/read", {}, decodeRecordResponse)));
   await waitFor("the hung process to be ended", () => exitMessage !== null);
   await waitFor("the hung process to exit", () => !alive(clientPid), 5_000).catch(() => false);
   report.hungProcess = { exitMessage, alive: alive(clientPid) };
 
-  // 3. The service: one turn, then the shared process hangs between turns.
   await runCauseEffect(agents.initialize());
   const agent = await runCauseEffect(
     agents.createAgent({
@@ -281,7 +263,6 @@ try {
   const restarted = await waitFor("Codex to start again", () =>
     protocol().find((line) => line.start && line.pid !== hungPid && line.pid !== clientPid),
   );
-  // The retry waits for the new process, and at most the first session retry wait.
   await waitFor("the second message to settle", idle, 40_000);
   await waitFor("the provider to be ready again", () => agents.getStatus().phase === "ready");
   const failed = agents

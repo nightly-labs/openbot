@@ -78,6 +78,9 @@ export const messages = {
   "mobile.channel.form.deselectAll": "Alles deselecteren",
   "mobile.channel.form.memories": "Herinneringen",
   "mobile.channel.form.routines": "Routines",
+  "mobile.channel.folders.description":
+    "Alle leden van {channel} kunnen in deze mappen bestanden wijzigen en opdrachten uitvoeren.",
+  "mobile.channel.folders.removeBody": "Leden van {channel} kunnen geen bestanden in {folder} meer wijzigen",
   "mobile.channel.form.deleteTitle": "Kanaal verwijderen?",
   "mobile.channel.form.deleteBody":
     "Hiermee stopt het kanaal. De geschiedenis blijft alleen ter inzage in Verwijderde kanalen. Je kunt het daar herstellen. Agents die lid zijn, blijven behouden.",

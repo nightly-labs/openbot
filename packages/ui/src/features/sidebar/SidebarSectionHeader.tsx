@@ -1,14 +1,3 @@
-/**
- * A section's header row: the collapse toggle, which doubles as the drag handle, and the section
- * context menu. The menu is inline rather than a component of its own because this is its only
- * caller - both regions that show a section header reach it through here.
- *
- * A folder in a folder names its parent before its own name, in muted text, because folders do not
- * indent. A folder header ends with a folder icon, and the unassigned section with a chevron. While
- * a folder or the unassigned section is closed, its header shows how many chats it hides and how
- * many messages in them are unread, so a chat that arrives in it does not go unseen (#7982).
- */
-
 import { SIDEBAR_FOLDER_LEVELS } from "@openbot/contracts/ipc";
 import {
   ArrowDown,
@@ -72,12 +61,10 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
   const parentName = () => customSectionById().get(parentId() ?? "")?.name;
   const unread = () => (collapsed() ? sectionUnreadCount(headerProps.sectionId) : 0);
   const hidden = createMemo(() => (collapsed() ? sectionChatCount(headerProps.sectionId) : 0));
-  /** An open folder that holds nothing shows a closed folder icon. */
   const empty = () =>
     (filteredChatsBySection().get(headerProps.sectionId)?.length ?? 0) === 0 &&
     sectionChildren(headerProps.sectionId).length === 0;
   const canHoldFolder = () => depth() + 1 < SIDEBAR_FOLDER_LEVELS;
-  /** The folders this folder can move into, in list order, without the one it is in now. */
   const destinations = () =>
     visibleSectionIds().filter(
       (sectionId) =>
