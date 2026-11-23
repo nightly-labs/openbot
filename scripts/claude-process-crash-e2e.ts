@@ -1,15 +1,3 @@
-// Checks that a Claude turn whose CLI process crashes continues once in the agent's chat (#12175).
-// Claude Code 2.1.327 on Windows stopped with a Bun "Segmentation fault" and exit code 3 in the
-// middle of a turn. The turn failed at once with the raw CLI text, and the agent did not continue.
-// Runs the real agent service on a temporary profile. Claude is the real `ClaudeAgentClient`, which
-// the Claude Agent SDK connects to a stand-in `claude` executable. Checks:
-//   1. A crash after the first part of the answer: the turn continues once with the provider-exit
-//      note, the chat shows the continuation line, and the message completes with no error.
-//   2. A crash in the continuation too: the message fails with the plain text, not the CLI's stderr,
-//      after one continuation only.
-//   3. A crash of a new process before it sends anything, which also stops the shared Claude client:
-//      the same as check 1.
-// `bun run test:claude-process-crash`. Writes .openbot-build/claude-process-crash-e2e/report.json.
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -50,8 +38,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The stand-in for the Claude CLI. A message that names a crash makes it exit with code 3 and Bun's
-// panic on stderr, as Claude Code 2.1.327 did. The provider-exit note gets the complete answer.
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { join } = require("node:path");
@@ -96,7 +82,6 @@ const finish = (message, text) => {
 };
 const crash = () => {
   process.stderr.write(${JSON.stringify(`${PANIC}\n`)});
-  // After stdout reaches the SDK, so the first part of the answer shows before the exit.
   process.stdout.write("", () => setTimeout(() => process.exit(3), 100));
 };
 const turn = (message) => {
@@ -152,10 +137,6 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. Sessions, turns, history and events go to the real client.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -227,12 +208,7 @@ interface CaseResult {
   notes: number;
   continuationLine: boolean;
   completeAnswer: boolean;
-  /** The errors of the agent: its chat shows them. */
   shownErrors: string[];
-  /**
-   * The errors of the provider row, which no chat shows. A process that sent nothing stops the shared
-   * Claude client, as a CLI that cannot start does, and its exit shows there as for any provider.
-   */
   providerErrors: string[];
 }
 
@@ -248,6 +224,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -375,8 +352,6 @@ try {
     report.failures.push(`crash twice: ${report.crashTwice.notes} continuation notes, not 1.`);
   if (report.crashTwice.shownErrors.length === 0) report.failures.push("crash twice: no error shown.");
   if (leaked(report.crashTwice)) report.failures.push("crash twice: the shown error has the CLI's crash text.");
-  // The crash in the continuation ended the process, so this message starts a new one, which crashes
-  // before it sends anything. That also stops the shared Claude client, which starts again.
   report.crashAtStart = await runCase("crash-at-start");
   check("crash at start", report.crashAtStart);
   report.passed = report.failures.length === 0;

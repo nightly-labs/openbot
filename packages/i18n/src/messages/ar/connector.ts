@@ -408,7 +408,8 @@ export const messages = {
   "connector.whatsapp.numbersTitle": "الأرقام",
   "connector.whatsapp.linkNumber": "ربط رقم",
   "connector.whatsapp.ownNumberNote": "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot.",
-  "connector.whatsapp.dedicatedNote": "يصل الأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
+  "connector.whatsapp.dedicatedNote":
+    "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
   "connector.whatsapp.helpLoggedOut": "أزال WhatsApp هذا الحاسوب من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpLoggedOutHost": "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpError":

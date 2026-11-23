@@ -17,11 +17,11 @@ import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 
-/** Why a saved login that fits the site was not filled, as the user reads it. */
 const VAULT_SKIP_TEXT = {
   "agent-script": "mobile.chat.browserSecret.vaultSkip.agentScript",
   "field-kind": "mobile.chat.browserSecret.vaultSkip.fieldKind",
@@ -30,10 +30,6 @@ const VAULT_SKIP_TEXT = {
   "vault-unreadable": "mobile.chat.browserSecret.vaultSkip.vaultUnreadable",
 } as const satisfies Record<BrowserVaultSkipReason, MobileTextKey>;
 
-/**
- * The surface of a browser request above the composer: one opaque gray, as the chat scrolls under
- * it, and the neutral action color for the one main action. Cancel is the close button.
- */
 function BrowserRequestCard({
   icon,
   title,
@@ -93,7 +89,6 @@ function BrowserRequestCard({
   );
 }
 
-/** A browser step that the user completes in the browser: Open browser, I'm done, or Cancel. */
 export function BrowserTakeoverCard({
   request,
   respondToTakeover,
@@ -101,7 +96,6 @@ export function BrowserTakeoverCard({
 }: {
   request: BrowserTakeoverRequest;
   respondToTakeover: (decision: "complete" | "cancel") => Promise<void>;
-  /** Shows the tab live on the phone. Absent when the host cannot stream it. */
   openBrowser?: () => void;
 }) {
   const { t } = useText();
@@ -123,8 +117,8 @@ export function BrowserTakeoverCard({
     }
   };
   const reload = request.secret?.requiresReload ? ` ${t("mobile.chat.browserSecret.takeoverReload")}` : "";
-  // The site refused the server's address. Only the desktop app sends a sign-in from the user's own device (#9783).
   const signInBlocked = request.reason === "sign-in-blocked";
+  const openServerPage = signInBlocked ? undefined : openBrowser;
   return (
     <BrowserRequestCard
       icon={<Globe color={String(muted)} size={14} strokeWidth={2.2} />}
@@ -140,14 +134,14 @@ export function BrowserTakeoverCard({
       onCancel={() => void finish("cancel")}
     >
       <View className="flex-row gap-2">
-        {openBrowser ? (
+        {openServerPage ? (
           <Button
             size="sm"
             className="flex-1 bg-action"
             isDisabled={pending}
             onPress={() => {
               void haptics.impact("soft");
-              openBrowser();
+              openServerPage();
             }}
           >
             <Button.Label className="text-action-foreground">{t("mobile.browser.open")}</Button.Label>
@@ -155,12 +149,12 @@ export function BrowserTakeoverCard({
         ) : null}
         <Button
           size="sm"
-          variant={openBrowser ? "ghost" : "primary"}
-          className={openBrowser ? "flex-1" : "flex-1 bg-action"}
+          variant={openServerPage ? "ghost" : "primary"}
+          className={openServerPage ? "flex-1" : "flex-1 bg-action"}
           isDisabled={pending}
           onPress={() => void finish("complete")}
         >
-          <Button.Label className={openBrowser ? undefined : "text-action-foreground"}>
+          <Button.Label className={openServerPage ? undefined : "text-action-foreground"}>
             {t("mobile.chat.browserSecret.done")}
           </Button.Label>
         </Button>
@@ -174,20 +168,13 @@ export function BrowserTakeoverCard({
   );
 }
 
-/** The request asks the user to type a secret on the phone, not to complete a step in the browser. */
 export function asksForSecret(request: BrowserTakeoverRequest) {
   return Boolean(request.secret && !request.secret.requiresReload);
 }
 
-// The composer's bar: its inset, its height and its corner, so the secure field takes its place.
 const BAR_INSET = 16;
 const BAR_HEIGHT = 48;
 
-/**
- * Takes the place of the composer while an agent asks for a password or a code, so the screen has
- * one field. The value stays in this component: it does not go to the draft, the queue or the chat,
- * and it is cleared when sent. The composer comes back when the request is answered or cancelled.
- */
 export function BrowserSecretComposer({
   request,
   respond,
@@ -205,7 +192,7 @@ export function BrowserSecretComposer({
   const { t } = useText();
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<MobileTextKey | null>(null);
   const password = request.secret?.method === "password";
   const digits = request.secret?.digits ?? 6;
   const title = password
@@ -222,7 +209,7 @@ export function BrowserSecretComposer({
   const send = async (decision: "submit" | "cancel" | "takeover") => {
     if (pending) return;
     setPending(true);
-    setError(false);
+    setError(null);
     const identity = { agentId: request.agentId, requestId: request.requestId };
     const input: RespondToBrowserSecretInput =
       decision === "submit" ? { ...identity, decision, secret: value } : { ...identity, decision };
@@ -230,9 +217,13 @@ export function BrowserSecretComposer({
     try {
       await respond(input);
       void haptics.notification("success");
-    } catch {
+    } catch (cause) {
       void haptics.notification("error");
-      setError(true);
+      setError(
+        cause instanceof InactiveRequestError
+          ? "mobile.chat.browserSecret.ended"
+          : "mobile.chat.browserSecret.submitFailed",
+      );
     } finally {
       if (input.decision === "submit") input.secret = "";
       setPending(false);
@@ -263,7 +254,7 @@ export function BrowserSecretComposer({
         </Button>
         {error ? (
           <Typography.Paragraph type="body-xs" className="text-danger-text" accessibilityRole="alert">
-            {t("mobile.chat.browserSecret.submitFailed")}
+            {t(error)}
           </Typography.Paragraph>
         ) : null}
       </BrowserRequestCard>
@@ -299,11 +290,6 @@ interface SecureComposerColors {
   actionForeground: ViewStyle["backgroundColor"];
 }
 
-/**
- * The masked field in the place of the composer, with the composer's inset, height and send button,
- * so the screen has one field. Its value is the caller's: it never goes to the draft, the queue or
- * the chat.
- */
 function SecureComposerBar({
   label,
   placeholder,
@@ -324,7 +310,6 @@ function SecureComposerBar({
   actionForeground,
 }: SecureComposerColors & {
   label: string;
-  /** The text of the empty field, when it is not the label. */
   placeholder?: string | undefined;
   value: string;
   onChangeText: (text: string) => void;
@@ -361,7 +346,6 @@ function SecureComposerBar({
         }}
       >
         <TextInput
-          // The composer's ID: the chat's keyboard gesture follows the one field that is shown.
           nativeID="chat-composer-input"
           accessibilityLabel={label}
           placeholder={placeholder ?? label}
@@ -403,11 +387,6 @@ function SecureComposerBar({
   );
 }
 
-/**
- * Takes the place of the composer while the open question of a form asks for a private answer, such
- * as an API key, a password or a card number. The question card above keeps the title, Skip and
- * Cancel; this is its one field. The value is cleared when it is sent.
- */
 export function QuestionSecretComposer({
   controller,
   ...colors

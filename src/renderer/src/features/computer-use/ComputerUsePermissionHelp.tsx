@@ -5,15 +5,6 @@ import { useText } from "@openbot/ui/text";
 import { createSignal, onCleanup, onSettled, Show } from "solid-js";
 import { computerUsePort } from "./computer-use-port";
 
-/**
- * What the user has to do in the pane that just opened, and whether it worked.
- *
- * The list in System Settings has no way to browse for an application, so the way in is the one
- * macOS gives everybody: drag the bundle onto the list. The window carries that bundle as a card,
- * and it carries the name of the bundle the system holds responsible - in a development build that
- * is Electron, and a card that said "OpenBot" would send the user looking for a row that never
- * appears.
- */
 const PERMISSION_HELP: Record<MacPermissionId, { title: AppTextKey; pane: AppTextKey; icon: typeof Monitor }> = {
   "screen-recording": {
     title: "computerUse.permission.screenRecording.title",
@@ -27,18 +18,11 @@ const PERMISSION_HELP: Record<MacPermissionId, { title: AppTextKey; pane: AppTex
   },
 };
 
-/** The names of the applications this window can point at. They are product names. */
 const SUNSHINE_APP_NAME = "Sunshine";
 const OPENBOT_APP_NAME = "OpenBot";
 
-/** How often the driver is asked again while the user is in System Settings. */
 const POLL_INTERVAL_MS = 1_000;
 
-/**
- * Which permission the window was opened for. The window carries it in its own address, and a
- * value the window does not know falls back to screen recording: the first grant Computer Use
- * needs, and the pane the panel sends the user to when it has no better answer.
- */
 export function permissionFromQuery(search: string): MacPermissionId {
   return new URLSearchParams(search).get("permission") === "accessibility" ? "accessibility" : "screen-recording";
 }
@@ -59,8 +43,6 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
     void computerUsePort().computerUse.closePermissionHelp();
   }
 
-  // Computer Use can poll its driver. Sunshine checks start the runtime when it is idle,
-  // so refresh those only on open and when the user returns from System Settings.
   async function read(): Promise<void> {
     if (reading || disposed) return;
     reading = true;
@@ -74,8 +56,6 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
         if (!disposed) setGranted(state.permissions.some((entry) => entry.id === permission && entry.granted));
       }
     } catch {
-      // Left as it was. A read that failed says nothing about the grant, and an error in this window
-      // would only take the steps off the screen the user is working on.
       if (!disposed && props.sunshine) setGranted(false);
     } finally {
       reading = false;
@@ -86,10 +66,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
     try {
       const next = await computerUsePort().computerUse.getPermissionApp();
       if (!disposed) setApp(next);
-    } catch {
-      // No card. The steps still name the application, and the list still accepts a bundle dropped
-      // from Finder.
-    }
+    } catch {}
   }
 
   async function reveal(): Promise<void> {
@@ -143,8 +120,6 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
             aria-label={t("computerUse.help.dragLabel", { name: bundle().name })}
             onClick={() => void reveal()}
             onDragStart={(event) => {
-              // The file leaves through the main process, which is the only side that has one. The
-              // browser's own drag would carry nothing, so it must not start.
               event.preventDefault();
               setDragging(true);
               setError(null);

@@ -9,12 +9,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 
-/**
- * The system message that shows the memory changes of a turn, after its answer, or null when there
- * are none. The text counts them for a client that does not read `memoryChanges`, such as a Team API
- * client. `redact` is the redaction that the memory tools use when the agent reads them back, which
- * also removes the secrets of the MCP servers.
- */
 export function memoryChangesMessage(
   turnId: string,
   changes: readonly ConversationMemoryChange[],
@@ -41,7 +35,6 @@ export function memoryChangesMessage(
   };
 }
 
-/** The count of the changes. The older text stays for a turn whose changes all committed. */
 function memoryChangesText(counts: Record<ConversationMemoryChangeAction, number>): string {
   const { notChanged, ...committed } = counts;
   return notChanged > 0

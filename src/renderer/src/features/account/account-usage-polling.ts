@@ -4,10 +4,6 @@ import { useServers } from "../servers/servers-context";
 import { useAuth } from "./account-context";
 import { createUsageRefreshPoll } from "./usage-refresh-poll";
 
-/**
- * Selects the usage target of the active server and keeps its plan limits fresh
- * for the rail rings.
- */
 export function useAccountUsagePolling() {
   const auth = useAuth();
   const { agentStatus, refreshHostAccountUsage } = useAgents();
@@ -29,7 +25,6 @@ export function useAccountUsagePolling() {
       .join(",");
     return `${serverId}:${connected}`;
   });
-  /** A provider still starts or checks its sign-in, so a new target and its reading follow. */
   const providersLoading = createMemo(() => {
     const status = agentStatus();
     return (
@@ -40,8 +35,6 @@ export function useAccountUsagePolling() {
   });
   let selectedServerId: string | null = null;
 
-  /* A reading belongs to one server. On that server, the reading stays until the refresh for the new target
-   * replaces it, so the rail rings do not blink while models load. */
   createEffect(
     () => usageTargetKey(),
     (targetKey) =>
@@ -52,7 +45,6 @@ export function useAccountUsagePolling() {
         auth.selectAccountUsageTarget(targetKey);
       }),
   );
-  /* With no provider ready or loading, no refresh follows, so the reading goes. */
   createEffect(
     () => usageReady() || providersLoading(),
     (refreshFollows) => {
@@ -60,8 +52,6 @@ export function useAccountUsagePolling() {
     },
   );
 
-  /* The backend reads only the providers that are available. While a reading shows, a read during the checks
-   * would replace it with part of it, so the poll waits for the checks to end. With no reading, it reads at once. */
   const hasReading = createMemo(() => (auth.accountUsage()?.limits.length ?? 0) > 0);
   createUsageRefreshPoll({
     target: () => (usageReady() && !(hasReading() && providersLoading()) ? usageTargetKey() : null),

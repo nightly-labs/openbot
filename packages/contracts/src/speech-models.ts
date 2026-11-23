@@ -1,4 +1,3 @@
-/** One file of a downloaded voice model: where it comes from, and what it must hash to. */
 export interface SpeechModelFile {
   name: string;
   url: string;
@@ -9,16 +8,8 @@ export interface SpeechModelFile {
 const PARAKEET_MODEL_REVISION = "2bda32ec70b097a55adaa07d9a7173915b43cc78";
 const PARAKEET_MODEL_BASE_URL = `https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/${PARAKEET_MODEL_REVISION}`;
 
-/**
- * The directory name of Parakeet on desktop (`<userData>/runtimes`) and on the phone. A new pin needs
- * a new name.
- */
 export const PARAKEET_MODEL_DIRECTORY = "parakeet-tdt-0.6b-v3-int8";
 
-/**
- * NVIDIA Parakeet TDT 0.6B v3 (CC-BY-4.0), int8 ONNX export for sherpa-onnx. It finds the spoken
- * language itself, in 25 European languages. Desktop and the phone download the same pinned files.
- */
 export const PARAKEET_MODEL_FILES: readonly SpeechModelFile[] = [
   {
     name: "encoder.int8.onnx",
@@ -49,17 +40,8 @@ export const PARAKEET_MODEL_FILES: readonly SpeechModelFile[] = [
 const PARAKEET_UNIFIED_MODEL_REVISION = "8c3a10fb13408c7a7054f6898958bf1c64a8d6c7";
 const PARAKEET_UNIFIED_MODEL_BASE_URL = `https://huggingface.co/csukuangfj2/sherpa-onnx-nemo-parakeet-unified-en-0.6b-int8-non-streaming/resolve/${PARAKEET_UNIFIED_MODEL_REVISION}`;
 
-/**
- * The directory name of Parakeet Unified EN on desktop (`<userData>/runtimes`) and on the phone. A new
- * pin needs a new name.
- */
 export const PARAKEET_UNIFIED_MODEL_DIRECTORY = "parakeet-unified-en-0.6b-int8";
 
-/**
- * NVIDIA Parakeet Unified EN 0.6B (NVIDIA Open Model License), int8 ONNX export of its offline
- * mode for sherpa-onnx. It has the file names of the Parakeet TDT export. It hears English only.
- * Desktop and the phone download the same pinned files.
- */
 export const PARAKEET_UNIFIED_MODEL_FILES: readonly SpeechModelFile[] = [
   {
     name: "encoder.int8.onnx",
@@ -90,15 +72,8 @@ export const PARAKEET_UNIFIED_MODEL_FILES: readonly SpeechModelFile[] = [
 const QWEN3_ASR_MODEL_REVISION = "68818b2313fe77bd06f6a7c5068ff3ef59d02b8a";
 const QWEN3_ASR_MODEL_BASE_URL = `https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/${QWEN3_ASR_MODEL_REVISION}`;
 
-/** The directory name of Qwen3-ASR on the phone. A new pin needs a new name. */
 export const QWEN3_ASR_MODEL_DIRECTORY = "qwen3-asr-0.6b-int8-2026-03-25";
 
-/**
- * Qwen3-ASR 0.6B (Apache-2.0), int8 ONNX export for sherpa-onnx. It finds the spoken language
- * itself, in 30 languages and 22 Chinese dialects, also when one sentence mixes two of them. The
- * tokenizer files of the export's `tokenizer/` directory are kept next to the weights, so the model
- * directory is also the tokenizer directory.
- */
 export const QWEN3_ASR_MODEL_FILES: readonly SpeechModelFile[] = [
   {
     name: "conv_frontend.onnx",
@@ -141,17 +116,8 @@ export const QWEN3_ASR_MODEL_FILES: readonly SpeechModelFile[] = [
 const SUPERTONIC_MODEL_REVISION = "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4";
 const SUPERTONIC_MODEL_BASE_URL = `https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/${SUPERTONIC_MODEL_REVISION}`;
 
-/**
- * The directory name of Supertonic 3 on desktop (`<userData>/runtimes`) and on the phone (the app's
- * storage outside the device backup). A new pin needs a new name.
- */
 export const SUPERTONIC_MODEL_DIRECTORY = "supertonic-3-int8";
 
-/**
- * Supertone Supertonic 3 (OpenRAIL-M weights, MIT code), int8 ONNX export for sherpa-onnx. The
- * export's MIT notice is a file of the model, so it stays next to the weights. Desktop and the
- * phone download the same pinned files, so a reply sounds the same on both.
- */
 export const SUPERTONIC_MODEL_FILES: readonly SpeechModelFile[] = [
   {
     name: "duration_predictor.int8.onnx",
@@ -203,5 +169,4 @@ export const SUPERTONIC_MODEL_FILES: readonly SpeechModelFile[] = [
   },
 ];
 
-/** More denoising steps sound cleaner and take longer. Desktop and the phone use the same value. */
 export const SUPERTONIC_DENOISING_STEPS = 8;

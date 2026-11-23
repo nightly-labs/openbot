@@ -1,6 +1,3 @@
-// The felt plush of the recovery window, in the `failed` pose of `PlushBot` (`@norbert_bodziony/bloub`)
-// with the sad eyes. The window runs no script, so this is a still frame of that component: the body
-// texture and two eyes, each eye made of four slices of one texture. CSS in the page moves it.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -9,10 +6,8 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 const logger = createOpenBotLogger("start-recovery");
 const CHARACTER = "cloe";
 
-/** The plush as inline SVG with its textures as `data:` URLs, or null when they cannot be read. */
 export function recoveryPlushSvg(): string | null {
   try {
-    // The package exports no path to its assets. They are next to the module that the export names.
     const assets = join(dirname(createRequire(import.meta.url).resolve("@norbert_bodziony/bloub/plush")), "assets");
     const body = webpDataUrl(join(assets, `${CHARACTER}-corps.webp`));
     const eye = webpDataUrl(join(assets, `${CHARACTER}-oeil0-x.webp`));
@@ -27,7 +22,6 @@ function webpDataUrl(path: string): string {
   return `data:image/webp;base64,${readFileSync(path).toString("base64")}`;
 }
 
-// The geometry is the one that `PlushBot` draws for this character at `state: "failed"`.
 function plushSvg(body: string, eye: string): string {
   const slice = (x: number, width: number, viewBox: string) =>
     `<svg preserveAspectRatio="none" x="${x}" y="-28.54" width="${width}" height="57.07" viewBox="${viewBox}" style="mix-blend-mode:plus-lighter"><use href="#plush-eye-texture"/></svg>`;

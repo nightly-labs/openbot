@@ -35,10 +35,8 @@ const SECTION_TITLE = {
   closed: "mobile.server.threads.section.closed",
 } as const satisfies Record<TasksSectionId, MobileTextKey>;
 
-/** The first rows that the list renders: more than a phone screen holds. */
 const INITIAL_ROWS = 16;
 
-/** One row of the virtualized list: a section title, a thread, or the "Show all" button of the archive. */
 type ThreadListItem =
   | { kind: "header"; key: string; section: TasksSectionId; count: number }
   | { kind: "task"; key: string; task: AgentTask; dimmed: boolean }
@@ -46,7 +44,6 @@ type ThreadListItem =
 
 const itemKey = (item: ThreadListItem) => item.key;
 
-/** The sections as one flat list, in the order of the screen. */
 function listItems(sections: readonly TasksSection[], showAllClosed: boolean): ThreadListItem[] {
   const items: ThreadListItem[] = [];
   for (const section of sections) {
@@ -61,21 +58,13 @@ function listItems(sections: readonly TasksSection[], showAllClosed: boolean): T
   return items;
 }
 
-/** The same threads in the same order. `useServerTasks` gives a new array on each render. */
 function sameTasks(previous: readonly AgentTask[], next: readonly AgentTask[]): boolean {
   return previous.length === next.length && previous.every((task, index) => task === next[index]);
 }
 
-/**
- * The threads of all agents of a server, or of one agent with `agentId`: working, unread, read, then
- * the newest archived threads. The host keeps the read marks; a host without them shows the open threads by what
- * they need: needs you, working, waiting. The bar's plus opens the new thread sheet, where
- * the person chooses the agent, or on one agent's page a new thread with that agent.
- */
 export function ServerTasksScreen() {
   const { t } = useText();
   const { serverId, agentId } = useLocalSearchParams<{ serverId: string; agentId?: string }>();
-  // A primitive, so the screen does not render again for a change elsewhere in the workspace.
   const serverName = useMobileWorkspaceSelector(
     (workspace) => workspace.servers.find((item) => item.id === serverId)?.name,
   );
@@ -88,12 +77,8 @@ export function ServerTasksScreen() {
   const agent = agentId ? agentById.get(agentId) : undefined;
   const title = agent ? t("mobile.server.threads.agentTitle", { name: agent.name }) : t("mobile.app.route.threads");
   const canStart = hasServer && online && supported && agents.length > 0;
-  // The rows fill the width of the list, so they take it from here and do not measure themselves.
   const [listWidth, setListWidth] = useState<number>();
 
-  // One agent's page that opened on top of that agent's chat, from its thread menu or its swipe: a
-  // thread from it takes the place of the page, so Back from the thread returns to the chat, as a
-  // thread from the menu does. Elsewhere, such as over a thread, the page stays under the thread.
   const route = useRoute();
   const overAgentChat = useNavigationState((state) => {
     const below = state.routes[state.routes.findIndex((candidate) => candidate.key === route.key) - 1];
@@ -103,8 +88,6 @@ export function ServerTasksScreen() {
     );
   });
   const show = agentId && overAgentChat ? router.replace : router.push;
-  // One agent's page starts a thread with that agent, as its thread menu does: its first message
-  // starts it. The page of all agents asks which agent starts it.
   const newTask = () => {
     void haptics.impact("soft");
     if (agentId) show({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: DRAFT_THREAD_ID } });
@@ -112,8 +95,6 @@ export function ServerTasksScreen() {
   };
   const open = (task: AgentTask) =>
     show({ pathname: "/task/[taskId]", params: { serverId, agentId: task.agentId, taskId: task.id } });
-  // The rows get handlers that do not change, so a memoized row does not render again. The handlers
-  // read the current navigation and actions when the person touches the row.
   const latest = useRef({ open, run: threadActions.run });
   useLayoutEffect(() => {
     latest.current = { open, run: threadActions.run };
@@ -132,10 +113,8 @@ export function ServerTasksScreen() {
           : !ready && tasks.length === 0
             ? t("mobile.server.threads.loading")
             : null;
-  // Keeps the previous array while the threads are the same, so the sections are not made again.
   const [shownTasks, setShownTasks] = useState(tasks);
   if (shownTasks !== tasks && !sameTasks(shownTasks, tasks)) setShownTasks(tasks);
-  // The unread threads as a string, because the read marks are a new map on each render.
   const unreadKey = threadReads
     ? shownTasks
         .filter((task) => (threadReads.get(task.id)?.unreadCount ?? 0) > 0)
@@ -206,15 +185,12 @@ export function ServerTasksScreen() {
           />
         </Stack.Toolbar>
       )}
-      {/* A virtualized list in place of the scroll view, so a long list of threads does not mount at once. */}
       <LargeTitleScrollView
         title={title}
         caption={serverName}
         renderScroll={(scrollProps, largeTitle) => (
           <Animated.FlatList
             {...scrollProps}
-            // Android clips off-screen rows by default. With Fabric, a clipped row that mounts again can
-            // crash with "The specified child already has a parent". iOS does not clip by default.
             removeClippedSubviews={false}
             onLayout={(event) => setListWidth(event.nativeEvent.layout.width)}
             data={items}

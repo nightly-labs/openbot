@@ -12,6 +12,9 @@ export const messages = {
   "error.voice.prepareRequired":
     "로컬 음성 받아쓰기를 사용할 수 없어요. `bun run voice:prepare`를 실행한 후 OpenBot을 다시 시작해 주세요.",
   "error.voice.transcriptionFailed": "OpenBot이 이 녹음을 받아쓰지 못했어요.",
+  "error.voice.videoModelMissing": "설정 → 음성에 녹음용 음성 인식 모델이 설정되어 있지 않아요.",
+  "error.voice.videoModelMissingServer":
+    "이 서버에 음성 인식 모델이 설정되어 있지 않아요. 소유자나 관리자가 서버 설정의 음성 인식에서 모델을 설정할 수 있어요.",
   "error.voice.cloud.keyRequired": "설정 → 음성에서 {provider} API 키를 추가해 주세요.",
   "error.voice.cloud.keyRejected": "{provider}가 API 키를 받아들이지 않았어요. 설정 → 음성에서 키를 확인해 주세요.",
   "error.voice.cloud.quotaExceeded": "{provider} 사용량을 모두 소진했어요.",
@@ -24,6 +27,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "설정 → 음성에서 음성 읽기 모델을 다운로드해 주세요.",
   "error.voice.speech.timedOut": "답변을 소리 내어 읽는 시간이 초과되었어요.",
   "error.voice.speech.failed": "OpenBot이 답변을 소리 내어 읽지 못했어요.",
+  "error.voice.speech.providerRefused": "{provider}가 오디오 생성을 거부했어요: {reason}",
   "error.voice.recordingNotKept": "OpenBot이 음성 녹음을 보관하지 못했어요.",
   "error.voice.live.timedOut": "Codex 라이브 음성이 제시간에 시작되지 않았어요. 다시 시도하세요.",
   "error.voice.live.failed": "라이브 음성이 중지되었어요: {reason}",
@@ -31,6 +35,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "서버의 Codex가 라이브 음성을 시작하지 못했어요. 소유자에게 그 컴퓨터의 Codex를 업데이트하고 ChatGPT로 로그인해 달라고 요청한 다음 다시 시도하세요.",
   "error.voice.live.signIn": "라이브 음성을 사용하려면 ChatGPT 계정으로 Codex에 로그인하세요.",
+  "error.voice.live.chooseAccount":
+    "이 ChatGPT 계정은 라이브 음성을 사용할 수 없습니다. 설정 → 음성에서 요금제에 음성이 포함된 계정을 선택하세요.",
   "error.voice.live.unavailable":
     "OpenAI가 라이브 음성을 시작하지 못했습니다. OpenAI 측 문제입니다. 나중에 다시 시도하세요.",
   "error.voice.live.refused":

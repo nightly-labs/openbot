@@ -1,5 +1,6 @@
 import { nextSpeechSpeed } from "@openbot/contracts/ipc";
 import { Button } from "@openbot/ui";
+import { defaultTalkKey } from "@openbot/ui/features/conversation/talk-key";
 import { VoicePill } from "@openbot/ui/features/conversation/VoicePill";
 import { useText } from "@openbot/ui/text";
 import { createSignal, Show, untrack } from "solid-js";
@@ -8,7 +9,6 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT } from "./fixtures";
 
 const QUIET = new Array(24).fill(0);
-/** A few words and a short pause, as the waveform shows them. */
 const SPEECH = [
   0, 0, 0.05, 0.3, 0.55, 0.4, 0.7, 0.5, 0.2, 0.05, 0, 0, 0.1, 0.45, 0.8, 0.6, 0.35, 0.6, 0.9, 0.5, 0.25, 0.4, 0.65, 0.5,
 ];
@@ -23,16 +23,23 @@ const meta = {
     levels: QUIET,
     error: null,
     onToggleMute: fn(),
+    talkMode: "push",
+    onTalkModeChange: fn(),
+    talking: false,
+    onTalkStart: fn(),
+    onTalkEnd: fn(),
+    onTalkCancel: fn(),
+    talkKey: { key: defaultTalkKey("darwin"), platform: "darwin" },
     onInterrupt: fn(),
     onEnd: fn(),
     speed: 1,
     onCycleSpeed: fn(),
   },
-  // Mute, speed and the open pill are local here; in the app the voice conversation and the saved
-  // speed hold them. End sends the pill back into the top edge, and Start brings it out again.
   render: (args) => {
     const { t } = useText();
     const [muted, setMuted] = createSignal(untrack(() => args.muted));
+    const [talkMode, setTalkMode] = createSignal(untrack(() => args.talkMode));
+    const [talking, setTalking] = createSignal(untrack(() => args.talking));
     const [speed, setSpeed] = createSignal(untrack(() => args.speed ?? 1));
     const [open, setOpen] = createSignal(true);
     const [shown, setShown] = createSignal(true);
@@ -65,6 +72,24 @@ const meta = {
               setMuted(!muted());
               args.onToggleMute();
             }}
+            talkMode={talkMode()}
+            onTalkModeChange={(mode) => {
+              setTalkMode(mode);
+              args.onTalkModeChange(mode);
+            }}
+            talking={talking()}
+            onTalkStart={() => {
+              setTalking(true);
+              args.onTalkStart();
+            }}
+            onTalkEnd={() => {
+              setTalking(false);
+              args.onTalkEnd();
+            }}
+            onTalkCancel={() => {
+              setTalking(false);
+              args.onTalkCancel();
+            }}
             speed={speed()}
             onCycleSpeed={
               args.onCycleSpeed
@@ -87,17 +112,33 @@ type Story = StoryObj<typeof meta>;
 
 export const Starting: Story = { args: { phase: "starting" } };
 
-export const Listening: Story = {};
+export const DownloadingVoiceModel: Story = { args: { phase: "starting", downloadProgress: 42 } };
 
-export const Hearing: Story = { args: { levels: SPEECH } };
+export const PushToTalk: Story = { args: { muted: true } };
 
-export const Muted: Story = { args: { muted: true } };
+export const Talking: Story = { args: { talking: true, levels: SPEECH } };
+
+export const PushToTalkWindows: Story = {
+  args: { muted: true, talkKey: { key: defaultTalkKey("win32"), platform: "win32" } },
+};
+
+export const PushToTalkCustomKey: Story = {
+  args: {
+    muted: true,
+    talkKey: { key: { ctrl: false, alt: true, shift: false, meta: false, code: "KeyQ" }, platform: "darwin" },
+  },
+};
+
+export const Listening: Story = { args: { talkMode: "open" } };
+
+export const Hearing: Story = { args: { talkMode: "open", levels: SPEECH } };
+
+export const Muted: Story = { args: { talkMode: "open", muted: true } };
 
 export const Thinking: Story = { args: { phase: "thinking" } };
 
 export const Speaking: Story = { args: { phase: "speaking", levels: SPEECH } };
 
-/** Codex live voice speaks at the speed of the realtime model, so it has no speed button. */
 export const LiveVoice: Story = { args: { onCycleSpeed: undefined } };
 
 export const MicrophoneBlocked: Story = {

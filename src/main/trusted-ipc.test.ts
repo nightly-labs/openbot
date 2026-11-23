@@ -4,10 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { handleTrusted, handleTrustedWithEvent, type IpcCallRecord, setIpcCallObserver } from "./trusted-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
-// electron cannot be imported outside an Electron process, and ipcMain is the
-// only thing these wrappers touch, so the registration is captured instead of
-// performed. Hoisted because the factory runs while ./trusted-ipc is imported,
-// before this module's own body.
 const { registrations } = vi.hoisted(() => ({
   registrations: new Map<string, (event: unknown, ...arguments_: unknown[]) => unknown>(),
 }));
@@ -39,11 +35,6 @@ describe("trusted IPC renderer boundary", () => {
   });
 });
 
-// The wrappers are the whole renderer-to-main trust boundary: every handler in
-// the main process is registered through one of them. The static scan in
-// ipc-channel-coverage.test.ts asserts that a registration here names the check,
-// which is what catches a new wrapper written without it; these assert that the
-// check actually rejects, which text cannot show.
 describe("trusted IPC wrappers", () => {
   it("rejects a request from an untrusted renderer without running the handler", () => {
     let handled = 0;
@@ -83,8 +74,6 @@ describe("trusted IPC wrappers", () => {
     expect(handled).toBe(0);
   });
 
-  // Ordering, not just outcome: decoding an untrusted renderer's payload is work done on behalf of
-  // a caller already known to be rejected, so the sender check has to come first.
   it("rejects an untrusted renderer before decoding anything it sent", () => {
     let decoded = 0;
     handleTrusted(
@@ -124,10 +113,6 @@ describe("trusted IPC wrappers", () => {
     expect(registrations.get("test:accept-with-event")?.(TRUSTED_EVENT, "one")).toEqual([TRUSTED_EVENT, "decoded:one"]);
   });
 
-  // Ordering again, one level in: every window of the app shares the trusted origin, so a channel
-  // restricted to one of them authorizes by sender identity. That answers "may this caller use this
-  // channel at all", so it has to settle before the decoder runs — otherwise a caller the channel
-  // rejects still gets to choose which payload-validation error comes back.
   it("authorizes the sender before decoding a payload it sent", () => {
     const order: string[] = [];
     handleTrustedWithEvent(
@@ -150,8 +135,6 @@ describe("trusted IPC wrappers", () => {
   });
 });
 
-// Electron sends only `<name>: <message>` to the renderer. The name carries the failure's code; the
-// message must not change, and a secret in it must never become the code.
 describe("trusted IPC error references", () => {
   it("keeps the message and names the error after its reference", async () => {
     handleTrusted("test:refused", () =>
@@ -178,8 +161,6 @@ describe("trusted IPC error references", () => {
   });
 });
 
-// The observer feeds the local trace file. It must not change what the renderer receives, and it
-// sees the channel name only: a payload or a result could carry a secret into the file.
 describe("trusted IPC call observer", () => {
   it("records the channel and outcome and returns the handler's own result or rejection", async () => {
     const calls: IpcCallRecord[] = [];

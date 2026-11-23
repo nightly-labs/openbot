@@ -11,27 +11,17 @@ export const setCommitCoAuthorToolSchema = z.strictObject({
   enabled: z.boolean(),
 });
 
-/** Where the user changes the setting, for an agent that tells the user. */
 const SETTING_PLACE = "Server settings > Agent defaults > Git commits > Credit OpenBot in commits";
 
-/** Saves the `commitCoAuthor` agent default, as Server settings > Agent defaults does, and gives it to every agent. */
 export type SetCommitCoAuthor = (enabled: boolean) => Effect.Effect<unknown, { readonly cause: unknown }>;
 
 export interface SetCommitCoAuthorToolOptions {
-  /** The `commitCoAuthor` agent default now. */
   current(): boolean;
   set: SetCommitCoAuthor;
-  /** Whether a person's message in the agent's own chat, or a thread they opened, started the turn. */
   requestedByPerson: boolean;
-  /** Waits for the owner's answer to a card with this text. */
   approve(reason: string): Effect.Effect<ToolApprovalDecision, ToolOperationFailed>;
 }
 
-/**
- * `set_commit_co_author`: turns the OpenBot co-author trailer of agent commits off or on (#7579). The
- * setting applies to every agent of this OpenBot, also on a server that other members use, so only the
- * owner approves it, and only for a person's request.
- */
 export const handleSetCommitCoAuthorTool = Effect.fn("SetCommitCoAuthorTool.handle")(
   function* (
     params: DynamicToolCallParams,
@@ -39,8 +29,6 @@ export const handleSetCommitCoAuthorTool = Effect.fn("SetCommitCoAuthorTool.hand
   ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
     const { enabled } = setCommitCoAuthorToolSchema.parse(params.arguments, { reportInput: true });
     if (options.current() === enabled) return openBotToolResult({ status: "unchanged", enabled });
-    // A routine, a channel task, an external chat, another agent or a web page must not change a
-    // setting of every agent.
     if (!options.requestedByPerson)
       return openBotToolFailure(
         `Only a message from the owner of this OpenBot, in your chat or a thread they opened, can change this setting. When a person asked for it, tell them that the owner can change it in ${SETTING_PLACE}.`,

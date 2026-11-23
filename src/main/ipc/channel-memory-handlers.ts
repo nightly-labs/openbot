@@ -1,5 +1,3 @@
-// What a channel remembers: the notes every member of it carries into a turn.
-
 import { decodeChannelMemories, decodeChannelMemory } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { AgentService } from "../../backend/agent-service";

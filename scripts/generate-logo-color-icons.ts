@@ -1,19 +1,3 @@
-/**
- * Writes one app icon for each logo color in `build/logo-colors/`, from the release icons.
- *
- * macOS has no alternate app icon API (`setAlternateIconName` is UIKit only), so the app sets the
- * Dock icon from one of these files while it runs. The files are committed: a designer can replace
- * one by hand, and this script is only the first draft of each color.
- *
- * Each pixel is placed on the line from the eye color to the lavender body color, and the new pixel
- * takes the same place on the line from the new eye color to the new body color. The eyes and the
- * antialiased edges keep their shape, and only the body and eye colors change.
- *
- * The release icons are 8-bit RGBA PNG files with no interlace, so the script reads and writes PNG
- * with `node:zlib` and needs no image library.
- *
- * Run with `bun scripts/generate-logo-color-icons.ts`.
- */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
@@ -38,7 +22,6 @@ const SOURCES = ["icon-production.png", "icon-production-macos-safe-area.png"] a
 const BUILD = resolve(import.meta.dirname, "../build");
 const OUTPUT = join(BUILD, "logo-colors");
 const logger = createOpenBotLogger("generate-logo-color-icons");
-/** The logo eyes in `build/icon-production*.png`, `--openbot-logo-eye`. */
 const ICON_EYE = hexToRgb(DEFAULT_APP_LOGO_EYE_HEX);
 
 function hexToRgb(hex: string): Rgb {
@@ -48,7 +31,6 @@ function hexToRgb(hex: string): Rgb {
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
-/** Reads an 8-bit RGBA PNG with no interlace. Any other format stops the script. */
 function decodePng(file: Buffer): RgbaImage {
   if (!file.subarray(0, 8).equals(PNG_SIGNATURE)) throw new Error("The file is not a PNG.");
   let width = 0;
@@ -106,7 +88,6 @@ function unfilter(filter: number | undefined, left: number, up: number, upLeft: 
   }
 }
 
-/** Writes an 8-bit RGBA PNG. Each row uses the "up" filter, which suits the flat icon colors. */
 function encodePng(image: RgbaImage): Buffer {
   const stride = image.width * 4;
   const rows = Buffer.alloc((stride + 1) * image.height);

@@ -9,14 +9,9 @@ import { LandingFooter } from "../landing/LandingFooter";
 import { SiteHeader } from "../landing/SiteHeader";
 import { PluginOpenButtons } from "../plugins/PluginOpenButtons";
 
-// The Bloub library, which draws the avatar and owns its colours, uses browser-only APIs as soon as
-// its module loads, so the Worker must never import it. The page loads both parts in the browser
-// after hydration.
 const AgentAvatar = lazy(() =>
   import("@openbot/ui/features/agents/AgentAvatar").then((module) => ({ default: module.AgentAvatar })),
 );
-// The instructions are Markdown. The renderer is the app's own, which builds elements from the parsed
-// text and never inserts HTML. It loads only when the reader opens the instructions.
 const MarkdownMessageText = lazy(() =>
   import("@openbot/ui/features/conversation/MarkdownMessageText").then((module) => ({
     default: module.MarkdownMessageText,
@@ -27,21 +22,10 @@ export interface AgentTemplatePageProps {
   template: AgentTemplateDetail;
 }
 
-/**
- * One shared agent as a single card: the page a link on X or in a chat opens.
- *
- * The card is tinted with the agent's own avatar colour, so each shared agent looks like itself.
- * The button opens `openbot://agents/<id>`, built from the id, and the app then shows its own preview
- * with Install; nothing here installs. The button below the card links `/app?agent=<id>`, where the
- * browser client shows the same preview.
- */
 export function AgentTemplatePage(props: AgentTemplatePageProps) {
-  // The Worker renders an empty box of the avatar's size, and the browser fills it in.
   const [mounted, setMounted] = createSignal(false);
   const [expanded, setExpanded] = createSignal(false);
-  // Whether the clamp hid any text, measured once the page is in the browser.
   const [clamped, setClamped] = createSignal(false);
-  // The avatar's colour tints the page; until it loads the page keeps the stylesheet's neutral one.
   const [accent, setAccent] = createSignal<string | null>(null);
   let description: HTMLParagraphElement | undefined;
   onSettled(() => {
@@ -53,8 +37,6 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
     return landingAnalytics.start(document, window.location.hostname, agentTemplatePath(props.template.id));
   });
 
-  // Closed, the instructions are one paragraph of plain text. Opened, they show their Markdown, so
-  // "Read more" is there also when the text fits but has headings, lists or other formatting.
   const preview = createMemo(() => markdownPreviewText(props.template.description));
   const hasMore = () => clamped() || preview() !== props.template.description.replace(/\s+/gu, " ").trim();
   const openUrl = () => createOpenBotAgentTemplateUrl(props.template.id);
@@ -68,7 +50,6 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
       <SiteHeader page="content" />
 
       <main class="agent-share-main">
-        {/* The landing page's grid, so a shared agent sits on the same backdrop as the product. */}
         <div class="landing-hero-grid" aria-hidden="true" />
         <article class="agent-share-card" aria-labelledby="agent-share-name">
           <div class="agent-share-hero" aria-hidden="true">

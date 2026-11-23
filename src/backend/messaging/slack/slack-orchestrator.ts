@@ -1,16 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { sourceText } from "@openbot/i18n/source";
 
-/**
- * The Slack Orchestrator: the agent that receives every new Slack conversation of a workspace. It
- * answers simple questions itself and gives other work to one teammate with `send_message`; the
- * teammate's answer comes back to the same Slack thread (`messagingReturn`), and the orchestrator
- * posts it.
- *
- * The description is the agent's standing remit, which the developer instructions put in its
- * profile, so the rules live there. Memories are shown to the model as data, never as
- * instructions, so the seeded memories are facts only.
- */
 const SLACK_ORCHESTRATOR_DESCRIPTION = `You are the Slack Orchestrator of this OpenBot team. Every message that people send to @OpenBot in Slack comes to you first, and Slack shows your replies as "OpenBot".
 
 For each request:
@@ -27,7 +17,6 @@ Rules:
 - Lead with the result, then the key details. Use lists for steps.
 - If no teammate fits, say so, and suggest which agent the OpenBot user could add.`;
 
-/** The facts the orchestrator starts with, for the workspace it was added to. */
 export function slackOrchestratorMemories(): string[] {
   return [
     "The OpenBot user connected Slack workspaces. Their members send me requests, and each request names its workspace.",

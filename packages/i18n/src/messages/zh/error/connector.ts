@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/connector";
 
 export const messages = {
-  // The built-in GitHub connection: the device flow, the token refresh and the stored file.
   "error.connector.githubUnavailable": "该版本的 OpenBot 不包含 GitHub App。",
   "error.connector.githubDenied": "GitHub 登录被拒绝。",
   "error.connector.githubCodeExpired": "GitHub 验证码已过期，请重新连接 GitHub。",
@@ -10,10 +9,11 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub 不认识该 GitHub App 的客户端 ID。",
   "error.connector.githubUnexpected": "GitHub 返回了意外的响应：{detail}",
   "error.connector.githubUnreachable": "OpenBot 无法连接 GitHub：{detail}",
+  "error.connector.githubOffline":
+    "OpenBot 无法连接 GitHub。请检查运行 OpenBot 的电脑或服务器的网络连接和 DNS 设置，然后重试。",
   "error.connector.githubExpired": "GitHub 连接已过期，请重新连接 GitHub。",
   "error.connector.githubFileUnreadable": "GitHub 连接文件无法读取。",
   "error.connector.githubFileTooLarge": "GitHub 连接文件过大。",
-  // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot 找不到 1Password CLI。请安装它并在 1Password 应用中开启集成，或改用服务账号令牌。",
   "error.connector.onePasswordCliInstallFailed": "OpenBot 无法安装 1Password CLI，请检查网络连接后重试。",

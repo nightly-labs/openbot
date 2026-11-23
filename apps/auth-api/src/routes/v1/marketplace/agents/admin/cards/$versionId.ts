@@ -11,7 +11,6 @@ import {
   requireSkillsAdmin,
 } from "../../../../../../server/request-auth";
 
-/** The reviewer's script stores the share card it drew for an approved version. The body is the PNG. */
 export const Route = createFileRoute("/v1/marketplace/agents/admin/cards/$versionId")({
   server: {
     handlers: {

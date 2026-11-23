@@ -10,7 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireVisibleBodyAgent, stringField } from "./request-helpers";
 
-/** Session configuration belongs to the host owner or an administrator. */
 export async function routeAgentSessionSettings(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,

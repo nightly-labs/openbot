@@ -1,11 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Grok Bot here is taken from xAI's Grok Bot documentation,
-// and each page used is in `sources`. Check them again, and move `checkedAt`,
-// whenever this file changes. Statements about OpenBot follow its privacy notes and
-// the remote connection that `remote/README.md` describes.
-
 const GROK_BOT_DOCS = "https://docs.x.ai/grok-bot";
 
 export const GROK_BOT_COMPARISON: Comparison = {

@@ -2,10 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { currentText } from "@/shared/lib/text";
 import { type ReplyReading, type ReplyVoiceChoice, readReply, replyVoiceFailureText } from "../model/reply-voice";
 
-/**
- * Plays a short sample with a voice. One sample plays at a time; `playing` names it, so each voice
- * can show Play or Stop. Leaving the page stops it.
- */
 export function useVoicePreview() {
   const [playing, setPlaying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +12,6 @@ export function useVoicePreview() {
     reading.current = null;
     setPlaying(null);
   };
-  /** Plays the sample with `choice`, or stops it when `id` is the sample that plays. */
   const toggle = (id: string, choice?: ReplyVoiceChoice) => {
     const same = playing === id;
     stop();

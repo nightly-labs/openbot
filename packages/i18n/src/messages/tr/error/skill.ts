@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Beceri paketleri sembolik bağlantılar içeremez.",
   "error.skill.expandedTooLarge": "Açılmış beceri 10 MB altında olmalıdır.",
   "error.skill.irregularEntry": "Beceri paketleri yalnızca normal dosyalar ve klasörler içerebilir.",

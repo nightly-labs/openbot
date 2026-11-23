@@ -3,11 +3,6 @@ import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { PreferenceStore } from "./preference-file";
 
-/**
- * Whether the Claude agents of this computer load the user's own Claude Code setup. A Claude process
- * reads it when it starts, so a change applies to the next process, not to a running turn. A file
- * without the switch reads as the default, off.
- */
 export type ClaudeUserSetupPreferenceStore = PreferenceStore<ClaudeUserSetupSetting>;
 
 export function createClaudeUserSetupPreferenceStore(path: string): ClaudeUserSetupPreferenceStore {
@@ -19,13 +14,8 @@ export function createClaudeUserSetupPreferenceStore(path: string): ClaudeUserSe
   });
 }
 
-/** The switch as Settings and a joined server's admin change it: a change tells `changed`. */
 export type ClaudeUserSetupControl = ReturnType<typeof claudeUserSetupControl>;
 
-/**
- * The switch with its change event. `changed` sends the provider status event, so that every open
- * settings page, on this computer and on a joined client, reads the switch again.
- */
 export function claudeUserSetupControl(store: ClaudeUserSetupPreferenceStore, changed: () => void) {
   return {
     get: () => store.get(),

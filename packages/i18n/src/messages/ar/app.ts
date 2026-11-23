@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "تعذّرت إعادة تشغيل {name}",
   "app.provider.included": "{name} مضمَّن مع OpenBot.",
   "app.clipboard.copyFailed": "تعذّر نسخ النص.",
-  "app.voice.tooLong": "الحد الأقصى للتسجيلات الصوتية دقيقتان.",
+  "app.voice.tooLong": "الحد الأقصى للتسجيلات الصوتية 10 دقائق.",
   "app.avatar.type": "اختر صورة PNG أو JPEG أو GIF أو WebP.",
   "app.avatar.size": "اختر صورة أصغر من 10 MB.",
   "app.avatar.processingUnavailable": "معالجة الصور غير متاحة.",
@@ -95,6 +95,7 @@ export const messages = {
     "وكلائي للذكاء الاصطناعي يعملون الآن على حاسوبي مع OpenBot. محادثاتي وملفاتي تبقى معي. جرّبه: {site}",
   "app.socialFollow.redditTitle": "كيف أستخدم OpenBot",
   "app.rail.usageRings": "استخدام {name}: {windows}. فتح الاستخدام",
+  "app.rail.usageUnavailable": "استخدام {name} غير متاح. فتح الاستخدام",
   "app.rail.customAgentUsage": "استخدام {name}. فتح الاستخدام",
   "app.rail.moreUsage": {
     zero: "لا حسابات أخرى. فتح الاستخدام",

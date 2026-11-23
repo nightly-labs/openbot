@@ -13,13 +13,11 @@ import { Button, Check, CirclePause, Clock3, Minus, Text, TriangleAlert, X } fro
 import { createEffect, createSignal, createUniqueId, For, Match, Show, Switch, untrack } from "solid-js";
 import { type TextValue, useText } from "../../text";
 
-/** The webhook activity of an event routine. Its ignored requests join the runs. */
 interface RoutineHistoryActivity {
   api: { listActivity: (input: ListEventActivityInput) => Promise<EventActivity[]> };
   routine: EventRoutineRef;
 }
 
-/** Where each run's answer went outside OpenBot. Only an agent routine on this computer has it. */
 interface RoutineHistoryDeliveries {
   items: RoutineResultDelivery[];
   onResend: (runId: string) => Promise<void>;
@@ -39,13 +37,8 @@ type HistoryEntry =
 
 const VISIBLE_ENTRIES = 10;
 const ACTIVITY_LIMIT = 50;
-/** A scheduled run that started this long after its time ran late: OpenBot was closed or asleep. */
 const LATE_RUN_MS = 60_000;
 
-/**
- * Only an agent run names a message the user can jump to: its mailbox delivery. A channel run
- * fires into the channel everybody is already reading, so its rows stay plain.
- */
 function runMessageId(run: RoutineRunFields): string | null {
   return isRoutineRun(run) ? run.deliveryId : null;
 }
@@ -78,7 +71,6 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
     }
   }
 
-  // A run changes the list, so the activity loads again with it. There is no refresh button.
   createEffect(
     () => [props.activity?.routine.id, props.activity?.routine.owner, props.runs] as const,
     ([routineId], previous) => {
@@ -102,7 +94,6 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
             ? { kind: "skipped", at: run.scheduledFor, missed: run.missed, reason: run.error }
             : { kind: "run", at: run.scheduledFor, run },
       ),
-      // A started request already shows as its run. The history adds only the requests that did not start a run.
       ...activity()
         .filter((item) => item.status === "ignored")
         .map((item): HistoryEntry => ({ kind: "ignored", at: item.occurredAt, item })),
@@ -147,7 +138,6 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
                         <span>{formatRoutineRunTime(skipped().at, text, skipped().missed.until)}</span>
                         <span class="agent-routine-run-note">{skippedNote(skipped(), text)}</span>
                       </span>
-                      {/* The note already says "Skipped", so the icon has no label of its own. */}
                       <span class="agent-routine-run-icon agent-routine-run-icon-ignored" aria-hidden="true">
                         <Minus />
                       </span>
@@ -161,7 +151,6 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
                         <span>{formatRoutineRunTime(item().occurredAt, text)}</span>
                         <span class="agent-routine-run-note">{ignoredNote(item(), text)}</span>
                       </span>
-                      {/* The note already says "Ignored", so the icon has no label of its own. */}
                       <span class="agent-routine-run-icon agent-routine-run-icon-ignored" aria-hidden="true">
                         <Minus />
                       </span>
@@ -189,7 +178,6 @@ function RunRow(props: { run: RoutineRunFields; onOpenRun?: ((messageId: string)
   };
   const late = () => lateStart(props.run);
   const failure = () => (props.run.status === "failed" && props.run.error ? text.sourceText(props.run.error) : null);
-  // The link's label replaces its text, so a screen reader gets the reason as the description.
   const reasonId = createUniqueId();
   const content = (
     <>
@@ -237,11 +225,6 @@ function RunRow(props: { run: RoutineRunFields; onOpenRun?: ((messageId: string)
   );
 }
 
-/**
- * The delivery's status is not the run's: a run gets one when its agent answered, also a run that
- * failed. A delivery that ended without a sure post can go again; a sent one cannot, so a click does
- * not post it twice.
- */
 function DeliveryRow(props: { delivery: RoutineResultDelivery; onResend: (runId: string) => Promise<void> }) {
   const { t, errorMessage } = useText();
   const [sending, setSending] = createSignal(false);
@@ -293,7 +276,6 @@ function DeliveryRow(props: { delivery: RoutineResultDelivery; onResend: (runId:
   );
 }
 
-/** When a scheduled run started late, the time it started. The run is created as it starts. */
 function lateStart(run: RoutineRunFields): Date | null {
   if (run.kind !== "scheduled") return null;
   const startedAt = new Date(run.createdAt);
@@ -306,7 +288,6 @@ function formatLateStart(scheduledFor: string, startedAt: Date, text: Pick<TextV
     : formatRoutineRunTime(startedAt.toISOString(), text);
 }
 
-/** A record that names no reason is from a time when OpenBot was closed. */
 function skippedNote(
   { missed, reason }: { missed: RoutineMissedRuns; reason: string | null },
   text: Pick<TextValue, "t" | "sourceText">,
@@ -350,7 +331,6 @@ function RoutineRunStatus(props: { status: RoutineRunFields["status"] }) {
   );
 }
 
-/** `until` makes a range. A range within one day names the day once. */
 function formatRoutineRunTime(value: string, text: Pick<TextValue, "t" | "format">, until?: string | null): string {
   const date = new Date(value);
   const end = until ? new Date(until) : null;

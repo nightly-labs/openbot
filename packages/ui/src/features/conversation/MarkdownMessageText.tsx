@@ -9,6 +9,7 @@ import {
 } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
@@ -34,17 +35,8 @@ type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter">
   showCitationFooter?: boolean;
   streaming?: boolean;
   imagesAsLinks?: boolean | undefined;
-  /** Opens a markdown image in the image viewer. Without it, an image is only a picture. */
   onOpenImage?: ((image: HTMLImageElement) => void) | undefined;
-  /**
-   * A short preview, such as a reply quote: only the first blocks, and each code fence as plain
-   * text, with no highlight, toolbar or live preview.
-   */
   excerpt?: boolean | undefined;
-  /**
-   * The text of a file, not a message. A message can name one folder for the file names after it;
-   * a file names its paths from the workspace, so its folder paths change no other path (#8536).
-   */
   document?: boolean | undefined;
 };
 
@@ -80,7 +72,6 @@ interface MarkdownTokenByType {
   attachmentTag: AttachmentTagToken;
 }
 
-/** A file in the message, `@[name](attachment:<id>)`. Its name can hold `[`, which a link cannot. */
 interface AttachmentTagToken extends Tokens.Generic {
   type: "attachmentTag";
   text: string;
@@ -97,8 +88,6 @@ const markdown = new Marked({
   gfm: true,
   breaks: true,
   tokenizer: {
-    // Marked tries a heading underlined by `=` or `-` before it ends a paragraph at a math block, so
-    // a formula with such a line became a heading. Return `undefined` to read a paragraph instead.
     lheading(source) {
       const heading = this.rules.block.lheading.exec(source);
       return heading && chatMathBlockInterrupts(source, heading[0].length) ? undefined : false;
@@ -157,7 +146,6 @@ const VOID_HTML_ELEMENTS = new Set([
   "wbr",
 ]);
 
-/** A reply quote shows four lines, and each block takes at least one. */
 const EXCERPT_BLOCK_LIMIT = 4;
 
 function tokenIs<K extends keyof MarkdownTokenByType>(token: Token, type: K): token is MarkdownTokenByType[K] {
@@ -173,18 +161,9 @@ function headingLevel(depth: number): 1 | 2 | 3 | 4 | 5 | 6 {
   return 6;
 }
 
-// Lexed tokens are shared across re-renders of identical bodies (scroll
-// virtualization re-renders settled messages often). Cap the size so a long
-// session cannot grow this without bound.
 const LEXER_CACHE_LIMIT = 200;
-/**
- * Tokens hold copies of the text, so 200 large bodies, such as pasted logs, would keep many megabytes
- * after their messages are gone. The cache also keeps at most this many characters, and a body that
- * is longer is lexed again on each render.
- */
 const LEXER_CACHE_CHARACTERS = 2 * 1024 * 1024;
 
-/** Keeps the newest entries, within a count and a character budget. */
 class LexerCache<T> {
   readonly #entries = new Map<string, T>();
   #characters = 0;
@@ -222,13 +201,6 @@ interface StreamedTokens {
   tokens: TokensList;
 }
 
-/**
- * The tokens of a streaming body, which only grows. A block that has a blank line after it and a
- * block after that is final, so only the text from that blank line is lexed again. Text with no
- * blank line before it can still join the block before it, such as `#1234` after a paragraph line.
- * A body that does not extend the previous one, or a link reference definition, which changes how
- * earlier blocks read, lexes the whole body. The settled body is lexed whole.
- */
 function lexStreamingTokens(body: string, previous: StreamedTokens | undefined): TokensList {
   if (!previous || !body.startsWith(previous.body) || Object.keys(previous.tokens.links).length > 0) {
     return markdown.lexer(body);
@@ -236,7 +208,6 @@ function lexStreamingTokens(body: string, previous: StreamedTokens | undefined):
   let kept = previous.tokens.length - 1;
   while (kept > 0 && previous.tokens[kept]?.type === "space") kept -= 1;
   while (kept > 0 && previous.tokens[kept]?.type !== "space") kept -= 1;
-  // Display math can span blank lines. Until its closing delimiter arrives, it reads as paragraphs.
   const openMath = previous.tokens.findIndex(
     (token, index) =>
       index < kept &&
@@ -247,7 +218,6 @@ function lexStreamingTokens(body: string, previous: StreamedTokens | undefined):
   if (openMath !== -1) kept = openMath;
   const settled = previous.tokens.slice(0, kept);
   const settledLength = settled.reduce((length, token) => length + token.raw.length, 0);
-  // The lexer normalizes line endings, and then the sources no longer add up to the body.
   const previousLength = previous.tokens.reduce((length, token) => length + token.raw.length, 0);
   if (settled.length === 0 || previousLength !== previous.body.length) return markdown.lexer(body);
   const tail = markdown.lexer(body.slice(settledLength));
@@ -264,9 +234,6 @@ function lexInlineTokens(body: string): Token[] {
 }
 
 export function MarkdownMessageText(props: MarkdownMessageTextProps) {
-  // A streaming reply passes each growing prefix here. Caching those would
-  // retain up to 200 obsolete token trees and evict completed messages, so
-  // only a settled body enters the shared cache.
   let streamed: StreamedTokens | undefined;
   const tokens = createMemo(() => {
     const body = props.body;
@@ -278,15 +245,12 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
     streamed = { body, tokens };
     return tokens;
   });
-  // An excerpt shows only a few lines, so it renders only the blocks that can fill them.
   const shownTokens = createMemo((): TokensList => {
     const all = tokens();
     if (props.excerpt !== true) return all;
     const blocks = all.filter((token) => token.type !== "space").slice(0, EXCERPT_BLOCK_LIMIT);
     return Object.assign(blocks, { links: all.links });
   });
-  // A memo, so each revealed word of a streaming reply does not give the kept blocks a new
-  // `content` object and run their reads again. Only a new directory changes it.
   const fileDirectory = createMemo(() => (props.document === true ? null : messageFileDirectory(props.body)), {
     equals: (previous, next) => previous?.path === next?.path && previous?.kind === next?.kind,
   });
@@ -356,10 +320,6 @@ interface RenderedToken {
   streaming: boolean;
 }
 
-/**
- * The characters of the streaming body after each token, so each text node fades the words
- * revealed in it. A memo compared by value, so the blocks with no fade do not update on each step.
- */
 function createTailOffsets(tokens: () => readonly { raw: string }[], after: () => number | undefined) {
   const trail = useStreamingReveal();
   return createMemo(
@@ -373,17 +333,12 @@ function createTailOffsets(tokens: () => readonly { raw: string }[], after: () =
   );
 }
 
-/** The characters after the children of `token`, from the characters after `token`. */
 function tailInside(token: Token, children: readonly Token[] | undefined, after: number | undefined) {
   return children ? streamingTailInside(token.raw, children, after) : after;
 }
 
 function MarkdownBlocks(props: {
   tokens: Token[];
-  /**
-   * The document's link reference definitions. A new definition can turn text in an earlier
-   * block into a link, so a change here renders every block again.
-   */
   linkDefinitions?: string;
   content: MarkdownContentProps;
   streaming?: boolean | undefined;
@@ -391,9 +346,6 @@ function MarkdownBlocks(props: {
 }) {
   const tokens = createMemo(() => props.tokens);
   const tailAfter = createTailOffsets(tokens, () => props.streamingTailAfter);
-  // A streaming reply gives new tokens for the whole body on each revealed word. Keeping the
-  // earlier item for a token with the same source keeps its block mounted, so only the growing
-  // tail renders again.
   const renderedTokens = createMemo<{ linkDefinitions: string | undefined; items: RenderedToken[] }>((previous) => {
     const values = tokens();
     const linkDefinitions = props.linkDefinitions;
@@ -595,7 +547,6 @@ function MarkdownList(props: {
                 aria-label={renderedItem.item.text}
               />
             </Show>
-            {/* A task item is a row. One body keeps its text, code and nested lists in one column. */}
             <Show when={renderedItem.item.task} fallback={blocks()}>
               <div class="message-markdown-task-body">{blocks()}</div>
             </Show>
@@ -605,7 +556,6 @@ function MarkdownList(props: {
     </For>
   );
 
-  // The marker side and the indent follow the list's own text, not the interface language.
   const direction = createMemo(() => tokensDirection(items()));
   return props.token.ordered ? (
     <ol start={props.token.start === "" ? undefined : props.token.start} dir={direction()}>
@@ -853,7 +803,6 @@ function MarkdownInline(props: {
           }
           case "attachmentTag": {
             if (!tokenIs(token, "attachmentTag")) return token.raw;
-            // A file that the message does not hold shows only its name, as on mobile.
             const held = props.content.attachments?.some((attachment) => attachment.id === token.attachmentId);
             return (
               <RichText body={held ? token.raw : token.text} content={props.content} streamingTailAfter={after()} />
@@ -869,13 +818,6 @@ function MarkdownInline(props: {
   );
 }
 
-/**
- * The base direction of a list, a quote or a table, from its first letter, as `dir="auto"` finds
- * it for a paragraph. `dir="auto"` skips the descendants that set their own direction, and each
- * block in these containers does, so the container reads its text here. Code, math, raw HTML and
- * bare URLs are skipped, as they are left to right and isolated. Undefined keeps the inherited
- * direction.
- */
 function tokensDirection(tokens: readonly Token[]): "ltr" | "rtl" | undefined {
   for (const token of tokens) {
     const direction = tokenDirection(token);
@@ -913,7 +855,6 @@ function semanticChatTag(token: Token | undefined): string | null {
   return target?.[2] ? `@${token.raw}` : null;
 }
 
-/* A picture that does not load shows its name as text, not the browser's broken-image icon. */
 function MarkdownImage(props: {
   url: string;
   alt: string;
@@ -934,7 +875,6 @@ function MarkdownImage(props: {
       }
     >
       {(url) => {
-        // Each URL gets its own element, so a late error of an earlier URL cannot mark this one.
         const image = () => (
           <img
             class="message-markdown-image"
@@ -1146,7 +1086,6 @@ function isEscapedMarkdownCharacter(value: string, index: number): boolean {
   return slashCount % 2 === 1;
 }
 
-/** The text of inline Markdown with no syntax, such as a link's label without its address. */
 export function markdownPlainText(body: string): string {
   return markdownInlinePlainText(lexInlineTokens(body));
 }
@@ -1175,7 +1114,6 @@ function LocalFileLink(props: {
   onOpen: (path: string) => void;
 }) {
   const { t } = useText();
-  // A workspace path that ends with a separator is a folder chip, such as `research/eyeliner/`.
   const folder = props.kind === "workspace" && /[/\\]$/u.test(props.path);
   const name = fileReferenceName(folder ? props.path.replace(/[/\\]+$/u, "") : props.path);
   const label = () => {
@@ -1312,10 +1250,6 @@ function localFileTarget(value: string): string | null {
   return /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path) || isFileReference(path) ? workspace : null;
 }
 
-/**
- * The path of a `file://` link, such as `file:///Users/me/a%20b.md` or `file:///C:/notes.md`. It stays
- * percent-encoded like any other link target, so the workspace resolver decodes it once.
- */
 function fileUrlPath(value: string): string | null {
   const match = /^file:\/\/(?:localhost)?(\/.*)$/iu.exec(value.trim());
   if (!match?.[1]) return null;
@@ -1326,7 +1260,6 @@ function decodedFileUrlPath(path: string): string {
   try {
     return decodeURIComponent(path);
   } catch {
-    // A literal percent sign can be part of a file name.
     return path;
   }
 }
@@ -1354,20 +1287,13 @@ function messageFileDirectory(body: string): FileDirectoryContext | null {
 
 const ABSOLUTE_PATH = /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u;
 
-/**
- * A full path to a file of any type, such as `/Users/me/Documents/Informe final.docx` (#12380). A bare
- * name needs a known type, because `config.version` is often not a file. A network path keeps the known
- * types only. A command line is not a file, such as `/usr/bin/python3 -m venv .venv` or `/bin/cp a.txt b.bak`.
- */
 function absoluteFilePath(path: string): boolean {
   if (!ABSOLUTE_PATH.test(path) || /^[/\\]{2}/u.test(path) || /[\0\r\n]/u.test(path)) return false;
   if (!/^[^.].*\.[\p{L}\p{N}_-]*\p{L}[\p{L}\p{N}_-]*$/u.test(fileReferenceName(path))) return false;
   if (!/\s/u.test(path)) return true;
-  // A flag such as ` -m` or ` --force`; a name such as `Informe - final.docx` is a file.
   return !/\s-+\p{L}/u.test(path) && !/[/\\]s?bin[/\\]/u.test(path.split(/\s/u)[0] ?? "");
 }
 
-/** The file that a code span names. `asWritten` is the span text when the path joins it to `directory`. */
 function mentionedFileTarget(
   value: string,
   directory: FileDirectoryContext | null,
@@ -1390,16 +1316,10 @@ function mentionedFileTarget(
 }
 
 const IMAGE_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|svg|webp)$/iu;
-/** A message shows at most this many named image files, as many as it can attach. */
 const IMAGE_FILE_LIMIT = INPUT_LIMITS.attachments;
 
-/** A local image file that a message names, in a code span or a file link. */
 export type MessageImageFile = FileDirectoryContext;
 
-/**
- * The image files that the text blocks of a message name in code spans and file links, in order,
- * without repeats. Each block resolves a file name against its own folder, as its chips do.
- */
 export function messageImageFiles(blocks: readonly string[]): MessageImageFile[] {
   const files = new Map<string, MessageImageFile>();
   for (const body of blocks) {
@@ -1417,22 +1337,15 @@ export function messageImageFiles(blocks: readonly string[]): MessageImageFile[]
   return [...files.values()].slice(0, IMAGE_FILE_LIMIT);
 }
 
-/** A character that a backslash escapes in CommonMark. */
 const MARKDOWN_ESCAPABLE = /[!-/:-@[-`{-~]/u;
 const WINDOWS_ABSOLUTE_PATH = /^(?:[A-Za-z]:[/\\]|\\\\)/u;
 
-/**
- * The target of a link as the agent wrote it, when that is a Windows path. CommonMark reads the `\.`
- * in `C:\me\.logs\x` as an escape, but each backslash of a Windows path is a separator (#9010). A
- * path written with escaped separators, such as `C:\\me\\.logs`, keeps the parsed text.
- */
 function writtenLinkTarget(token: { raw: string; href: string }): string {
   const { raw, href } = token;
   for (const match of raw.matchAll(/\]\(\s*<?/gu)) {
     const start = match.index + match[0].length;
     let index = start;
     let parsed = 0;
-    // Walk the written text and the parsed target together; a backslash before punctuation is an escape.
     while (parsed < href.length && index < raw.length) {
       const escaped = raw[index] === "\\" && MARKDOWN_ESCAPABLE.test(raw[index + 1] ?? "");
       if ((escaped ? raw[index + 1] : raw[index]) !== href[parsed]) break;
@@ -1440,41 +1353,23 @@ function writtenLinkTarget(token: { raw: string; href: string }): string {
       parsed += 1;
     }
     const written = raw.slice(start, index);
-    // Only a network path starts with two backslashes; a pair after that start is an escaped separator.
     if (parsed !== href.length || !WINDOWS_ABSOLUTE_PATH.test(written)) continue;
     return written.slice(2).includes("\\\\") ? href : written;
   }
   return href;
 }
 
-/** The shared and workspace paths that a link target can open as a chip. */
 function linkFileTargets(href: string): { shared: string | null; workspace: string | null } {
   const fileUrl = fileUrlPath(href);
-  // A link target is percent-encoded, such as `a%20b.md`. The shared-file resolver does not decode, so
-  // the shared target is decoded here once; the workspace resolver decodes by itself (#12104).
   return {
     shared: sharedFileTarget(decodedFileUrlPath(fileUrl ?? href)),
     workspace: workspaceFileTarget(fileUrl ?? href),
   };
 }
 
-/** The file that a link opens as a chip, as the `link` token draws it. */
 function linkFileTarget(href: string): FileDirectoryContext | null {
   if (safeBrowserUrl(href)) return null;
   const { shared, workspace } = linkFileTargets(href);
   if (shared) return { path: shared, kind: "shared" };
   return workspace ? { path: workspace, kind: "workspace" } : null;
-}
-
-/** What the image viewer calls a markdown image: its alt text, else the file name in its URL. */
-export function markdownImageName(alt: string, url: string): string {
-  if (alt.trim()) return alt.trim();
-  try {
-    const path = new URL(url).pathname;
-    const name = decodeURIComponent(path.slice(path.lastIndexOf("/") + 1));
-    if (name) return name;
-  } catch {
-    // A URL that does not parse keeps its own text as the name.
-  }
-  return url;
 }

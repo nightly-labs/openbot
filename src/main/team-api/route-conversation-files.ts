@@ -10,14 +10,8 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { nullableString, readJson, stringField } from "./request-helpers";
 
-/** The page size when the client does not name one, as on the desktop. */
 const DEFAULT_PAGE_SIZE = 50;
 
-/**
- * The files in the agent chats of this host whose name contains the query, newest first. Any member
- * can search them, as any member can read these chats. The response projection in the router removes
- * each result of an agent hidden from the caller. Frozen by `conversation-file-search-v1`.
- */
 export async function routeConversationFiles(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "searchConversationFiles">,
@@ -26,7 +20,6 @@ export async function routeConversationFiles(
   if (method !== "POST" || url.pathname !== CONVERSATION_FILE_SEARCH_ROUTES.search) return "unmatched";
   if (!capabilities.has(CONVERSATION_FILE_SEARCH_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.conversationFileSearchUnsupported"));
-  // `readJson` has already run the body through the conversation-file-search wire codec.
   const body = await readJson(request);
   const query = stringField(body, "query", true, 255);
   const cursor = nullableString(body, "cursor", 2_048);

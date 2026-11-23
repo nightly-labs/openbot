@@ -94,8 +94,10 @@ uses it in two places: `openbot_browser.list_logins` returns the logins saved fo
 site (id, title, username), and `AttentionRegistry` answers a `submit_secret` password or
 authenticator request for a saved login by filling it through the same `prepareSecret` path as the
 secure card, with no card. While agent code from `evaluate` can still run in the page,
-`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because that code could read
-the filled fields. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
+`BrowserHost` reports `agentScriptedOrigin`, because that code could read the filled fields. When the
+call names a `loginId`, the agent gets the skip text at once, with no card: a reload of the sign-in page
+lets the saved login fill, and a scheduled routine has nobody to answer a card (#14181). Without a
+`loginId`, the card opens instead, so the agent can still let the user type the password. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
 A script can also write Cache Storage that a service worker serves as page code, also to a page that
 the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
@@ -199,7 +201,14 @@ and `mcpAuthorization()` gives it a fresh bearer at each hand-off. An enabled se
 with the name `github` wins. For `gh` and `git`, the service writes the token to
 `<userData>/provider-state/github` (mode 0600), and each provider gets `GH_CONFIG_DIR` and a
 `GIT_CONFIG_*` credential helper that reads that file. The environment holds only paths, never the
-token. Codex gets these values through `shell_environment_policy.set` in the thread config.
+token. The helper gives the `openbotgit[bot]` token for a repository that has one. For other
+repositories, it first asks the git credential helpers that the computer had before (with the
+original `GH_CONFIG_DIR` and no prompts), and gives the connector's user token only when they have
+no credential. The OpenBot GitHub App reaches only the repositories where it is installed, so this
+keeps git working on private repositories that the user's own login reaches. The fallback only
+reads: git does not send a store or an erase to the helpers of the computer, and when GitHub refuses
+the computer's credential, git does not try the connector token in the same command. Codex gets
+these values through `shell_environment_policy.set` in the thread config.
 
 A user token makes GitHub show "user with OpenBotGit". To show `openbotgit[bot]`, the desktop sends
 the user token to `POST /v1/github/installation-tokens` on the account Worker
@@ -215,7 +224,8 @@ granted the permission, the proxy adds an explanation to the `create_repository`
 agent can give to the user. With no key it answers 503, and the desktop keeps the user token.
 `src/main/github-bot-tokens.ts` renews the set ten minutes before the first token expires.
 - `git`: the helper runs with `useHttpPath`, and takes the bot token for the repository from
-  `provider-state/github/repositories`, or else the user token.
+  `provider-state/github/repositories`, or else the computer's own git login,
+  or else the user token.
 - MCP: `src/main/github-mcp-proxy.ts` is a loopback MCP server with a secret bearer. It forwards to
   `api.githubcopilot.com/mcp/` with one upstream client for each token, because GitHub binds an MCP
   session to its token. A tool call with `owner` and `repo` arguments uses that repository's bot

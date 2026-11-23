@@ -5,7 +5,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** An owner or admin restarts this self-hosted server now. Frozen by `host-restart-v1`. */
 export async function routeHostRestart(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,

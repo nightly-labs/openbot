@@ -2,7 +2,6 @@
 set -eu
 
 lego_args="--path /acme --email ${ACME_EMAIL} --accept-tos --dns cloudflare --domains ${SIGNAL_DOMAIN} --domains ${TURN_DOMAIN}"
-# A standby host adds its own names, such as signal2.openbot.run, separated by spaces.
 for domain in ${ACME_EXTRA_DOMAINS:-}; do
   lego_args="$lego_args --domains $domain"
 done
@@ -19,7 +18,6 @@ if [ ! -f "/acme/certificates/${SIGNAL_DOMAIN}.crt" ]; then
 fi
 make_certificates_readable
 while true; do
-  # lego v5 uses `run` for both initial issuance and renewal. `--renew-days` is the v5 renewal threshold flag.
   # shellcheck disable=SC2086
   /lego run $lego_args --renew-days 30
   make_certificates_readable

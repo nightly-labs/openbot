@@ -1,11 +1,3 @@
-// Writes `nix/sources.json` for a published release: its version, and the asset and hash that the Nix
-// package fetches for each system. The hashes come from the release's `SHA256SUMS.txt`, so no
-// installer is downloaded.
-//
-//   bun scripts/nix-sources.ts [version]
-//
-// Without a version, it uses the version in package.json. It never writes an older version than the
-// file already names, because release runs can finish out of tag order.
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Schema } from "effect";
@@ -23,8 +15,6 @@ const repository = process.env.GITHUB_REPOSITORY ?? "nightly-labs/openbot";
 const root = resolve(import.meta.dir, "..");
 const sourcesPath = resolve(root, "nix/sources.json");
 
-// Linux runs the AppImage. macOS runs the app from the ZIP, which electron-builder also makes for the
-// updater; the DMG would need a mount.
 const assetNames: Record<string, (version: string) => string> = {
   "x86_64-linux": (version) => `OpenBot-${version}-x86_64.AppImage`,
   "aarch64-linux": (version) => `OpenBot-${version}-arm64.AppImage`,

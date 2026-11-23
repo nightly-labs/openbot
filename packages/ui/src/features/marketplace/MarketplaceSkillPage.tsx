@@ -36,10 +36,8 @@ import type { MarketplaceAgent, MarketplaceModel } from "./marketplace-model";
 import { agentsWith, canSwitch, isOn, matches, outdated, useSkillWords } from "./marketplace-skill-state";
 import { createDetail, type MarketplaceScope } from "./marketplace-view";
 
-/** The agents section shows a search when more agents than this have the skill. */
 const AGENT_SEARCH_FROM = 6;
 
-/** The status of a skill on the page header, as an app's. */
 function useSkillStatus(model: () => MarketplaceModel) {
   const { t } = useText();
   const words = useSkillWords(model);
@@ -52,10 +50,6 @@ function useSkillStatus(model: () => MarketplaceModel) {
   };
 }
 
-/**
- * One agent that has the skill: its state, Update, on and off, and Remove. A built-in or a folder
- * skill has no Remove. A changed copy, or one that needs repair, keeps its switch as it is.
- */
 function AgentSkillRow(props: {
   model: MarketplaceModel;
   agent: MarketplaceAgent;
@@ -120,7 +114,6 @@ function AgentSkillRow(props: {
   );
 }
 
-/** "Agents · 12": a row for each agent that has the skill, a search for many, and Remove all. */
 function SkillAgents(props: {
   model: MarketplaceModel;
   skill: DialogSkill;
@@ -198,7 +191,6 @@ function SkillAgents(props: {
   );
 }
 
-/** What the skill does, who made it, where it comes from, its category, version, date and installs. */
 function SkillInformation(props: { skill: MarketplaceSkillSummary }) {
   const { t, format } = useText();
   const installs = useInstalls();
@@ -210,7 +202,6 @@ function SkillInformation(props: { skill: MarketplaceSkillSummary }) {
     label: t("marketplace.properties.updated"),
     value: format.date(new Date(props.skill.updatedAt), { dateStyle: "medium" }),
   });
-  /* A skill from GitHub has no catalog category, version or install count: its source is the commit. */
   const githubFacts = (origin: { repository: string; commit: string }) => [
     { label: t("marketplace.properties.creator"), value: props.skill.creatorName },
     { label: t("marketplace.skills.sourceLabel"), value: t("marketplace.skills.github.source", origin) },
@@ -236,7 +227,6 @@ function SkillInformation(props: { skill: MarketplaceSkillSummary }) {
           <Text as="p" variant="body-sm">
             {props.skill.description}
           </Text>
-          {/* `dt` and `dd` stay direct children of the list: axe rejects a wrapper per row. */}
           <dl class="marketplace-props marketplace-info">
             <For each={facts()} keyed={(fact) => fact.label}>
               {(fact) => (
@@ -261,24 +251,19 @@ function SkillInformation(props: { skill: MarketplaceSkillSummary }) {
   );
 }
 
-/** The page of a catalog skill on the app page layout: Try, the agents that have it, its SKILL.md and facts. */
 export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: MarketplaceSkillSummary }) {
   const { t } = useText();
   const model = () => props.scope.model;
   const status = useSkillStatus(model);
   const detail = createDetail(() => model().loadSkill(props.listing.id));
-  /* The loaded detail can be newer than the listing, and the Try card sends its instructions. */
   const skill = () => detail.value() ?? props.listing;
   const current = () => status(skill().id, skill().version);
   const origin = () => githubOrigin(skill().id);
-  // An effect, not `onSettled`: the read goes through the owner's props, and a prop that the
-  // owner computes makes a memo, which `onSettled` refuses.
   createEffect(
     () => props.listing.id,
     () => model().readSkills(),
   );
 
-  /* An agent can try the skill when it has this version and the skill is on. */
   const usable = (agentId: string) => {
     const installed = model().installedSkill(agentId, skill().id);
     return (
@@ -288,14 +273,12 @@ export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: 
       installed.installedVersion >= skill().version
     );
   };
-  /** The agent whose chat is open, when it can try the skill; else the first agent that can. */
   const tryAgent = () => {
     const agents = model()
       .agents()
       .filter((agent) => usable(agent.id));
     return agents.find((agent) => agent.id === model().activeAgentId()) ?? agents[0];
   };
-  /** Why the Try arrow is off, when the reason is not on the page already. */
   const reason = () => {
     if (tryAgent()) return model().trySkill ? undefined : t("marketplace.try.composerUnavailable");
     if (
@@ -314,7 +297,6 @@ export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: 
     const agent = tryAgent();
     return agent ? t("marketplace.try.in", { name: agent.name }) : t("skill.preview.try");
   };
-  /** The Try arrow: off while no agent can try the skill or no composer takes it. */
   const tryHandler = (full: MarketplaceSkillDetail) => {
     const run = model().trySkill;
     if (!tryAgent() || !run) return undefined;
@@ -412,7 +394,6 @@ export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: 
   );
 }
 
-/** A skill made on this computer, or in an agent's folder: the agents that have it. It has no catalog page. */
 export function MarketplaceLocalSkillPage(props: { scope: MarketplaceScope; skillId: string }) {
   const { t } = useText();
   const model = () => props.scope.model;

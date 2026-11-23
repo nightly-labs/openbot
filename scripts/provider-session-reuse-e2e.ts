@@ -1,17 +1,3 @@
-// Checks that OpenBot keeps a provider session when nothing in it is out of date, so the provider
-// keeps its history and its prompt cache. Runs the real agent service on a temporary profile with
-// stand-in provider executables. Cases:
-// - claude-refresh-resumes: a runtime refresh (an MCP or skill change) closes the Claude process and
-//   the next turn resumes the same session, with no history handoff. Before, it started a new session.
-// - codex-approval-grant-keeps-session: a tool approval granted in `~/.codex/config.toml` keeps the
-//   Codex session. A revoked approval still replaces it. Before, a grant also replaced it.
-// - antigravity-channel-delta: a channel member on Antigravity gets only the unread channel messages
-//   in its next turn on the same session. Before, each turn got the complete channel packet.
-// - claude-release-ends-process-group, codex-stop-ends-process-group:
-//   each stand-in starts a child in its own process group and does not stop it, as an MCP server
-//   leaves its child. When OpenBot closes the provider process, the child must end too. Before, it
-//   stayed with no owner. Each child holds a socket to this check, and the check waits for it to close.
-// `bun scripts/provider-session-reuse-e2e.ts`. Writes .openbot-build/provider-session-reuse-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -52,10 +38,8 @@ const agyLog = join(root, "agy.jsonl");
 const groupSocket = join(root, "group.sock");
 const CLAUDE_MODEL = defaultProviderModel("claude");
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
-// Bun's homedir does not follow HOME, and the Antigravity driver reads and writes the sign-in here.
 process.env.GEMINI_HOME = join(home, ".gemini");
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -71,21 +55,12 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { CODEX_PLACEHOLDER_COMMAND, codexMcpServerKey } = await import("../src/backend/mcp-provider-shapes");
 const { CURRENT_MESSAGE_SEPARATOR, HANDOFF_START } = await import("../src/backend/agent/delivery-content");
 
-/** A child that holds a socket to this check until it ends. It writes its process id. */
 const GROUP_CHILD = `const socket = require("node:net").connect(${JSON.stringify(groupSocket)});
 socket.on("error", () => process.exit(1));
 socket.write(String(process.pid));`;
-/**
- * Each stand-in runs this line at start. While a process-group case listens, it starts a child in the
- * stand-in's process group (not `detached`) and never stops it, as an MCP server leaves its child.
- */
 const START_GROUP_CHILD = `if (require("node:fs").existsSync(${JSON.stringify(groupSocket)}))
   require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(GROUP_CHILD)}], { stdio: "ignore" });`;
 
-/**
- * The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end. It
- * logs each start with its `--resume` session, and the text of each user message it gets.
- */
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
@@ -135,11 +110,6 @@ process.stdin.on("data", (chunk) => {
 process.stdin.on("end", () => process.exit(0));
 `;
 
-/**
- * A Codex app-server with the methods that the service calls. It logs each request. `config/read`
- * returns the `mcp_servers` table of a JSON file that the check changes, as Codex returns the table
- * of `~/.codex/config.toml`.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -209,7 +179,6 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-/** An Antigravity CLI 1.5.4 with the methods that the service calls. It logs each prompt. */
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -233,8 +202,6 @@ function handle(message) {
   if (message.method === "session/prompt") {
     const text = params.prompt.map((block) => block.text ?? "").join("");
     log({ sessionId: params.sessionId, length: text.length, text });
-    // The context fill: a drop is a compaction that the agent does by itself, and a nearly full
-    // context makes OpenBot replace the session.
     const used = text.includes("usage-high") ? 900000 : text.includes("usage-drop") ? 1000 : 400000;
     write({ method: "session/update", params: { sessionId: params.sessionId, update: { sessionUpdate: "usage_update", used, size: 1000000 } } });
     write({ method: "session/update", params: { sessionId: params.sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } } } });
@@ -263,10 +230,6 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. Sessions, turns and events come from the real client.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -337,7 +300,6 @@ interface PromptReport {
   length: number;
 }
 
-/** What each case saw. Each case sets only its own fields. */
 interface CaseDetails {
   sessionRows?: { session: string; state: string }[];
   spawns?: { resume: string | null; sessionId: string }[];
@@ -366,6 +328,7 @@ const report: { cases: CaseReport[]; passed: boolean } = { cases: [], passed: fa
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -384,7 +347,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, of its database, or of a stand-in log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -395,7 +357,6 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-/** The entries of a JSON-lines log that a stand-in writes. */
 function entries<T>(path: string): T[] {
   try {
     return readFileSync(path, "utf8")
@@ -418,7 +379,6 @@ interface Profile {
   sqlite: () => DatabaseSync;
 }
 
-/** Runs one case on its own temporary profile and service, where only `provider` is on. */
 async function runCase(
   name: string,
   provider: AgentProviderId,
@@ -463,7 +423,6 @@ const idle = (agents: Service, agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Creates an agent whose first chat turn runs `initialMessage`, and waits for that turn to end. */
 async function createAgent(agents: Service, name: string, provider: AgentProviderId, model?: string) {
   const agent = await runCauseEffect(
     agents.createAgent({
@@ -481,7 +440,6 @@ async function createAgent(agents: Service, name: string, provider: AgentProvide
   return agent;
 }
 
-/** Sends one chat message and waits for its delivery to complete. */
 async function sendTurn({ agents, mailbox }: Profile, agentId: string, text: string): Promise<void> {
   const receipt = await runCauseEffect(agents.sendMessage({ agentId, text }));
   const deliveryId = receipt.deliveries[0]?.id;
@@ -509,13 +467,8 @@ interface GroupChild {
   ended: Promise<void>;
 }
 
-/** How long a child can stay after its provider closes. The group gets SIGKILL 2 seconds after SIGTERM. */
 const GROUP_CHILD_END_MS = 10_000;
 
-/**
- * Runs `run` while the stand-ins start a group child (`START_GROUP_CHILD`). The socket of a child
- * closes when the child ends, for any reason. A child that is still there at the end is stopped.
- */
 async function withGroupChildren(run: (children: GroupChild[]) => Promise<void>): Promise<void> {
   const children: GroupChild[] = [];
   const server = createServer((socket) => {
@@ -539,18 +492,15 @@ async function withGroupChildren(run: (children: GroupChild[]) => Promise<void>)
     await rm(groupSocket, { force: true });
     for (const child of children) {
       if (child.socket.closed) continue;
-      // A child that this check started, which the provider stop left.
       if (child.pid > 0) process.kill(child.pid, "SIGKILL");
       child.socket.destroy();
     }
   }
 }
 
-/** Waits for the first group child to connect and give its process id. */
 const firstGroupChild = (children: GroupChild[]) =>
   waitFor("the stand-in's group child", () => (children[0]?.pid ? children[0] : null));
 
-/** Waits for each group child to end. True for a child that ended, false for one still there. */
 async function groupChildrenEnd(children: GroupChild[]): Promise<{ pid: number; endedWithProvider: boolean }[]> {
   let deadline: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<void>((done) => {
@@ -561,10 +511,6 @@ async function groupChildrenEnd(children: GroupChild[]): Promise<{ pid: number; 
   return children.map((child) => ({ pid: child.pid, endedWithProvider: child.socket.closed }));
 }
 
-/**
- * Creates an agent, closes its provider process with `close`, and checks that each group child ended.
- * The socket listens before the service starts, because the service starts Codex at once.
- */
 const runGroupCase = (
   name: string,
   provider: AgentProviderId,
@@ -608,8 +554,6 @@ try {
       );
       const firstSpawn = await waitFor("the first Claude start", () => entries<{ sessionId: string }>(claudeSpawns)[0]);
       const firstSession = firstSpawn.sessionId;
-      // The same call that an MCP server or a skill change makes. The second one finds the session
-      // with no process: it must keep the session as well.
       await runCauseEffect(agents.refreshAllAgentRuntimes());
       await runCauseEffect(agents.refreshAllAgentRuntimes());
       const messagesBefore = entries(claudeMessages).length;
@@ -637,7 +581,6 @@ try {
   await runCase("codex-approval-grant-keeps-session", "codex", async (profile, details) => {
     const { agents } = profile;
     const server: McpServerConfig = {
-      // A new server has no id yet. The store gives it one.
       id: "",
       name: "echo",
       transport: "stdio",
@@ -650,7 +593,6 @@ try {
       url: "",
       headers: [],
     };
-    // The entry that Codex keeps for this server: OpenBot's disabled placeholder, with the approvals.
     const key = codexMcpServerKey(server);
     const writeConfig = (tools: { echo: { approval_mode: "approve" | "prompt" } } | null) =>
       writeFileSync(
@@ -672,7 +614,6 @@ try {
     writeConfig(null);
     await sendTurn(profile, agent.id, "turn-after-revoke");
     const afterRevokeTurn3 = starts();
-    // A tool set to ask every time is stricter than no setting: the session must not keep running it.
     writeConfig({ echo: { approval_mode: "prompt" } });
     await sendTurn(profile, agent.id, "turn-after-prompt");
     const counts = { afterTurn1, afterGrantTurn2, afterRevokeTurn3, afterPromptTurn4: starts() };
@@ -708,13 +649,10 @@ try {
     );
     const FIRST = "first-channel-request-7c1e";
     const SECOND = "second-channel-request-9b4d";
-    // The agent compacts by itself during this turn, so the next packet is complete again.
     const THIRD = "third-channel-request-usage-drop-2f6a";
-    // The context is nearly full after this turn, so OpenBot replaces the channel session.
     const FOURTH = "fourth-channel-request-usage-high-5d3c";
     const FIFTH = "fifth-channel-request-a81b";
     const prompts = () => entries<{ sessionId: string; length: number; text: string }>(agyLog);
-    // The agent's first chat turn is in the log too.
     const beforeChannel = prompts().length;
     for (const text of [FIRST, SECOND, THIRD, FOURTH, FIFTH]) {
       await runCauseEffect(
@@ -760,19 +698,15 @@ try {
     assert.ok(fourth.text.includes(FIRST), "After the agent compacts, the next packet is complete.");
     assert.notEqual(fifth.sessionId, first.sessionId, "A nearly full channel session is replaced.");
     assert.ok(fifth.text.includes(FIRST), "The replacement channel session gets the complete packet.");
-    // A channel summary would run as more prompts: the new session's unknown window must not shrink
-    // the packet budget to a few characters.
     assert.equal(prompts().length - beforeChannel, 5, "Each channel message is one prompt, with no summary prompts.");
   });
 
-  // The release that an MCP or skill change makes: the Claude CLI gets the end of its stdin and exits.
   await runGroupCase(
     "claude-release-ends-process-group",
     "claude",
     (profile) => runCauseEffect(profile.agents.refreshAllAgentRuntimes()),
     { model: CLAUDE_MODEL, clientFactory: (_provider, cli) => new ClaudeStandIn(cli) },
   );
-  // The stop of each client, as when the app quits. The release of an idle provider calls the same stop.
   const stopService = (profile: Profile) => runCauseEffect(profile.agents.stop());
   await runGroupCase("codex-stop-ends-process-group", "codex", stopService);
 

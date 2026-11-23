@@ -1,13 +1,3 @@
-// Checks that a macOS Host Manager that takes over the updates (docs/multi-tenant-hosting.md) stops
-// the tenant's own update work. It runs the app's `UpdateService` on an updater that answers like
-// electron-updater, and makes the calls that `HostUpdateCoordinator` makes on each poll:
-// `setManagedByHost`, then `setHostState`. It checks that:
-// - the takeover cancels a download that runs, and its late progress and "downloaded" events do not
-//   replace the host state;
-// - a check that is still out when the host takes over does not show its result or start a download;
-// - a tenant that the host does not list does not keep a busy phase, which has no deadline then;
-// - when the host gives the updates back, the tenant checks and downloads again.
-// `bun run test:update-host-takeover`. Writes .openbot-build/update-host-takeover-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -29,10 +19,8 @@ const CURRENT = "1.0.0";
 const TENANT_RELEASE = "1.1.0";
 const HOST_RELEASE = "1.2.0";
 
-/** The result of `Promise.withResolvers`, which the Node type environment does not name. */
 type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (reason: Error) => void };
 
-/** A cancellation token as electron-updater makes it: a cancel rejects the download that uses it. */
 class Token implements UpdateCancellationToken {
   cancelled = false;
   #onCancel: (() => void) | null = null;
@@ -45,7 +33,6 @@ class Token implements UpdateCancellationToken {
   }
 }
 
-/** An updater whose checks and downloads end only when the test says so. */
 class ProbeUpdater implements UpdateAdapter {
   allowPrerelease = false;
   autoDownload = false;
@@ -56,7 +43,6 @@ class ProbeUpdater implements UpdateAdapter {
   #checkStarted: Deferred<void> = Promise.withResolvers();
   #downloadStarted: Deferred<void> = Promise.withResolvers();
 
-  /** As in `hosted-update-adapter.ts`: each updater event passes at most one of these values. */
   on(event: string, listener: (value: ProgressInfo & UpdateInfo & Error) => void): this {
     this.#events.on(event, listener);
     return this;
@@ -120,7 +106,6 @@ function newService(updater: ProbeUpdater): UpdateService {
     autoDownload: true,
     beforeInstall: async () => undefined,
     platform: "darwin",
-    // Only the checks that the test starts.
     initialCheckDelayMs: 3_600_000,
     checkIntervalMs: 3_600_000,
   });
@@ -128,7 +113,6 @@ function newService(updater: ProbeUpdater): UpdateService {
   return service;
 }
 
-/** The host state that `HostUpdateCoordinator` reads from `state.json` and passes on. */
 function hostState(phase: "idle" | "downloading", version: string | null) {
   return { phase, cycle: "cycle-1", version, updatedAt: Date.now(), error: null };
 }
@@ -145,7 +129,6 @@ function view(status: UpdateStatus) {
 const steps: { name: string; status: ReturnType<typeof view> }[] = [];
 const record = (name: string, status: UpdateStatus) => steps.push({ name, status: view(status) });
 
-// 1. A download runs when the host takes over.
 {
   const updater = new ProbeUpdater();
   const service = newService(updater);
@@ -181,7 +164,6 @@ const record = (name: string, status: UpdateStatus) => steps.push({ name, status
   assert.deepEqual(view(service.getStatus()), host, "late events of the cancelled download change nothing");
   record("late events of the cancelled download change nothing", service.getStatus());
 
-  // The reverse: the host gives the updates back.
   service.setManagedByHost(false);
   assert.equal(service.getStatus().phase, "idle");
   const again = Effect.runPromise(service.checkForUpdates());
@@ -198,7 +180,6 @@ const record = (name: string, status: UpdateStatus) => steps.push({ name, status
   await Effect.runPromise(service.stop());
 }
 
-// 2. A check is still out when the host takes over.
 {
   const updater = new ProbeUpdater();
   const service = newService(updater);

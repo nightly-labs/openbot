@@ -1,6 +1,3 @@
-// How the app starts the speech host. It is an Electron `utilityProcess` for the same reasons as the
-// voice transcription host; see `voice-transcription-host-process.ts`.
-
 import { join } from "node:path";
 import { utilityProcess } from "electron";
 import type { VoiceSpeechHostProcess, VoiceSpeechResponse } from "./voice-speech-protocol";
