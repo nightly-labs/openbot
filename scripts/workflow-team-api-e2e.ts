@@ -371,6 +371,50 @@ const teamBrowser: TeamApiBrowser = {
 const root = await mkdtemp(join(tmpdir(), "openbot-workflow-team-api-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
+const FAKE_CODEX = `#!/usr/bin/env node
+if (process.argv.includes("--version")) {
+  process.stdout.write("codex-cli 99.0.0\\n");
+  process.exit(0);
+}
+process.stdout.on("error", (error) => {
+  if (error.code === "EPIPE") process.exit(0);
+  throw error;
+});
+const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
+const answer = (message) => {
+  switch (message.method) {
+    case "initialize": return write({ id: message.id, result: {} });
+    case "account/read": return write({ id: message.id, result: { account: { type: "chatgpt", email: "codex@example.com" } } });
+    case "account/rateLimits/read": return write({ id: message.id, result: { rateLimits: { limitId: "codex", primary: null, secondary: null }, rateLimitsByLimitId: null } });
+    case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-5.5", displayName: "GPT-5.5" }] } });
+    case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
+    case "config/read": return write({ id: message.id, result: { config: { mcp_servers: {} }, layers: [] } });
+    case "config/batchWrite": return write({ id: message.id, result: {} });
+    default: return write({ id: message.id, error: { code: -32601, message: "Method not found: " + message.method } });
+  }
+};
+let buffer = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let newline = buffer.indexOf("\\n");
+  while (newline >= 0) {
+    const line = buffer.slice(0, newline);
+    buffer = buffer.slice(newline + 1);
+    if (line) {
+      const message = JSON.parse(line);
+      if (message.method && message.id !== undefined) answer(message);
+    }
+    newline = buffer.indexOf("\\n");
+  }
+});
+process.stdin.on("end", () => process.exit(0));
+setInterval(() => {}, 1000);
+`;
+const fakeCodex = join(root, "codex");
+writeFileSync(fakeCodex, FAKE_CODEX, { mode: 0o755 });
+process.env.OPENBOT_CODEX_PATH = fakeCodex;
+process.env.CODEX_HOME = join(home, ".codex");
 
 interface Host {
   database: OpenBotDatabase;
