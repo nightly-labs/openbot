@@ -49,7 +49,7 @@ export function withClientTabs(
   browser: ClientBrowser | null,
   requesters: readonly string[],
 ): DynamicToolResult {
-  const shared = requesters.flatMap((memberId) => {
+  const shared = onlyRequester(requesters).flatMap((memberId) => {
     const tabs = browser?.tabs(memberId);
     return tabs ? [tabs.map((tab) => sharedTab(memberId, tab))] : [];
   });
@@ -64,6 +64,10 @@ const PERSON_TYPES_SECRETS =
   "On a Chrome tab, the person types passwords and other secrets. Ask the person to type it in that tab, then go on.";
 const NOT_SHARED =
   "No person who requested this turn shares Chrome tabs now. Use the OpenBot browser, or ask the person to share tabs with the OpenBot Chrome extension.";
+
+function onlyRequester(requesters: readonly string[]): readonly string[] {
+  return requesters.length === 1 ? requesters : [];
+}
 
 const FAILURES: Record<ClientBrowserFailureCode, string> = {
   denied: "The person denied this action in Chrome. Do not try it again in another way; tell the person.",
@@ -157,7 +161,7 @@ export const runClientBrowserTool = Effect.fn("runClientBrowserTool")(function* 
   tool: string,
   args: unknown,
 ) {
-  const sharing = requesters.filter((memberId) => browser?.tabs(memberId));
+  const sharing = onlyRequester(requesters).filter((memberId) => browser?.tabs(memberId));
   let memberId: string | undefined;
   let tabId = "";
   if (tool === "open") memberId = sharing[0];

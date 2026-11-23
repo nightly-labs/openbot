@@ -212,6 +212,11 @@ export async function runCommand(command: ClientBrowserCommand, context: Command
         await context.allow("site", url, command.key);
         if (looksLikeGrant(url)) await context.allow("sign-in", url, command.key);
         await attach(id);
+        if (typesText(command.key)) {
+          const focused = await inPage(id, focusedField, {});
+          if (focused.password === true) await context.allow("password", url, command.key);
+          else if (focused.payment === true) await context.allow("payment", url, command.key);
+        }
         await pressKey(id, command.key);
         return result(`Pressed ${command.key}.`, await waitForLoad(id));
       case "scroll":
@@ -496,6 +501,21 @@ const NAMED_KEYS: Record<string, { code: string; keyCode: number; text?: string 
   Space: { code: "Space", keyCode: 32, text: " " },
 };
 const MODIFIERS: Record<string, number> = { Alt: 1, Control: 2, Ctrl: 2, Meta: 4, Cmd: 4, Shift: 8 };
+
+function typesText(key: string): boolean {
+  const main = key.split("+").pop() || "+";
+  const named = NAMED_KEYS[main === " " ? "Space" : main];
+  return named ? named.text !== undefined : true;
+}
+
+function focusedField() {
+  const field = document.activeElement;
+  const tokens = (field?.getAttribute("autocomplete") ?? "").split(/\s+/);
+  return {
+    password: field instanceof HTMLInputElement && field.type === "password",
+    payment: tokens.some((token) => token.startsWith("cc-")),
+  };
+}
 
 async function pressKey(id: number, key: string): Promise<void> {
   const parts = key.split("+");

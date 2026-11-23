@@ -164,9 +164,9 @@ async function webCode(silent: boolean): Promise<{ code: string; verifier: strin
 }
 
 async function exchangeCode({ code, verifier }: { code: string; verifier: string }): Promise<ExtensionSession> {
-  const { response, body } = await accountRequest("/v1/browser-extension/exchange", {
+  const { response, body } = await accountRequest("/v1/mobile-auth/company/exchange", {
     method: "POST",
-    body: { code, codeVerifier: verifier, deviceId: await deviceId(), deviceName: DEVICE_NAME },
+    body: { code, codeVerifier: verifier, deviceId: await deviceId(), deviceName: DEVICE_NAME, platform: "unknown" },
   });
   if (!response.ok) throw new SignInIssue(issueFrom(response, body));
   const user = decodeUser(body?.user);
