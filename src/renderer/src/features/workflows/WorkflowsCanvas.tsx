@@ -76,23 +76,19 @@ export function WorkflowsCanvas(props: {
         setHiggsfield(providers.higgsfield);
         setOpenbot(providers.openbot === true);
         setServiceAccounts(providers.accounts);
+        setProvidersRead(true);
         if (providers.openbot === true) readCreditBalance();
       })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!disposed) setProvidersRead(true);
-      });
+      .catch(() => undefined);
     void props.host.workflows
       .mediaCatalog()
       .then((answer) => {
         if (disposed) return;
         setCatalog(answer.models);
         setUnavailable(answer.unavailable ?? []);
+        setCatalogRead(true);
       })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!disposed) setCatalogRead(true);
-      });
+      .catch(() => undefined);
   };
   const serviceModels = (provider: "sunra" | "higgsfield"): readonly WorkflowMediaModel[] => {
     const live = catalog()

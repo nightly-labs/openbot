@@ -3083,7 +3083,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const [listed, credits] = yield* Effect.all([services, credit], { concurrency: "unbounded" });
     return {
       models: [...credits.models, ...listed.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
-      ...(credits.unavailable?.length ? { unavailable: credits.unavailable.slice(0, WORKFLOW_MEDIA_CATALOG_MAX) } : {}),
+      ...(credits.unavailable.length > 0
+        ? { unavailable: credits.unavailable.slice(0, WORKFLOW_MEDIA_CATALOG_MAX) }
+        : {}),
     } satisfies WorkflowMediaCatalog;
   }).bind(this);
 
