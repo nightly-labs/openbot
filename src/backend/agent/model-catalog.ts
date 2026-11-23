@@ -22,6 +22,14 @@ type ProviderModelCatalog = NonNullable<BuiltInProviderDriver["catalog"]>;
 const logger = createOpenBotLogger("provider-runtime");
 const MODEL_METADATA_FALLBACKS = [...FALLBACK_MODELS, ...OPENCODE_FREE_MODEL_FALLBACKS];
 
+function isOlderListing(
+  server: ModelListResponse["data"][number],
+  listed: ReadonlyMap<string, ModelListResponse["data"][number]>,
+): boolean {
+  if (server.hidden === true) return true;
+  return server.upgrade !== undefined && server.upgrade !== server.model && listed.has(server.upgrade);
+}
+
 function withPublicIds(models: AgentModelOption[]): AgentModelOption[] {
   registerPublicValues(models.map((model) => model.id));
   return models;
@@ -132,6 +140,7 @@ export class ModelCatalog {
           : (fallback?.defaultReasoningEffort ?? "medium"),
         supportedReasoningEfforts: efforts.length ? efforts : (fallback?.supportedReasoningEfforts ?? ["medium"]),
         ...(server.reasoningEffortConfigurable === false ? { reasoningEffortConfigurable: false } : {}),
+        ...(isOlderListing(server, serverModels) ? { listing: "older" as const } : {}),
         ...catalog.modelFields?.(server),
       });
     }
