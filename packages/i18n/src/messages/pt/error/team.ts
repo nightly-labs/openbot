@@ -130,6 +130,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Esta conexão não oferece suporte a alterações na identidade do servidor.",
   "error.team.hostUpdateUnsupported": "Esta conexão não oferece suporte a atualizações do computador anfitrião.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
+  "error.team.hostSignalHomeUnsupported": "Esta conexão não oferece suporte à escolha do servidor do Signal.",
   "error.team.hostVoiceModelUnsupported":
     "Esta conexão não oferece suporte ao modelo de reconhecimento de fala do servidor.",
   "error.team.hostRestartUnsupported": "Esta conexão não oferece suporte à reinicialização do servidor.",

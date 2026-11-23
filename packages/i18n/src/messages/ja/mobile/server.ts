@@ -330,6 +330,7 @@ export const messages = {
   "mobile.server.route.invite": "ユーザーを招待",
   "mobile.server.route.member": "メンバー",
   "mobile.server.route.timezone": "タイムゾーン",
+  "mobile.server.route.signalHome": "Signal サーバー",
   "mobile.server.route.personality": "エージェントの性格",
   "mobile.server.route.agents": "エージェント",
   "mobile.server.route.voiceModel": "音声認識",
@@ -458,6 +459,28 @@ export const messages = {
     "タイムゾーンを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.settings.timezoneUnsupported":
     "ここでタイムゾーンを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.signalHomeAutomatic": "自動",
+  "mobile.server.settings.signalHomeNearest": "最寄りの Signal サーバー",
+  "mobile.server.settings.signalHomeInUse": "使用中: {name}",
+  "mobile.server.settings.signalHomeLoading": "Signal サーバーを測定しています…",
+  "mobile.server.settings.signalHomeSaveFailed": "Signal サーバーを変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Signal サーバーを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
+  "mobile.server.settings.signalHomeUnsupported":
+    "ここで Signal サーバーを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.signalHomeDescription":
+    "メンバーはこの Signal サーバーを通じてこのサーバーに接続します。レイテンシの低い Signal サーバーほど接続が速くなります。",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} が応答しません。{chosen} が再び応答するまで、サーバーは {name} を使います。",
+  "mobile.server.settings.signalHomeMoving": "サーバーは {name} に移動します。メンバーは数秒後に再接続します。",
+  "mobile.server.settings.signalHomeLoadFailed": "Signal サーバーを読み込めませんでした。",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "応答なし",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "ヘルシンキ 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "ヘルシンキ 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "サンノゼ",
+  "mobile.server.settings.signalHomePlaceSydney": "シドニー",
+  "mobile.server.settings.signalHomePlaceSingapore": "シンガポール",
   "mobile.server.settings.voiceModelDescription":
     "このサーバーのエージェントは、字幕のない動画の音声をこのモデルで文字起こしします。",
   "mobile.server.settings.voiceModelLoading": "音声認識を読み込み中…",

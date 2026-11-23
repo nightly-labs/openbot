@@ -21,6 +21,7 @@ import type {
 import {
   decodeCompanySignInScimToken,
   decodeCompanySignInSettings,
+  isSignalHomeId,
   type TestCompanySignInInput,
   type TestCompanySignInResult,
 } from "@openbot/contracts/ipc";
@@ -178,6 +179,24 @@ export type RemoteConnectionBootstrap = RemoteSessionTicket;
 
 export interface RemoteHostTicketHome {
   readonly failedSignalUrl?: string;
+  readonly preferredSignalHome?: string | null;
+}
+
+export interface RemoteSignalHomeEntry {
+  readonly id: string;
+  readonly url: string;
+}
+
+function decodeRemoteSignalHomes(value: unknown): RemoteSignalHomeEntry[] {
+  const homes = decodeRecord(value, "Signal homes").homes;
+  if (!Array.isArray(homes)) throw new Error("Invalid Signal homes.");
+  return homes.map((home) => {
+    const entry = decodeRecord(home, "Signal home");
+    const id = requiredString(entry, "id");
+    const url = requiredString(entry, "url");
+    if (!isSignalHomeId(id) || !/^wss?:/u.test(url)) throw new Error("Invalid Signal home.");
+    return { id, url };
+  });
 }
 
 export type VerifiedRemoteSessionTicket = Pick<
@@ -724,6 +743,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
             machineToken,
             signalHome: true,
             ...(home.failedSignalUrl === undefined ? {} : { failedSignalUrl: home.failedSignalUrl }),
+            ...(home.preferredSignalHome ? { preferredSignalHome: home.preferredSignalHome } : {}),
           }
         : // `false` keeps the stored home: the host peer of this build still connects to it.
           { machineToken, signalHome: false };
@@ -731,6 +751,21 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
         decodeRemoteSessionTicket,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly listRemoteSignalHomes = Effect.fn("CentralAuth.listRemoteSignalHomes")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<RemoteSignalHomeEntry[], CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/signal-homes`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
+        decodeRemoteSignalHomes,
       );
     },
     (operation) => this.#owned(operation),

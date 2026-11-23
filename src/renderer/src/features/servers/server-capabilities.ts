@@ -89,6 +89,7 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-signal-home-v1" ||
       capability === "host-turn-limits-v1" ||
       capability === "host-restart-v1" ||
       capability === "host-appearance-v1" ||

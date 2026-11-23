@@ -123,6 +123,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
+  "error.team.hostSignalHomeUnsupported": "この接続では Signal サーバーの選択に対応していません。",
   "error.team.hostVoiceModelUnsupported": "この接続はサーバーの音声認識モデルに対応していません。",
   "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
   "error.team.ownerTransferUnsupported": "このサーバーは所有権の移転に対応していません。",
