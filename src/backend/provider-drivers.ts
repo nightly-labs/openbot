@@ -793,6 +793,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         withAccountEnvironment(context),
         context.history?.("grok"),
         context.fitImage,
+        () => discoveryFolder("grok"),
       ),
     createProfileClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
@@ -805,6 +806,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         undefined,
         accountEnvironment && (() => accountEnvironment),
+        undefined,
+        undefined,
+        () => discoveryFolder("grok"),
       ),
     createMediaClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
@@ -817,6 +821,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         undefined,
         accountEnvironment && (() => accountEnvironment),
+        undefined,
+        undefined,
+        () => discoveryFolder("grok"),
       ),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,

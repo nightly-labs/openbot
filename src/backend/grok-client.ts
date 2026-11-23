@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ClientSideConnection, ContentBlock, InitializeResponse } from "@agentclientprotocol/sdk";
@@ -31,10 +31,23 @@ export class GrokAgentClient extends AcpAgentClient {
     agentEnvironment?: () => Readonly<Record<string, string>>,
     history?: AcpHistoryPersistence,
     fitImage?: ImageFitter | null,
+    discoveryFolder?: () => string,
   ) {
+    const discoveryCwd = discoveryFolder && (() => realpathSync(discoveryFolder()));
     super(cli, requestTimeoutMs, {
       provider: "grok",
-      flavor: GROK_ACP_FLAVOR,
+      flavor: discoveryCwd
+        ? {
+            ...GROK_ACP_FLAVOR,
+            sessionFiles: (_argv, sessionId) =>
+              grokDiscoverySessionFiles(
+                grokHomeDirectory({ ...process.env, ...agentEnvironment?.() }),
+                discoveryCwd(),
+                sessionId,
+              ),
+          }
+        : GROK_ACP_FLAVOR,
+      ...(discoveryCwd ? { discoveryCwd } : {}),
       ...(confinement
         ? {
             confine: (target) =>
@@ -81,6 +94,13 @@ export class GrokAgentClient extends AcpAgentClient {
       steer,
     });
   }
+}
+
+const GROK_SESSION_ID = /^[\w-]+$/u;
+
+function grokDiscoverySessionFiles(grokHome: string, cwd: string, sessionId: string): string[] {
+  if (!GROK_SESSION_ID.test(sessionId)) return [];
+  return [join(grokHome, "sessions", encodeURIComponent(cwd), sessionId)];
 }
 
 const GROK_NON_MEDIA_TOOLS = [
