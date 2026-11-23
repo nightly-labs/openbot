@@ -224,7 +224,8 @@ export async function runCommand(command: ClientBrowserCommand, context: Command
         if (typesText(command.key)) {
           const focused = await inPage(id, focusedField, {});
           if (focused.password === true) await context.allow("password", url, command.key);
-          else if (focused.payment === true) await context.allow("payment", url, command.key);
+          else if (focused.payment === true || (await focusInClosedShadow(id)))
+            await context.allow("payment", url, command.key);
         }
         await pressKey(id, command.key);
         return result(`Pressed ${command.key}.`, await waitForLoad(id));
@@ -517,15 +518,25 @@ function typesText(key: string): boolean {
   return named ? named.text !== undefined : true;
 }
 
+async function focusInClosedShadow(tabId: number): Promise<boolean> {
+  const focused = await send(tabId, "Runtime.evaluate", {
+    expression:
+      "(() => { let field = document.activeElement; while (field?.shadowRoot?.activeElement) field = field.shadowRoot.activeElement; return field; })()",
+    contextId: await world(tabId, false),
+  });
+  const objectId = isDynamicRecord(focused.result) ? focused.result.objectId : null;
+  if (!isString(objectId)) return false;
+  const described = await send(tabId, "DOM.describeNode", { objectId, depth: 1, pierce: true }).catch(() => null);
+  const roots = described && isDynamicRecord(described.node) ? described.node.shadowRoots : null;
+  return Array.isArray(roots) && roots.some((root) => isDynamicRecord(root) && root.shadowRootType === "closed");
+}
+
 function focusedField() {
   let field = document.activeElement;
   while (field?.shadowRoot?.activeElement) field = field.shadowRoot.activeElement;
   const tokens = (field?.getAttribute("autocomplete") ?? "").split(/\s+/);
   const opaque =
-    field instanceof HTMLIFrameElement ||
-    field instanceof HTMLFrameElement ||
-    field instanceof HTMLObjectElement ||
-    (field?.tagName.includes("-") === true && !field.shadowRoot);
+    field instanceof HTMLIFrameElement || field instanceof HTMLFrameElement || field instanceof HTMLObjectElement;
   return {
     password: field instanceof HTMLInputElement && field.type === "password",
     payment: opaque || tokens.some((token) => token.startsWith("cc-")),
@@ -850,7 +861,7 @@ function pageLocate(input: { target: ClientBrowserTarget; focus: boolean; intera
     node instanceof HTMLIFrameElement ||
     node instanceof HTMLFrameElement ||
     node instanceof HTMLObjectElement ||
-    (node.tagName.includes("-") && !node.shadowRoot);
+    (!field.matches(fields) && node.tagName.includes("-") && !node.shadowRoot);
   const tokens = (field.getAttribute("autocomplete") ?? "").split(/\s+/);
   const link = element.closest("a[href]");
   let x = 0;
