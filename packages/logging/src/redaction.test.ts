@@ -318,6 +318,8 @@ describe("redactText", () => {
     expect(
       containsSecret('const body = {"name": "demo"\nlater {"auth": {"user": "a", "pwd": "x"}, "apiKey": "abc123zz"}'),
     ).toBe(true);
+    expect(containsSecret(`${code}\n{"body": "{\\"apiKey\\":\\"abcdef123456\\"}"}`)).toBe(true);
+    expect(containsSecret(`${code}\n{"body": "{\\"headers\\":{\\"X-Custom\\":\\"abc123zz\\"}}"}`)).toBe(true);
     registerSecretValue("saved-skill-secret-value");
     expect(containsSecret(`${code}\nuse saved-skill-secret-value here`)).toBe(true);
   });

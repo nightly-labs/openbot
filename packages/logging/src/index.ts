@@ -230,7 +230,7 @@ const MAX_EMBEDDED_SCANS = 16;
 const UNSCANNED = "[redacted-unscanned]";
 
 const JSON_ONLY_SECRET_SHAPE = new RegExp(
-  String.raw`"headers"\s*:|\\u[0-9A-Fa-f]{4}|"(?:name|key)"\s*:\s*"(?:${SECRET_LABEL}|keys?)"`,
+  String.raw`\\?"headers\\?"\s*:|\\u[0-9A-Fa-f]{4}|\\"(?:${SECRET_LABEL}|keys?)\\"\s*:|\\?"(?:name|key)\\?"\s*:\s*\\?"(?:${SECRET_LABEL}|keys?)\\?"`,
   "iu",
 );
 
