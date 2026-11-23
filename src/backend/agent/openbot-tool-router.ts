@@ -2096,7 +2096,9 @@ export class OpenBotToolRouter {
           "The user has not allowed you to start a new chat. Ask the user to allow it in your settings, or to start a new chat there.",
         );
       if (agent.threadId !== this.#conversation.publicThreadId(senderAgentId, params.threadId))
-        return openBotToolFailure("You can start a new chat only from your own chat, not from a task or a channel.");
+        return openBotToolFailure(
+          "You can start a new chat only from your own main chat, not from a task, a thread or a channel. Write your handoff note first, then tell the user to open a new chat with you from your main chat.",
+        );
       this.#hooks.requestNewChat(senderAgentId);
       return openBotToolResult({
         status: "requested",
