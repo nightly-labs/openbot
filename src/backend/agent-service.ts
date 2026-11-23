@@ -1173,6 +1173,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               Effect.andThen(this.#warmGenerations.stopIdle("pi")),
             ),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        removedModelBackup: (agent) => {
+          const backup = this.#readyBackup(agent);
+          return backup ? this.#moveInput(agent.id, backup, agent.reasoningEffort) : null;
+        },
+        noteModelRemoved: (agent, removed) => this.#appendModelSwitchMarker(agent, "model-removed", removed, false),
         providerAvailable: (provider) => this.#providerAvailable(provider),
         preference: () => this.#preference(),
       },
@@ -4203,21 +4208,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       };
     if (!agent.usageLimitReturn && !agent.backupModels) return null;
     if (this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId)) return null;
-    const move = (choice: AgentModelChoice, reasoningEffort = agent.reasoningEffort) => {
-      const model = this.#agentModels(choice).find(
-        (option) => option.provider === choice.provider && option.id === choice.model,
-      );
-      return {
-        agentId,
-        provider: choice.provider,
-        model: choice.model,
-        providerAccountId: choice.providerAccountId ?? null,
-        reasoningEffort:
-          model && !model.supportedReasoningEfforts.includes(reasoningEffort)
-            ? model.defaultReasoningEffort
-            : reasoningEffort,
-      };
-    };
+    const move = (choice: AgentModelChoice, reasoningEffort = agent.reasoningEffort) =>
+      this.#moveInput(agentId, choice, reasoningEffort);
     const returnTo = agent.usageLimitReturn && this.#returnTarget(agent.usageLimitReturn);
     if (returnTo && this.#usageLimitReady(returnTo) && this.#usageLimits.returnConfirmed(usageLimitOf(returnTo)))
       return {
@@ -4405,11 +4397,31 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return !this.#usageLimits.mayDrain(agentId) && !this.#usageLimits.mayTry(agentId);
   }
 
+  #moveInput(agentId: string, choice: AgentModelChoice, reasoningEffort: AgentReasoningEffort): UpdateAgentInput {
+    const model = this.#agentModels(choice).find(
+      (option) => option.provider === choice.provider && option.id === choice.model,
+    );
+    return {
+      agentId,
+      provider: choice.provider,
+      model: choice.model,
+      providerAccountId: choice.providerAccountId ?? null,
+      reasoningEffort:
+        model && !model.supportedReasoningEfforts.includes(reasoningEffort)
+          ? model.defaultReasoningEffort
+          : reasoningEffort,
+    };
+  }
+
   #usageLimitBackup(agentId: string, startedWork = false): AgentModelChoice | undefined {
     const agent = this.#store.get(agentId);
     if (!agent?.backupModels || (!agent.backupModels.automatic && !startedWork)) return undefined;
+    return this.#readyBackup(agent);
+  }
+
+  #readyBackup(agent: AgentSummary): AgentModelChoice | undefined {
     const current = agentModelChoice(agent);
-    return agent.backupModels.order.find(
+    return agent.backupModels?.order.find(
       (choice) =>
         !sameAgentModelChoice(choice, current) &&
         this.#usageLimitReady(choice) &&
@@ -4627,13 +4639,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const accountName = account?.label || (email ? account?.email : null);
       return accountName ? `${accountName} · ${model}` : model;
     };
-    const note = (email: boolean) =>
-      spent && left
-        ? sourceText("status.agent.modelSwitchedForSpentBalance", {
-            previous: name(left, email),
-            model: name(joined, email),
-          })
-        : sourceText(MODEL_SWITCH_TEXT[reason], { model: name(joined, email) });
+    const note = (email: boolean) => {
+      const model = name(joined, email);
+      if (spent && left)
+        return sourceText("status.agent.modelSwitchedForSpentBalance", { previous: name(left, email), model });
+      if (reason === "model-removed")
+        return sourceText("status.agent.modelSwitchedForRemovedModel", {
+          previous: name(left ?? joined, email),
+          model,
+        });
+      return sourceText(MODEL_SWITCH_TEXT[reason], { model });
+    };
     const text = note(true);
     try {
       this.channels.noteModelSwitch(agent.id, note(false), MODEL_SWITCH_ITEM_TYPES[reason]);

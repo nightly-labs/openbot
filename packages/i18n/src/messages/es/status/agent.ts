@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} no tiene créditos. Se cambió a {model}. Para volver a usarlo, añade créditos y luego selecciónalo.",
   "status.agent.modelReturnedAfterError": "Se volvió a {model} tras el error del proveedor.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} ya no está disponible. Se cambió a {model}.",
   "status.agent.marketplaceSuggested": "Se sugirió una aplicación de Marketplace: {app}.",
   "status.agent.settingShown": "Se mostró un ajuste: {setting}.",
   "status.agent.channelMemberAdded": "{agent} agregó a {member} al canal. {person} lo pidió.",

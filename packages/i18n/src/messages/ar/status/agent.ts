@@ -13,6 +13,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
   "status.agent.modelReturnedAfterError": "تمت العودة إلى {model} بعد خطأ المزوّد.",
+  "status.agent.modelSwitchedForRemovedModel": "لم يعد {previous} متاحًا. تم التبديل إلى {model}.",
   "status.agent.marketplaceSuggested": "اقترح تطبيقًا من المتجر: {app}.",
   "status.agent.settingShown": "عرض إعدادًا: {setting}.",
   "status.agent.channelMemberAdded": "أضاف {agent} العضو {member} إلى القناة. بطلب من {person}.",

@@ -290,6 +290,7 @@ export const MODEL_SWITCH_ITEM_TYPES = {
   "usage-limit-ended": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}usage-limit-ended`,
   "provider-error": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}provider-error`,
   "provider-error-ended": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}provider-error-ended`,
+  "model-removed": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}model-removed`,
 } as const;
 export type ModelSwitchReason = keyof typeof MODEL_SWITCH_ITEM_TYPES;
 
@@ -299,6 +300,7 @@ export function modelSwitchReason(message: ConversationMessage): ModelSwitchReas
   if (message.itemType === MODEL_SWITCH_ITEM_TYPES["usage-limit-ended"]) return "usage-limit-ended";
   if (message.itemType === MODEL_SWITCH_ITEM_TYPES["provider-error"]) return "provider-error";
   if (message.itemType === MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]) return "provider-error-ended";
+  if (message.itemType === MODEL_SWITCH_ITEM_TYPES["model-removed"]) return "model-removed";
   return null;
 }
 
