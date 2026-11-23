@@ -172,8 +172,12 @@ function UsageRings(props: {
             .map((window) => t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }))
             .join(", "),
         });
-  const ringRow = () =>
-    rows().reduce((lowest, row) => ((row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest));
+  const ringRow = () => {
+    const read = rows().filter((row) => !row.readFailed);
+    return (read.length > 0 ? read : rows()).reduce((lowest, row) =>
+      (row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest,
+    );
+  };
   const windows = () => [...ringRow().ringWindows].reverse().slice(0, 2);
   const unavailable = () => props.row.readFailed && windows().length === 0;
   const outerRadius = (RING.size - RING.stroke) / 2;
