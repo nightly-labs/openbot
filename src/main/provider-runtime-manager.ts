@@ -1509,7 +1509,8 @@ function unsupportedProcessorFailure(
     return failure;
   const kernel = unsupportedKernelReason(cause.stderr);
   if (kernel) return new ProviderRuntimeFailure({ cause: new Error(sourceText(kernel), { cause }) });
-  if (!reportsMissingProcessorFeature(cause.stderr, "signal" in cause && cause.signal === "SIGILL")) return failure;
+  const illegalInstruction = "signal" in cause && cause.signal === "SIGILL";
+  if (!illegalInstruction && !reportsMissingProcessorFeature(cause.stderr, false)) return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
 }
 
