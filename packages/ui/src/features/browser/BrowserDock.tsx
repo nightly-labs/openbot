@@ -518,7 +518,10 @@ export function BrowserDock(props: BrowserDockProps) {
               size="xs"
               class="browser-dock-tab-done"
               loading={props.handoffPending === true}
-              onClick={() => done()()}
+              onClick={() => {
+                tabButton?.focus({ preventScroll: true });
+                done()();
+              }}
             >
               {t("prompt.browser.done")}
             </Button>

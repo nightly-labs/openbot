@@ -251,12 +251,13 @@
   transition-property: none;
 }
 
-.browser-dock .browser-dock-tab:has(:focus-visible) {
+.browser-dock .browser-dock-tab:has(> .browser-dock-tab-open:focus-visible) {
   box-shadow: var(--openbot-focus-ring);
 }
 
 .browser-dock .browser-dock-tab-open {
   min-width: 0;
+  flex: 0 1 auto;
   height: auto;
   justify-content: flex-start;
   padding-block: var(--openbot-space-1);
@@ -284,7 +285,6 @@
 .browser-dock .browser-dock-tab-done {
   flex: none;
   border-radius: var(--openbot-radius-pill);
-  box-shadow: none;
   margin-inline-end: var(--openbot-space-1);
 }
 
@@ -338,7 +338,7 @@
   transition: translate var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-.browser-dock-tab:hover .browser-dock-tab-chevron {
+.browser-dock-tab-open:hover .browser-dock-tab-chevron {
   translate: 0 -2px;
 }
 
