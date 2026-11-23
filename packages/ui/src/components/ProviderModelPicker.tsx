@@ -1237,7 +1237,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           optionDisabled={(option) => option.locked === true}
                           sameWidth={!effortLimit()}
                           placement={effortLimit() ? "bottom-end" : undefined}
-                          value={effortOptions().find((option) => option.id === effortValue())}
+                          value={effortOptions().find((option) => !option.locked && option.id === effortValue())}
                           onChange={(option) => option && chooseEffort(option.id)}
                           itemComponent={(item) => (
                             <SelectItem item={item.item}>
