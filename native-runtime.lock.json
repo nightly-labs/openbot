@@ -355,7 +355,7 @@
       "licenseSha256": "8b1ba204bb69a0ade2bfcf65ef294a920f6bb361b317dba43c7ef29d96332b9b",
       "patch": {
         "path": "vendor/remote-desktop/patches/moonlight-web-stream-v2.10.0-openbot.patch",
-        "sha256": "916fcf57ec3f3d5a7517d488d106d698dbc7f4c8c2d12acc6be9982510a05444"
+        "sha256": "6c980a66ae514c32465717597c7e2ae297af628bbfef4ac179631bb47053493f"
       },
       "overrides": [],
       "submodules": {}

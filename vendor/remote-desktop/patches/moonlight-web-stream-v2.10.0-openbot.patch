@@ -3246,3 +3246,45 @@ index 977a906..e51f447 100644
      async initPeer(configuration?: RTCConfiguration) {
          this.logger?.debug(`Creating Client Peer`)
  
+diff --git a/web/stream/video/video_decoder_pipe.ts b/web/stream/video/video_decoder_pipe.ts
+index b340ecc..ca543d4 100644
+--- a/web/stream/video/video_decoder_pipe.ts
++++ b/web/stream/video/video_decoder_pipe.ts
+@@ -33,15 +33,15 @@ async function detectCodecs(): Promise<VideoCodecSupport> {
+ 
+     for (const codec in codecs) {
+         promises.push((async () => {
+-            const supportedInBand = await VideoDecoder.isConfigSupported({
++            const supportedInBand = await isDecoderConfigSupported({
+                 codec: VIDEO_DECODER_CODECS_IN_BAND[codec]
+             })
+ 
+-            const supportedOutOfBand = await VideoDecoder.isConfigSupported({
++            const supportedOutOfBand = await isDecoderConfigSupported({
+                 codec: VIDEO_DECODER_CODECS_OUT_OF_BAND[codec]
+             })
+ 
+-            codecs[codec] = supportedInBand.supported || supportedOutOfBand.supported ? true : false
++            codecs[codec] = supportedInBand || supportedOutOfBand
+         })())
+     }
+     await Promise.all(promises)
+@@ -51,9 +51,16 @@ async function detectCodecs(): Promise<VideoCodecSupport> {
+ 
+     return codecs
+ }
++async function isDecoderConfigSupported(config: VideoDecoderConfig): Promise<boolean> {
++    try {
++        const support = await VideoDecoder.isConfigSupported(config)
++        return support.supported === true
++    } catch {
++        return false
++    }
++}
+ async function getIfConfigSupported(config: VideoDecoderConfig): Promise<VideoDecoderConfig | null> {
+-    const supported = await VideoDecoder.isConfigSupported(config)
+-    if (supported.supported) {
++    if (await isDecoderConfigSupported(config)) {
+         return config
+     }
+     return null
