@@ -378,13 +378,9 @@ class WhatsAppAdapter implements MessagingAdapter {
       const identity = whatsAppIdentity(this.#handle);
       if (!identity) return { places: [] };
       const rules = this.#runtime.policy.rules(identity.number);
-      const places: MessagingPlace[] = [];
-      if (rules.ownNumber)
-        places.push({
-          id: userJid(identity.number),
-          name: sourceText("status.messaging.whatsappOwnChat"),
-          kind: "chat",
-        });
+      const places: MessagingPlace[] = [
+        { id: userJid(identity.number), name: sourceText("status.messaging.whatsappOwnChat"), kind: "chat" },
+      ];
       for (const [contact, savedName] of rules.contacts)
         places.push({
           id: userJid(contact),

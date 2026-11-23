@@ -248,6 +248,7 @@ import {
   claimErrorToast,
   createTurnErrorBanners,
   readableAgentError,
+  remoteAgentError,
 } from "../agents/agent-error-text";
 import { agentTakeoverTabIds } from "../agents/agent-thread-attention";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
@@ -979,7 +980,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const choose = providerSettings()?.accountActions?.setLiveVoiceAccount;
     const codex = providerAdmin.status().providers?.find((row) => row.id === "codex");
     if (!choose || !codex?.accounts) return undefined;
-    return { accounts: codex.accounts, accountId: codex.liveVoiceAccount ?? null, choose };
+    return {
+      accounts: codex.accounts,
+      accountId: codex.liveVoiceAccount ?? null,
+      defaultUsesKey: codex.apiKeyInUse === true,
+      choose,
+    };
   };
   const accountUsage = () => withHostAccountUsage(usageReading.accountUsage(), providerAdmin.hostAccounts.limits());
   const agentAccountChoice = createMemo(
@@ -1308,6 +1314,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     githubConnector: githubPort,
     attachmentMedia: runtime.attachmentMedia,
     previewMedia: workflowPreviews,
+    download: (attachmentId) => workspace.runtime.download(attachmentId),
+    saveFile: createWebFileSaver(),
   });
   const mediaCredits = createWorkflowMediaCredits(
     () => (page() === "workflows" && workspace.state.status === "online" ? (server()?.id ?? null) : null),
@@ -2048,7 +2056,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (event.type !== "error") return;
       if (event.agentId && serverId) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
-        const message = readableAgentError(event.message);
+        const message = readableAgentError(remoteAgentError(event.message));
         errorBanners.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         const details = agentErrorDetails(event.message, message);
@@ -2060,7 +2068,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         });
         return;
       }
-      const description = readableAgentError(event.message);
+      const description = readableAgentError(remoteAgentError(event.message));
       if (!claimErrorToast(description)) return;
       if (event.code === "mcp_server_not_started") {
         toast.error(t("agent.error.mcpNotStarted"), {
@@ -2786,10 +2794,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const unavailable = async (): Promise<never> => {
     throw new Error(t("webClient.error.desktopOnly"));
   };
-  const connectionDetail = () =>
-    workspace.state.hostedSleep !== "sleeping" && !workspace.state.hostedIssue && !hostUpdating()
-      ? (workspace.state.connectionError ?? null)
-      : null;
+  const connectionDetail = () => {
+    if (workspace.state.hostedSleep === "sleeping" || workspace.state.hostedIssue || hostUpdating()) return null;
+    if (workspace.state.hostOffline && workspace.state.host && workspace.state.host.hosted !== true)
+      return {
+        message: t("server.connection.computerOffline", { name: workspace.state.host.name }),
+        reference: workspace.state.connectionError?.reference ?? null,
+      };
+    return workspace.state.connectionError ?? null;
+  };
   const frameConnecting = () =>
     connectionShown() &&
     !fullWindowLoading() &&
@@ -3643,6 +3656,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       hostName={target().name}
                       onBack={closeHostPage}
                       source={tasksSource}
+                      failureText={remoteAgentError}
                       responseStyle={responseStyle()}
                       mediaSource={runtime.attachmentMedia}
                       files={{

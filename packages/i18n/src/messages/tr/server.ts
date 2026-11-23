@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Bu sunucu yüklenirken başka bir sunucu seçebilirsiniz.",
   "server.connection.cachedHint":
     "Yüklenen içerik ve taslaklar korunur. Sunucu işlemleri yeniden bağlandıktan sonra devam eder.",
+  "server.connection.computerOffline":
+    "{name} çevrimdışı. Bilgisayarının açık olduğundan, OpenBot'un açık olduğundan ve Sunucu ayarları > Üyeler bölümünde Bu sunucuyu yayımla seçeneğinin etkin olduğundan emin olun.",
   "server.connection.conversationFailed": "Konuşma yüklenemedi. Tekrar deneyin.",
   "server.connection.panelsFailed": "Bazı çalışma alanı panelleri yüklenemedi. Tekrar deneyin.",
   "server.connection.retry": "Tekrar dene",
@@ -556,6 +558,7 @@ export const messages = {
     "Uzak masaüstü için ayrı bir parola yok. Bu bilgisayarı kimin kontrol edebileceğini aşağıdaki ayarlar belirler.",
   "server.desktop.componentInstalled": "Ana makine bileşeni yüklendi",
   "server.desktop.componentNotInstalled": "Ana makine bileşeni yüklenmedi",
+  "server.desktop.needsX11Session": "X11 oturumu gerekli",
   "server.desktop.sessions": "Katılımsız: {unattended} · Etkin oturumlar: {active}/{max}",
   "server.desktop.unattendedEnabled": "etkin",
   "server.desktop.unattendedUnavailable": "kullanılamıyor",

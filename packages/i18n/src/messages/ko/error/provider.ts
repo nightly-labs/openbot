@@ -276,6 +276,8 @@ export const messages = {
     "OpenCode가 이 강도에서 이 모델의 추론을 읽지 못했습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.opencodeModelNotServed":
     "모델 제공자가 지금 이 모델을 계정에 제공하지 않아요. 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.opencodeSafetyBlocked":
+    "모델 제공자가 안전 규칙 때문에 이 메시지를 차단했습니다. 다른 표현으로 요청을 다시 보내세요. 다음 메시지도 차단되면 새 채팅을 시작하거나 다른 모델을 선택하세요.",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":
@@ -585,6 +587,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse 턴에 실패했어요.",
   "error.provider.museModelUnavailable":
     "Muse에서 이 모델을 사용할 수 없어요. 이 에이전트가 실행되는 국가에서 Muse를 사용할 수 없거나, 이 계정에 모델 접근 권한이 없을 수 있어요. 다른 모델을 선택한 다음 다시 시도하세요.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse가 이 요청을 완료하지 못했어요. Muse는 로그인이 아닌 저장된 Meta API 키를 사용해요. 키를 교체하거나, 설정에서 키를 제거해 로그인을 사용하세요.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse는 외부 도구에 접근하지 않고는 프로필을 생성할 수 없어요. 다른 제공자로 프로필을 생성한 후 에이전트에 Muse를 선택하세요.",
   "error.provider.museAuthUnverified":

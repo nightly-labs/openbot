@@ -117,7 +117,8 @@ export const messages = {
     "Estes modelos não funcionam com “Espaço de trabalho” no Windows e no Linux. Para usá-los, altere “Permissões” nas configurações do agente.",
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
-  "provider.picker.noModels": "Nenhum modelo de {name} está disponível.",
+  "provider.picker.noModels":
+    "Nenhum modelo de {name} aparece aqui. Se estiverem desativados, um administrador pode ativá-los em Configurações do servidor > Provedores > {name} > Modelos.",
   "provider.picker.endpointModelsInCustom":
     "{name} executa seus endpoints personalizados. Os modelos deles estão na aba Personalizado.",
   "provider.picker.showCustomModels": "Ver modelos",
@@ -262,6 +263,7 @@ export const messages = {
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
   "provider.settings.geminiKeyReplacesAccount":
     "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
+  "provider.settings.museKeyInUse": "O Muse usa esta chave, não o seu login. Para usar o seu login, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",

@@ -665,6 +665,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "{name} uygulamasını bu ajanları çalıştıran bilgisayara yükleyin: uygulaması tarayıcıda oturum açmayı gerektirir.",
   "marketplace.error.appInvalid": "{name} eklenemiyor: {reason}",
+  "marketplace.error.appNotConnected": "{name} bağlanamıyor: {reason}",
   "marketplace.error.uninstallNoServer": "Bir eklentiyi kaldırmak için yerel bir sunucu seçin.",
   "marketplace.error.uninstallPartial": "{name} uygulamasının bazı kısımları kaldırılamadı. {failures}",
   "marketplace.error.actionFailed": "Pazaryeri eylemi tamamlanamadı. Tekrar deneyin.",

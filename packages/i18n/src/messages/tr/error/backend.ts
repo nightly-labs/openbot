@@ -127,6 +127,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "Çalıştırma bir hatayla durdu, ancak bir neden gelmedi. Ajanın ne yaptığını görmek için çalıştırmayı açın.",
   "error.backend.turnNotStarted": "Sağlayıcı bu turu başlatmadı.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} bu mesajı başlattığını zamanında onaylamadı. İş iki kez çalışmasın diye OpenBot mesajı yeniden göndermez. OpenBot, ajanın başlaması için en fazla 5 dakika bekler.",
+  "error.backend.turnStartAbandoned": "Ajan bu mesajı 5 dakika içinde başlatmadı. Mesajı yeniden gönderin.",
   "error.backend.routineResultConnectionOff": "Bu mesajlaşma bağlantısı kapalı veya kaldırılmış. Başka bir yer seçin.",
   "error.backend.routineResultNoDelivery": "Bu çalıştırmanın yeniden gönderilecek bir yanıtı yok.",
   "error.backend.channelMemoryLimit": "Bir kanal en fazla {limit} belleğe sahip olabilir.",
@@ -241,8 +244,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
   "error.backend.mcpServerInvalid": "OpenBot bu MCP sunucusu yapılandırmasını kaydedemiyor.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Başlık adları boşluk veya : ( ) / gibi simgeler içeremez. Authorization gibi bir ad kullanın ve anahtarı ya da belirteci Değer alanına girin.",
   "error.backend.mcpServerNoAnswer": "Sunucu {seconds} saniye içinde yanıt vermedi.",
   "error.backend.mcpSignInNotAccepted": "Sunucu bu oturum açmayı kabul etmedi.",
+  "error.backend.mcpSignInGrantRefused":
+    "Sunucu oturum açmayı kabul etmedi. Yeniden oturum açın. Sorun devam ederse hesabınızın bu uygulamayla aynı sitede veya bölgede olduğundan emin olun.",
   "error.backend.mcpSignInAccountRefused":
     "Sunucu, oturum açtığınız hesabı reddetti. Bu hesabın hizmeti kullanabildiğini kontrol edin. Başka bir hesap kullanmak için oturumu kapatıp yeniden açın.",
   "error.backend.mcpSignInClientRefused":
@@ -287,6 +294,8 @@ export const messages = {
     "Sunucunun {tool} aracının giriş biçimini bu sağlayıcı okuyamıyor. Diğer sağlayıcılardaki ajanlar sunucuyu almaya devam ediyor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu oturum açmanızı istiyor. Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve Oturum aç'ı seçin.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu bir anahtar istiyor. Pazaryeri, Uygulamalar bölümünde {name} öğesini açın, Düzenle'yi seçin ve Başlıklar altına doğru anahtarı girin.",
   "error.backend.mcpServerFailedForProvider":
     "{provider}, {name} MCP sunucusunu başlatamadı. Nedeni görmek için Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve Bağlantıyı test et'i seçin.",
   "error.backend.mcpServerFailedInProvider":

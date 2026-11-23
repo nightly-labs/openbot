@@ -1015,7 +1015,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
+    "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1321,6 +1321,8 @@ export const messages = {
     "ChatGPT использует этот ключ, а не ваш план ChatGPT. OpenAI списывает оплату за каждый запрос с ключа. Расход по плану не показывается.",
   "mobile.server.providers.codexKeyAlternative":
     "Или войдите с API-ключом OpenAI. OpenAI списывает оплату за каждый запрос с ключа.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse использует этот ключ, а не ваш вход. Чтобы использовать вход, удалите ключ.",
   "mobile.server.providers.sectionUse": "Использование",
   "mobile.server.providers.unused": "Не используется агентами",
   "mobile.server.providers.usedByCount": {

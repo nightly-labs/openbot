@@ -125,6 +125,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "실행이 오류로 멈췄지만 이유가 전달되지 않았습니다. 실행을 열어 에이전트가 한 일을 확인하세요.",
   "error.backend.turnNotStarted": "제공자가 이 턴을 시작하지 않았어요.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider}이(가) 이 메시지를 시작했는지 제때 확인하지 않았어요. 작업이 두 번 실행되지 않도록 OpenBot은 메시지를 다시 보내지 않아요. OpenBot은 에이전트가 시작할 때까지 최대 5분 기다려요.",
+  "error.backend.turnStartAbandoned": "에이전트가 5분 안에 이 메시지를 시작하지 않았어요. 메시지를 다시 보내 주세요.",
   "error.backend.routineResultConnectionOff": "이 메시징 연결이 꺼져 있거나 제거되었어요. 다른 위치를 선택하세요.",
   "error.backend.routineResultNoDelivery": "이 실행에는 다시 보낼 답변이 없어요.",
   "error.backend.channelMemoryLimit": "채널 하나에는 메모리를 최대 {limit}개까지 둘 수 있어요.",
@@ -239,8 +242,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",
   "error.backend.mcpServerInvalid": "OpenBot이 이 MCP 서버 설정을 저장할 수 없어요.",
+  "error.backend.mcpHeaderNameInvalid":
+    "헤더 이름에는 공백이나 : ( ) / 같은 기호를 쓸 수 없어요. Authorization 같은 이름을 쓰고 키나 토큰은 값에 넣어 주세요.",
   "error.backend.mcpServerNoAnswer": "서버가 {seconds}초 안에 응답하지 않았어요.",
   "error.backend.mcpSignInNotAccepted": "서버가 해당 로그인을 수락하지 않았어요.",
+  "error.backend.mcpSignInGrantRefused":
+    "서버가 로그인을 받아들이지 않았습니다. 다시 로그인하세요. 문제가 계속되면 계정이 이 앱과 같은 사이트 또는 리전에 있는지 확인하세요.",
   "error.backend.mcpSignInAccountRefused":
     "서버가 로그인한 계정을 거부했어요. 이 계정이 서비스를 사용할 수 있는지 확인하세요. 다른 계정을 사용하려면 로그아웃한 다음 다시 로그인하세요.",
   "error.backend.mcpSignInClientRefused":
@@ -283,6 +290,8 @@ export const messages = {
     "이 서버의 도구 {tool}의 입력 형식을 이 제공자가 읽을 수 없어요. 다른 제공자의 에이전트는 계속 이 서버를 받아요.",
   "error.backend.mcpServerSignInForProvider":
     "{provider}이(가) MCP 서버 {name}을(를) 사용할 수 없었어요. 서버가 로그인을 요청해요. 마켓플레이스, 앱에서 {name}을(를) 열고 로그인을 선택해 주세요.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider}이(가) MCP 서버 {name}을(를) 사용할 수 없었어요. 서버가 키를 요청해요. 마켓플레이스, 앱에서 {name}을(를) 열고 편집을 선택한 뒤 헤더에 올바른 키를 입력해 주세요.",
   "error.backend.mcpServerFailedForProvider":
     "{provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. 마켓플레이스, 앱에서 {name}을(를) 열고 연결 테스트를 선택하면 원인을 확인할 수 있어요.",
   "error.backend.mcpServerFailedInProvider":

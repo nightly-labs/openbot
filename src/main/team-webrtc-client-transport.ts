@@ -993,7 +993,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         reject(
           new TeamWebRtcConnectError(
             `connect_timeout_${stage}`,
-            sourceText(stage === "ice" ? "error.remote.iceFailed" : "error.remote.hostDidNotConnect"),
+            sourceText(
+              stage === "ice"
+                ? "error.remote.iceFailed"
+                : stage === "auth"
+                  ? "error.remote.serverAnswerTimeout"
+                  : "error.remote.connectionServiceUnreachable",
+            ),
           ),
         );
       };

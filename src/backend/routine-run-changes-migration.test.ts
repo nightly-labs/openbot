@@ -2,7 +2,7 @@
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { releasedDatabaseCases } from "./migration-harness";
-import { migration as runChangesMigration } from "./migrations/0068-agent-routine-run-changes";
+import { migration as runChangesMigration } from "./migrations/0069-agent-routine-run-changes";
 import type * as Registry from "./migrations/registry";
 import { LATEST_SCHEMA_VERSION, migrateOpenBotDatabase, NewerDatabaseError } from "./openbot-database-schema";
 

@@ -237,6 +237,9 @@ export function WorkflowsCanvas(props: {
     get upload() {
       return props.host.mediaSupported() ? workflows.uploadPicture : undefined;
     },
+    get download() {
+      return props.host.mediaSupported() ? workflows.downloadMedia : undefined;
+    },
     get self() {
       return props.self;
     },
@@ -263,6 +266,7 @@ export function WorkflowsCanvas(props: {
       uploads: media,
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
       outputs: [...outputs, ...added],
+      format: workflows.detail()?.hostFormat ?? WORKFLOW_FEATURES_V1.format,
     };
   });
   return (
@@ -283,6 +287,7 @@ export function WorkflowsCanvas(props: {
           catalogs={catalogs}
           github={workflows.github}
           frame="window"
+          server={props.serverId}
           readOnly={workflows.readOnly()}
           agentProgress={props.agentProgress}
           {...workflows.props}

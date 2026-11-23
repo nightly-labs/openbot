@@ -143,6 +143,7 @@
 .question-prompt-detail {
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
+  white-space: pre-line;
 }
 
 .question-prompt-options {
@@ -219,7 +220,8 @@
     color var(--openbot-duration-fast) ease-out;
 }
 
-.question-prompt-answer-skipped .question-prompt-letter.ui-kbd {
+.question-prompt-answer-skipped .question-prompt-letter.ui-kbd,
+.question-prompt-answer-closed .question-prompt-letter.ui-kbd {
   background: var(--openbot-bg-control-active);
   color: var(--openbot-text-muted);
 }
@@ -360,7 +362,8 @@
   overflow-wrap: anywhere;
 }
 
-.question-prompt-answer-skipped {
+.question-prompt-answer-skipped,
+.question-prompt-answer-closed {
   color: var(--openbot-text-muted);
 }
 

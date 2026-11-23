@@ -430,6 +430,14 @@ Node kinds, port types, statuses, run sources, trigger types and version kinds c
 so a newer host can add one. A client shows a workflow with a node kind or a port type that it does
 not know as read-only (`needsNewerApp`), and keeps the node when it saves.
 
+One registry (`packages/contracts/src/ipc-workflow-nodes.ts`) lists the fields of each node kind:
+which fields the host reads at run time, which take `{{name}}` values, the values that a field can
+have, the values that need an admin, and the fields that hold an ID. A client also shows a workflow
+as read-only when a field has a value that is not in the registry. The host asks for an admin when a
+trigger type or an output target is not in the registry. The agent `edit_workflow` tool refuses a
+value that is not in the registry. To add a node kind or a value, add it to the registry and keep
+every released value.
+
 `workflows-media-v1` lets the host run the `image` and `asset` nodes of `workflows-v1`. An image
 step makes a picture or a video with the subscription of the model's provider and keeps it as a
 generated attachment; a client fetches it through `GET /v1/attachments/:id`. An asset step names a
@@ -510,6 +518,42 @@ step and a webhook trigger, the `check` field of a condition, and `{{name}}` in 
 and a host before it keeps them but does not use them. A client shows the editors and the problems
 only on a host that advertises it.
 
+Each workflow detail has `format` and `hostFormat`; no capability marks them. `format` is the
+lowest workflow format that can show the graph (`workflowGraphFormat` in
+`packages/contracts/src/ipc-workflow-format.ts`). `hostFormat` is `WORKFLOW_FORMAT` of the host. The
+format number goes up without a new capability. A client opens a graph read-only (`needsNewerApp`)
+when its `format` is higher than the client's `WORKFLOW_FORMAT`, or when a node, edge, stroke or
+size has a property that the client does not know. The Team API codec drops unknown properties, so
+the format number is the protection for older clients. The host refuses a create or a save that adds
+or changes a step value that it does not know (`error.workflow.unknownValue`), and keeps a value that
+is already saved. A server transfer copies saved values as they are. A client shows content of a
+newer format only when `hostFormat` is at least that format.
+
+Format 2 adds the output `message` and `{{name}}` in the output title, labels and person. A host of
+format 1 sends the input and keeps `{{...}}` text as it is, so a client shows the message field only
+when `hostFormat` is 2 or higher, or when the field already has a value.
+
+Format 3 adds the built-in fields of schedule, GitHub, Discord, Telegram and Slack triggers. A graph
+is format 3 when a step after the trigger reads one of these names in `{{name}}` or in a check, and no
+step declares that name. A host of format 2 does not give these fields, so the editor offers them,
+and checks names against them, only when `hostFormat` is 3 or higher (`WorkflowAnswerScope`).
+
+An `openbot.workflow` file holds one workflow (`packages/contracts/src/ipc-workflow-file.ts`). It has
+`format`, the file `version`, the `graphFormat` of the graph, the `minAppVersion` (the version of the
+app that wrote it), the title, the graph, `references`, `links` and `assets`. The id fields of the
+node registry (`workflowIdFields`) decide what changes. An agent or a channel id becomes a key such as
+`agent-1`, and `references` gives its name (and the agent title). A connection and its place are
+cleared, and `links` names each step that needs a new link. A media account is cleared. A schedule
+with no timezone gets the timezone of the host. An asset file id becomes a key such as `file-1`, and
+`assets` holds the bytes as base64, at most `ATTACHMENT_LIMITS.fileBytes` for each file and
+`ATTACHMENT_LIMITS.totalBytes` for all. Export refuses a file with a secret in a text field and lists
+the fields; the host gives the secret test. Decode refuses an id of a host, a key with no reference,
+and asset data that is not base64. It gives "update required", with the names of the steps that it
+does not know, for a newer file version, a newer graph format, an unknown property or an unknown step
+value. Import maps each reference to a local agent or channel (`matchWorkflowFileReferences` matches
+a name, and the title when two agents have that name), and uploads the asset bytes again before it
+writes the new file ids (`workflowFromFile`).
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
@@ -570,6 +614,32 @@ recorded". Each member who can read the run can read its steps. A workflow that 
 see answers `missing`, and a step of an agent that the member cannot see answers `stepMissing`. The fields are the node settings that the member can already read
 in the graph, and no secret is in them. The answer has its own route so that the frozen
 `workflows-v1` step stays as it is. The capability goes to protocol 10 peers.
+
+`workflows-pause-v1` pauses and resumes a workflow. `POST /v1/workflows/pause { workflowId, paused }`
+answers the workflow summary. A paused summary has `paused: true`; a running workflow has no
+`paused` key, so a `workflows-v1` peer decodes the summary as before. A paused workflow starts no
+run from a schedule, a webhook, a chat mention or a GitHub event. A manual run and a run that already
+started go on. A schedule moves its plan past each occurrence while it is paused, so a resume does not
+start the occurrences that it skipped. A webhook request to a paused workflow gets 202 and a receipt
+with the reason `refused`. A GitHub repository of a paused workflow is not watched. Only a member who
+manages the agents of the workflow can pause or resume it. With the capability, `create` also takes
+`paused: true`: a duplicate makes a paused copy, so a copy never starts on its own. A
+client strips `paused` from `create` when the host does not have the capability. The capability goes
+to protocol 10 peers. The state is in the `paused` column of `workflows` (migration 68).
+
+`workflows-portable-v1` exports a workflow as an `openbot.workflow` file
+(`packages/contracts/src/ipc-workflow-file.ts`). `POST /v1/workflows/export { workflowId }` answers
+`{ text, assets, problem }`. Only a member who manages the agents of the workflow can export it. The
+host writes the file with the names of its agents and channels, not their ids, and with each asset
+file empty. `assets` lists the asset files to download: the key in the file, the attachment id and
+the step. The client downloads each one with the attachment route and fills it in
+(`fillWorkflowFileText`), because one Team API frame cannot hold the asset bytes. A text field with
+a secret (`redactSecrets`), a missing asset file or a file that is too large gives a `problem` and no
+`text`, and the secret does not leave the host. Import has no route: the client reads the file, the
+person chooses an agent or channel for each name, the client uploads the assets as attachments, and
+`create` makes a paused copy. The desktop app and the web client show Export and Import in the
+workflow menu only when the host has the capability. The phone does not edit workflow graphs, so it
+does not export or import. The capability goes to protocol 10 peers.
 
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.

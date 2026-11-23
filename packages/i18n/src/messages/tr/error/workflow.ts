@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "İş akışının bu sürümü artık yok.",
   "error.workflow.annotation": "Metinler, notlar ve şekiller bağlantı içeremez.",
   "error.workflow.port": "Bir adım bu tür girdiyi alamaz.",
+  "error.workflow.unknownValue":
+    "Bu OpenBot bir adımın ayarını bilmiyor. OpenBot’u güncelleyin, sonra yeniden deneyin.",
   "error.workflow.branch": "Yalnızca bir koşul evet ve hayır bağlantılarına sahip olabilir.",
   "error.workflow.conditionBranch": "Bir koşuldan çıkan her bağlantı evet veya hayır olmalıdır.",
   "error.workflow.duplicateEdge": "Bu iki adımda bu bağlantı zaten var.",

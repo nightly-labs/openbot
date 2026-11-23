@@ -501,6 +501,10 @@ interface ProviderModelCatalog {
   ): Effect.Effect<{ source: ProviderModelSource | null; startSettings: string | null }, unknown>;
 }
 
+function steeringFields(model: ModelListResponse["data"][number]): Pick<AgentModelOption, "steersTurns"> {
+  return model.steersTurns ? { steersTurns: true } : {};
+}
+
 export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
@@ -813,6 +817,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       hiddenWhenSignedOut: true,
       partialListAtStart: true,
       relistAfterStart: true,
+      modelFields: steeringFields,
       fallback: modelsAfterOpenCodeDiscoveryFailure,
     },
     resolveCli: resolveOpencodeCli,
@@ -1351,7 +1356,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       slowList: true,
       partialListAtStart: true,
       relistAfterStart: true,
-      modelFields: (model) => (model.steersTurns ? { steersTurns: true } : {}),
+      modelFields: steeringFields,
     },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>

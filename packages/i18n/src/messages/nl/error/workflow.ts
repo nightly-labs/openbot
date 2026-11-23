@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "Deze versie van de workflow bestaat niet meer.",
   "error.workflow.annotation": "Tekst, notities en vormen kunnen geen verbindingen hebben.",
   "error.workflow.port": "Een stap kan dit type invoer niet aannemen.",
+  "error.workflow.unknownValue":
+    "Deze OpenBot kent een instelling van een stap niet. Werk OpenBot bij en probeer het opnieuw.",
   "error.workflow.branch": "Alleen een voorwaarde kan ja- en nee-verbindingen hebben.",
   "error.workflow.conditionBranch": "Elke verbinding vanuit een voorwaarde moet ja of nee zijn.",
   "error.workflow.duplicateEdge": "Deze twee stappen hebben deze verbinding al.",

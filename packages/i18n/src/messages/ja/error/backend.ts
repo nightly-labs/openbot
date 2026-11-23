@@ -136,6 +136,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "実行はエラーで停止しましたが、理由は届いていません。実行を開いて、エージェントが何をしたかを確認してください。",
   "error.backend.turnNotStarted": "プロバイダーはこのターンを開始しませんでした。",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} はこのメッセージを開始したことを時間内に確認しませんでした。作業が二重に実行されないように、OpenBot はメッセージを再送信しません。OpenBot はエージェントが開始するまで最大 5 分待ちます。",
+  "error.backend.turnStartAbandoned":
+    "エージェントは 5 分以内にこのメッセージを開始しませんでした。メッセージをもう一度送信してください。",
   "error.backend.routineResultConnectionOff":
     "このメッセージ接続はオフか削除されています。別の送信先を選んでください。",
   "error.backend.routineResultNoDelivery": "この実行には再送信できる回答がありません。",
@@ -257,8 +261,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
   "error.backend.mcpServerInvalid": "OpenBot はこの MCP サーバーの設定を保存できません。",
+  "error.backend.mcpHeaderNameInvalid":
+    "ヘッダー名にはスペースや : ( ) / などの記号を使えません。Authorization のような名前を使い、キーまたはトークンは「値」に入力してください。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
+  "error.backend.mcpSignInGrantRefused":
+    "サーバーがサインインを受け付けませんでした。もう一度サインインしてください。問題が続く場合は、アカウントがこのアプリと同じサイトまたはリージョンにあることを確認してください。",
   "error.backend.mcpSignInAccountRefused":
     "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
@@ -304,6 +312,8 @@ export const messages = {
     "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。マーケットプレイス、アプリで {name} を開いて「サインイン」を選択してください。",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがキーを求めています。マーケットプレイス、アプリで {name} を開き、「編集」を選択して、「ヘッダー」に正しいキーを入力してください。",
   "error.backend.mcpServerFailedForProvider":
     "{provider} は MCP サーバー {name} を起動できませんでした。マーケットプレイス、アプリで {name} を開いて「接続をテスト」を選択すると、原因を確認できます。",
   "error.backend.mcpServerFailedInProvider":

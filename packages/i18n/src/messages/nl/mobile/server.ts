@@ -890,7 +890,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "De mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
+    "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1191,6 +1191,8 @@ export const messages = {
     "ChatGPT gebruikt deze sleutel, niet je ChatGPT-abonnement. OpenAI rekent elk verzoek af op de sleutel. Het gebruik van het abonnement wordt niet getoond.",
   "mobile.server.providers.codexKeyAlternative":
     "Of log in met een OpenAI-API-sleutel. OpenAI rekent elk verzoek af op de sleutel.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse gebruikt deze sleutel, niet je login. Verwijder de sleutel om je login te gebruiken.",
   "mobile.server.providers.sectionUse": "Gebruik",
   "mobile.server.providers.unused": "Geen agent gebruikt deze",
   "mobile.server.providers.usedByCount": { one: "1 agent gebruikt deze", other: "{count} agents gebruiken deze" },

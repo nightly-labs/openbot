@@ -1,3 +1,4 @@
+import { isOpenableAttachmentName } from "@openbot/contracts/attachment-files";
 import {
   type AttachmentSummary,
   type BrowserBounds,
@@ -360,6 +361,18 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   const attachmentDownloads = attachmentFiles.downloads;
 
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
+    if (action === "open" && previewsInsteadOfReveal(attachment)) {
+      void previewAttachment(attachment);
+      return;
+    }
+    attachmentFileAction(attachment, action);
+  }
+
+  function previewsInsteadOfReveal(attachment: AttachmentSummary) {
+    return canPreviewAttachment(attachment) && !isOpenableAttachmentName(attachment.name);
+  }
+
+  function attachmentFileAction(attachment: AttachmentSummary, action: FileAction) {
     if (action === "open" && deps.props.runtime && canPreviewAttachment(attachment)) {
       void previewAttachment(attachment);
       return;
@@ -677,7 +690,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!file) return;
     const source = file.source;
     if (source.kind === "attachment") {
-      attachmentAction(source.attachment, action);
+      attachmentFileAction(source.attachment, action);
       return;
     }
     if (source.kind === "workspace-folder") return;

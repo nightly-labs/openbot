@@ -46,6 +46,7 @@ import type {
   ChannelRoutine,
   ChannelRoutineRun,
   CodexLiveVoice,
+  CompleteMcpSignInRelayInput,
   ConversationFileSearchPage,
   ConversationMessage,
   ConversationMessageSender,
@@ -84,6 +85,7 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagePinner,
+  PasswordManagerId,
   PinnedMessagesSnapshot,
   ProviderAccountCodeLoginStart,
   ProviderAccountCodeLoginStatus,
@@ -177,6 +179,7 @@ import {
   workflowCatalogSource,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { AGENT_THREAD_READS_LIMIT } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/context-compact-v1";
@@ -337,7 +340,7 @@ import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
 import { type MailboxStore, MESSAGING_LANE } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
-import type { McpSignInOpener } from "./mcp-oauth-provider";
+import type { McpSignInAddressOutcome, McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { MessagePinRefused } from "./message-pins";
@@ -432,7 +435,9 @@ export interface AgentServiceOptions {
   avatarDecoder?: AvatarImageDecoder | null;
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
+  hiddenModels?: (provider: AgentProvider) => ReadonlySet<string> | undefined;
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
+  passwordManagerConnected?: (manager: PasswordManagerId) => boolean;
   feedbackFacts?: FeedbackFacts | null;
   feedback?: AgentFeedback | null;
   serverClaims?: AgentServerClaims | null;
@@ -558,6 +563,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #mediaCatalog: WorkflowMediaCatalogCache;
   readonly #creditMedia: CreditMediaWorkflows | null;
   readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
+  readonly #hiddenModels: AgentServiceOptions["hiddenModels"];
   readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
   readonly #providerUseChanges = Semaphore.makeUnsafe(1);
@@ -608,6 +614,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   constructor(options: AgentServiceOptions) {
     super();
     this.#mcpAgentAccess = options.mcpAgentAccess;
+    this.#hiddenModels = options.hiddenModels;
     this.#clearPictureBackground = options.clearPictureBackground;
     const {
       store,
@@ -1130,6 +1137,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       mcpHandoff: this.#mcp.handoffLog(),
       redactMcp: (text) => this.#mcp.redact(text),
+      reportMcpSignIn: (provider, server, signInText) => this.#mcp.reportSignInFailure(provider, server, signInText),
     });
     this.#endpoints = new CustomEndpoints({
       store,
@@ -2061,6 +2069,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
+      ...(options.passwordManagerConnected === undefined
+        ? {}
+        : { passwordManagerConnected: options.passwordManagerConnected }),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
       feedbackWithdrawal: this.#feedbackWithdrawal,
@@ -2078,6 +2089,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
+        hiddenModels: (provider) => this.#hiddenModels?.(provider),
         agentModels: (choice) => this.#agentModels(choice),
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
         providerStatuses: () => this.getStatus().providers ?? [],
@@ -2648,6 +2660,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mcp.signInLink(input.url);
   }
 
+  receiveMcpSignInAddress(input: CompleteMcpSignInRelayInput): McpSignInAddressOutcome {
+    return this.#mcp.receiveSignInAddress(input.url, input.address);
+  }
+
   signOutMcpServer(input: SignOutMcpServerInput): Effect.Effect<McpSignInState[], AgentLifecycleFailed> {
     return this.#mcp
       .signOut(input)
@@ -2947,7 +2963,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ).bind(this);
 
   readonly generateWorkflowText = Effect.fn("AgentService.generateWorkflowText")(
-    function* (this: AgentService, input: WorkflowModelInput & { prompt: string; images: readonly string[] }) {
+    function* (
+      this: AgentService,
+      input: WorkflowModelInput & {
+        prompt: string;
+        images: readonly string[];
+        outputSchema?: DynamicRecord;
+      },
+    ) {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
@@ -2961,6 +2984,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           input.prompt,
           workflowUsageObserver(this.#store.database.usage, provider, model.id),
           input.images,
+          input.outputSchema ?? null,
         )
         .pipe(
           Effect.tapError((failure) =>
@@ -5429,7 +5453,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #liveVoiceAccountId(agent: Pick<AgentSummary, "provider" | "providerAccountId"> | undefined): string | undefined {
-    return this.#providers.liveVoiceAccount() ?? (agent?.provider === "codex" ? agent.providerAccountId : undefined);
+    const agentAccount = agent?.provider === "codex" ? agent.providerAccountId : undefined;
+    const ownAccount = agentAccount === DEFAULT_PROVIDER_ACCOUNT_ID ? undefined : agentAccount;
+    const planAccount = this.#providers.codexPlanAccountInPlaceOfKey();
+    const chosen = this.#providers.liveVoiceAccount();
+    const usableChoice = planAccount && chosen === DEFAULT_PROVIDER_ACCOUNT_ID ? null : chosen;
+    return usableChoice ?? ownAccount ?? planAccount ?? agentAccount;
   }
 
   providerUsageResets(provider: AgentProvider): Effect.Effect<ProviderUsageResets[]> {

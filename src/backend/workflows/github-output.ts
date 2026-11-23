@@ -30,6 +30,10 @@ export interface GitHubOutputChoice {
   person: boolean;
 }
 
+export type GitHubOutputFill = (text: string, reader: "person" | "lines") => string;
+
+const KEEP_TEXT: GitHubOutputFill = (text) => text;
+
 export type GitHubOutputPlan =
   | { kind: "change"; change: WorkflowGitHubChange; choose: GitHubOutputChoice }
   | { kind: "quiet" }
@@ -42,6 +46,7 @@ export function githubOutputPlan(
   triggerNodeId: string | null,
   runItem: WorkflowGitHubItem | null,
   files: WorkflowGitHubFiles | null = null,
+  fill: GitHubOutputFill = KEEP_TEXT,
 ): GitHubOutputPlan {
   const action = node.fields.action;
   if (!isOneOf(WORKFLOW_GITHUB_ACTIONS, action))
@@ -63,9 +68,9 @@ export function githubOutputPlan(
   const body = text.trim().slice(0, GITHUB_BODY_LIMIT);
   const textMissing = sourceText(onlyEvent ? "error.workflow.githubEventText" : "error.workflow.githubTextMissing");
   const chooseLabels = fieldText(node, "labelsFrom") === "agent";
-  const labels = chooseLabels ? [] : workflowListField(node.fields.labels);
-  const person = fieldText(node, "person");
-  const choosePerson = person === "agent";
+  const labels = chooseLabels ? [] : workflowListField(fill(fieldText(node, "labels"), "lines"));
+  const choosePerson = fieldText(node, "person") === "agent";
+  const person = choosePerson ? "agent" : fill(fieldText(node, "person"), "person").trim();
   const reason = node.fields.reason;
   const change: WorkflowGitHubChange = {
     action,
@@ -101,7 +106,9 @@ export function githubOutputPlan(
       choose.person = choosePerson;
       break;
     case "issue.create": {
-      const title = (fieldText(node, "title") || body.split("\n", 1)[0] || "").trim().slice(0, TITLE_LIMIT);
+      const title = (fill(fieldText(node, "title"), "person").trim() || body.split("\n", 1)[0] || "")
+        .trim()
+        .slice(0, TITLE_LIMIT);
       if (!title) return { kind: "failed", error: textMissing };
       change.title = title;
       change.files = files;
@@ -112,9 +119,9 @@ export function githubOutputPlan(
   return { kind: "change", change, choose };
 }
 
-export function githubOutputInput(inputs: readonly string[]): string {
+export function githubOutputInput(inputs: readonly string[], message: string | null = null): string {
   const events = inputs.map((input) => input.trim()).filter((input) => input.startsWith(EXTERNAL_EVENT_START));
-  const text = inputText(inputs.filter((input) => !input.trim().startsWith(EXTERNAL_EVENT_START)));
+  const text = message ?? inputText(inputs.filter((input) => !input.trim().startsWith(EXTERNAL_EVENT_START)));
   return [text, ...events].filter(Boolean).join("\n\n").slice(0, INPUT_LIMITS.workflowStepInput);
 }
 

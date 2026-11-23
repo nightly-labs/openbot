@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   CopyPlus,
+  Download,
   DropdownMenu,
   Folder,
   FolderInput,
@@ -13,10 +14,13 @@ import {
   History,
   Input,
   LayoutGrid,
+  Pause,
   Pencil,
   PencilLine,
+  Play,
   Plus,
   Trash2,
+  Upload,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
@@ -27,6 +31,10 @@ export type SwitcherAction =
   | "new"
   | "rename"
   | "duplicate"
+  | "export"
+  | "import"
+  | "pause"
+  | "resume"
   | "delete"
   | "live"
   | `open:${string}`
@@ -42,6 +50,7 @@ export interface SwitcherWorkflow {
   id: string;
   title: string;
   steps: number;
+  paused: boolean;
 }
 
 export interface SwitcherVersion {
@@ -79,7 +88,14 @@ function WorkflowItem(props: {
     >
       <CheckMark checked={current()} />
       <span class="wfs-name">{props.workflow.title}</span>
-      <span class="ui-menu-trailing">{t("workflow.canvas.switcher.steps", { count: props.workflow.steps })}</span>
+      <span class="ui-menu-trailing">
+        <Show
+          when={props.workflow.paused}
+          fallback={t("workflow.canvas.switcher.steps", { count: props.workflow.steps })}
+        >
+          {t("workflow.canvas.paused")}
+        </Show>
+      </span>
     </DropdownMenu.Item>
   );
 }
@@ -91,6 +107,8 @@ export function WorkflowSwitcher(props: {
   viewing: string | undefined;
   versionsDisabled: boolean;
   readOnly: boolean;
+  paused: boolean | undefined;
+  portable: boolean;
   folders: SwitcherFolders | undefined;
   onAction: (action: SwitcherAction) => void;
   onFolder: (action: FolderMenuAction) => void;
@@ -169,6 +187,12 @@ export function WorkflowSwitcher(props: {
           </span>
           <span>{t("workflow.canvas.switcher.new")}</span>
         </DropdownMenu.Item>
+        <Show when={props.portable}>
+          <DropdownMenu.Item onSelectAfterClose={() => props.onAction("import")}>
+            <Upload class="agent-context-icon" aria-hidden="true" />
+            <span>{t("workflow.canvas.switcher.import")}</span>
+          </DropdownMenu.Item>
+        </Show>
         <DropdownMenu.Separator />
         <Show when={props.versions.length > 0}>
           <DropdownMenu.Sub>
@@ -241,10 +265,24 @@ export function WorkflowSwitcher(props: {
             </DropdownMenu.Sub>
           )}
         </Show>
+        <Show when={props.paused !== undefined}>
+          <DropdownMenu.Item onSelect={() => props.onAction(props.paused ? "resume" : "pause")}>
+            <Show when={props.paused} fallback={<Pause class="agent-context-icon" aria-hidden="true" />}>
+              <Play class="agent-context-icon" aria-hidden="true" />
+            </Show>
+            <span>{props.paused ? t("workflow.canvas.resume") : t("workflow.canvas.pause")}</span>
+          </DropdownMenu.Item>
+        </Show>
         <DropdownMenu.Item onSelect={() => props.onAction("duplicate")}>
           <CopyPlus class="agent-context-icon" aria-hidden="true" />
           <span>{t("workflow.canvas.switcher.duplicate")}</span>
         </DropdownMenu.Item>
+        <Show when={props.portable}>
+          <DropdownMenu.Item onSelectAfterClose={() => props.onAction("export")}>
+            <Download class="agent-context-icon" aria-hidden="true" />
+            <span>{t("workflow.canvas.switcher.export")}</span>
+          </DropdownMenu.Item>
+        </Show>
         <DropdownMenu.Item class="ui-action-menu-danger" onSelect={() => props.onAction("delete")}>
           <Trash2 aria-hidden="true" />
           <span>{t("workflow.canvas.switcher.delete")}</span>

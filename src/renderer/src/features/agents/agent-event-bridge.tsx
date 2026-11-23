@@ -48,6 +48,7 @@ import {
   createTurnErrorBanners,
   providerErrorTitle,
   readableAgentError,
+  remoteAgentError,
 } from "./agent-error-text";
 import { createAgentEventSounds } from "./agent-event-sounds";
 import {
@@ -467,12 +468,14 @@ export function AgentEventBridge() {
         );
         return;
       case "error": {
+        const server = activeServer();
+        const shownError = !server || server.kind === "local" ? event.message : remoteAgentError(event.message);
         const authFailure = classifyUserError(event.message) === "auth";
         if (authFailure) void refreshAgentProviders({ automatic: true }).catch(() => undefined);
         const agentId = event.agentId;
         if (agentId) {
           const key = composerDraftKey({ agentId, serverId: activeServerId() });
-          const message = readableAgentError(event.message);
+          const message = readableAgentError(shownError);
           errorBanners.noteError(key, event.message, message);
           setConversationErrors((current) => ({ ...current, [key]: message }));
           const provider = event.provider ? providerDisplayName(event.provider) : null;
@@ -492,7 +495,7 @@ export function AgentEventBridge() {
           });
           return;
         }
-        const toastKey = readableAgentError(event.message);
+        const toastKey = readableAgentError(shownError);
         if (claimErrorToast(toastKey)) {
           const { t } = currentText();
           const mcp = event.code === "mcp_server_not_started";

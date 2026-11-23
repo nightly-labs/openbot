@@ -53,12 +53,13 @@ export function WorkflowRow({
   const menu = useRef<MenuComponentRef | null>(null);
   const [width, setWidth] = useState<number>();
   const last = workflow.lastRun;
-  const status = last
+  const lastRunText = last
     ? t("mobile.workflow.list.lastRun", {
         status: t(RUN_STATUS_LABEL[last.status]),
         time: formatUpdatedAt(last.at, format),
       })
     : t("mobile.workflow.list.neverRun");
+  const status = workflow.paused ? t("mobile.workflow.list.paused") : lastRunText;
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       <MenuView
@@ -116,7 +117,11 @@ export function WorkflowRow({
                 {workflow.title}
               </Typography.Paragraph>
             </View>
-            <Typography.Paragraph className={runStatusClass(last)} numberOfLines={1} style={typeScale.caption}>
+            <Typography.Paragraph
+              className={workflow.paused ? "text-text-secondary" : runStatusClass(last)}
+              numberOfLines={1}
+              style={typeScale.caption}
+            >
               {status}
             </Typography.Paragraph>
           </View>

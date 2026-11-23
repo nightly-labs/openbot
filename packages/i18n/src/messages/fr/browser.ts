@@ -95,6 +95,7 @@ export const messages = {
   "browser.secret.submitting": "Envoi…",
   "browser.secret.takeOver": "Prendre la main",
   "browser.secret.failed": "Impossible de terminer la demande. Vérifiez la connexion et réessayez.",
+  "browser.secret.ended": "Cette demande de connexion est terminée. Demandez à l’agent de réessayer.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a exécuté un script sur cette page. Pour l’utiliser, demandez à l’agent de recharger la page et de réessayer.",
   "browser.secret.vaultSkip.fieldKind":

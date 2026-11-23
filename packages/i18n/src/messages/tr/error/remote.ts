@@ -31,6 +31,8 @@ export const messages = {
     "Ana makineyle bağlantı görüntü için çok yavaş. Tekrar deneyin: sonraki bağlantı daha düşük bir kalite kullanır.",
   "error.remote.streamTooSlow":
     "Ana makineyle bağlantı görüntü için çok yavaş. Daha hızlı bir ağ kullanın, ardından tekrar deneyin.",
+  "error.remote.noPictureSwitchEncoder":
+    "Ana makine görüntü göndermedi. Tekrar deneyin: sonraki bağlantı daha fazla bilgisayarda çalışan bir video ayarı kullanır.",
   "error.remote.teamSessionExpired": "Ekip oturumunun süresi doldu.",
   "error.remote.finishTestBeforeSwitch": "Ekranları değiştirmeden önce uzak masaüstü testini tamamlayın.",
   "error.remote.displayNotFound": "Uzak ekran bulunamadı.",
@@ -93,7 +95,9 @@ export const messages = {
     "Güvenlik anahtarı eksik olduğu veya değiştiği için OpenBot bu sunucuyu doğrulayamıyor. Sunucu sahibinden sunucuyu kontrol etmesini isteyin.",
   "error.remote.connectionNotStarted":
     "OpenBot bu sunucuyla bağlantıyı başlatamadı. Sorun devam ederse OpenBot'tan çıkın ve yeniden açın.",
-  "error.remote.hostDidNotConnect": "WebRTC ana makinesi bağlanmadı.",
+  "error.remote.connectionServiceUnreachable":
+    "Bu bilgisayar OpenBot bağlantı hizmetine ulaşamıyor. İnternet bağlantısını kontrol edin. OpenBot otomatik olarak yeniden bağlanır.",
+  "error.remote.serverAnswerTimeout": "Sunucu zamanında yanıt vermedi. OpenBot otomatik olarak yeniden bağlanır.",
   "error.remote.connectionCancelled": "Uzak bağlantı iptal edildi.",
   "error.remote.hostDisconnected":
     "Sunucuyla bağlantı kesildi. Eylemin tamamlanıp tamamlanmadığını kontrol edin, ardından tekrar deneyin.",

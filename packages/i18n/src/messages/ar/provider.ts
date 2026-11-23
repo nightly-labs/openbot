@@ -142,7 +142,8 @@ export const messages = {
     "لا تعمل هذه النماذج مع «مساحة العمل فقط» على Windows وLinux. لاستخدامها، غيّر «الأذونات» في إعدادات الوكيل.",
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
-  "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.noModels":
+    "لا تظهر هنا نماذج من {name}. إذا كانت متوقفة، يمكن للمسؤول تشغيلها في إعدادات الخادم > المزوّدون > {name} > النماذج.",
   "provider.picker.endpointModelsInCustom": "يشغّل {name} نقاط النهاية المخصصة لديك. نماذجها في تبويب مخصص.",
   "provider.picker.showCustomModels": "عرض النماذج",
   "provider.picker.museNoModels":
@@ -350,6 +351,7 @@ export const messages = {
   "provider.settings.codexKeyInUse":
     "يستخدم ChatGPT هذا المفتاح، لا خطة ChatGPT. تحتسب OpenAI كل طلب على المفتاح. لا يُعرض استخدام الخطة.",
   "provider.settings.codexKeyAlternative": "أو سجّل الدخول بمفتاح OpenAI API. تحتسب OpenAI كل طلب على المفتاح.",
+  "provider.settings.museKeyInUse": "يستخدم Muse هذا المفتاح، لا تسجيل دخولك. لاستخدام تسجيل الدخول، أزل المفتاح.",
   "provider.settings.addKey": "إضافة مفتاح",
   "provider.settings.changeKey": "تغيير المفتاح",
   "provider.settings.runtime": "بيئة التشغيل",

@@ -6,6 +6,7 @@ export const messages = {
   "error.workflow.versionMissing": "הגרסה הזו של תהליך העבודה כבר לא קיימת.",
   "error.workflow.annotation": "אי אפשר לחבר טקסט, הערות וצורות.",
   "error.workflow.port": "שלב לא יכול לקבל סוג קלט כזה.",
+  "error.workflow.unknownValue": "ה-OpenBot הזה לא מכיר הגדרה של שלב. יש לעדכן את OpenBot ולנסות שוב.",
   "error.workflow.branch": "רק לתנאי יכולים להיות חיבורי כן ולא.",
   "error.workflow.conditionBranch": "כל חיבור היוצא מתנאי חייב להיות כן או לא.",
   "error.workflow.duplicateEdge": "שני השלבים האלה כבר מחוברים כך.",

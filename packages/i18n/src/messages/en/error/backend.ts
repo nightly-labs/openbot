@@ -125,6 +125,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.routineRunFailedNoReason":
     "The run stopped with an error, but no reason came with it. Open the run to see what the agent did.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} did not confirm in time that it started this message. OpenBot does not send it again, so the work does not run twice. OpenBot waits up to 5 minutes for the agent to start.",
+  "error.backend.turnStartAbandoned": "The agent did not start this message in 5 minutes. Send the message again.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",
   "error.backend.channelMemoryLimit": "A channel can have up to {limit} memories.",
@@ -242,8 +245,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
   "error.backend.mcpServerInvalid": "OpenBot cannot save this MCP server configuration.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Header names cannot contain spaces or symbols such as : ( ) /. Use a name such as Authorization, and put the key or token in Value.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",
   "error.backend.mcpSignInNotAccepted": "The server did not accept that sign-in.",
+  "error.backend.mcpSignInGrantRefused":
+    "The server did not accept the sign-in. Sign in again. If the problem continues, make sure that your account is on the same site or region as this app.",
   "error.backend.mcpSignInAccountRefused":
     "The server refused the account that you signed in with. Check that this account can use the service. To use another account, sign out, then sign in again.",
   "error.backend.mcpSignInClientRefused":
@@ -287,6 +294,8 @@ export const messages = defineMessages("error.backend", {
     "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open {name} in Marketplace, Apps, and choose Sign in.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} could not use the MCP server {name}, because the server asks for a key. Open {name} in Marketplace, Apps, choose Edit, and enter the correct key under Headers.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} could not start the MCP server {name}. Open {name} in Marketplace, Apps, and choose Test connection to see the cause.",
   "error.backend.mcpServerFailedInProvider":

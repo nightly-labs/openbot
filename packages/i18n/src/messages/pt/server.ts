@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Você pode selecionar outro servidor enquanto este carrega.",
   "server.connection.cachedHint":
     "O conteúdo carregado e os rascunhos são mantidos. As ações do servidor serão retomadas após a reconexão.",
+  "server.connection.computerOffline":
+    "{name} está offline. Verifique se o computador dele está ligado, se o OpenBot está aberto e se Publicar este servidor está ativado em Configurações do servidor > Membros.",
   "server.connection.conversationFailed": "A conversa não pôde ser carregada. Tente de novo.",
   "server.connection.panelsFailed": "Alguns painéis do espaço de trabalho não puderam ser carregados. Tente de novo.",
   "server.connection.retry": "Repetir",
@@ -549,6 +551,7 @@ export const messages = {
     "Não há uma senha separada para a área de trabalho remota. As configurações abaixo escolhem quem pode controlar este computador.",
   "server.desktop.componentInstalled": "Componente instalado",
   "server.desktop.componentNotInstalled": "Componente não instalado",
+  "server.desktop.needsX11Session": "Requer sessão X11",
   "server.desktop.sessions": "Acesso não supervisionado: {unattended} · Sessões ativas: {active}/{max}",
   "server.desktop.unattendedEnabled": "ativado",
   "server.desktop.unattendedUnavailable": "indisponível",

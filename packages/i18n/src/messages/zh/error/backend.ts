@@ -113,6 +113,9 @@ export const messages = {
   "error.backend.routineRunGone": "该自动化任务的此次运行已不存在。",
   "error.backend.routineRunFailedNoReason": "运行因错误而停止，但没有收到原因。打开这次运行，查看智能体做了什么。",
   "error.backend.turnNotStarted": "服务商未启动本轮对话。",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} 未及时确认已开始处理这条消息。为避免重复执行，OpenBot 不会再次发送。OpenBot 最多等待 5 分钟让智能体开始。",
+  "error.backend.turnStartAbandoned": "智能体在 5 分钟内未开始处理这条消息。请重新发送这条消息。",
   "error.backend.routineResultConnectionOff": "该消息连接已关闭或已移除，请另选投递位置。",
   "error.backend.routineResultNoDelivery": "本次运行没有可再次发送的回答。",
   "error.backend.channelMemoryLimit": "一个频道最多可有 {limit} 条记忆。",
@@ -219,8 +222,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot 最多保留 {limit} 个 MCP 服务器。",
   "error.backend.mcpServerNameTaken": "名为 {name} 的 MCP 服务器已存在。",
   "error.backend.mcpServerInvalid": "OpenBot 无法保存此 MCP 服务器配置。",
+  "error.backend.mcpHeaderNameInvalid":
+    "标头名称不能包含空格或 : ( ) / 等符号。请使用 Authorization 这样的名称，并将密钥或令牌填入“值”。",
   "error.backend.mcpServerNoAnswer": "服务器未在 {seconds} 秒内响应。",
   "error.backend.mcpSignInNotAccepted": "服务器未接受该登录。",
+  "error.backend.mcpSignInGrantRefused":
+    "服务器未接受此次登录。请重新登录。如果问题仍然存在，请确认你的账号与此应用位于同一站点或区域。",
   "error.backend.mcpSignInAccountRefused":
     "服务器拒绝了你登录所用的账号。请确认该账号可以使用此服务。要使用其他账号，请先退出登录，再重新登录。",
   "error.backend.mcpSignInClientRefused":
@@ -259,6 +266,8 @@ export const messages = {
     "它的工具 {tool} 使用了这个提供方无法读取的输入格式。其他提供方的智能体仍会获得这个服务器。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请在 市场、应用 中打开 {name} 并选择“登录”。",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求提供密钥。请在 市场、应用 中打开 {name}，选择“编辑”，然后在“请求头”中输入正确的密钥。",
   "error.backend.mcpServerFailedForProvider":
     "{provider} 无法启动 MCP 服务器 {name}。请在 市场、应用 中打开 {name} 并选择“测试连接”查看原因。",
   "error.backend.mcpServerFailedInProvider":

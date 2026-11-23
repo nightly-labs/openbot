@@ -63,6 +63,7 @@ export const messages = {
   "composer.voice.stop": "עצירת הקלטת הקול",
   "composer.voice.cancel": "ביטול הקלטת הקול",
   "composer.voice.preparing": "מוריד מודל קול",
+  "composer.voice.starting": "מתחיל הקלטה קולית",
   "composer.voice.requesting": "מבקש גישה למיקרופון",
   "composer.voice.transcribing": "מתמלל הנחיה קולית",
   "composer.voice.start": "יצירת הנחיה בקול",

@@ -7,6 +7,7 @@ import {
   type WorkflowAnswer,
   type WorkflowAnswerField,
   type WorkflowAnswerSource,
+  type WorkflowAnswerValue,
   type WorkflowAnswerValueProblem,
   type WorkflowFields,
   type WorkflowGraph,
@@ -20,20 +21,31 @@ import {
   workflowAnswerTemplateText,
   workflowAnswerValueText,
   workflowNodeAnswerNames,
+  workflowTriggerFields,
+  workflowTriggerRecord,
 } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { StoredWorkflowStep } from "./workflow-run-store";
+import { workflowScheduleRecord } from "./workflow-triggers";
 
 export function answerFields(fields: WorkflowFields | null | undefined): WorkflowAnswerField[] {
   const spec = fields?.[WORKFLOW_ANSWER_FIELD];
   return typeof spec === "string" && spec.trim() ? parseWorkflowAnswerSpec(spec).fields : [];
 }
 
-function givenAnswer({ node, fields }: WorkflowAnswerSource, output: string): WorkflowAnswer {
+function givenAnswer({ node, fields, builtIn }: WorkflowAnswerSource, output: string): WorkflowAnswer {
+  if (builtIn) return triggerAnswer(node, output);
   const record = lastJsonObject(output);
   if (!record) return {};
   const given = node.kind === "trigger" && Object.hasOwn(record, "data") ? record.data : record;
   return checkWorkflowAnswer(fields, given).answer;
+}
+
+function triggerAnswer(node: WorkflowNode, output: string): WorkflowAnswer {
+  const fields = workflowTriggerFields(node);
+  const record = node.fields.trigger === "schedule" ? workflowScheduleRecord(output) : lastJsonObject(output);
+  return record ? checkWorkflowAnswer(fields, workflowTriggerRecord(fields, record)).answer : {};
 }
 
 type GivenAnswer = { source: WorkflowAnswerSource; answer: WorkflowAnswer };
@@ -60,7 +72,17 @@ export function stepAnswer(
   return Object.fromEntries(givenAnswers(graph, nodeId, latest).flatMap(({ answer }) => Object.entries(answer)));
 }
 
-export type TemplateReader = "model" | "person";
+export type TemplateReader = "model" | "person" | "lines";
+
+function readerText(
+  reader: TemplateReader,
+  field: WorkflowAnswerField,
+  value: WorkflowAnswerValue | undefined,
+): string {
+  if (reader === "model") return workflowAnswerTemplateText(field, value);
+  if (reader === "lines" && Array.isArray(value)) return value.join("\n");
+  return workflowAnswerValueText(value);
+}
 
 export function templateValues(
   graph: WorkflowGraph,
@@ -74,10 +96,7 @@ export function templateValues(
     for (const field of source.fields) {
       if (!Object.hasOwn(answer, field.name)) continue;
       const value = answer[field.name];
-      values.set(
-        field.name,
-        reader === "person" ? workflowAnswerValueText(value) : workflowAnswerTemplateText(field, value),
-      );
+      values.set(field.name, readerText(reader, field, value));
     }
   return values;
 }
@@ -90,7 +109,7 @@ export function stepAnswerGap(
   endedWithoutAnswer: (nodeId: string) => boolean,
 ): AnswerGap | null {
   const sources = workflowAnswerSources(graph, node.id);
-  const typed = sources.length > 0;
+  const typed = sources.some((source) => !source.builtIn);
   const problems = nodeAnswerProblemsWithoutPaths(graph, node).filter((problem) => typed && problem.code !== "check");
   if (problems.length > 0)
     return { kind: "setup", names: [...new Set(problems.map(workflowAnswerProblemName))].join(", ") };
@@ -133,8 +152,43 @@ export function modelAnswerAsk(fields: readonly WorkflowAnswerField[]): string {
   return `Answer with only one JSON object, with no other text, with these fields:\n${workflowAnswerInstruction(fields)}`;
 }
 
+export function workflowAnswerJsonSchema(fields: readonly WorkflowAnswerField[]): DynamicRecord {
+  return {
+    type: "object",
+    properties: Object.fromEntries(fields.map((field) => [field.name, answerValueSchema(field)])),
+    required: fields.filter((field) => !field.optional).map((field) => field.name),
+    additionalProperties: false,
+  };
+}
+
+function answerValueSchema(field: WorkflowAnswerField): DynamicRecord {
+  switch (field.type) {
+    case "text":
+      return { type: "string" };
+    case "number":
+      return { type: "number" };
+    case "integer":
+      return { type: "integer" };
+    case "yes/no":
+      return { type: "boolean" };
+    case "list":
+      return { type: "array", items: { type: "string" } };
+    case "choice":
+      return { type: "string", enum: [...field.labels] };
+  }
+}
+
+export const WORKFLOW_ANSWER_TOOL = "workflow_answer";
+
 export function agentAnswerAsk(fields: readonly WorkflowAnswerField[]): string {
-  return `End your reply with one JSON object with these fields:\n${workflowAnswerInstruction(fields)}`;
+  return `Give your answer with the openbot.${WORKFLOW_ANSWER_TOOL} tool, as {"answer":{…}}, with these fields:\n${workflowAnswerInstruction(fields)}\nWhen it is not in your tool list, run it with openbot.tool_call. It checks the fields at once; when it tells you a problem, correct the answer and call it again. When you cannot call it, end your reply with the same JSON object.`;
+}
+
+export function toolAnswerFixAsk(
+  fields: readonly WorkflowAnswerField[],
+  problems: readonly WorkflowAnswerValueProblem[],
+): string {
+  return `The answer did not fit: ${workflowAnswerFixText(problems)}. Call ${WORKFLOW_ANSWER_TOOL} again with the corrected answer, with these fields:\n${workflowAnswerInstruction(fields)}`;
 }
 
 export function answerFixAsk(
@@ -149,7 +203,11 @@ export type ReadAnswer = { output: string } | { problems: WorkflowAnswerValuePro
 export function readAnswer(fields: readonly WorkflowAnswerField[], text: string): ReadAnswer {
   const record = lastJsonObject(text);
   if (!record) return { problems: [{ name: fields.map((field) => field.name).join(", "), problem: "json" }] };
-  const { answer, problems } = checkWorkflowAnswer(fields, record, "refuse");
+  return readGivenAnswer(fields, record);
+}
+
+export function readGivenAnswer(fields: readonly WorkflowAnswerField[], value: unknown): ReadAnswer {
+  const { answer, problems } = checkWorkflowAnswer(fields, value, "refuse");
   return problems.length > 0 ? { problems } : { output: JSON.stringify(answer) };
 }
 

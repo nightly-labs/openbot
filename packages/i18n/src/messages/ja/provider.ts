@@ -125,7 +125,8 @@ export const messages = {
     "これらのモデルは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、エージェントの設定で「権限」を変更してください。",
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
-  "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.noModels":
+    "ここには {name} のモデルが表示されていません。オフになっている場合は、管理者が「サーバーの設定」>「プロバイダー」>「{name}」>「モデル」でオンにできます。",
   "provider.picker.endpointModelsInCustom":
     "{name} はカスタムエンドポイントを実行しています。そのモデルは「カスタム」タブにあります。",
   "provider.picker.showCustomModels": "モデルを表示",
@@ -268,6 +269,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
   "provider.settings.geminiKeyReplacesAccount":
     "保存された Gemini API キーが Google のサインインの代わりに使われます。Google のプランとそのモデルを使うには、キーを削除してください。",
+  "provider.settings.museKeyInUse":
+    "Muse はサインインではなく、このキーを使います。サインインを使うには、キーを削除してください。",
   "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 自分でインストール",

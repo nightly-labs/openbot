@@ -30,6 +30,8 @@ export const messages = {
   "error.remote.streamTooSlowLowerQuality":
     "החיבור למארח איטי מדי בשביל התמונה. יש לנסות שוב: החיבור הבא ישתמש באיכות נמוכה יותר.",
   "error.remote.streamTooSlow": "החיבור למארח איטי מדי בשביל התמונה. יש להשתמש ברשת מהירה יותר ולנסות שוב.",
+  "error.remote.noPictureSwitchEncoder":
+    "המארח לא שלח תמונה. יש לנסות שוב: החיבור הבא משתמש בהגדרת וידאו שעובדת ביותר מחשבים.",
   "error.remote.teamSessionExpired": "הסשן של הצוות פג.",
   "error.remote.finishTestBeforeSwitch": "יש לסיים את בדיקת שולחן העבודה המרוחק לפני החלפת תצוגות.",
   "error.remote.displayNotFound": "התצוגה המרוחקת לא נמצאה.",
@@ -90,7 +92,9 @@ export const messages = {
     "OpenBot לא יכול לאמת את השרת הזה, כי מפתח האבטחה שלו חסר או השתנה. בקשו מבעל השרת לבדוק את השרת.",
   "error.remote.connectionNotStarted":
     "OpenBot לא הצליח להתחיל את החיבור לשרת הזה. אם הבעיה נמשכת, צאו מ-OpenBot ופתחו אותו שוב.",
-  "error.remote.hostDidNotConnect": "מארח ה-WebRTC לא התחבר.",
+  "error.remote.connectionServiceUnreachable":
+    "המחשב הזה לא מצליח להגיע לשירות החיבור של OpenBot. יש לבדוק את החיבור שלו לאינטרנט. OpenBot יתחבר שוב אוטומטית.",
+  "error.remote.serverAnswerTimeout": "השרת לא ענה בזמן. OpenBot יתחבר שוב אוטומטית.",
   "error.remote.connectionCancelled": "החיבור המרוחק בוטל.",
   "error.remote.hostDisconnected": "החיבור לשרת נותק. יש לבדוק אם הפעולה הושלמה ואז לנסות שוב.",
   "error.remote.eventGap": "ברצף האירועים של המארח יש פער.",

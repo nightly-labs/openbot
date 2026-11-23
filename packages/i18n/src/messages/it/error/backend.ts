@@ -133,6 +133,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "L’esecuzione si è fermata con un errore, ma senza un motivo. Apri l’esecuzione per vedere cosa ha fatto l’agente.",
   "error.backend.turnNotStarted": "Il provider non ha avviato questo turno.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} non ha confermato in tempo di aver avviato questo messaggio. OpenBot non lo invia di nuovo, così il lavoro non viene eseguito due volte. OpenBot attende fino a 5 minuti che l’agente inizi.",
+  "error.backend.turnStartAbandoned":
+    "L’agente non ha avviato questo messaggio entro 5 minuti. Invia di nuovo il messaggio.",
   "error.backend.routineResultConnectionOff":
     "Questa connessione di messaggistica è disattivata o rimossa. Scegli un altro luogo.",
   "error.backend.routineResultNoDelivery": "Questa esecuzione non ha una risposta da inviare di nuovo.",
@@ -255,8 +259,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot conserva fino a {limit} server MCP.",
   "error.backend.mcpServerNameTaken": "Esiste già un server MCP chiamato {name}.",
   "error.backend.mcpServerInvalid": "OpenBot non può salvare questa configurazione del server MCP.",
+  "error.backend.mcpHeaderNameInvalid":
+    "I nomi delle intestazioni non possono contenere spazi o simboli come : ( ) /. Usa un nome come Authorization e inserisci la chiave o il token in Valore.",
   "error.backend.mcpServerNoAnswer": "Il server non ha risposto entro {seconds} secondi.",
   "error.backend.mcpSignInNotAccepted": "Il server non ha accettato quell'accesso.",
+  "error.backend.mcpSignInGrantRefused":
+    "Il server non ha accettato l'accesso. Accedi di nuovo. Se il problema continua, verifica che il tuo account sia sullo stesso sito o nella stessa regione di questa app.",
   "error.backend.mcpSignInAccountRefused":
     "Il server ha rifiutato l'account con cui hai effettuato l'accesso. Verifica che questo account possa usare il servizio. Per usare un altro account, esci e poi accedi di nuovo.",
   "error.backend.mcpSignInClientRefused":
@@ -301,6 +309,8 @@ export const messages = {
     "Il suo strumento {tool} ha un formato di input che questo provider non riesce a leggere. Gli agenti con altri provider ricevono ancora il server.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} non è riuscito a usare il server MCP {name} perché il server chiede l’accesso. Apri {name} in Marketplace, App, e scegli Accedi.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} non è riuscito a usare il server MCP {name} perché il server chiede una chiave. Apri {name} in Marketplace, App, scegli Modifica e inserisci la chiave corretta in Header.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} non è riuscito ad avviare il server MCP {name}. Apri {name} in Marketplace, App, e scegli Prova la connessione per vedere la causa.",
   "error.backend.mcpServerFailedInProvider":

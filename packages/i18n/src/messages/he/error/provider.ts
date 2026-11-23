@@ -258,6 +258,8 @@ export const messages = {
     "OpenCode לא הצליח לקרוא את החשיבה של המודל הזה ברמת המאמץ הזו. יש לבחור רמת מאמץ נמוכה יותר או מודל אחר, ואז לשלוח את ההודעה שוב.",
   "error.provider.opencodeModelNotServed":
     "ספק המודל לא מציע כרגע את המודל הזה לחשבון שלך. יש לבחור מודל אחר ולשלוח את ההודעה שוב.",
+  "error.provider.opencodeSafetyBlocked":
+    "ספק המודל חסם את ההודעה הזאת בגלל כללי הבטיחות שלו. יש לשלוח את הבקשה שוב במילים אחרות. אם הוא חוסם גם את ההודעות הבאות, יש להתחיל צ'אט חדש או לבחור מודל אחר.",
   "error.provider.opencodeNetwork":
     "OpenCode לא הצליח להתחבר לספק המודלים. יש לבדוק את חיבור הרשת של המחשב שמריץ את OpenBot ואז לנסות שוב.\n{detail}",
   "error.provider.codexStateBusy":
@@ -552,6 +554,8 @@ export const messages = {
   "error.provider.museTurnFailed": "הפעולה של Muse נכשלה.",
   "error.provider.museModelUnavailable":
     "Muse לא יכול להשתמש במודל הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל, או שלחשבון הזה אין גישה למודל. בחר מודל אחר ונסה שוב.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse לא הצליח להשלים את הבקשה. Muse משתמש במפתח Meta API השמור, לא בהתחברות שלך. יש להחליף את המפתח, או להסיר אותו בהגדרות כדי להשתמש בהתחברות.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse לא יכול ליצור פרופיל בלי גישה לכלים חיצוניים. יש להשתמש בספק אחר כדי ליצור את הפרופיל, ואז לבחור ב-Muse עבור הסוכן.",
   "error.provider.museAuthUnverified": "האימות של Muse לא אומת. יש להתחבר במחשב המארח, או להגדיר מפתח API של Meta.",

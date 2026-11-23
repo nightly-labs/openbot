@@ -3445,6 +3445,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "datadog-eu",
+    name: "Datadog EU",
+    tagline: "Monitoring, logs and traces",
+    description:
+      "Datadog EU lets agents search logs, metrics, traces, monitors, dashboards and incidents in the organization of the signed-in account. Each user signs in to their own Datadog account on the EU site (datadoghq.eu) through the browser.",
+    category: "coding",
+    creatorName: "Datadog",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-errors", text: "Which services had the most errors in the last hour?" },
+      { id: "prompt-monitor", text: "Why is the checkout latency monitor alerting?" },
+      { id: "prompt-incident", text: "Summarize the open incidents and their status." },
+    ],
+    websiteUrl: "https://www.datadoghq.com",
+    privacyPolicyUrl: "https://www.datadoghq.com/legal/privacy/",
+    termsUrl: "https://www.datadoghq.com/legal/terms/",
+    featured: false,
+    apps: [
+      {
+        id: "app-datadog-eu-mcp",
+        name: "Datadog EU",
+        description:
+          "Logs, metrics, traces, monitors, and incidents, over Datadog's EU MCP server with browser sign-in.",
+        server: {
+          name: "datadog-eu",
+          transport: "http",
+          url: "https://mcp.datadoghq.eu/v1/mcp",
+          auth: [{ id: "datadog-eu-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "dataforseo",
     name: "DataForSEO",
     tagline: "SEO and search data",

@@ -122,7 +122,8 @@ export const messages = {
     "המודלים האלה לא עובדים עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בהם, שנו את „הרשאות” בהגדרות הסוכן.",
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
-  "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.noModels":
+    "לא מוצגים כאן מודלים של {name}. אם הם כבויים, מנהל יכול להפעיל אותם בהגדרות השרת ← ספקים ← {name} ← מודלים.",
   "provider.picker.endpointModelsInCustom":
     "{name} מפעיל את נקודות הקצה המותאמות שלך. המודלים שלהן נמצאים בכרטיסייה מותאם אישית.",
   "provider.picker.showCustomModels": "הצגת מודלים",
@@ -316,6 +317,7 @@ export const messages = {
   "provider.settings.codexKeyInUse":
     "ChatGPT משתמש במפתח הזה, ולא בתוכנית ChatGPT שלך. OpenAI מחייבת כל בקשה במפתח. השימוש בתוכנית לא מוצג.",
   "provider.settings.codexKeyAlternative": "או להתחבר עם מפתח OpenAI API. OpenAI מחייבת כל בקשה במפתח.",
+  "provider.settings.museKeyInUse": "Muse משתמש במפתח הזה, לא בהתחברות שלך. כדי להשתמש בהתחברות, יש להסיר את המפתח.",
   "provider.settings.addKey": "הוספת מפתח",
   "provider.settings.changeKey": "החלפת מפתח",
   "provider.settings.runtime": "סביבת ריצה",

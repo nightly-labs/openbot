@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Je kunt een andere server kiezen terwijl deze laadt.",
   "server.connection.cachedHint":
     "Geladen inhoud en concepten blijven bewaard. Serveracties gaan verder zodra de verbinding terug is.",
+  "server.connection.computerOffline":
+    "{name} is offline. Controleer of de computer aan staat, OpenBot open is en Publiceer deze server aan staat in Serverinstellingen > Leden.",
   "server.connection.conversationFailed": "Het gesprek kon niet laden. Probeer het opnieuw.",
   "server.connection.panelsFailed": "Sommige panelen van de werkruimte konden niet laden. Probeer het opnieuw.",
   "server.connection.retry": "Opnieuw",
@@ -619,6 +621,7 @@ export const messages = {
     "Er is geen apart wachtwoord voor extern bureaublad. Met de instellingen hieronder kies je wie deze computer mag bedienen.",
   "server.desktop.componentInstalled": "Hostonderdeel geïnstalleerd",
   "server.desktop.componentNotInstalled": "Hostonderdeel niet geïnstalleerd",
+  "server.desktop.needsX11Session": "X11-sessie nodig",
   "server.desktop.sessions": "Onbeheerd: {unattended} · Actieve sessies: {active}/{max}",
   "server.desktop.unattendedEnabled": "ingeschakeld",
   "server.desktop.unattendedUnavailable": "niet beschikbaar",

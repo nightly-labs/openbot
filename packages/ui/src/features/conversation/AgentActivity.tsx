@@ -93,7 +93,7 @@ export function AgentActivityIndicator(props: {
   const waiting = () => (props.waitingFor ? "true" : undefined);
   const plain = () => (props.plain ? "true" : undefined);
   const avatarActivity = () => (props.plain && !props.waitingFor ? (props.activity ?? null) : undefined);
-  const shownSteps = () => (props.plain ? undefined : props.steps);
+  const shownSteps = () => (props.plain && !props.stepsOpenByDefault ? undefined : props.steps);
   const elapsedMs = createElapsed(() => (props.phase === "exiting" ? undefined : props.since));
   const elapsed = createMemo(() => {
     const ms = elapsedMs();

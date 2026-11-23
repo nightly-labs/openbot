@@ -822,7 +822,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkNumber": "关联号码",
   "mobile.server.connectors.whatsapp.ownNumberNote": "你的“给自己发消息”聊天和你允许的人可以联系 OpenBot。",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "你允许的人可以联系 OpenBot。其他人会收到一个代码，需要把它交给你。",
+    "你的“给自己发消息”聊天和你允许的人可以联系 OpenBot。其他人会收到一个代码，需要把它交给你。",
   "mobile.server.connectors.whatsapp.helpLoggedOut": "WhatsApp 已把这台服务器从已关联的设备中移除。请重新关联该号码。",
   "mobile.server.connectors.whatsapp.helpError": "OpenBot 无法通过该号码连接 WhatsApp。请重新连接，或断开该号码。",
   "mobile.server.connectors.whatsapp.helpKeysUnreadable": "OpenBot 无法读取该号码已保存的密钥。请重新关联该号码。",
@@ -1097,6 +1097,7 @@ export const messages = {
   "mobile.server.providers.codexKeyInUse":
     "ChatGPT 使用该密钥，而不是你的 ChatGPT 套餐。OpenAI 按每个请求向该密钥计费。不显示套餐用量。",
   "mobile.server.providers.codexKeyAlternative": "或使用 OpenAI API 密钥登录。OpenAI 按每个请求向该密钥计费。",
+  "mobile.server.providers.museKeyInUse": "Muse 使用此密钥，而不是你的登录。要使用你的登录，请移除该密钥。",
   "mobile.server.providers.sectionUse": "使用",
   "mobile.server.providers.unused": "没有助手在使用",
   "mobile.server.providers.usedByCount": { other: "{count} 个助手在使用" },

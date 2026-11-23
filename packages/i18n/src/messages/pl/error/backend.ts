@@ -131,6 +131,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "Uruchomienie zatrzymało się z błędem, ale bez podanego powodu. Otwórz uruchomienie, aby zobaczyć, co zrobił agent.",
   "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} nie potwierdził na czas, że rozpoczął tę wiadomość. OpenBot nie wysyła jej ponownie, aby praca nie wykonała się dwa razy. OpenBot czeka do 5 minut, aż agent zacznie.",
+  "error.backend.turnStartAbandoned": "Agent nie rozpoczął tej wiadomości w ciągu 5 minut. Wyślij wiadomość ponownie.",
   "error.backend.routineResultConnectionOff":
     "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",
   "error.backend.routineResultNoDelivery": "To uruchomienie nie ma odpowiedzi do ponownego wysłania.",
@@ -248,8 +251,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",
   "error.backend.mcpServerInvalid": "OpenBot nie może zapisać tej konfiguracji serwera MCP.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Nazwy nagłówków nie mogą zawierać spacji ani symboli, takich jak : ( ) /. Użyj nazwy takiej jak Authorization, a klucz lub token wpisz w polu Wartość.",
   "error.backend.mcpServerNoAnswer": "Serwer nie odpowiedział w ciągu {seconds} s.",
   "error.backend.mcpSignInNotAccepted": "Serwer nie zaakceptował tego logowania.",
+  "error.backend.mcpSignInGrantRefused":
+    "Serwer nie zaakceptował logowania. Zaloguj się ponownie. Jeśli problem nie ustąpi, sprawdź, czy Twoje konto jest w tej samej witrynie lub regionie co ta aplikacja.",
   "error.backend.mcpSignInAccountRefused":
     "Serwer odrzucił konto, na które się zalogowano. Sprawdź, czy to konto może korzystać z usługi. Aby użyć innego konta, wyloguj się, a potem zaloguj ponownie.",
   "error.backend.mcpSignInClientRefused":
@@ -294,6 +301,8 @@ export const messages = {
     "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz {name} w Marketplace, Aplikacje i wybierz Zaloguj się.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga klucza. Otwórz {name} w Marketplace, Aplikacje, wybierz Edytuj i wpisz poprawny klucz w sekcji Nagłówki.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} nie może uruchomić serwera MCP {name}. Otwórz {name} w Marketplace, Aplikacje i wybierz Testuj połączenie, aby zobaczyć przyczynę.",
   "error.backend.mcpServerFailedInProvider":

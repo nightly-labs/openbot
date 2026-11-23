@@ -34,6 +34,7 @@ import {
   mcpSignInEvent,
   type QueueHold,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+  settingLinkEvent,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -2643,7 +2644,8 @@ export class ChannelService {
         message.author !== "assistant" &&
         !message.questionPrompt &&
         !(message.attachments?.length && message.author !== "user") &&
-        !mcpSignInEvent(message)
+        !mcpSignInEvent(message) &&
+        !settingLinkEvent(message)
       )
         continue;
       const lateId = message.turnId === undefined ? undefined : this.#lateTurns.get(message.turnId);

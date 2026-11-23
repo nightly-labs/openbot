@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "Questa versione del workflow non esiste più.",
   "error.workflow.annotation": "Testi, note e forme non possono avere connessioni.",
   "error.workflow.port": "Un passaggio non può ricevere questo tipo di input.",
+  "error.workflow.unknownValue":
+    "Questo OpenBot non conosce un’impostazione di un passaggio. Aggiorna OpenBot, poi riprova.",
   "error.workflow.branch": "Solo una condizione può avere connessioni sì e no.",
   "error.workflow.conditionBranch": "Ogni connessione da una condizione deve essere sì o no.",
   "error.workflow.duplicateEdge": "Questi due passaggi hanno già questa connessione.",

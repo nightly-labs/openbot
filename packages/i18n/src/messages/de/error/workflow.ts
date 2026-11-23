@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "Diese Version des Workflows existiert nicht mehr.",
   "error.workflow.annotation": "Texte, Notizen und Formen können keine Verbindungen haben.",
   "error.workflow.port": "Ein Schritt kann diese Art von Eingabe nicht annehmen.",
+  "error.workflow.unknownValue":
+    "Dieses OpenBot kennt eine Einstellung eines Schritts nicht. Aktualisiere OpenBot und versuche es dann erneut.",
   "error.workflow.branch": "Nur eine Bedingung kann Ja- und Nein-Verbindungen haben.",
   "error.workflow.conditionBranch": "Jede Verbindung einer Bedingung muss Ja oder Nein sein.",
   "error.workflow.duplicateEdge": "Diese zwei Schritte haben diese Verbindung bereits.",

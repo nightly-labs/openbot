@@ -12,7 +12,7 @@ import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../src/backend/workflows/workflow-store";
-import { handleWorkflowTool } from "../src/backend/workflows/workflow-tools";
+import { handleWorkflowAnswerTool, handleWorkflowTool } from "../src/backend/workflows/workflow-tools";
 import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
 import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/workflows";
 
@@ -27,6 +27,7 @@ type DeliveryState = { status: "running" | "completed"; turnId: string | null; e
 interface Report {
   checks: string[];
   modelPrompts: string[];
+  modelSchemas: unknown[];
   handoffs: { deliveryId: string; text: string; idempotencyKey: string }[];
   notices: string[];
   promptBytes: Record<string, number>;
@@ -34,7 +35,15 @@ interface Report {
   failure?: string;
 }
 
-const report: Report = { checks: [], modelPrompts: [], handoffs: [], notices: [], promptBytes: {}, passed: false };
+const report: Report = {
+  checks: [],
+  modelPrompts: [],
+  modelSchemas: [],
+  handoffs: [],
+  notices: [],
+  promptBytes: {},
+  passed: false,
+};
 const check = (name: string, ok: boolean, detail?: unknown) => {
   assert.ok(ok, `${name}${detail === undefined ? "" : `: ${JSON.stringify(detail)}`}`);
   report.checks.push(name);
@@ -117,6 +126,14 @@ const complete = (deliveryId: string, answer: string) => {
   turnAnswers.set(turnId, answer);
 };
 
+async function answerTool(args: unknown, deliveryIds: readonly string[]) {
+  assert.ok(service);
+  const response = await runCauseEffect(handleWorkflowAnswerTool(args, service, deliveryIds));
+  const item = response.contentItems[0];
+  assert.ok(item && item.type === "inputText");
+  return { ok: response.success, text: item.text };
+}
+
 async function tool(name: string, args: unknown) {
   assert.ok(service);
   const response = await runCauseEffect(
@@ -155,6 +172,7 @@ try {
       stopDelivery: () => Effect.void,
       generateText: (request) => {
         report.modelPrompts.push(request.prompt);
+        report.modelSchemas.push(request.outputSchema ?? null);
         if (report.modelPrompts.length === failModelCall) return Effect.fail({ message: MODEL_TIMEOUT });
         return Effect.succeed(modelReplies.shift() ?? "");
       },
@@ -180,6 +198,18 @@ try {
     ask,
   );
   report.promptBytes.modelAsk = Buffer.byteLength(ask ?? "");
+  const schema = report.modelSchemas[0];
+  check(
+    "the model step gives the provider the JSON Schema of its answer fields",
+    JSON.stringify(schema) ===
+      JSON.stringify({
+        type: "object",
+        properties: { priority: { type: "string", enum: ["high", "normal", "low"] }, count: { type: "number" } },
+        required: ["priority", "count"],
+        additionalProperties: false,
+      }),
+    schema,
+  );
   check(
     "a wrong answer gets one more try that names the problem",
     report.modelPrompts.length === 2 && fix?.includes("Your answer did not fit") === true && fix.includes("priority"),
@@ -202,7 +232,8 @@ try {
   check(
     "the agent task gets the answer values and the answer request",
     handoff?.text.includes("Handle the high ticket for 3 users.") === true &&
-      handoff.text.includes("End your reply with one JSON object") &&
+      handoff.text.includes("openbot.workflow_answer") &&
+      handoff.text.includes("end your reply with the same JSON object") &&
       handoff.text.includes("- done: true or false"),
     handoff?.text,
   );
@@ -303,6 +334,36 @@ try {
     stepOf(detail, "agent")?.status === "failed" &&
       stepOf(detail, "agent")?.error === sourceText("error.workflow.answerInvalid", { fields: "done" }),
     stepOf(detail, "agent"),
+  );
+
+  modelReplies = ['{"priority":"high","count":5}'];
+  const viaTool = await startRun(workflows, "Answer with the tool", triageGraph("priority = high", REPORT));
+  await runUntil(workflows, viaTool, (run) => stepOf(run, "agent")?.status === "running");
+  const toolDelivery = report.handoffs.at(-1)?.deliveryId ?? "";
+  const handoffsBefore = report.handoffs.length;
+  const misfit = await answerTool({ answer: { summary: "Restarted", done: "maybe" } }, [toolDelivery]);
+  check(
+    "workflow_answer refuses an answer that does not fit and tells the agent what to correct",
+    !misfit.ok && misfit.text.includes("done") && misfit.text.includes("Call workflow_answer again"),
+    misfit.text,
+  );
+  const right = await answerTool({ answer: '{"summary":"Restarted the service","done":true}' }, [toolDelivery]);
+  check("workflow_answer keeps an answer that fits, also given as JSON text", right.ok, right.text);
+  complete(toolDelivery, "I restarted the service and told the users.");
+  detail = await runUntil(workflows, viaTool, ended);
+  check(
+    "the step takes the tool answer, not the text of the reply, and asks for no fix",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === '{"summary":"Restarted the service","done":true}' &&
+      report.handoffs.length === handoffsBefore,
+    { step: stepOf(detail, "agent"), handoffs: report.handoffs.length - handoffsBefore },
+  );
+  const outside = await answerTool({ answer: { summary: "x", done: true } }, ["delivery-not-a-step"]);
+  const afterEnd = await answerTool({ answer: { summary: "x", done: true } }, [toolDelivery]);
+  check(
+    "workflow_answer outside a running workflow step is refused",
+    !outside.ok && outside.text.includes("only in a workflow step") && !afterEnd.ok,
+    { outside, afterEnd },
   );
 
   const refused = await tool("edit_workflow", {
@@ -683,6 +744,103 @@ try {
       report.handoffs.length === joinHandoffs,
     detail.steps,
   );
+
+  modelReplies = ['{"priority":"low"}'];
+  const skippedHandoffs = report.handoffs.length;
+  const skippedSource = await startRun(workflows, "Join with a skipped optional source", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Read the ticket." }),
+      node("rate", "llm", 300, { prompt: "Rate it.", answer: "priority: high|low" }),
+      node("gate", "condition", 600, { check: "priority = high" }),
+      node("detail", "llm", 900, { prompt: "Add a note.", answer: "note?: text" }),
+      node("context", "prompt", 900, { text: "The user is on the free plan." }),
+      node("agent", "agent", 1200, { agentId: AGENT, task: "Handle it. Note: {{note}}." }),
+    ],
+    edges: [
+      { id: "prompt-rate", from: "prompt", to: "rate", type: "text" },
+      { id: "rate-gate", from: "rate", to: "gate", type: "text" },
+      { id: "gate-detail", from: "gate", to: "detail", type: "text", branch: "yes" },
+      { id: "detail-agent", from: "detail", to: "agent", type: "text" },
+      { id: "context-agent", from: "context", to: "agent", type: "text" },
+    ],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, skippedSource, (run) => stepOf(run, "agent")?.status === "running");
+  const skippedHandoff = report.handoffs.at(-1);
+  check(
+    "a join runs when its source with an optional field was skipped, and the field is empty",
+    stepOf(detail, "detail")?.status === "skipped" &&
+      report.handoffs.length === skippedHandoffs + 1 &&
+      skippedHandoff?.text.includes("Handle it. Note: .") === true &&
+      skippedHandoff.text.includes("free plan"),
+    { steps: detail.steps, handoff: skippedHandoff?.text },
+  );
+  complete(skippedHandoff?.deliveryId ?? "", "Done.");
+  detail = await runUntil(workflows, skippedSource, ended);
+  check("the run with the skipped source ends done", detail.run.status === "done", detail.steps);
+
+  modelReplies = ['{"count":1}', '{"count":3}'];
+  const countPrompts = report.modelPrompts.length;
+  const counted = await startRun(workflows, "Loop with a typed number", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Count the open tickets." }),
+      node("count", "llm", 300, { prompt: "Count them.", answer: "count: number" }),
+      node("gate", "condition", 600, { check: "count > 2" }),
+      node("tell", "output", 900, { target: "notify" }),
+    ],
+    edges: [
+      { id: "prompt-count", from: "prompt", to: "count", type: "text" },
+      { id: "count-gate", from: "count", to: "gate", type: "text" },
+      { id: "gate-count", from: "gate", to: "count", type: "text", branch: "no" },
+      { id: "gate-tell", from: "gate", to: "tell", type: "text", branch: "yes" },
+    ],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, counted, ended);
+  const countSteps = detail.steps.filter((step) => step.nodeId === "count");
+  const gateBranches = detail.steps
+    .filter((step) => step.nodeId === "gate")
+    .sort((a, b) => a.attempt - b.attempt)
+    .map((step) => step.branch);
+  const secondCount = report.modelPrompts[countPrompts + 1] ?? "";
+  check(
+    "a loop carries the typed number of the last pass and stops when the check is true",
+    detail.run.status === "done" &&
+      countSteps.length === 2 &&
+      gateBranches.join(",") === "no,yes" &&
+      lastJsonObject(stepOf(detail, "count")?.output ?? "")?.count === 3 &&
+      secondCount.includes('Input 2:\n\n{"count":1}') &&
+      stepOf(detail, "tell")?.status === "done",
+    { steps: detail.steps, secondCount },
+  );
+
+  modelReplies = ['{"priority":"low","count":4}'];
+  const noBranchHandoffs = report.handoffs.length;
+  const noBranch = await startRun(workflows, "Typed value on the no branch", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Read the tickets." }),
+      node("rate", "llm", 300, { prompt: "Rate them.", answer: TRIAGE }),
+      node("gate", "condition", 600, { check: "priority = high" }),
+      node("agent", "agent", 900, { agentId: AGENT, task: "Handle {{count}} {{priority}} tickets." }),
+    ],
+    edges: [
+      { id: "prompt-rate", from: "prompt", to: "rate", type: "text" },
+      { id: "rate-gate", from: "rate", to: "gate", type: "text" },
+      { id: "gate-agent", from: "gate", to: "agent", type: "text", branch: "no" },
+    ],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, noBranch, (run) => stepOf(run, "agent")?.status === "running");
+  const noBranchHandoff = report.handoffs.at(-1);
+  check(
+    "the no branch gets the typed values, with the number as a number",
+    stepOf(detail, "gate")?.branch === "no" &&
+      report.handoffs.length === noBranchHandoffs + 1 &&
+      noBranchHandoff?.text.includes("Handle 4 low tickets.") === true,
+    noBranchHandoff?.text,
+  );
+  complete(noBranchHandoff?.deliveryId ?? "", "Done.");
+  await runUntil(workflows, noBranch, ended);
 
   const retryGraph = (answer: string): WorkflowGraph => ({
     nodes: [

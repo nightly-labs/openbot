@@ -96,6 +96,7 @@ export const messages = {
   "browser.secret.submitting": "Wysyłanie…",
   "browser.secret.takeOver": "Przejmij",
   "browser.secret.failed": "Nie udało się wykonać żądania. Sprawdź połączenie i spróbuj ponownie.",
+  "browser.secret.ended": "To żądanie logowania zostało zakończone. Poproś agenta o ponowną próbę.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent uruchomił skrypt na tej stronie. Aby ich użyć, poproś agenta o ponowne załadowanie strony i ponowną próbę.",
   "browser.secret.vaultSkip.fieldKind":

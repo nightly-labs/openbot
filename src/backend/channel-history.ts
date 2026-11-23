@@ -10,6 +10,7 @@ import {
   isChannelChangeMarker,
   isContextResetMarker,
   mcpSignInEvent,
+  settingLinkEvent,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -136,6 +137,7 @@ function conversation(all: ChannelMessage[]): ChannelMessage[] {
       channelRoutingConversationEvent(message.message) === null &&
       !isChannelChangeMarker(message.message) &&
       mcpSignInEvent(message.message) === null &&
+      settingLinkEvent(message.message) === null &&
       !isMemberThinking(message) &&
       !(
         message.message.itemType === "commentary" &&

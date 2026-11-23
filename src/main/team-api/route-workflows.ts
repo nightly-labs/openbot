@@ -8,6 +8,7 @@ import {
   type WorkflowRunDetail,
   type WorkflowRunPage,
   type WorkflowStep,
+  workflowNeedsAdmin,
 } from "@openbot/contracts/ipc";
 import {
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
@@ -38,6 +39,14 @@ import {
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import {
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_PORTABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
@@ -59,6 +68,7 @@ import {
   parseRetryWorkflowStep,
   parseRunWorkflowStep,
   parseSaveWorkflowGraph,
+  parseSetWorkflowPaused,
   parseStartWorkflowRun,
   parseWorkflowGitHubLastEvent,
   parseWorkflowGitHubRepository,
@@ -84,6 +94,8 @@ const WORKFLOW_MEDIA_CATALOG_V2_PATHS = new Set<string>(Object.values(WORKFLOWS_
 const WORKFLOW_MEDIA_ACCOUNT_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES));
 const WORKFLOW_CREDIT_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_CREDIT_MEDIA_ROUTES));
 const WORKFLOW_STEP_SETTINGS_PATHS = new Set<string>(Object.values(WORKFLOWS_STEP_SETTINGS_ROUTES));
+const WORKFLOW_PAUSE_PATHS = new Set<string>(Object.values(WORKFLOWS_PAUSE_ROUTES));
+const WORKFLOW_PORTABLE_PATHS = new Set<string>(Object.values(WORKFLOWS_PORTABLE_ROUTES));
 
 function serviceCatalog(catalog: WorkflowMediaCatalog): WorkflowMediaCatalog {
   return { models: catalog.models.filter((model) => model.provider !== "openbot") };
@@ -125,9 +137,7 @@ const DISPLAY_FIELD_KEYS: ReadonlySet<string> = new Set([
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
   for (const node of graph.nodes) {
-    const kind = node.kind === "trigger" ? node.fields.trigger : node.kind === "output" ? node.fields.target : null;
-    if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack" && kind !== "chat-channel")
-      continue;
+    if (!workflowNeedsAdmin(node)) continue;
     const fields = Object.keys(node.fields)
       .filter((key) => !DISPLAY_FIELD_KEYS.has(key))
       .sort()
@@ -179,6 +189,8 @@ export async function routeWorkflows(
   const accountPath = WORKFLOW_MEDIA_ACCOUNT_PATHS.has(path);
   const creditPath = WORKFLOW_CREDIT_MEDIA_PATHS.has(path);
   const settingsPath = WORKFLOW_STEP_SETTINGS_PATHS.has(path);
+  const pausePath = WORKFLOW_PAUSE_PATHS.has(path);
+  const portablePath = WORKFLOW_PORTABLE_PATHS.has(path);
   if (
     method !== "POST" ||
     !(
@@ -191,6 +203,8 @@ export async function routeWorkflows(
       accountPath ||
       creditPath ||
       settingsPath ||
+      pausePath ||
+      portablePath ||
       WORKFLOW_PATHS.has(path)
     )
   )
@@ -215,6 +229,11 @@ export async function routeWorkflows(
   if (accountPath && !capabilities.has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (settingsPath && !capabilities.has(WORKFLOWS_STEP_SETTINGS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (pausePath && !capabilities.has(WORKFLOWS_PAUSE_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  const files = workflows.files;
+  if (portablePath && (!files || !capabilities.has(WORKFLOWS_PORTABLE_CAPABILITY)))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const body = await readJson(request);
   const { admin, listed, visibleAgents, visibleGraph, requireUsable, visibleDetail, usableDetail } = workflowVisibility(
@@ -395,6 +414,15 @@ export async function routeWorkflows(
     return json(200, { accounts: workflows.mediaProviders().accounts ?? [] });
   if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits)
     return json(200, { accounts: (await run(workflows.mediaCredits())).accounts ?? [] });
+  if (path === WORKFLOWS_PAUSE_ROUTES.pause) {
+    const input = parse(parseSetWorkflowPaused, body);
+    await usableDetail(input.workflowId, "manage");
+    return json(200, await run(workflows.setPaused(input)));
+  }
+  if (path === WORKFLOWS_PORTABLE_ROUTES.export && files) {
+    const detail = await usableDetail(stringField(body, "workflowId"), "manage");
+    return json(200, fitted(await run(files.source(detail))));
+  }
   if (path === WORKFLOWS_STEP_SETTINGS_ROUTES.read) {
     const stepId = stringField(body, "stepId");
     const scope = await run(workflows.workflowOf({ stepId }));

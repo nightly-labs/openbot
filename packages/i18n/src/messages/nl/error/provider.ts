@@ -278,6 +278,8 @@ export const messages = {
     "OpenCode kon de redenering van dit model bij dit denkniveau niet lezen. Kies een lager denkniveau of een ander model en stuur je bericht dan opnieuw.",
   "error.provider.opencodeModelNotServed":
     "De modelaanbieder biedt dit model nu niet aan je account aan. Kies een ander model en stuur je bericht daarna opnieuw.",
+  "error.provider.opencodeSafetyBlocked":
+    "De modelaanbieder heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels. Stuur je verzoek opnieuw met andere woorden. Als hij ook je volgende berichten blokkeert, start dan een nieuwe chat of kies een ander model.",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
   "error.provider.codexStateBusy":
@@ -595,6 +597,8 @@ export const messages = {
   "error.provider.museTurnFailed": "De Muse-beurt is mislukt.",
   "error.provider.museModelUnavailable":
     "Muse kan dit model niet gebruiken. Muse is mogelijk niet beschikbaar in het land waar deze agent draait, of dit account heeft geen toegang tot het model. Kies een ander model en probeer het opnieuw.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse kon dit verzoek niet voltooien. Muse gebruikt je opgeslagen Meta API-sleutel, niet je login. Vervang de sleutel, of verwijder hem in Instellingen om je login te gebruiken.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse kan geen profiel maken zonder toegang tot externe tools. Gebruik een andere aanbieder om het profiel te maken en kies daarna Muse voor de agent.",
   "error.provider.museAuthUnverified":

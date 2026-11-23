@@ -16,7 +16,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { Deferred, Effect, Exit } from "effect";
 import { runCauseEffect } from "./effect-boundary";
 import { type McpOperationError, mcpCall, mcpFailure, mcpResult, mcpSync } from "./mcp-effects";
-import type { DynamicToolResult } from "./protocol";
+import { type DynamicToolResult, PROVIDER_STOPPED_WAITING } from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
 
 interface DynamicToolDefinition {
@@ -350,7 +350,8 @@ export class LocalMcpBridge {
           if (!tool) return yield* mcpFailure(new Error(`Unknown ${route.namespace.name} tool: ${params.name}`));
           const abandoned = new AbortController();
           const abandon = () => abandoned.abort();
-          extra.signal.addEventListener("abort", abandon, { once: true });
+          const stopWaiting = () => abandoned.abort(PROVIDER_STOPPED_WAITING);
+          extra.signal.addEventListener("abort", stopWaiting, { once: true });
           route.running.set(extra.requestId, abandoned);
           const progressToken = extra._meta?.progressToken;
           let progress = 0;
@@ -384,7 +385,7 @@ export class LocalMcpBridge {
             Effect.ensuring(
               Effect.sync(() => {
                 clearInterval(keepAlive);
-                extra.signal.removeEventListener("abort", abandon);
+                extra.signal.removeEventListener("abort", stopWaiting);
                 if (route.running.get(extra.requestId) === abandoned) route.running.delete(extra.requestId);
               }),
             ),
@@ -414,7 +415,7 @@ export class LocalMcpBridge {
         for (const message of Array.isArray(body) ? body : body ? [body] : []) {
           const cancelled = CancelledNotificationSchema.safeParse(message);
           const requestId = cancelled.success ? cancelled.data.params.requestId : undefined;
-          if (requestId !== undefined) route.running.get(requestId)?.abort();
+          if (requestId !== undefined) route.running.get(requestId)?.abort(PROVIDER_STOPPED_WAITING);
         }
         mcpResult(yield* Effect.result(mcpCall(() => transport.handleRequest(request, response, body))));
       } catch {

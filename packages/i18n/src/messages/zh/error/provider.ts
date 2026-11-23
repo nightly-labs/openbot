@@ -242,6 +242,8 @@ export const messages = {
   "error.provider.opencodeReasoningOverlap":
     "OpenCode 无法在此推理强度下读取该模型的推理内容。请选择更低的推理强度或其他模型，然后重新发送消息。",
   "error.provider.opencodeModelNotServed": "模型服务商目前不向你的账号提供此模型。请选择其他模型，然后重新发送消息。",
+  "error.provider.opencodeSafetyBlocked":
+    "模型服务商因其安全规则拦截了此消息。请换一种说法重新发送你的请求。如果后续消息也被拦截，请开始新的聊天或选择其他模型。",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
   "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
@@ -519,6 +521,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse 本轮对话失败。",
   "error.provider.museModelUnavailable":
     "Muse 无法使用此模型。Muse 可能在此智能体运行的国家或地区不可用，或者此账号无权访问该模型。请选择其他模型，然后重试。\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse 无法完成此请求。Muse 使用已保存的 Meta API 密钥，而不是你的登录。请更换该密钥，或在设置中移除它以使用你的登录。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse 在无法使用外部工具时无法生成资料。请改用其他服务商生成资料，然后为该助手选择 Muse。",
   "error.provider.museAuthUnverified": "Muse 身份验证尚未确认。请在主机电脑上连接，或设置 Meta API 密钥。",

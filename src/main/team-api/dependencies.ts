@@ -101,6 +101,7 @@ import type { SkillLearningPreferenceStore } from "../skill-learning-preference-
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import type { TeamStore } from "../team-store";
 import type { VaultService } from "../vault-service";
+import type { WorkflowFileExporter } from "../workflow-file-export";
 import type { WorkflowFoldersService } from "../workflow-folders-service";
 
 type TeamApiAgentMethods = Pick<
@@ -381,6 +382,7 @@ export type TeamApiWorkflows = Pick<
   | "get"
   | "create"
   | "rename"
+  | "setPaused"
   | "remove"
   | "saveGraph"
   | "versions"
@@ -406,6 +408,7 @@ export type TeamApiWorkflows = Pick<
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     github?: WorkflowGitHubDirectory;
+    files?: Pick<WorkflowFileExporter, "source">;
   };
 
 export type TeamApiCrm = CrmPeopleOperations;

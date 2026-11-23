@@ -383,6 +383,10 @@ export class ModelVisibility {
     return this.#set(change);
   }
 
+  hiddenIn(provider: string): ReadonlySet<string> | undefined {
+    return this.#hidden.get(provider);
+  }
+
   hiddenModels(): { provider: string; hidden: string[] }[] {
     return [...this.#hidden].map(([provider, ids]) => ({ provider, hidden: [...ids] }));
   }

@@ -14,13 +14,14 @@ import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } f
 import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
-import { Effect, Result, Schema } from "effect";
+import { Effect, Exit, Result, Schema, Scope } from "effect";
 import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
 import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import {
   type McpOAuthAuthority,
+  type McpSignInAddressOutcome,
   type McpSignInOffer,
   type McpSignInOpener,
   mcpOAuthAccountKey,
@@ -47,6 +48,8 @@ import { mcpSecretValues, redactMcpValues } from "../mcp-redaction";
 import { McpServerError, type McpServerStore } from "../mcp-server-store";
 import type { ProviderClientContext } from "../provider-drivers";
 import { providerLabel } from "./thread-items";
+
+const SIGN_IN_FAILURE_CHECK_MS = 5_000;
 
 export interface TestMcpServerOptions {
   interactive?: boolean;
@@ -97,6 +100,7 @@ export class McpGateway {
   readonly #proxy: McpOAuthProxy;
   readonly #logger: Logger;
   readonly #hooks: McpGatewayHooks;
+  readonly #scope = Scope.makeUnsafe();
 
   constructor(options: McpGatewayOptions) {
     const { credentials } = options;
@@ -180,6 +184,7 @@ export class McpGateway {
   }
 
   readonly close = Effect.fnUntraced(function* (this: McpGateway) {
+    yield* Scope.close(this.#scope, Exit.void);
     yield* this.#proxy.close();
   });
 
@@ -268,7 +273,7 @@ export class McpGateway {
   ) {
     const config = normalizeMcpConfig(input.config);
     const errors = mcpConfigErrors(config);
-    const firstError = errors.name ?? errors.command ?? errors.url;
+    const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
     if (firstError) return yield* new McpGatewayFailed({ cause: new Error(firstError) });
     const stored = this.#oauth;
     const silent: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined =
@@ -283,13 +288,21 @@ export class McpGateway {
             signIn: (url) => stored.signIn(url, open, options.deepLinkRedirectUrl),
           }
         : (stored ?? undefined);
-    const outcome = options.interactive
-      ? yield* inspectMcpServer(config, undefined, this.#toolRuntimes(), opened, options.signInPlace ?? null).pipe(
-          toMcpGatewayFailed,
-        )
-      : yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
-    if (!options.interactive) yield* this.#refreshForTestedTools(config, outcome);
-    return { toolCount: outcome.toolCount, error: outcome.error };
+    if (options.interactive) {
+      const outcome = yield* inspectMcpServer(
+        config,
+        undefined,
+        this.#toolRuntimes(),
+        opened,
+        options.signInPlace ?? null,
+      ).pipe(toMcpGatewayFailed);
+      return { toolCount: outcome.toolCount, error: outcome.error };
+    }
+    const outcome = yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
+    yield* this.#refreshForTestedTools(config, outcome);
+    const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
+    const error = refused ? sourceText("error.backend.mcpRegistrationUnavailable") : outcome.error;
+    return { toolCount: outcome.toolCount, error };
   });
 
   readonly #probeStoredSignIn = Effect.fnUntraced(function* (
@@ -406,6 +419,10 @@ export class McpGateway {
 
   signInLink(url: string): string | null {
     return this.#oauth?.signInLink(url) ?? null;
+  }
+
+  receiveSignInAddress(url: string, address: string): McpSignInAddressOutcome {
+    return this.#oauth?.receiveSignInAddress(url, address) ?? "ended";
   }
 
   readonly signOut = Effect.fn("McpGateway.signOut")(function* (this: McpGateway, input: SignOutMcpServerInput) {
@@ -544,6 +561,10 @@ export class McpGateway {
         reason: drop.reason,
         detail: this.redact(drop.detail),
       });
+      if (drop.signIn) {
+        this.reportSignInFailure(provider, drop.name, drop.detail);
+        continue;
+      }
       this.#hooks.emitError(
         "mcp_server_not_started",
         drop.reason === "failed_in_provider"
@@ -551,6 +572,26 @@ export class McpGateway {
           : `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
       );
     }
+  }
+
+  reportSignInFailure(provider: AgentProvider, name: string, signInText: string): void {
+    const config = this.#servers.listEnabled().find((row) => row.transport === "http" && row.name === name);
+    const emit = (text: string) => this.#hooks.emitError("mcp_server_not_started", text);
+    if (!config) {
+      emit(signInText);
+      return;
+    }
+    const keyText = sourceText("error.backend.mcpServerKeyForProvider", { provider: providerLabel(provider), name });
+    Effect.runFork(
+      this.inspect(config).pipe(
+        Effect.timeoutOrElse({ duration: SIGN_IN_FAILURE_CHECK_MS, orElse: () => Effect.succeed(null) }),
+        Effect.exit,
+        Effect.flatMap((exit) =>
+          Effect.sync(() => emit(Exit.isSuccess(exit) && exit.value?.needs === "key" ? keyText : signInText)),
+        ),
+        Effect.forkIn(this.#scope),
+      ),
+    );
   }
 
   redact(text: string): string {

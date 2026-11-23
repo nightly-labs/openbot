@@ -1214,7 +1214,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkNumber": "ربط رقم",
   "mobile.server.connectors.whatsapp.ownNumberNote": "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "يصل الأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
+    "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1524,6 +1524,8 @@ export const messages = {
   "mobile.server.providers.codexKeyInUse":
     "يستخدم ChatGPT هذا المفتاح، لا خطة ChatGPT. تحتسب OpenAI كل طلب على المفتاح. لا يُعرض استخدام الخطة.",
   "mobile.server.providers.codexKeyAlternative": "أو سجّل الدخول بمفتاح OpenAI API. تحتسب OpenAI كل طلب على المفتاح.",
+  "mobile.server.providers.museKeyInUse":
+    "يستخدم Muse هذا المفتاح، لا تسجيل دخولك. لاستخدام تسجيل الدخول، أزل المفتاح.",
   "mobile.server.providers.sectionUse": "الاستخدام",
   "mobile.server.providers.unused": "لا يستخدمه أي وكيل",
   "mobile.server.providers.usedByCount": {

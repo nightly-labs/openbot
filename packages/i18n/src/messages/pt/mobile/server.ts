@@ -926,7 +926,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Seu chat “Mensagem para você mesmo” e as pessoas que você permitir falam com o OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "As pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
+    "Seu chat “Mensagem para você mesmo” e as pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "O WhatsApp removeu este servidor dos dispositivos conectados. Vincule o número novamente.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1233,6 +1233,8 @@ export const messages = {
     "O ChatGPT usa esta chave, não o seu plano do ChatGPT. A OpenAI cobra cada solicitação na chave. O uso do plano não é exibido.",
   "mobile.server.providers.codexKeyAlternative":
     "Ou entre com uma chave de API da OpenAI. A OpenAI cobra cada solicitação na chave.",
+  "mobile.server.providers.museKeyInUse":
+    "O Muse usa esta chave, não o seu login. Para usar o seu login, remova a chave.",
   "mobile.server.providers.sectionUse": "Uso",
   "mobile.server.providers.unused": "Nenhum agente o usa",
   "mobile.server.providers.usedByCount": { one: "1 agente o usa", other: "{count} agentes o usam" },
