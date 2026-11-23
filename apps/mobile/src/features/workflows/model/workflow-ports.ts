@@ -2,7 +2,7 @@ import { WORKFLOW_PORTS, type WorkflowNode, type WorkflowPortType, workflowMedia
 
 type PortNode = Pick<WorkflowNode, "kind" | "fields">;
 
-export function outputTypes(node: PortNode): readonly WorkflowPortType[] {
+function outputTypes(node: PortNode): readonly WorkflowPortType[] {
   if (node.kind === "image") return [workflowMediaKind(node.fields) === "video" ? "file" : "image"];
   if (node.kind === "asset") return ["image"];
   return WORKFLOW_PORTS[node.kind].out;

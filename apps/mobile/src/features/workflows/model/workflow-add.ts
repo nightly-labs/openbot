@@ -14,7 +14,7 @@ export const ADD_KEYS = [
 ] as const;
 export type AddKey = (typeof ADD_KEYS)[number];
 
-export type AddableKind = Exclude<AddKey, "video"> | "image";
+type AddableKind = Exclude<AddKey, "video"> | "image";
 
 export function addKind(key: AddKey): AddableKind {
   return key === "video" ? "image" : key;

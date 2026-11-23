@@ -23,7 +23,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-export interface MediaChoice {
+interface MediaChoice {
   kind: WorkflowMediaKind;
   models: WorkflowMediaModel[];
   model: WorkflowMediaModel | null | undefined;
@@ -67,7 +67,7 @@ function priceRequest(choice: MediaChoice): WorkflowMediaPriceRequest | null {
   };
 }
 
-export function useMediaModels(serverId: string, enabled = true) {
+function useMediaModels(serverId: string, enabled = true) {
   const queryScope = useQueryScope();
   const { loadWorkflowMediaModels } = useMobileWorkspaceActions();
   const supported = useWorkflowMediaSupported(serverId);
