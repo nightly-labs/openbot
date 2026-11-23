@@ -31,6 +31,12 @@ interface AcpRetryUpdate {
   readonly cause: AcpRetryCause;
 }
 
+export interface AcpReplyEvent {
+  readonly sessionId: string;
+  readonly reply: string;
+  readonly failure: string | null;
+}
+
 export interface AcpCustomEndpoint {
   readonly name: string;
   readonly hasCredentials: boolean;
@@ -133,6 +139,8 @@ export interface AcpFlavor {
   resendsAnswer?: true;
   childSessionUpdates?: true;
   retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
+  clientMeta?: DynamicRecord;
+  replyEvent?: (method: string, params: DynamicRecord) => AcpReplyEvent | null;
   retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   turnStallMs?: number;
@@ -190,17 +198,32 @@ export const CLINE_ACP_FLAVOR: AcpFlavor = {
     error.code === -32603 ? isRecord(error.data) && error.data.details === `session not found: ${sessionId}` : null,
 };
 
+const COPILOT_SESSION_EVENT = "github.com/copilot/sessionEvent";
+
 export const COPILOT_ACP_FLAVOR: AcpFlavor = {
   relayStdioMcpServers: true,
   turnFailure: copilotTurnFailure,
   planUsedUpChunk: COPILOT_PLAN_USED_UP,
   failureCause: (error) => (COPILOT_PLAN_USED_UP_TEXT.test(errorText(error)) ? "usage_limit" : null),
   compactsItself: true,
+  clientMeta: { "github.com/copilot": { events: ["session.error", "session.info"] } },
+  replyEvent: copilotReplyEvent,
 };
+
+function copilotReplyEvent(method: string, params: DynamicRecord): AcpReplyEvent | null {
+  const { sessionId, type, data, agentId } = params;
+  if (method.replace(/^_/u, "") !== COPILOT_SESSION_EVENT || agentId !== undefined) return null;
+  if (typeof sessionId !== "string" || !isRecord(data) || typeof data.message !== "string") return null;
+  if (type === "session.error") return { sessionId, reply: `Error: ${data.message}`, failure: data.message };
+  if (type === "session.info" && data.infoType === "model_retry")
+    return { sessionId, reply: `Info: ${data.message}`, failure: null };
+  return null;
+}
 
 function copilotTurnFailure(_error: unknown, detail: string): string {
   if (COPILOT_PLAN_USED_UP_TEXT.test(detail))
     return sourceText("error.provider.acpPlanUsedUp", { provider: agentProviderName("copilot") });
+  if (/\bmissing_finish_reason\b/u.test(detail)) return sourceText("error.provider.copilotAnswerIncomplete");
   return /"thinking\.type\.enabled" is not supported for this model/u.test(detail)
     ? sourceText("error.provider.copilotThinkingRejected")
     : detail;

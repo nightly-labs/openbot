@@ -395,6 +395,8 @@ export const messages = {
     "Hermes utracił połączenie podczas tej wiadomości, więc nie wie, czy praca się zakończyła. Sprawdź, co zrobił agent, zanim wyślesz wiadomość ponownie.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot nie mógł użyć tego modelu: model nie przyjął jego ustawienia myślenia. Wybierz inny model dla tego agenta, a potem wyślij wiadomość ponownie.",
+  "error.provider.copilotAnswerIncomplete":
+    "Model zatrzymał się, zanim skończył odpowiedź. Wyślij wiadomość ponownie lub wybierz inny model dla tego agenta.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
   "error.provider.claudeContextFull":
     "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",

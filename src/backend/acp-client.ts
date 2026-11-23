@@ -40,7 +40,7 @@ import {
   modelsFromSessionSetup,
 } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
-import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpRetryCause } from "./acp-flavor";
+import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpReplyEvent, AcpRetryCause } from "./acp-flavor";
 import {
   foldAcpSubagentTool,
   foldOpenCodeChildUpdate,
@@ -214,6 +214,8 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
+type AcpEventReply = Omit<AcpReplyEvent, "sessionId">;
+
 interface AcpTurn {
   id: string;
   startedAt: number;
@@ -234,6 +236,9 @@ interface AcpTurn {
   sessionLost: boolean;
   sdkFailureAt: number | null;
   retryNotices: string;
+  eventReplies: AcpEventReply[];
+  replyFailure: AcpEventReply | null;
+  eventRetries: number;
   textToolCallAt: number | null;
   answerPaused: boolean;
   answerOptional: boolean;
@@ -607,6 +612,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       privateTemp: this.options.privateTemp,
       label: () => this.#label,
       redact: (text) => this.#redact(text),
+      peek: this.options.flavor.replyEvent ? (message) => this.#peekMessage(message) : undefined,
       diagnostic: (message, origin) => {
         const failedSession = this.options.flavor.sdkHarness?.failedSession(message);
         const failedTurn = failedSession ? this.#threads.get(failedSession)?.activeTurn : undefined;
@@ -1445,7 +1451,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         protocolVersion: 1,
         clientCapabilities: this.#flavor.childSessionUpdates
           ? { ...OPENBOT_ACP_CLIENT_CAPABILITIES, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
-          : OPENBOT_ACP_CLIENT_CAPABILITIES,
+          : this.#flavor.clientMeta
+            ? { ...OPENBOT_ACP_CLIENT_CAPABILITIES, _meta: this.#flavor.clientMeta }
+            : OPENBOT_ACP_CLIENT_CAPABILITIES,
         clientInfo: this.#flavor.clientInfo ?? OPENBOT_ACP_CLIENT_INFO,
       }),
     );
@@ -2473,6 +2481,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       sessionLost: false,
       sdkFailureAt: null,
       retryNotices: "",
+      eventReplies: [],
+      replyFailure: null,
+      eventRetries: 0,
       textToolCallAt: null,
       answerPaused: false,
       answerOptional,
@@ -3235,6 +3246,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       this.#releaseBeforeWakeEcho(thread, turn);
     }
+    if (this.#isEventReply(thread, turn, update)) return;
     const retry = turn.stopped ? null : this.#flavor.retryUpdate?.(update);
     if (retry) {
       turn.retrying = "model";
@@ -3253,6 +3265,45 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#emitTurnProgress(thread, turn, recovered);
     }
     this.#applyTurnUpdate(thread, turn, update);
+  }
+
+  #isEventReply(thread: AcpThread, turn: AcpTurn, update: SessionUpdate): boolean {
+    const failure = turn.replyFailure;
+    if (failure && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+      turn.replyFailure = null;
+      if (turn.providerError === failure.failure) turn.providerError = null;
+      this.#applyTurnUpdate(thread, turn, {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: failure.reply },
+      });
+    }
+    const text =
+      update.sessionUpdate === "agent_message_chunk" && update.content.type === "text" ? update.content.text : null;
+    const event = text === null ? undefined : turn.eventReplies.find(({ reply }) => reply === text);
+    if (!event) return false;
+    turn.eventReplies.splice(turn.eventReplies.indexOf(event), 1);
+    if (event.failure === null) {
+      turn.retrying = "model";
+      turn.eventRetries += 1;
+      this.#emitTurnProgress(
+        thread,
+        turn,
+        sourceText("status.provider.modelRetryServerError", { provider: this.#label, attempt: turn.eventRetries }),
+      );
+      return true;
+    }
+    turn.receivedOutput = true;
+    turn.replyFailure = event;
+    turn.providerError ??= event.failure;
+    return true;
+  }
+
+  #peekMessage(message: unknown): void {
+    if (!isRecord(message) || typeof message.method !== "string" || !isRecord(message.params)) return;
+    const event = this.#flavor.replyEvent?.(message.method, message.params);
+    const turn = event ? this.#threads.get(event.sessionId)?.activeTurn : undefined;
+    if (!event || !turn || turn.completing || turn.stopped) return;
+    turn.eventReplies.push({ reply: event.reply, failure: event.failure });
   }
 
   #releaseBeforeWakeEcho(thread: AcpThread, turn: AcpTurn): void {

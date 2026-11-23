@@ -407,6 +407,8 @@ export const messages = {
     "Hermes ha perso la connessione durante questo messaggio, quindi non sa se il lavoro è finito. Controlla cosa ha fatto l'agente prima di inviare di nuovo il messaggio.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot non ha potuto usare questo modello: il modello non ha accettato la sua impostazione di ragionamento. Seleziona un altro modello per questo agente, poi invia di nuovo il messaggio.",
+  "error.provider.copilotAnswerIncomplete":
+    "Il modello si è fermato prima di completare la risposta. Invia di nuovo il messaggio o seleziona un altro modello per questo agente.",
   "error.provider.usageLimitReached": "L'account ha raggiunto il limite di utilizzo.",
   "error.provider.claudeContextFull":
     "Questa chat è diventata troppo lunga per Claude. OpenBot ha avviato una nuova sessione di Claude Code con la cronologia della chat. Riprova.",
