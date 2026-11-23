@@ -269,16 +269,19 @@ function ChannelChat({
   const [questionMessageId, setQuestionMessageId] = useState<string | null | undefined>(
     questionAgentId ? undefined : null,
   );
+  const waitingQuestionId =
+    questionMessageId === undefined
+      ? (pendingPrompts.findLast((message) => promptAgentOf(message.id) === questionAgentId)?.id ?? null)
+      : null;
   if (questionMessageId === undefined && unreadLine !== null) {
-    const waitingId = pendingPrompts.findLast((message) => promptAgentOf(message.id) === questionAgentId)?.id ?? null;
-    setQuestionMessageId(waitingId);
-    if (waitingId) selectPrompt(waitingId);
+    setQuestionMessageId(waitingQuestionId);
+    if (waitingQuestionId) selectPrompt(waitingQuestionId);
   }
   const opensAtQuestion =
     opening === "pending" &&
     online &&
     (questionMessageId === undefined
-      ? Boolean(page && summary)
+      ? waitingQuestionId !== null
       : questionMessageId !== null && shownMessages.some((message) => message.id === questionMessageId));
   const respondToPrompt = useCallback(
     (agentId: string, input: RespondToPromptInput) => store.respondToPrompt(serverId, channelId, agentId, input),
@@ -342,7 +345,7 @@ function ChannelChat({
       unreadLineMessageIds={unreadLineMessageIds}
       focusMessageId={
         opensAtQuestion
-          ? (questionMessageId ?? null)
+          ? (questionMessageId ?? waitingQuestionId)
           : opensAtUnread && unreadLineMessageIds
             ? unreadLineMessageId
             : null
