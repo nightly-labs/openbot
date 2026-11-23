@@ -224,7 +224,7 @@ export class BootRecovery {
           .pipe(
             Effect.tapError((failure) =>
               Effect.sync(() => {
-                if (unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);
+                if (session.state === "inactive" || unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);
               }),
             ),
             toBootRecoveryFailed,
@@ -447,6 +447,7 @@ export class BootRecovery {
             agentId: agent.id,
             publicThreadId,
             cwd: typeof params.cwd === "string" ? params.cwd : agent.workspacePath,
+            retired: session.state === "inactive",
             findDelivery: (deliveryId) => this.#mailbox.deliveryForProviderMessage(agent.id, deliveryId),
             findMessageDelivery: (messageId) => this.#mailbox.deliveryForMessage(messageId, agent.id),
             quietRoutineDelivery: (deliveryId) => this.#hooks.quietRoutineDelivery(deliveryId),
