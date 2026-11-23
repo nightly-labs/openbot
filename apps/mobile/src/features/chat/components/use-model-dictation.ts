@@ -76,6 +76,7 @@ interface CaptureSession {
   recording: string[] | null;
   spokeAt: number | null;
   abort: AbortController;
+  ready: Promise<void>;
   native: boolean;
   heard: boolean;
   listeningAt: number | null;
@@ -302,6 +303,7 @@ export function useModelDictation({
         recording: engine === "voice-server" ? [] : null,
         spokeAt: null,
         abort: new AbortController(),
+        ready: Promise.resolve(),
         native: false,
         heard: false,
         listeningAt: null,
@@ -312,6 +314,7 @@ export function useModelDictation({
       update("starting");
       const stillCurrent = () => owner === id && session.current === current && phaseRef.current === "starting";
       void (async () => {
+        let loading: Promise<void> | null = null;
         try {
           const permission = await recognizer.requestMicrophonePermissionsAsync();
           if (!stillCurrent()) return;
@@ -325,15 +328,11 @@ export function useModelDictation({
             if (!useVoiceServer.getState().server?.routes.dictation)
               throw new VoiceServerError("address", sourceText("error.voice.server.routeOff"));
           } else if (engine !== "elevenlabs") {
-            try {
-              await loadLocalRecognizer(engine, LOCAL_MODEL_THREADS);
-            } catch (error) {
-              if (!stillCurrent()) return;
-              current.ending = "operation_failed";
-              settle();
-              showNotice(modelLoadNotice, error);
-              return;
-            }
+            loading = loadLocalRecognizer(engine, LOCAL_MODEL_THREADS);
+            current.ready = loading.then(
+              () => undefined,
+              () => undefined,
+            );
           } else {
             const key = await readElevenLabsKey();
             if (!key) throw new ElevenLabsError("invalid-key");
@@ -358,6 +357,7 @@ export function useModelDictation({
           current.listeningAt = performance.now();
           update("listening");
           void haptics.impact("light");
+          void loading?.catch((error: unknown) => fail(current, modelLoadNotice, error));
         } catch (error) {
           if (session.current !== current) return;
           current.native = false;
@@ -399,11 +399,14 @@ export function useModelDictation({
       update("stopping");
       void haptics.selection();
       speechNative?.finishCapture?.();
-      stopTimer.current = setTimeout(() => {
+      void current.ready.then(() => {
         if (owner !== id || session.current !== current) return;
-        cancelNative(current);
-        settle();
-      }, STOP_TIMEOUT_MS[current.engine]);
+        stopTimer.current = setTimeout(() => {
+          if (owner !== id || session.current !== current) return;
+          cancelNative(current);
+          settle();
+        }, STOP_TIMEOUT_MS[current.engine]);
+      });
     });
   }, [cancelNative, id, settle, update]);
 
