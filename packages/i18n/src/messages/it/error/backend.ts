@@ -54,6 +54,8 @@ export const messages = {
     "Questo host remoto non supporta il controllo di una scheda del browser.",
   "error.backend.browserSignInUnsupported": "Questo host remoto non può ricevere un accesso da questo computer.",
   "error.backend.browserSignInOpenFailed": "OpenBot non è riuscito ad aprire la finestra di accesso.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot non è riuscito a caricare la pagina nella finestra di accesso. Controlla la connessione a internet, poi apri di nuovo la finestra di accesso.",
   "error.backend.browserSignInReadFailed": "OpenBot non è riuscito a leggere l’accesso dalla finestra.",
   "error.backend.browserStopUnsupported": "Questo host remoto non può interrompere il caricamento di una pagina.",
   "error.backend.sharedDataLocalOnly": "I dati condivisi sono gestiti sul computer su cui girano questi agenti.",

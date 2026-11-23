@@ -49,6 +49,7 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "该远程主机不支持接管浏览器标签页。",
   "error.backend.browserSignInUnsupported": "该远程主机无法接收来自这台电脑的登录。",
   "error.backend.browserSignInOpenFailed": "OpenBot 无法打开登录窗口。",
+  "error.backend.browserSignInLoadFailed": "OpenBot 无法在登录窗口中加载页面。请检查网络连接，然后再次打开登录窗口。",
   "error.backend.browserSignInReadFailed": "OpenBot 无法从窗口读取登录信息。",
   "error.backend.browserStopUnsupported": "该远程主机无法停止页面加载。",
   "error.backend.sharedDataLocalOnly": "共享数据在运行这些助手的电脑上管理。",

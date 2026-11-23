@@ -57,6 +57,8 @@ export const messages = {
   "error.backend.browserSignInUnsupported":
     "Cet hôte distant ne peut pas recevoir une connexion depuis cet ordinateur.",
   "error.backend.browserSignInOpenFailed": "OpenBot n’a pas pu ouvrir la fenêtre de connexion.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot n’a pas pu charger la page dans la fenêtre de connexion. Vérifiez la connexion internet, puis rouvrez la fenêtre de connexion.",
   "error.backend.browserSignInReadFailed": "OpenBot n’a pas pu lire la connexion dans la fenêtre.",
   "error.backend.browserStopUnsupported": "Cet hôte distant ne peut pas arrêter le chargement d’une page.",
   "error.backend.sharedDataLocalOnly": "Les données partagées sont gérées sur l’ordinateur qui exécute ces agents.",
