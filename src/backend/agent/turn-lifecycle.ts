@@ -931,19 +931,6 @@ export class TurnLifecycle {
       (this.#noUpdateTurns.has(turnId) && this.#quietRoutineTurn(agentId, threadId, deliveries, true))
     )
       return false;
-    if (
-      this.#hooks.hasOpenWait(
-        agentId,
-        deliveries.map(({ delivery }) => delivery.id),
-      )
-    ) {
-      logger.info("A turn that keeps a wait open ended with no answer.", {
-        agentId,
-        turnId,
-        provider: source.provider,
-      });
-      return false;
-    }
     const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
     const { messages } = snapshot;
     if (
@@ -958,6 +945,19 @@ export class TurnLifecycle {
       this.#answerWithNarration(messages, turnId, running.narration)
     ) {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
+      return false;
+    }
+    if (
+      this.#hooks.hasOpenWait(
+        agentId,
+        deliveries.map(({ delivery }) => delivery.id),
+      )
+    ) {
+      logger.info("A turn that keeps a wait open ended with no answer.", {
+        agentId,
+        turnId,
+        provider: source.provider,
+      });
       return false;
     }
     if (source.provider !== "codex" && source.provider !== "claude") return false;
