@@ -152,7 +152,7 @@ function liveVoiceErrorText(path: string, status: number, body: unknown): string
 }
 
 function liveVoiceHostFailure(path: string, reference: string | undefined): string | null {
-  return path === LIVE_VOICE_ROUTES.start && reference?.startsWith("host/5")
+  return path === LIVE_VOICE_ROUTES.start && reference?.startsWith("host/500/")
     ? sourceText("error.voice.live.hostFailed")
     : null;
 }

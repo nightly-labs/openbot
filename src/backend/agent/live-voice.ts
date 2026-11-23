@@ -481,10 +481,11 @@ export class LiveVoice {
     const text = this.#plainText(message, agentId);
     if (text) return liveFailure(text);
     if (isFixedSourceText(message)) return failure;
-    const reason = (sourceTextValues(message, "error.voice.live.failed")?.reason ?? this.#hooks.redact(message)).slice(
-      0,
-      START_REASON_LIMIT,
-    );
+    const reason = Array.from(
+      sourceTextValues(message, "error.voice.live.failed")?.reason ?? this.#hooks.redact(message),
+    )
+      .slice(0, START_REASON_LIMIT)
+      .join("");
     logger.warn("Codex could not start live voice.", { reason });
     return liveFailure(sourceText("error.voice.live.startFailed", { reason }));
   }
