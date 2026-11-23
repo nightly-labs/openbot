@@ -21,10 +21,8 @@ let runtime: ObjcRuntime | null = null;
 
 function objcRuntime(): ObjcRuntime {
   if (runtime) return runtime;
-  // Loaded on first use, so that only a macOS panel loads the FFI.
   const koffi: typeof Koffi = requireModule("koffi");
   const objc = koffi.load("/usr/lib/libobjc.A.dylib");
-  // `objc_msgSend` must be called through the exact prototype of each method, never as a variadic.
   runtime = {
     pointerOf: (handle) => koffi.decode(handle, "void *"),
     sel: objc.func("void *sel_registerName(const char *name)"),
@@ -38,17 +36,6 @@ function objcRuntime(): ObjcRuntime {
   return runtime;
 }
 
-/**
- * Stops a macOS panel from making OpenBot the active application.
- *
- * Electron's `type: "panel"` window reports the non-activating style only from its own `styleMask`
- * getter, so the window server never learns that the panel must not take activation. When the user
- * switches to an application that has no window on the current Space, macOS can then give
- * activation to the owner of the topmost window, which is the Dynamic Island (#3497). AppKit has no
- * public API to set this after the window exists, so this calls the private
- * `_setPreventsActivation:` that `NSPanel` uses for its own non-activating style. When the method is
- * missing, the panel stays as it was.
- */
 export function preventPanelActivation(window: BrowserWindow): void {
   if (process.platform !== "darwin") return;
   try {
@@ -65,13 +52,6 @@ export function preventPanelActivation(window: BrowserWindow): void {
   }
 }
 
-/**
- * Tells window switchers, such as AltTab, that a macOS panel or helper window is not a window to switch to.
- *
- * An Electron panel reports the `AXStandardWindow` subrole, and a focused panel also reports itself as
- * the main window. A frameless window reports `AXDialog`. A window switcher lists both as windows of
- * OpenBot. `AXFloatingWindow` is the subrole of a floating palette, which window switchers do not list.
- */
 export function hidePanelFromWindowSwitchers(window: BaseWindow): void {
   if (process.platform !== "darwin") return;
   try {
@@ -93,10 +73,6 @@ export function hidePanelFromWindowSwitchers(window: BaseWindow): void {
   }
 }
 
-/**
- * Keeps a macOS panel on screen when the user hides OpenBot (Hide OpenBot, ⌘H). AppKit hides every
- * window of a hidden application unless the window sets `canHide` to NO. Electron has no option for it.
- */
 export function keepPanelThroughAppHide(window: BrowserWindow): void {
   if (process.platform !== "darwin") return;
   try {

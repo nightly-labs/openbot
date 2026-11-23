@@ -1,6 +1,3 @@
-// The one GitHub connection of this computer: sign in with a device code, list the repositories it
-// reaches, and sign out. The `host*` endpoints do the same for a joined server (`connectors-v1`).
-
 import {
   decodeHostGitHubConnectorRepositories,
   decodeHostGitHubConnectorStatus,
@@ -19,7 +16,6 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 import { handler, type IpcGroupHandlers } from "./define-ipc-group";
 import { scopedQueryHandler } from "./scoped-handler";
 
-// Only the methods these endpoints call, so a test can pass a double without an assertion.
 export interface GitHubConnectorIpcDependencies {
   githubConnector: Pick<
     GitHubConnectorService,
@@ -34,15 +30,9 @@ export interface GitHubConnectorIpcDependencies {
       init?: RemoteRequestInit,
     ): Effect.Effect<T, RemoteWorkflowError>;
   };
-  /** Opens a GitHub page of a joined server's connection in this computer's browser. */
   openExternal: (url: string) => Promise<void>;
 }
 
-/**
- * No endpoint takes a payload but the server: the renderer cannot name a URL, a Client ID or a token.
- * The main process builds each GitHub address from the app that this build ships with. A joined
- * server names its own pages, so only an https page on github.com opens.
- */
 export function githubConnectorIpcHandlers({
   githubConnector,
   remoteServers,
@@ -73,7 +63,6 @@ export function githubConnectorIpcHandlers({
         local: () => githubConnector.status(),
         remote: async (serverId) => withoutGitHubPages(await hostStatus(serverId)),
       }),
-      // The host opens no page, so this computer opens the code page, as a local connect does.
       hostConnect: scopedQueryHandler({
         local: () => runCauseEffect(githubConnector.connect(true)),
         remote: async (serverId) => {
@@ -86,7 +75,6 @@ export function githubConnectorIpcHandlers({
         local: () => githubConnector.cancel(),
         remote: async (serverId) => withoutGitHubPages(await hostStatus(serverId, CONNECTORS_ROUTES.githubCancel)),
       }),
-      // GitHub's revoke page opens only when a sign-in was stored, as a local disconnect does.
       hostDisconnect: scopedQueryHandler({
         local: () => runCauseEffect(githubConnector.disconnect(true)),
         remote: async (serverId) => {

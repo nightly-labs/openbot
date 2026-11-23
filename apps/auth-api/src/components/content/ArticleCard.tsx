@@ -6,13 +6,9 @@ import { ArticleGradient } from "./ArticleGradient";
 export interface ArticleCardProps {
   collection: ContentCollection;
   article: CollectionArticle;
-  /** Position in the grid, used only to stagger the reveal. */
   index: number;
 }
 
-// The title appears twice on purpose: once over the artwork, once below it. The
-// one over the artwork is decorative and hidden from assistive technology, so the
-// card reads as a single link with one name rather than repeating itself.
 export function ArticleCard(props: ArticleCardProps) {
   let root: HTMLAnchorElement | undefined;
 

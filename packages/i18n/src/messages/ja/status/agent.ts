@@ -27,6 +27,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "メイン画面をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureChannel":
     "画像はチャンネル {channel} に表示され、このサーバーでチャンネルを読むメンバー全員が見ることができます。",
+  "status.agent.screenCapturePermissionNext": "その後、macOS が OpenBot に画面収録を許可するよう求めることがあります。",
   "status.agent.screenCaptureDisplay":
     "ディスプレイ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureWindow": "ウィンドウ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
@@ -71,6 +72,7 @@ export const messages = {
   "status.agent.browserActing": "Web ページを操作しています…",
   "status.agent.browserReviewing": "Web ページを確認しています…",
   "status.agent.memoriesSearching": "メモリーを検索しています…",
+  "status.agent.chatsSearching": "過去のチャットを検索しています…",
   "status.agent.memoriesSearched": { other: "メモリーを検索しました: {count} 件見つかりました" },
   "status.agent.memoriesUpdating": "メモリーを更新しています…",
   "status.agent.skillUsing": "スキル {name} を使用しています…",

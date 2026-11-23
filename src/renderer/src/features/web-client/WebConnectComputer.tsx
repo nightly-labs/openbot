@@ -3,17 +3,11 @@ import { Button, buttonVariants, Download, ErrorReference, Heading, Link2, Refre
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 
-/** The first screen of the web client when the account has no computer to connect to. */
 export function WebConnectComputer(props: {
   loading: boolean;
   failed: boolean;
-  /** The code of the failed host list read. */
   reference?: string | null;
   onJoin: () => void;
-  /**
-   * Opens the hosted server plans. Leave it out when the account cannot create a hosted server. With
-   * it, the hosted server is the first action, because it needs no install.
-   */
   onCreateServer?: (() => void) | undefined;
   onRefresh: () => void;
 }) {

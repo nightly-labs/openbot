@@ -1,5 +1,122 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Sur un serveur, les tâches exécutées en même temps, le compte de voix en direct, l’interrupteur de la mémoire d’OpenBot, les dossiers de workflows, les réponses typées des workflows et plus de 10 comptes d’un même fournisseur ne fonctionnent que si le serveur a cette version.",
+      "Après cette mise à jour, une version plus ancienne d’OpenBot ne peut pas ouvrir vos données."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Un agent peut répartir des travaux indépendants en tâches exécutées en même temps. Chaque résultat revient dans la discussion principale, et l’agent combine les résultats pour vous.",
+          "Consultez tous les fils ouverts d’un agent dans le nouvel onglet Fils du panneau latéral. L’onglet affiche le nombre de fils qui vous attendent.",
+          "Changez vos raccourcis clavier dans le nouvel onglet Clavier des Réglages. Les nouveaux raccourcis ouvrent un fil et passent au fil suivant et au fil précédent.",
+          "Les workflows s’ouvrent dans des onglets, et les étapes de workflow peuvent donner des réponses typées. Écrivez {{name}} pour placer une réponse dans une étape suivante.",
+          "Importez une vidéo MP4 ou WebM comme arrière-plan de la fenêtre dans Réglages > Apparence.",
+          "Choisissez le compte ChatGPT qu’utilise la voix en direct de GPT dans Réglages > Voix."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un fournisseur garde jusqu’à 20 comptes. Avant, la limite était de 10.",
+          "La dictée enregistre jusqu’à 10 minutes. Avant, elle s’arrêtait après 2 minutes.",
+          "Un fil charge les messages plus anciens quand vous faites défiler près du haut. Vous n’avez pas besoin de cliquer sur un bouton."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Une routine planifiée ne s’éteint plus en silence quand une exécution n’a rien à signaler.",
+          "Une longue discussion garde tous ses messages, dans le bon ordre, pendant qu’une réponse s’affiche.",
+          "Un numéro WhatsApp lié ne cesse plus de recevoir des messages alors qu’il affiche encore « Connecté ».",
+          "Sous Windows, les agents OpenCode exécutent de nouveau des commandes. Avant, ils échouaient souvent avec « opencode-pty request timed out ».",
+          "Un agent que vous avez mis en sourdine ne vous envoie plus de notification quand il répond dans un canal."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Sur un serveur, les réglages des étapes de workflow, Lancer depuis cette étape, le transfert de propriété, le bouton Tout mettre à jour et de nombreuses corrections pour les agents ne fonctionnent que si le serveur a cette version.",
+      "Après cette mise à jour, une version plus ancienne d’OpenBot ne peut pas ouvrir vos données."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Parlez à un agent avec Appuyer pour parler. Maintenez le bouton pour parler ou la touche pour parler pendant que vous parlez. OpenBot envoie ce que vous avez dit quand vous relâchez. Changez la touche dans Réglages > Voix.",
+          "Relancez un workflow à partir d’une étape. Dans le menu de l’étape, sélectionnez Lancer depuis cette étape. Les étapes précédentes gardent leurs réponses et ne sont pas relancées.",
+          "Consultez les réglages et les entrées qui ont produit le résultat d’une étape de workflow. Sélectionnez Réglages sur l’étape, puis Utiliser ces réglages pour la relancer de la même manière.",
+          "Confiez votre serveur à un autre compte OpenBot. Dans Réglages du serveur > Membres, saisissez l’adresse e-mail du nouveau propriétaire. Le serveur change de mains quand le nouveau propriétaire accepte.",
+          "Mettez à jour tous les fournisseurs en une fois. Réglages > Fournisseurs affiche Tout mettre à jour lorsqu’un ou plusieurs fournisseurs ont une mise à jour."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot met à jour chaque heure les CLI des fournisseurs qu’il a téléchargées, lorsqu’une nouvelle version est disponible. La mise à jour attend que les agents soient inactifs.",
+          "Chaque fil d’un agent peut utiliser les onglets du navigateur que la discussion principale ou un autre fil de cet agent a ouverts.",
+          "L’onglet Routines a disparu de la barre latérale. Les routines continuent de s’exécuter. Gérez-les dans les réglages de l’agent, sur la page Planning et dans Réglages du serveur > Routines."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Le redémarrage pour une mise à jour téléchargée attend maintenant que les agents soient inactifs, avec Annuler le redémarrage. Avant, OpenBot se fermait immédiatement et arrêtait la tâche de l’agent.",
+          "Un agent ne reste plus « En cours » avec ses messages en attente après un redémarrage ou une limite d’utilisation. Le tour arrêté s’affiche comme interrompu, et les messages en attente démarrent.",
+          "Un serveur chargé avec de nombreux agents et appareils rejoints ne manque plus de mémoire et ne se bloque plus lorsqu’il sélectionne le tour suivant.",
+          "Un message que vous envoyez après une pause ne reste plus « Non envoyé » avec « Connectez Claude pour continuer. » lorsque Claude est connecté.",
+          "Les onglets de navigateur d’agent que personne n’utilise cessent d’utiliser le processeur après 2 minutes."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Sur un serveur, les petites copies des images du canevas de workflow, les durées de vidéo personnalisées et les agents qui terminent une demande sans « Continuer » ne fonctionnent que si le serveur a cette version.",
+      "Sous Linux, si OpenBot reste lent après la mise à jour, supprimez le fichier `~/.config/OpenBot/gpu-crash.json`, puis relancez OpenBot.",
+      "Si vous avez réglé Réflexion dans Réglages du fournisseur pour un agent Mistral, sélectionnez de nouveau le niveau dans le menu Effort, et réinitialisez l’ancienne ligne Réflexion."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Partagez votre lien d’invitation dans Réglages > Invite friends. L’onglet affiche votre crédit et les amis qui ont rejoint. Un ami obtient 10 % de réduction sur chaque paiement, et vous obtenez 10 % de chaque facture payée de votre ami sous forme de crédit.",
+          "Placez des nœuds d’un canevas de workflow dans un groupe. Sélectionnez-les et appuyez sur Grouper (⌘G). Réduisez un groupe en une seule carte empilée, et appuyez sur Dissocier (⇧⌘G) pour le défaire.",
+          "Donnez à une étape vidéo du canevas de workflow n’importe quelle durée que permet son modèle Sunra ou Higgsfield. Sélectionnez Personnalisée dans le menu Durée, puis utilisez le curseur.",
+          "Ouvrez le Marketplace depuis la ligne Apps dans les réglages d’un agent. Connectez une application, ou ajoutez votre propre serveur MCP avec Ajout personnalisé.",
+          "Quand vous vous connectez sur un nouvel ordinateur et que votre compte a déjà des serveurs, la première étape les affiche. Ouvrez-en un pour continuer avec ses agents et ses discussions."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Les agents terminent votre demande sans que vous ayez à écrire « Continuer ». Si une partie de la demande n’est pas faite, l’agent poursuit cette partie, au maximum 3 fois. Une question qui demande votre choix ou votre approbation arrête toujours l’agent.",
+          "Les onglets du panneau latéral gardent leur titre et une largeur unique. Quand les onglets ne tiennent pas, la ligne défile, et un menu à la fin de la ligne affiche les autres onglets. Un clic molette ferme un onglet.",
+          "Sur un serveur rejoint, les images du canevas de workflow s’affichent beaucoup plus vite. Le canevas reçoit une petite copie de chaque image, et l’image complète s’ouvre dans la visionneuse.",
+          "Un fil ressemble désormais à la discussion de l’agent. Les messages d’un même expéditeur forment un seul bloc, et les étapes d’une réponse s’affichent à côté."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un agent Claude ou ChatGPT ne reste plus « En cours » pendant des heures lorsque le fournisseur ne répond plus. Après 15 minutes sans sortie (60 minutes pendant qu’un outil tourne), OpenBot termine le tour, et les messages en file d’attente continuent.",
+          "Lorsque « Utiliser ma configuration Claude Code » est désactivé, les agents Claude ne chargent plus vos instructions et règles globales de Claude Code. Chaque tour est plus rapide et coûte moins cher. Pour les garder, activez « Utiliser ma configuration Claude Code ».",
+          "Vos agents continuent de travailler pendant qu’OpenBot télécharge une mise à jour d’un fournisseur. Un téléchargement qui ne reçoit aucune donnée pendant une minute s’arrête, puis reprend là où il s’était arrêté lorsque vous réessayez.",
+          "Les agents envoient de nouveau des messages directement à leurs agents coéquipiers. Auparavant, une carte demandait d’approuver chaque passation, et le travail s’arrêtait jusqu’à votre approbation.",
+          "Un agent doté de modèles de secours automatiques passe à son modèle de secours suivant dans davantage de cas, par exemple après une limite de débit ou lorsque Gemini perd sa connexion à Google."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.73.0",
     "date": "2026-11-18",
     "notices": [

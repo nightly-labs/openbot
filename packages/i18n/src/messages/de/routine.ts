@@ -332,7 +332,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "Weitergeben",
   "routine.webhook.giveSecretFailed": "Das Signaturgeheimnis konnte nicht an {name} weitergegeben werden.",
   "routine.webhook.secretGiven": "{name} hat das neue Signaturgeheimnis.",
-  "routine.webhook.statusFailed": "Es konnte nicht geprüft werden, ob der Host mit dem Relay verbunden ist.",
   "routine.settings.instruction": "Anweisung",
   "routine.settings.instructionPlaceholderAgent": "Beschreibe, was dieser Agent tun soll.",
   "routine.settings.instructionPlaceholderChannel": "Beschreibe, was dieser Kanal tun soll.",

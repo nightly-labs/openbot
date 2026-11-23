@@ -30,6 +30,8 @@ export const messages = {
   "mcp.signIn.pageDescription": "Esta página está abierta en el navegador de {host}. Inicia sesión aquí.",
   "mcp.signIn.copyHint": "Si la página no carga, copia el enlace y ábrelo en otro navegador.",
   "mcp.signIn.copyLink": "Copiar enlace",
+  "mcp.signIn.pasteHint":
+    "Si inicias sesión en otro dispositivo, copia la dirección que muestra su navegador al final y pégala aquí.",
   "mcp.test.connected": {
     one: "Conectado · {count} herramienta",
     other: "Conectado · {count} herramientas",
@@ -102,6 +104,7 @@ export const messages = {
   "mcp.panel.signIn": "Iniciar sesión",
   "mcp.panel.signOut": "Cerrar sesión",
   "mcp.panel.cancelSignIn": "Cancelar",
+  "mcp.panel.useAddress": "Usar esta dirección",
   "mcp.panel.signInTo": "Iniciar sesión en {name}",
   "mcp.panel.signInWaiting": {
     one: "Completa el inicio de sesión en tu navegador. OpenBot deja de esperar después de {count} minuto.",

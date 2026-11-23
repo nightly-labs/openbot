@@ -45,26 +45,14 @@ import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runti
 import { allowsContact, whatsAppNumberForms } from "./whatsapp-senders";
 import { WhatsAppTransport } from "./whatsapp-transport";
 
-/** WhatsApp takes larger files, but a phone on mobile data should not have to. */
 const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
-/** The longest caption that WhatsApp's own API takes; a longer text goes before the file, apart. */
 const WHATSAPP_CAPTION_LIMIT = 1_024;
-/**
- * The adapter's own reasons that a post did not go, which a second post would meet too. The last one
- * says that WhatsApp can have the post already.
- */
 const WHATSAPP_POST_STOPS = new Set(["place_not_allowed", "not_linked", "not_connected", "not_confirmed"]);
-/** WhatsApp clients show an edit only within 15 minutes; a later edit is lost without an error. */
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
-/**
- * Why a history read has fewer messages than it asked for. Without it, an empty read looks like a
- * broken connection. The rules are in `senderDecision` and `whatsAppInbound`.
- */
 const SAVED_HISTORY_NOTE =
   "WhatsApp sends no older messages to OpenBot. OpenBot has only the messages that it received after the number was linked and the chat was allowed, up to 1 day old on arrival, for 90 days. In a chat with a contact, the messages that the user sent from their phone are not saved. Fewer messages here does not mean that the connection has a problem: tell the user what OpenBot can read.";
 
-/** The reaction on the person's message: arrived, then done, failed or stopped. */
 const REACTIONS: Record<StatusReaction, string> = {
   received: "👀",
   done: "✅",
@@ -79,20 +67,16 @@ const IMAGE_TYPES: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-/** WhatsApp opens a document by its type, so a generic type makes a ".bin" file. Attachments store HTML as plain text. */
 const DOCUMENT_TYPES: Record<string, string> = {
   ".htm": "text/html",
   ".html": "text/html",
 };
 
-/** The stored values of one linked number. `whatsappStoreKey` opens its store, the others name it. */
 export interface WhatsAppCredentials {
   storeId: string;
   storeKey: Uint8Array;
   ownNumber: boolean;
-  /** False when the owner turned off the "Working on it…" post: a request then gets only its answer. */
   workingMessage: boolean;
-  /** False when the owner turned off the status reactions: a request then gets no 👀, ✅, ❌ or 🫡. */
   statusReactions: boolean;
 }
 
@@ -106,7 +90,6 @@ export function whatsAppCredentials(values: Record<string, string>): WhatsAppCre
   };
 }
 
-/** The linked number of a store, or null before the link finished. */
 export function whatsAppIdentity(handle: WhatsAppConnectionHandle): WhatsAppIdentity | null {
   const me = handle.store.creds.me;
   const number = me?.id ? userPart(me.id) : null;
@@ -114,19 +97,16 @@ export function whatsAppIdentity(handle: WhatsAppConnectionHandle): WhatsAppIden
   return { number, lid: me?.lid ? `${userPart(me.lid)}@lid` : null };
 }
 
-/** A phone number with only its last digits shown, for a name that can appear in logs and lists. */
 export function maskedNumber(number: string): string {
   return number.length <= 4 ? number : `+${"•".repeat(Math.max(0, number.length - 4))}${number.slice(-4)}`;
 }
 
-/** The outbound side of one linked number. It never logs message text or phone numbers. */
 class WhatsAppAdapter implements MessagingAdapter {
   readonly platform = "whatsapp" as const;
   readonly searchesHistory = true;
   readonly #runtime: WhatsAppRuntime;
   readonly #credentials: WhatsAppCredentials;
   #opened: WhatsAppConnectionHandle | null = null;
-  /** When each post was sent, for the edit window. */
   readonly #sentAt = new Map<string, number>();
 
   constructor(runtime: WhatsAppRuntime, credentials: WhatsAppCredentials) {
@@ -134,7 +114,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     this.#credentials = credentials;
   }
 
-  /** The open store. `identify` opens it; every other call comes after a successful `identify`. */
   get #handle(): WhatsAppConnectionHandle {
     this.#opened ??= this.#runtime.open(this.#credentials.storeId, this.#credentials.storeKey);
     return this.#opened;
@@ -146,8 +125,6 @@ class WhatsAppAdapter implements MessagingAdapter {
         try: () => this.#handle,
         catch: (cause) => cause,
       });
-      // A store that another process holds is tried again later. One that does not open has lost its
-      // keys: the number must link again.
       if (Result.isFailure(opened))
         return Effect.fail(
           new MessagingAdapterError({
@@ -158,7 +135,6 @@ class WhatsAppAdapter implements MessagingAdapter {
           }),
         );
       const identity = whatsAppIdentity(this.#handle);
-      // A device that never finished its link, or one whose keys were removed, must link again.
       if (!identity)
         return Effect.fail(new MessagingAdapterError({ cause: new MessagingConnectionError("invalid_token") }));
       const name = this.#handle.store.creds.me?.name?.trim();
@@ -194,7 +170,6 @@ class WhatsAppAdapter implements MessagingAdapter {
   ) {
     if (!body.buttons?.length) this.#handle.chats.forgetMenu(messageId);
     const sentAt = this.#sentAt.get(messageId);
-    // Past the window, an edit would be lost: the change goes as a new post that quotes the old one.
     if (sentAt === undefined || Date.now() - sentAt > EDIT_WINDOW_MS) {
       yield* this.post(target, body);
       return;
@@ -205,14 +180,12 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   });
 
-  /** Deletes a status post for everyone, so a quiet answer leaves no "finished" text in the chat. */
   readonly remove = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, messageId: string) {
     yield* this.#session().send(target.platformChannelId, { delete: this.#ownKey(target, messageId) });
     this.#handle.chats.forgetMenu(messageId);
     this.#sentAt.delete(messageId);
   });
 
-  /** WhatsApp has no message that only one person sees, so the text is a reply in the chat. */
   postPrivate(target: MessageTarget, _userId: string, text: string): Effect.Effect<void, MessagingAdapterError> {
     return this.post(target, { text }).pipe(Effect.asVoid);
   }
@@ -245,7 +218,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     const firstMentions = this.#mentions(first);
     let firstId: string | null = null;
     const sentAt = replaceMessageId ? this.#sentAt.get(replaceMessageId) : undefined;
-    // An edit notifies nobody, so an answer that mentions a person replaces the status post with a new one.
     if (replaceMessageId && !firstMentions.mentions && sentAt !== undefined && Date.now() - sentAt <= EDIT_WINDOW_MS) {
       const edited = yield* Effect.result(
         this.#session().send(target.platformChannelId, { text: first, edit: this.#ownKey(target, replaceMessageId) }),
@@ -254,11 +226,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     }
     if (firstId === null) {
       firstId = yield* this.#send(target, { text: first, ...firstMentions });
-      // The status post would stay as "Working on it…" above the answer, so it goes. After the post:
-      // when the post fails, the status post stays for the next attempt.
       if (replaceMessageId) yield* this.remove(target, replaceMessageId).pipe(Effect.catch(() => Effect.void));
     }
-    // Only a later part fails after a part is in the chat: the host then must not touch the status post.
     for (const chunk of rest)
       yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) }).pipe(
         Effect.mapError((failure) =>
@@ -293,11 +262,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     return { skipped, firstId };
   });
 
-  /**
-   * One message: the file with the text as its caption, so that the text cannot go missing while the
-   * file arrives. Null when they must go apart: the text is too long, the file cannot be read, or its
-   * send failed on the way.
-   */
   readonly postFileWithText = Effect.fnUntraced(function* (
     this: WhatsAppAdapter,
     target: MessageTarget,
@@ -307,12 +271,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     const chunks = whatsAppChunks(markdown);
     const caption = chunks.length === 1 ? (chunks[0] ?? "") : "";
     if (!caption || caption.length > WHATSAPP_CAPTION_LIMIT) return null;
-    // An unreadable file goes apart, so the text is still posted and the result names the file.
     const content = yield* this.#fileContent(file).pipe(Effect.catch(() => Effect.succeed(null)));
     if (!content) return null;
-    // A refusal, or a reason that a second post would meet too, fails the post: WhatsApp counts each
-    // refused post against the number. Any other failure, such as a media upload, sent nothing: the
-    // text and the file then go apart, so the text is still posted.
     return yield* this.#send(target, { ...content, caption, ...this.#mentions(caption) }).pipe(
       Effect.catch((failure) => {
         const cause = failure.cause;
@@ -323,7 +283,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     );
   });
 
-  /** The message of a file: an image shows in the chat, any other file is a document. Null when it cannot go. */
   readonly #fileContent = Effect.fnUntraced(function* (this: WhatsAppAdapter, file: MessagingAnswerFile) {
     const size = yield* Effect.tryPromise({
       try: () => stat(file.path).then((info) => info.size),
@@ -331,7 +290,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
     if (size === 0 || size > WHATSAPP_FILE_BYTES_LIMIT) return null;
     const image = IMAGE_TYPES[extname(file.name).toLowerCase()];
-    // Without its size, WhatsApp crops the image in the chat. An unreadable header sends it as before.
     const dimensions = image ? yield* Effect.promise(() => imageSize(file.path).catch(() => null)) : null;
     const content: AnyMessageContent = image
       ? { image: { url: file.path }, mimetype: image, ...dimensions }
@@ -355,7 +313,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   }
 
-  /** WhatsApp sends no history to this device: this is what it saw and saved, for 90 days. */
   recent(
     platformChannelId: string,
     threadKey: string | null,
@@ -371,7 +328,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   }
 
-  /** Copies the file that the archive saved at arrival, or else downloads it from WhatsApp. */
   readonly download = Effect.fnUntraced(function* (
     this: WhatsAppAdapter,
     file: InboundFile,
@@ -408,7 +364,6 @@ class WhatsAppAdapter implements MessagingAdapter {
       }
       const known = this.#handle.chats.groupName(platformChannelId);
       if (known) return known;
-      // A name is not worth a failed list: a slow or refused lookup gives the fallback name, and the next call asks again.
       const metadata = yield* this.#handle.session.groupMetadata(platformChannelId).pipe(
         Effect.timeoutOrElse({ duration: PLACE_NAME_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
         Effect.orElseSucceed(() => null),
@@ -418,20 +373,14 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   }
 
-  /** The owner's own chat and the allowed chats. OpenBot posts nowhere else. */
   places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
       const identity = whatsAppIdentity(this.#handle);
       if (!identity) return { places: [] };
       const rules = this.#runtime.policy.rules(identity.number);
-      const places: MessagingPlace[] = [];
-      if (rules.ownNumber)
-        places.push({
-          id: userJid(identity.number),
-          name: sourceText("status.messaging.whatsappOwnChat"),
-          kind: "chat",
-        });
-      // The name that the user saved in the app settings comes first, so an agent finds the contact by it.
+      const places: MessagingPlace[] = [
+        { id: userJid(identity.number), name: sourceText("status.messaging.whatsappOwnChat"), kind: "chat" },
+      ];
       for (const [contact, savedName] of rules.contacts)
         places.push({
           id: userJid(contact),
@@ -443,10 +392,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   }
 
-  /**
-   * The chat of the owner or of an allowed contact, for a number with a plus, spaces or dashes, or in
-   * its other Brazilian form. WhatsApp delivers only to the form that has the account, which is the saved one.
-   */
   placeId(placeId: string): string {
     const [user = "", domain] = placeId.split("@");
     if (domain !== undefined && domain !== "s.whatsapp.net") return placeId;
@@ -458,7 +403,12 @@ class WhatsAppAdapter implements MessagingAdapter {
     return saved ? userJid(saved) : placeId;
   }
 
-  /** WhatsApp notifies a person for `@<number>` when the post also lists them; `post` does that. */
+  directChat(target: MessageTarget): { userId: string; threadKey: string } | null {
+    if (isJidGroup(target.platformChannelId)) return null;
+    const userId = userPart(target.platformChannelId);
+    return userId ? { userId, threadKey: WHATSAPP_DIRECT_THREAD } : null;
+  }
+
   mention(userId: string): string {
     return /^[0-9]+$/u.test(userId) ? `@${userId}` : userId;
   }
@@ -467,7 +417,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     return this.#handle.session;
   }
 
-  /** Posts to the target's chat, quoting the message it answers in a group, and records the post. */
   #send(target: MessageTarget, content: AnyMessageContent): Effect.Effect<string, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
       yield* this.#checkPlace(target.platformChannelId);
@@ -482,29 +431,22 @@ class WhatsAppAdapter implements MessagingAdapter {
         const oldest = this.#sentAt.keys().next().value;
         if (oldest !== undefined) this.#sentAt.delete(oldest);
       }
-      // A reply to this post continues its conversation, also after a restart.
       this.#handle.store.putPost(id, { chatJid: target.platformChannelId, threadKey: this.#threadKey(target, id) });
       this.#handle.chats.rememberKey(id, { fromMe: true, participant: null, text: "" });
       return id;
     });
   }
 
-  /** The conversation of a post: the one it answers in a group, or a new one; the direct chat otherwise. */
   #threadKey(target: MessageTarget, postId: string): string {
     if (!isJidGroup(target.platformChannelId)) return WHATSAPP_DIRECT_THREAD;
     return target.replyThreadId ? whatsAppThreadKey(target) : postId;
   }
 
-  /**
-   * WhatsApp sends no history to this device, so a post that an agent or a routine sent on its own is
-   * kept here, for the context of the chat's next message and for `messaging_history`.
-   */
   rememberPost(target: MessageTarget, postId: string, text: string): void {
     this.#handle.chats.rememberMessage({
       id: postId,
       chatJid: target.platformChannelId,
       threadKey: this.#threadKey(target, postId),
-      // The linked number sent it: an edit or a delete from the owner's phone matches.
       authorId: whatsAppIdentity(this.#handle)?.number ?? "",
       authorName: "OpenBot",
       text,
@@ -512,7 +454,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   }
 
-  /** Refuses a chat that the owner did not allow, such as a place an agent named by mistake. */
   #checkPlace(chatJid: string): Effect.Effect<void, MessagingAdapterError> {
     return Effect.suspend(() => {
       const identity = whatsAppIdentity(this.#handle);
@@ -526,7 +467,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   }
 
-  /** The message to quote. WhatsApp needs its key and some content; the text is what OpenBot saw of it. */
   #quoted(target: MessageTarget, messageId: string): WAMessage {
     const facts = this.#handle.chats.keyOf(messageId);
     return {
@@ -544,7 +484,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     return { remoteJid: target.platformChannelId, id: messageId, fromMe: true };
   }
 
-  /** Status text from the host, in WhatsApp's formatting, with its buttons as a numbered menu. */
   #statusText(body: MessageBody): string {
     const actions = new Set(body.buttons?.map((button) => button.action));
     const menu = [
@@ -554,10 +493,6 @@ class WhatsAppAdapter implements MessagingAdapter {
     return [whatsAppText(body.text), ...menu].join("\n\n");
   }
 
-  /**
-   * The people that a post or an answer mentions as `@<number>` outside code, so WhatsApp shows them
-   * as mentions and notifies them. An email address mentions nobody.
-   */
   #mentions(text: string): { mentions?: string[] } {
     const prose = text.replace(/```[\s\S]*?(?:```|$)|`[^`\n]+`/gu, "");
     const numbers = [...prose.matchAll(/(?<![\w@])@([0-9]{5,20})\b/gu)].map((match) => userJid(match[1] ?? ""));
@@ -569,7 +504,6 @@ export interface WhatsAppDriverOptions {
   runtime: WhatsAppRuntime;
 }
 
-/** Each connection is one linked number with its own store; the runtime keeps them open. */
 export function whatsAppDriver(options: WhatsAppDriverOptions): MessagingDriver {
   const { runtime } = options;
   return {
@@ -578,7 +512,6 @@ export function whatsAppDriver(options: WhatsAppDriverOptions): MessagingDriver 
     createAdapter(credentials) {
       return new WhatsAppAdapter(runtime, whatsAppCredentials(credentials));
     },
-    // After `identify`, which opened the store.
     createTransport(credentials, identity) {
       const values = whatsAppCredentials(credentials);
       const handle = runtime.open(values.storeId, values.storeKey);
@@ -601,7 +534,6 @@ function userPart(jid: string): string | null {
   return jid.split("@")[0]?.split(":")[0] ?? null;
 }
 
-/** Copies a saved file. False when the copy is gone or larger than `maxBytes`. */
 async function copySaved(path: string, destination: string, maxBytes: number): Promise<boolean> {
   const { size } = await stat(path);
   if (size > maxBytes) return false;

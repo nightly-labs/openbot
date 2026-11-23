@@ -1,14 +1,3 @@
-// Runs the real `pi` provider driver and the real Pi binary against a fake OpenAI-compatible server,
-// and books each turn's usage in a real OpenBot database, to check that a Pi turn gets the cost that
-// Pi reports. Pi's `get_session_stats` sends the session's tokens and its cost at the rates of Pi's
-// model list; both are session totals, so each turn books the difference from the last one. The
-// agent directory has a `models.json` with a priced model and a model with no rates. Cases: a first
-// turn, a second turn in the same session (it books its own cost, not the session total), a model
-// with no rates (Pi reports 0, which is not a free turn, so the turn stays unpriced), a change in the
-// same session to the priced model (priced) and back (unpriced again), and a session
-// from before Pi costs were kept (its first cost report also counts that earlier use, so the turn
-// stays unpriced and the next turn is priced).
-// `PI_CLI=<pi> bun run test:pi-usage-cost`. Writes .openbot-build/pi-usage-cost-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -26,7 +15,6 @@ import { runTurn, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/pi-usage-cost-e2e");
 const PROVIDER = "cost-e2e";
-/** USD per million tokens. */
 const RATES = { input: 2, output: 10, cacheRead: 0.5, cacheWrite: 0 };
 
 interface Sent {
@@ -56,10 +44,8 @@ interface Report {
 const report: Report = { passed: false, usageNotices: [], cases: [] };
 const root = await mkdtemp(join(tmpdir(), "openbot-pi-usage-cost-e2e-"));
 const clients: AgentClient[] = [];
-/** The usage of the next reply. Each case sets it before its turn. */
 let next: Sent = { input: 0, cached: 0, output: 0 };
 
-/** One server-sent event of a streamed chat completion. The last one has the usage of the request. */
 function chunk(model: string, content: string | null, usage?: Sent): string {
   const choices = content
     ? [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }]
@@ -103,7 +89,6 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
   });
 });
 
-/** The price of one request at `RATES`, or null for the model with no rates. */
 function price(sent: Sent, priced: boolean): number | null {
   if (!priced) return null;
   return (
@@ -116,7 +101,6 @@ try {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("The fake endpoint has no port.");
 
-  // Pi must not read the developer's own providers and keys.
   const agentDirectory = join(root, "agent");
   await mkdir(agentDirectory, { recursive: true });
   await writeFile(join(agentDirectory, "settings.json"), "{}\n");
@@ -160,7 +144,6 @@ try {
   });
   clients.push(client);
 
-  /** The agent service books each provider notice of a session as this does. */
   const sessions = new Map<string, { id: string; createdAt: string; dropCost: boolean; model: string }>();
   client.on("notification", (notification: AppServerNotification) => {
     const session = sessions.get(getString(notification.params, "threadId") ?? "");
@@ -168,7 +151,6 @@ try {
     let params = notification.params;
     if (notification.method === "openbot/usage") {
       report.usageNotices.push(params);
-      // A version of OpenBot from before this change booked Pi's tokens without the cost.
       if (session.dropCost && isRecord(params)) {
         const { cost: _cost, ...rest } = params;
         params = rest;
@@ -252,7 +234,6 @@ try {
     `${PROVIDER}/unpriced`,
   );
 
-  // A session from before Pi costs were kept: its first turn has tokens and no cost.
   const older = await open(priced, true);
   const before = { input: 2_000, cached: 0, output: 400 };
   await turn("turn before costs were kept", older, before, null);

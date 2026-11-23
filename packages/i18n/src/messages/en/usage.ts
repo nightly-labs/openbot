@@ -8,6 +8,7 @@ export const messages = defineMessages("usage", {
   "usage.period.days90": "90 days",
   "usage.period.year": "1 year",
   "usage.unavailable": "Unavailable",
+  "usage.noCostEstimate": "No cost estimate",
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} tokens",
   "usage.chart.costDescription":

@@ -1,19 +1,5 @@
-/**
- * The D1 binding of the Worker, with two additions at the I/O boundary:
- *
- * - Each failed D1 call writes one log line with a fixed error class. The services map a D1 failure
- *   to their own error and keep the cause private, so without this line a 500 does not show why D1
- *   failed. The line never holds the error message: a D1 message can quote SQL text or a value.
- * - A read that fails because D1 is overloaded runs one more time after a short wait. D1 refuses
- *   calls for about a minute at a time when its queue is full (2026-11-04: "D1 DB is overloaded.
- *   Requests queued for too long."), and most calls in that minute still pass. Writes do not run
- *   again: D1 can apply a write and still report a failure.
- */
-
-/** The only values a failed D1 call writes to the log. */
 type D1FailureClass = "overloaded" | "constraint" | "network" | "other";
 
-/** What the one retry of an overloaded read did. `none`: the call did not run again. */
 type D1RetryOutcome = "none" | "succeeded" | "failed";
 
 type D1Operation = "first" | "all" | "raw" | "run" | "batch" | "exec";
@@ -68,7 +54,6 @@ async function observedCall<T>(operation: D1Operation, readOnly: boolean, call: 
 class ObservedStatement implements D1PreparedStatement {
   readonly #readOnly: boolean;
 
-  /** The statement that D1 made. `batch` takes only D1's own statements. */
   constructor(
     readonly source: D1PreparedStatement,
     readonly sql: string,
@@ -122,7 +107,6 @@ class ObservedDatabase implements D1Database {
     return observedCall("exec", false, () => this.source.exec(query));
   }
 
-  /** Not observed. The Worker does not use sessions. */
   withSession(constraintOrBookmark?: D1SessionBookmark | D1SessionConstraint): D1DatabaseSession {
     return this.source.withSession(constraintOrBookmark);
   }
@@ -132,7 +116,6 @@ class ObservedDatabase implements D1Database {
   }
 }
 
-/** The same database, with a log line for each failed call and one retry of an overloaded read. */
 export function observedD1(database: D1Database): D1Database {
   if (database instanceof ObservedDatabase) return database;
   const known = observedDatabases.get(database);

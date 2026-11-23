@@ -39,7 +39,6 @@ export async function runEventsEffect<A>(operation: Effect.Effect<A, HostEventsF
   try {
     return await Effect.runPromise(operation);
   } catch (error) {
-    // An internal failure goes to the dispatcher, which logs it and returns a generic 500.
     const message = error instanceof HostEventsFailure ? hostEventsFailureMessage(error) : null;
     if (message !== null) throw new HttpError(400, message);
     throw error;
@@ -79,10 +78,8 @@ export async function routeEvents(
   switch (path) {
     case EVENTS_ROUTES.status:
       return json(200, await runEventsEffect(events.getStatus()));
-    // The recovery routes answer as the events routes do; only their wire codecs keep `missedPolicy`.
     case EVENTS_ROUTES.listRoutines:
     case ROUTINE_RECOVERY_ROUTES.listRoutines:
-      // A `once` routine stays on this computer: the events codecs reject its schedule.
       return json(
         200,
         (await runEventsEffect(events.listRoutines(input(parseListEventRoutines)))).filter(
@@ -93,7 +90,6 @@ export async function routeEvents(
     case ROUTINE_RECOVERY_ROUTES.saveRoutine: {
       const routine = input(parseSaveEventRoutine);
       if (routine.trigger.kind === "schedule") requireReleasedSchedule(routine.trigger.schedule);
-      // A `once` routine is not in these lists, so a save cannot change it either.
       if (routine.id !== undefined) {
         const saved = await runEventsEffect(events.listRoutines({ owner: routine.owner }));
         const hidden = saved.some(

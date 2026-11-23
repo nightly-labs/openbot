@@ -11,30 +11,15 @@ import { type UserErrorDetails, userErrorDetails, userErrorMessage } from "@open
 import type { JSX } from "@solidjs/web";
 import { createContext, createEffect, createSignal, type ParentProps, useContext } from "solid-js";
 
-/**
- * The interface language, as shared components read it.
- *
- * This is the one application value `@openbot/ui` reads from a context instead of a prop: nearly
- * every component renders text, and threading a translator through each prop list would change
- * every signature for no gain in testability. The app provides the value; outside a provider - a
- * unit test, a story, a page without the app - it is English.
- *
- * Each member reads the locale when it is called, so text rendered through it repaints on a
- * language change.
- */
 export interface TextValue {
   locale: () => TranslatedLocale;
   t: AppTranslate;
   format: AppFormat;
-  /** `userErrorMessage` in the interface language. `fallback` is already translated. */
   errorMessage: (error: unknown, fallback: string) => string;
-  /** `errorMessage` with the failure's code, for a screen that shows `ErrorReference` beside it. */
   errorDetails: (error: unknown, fallback: string) => UserErrorDetails;
-  /** Text a host or the main process sent as English source text, in the interface language. */
   sourceText: (text: string) => string;
 }
 
-// `formatLocale` is `null` outside a provider: numbers and dates then use the runtime's locale.
 function createTextValue(locale: () => TranslatedLocale, formatLocale: () => string | null): TextValue {
   const current = () => createFormat(locale(), formatLocale());
   return {
@@ -73,11 +58,9 @@ const TextContext = createContext<TextValue>(
 
 export interface TextProviderProps {
   locale: TranslatedLocale;
-  /** The locale of numbers and dates (`formatLocale` from `@openbot/i18n`). The default is `locale`. */
   formatLocale?: string | undefined;
 }
 
-// The locale of the last provider that rendered, for code that runs outside a component.
 const [activeLocale, setActiveLocale] = createSignal<TranslatedLocale>("en");
 const [activeFormatLocale, setActiveFormatLocale] = createSignal<string | null>(null);
 const CURRENT_TEXT = createTextValue(activeLocale, activeFormatLocale);
@@ -92,11 +75,6 @@ export function TextProvider(props: ParentProps<TextProviderProps>): JSX.Element
       setActiveFormatLocale(format);
     },
   );
-  // Kobalte reads its layout direction from this locale, not from `<html dir>`. Without it, menus,
-  // submenus, tabs and sliders keep the direction of `navigator.language` in the Arabic interface.
-  // The format locale gives sliders and progress bars the numbers of `format`, but only when it has
-  // the language of the interface. "System" on a Hebrew computer shows English text with a `he-IL`
-  // format locale, and Kobalte would lay out from right to left in a left-to-right page.
   const controlLocale = () => {
     const format = formatLocale();
     return format.split("-")[0]?.toLowerCase() === props.locale ? format : props.locale;
@@ -112,11 +90,6 @@ export function useText(): TextValue {
   return useContext(TextContext);
 }
 
-/**
- * The text of the app's provider, for a store or an action that runs outside a component. Text it
- * returns is fixed when it is made, so keep it only as long as the message it explains: a component
- * that renders the text itself should call `useText()` instead.
- */
 export function currentText(): TextValue {
   return CURRENT_TEXT;
 }

@@ -1,14 +1,3 @@
-// Checks member-to-member replies in a channel (#4847), in this worktree's running dev app with real
-// provider turns. Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/channel-reply-e2e.ts --allow-mutations`. It needs two visible agents whose provider is
-// signed in and follows tool instructions.
-//
-// It checks that `channel_reply` posts a reply to the other member's message, that the other member
-// gets one turn for it and its answer replies to the reply, that the caller waits for that answer and
-// continues after it, and that a request that asks for more
-// replies than the limit gets no more than two. The model does the tool calls, so a model that does
-// not follow the instructions fails a step. It makes its own channel and deletes it.
-// Writes .openbot-build/channel-reply-e2e/report.json.
 import assert from "node:assert/strict";
 import type { ChannelMessage, ChannelPage, ChannelTask } from "@openbot/contracts/ipc";
 import { ChannelClient, connectChannelE2e, waitFor, writeReport } from "./channel-e2e-support";
@@ -40,7 +29,6 @@ const agentText = (message: ChannelMessage) =>
   !message.message.uiBlock &&
   (!message.message.itemType || message.message.itemType === "agentMessage");
 
-/** The root task of the agent for a person's message after `sequence`. */
 function newRoot(channel: ChannelPage, agentId: string, sequence: number): ChannelTask | undefined {
   const requests = new Set(
     channel.messages
@@ -52,7 +40,6 @@ function newRoot(channel: ChannelPage, agentId: string, sequence: number): Chann
   );
 }
 
-/** Sends one request to the agent and waits until each task of its run ends. */
 async function ask(channelId: string, agentId: string, text: string, label: string) {
   const sequence = (await client.read(channelId)).throughSequence;
   await client.send(channelId, text, agentId);
@@ -75,7 +62,6 @@ try {
   assert.ok(a && b, "This check needs two visible agents.");
   const channel = await client.create(`Reply e2e ${Date.now()}`, [a.id, b.id], null);
 
-  // B writes the message that A replies to.
   const first = await ask(channel.id, b.id, "Reply with the single word FALCON. Do not use tools.", "B answers");
   const target = first.channel.messages.find(
     (message) => message.sequence > first.sequence && message.author.id === b.id && agentText(message),
@@ -83,7 +69,6 @@ try {
   assert.ok(target, "B posted no answer.");
   report.target = { messageId: target.id, text: target.message.text };
 
-  // A replies to it with a question, so B gets one turn to answer.
   const second = await ask(
     channel.id,
     a.id,
@@ -121,14 +106,12 @@ try {
   assert.ok(answer, "B did not answer the reply.");
   report.answer = { replyToMessageId: answer.message.replyToMessageId ?? null, text: answer.message.text };
   assert.equal(answer.message.replyToMessageId, reply.id, "B's answer does not reply to the reply.");
-  // A continues with the answer, so its last answer comes after B's.
   const final = second.channel.messages.findLast(
     (message) => message.taskId === second.root.id && message.author.id === a.id && agentText(message),
   );
   report.final = final?.message.text ?? null;
   assert.ok(final && final.sequence > answer.sequence, "A did not continue after B's answer.");
 
-  // A request that asks for more replies than the limit gets the limit.
   const third = await ask(
     channel.id,
     a.id,

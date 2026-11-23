@@ -15,6 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
+import { perfTimed } from "../perf-probe-hooks";
 import type { AttentionRegistry } from "./attention-registry";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { TurnLifecycle } from "./turn-lifecycle";
@@ -76,8 +77,6 @@ export function compactRuntimeApproval(approval: AgentApproval): AgentRuntimeSna
 function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntimeSnapshot {
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
-  // The context goes first: only context-usage-v1 carries it, so it never costs a Team client a field
-  // that it had before. The side threads go before the agents' own chats.
   if (snapshot.threadContextStates?.length) {
     snapshot.threadContextStates = [];
     if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
@@ -153,10 +152,14 @@ export interface RuntimeSnapshotSources {
   turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns" | "backgroundWork">;
   attention: Pick<AttentionRegistry, "runtimeAttention">;
   usageLimits: Pick<UsageLimitGate, "limitedAgents" | "limitedModels" | "failedModels">;
+  waitsForLimit: (agentId: string) => boolean;
 }
 
-/** The runtime view of every agent: active turns, queued work, latest messages and attention. */
-export function buildRuntimeSnapshot({
+export function buildRuntimeSnapshot(sources: RuntimeSnapshotSources): AgentRuntimeSnapshot {
+  return perfTimed("runtime.snapshot", () => buildRuntimeSnapshotNow(sources));
+}
+
+function buildRuntimeSnapshotNow({
   contextStates,
   threadContextStates,
   agents,
@@ -166,6 +169,7 @@ export function buildRuntimeSnapshot({
   turn,
   attention,
   usageLimits,
+  waitsForLimit,
 }: RuntimeSnapshotSources): AgentRuntimeSnapshot {
   const runtimeAgents: AgentRuntimeSnapshot["agents"] = agents.map((agent) => ({
     id: agent.id,
@@ -182,11 +186,9 @@ export function buildRuntimeSnapshot({
   const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
   for (const agent of agents) {
     const live = conversation.loadedSnapshot(agent.id);
-    // Each change of attention builds this for every agent, so the messages are not copied.
     const liveLatest = live?.messages.findLast(
       (message) =>
         (message.author === "assistant" || message.author === "agent") &&
-        // A message that another agent sent to this one is not a reply to the user.
         !message.senderAgentId &&
         message.itemType !== "commentary" &&
         message.itemType !== "question_prompt" &&
@@ -224,7 +226,7 @@ export function buildRuntimeSnapshot({
     latestMessages,
     ...attention.runtimeAttention(),
     failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
-    usageLimits: usageLimits.limitedAgents(),
+    usageLimits: usageLimits.limitedAgents().filter((limit) => waitsForLimit(limit.agentId)),
     usageLimitedModels: usageLimits.limitedModels(),
     failedModels: usageLimits.failedModels(),
     subagentTurns: turn.subagentTurns(agentIds),

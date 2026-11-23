@@ -1,21 +1,9 @@
-import { decodeHostReleaseStatus, type HostReleaseStatus } from "@openbot/contracts/ipc";
-// What the Team API client will accept from a remote host. `packages/contracts/src/ipc-decoding.ts`
-// supplies the primitives; this family says which shapes survive them.
-//
-// A `FromHost` decoder has a same-shaped `FromMain` twin in `src/preload/index.ts` and is deliberately
-// not the same function: a remote team server is an untrusted sender, so these enumerate what the
-// preload's twin is content to accept as a string. The suffix is there so a later reader does not
-// merge them onto whichever is looser. The convention only works while both halves keep the suffix,
-// because it is what lets a reader find the twin at all - which is why
-// `src/main/ipc-channel-coverage.test.ts` compares the two sets name for name.
-//
-// The decoders sit in four sibling files by wire area — `remote-agent-decoding.ts`,
-// `remote-conversation-decoding.ts`, `remote-team-decoding.ts`, `remote-device-decoding.ts` — and this
-// file holds only what all four share.
-//
-// There is deliberately no `remote-*-decoding.test.ts`. These are pure functions over shapes `tsc`
-// already checks; the two consequences worth naming (a host older than 63b55606 omitting `avatarUrl`,
-// a browser preview that is not a bounded JPEG data URL) are covered where they are reached.
+import {
+  decodeHostReleaseStatus,
+  decodeWorkflowFoldersSnapshot,
+  type HostReleaseStatus,
+  type WorkflowFoldersSnapshot,
+} from "@openbot/contracts/ipc";
 
 import { emptyDecoder } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -24,13 +12,14 @@ export type ResponseDecoder<T> = (value: unknown) => T;
 
 export const decodeVoid = emptyDecoder("The remote server returned data.");
 
-/** Discards the reply of a route whose team-protocol codec has already checked it. */
 export const acceptEmpty = (): undefined => undefined;
 
-/** Whether the host notifies a phone of the member. The `computer-activity-v1` codec has already checked the reply. */
 export const decodeComputerActivityReply = (value: unknown): boolean => isDynamicRecord(value) && value.phones === true;
 
-/** The web client uses the same remote boundary; the preload has its own decoder. */
 export function decodeHostReleaseStatusFromHost(value: unknown): HostReleaseStatus {
   return decodeHostReleaseStatus(value);
+}
+
+export function decodeWorkflowFoldersSnapshotFromHost(value: unknown): WorkflowFoldersSnapshot {
+  return decodeWorkflowFoldersSnapshot(value);
 }

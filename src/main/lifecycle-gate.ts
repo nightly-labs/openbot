@@ -10,7 +10,6 @@ interface QueuedStop<E> {
   readonly done: Deferred.Deferred<void, E>;
 }
 
-/** Serialize lifecycle operations; repeated pending actions share their result. */
 export class LifecycleGate<T, E> {
   #last: QueuedStart<T, E> | QueuedStop<E> | null = null;
 

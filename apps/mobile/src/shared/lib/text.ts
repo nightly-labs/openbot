@@ -14,11 +14,6 @@ function phoneLocale(): string {
 let systemLocale: string | null = null;
 const systemLocaleListeners = new Set<() => void>();
 
-/**
- * The phone's language. Each read is a synchronous call to the native module, and every row of a
- * list uses text, so it is read once for the app. The phone's language can change in its settings
- * while OpenBot is in the background, so it is read again each time the app becomes active.
- */
 function systemLocaleNow(): string {
   if (systemLocale === null) {
     systemLocale = phoneLocale();
@@ -42,7 +37,6 @@ function subscribeSystemLocale(listener: () => void) {
 
 const texts = new Map<string, MobileText>();
 
-/** One text value for each pair of languages, shared by every component that uses it. */
 function sharedText(locale: TranslatedLocale, numbers: string): MobileText {
   const key = `${locale}\u0000${numbers}`;
   const cached = texts.get(key);
@@ -58,7 +52,6 @@ export function currentText(): MobileText {
   return sharedText(resolveLocale(language, locale), formatLocale(language, locale));
 }
 
-/** The interface language now, for text that the phone asks another computer to write. */
 export function currentLocale(): TranslatedLocale {
   return resolveLocale(useAppLanguage.getState().value, systemLocaleNow());
 }

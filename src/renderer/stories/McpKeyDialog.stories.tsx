@@ -1,11 +1,3 @@
-/**
- * The connect step that stays here: a credential from the server's own settings page, pasted and
- * proved before an agent is given the tools.
- *
- * One story, with the server and its answer on controls. `good-key` is the credential the story
- * server accepts; anything else is refused, so a refusal is a state the dialog reached.
- */
-
 import type { McpKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import { McpKeyDialog } from "@openbot/ui/features/settings/McpKeyDialog";
 import { fn } from "storybook/test";
@@ -27,7 +19,6 @@ import {
 } from "./mcp-connect-stage";
 import { SettledArgs } from "./settled-args";
 
-/** A local command instead of an address: the same flow, written to the environment. */
 const POSTGRES = {
   subject: {
     name: "Postgres",
@@ -63,14 +54,11 @@ const POSTGRES = {
   } satisfies McpKeyFlow,
 };
 
-/** A server that asks for nothing still comes through a connect step, so a dead one is found now. */
 const NOTHING_ASKED: McpKeyFlow = { id: "none", kind: "key", label: "Connect", fields: [] };
 
-/** The key a Composio account issues, the choice beside its sign-in. */
 const COMPOSIO = MARKETPLACE_PLUGINS.find((plugin) => plugin.slug === "composio")?.apps[0];
 if (!COMPOSIO) throw new Error("The catalog must carry the Composio plugin with an app.");
 
-/** One key for the environment, the key a server issues beside its sign-in, two values, a header key, and none. */
 const SERVERS = {
   resend: () => ({ subject: subjectFor(RESEND), flow: keyFlowFor(RESEND) }),
   linear: () => ({ subject: subjectFor(LINEAR), flow: keyFlowFor(LINEAR) }),
@@ -81,9 +69,7 @@ const SERVERS = {
 
 interface KeyPlaygroundProps {
   server: keyof typeof SERVERS;
-  /** What the server answers once the credential reaches it. */
   outcome: ConnectOutcome;
-  /** The listing names the page the key is made on, and the caller can open it. */
   showsTheKeyPage: boolean;
 }
 

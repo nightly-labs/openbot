@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Tarayıcı açılır penceresini kapat",
   "browser.pip.reattachFailed": "OpenBot tarayıcıyı kenar çubuğuna geri ekleyemedi.",
   "browser.pip.closeFailed": "OpenBot tarayıcı açılır penceresini kapatamadı.",
+  "browser.window.open": "Tarayıcıyı yeni pencerede aç",
+  "browser.window.openFailed": "OpenBot tarayıcı penceresini açamadı.",
   "browser.popupBlocked.title": "Açılır pencere engellendi",
   "browser.popupBlocked.dismiss": "Açılır pencere mesajını kapat",
   "browser.liveView.label": "Sunucudaki sayfanın canlı görünümü",
@@ -92,6 +94,7 @@ export const messages = {
   "browser.secret.submitting": "Gönderiliyor…",
   "browser.secret.takeOver": "Devral",
   "browser.secret.failed": "İstek tamamlanamadı. Bağlantıyı kontrol edin ve tekrar deneyin.",
+  "browser.secret.ended": "Bu oturum açma isteği sona erdi. Ajandan tekrar denemesini isteyin.",
   "browser.secret.vaultSkip.agentScript":
     "Ajan bu sayfada bir betik çalıştırdığı için OpenBot kayıtlı oturum bilgilerinizi kullanmadı. Kullanmak için ajandan sayfayı yeniden yüklemesini ve tekrar denemesini isteyin.",
   "browser.secret.vaultSkip.fieldKind":

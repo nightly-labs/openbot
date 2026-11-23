@@ -1,13 +1,12 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.vault", {
-  // The Vault of this computer: its encrypted file and the items that the user saves in it.
   "error.vault.unavailable": "This computer has no secret storage, so the Vault cannot save items.",
   "error.vault.unreadable": "The Vault file is unreadable. Reset the Vault to use it again.",
   "error.vault.tooLarge": "The Vault is full. Delete some items, then try again.",
   "error.vault.itemMissing": "This item is no longer in the Vault.",
   "error.vault.valueTooLong": "A value is too long.",
-  "error.vault.websiteInvalid": "Enter an HTTPS website address.",
+  "error.vault.websiteInvalid": "Enter an HTTP or HTTPS website address.",
   "error.vault.passwordRequired": "Enter a password.",
   "error.vault.twoStepKeyInvalid":
     "This is not a two-step key. Enter the setup key or the otpauth:// link of the site.",

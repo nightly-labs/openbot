@@ -7,11 +7,6 @@ import { type Accessor, createEffect, onCleanup } from "solid-js";
 
 const TOAST_ID = "idle-app-restart";
 
-/**
- * A notice while a restart that the user asked for waits for idle, so the user knows why the
- * routines wait and why OpenBot will restart. A restart that did not start stays as an error until
- * the user closes it. The text is built where the effect tracks it, so it follows a language change.
- */
 export function createIdleRestartToast(options: { status: Accessor<UpdateStatus>; cancel: () => Promise<void> }): void {
   createEffect(
     () => {

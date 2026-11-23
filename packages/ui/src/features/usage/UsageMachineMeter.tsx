@@ -15,20 +15,12 @@ import { MACHINE_METRIC_ICONS, MACHINE_METRIC_LABELS, useMachineMetricDetail } f
 
 export interface UsageMachineMeterProps {
   metrics: MachineMetrics;
-  /** The disk is the storage of a hosted plan, so its sizes show in binary units, as the plan counts. */
   hostedPlan?: boolean;
-  /** Opens Server settings › Storage, where the disk is managed. */
   onOpenStorage: () => void;
 }
 
-/** CPU and memory decide whether a turn starts at once, so the closed meter shows only them. */
 const HEADER_METRICS = ["cpu", "memory"] as const satisfies readonly MachineMetric[];
 
-/**
- * The machine use of a server in the Usage header: a ring and a percentage for CPU and memory. A
- * click shows each one with its size, then the disk, whose row opens Storage. The colours follow the
- * default machine alert levels. When the host can read neither CPU nor memory, the meter shows nothing.
- */
 export function UsageMachineMeter(props: UsageMachineMeterProps) {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
@@ -38,7 +30,6 @@ export function UsageMachineMeter(props: UsageMachineMeterProps) {
   const known = () => HEADER_METRICS.some((metric) => percent(metric) !== null);
   return (
     <Show when={known()}>
-      {/* As the filter selects beside it: centred under the trigger. */}
       <Popover.Root open={open()} onOpenChange={setOpen} placement="bottom" gutter={8}>
         <Popover.Trigger
           class={buttonVariants({ variant: "ghost", size: "sm", class: "usage-machine-trigger" })}
@@ -104,7 +95,6 @@ export function UsageMachineMeter(props: UsageMachineMeterProps) {
   );
 }
 
-/** The percentage of one metric, or "Unknown" when the host could not read it. */
 function useMetricPercentText() {
   const { t, format } = useText();
   return (metrics: MachineMetrics, metric: MachineMetric) => {
@@ -120,10 +110,6 @@ function metricTone(metrics: MachineMetrics, metric: MachineMetric): MachineMetr
   );
 }
 
-/**
- * The name, the percentage, the bar and the size of one metric. In the Storage button the bar is
- * hidden from screen readers: the button label names the disk use.
- */
 function MetricDetail(props: {
   metrics: MachineMetrics;
   metric: MachineMetric;
@@ -160,7 +146,6 @@ function MetricDetail(props: {
   );
 }
 
-/** Below the alert level the ring takes the quiet text colour that the stylesheet sets. */
 function ringTone(tone: MachineMetricTone) {
   return tone === "normal" ? "accent" : tone;
 }

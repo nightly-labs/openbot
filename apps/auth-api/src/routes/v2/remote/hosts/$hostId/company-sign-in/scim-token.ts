@@ -9,7 +9,6 @@ import {
   requestUser,
 } from "../../../../../../server/request-auth";
 
-// The SCIM token of a server's company sign-in. The answer shows a new token once.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/company-sign-in/scim-token")({
   server: {
     handlers: {

@@ -39,7 +39,6 @@
 
 .backup-models-list {
   display: flex;
-  /* The list is a grid item of the card: without this, a long name makes it wider than the pane. */
   min-width: 0;
   flex-direction: column;
   margin: 0;
@@ -86,7 +85,6 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* The same dimming the provider picker uses for an unavailable provider. */
 .backup-models-row:not([data-state="ready"]) .backup-model-logo svg {
   opacity: 0.44;
 }
@@ -101,7 +99,6 @@
   flex: none;
 }
 
-/* The frame is a UiBlockCard (ui-blocks.css). */
 .usage-limit-ask-card {
   max-width: 560px;
   margin: var(--openbot-space-4) 0 0;

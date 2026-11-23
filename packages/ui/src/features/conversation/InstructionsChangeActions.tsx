@@ -1,10 +1,3 @@
-/**
- * View and Undo on the chat line that says the agent changed its instructions. View opens the
- * Instructions page in the agent settings. Undo puts back the text from before the turn, but only while the file still has the
- * agent's text: the save sends that text, so main refuses it after a later change. Without the file
- * calls, as in a thread, the line has View only.
- */
-
 import type { AgentInstructionsChange } from "@openbot/contracts/ipc";
 import { Button, FileText, MarkerIcon, Undo2 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -16,16 +9,13 @@ export function InstructionsChangeActions(props: {
   agentId: string;
   change: AgentInstructionsChange | null;
   calls?: AgentInstructionsFileCalls | undefined;
-  /** Absent where the chat has no settings page for the agent. View then does not show. */
   onView?: ((agentId: string) => void) | undefined;
 }): JSX.Element {
   const { t, errorMessage } = useText();
-  /** The file text now, or null before the first read. */
   const [current, setCurrent] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   let closed = false;
-  /** A read that ends after a save, or after a later read, does not replace the newer text. */
   let request = 0;
 
   async function refresh(calls: AgentInstructionsFileCalls): Promise<void> {
@@ -33,9 +23,7 @@ export function InstructionsChangeActions(props: {
     try {
       const file = await calls.read(props.agentId);
       if (!closed && mine === request) setCurrent(file.text);
-    } catch {
-      // Undo stays hidden. View still opens the page, which shows its own read error.
-    }
+    } catch {}
   }
 
   onSettled(() => {

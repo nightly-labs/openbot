@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Coinbase here is taken from docs.cdp.coinbase.com. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const COINBASE_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

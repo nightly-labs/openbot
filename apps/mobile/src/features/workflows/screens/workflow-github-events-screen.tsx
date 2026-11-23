@@ -15,10 +15,6 @@ const GROUPS = [
   { outcome: "skipped", title: "mobile.workflow.github.history.skippedGroup" },
 ] as const satisfies readonly { outcome: WorkflowGitHubDeliveryOutcome; title: MobileTextKey }[];
 
-/**
- * Drawer > Workflows > a workflow > GitHub events: the newest events that GitHub sent to the triggers
- * of the workflow, in the groups of the desktop Events menu: waiting, started and skipped.
- */
 export function WorkflowGitHubEventsScreen() {
   const { t, errorMessage } = useText();
   const { serverId, workflowId } = useLocalSearchParams<{ serverId: string; workflowId: string }>();

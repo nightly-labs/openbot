@@ -24,4 +24,7 @@ export const messages = {
   "preview.tooLarge.description": "התצוגה המקדימה מוגבלת ל-100MB. אפשר לפתוח את הקובץ באפליקציית ברירת המחדל שלו.",
   "preview.spreadsheet.readFailed": "לא ניתן לקרוא את הגיליון.",
   "preview.spreadsheet.truncated": "התצוגה המקדימה מוגבלת ל-{rows} השורות הראשונות ול-{columns} העמודות הראשונות.",
+  "preview.document.readFailed": "לא ניתן לקרוא את המסמך הזה.",
+  "preview.document.empty": "אין במסמך הזה טקסט להצגה.",
+  "preview.document.truncated": "התצוגה המקדימה מוגבלת לחלק הראשון של המסמך.",
 } as const satisfies PartialTranslation<typeof source>;

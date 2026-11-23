@@ -3,10 +3,6 @@ import type { DesktopAnalyticsProperties } from "../../analytics";
 
 type AttachmentKind = NonNullable<DesktopAnalyticsProperties<"message_send">["attachment_kinds"]>[number];
 
-/**
- * The send calls get only draft ids, so the composer records each draft's kind here before it sends.
- * Only the kind is kept: never the name or the type that the analytics event would carry.
- */
 const kinds = new Map<string, AttachmentKind>();
 
 function attachmentKind(attachment: DraftAttachment): AttachmentKind {
@@ -19,6 +15,7 @@ function attachmentKind(attachment: DraftAttachment): AttachmentKind {
     case "spreadsheet":
       return "spreadsheet";
     case "pdf":
+    case "document":
     case "text":
     case "markdown":
       return "document";
@@ -31,7 +28,6 @@ export function rememberAttachmentKinds(attachments: readonly DraftAttachment[])
   for (const attachment of attachments) kinds.set(attachment.id, attachmentKind(attachment));
 }
 
-/** The kinds of the sent drafts. A sent draft id is not used again, so its entry is removed. */
 export function takeAttachmentKinds(draftIds: readonly string[]): AttachmentKind[] {
   return draftIds.flatMap((id) => {
     const kind = kinds.get(id);

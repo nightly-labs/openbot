@@ -7,10 +7,8 @@ import {
 
 type PasswordManagersApi = OpenBotDesktopApi["passwordManagers"];
 
-/** How long the mock sign-in takes in the browser, and to make the vault and its key. */
 const MOCK_SIGN_IN_MS = 2_500;
 const MOCK_SETUP_MS = 1_500;
-/** The mock key expires one year after it is made. */
 const MOCK_KEY_DAYS = 365;
 
 const SIGN_IN_URL = "https://account.proton.me/authorize?app=proton-pass-cli";
@@ -25,15 +23,9 @@ function connected(manager: PasswordManagerId): PasswordManagerStatus {
   };
 }
 
-/**
- * Proton Pass only. A browser connection names the sign-in page, then the user signs in in the
- * browser, then the host makes the vault and its key. An access key connects at once. The preview
- * opens no page: "Open again" does nothing.
- */
 export function createMockPasswordManagers(): PasswordManagersApi {
   const manager: PasswordManagerId = "protonpass";
   let status = disconnectedPasswordManager(manager, ["browser", "key"]);
-  /** Each connect, cancel and disconnect replaces the sign-in that a timer waits for. */
   let attempt = 0;
   const listeners = new Set<(status: PasswordManagerStatus) => void>();
   const set = (next: PasswordManagerStatus): PasswordManagerStatus => {
@@ -71,7 +63,6 @@ export function createMockPasswordManagers(): PasswordManagersApi {
       };
     },
   } satisfies Omit<PasswordManagersApi, `host${string}`>;
-  // The preview has one connection, so a joined server shows the same one.
   return {
     ...api,
     hostList: () => api.list(),

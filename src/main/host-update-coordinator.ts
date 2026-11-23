@@ -32,7 +32,6 @@ interface HostUpdateCoordinatorOptions {
   onDiagnostic?: (message: string) => void;
 }
 
-/** Tenant client only. It can report its own status and quit its own process. */
 export class HostUpdateCoordinator {
   readonly #options: HostUpdateCoordinatorOptions;
   #timer: ReturnType<typeof setInterval> | null = null;
@@ -61,7 +60,6 @@ export class HostUpdateCoordinator {
     return Effect.sync(() => {
       if (this.#timer) clearInterval(this.#timer);
       this.#timer = null;
-      // The stop handler enters teardown, so waiting on its own tick would deadlock.
     });
   }
 
@@ -132,7 +130,6 @@ export class HostUpdateCoordinator {
       return;
     }
     if (now < state.updatedAt || now - state.updatedAt > HOST_HEARTBEAT_TIMEOUT_MS) return;
-    // A short operation after the host's last observation must also veto an already-issued stop.
     if (this.#idleSince === null || now - this.#idleSince < HOST_IDLE_GRACE_MS) return;
     if (
       restartActivityGeneration() !== activityGeneration ||
@@ -156,7 +153,6 @@ export class HostUpdateCoordinator {
   });
 }
 
-/** Called before tenant services start, so login items cannot start work during replacement. */
 export const hostAllowsTenantLaunch = Effect.fn("HostCoordinator.allowsLaunch")(function* () {
   if (process.platform !== "darwin") return true;
   const config = yield* readHostConfig().pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })));

@@ -1,7 +1,3 @@
-// bun scripts/spreadsheet-preview-e2e.ts --phase=before|after --allow-mutations --instance=<id>
-// The coordinator owns the isolated seeded dev app and selects Chief before this script runs.
-// Precondition: the coordinator selects English through the app UI in each fresh profile.
-// Reports and panel screenshots go to .openbot-build/spreadsheet-preview-e2e/<phase>.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -29,12 +25,6 @@ interface WorkbookCase {
   cases: PreviewCase[];
 }
 
-// Expectations come from Excel's date systems, not the component's parser or formatters.
-// https://support.microsoft.com/en-gb/excel/change-the-date-system-format-or-two-digit-year-interpretation
-// https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/wrongly-assumes-1900-is-leap-year
-// Number format expectations follow Excel's format code rules: one section applies to every number,
-// Excel puts the minus sign before the whole result, and quoted text shows as written.
-// https://support.microsoft.com/en-US/excel/review-guidelines-for-customizing-a-number-format
 const workbooks: WorkbookCase[] = [
   {
     filename: "spreadsheet-dates-1900.xlsx",
@@ -184,7 +174,6 @@ try {
     await panel.waitFor({ state: "detached" });
   }
 } catch (error) {
-  // Do not export Playwright call logs, app content, profile paths or arbitrary exception text.
   report.errors.push(`${stage} failed (${error instanceof Error ? error.name : "unknown error"}).`);
 } finally {
   try {

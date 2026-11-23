@@ -1,5 +1,3 @@
-// Exercises an existing local dev app. Opens and closes the Marketplace page; installs nothing.
-// Writes .openbot-build/marketplace-page-e2e/report.json and marketplace.png.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -42,7 +40,6 @@ try {
   await railButton("Agents").click();
   await waitForPage("agents");
 
-  // The rail opens the Marketplace as a page of the window, with the focus on the title of its side panel.
   await railButton("Marketplace").click();
   await marketplace.waitFor();
   await waitForPage("marketplace");
@@ -53,18 +50,15 @@ try {
   await page.screenshot({ path: resolve(OUT, "marketplace.png") });
   steps.push("rail opens the page");
 
-  // A listing opens a view in the page. The kind in the path of the top row and Escape go back to the catalog.
   const back = marketplace
     .getByRole("navigation", { name: "Location" })
     .getByRole("button", { name: "Apps", exact: true });
-  // Apps is the first kind in the side panel, and the page opens on it.
   const kinds = marketplace.getByRole("navigation", { name: "Marketplace content types" }).getByRole("button");
   assert.equal((await kinds.first().innerText()).trim(), "Apps");
   assert.equal(await kinds.first().getAttribute("aria-current"), "page");
   steps.push("page opens on Apps");
   await marketplace.locator(".marketplace-app-row-hit").first().click();
   await back.waitFor();
-  // On an app page one row stays selected: Apps, or the app in "Your apps".
   const selected = await marketplace
     .locator(".marketplace-nav [aria-current]")
     .evaluateAll((rows) => rows.map((row) => row.getAttribute("aria-current")));
@@ -83,8 +77,6 @@ try {
   assert.equal(await windowPage(), "marketplace", "Escape in a view closed the page.");
   steps.push("escape goes back one view");
 
-  // A view does not show the search, so Escape there goes back and keeps the search. On the catalog,
-  // Escape clears the search.
   const search = marketplace.getByRole("searchbox");
   await search.fill("git");
   await marketplace.locator(".marketplace-app-row-hit").first().click();
@@ -98,14 +90,12 @@ try {
   assert.equal(await windowPage(), "marketplace", "Escape with a search closed the page.");
   steps.push("escape keeps the search in a view and clears it on the catalog");
 
-  // Escape on the catalog closes the page, and the rail button that opened it gets the focus back.
   await page.keyboard.press("Escape");
   await waitForPage("agents");
   await marketplace.waitFor({ state: "detached" });
   await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Marketplace");
   steps.push("escape closes the page and returns the focus");
 
-  // The rail leaves the page.
   await railButton("Marketplace").click();
   await marketplace.waitFor();
   await railButton("Agents").click();
@@ -113,7 +103,6 @@ try {
   await marketplace.waitFor({ state: "detached" });
   steps.push("rail Agents closes the page");
 
-  // Another page replaces it, and the Marketplace replaces that page.
   await railButton("Marketplace").click();
   await marketplace.waitFor();
   await railButton("Settings").click();

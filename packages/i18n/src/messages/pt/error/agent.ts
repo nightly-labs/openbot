@@ -55,6 +55,12 @@ export const messages = {
   "error.agent.modelUnavailable": "O modelo selecionado para o agente está indisponível.",
   "error.agent.modelProviderNotConnected":
     'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não está conectado.',
+  "error.agent.modelProviderSignInRequired":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} precisa de login. Entre no {provider} e tente de novo.',
+  "error.agent.modelProviderNotInstalled":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não está instalado.',
+  "error.agent.modelProviderOutdated":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} precisa de uma atualização.',
   "error.agent.modelListEmpty":
     'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não listou nenhum modelo. Último erro: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -129,6 +135,10 @@ export const messages = {
     "Não foi possível remover todos os dados do agente. Tente excluir o agente novamente.",
   "error.agent.deleteFolderInUse":
     "O trabalho de outro agente ainda usa a pasta deste agente. Exclua este agente de novo quando esse trabalho terminar ou depois de reiniciar o OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Outro programa ainda usa a pasta deste agente, por exemplo um programa que o agente iniciou. Feche esse programa ou reinicie o computador em que este agente roda e exclua o agente novamente.",
+  "error.agent.deleteWhenFolderFree":
+    "O trabalho de outro agente ainda usa a pasta deste agente. O OpenBot exclui este agente quando esse trabalho terminar.",
   "error.agent.duplicationBusy": "Este agente já está sendo duplicado.",
   "error.agent.waitBeforeDuplicate": "Aguarde o agente terminar e esvaziar a fila antes de duplicá-lo.",
   "error.agent.saveOtherAgent": "Este registro salvo pertence a outro agente.",
@@ -151,6 +161,8 @@ export const messages = {
     "O que as mensagens fazem enquanto o agente trabalha só pode ser definido no computador que executa o agente.",
   "error.agent.backupModelsLocalOnly":
     "Os modelos de reserva só podem ser definidos no computador que executa o agente.",
+  "error.agent.backupModelsAtLimit":
+    "Nenhum modelo reserva pode assumir agora: cada um atingiu o limite de uso ou falhou há pouco. Os modelos de uma conta podem dividir um limite. Para continuar agora, adicione um modelo reserva de outro provedor ou de outra conta, ou espere o limite ser renovado.",
   "error.agent.taskLimitLocalOnly": "O limite de tarefas só pode ser definido no computador que executa o agente.",
   "error.agent.localScriptsOff": "Este agente não permite scripts locais.",
   "error.agent.localScriptsRateLimited":
@@ -191,6 +203,8 @@ export const messages = {
     "A região não está dentro de um único monitor. Use pontos da área de trabalho dentro dos limites de um monitor de list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "O OpenBot não tem a permissão de Gravação de Tela. Peça ao usuário para abrir Ajustes do Sistema > Privacidade e Segurança > Gravação de Tela e Áudio do Sistema, ativar o OpenBot e depois sair e abrir o OpenBot de novo.",
+  "error.agent.screenCaptureListPermission":
+    "O OpenBot ainda não tem a permissão de Gravação de Tela, então não pode listar as janelas. Para capturar uma tela, chame capture_screen com target screen. O usuário aprova a captura primeiro, e depois o macOS pode pedir a permissão a ele.",
   "error.agent.screenCaptureEmptyWindows":
     "O Windows retornou uma imagem vazia. Peça ao usuário para desbloquear o computador e fechar o conteúdo protegido. Uma política da organização também pode impedir a captura de tela.",
   "error.agent.screenCaptureFailed": "A captura de tela falhou. Tente de novo.",

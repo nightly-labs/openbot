@@ -1,4 +1,3 @@
-// Composition adapted from https://zaidan.carere.dev/r/kobalte/chart-area-interactive.json (MIT).
 import type { HostAnalytics } from "@openbot/contracts/ipc";
 import {
   Area,
@@ -34,8 +33,6 @@ export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }
     props.metric === "cost"
       ? usageExactCost(value, text)
       : t("usage.tokensAmount", { tokens: usageNumber(value, text) });
-  // A host that reports totals but no split still draws one area, and naming it "Total"
-  // twice - as its own row and as the sum - would say the same number to itself.
   const named = () => chart().series[0] !== usageTotalSeries;
   return (
     <ChartContainer
@@ -57,11 +54,7 @@ export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }
           minTickGap={48}
           tickMargin={12}
           stroke="var(--openbot-text-muted)"
-          // Uppercased here rather than in CSS: a .recharts-* rule is a class no component
-          // names, which the dead-class scan in check:ui reports.
           tickFormatter={(value) => {
-            // The chart also formats values that are not days while it measures ticks. Intl throws on
-            // an invalid date, so such a value shows as it is.
             const day = new Date(`${String(value)}T12:00:00Z`);
             return Number.isNaN(day.getTime())
               ? String(value)
@@ -71,11 +64,8 @@ export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }
         <YAxis
           tickLine={false}
           axisLine={false}
-          // Measured from the ticks: a fixed width cut "US$ 2.400,00" in Portuguese.
           width="auto"
           tickCount={4}
-          // Every tick at its own grid line. The default fit moves the top label into the plot and then
-          // drops the zero label, which it finds too close.
           interval={0}
           stroke="var(--openbot-text-muted)"
           tickFormatter={(value) =>
@@ -97,8 +87,6 @@ export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }
             />
           )}
         />
-        {/* Overlaid, not stacked: each area is read against the shared baseline. The
-            largest is drawn first so the smaller ones paint on top and stay visible. */}
         <For each={chart().series}>
           {(provider) => (
             <Area

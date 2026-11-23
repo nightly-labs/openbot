@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("computerUse", {
-  // Computer Use settings, the permission help window, and the window highlight.
   "computerUse.permission.screenRecording.title": "Screen Recording",
   "computerUse.permission.screenRecording.description": "Lets OpenBot see app windows.",
   "computerUse.permission.screenRecording.pane": "Screen & System Audio Recording",
@@ -19,6 +18,7 @@ export const messages = defineMessages("computerUse", {
   "computerUse.ready.title": "Computer Use is ready",
   "computerUse.ready.description":
     "OpenBot can see and interact with apps on this computer. This system asks for no extra permission.",
+  "computerUse.limited.title": "Computer Use is limited on this desktop",
   "computerUse.openSettingsFailed.title": "Couldn’t open System Settings",
   "computerUse.restartRequired.title": "Restart needed",
   "computerUse.restartRequired.description":
