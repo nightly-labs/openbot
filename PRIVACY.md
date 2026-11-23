@@ -482,7 +482,7 @@ The service stores:
   without the ID of the deleted account. For each image or video that OpenBot credits pay for, the
   service keeps a hold record: the job ID, the account or server that pays, the account that started
   it, the model, the credits held and charged, the result (completed, failed, canceled, refused or
-  expired), the job ID of the media generation processor, and the times. It keeps no prompt, picture
+  expired), the media generation processor and its job ID, and the times. It keeps no prompt, picture
   or result file. Deleting the account removes the hold records of its own balance. For the free
   monthly credits of a paid license, it keeps a grant record: the license, the account or server that
   has them, the credits given and left, and the start and end times. Deleting the account removes the
@@ -1582,7 +1582,8 @@ A step with an OpenBot model uses OpenBot credits. When the computer is signed i
 account, the credits of that account pay; a server pays with its own credits. The computer sends the
 prompt, the model, the size settings and the input pictures to the account service
 (`openbot.run`). The account service holds the credits, sends the same values to a media generation
-processor, and returns the result file to the computer, which keeps it. The account service passes
+processor, and returns the result file to the computer, which keeps it. A processor can keep the
+input pictures for up to one day so that it can read them. The account service passes
 the prompt, the pictures and the file through in transit only: it does not store or log them. It
 keeps only the hold record above. A failed or refused generation spends no credits. A stop does not
 cancel a generation that was sent: when the run stops or the app closes, the job continues, and the
