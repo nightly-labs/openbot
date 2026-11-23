@@ -450,7 +450,7 @@ export class AgentStore {
                 stagedWorkspace,
                 record.workspacePath,
               );
-              yield* copyFolderLinksAsJunctionsEffect(
+              yield* copyFolderLinksEffect(
                 windowsFolderLinks,
                 source.workspacePath,
                 stagedWorkspace,
@@ -1697,7 +1697,7 @@ function skipFolderLinksOnWindows(sourceRoot: string, skipped: string[]): CopyOp
   };
 }
 
-const copyFolderLinksAsJunctionsEffect = Effect.fn("AgentStore.copyFolderLinksAsJunctions")(function* (
+const copyFolderLinksEffect = Effect.fn("AgentStore.copyFolderLinks")(function* (
   sourceLinks: readonly string[],
   sourceRoot: string,
   stagedRoot: string,
@@ -1706,11 +1706,27 @@ const copyFolderLinksAsJunctionsEffect = Effect.fn("AgentStore.copyFolderLinksAs
   if (sourceLinks.length === 0) return;
   const canonicalSourceRoot = yield* storedIO(() => realpath(sourceRoot));
   for (const sourcePath of sourceLinks) {
+    const linkPath = relative(sourceRoot, sourcePath);
+    const stagedPath = join(stagedRoot, linkPath);
     const target = yield* storedIO(() => readlink(sourcePath));
-    const finalTarget =
-      (yield* copiedInternalLinkTargetEffect(canonicalSourceRoot, sourceRoot, finalRoot, sourcePath, target)) ??
-      resolve(dirname(sourcePath), target);
-    yield* storedIO(() => symlink(finalTarget, join(stagedRoot, relative(sourceRoot, sourcePath)), "junction"));
+    const internalTarget = yield* copiedInternalLinkTargetEffect(
+      canonicalSourceRoot,
+      sourceRoot,
+      finalRoot,
+      sourcePath,
+      target,
+    );
+    const symlinkTarget =
+      internalTarget === null
+        ? target
+        : isAbsolute(target)
+          ? internalTarget
+          : relative(dirname(join(finalRoot, linkPath)), internalTarget) || ".";
+    const linked = yield* Effect.result(storedIO(() => symlink(symlinkTarget, stagedPath, "dir")));
+    if (Result.isSuccess(linked)) continue;
+    if (!isRecord(linked.failure.cause) || linked.failure.cause.code !== "EPERM") return yield* linked.failure;
+    const junctionTarget = internalTarget ?? resolve(dirname(sourcePath), target);
+    yield* storedIO(() => symlink(junctionTarget, stagedPath, "junction"));
   }
 });
 
