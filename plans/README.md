@@ -21,11 +21,11 @@ changes, and respect the `STOP` conditions.
 | 011 | Upgrades, migrations and team protocol stay safe for the long term | P1 | L | — | IN PROGRESS |
 | 012 | A pool server whose plan ended goes to an archive in B2 | P2 | L | — | IN PROGRESS |
 | 013 | Workflows are typed, portable and future proof | P1 | L | — | DONE |
-| 014 | Enforce agent ownership in conversation reads | P1 | S | — | TODO |
-| 015 | Check generated plugin catalogs in CI | P1 | S | — | TODO |
-| 016 | Batch channel summary queries | P1 | M | — | TODO |
-| 017 | Add direct remote protocol coverage | P1 | M | — | TODO |
-| 018 | Pin contract decoder edge behavior | P2 | M | — | TODO |
+| 014 | Enforce agent ownership in conversation reads | P1 | S | — | DONE |
+| 015 | Check generated plugin catalogs in CI | P1 | S | — | DONE |
+| 016 | Batch channel summary queries | P1 | M | — | DONE |
+| 017 | Add direct remote protocol coverage | P1 | M | — | DONE |
+| 018 | Pin contract decoder edge behavior | P2 | M | — | DONE |
 
 Allowed states: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED: <reason>`,
 `REJECTED: <reason>`.
@@ -140,3 +140,11 @@ selection by leverage. The audit did not modify source code.
 
 - Stale Team API introductory wording: real and high confidence, but a docs-only fix with lower leverage than the five selected plans. Keep it as a small follow-up.
 - Agent service decomposition: real architectural pressure, but medium confidence and high fix risk. Require characterization coverage and a separate maintainer decision before planning.
+
+### Execution notes
+
+- Plan 014 landed in commit `6e8482570f`. Focused related tests passed with 238 tests.
+- Plan 015 landed in commit `eb2d4c7928`. The generated catalog check passes and CI now runs it.
+- Plan 016 landed in commit `a0cac6b8b4`. The channel benchmark recorded batched aggregate queries and the focused tests passed.
+- Plan 017 landed in commit `79772b6f48`. The direct remote protocol E2E passed 6 checks.
+- Plan 018 landed in commit `8e1e789e64`. Decoder E2E passed 9 checks.
