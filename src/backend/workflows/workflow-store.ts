@@ -24,7 +24,7 @@ import {
   workflowGraphProblem,
   workflowUnknownFields,
 } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Schema } from "effect";
 import {
@@ -89,7 +89,7 @@ export class WorkflowStore {
     ).map(toSummary);
   }
 
-  listWithGraphs(): { summary: WorkflowSummary; graph: WorkflowGraph }[] {
+  listWithGraphs(): { summary: WorkflowSummary; graph: WorkflowGraph; needsNewerApp?: true }[] {
     const db = this.#database.connection;
     const rows = databaseRows(db.prepare(`${SUMMARY_SELECT} ORDER BY w.updated_at DESC, w.workflow_id`).all());
     const nodes = byWorkflow(
@@ -100,14 +100,8 @@ export class WorkflowStore {
     );
     return rows.map((row) => {
       const workflowId = requiredStringColumn(row, "workflow_id");
-      return {
-        summary: toSummary(row),
-        graph: toGraph(
-          nodes.get(workflowId) ?? [],
-          edges.get(workflowId) ?? [],
-          requiredStringColumn(row, "strokes_json"),
-        ),
-      };
+      const stored = toGraph(nodes.get(workflowId) ?? [], edges.get(workflowId) ?? [], row.strokes_json);
+      return { summary: toSummary(row), graph: stored.graph, ...(stored.unreadable ? { needsNewerApp: true } : {}) };
     });
   }
 
@@ -124,14 +118,15 @@ export class WorkflowStore {
       this.#database.connection.prepare(`${SUMMARY_SELECT} WHERE w.workflow_id = ?`).get(workflowId),
     );
     if (!row) return null;
-    const graph = this.#graph(workflowId, requiredStringColumn(row, "strokes_json"));
+    const stored = this.#graph(workflowId, row.strokes_json);
     return {
       summary: toSummary(row),
-      graph,
+      graph: stored.graph,
       revision: requiredNumberColumn(row, "graph_revision"),
       triggers: this.#triggers(workflowId),
-      format: workflowGraphFormat(graph),
+      format: workflowGraphFormat(stored.graph),
       hostFormat: WORKFLOW_FORMAT,
+      ...(stored.unreadable ? { needsNewerApp: true } : {}),
     };
   }
 
@@ -188,6 +183,7 @@ export class WorkflowStore {
     return this.#transaction(() => {
       const revision = this.#revision(workflowId);
       if (revision !== baseRevision) return { ok: false, conflict: this.#requireDetail(workflowId) };
+      this.#refusePlaceholders(workflowId, graph);
       assertKnownValues(graph, () => this.#requireDetail(workflowId).graph.nodes);
       this.#writeGraph(workflowId, graph, now);
       const next = this.#bumpRevision(workflowId, now);
@@ -275,6 +271,7 @@ export class WorkflowStore {
       const graph = storedGraph(requiredStringColumn(row, "graph_json"));
       assertRunnable(graph);
       const current = this.#requireDetail(workflowId);
+      if (current.needsNewerApp) throw newerSteps();
       this.#addVersion(workflowId, current.revision, "restore", current.graph, now);
       this.#writeGraph(workflowId, graph, now);
       this.#bumpRevision(workflowId, now);
@@ -302,10 +299,10 @@ export class WorkflowStore {
       this.#database.connection
         .prepare(`SELECT * FROM workflow_nodes WHERE node_id IN (${ids.map(() => "?").join(", ")})`)
         .all(...ids),
-    ).map(toNode);
+    ).flatMap((row) => toNode(row) ?? []);
   }
 
-  #graph(workflowId: string, strokesJson: string): WorkflowGraph {
+  #graph(workflowId: string, strokesJson: unknown): StoredGraph {
     const db = this.#database.connection;
     return toGraph(
       databaseRows(
@@ -333,6 +330,20 @@ export class WorkflowStore {
       nextDueAt: optionalStringColumn(row, "next_due_at"),
       webhookUrl: optionalStringColumn(row, "url"),
     }));
+  }
+
+  #refusePlaceholders(workflowId: string, graph: WorkflowGraph): void {
+    if (this.detail(workflowId)?.needsNewerApp) throw newerSteps();
+    const stored = new Map(
+      databaseRows(
+        this.#database.connection
+          .prepare("SELECT node_id, kind FROM workflow_nodes WHERE workflow_id = ?")
+          .all(workflowId),
+      ).map((row) => [requiredStringColumn(row, "node_id"), requiredStringColumn(row, "kind")]),
+    );
+    const placeholder = (node: WorkflowNode) =>
+      node.kind === "note" && node.locked === true && (stored.get(node.id) ?? "note") !== "note";
+    if (graph.nodes.some(placeholder)) throw newerSteps();
   }
 
   #writeGraph(workflowId: string, graph: WorkflowGraph, now: Date): void {
@@ -510,6 +521,10 @@ function assertKnownValues(graph: WorkflowGraph, saved: () => readonly WorkflowN
   if (changed) throw new WorkflowStoreError({ code: "refused", message: sourceText("error.workflow.unknownValue") });
 }
 
+function newerSteps(): WorkflowStoreError {
+  return new WorkflowStoreError({ code: "refused", message: sourceText("error.workflow.newerSteps") });
+}
+
 function missing(): WorkflowStoreError {
   return new WorkflowStoreError({ code: "missing", message: sourceText("error.workflow.missing") });
 }
@@ -537,10 +552,58 @@ function byWorkflow(rows: readonly DynamicRecord[]): Map<string, DynamicRecord[]
   return groups;
 }
 
-function toGraph(nodeRows: readonly DynamicRecord[], edgeRows: readonly DynamicRecord[], strokesJson: string) {
-  const graph = { nodes: nodeRows.map(toNode), edges: edgeRows.map(toEdge), strokes: JSON.parse(strokesJson) };
-  if (!isWorkflowGraph(graph)) throw new Error("The stored workflow graph is invalid.");
-  return graph;
+interface StoredGraph {
+  graph: WorkflowGraph;
+  unreadable: boolean;
+}
+
+function toGraph(nodeRows: readonly DynamicRecord[], edgeRows: readonly DynamicRecord[], strokesJson: unknown) {
+  const nodes: WorkflowNode[] = [];
+  const readable = new Set<string>();
+  let unreadable = false;
+  for (const row of nodeRows) {
+    const node = toNode(row);
+    if (node) readable.add(node.id);
+    else unreadable = true;
+    const shown = node ?? placeholder(row);
+    if (shown) nodes.push(shown);
+  }
+  const edges = edgeRows.flatMap((row) => {
+    const edge = toEdge(row);
+    if (edge && readable.has(edge.from) && readable.has(edge.to)) return [edge];
+    unreadable = true;
+    return [];
+  });
+  const graph = { nodes, edges, strokes: readJson(strokesJson, Array.isArray) };
+  if (isWorkflowGraph(graph)) return { graph, unreadable } satisfies StoredGraph;
+  const bare = { nodes, edges, strokes: [] };
+  return {
+    graph: isWorkflowGraph(bare) ? bare : { nodes: [], edges: [], strokes: [] },
+    unreadable: true,
+  } satisfies StoredGraph;
+}
+
+function readJson<T>(text: unknown, valid: (value: unknown) => value is T): T | null {
+  if (typeof text !== "string") return null;
+  try {
+    const value = JSON.parse(text);
+    return valid(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function placeholder(row: DynamicRecord): WorkflowNode | null {
+  const x = Number(row.x);
+  const y = Number(row.y);
+  const node = {
+    id: row.node_id,
+    kind: "note",
+    at: Number.isFinite(x) && Number.isFinite(y) ? { x, y } : { x: 0, y: 0 },
+    locked: true,
+    fields: {},
+  };
+  return isWorkflowNode(node) ? node : null;
 }
 
 function optionalNumber(row: DynamicRecord, key: string): number | undefined {
@@ -548,14 +611,14 @@ function optionalNumber(row: DynamicRecord, key: string): number | undefined {
   return value === null || value === undefined ? undefined : Number(value);
 }
 
-function toNode(row: DynamicRecord): WorkflowNode {
+function toNode(row: DynamicRecord): WorkflowNode | null {
   const width = optionalNumber(row, "width");
   const height = optionalNumber(row, "height");
   const font = optionalNumber(row, "font");
-  const schedule = optionalStringColumn(row, "schedule_json");
+  const schedule = row.schedule_json;
   const node = {
-    id: requiredStringColumn(row, "node_id"),
-    kind: requiredStringColumn(row, "kind"),
+    id: row.node_id,
+    kind: row.kind,
     at: { x: Number(row.x), y: Number(row.y) },
     ...(width === undefined && height === undefined && font === undefined
       ? {}
@@ -567,24 +630,22 @@ function toNode(row: DynamicRecord): WorkflowNode {
           },
         }),
     ...(row.locked === 1 ? { locked: true } : {}),
-    fields: JSON.parse(requiredStringColumn(row, "fields_json")),
-    ...(schedule === null ? {} : { schedule: JSON.parse(schedule) }),
+    fields: readJson(row.fields_json, isDynamicRecord),
+    ...(schedule === null || schedule === undefined ? {} : { schedule: readJson(schedule, isRoutineSchedule) }),
   };
-  if (!isWorkflowNode(node)) throw new Error("Invalid SQLite column: workflow_nodes");
-  return node;
+  return isWorkflowNode(node) ? node : null;
 }
 
-function toEdge(row: DynamicRecord): WorkflowEdge {
-  const branch = optionalStringColumn(row, "branch");
+function toEdge(row: DynamicRecord): WorkflowEdge | null {
+  const branch = row.branch;
   const edge = {
-    id: requiredStringColumn(row, "edge_id"),
-    from: requiredStringColumn(row, "from_node_id"),
-    to: requiredStringColumn(row, "to_node_id"),
-    type: requiredStringColumn(row, "port_type"),
-    ...(branch === null ? {} : { branch }),
+    id: row.edge_id,
+    from: row.from_node_id,
+    to: row.to_node_id,
+    type: row.port_type,
+    ...(branch === null || branch === undefined ? {} : { branch }),
   };
-  if (!isWorkflowEdge(edge)) throw new Error("Invalid SQLite column: workflow_edges");
-  return edge;
+  return isWorkflowEdge(edge) ? edge : null;
 }
 
 function toSummary(row: DynamicRecord): WorkflowSummary {

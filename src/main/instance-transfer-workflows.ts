@@ -2,9 +2,11 @@ import {
   type CreateWorkflowInput,
   isWorkflowGraph,
   WORKFLOW_STEP_NAME_FIELD,
+  WORKFLOW_UNLINKED_CONNECTION,
   type WorkflowFields,
   type WorkflowGraph,
   type WorkflowIdKind,
+  type WorkflowNode,
   workflowFormatIsNewer,
   workflowGraphFormat,
   workflowGraphPlaceholders,
@@ -33,7 +35,7 @@ export interface TransferWorkflowPort {
 
 type IdMaps = Readonly<Partial<Record<WorkflowIdKind, ReadonlyMap<string, string>>>>;
 
-const EXPORT_CLEARS: ReadonlySet<WorkflowIdKind> = new Set(["connection", "file"]);
+const EXPORT_CLEARS: ReadonlySet<WorkflowIdKind> = new Set(["file"]);
 const IMPORT_CLEARS: ReadonlySet<WorkflowIdKind> = new Set(["file"]);
 const TITLE_LIMIT = 160;
 
@@ -44,7 +46,7 @@ export function exportWorkflows(
 ): TransferWorkflow[] {
   return workflows.slice(0, TRANSFER_WORKFLOWS).map((workflow) => ({
     title: workflow.title,
-    graph: remapGraph(workflow.graph, { agent: agentKeys, channel: channelKeys }, EXPORT_CLEARS),
+    graph: remapGraph(workflow.graph, { agent: agentKeys, channel: channelKeys }, EXPORT_CLEARS, true),
     format: workflowGraphFormat(workflow.graph),
     ...(needsLink(workflow.graph) ? { relink: true } : {}),
   }));
@@ -88,7 +90,12 @@ export const importWorkflows = Effect.fn("InstanceTransfer.importWorkflows")(fun
   if (created > 0) warnings.push(sourceText("error.import.transferWorkflowPaused"));
 });
 
-function remapGraph(graph: WorkflowGraph, maps: IdMaps, clears: ReadonlySet<WorkflowIdKind>): WorkflowGraph {
+function remapGraph(
+  graph: WorkflowGraph,
+  maps: IdMaps,
+  clears: ReadonlySet<WorkflowIdKind>,
+  unlink = false,
+): WorkflowGraph {
   return {
     ...graph,
     nodes: graph.nodes.map((node) => {
@@ -100,9 +107,33 @@ function remapGraph(graph: WorkflowGraph, maps: IdMaps, clears: ReadonlySet<Work
         if (map) fields[field.name] = map.get(value) ?? "";
         else if (clears.has(field.id)) fields[field.name] = "";
       }
-      return { ...node, fields };
+      return { ...node, fields: unlink && hasConnection(node) ? unlinked(node, fields) : fields };
     }),
   };
+}
+
+function connectionValues(node: WorkflowNode): unknown[] {
+  return workflowIdFields(node.kind)
+    .filter((field) => field.id === "connection")
+    .map((field) => node.fields[field.name]);
+}
+
+function hasConnection(node: WorkflowNode): boolean {
+  return connectionValues(node).some(
+    (value) =>
+      typeof value === "string" && value !== "" && value !== "trigger" && value !== WORKFLOW_UNLINKED_CONNECTION,
+  );
+}
+
+function unlinked(node: WorkflowNode, fields: WorkflowFields): WorkflowFields {
+  const cleared: WorkflowFields = { ...fields };
+  for (const field of workflowIdFields(node.kind)) {
+    const value = fields[field.name];
+    if (field.id === "connection") cleared[field.name] = WORKFLOW_UNLINKED_CONNECTION;
+    else if (field.id === "place" && !workflowIdFollowsTrigger(field, value)) cleared[field.name] = "";
+  }
+  if ("roles" in fields) cleared.roles = "";
+  return cleared;
 }
 
 function needsLink(graph: WorkflowGraph): boolean {

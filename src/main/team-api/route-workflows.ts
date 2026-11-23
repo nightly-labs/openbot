@@ -300,7 +300,9 @@ export async function routeWorkflows(
       const known = listed();
       const all = await run(workflows.listWithGraphs());
       return json(200, {
-        workflows: all.filter(({ graph }) => visibleGraph(graph, known)).map(({ summary }) => summary),
+        workflows: all
+          .filter(({ graph, needsNewerApp }) => !needsNewerApp && visibleGraph(graph, known))
+          .map(({ summary }) => summary),
       });
     }
     case WORKFLOWS_ROUTES.get:
