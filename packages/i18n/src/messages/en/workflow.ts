@@ -149,6 +149,7 @@ export const messages = defineMessages("workflow", {
   "workflow.image.descriptionPlaceholder": "Describe the image",
   "workflow.image.models": "Image models",
   "workflow.image.chooseModel": "Choose model",
+  "workflow.image.modelUnavailable": "Model not available",
   "workflow.media.subscription": "{name} subscription",
   "workflow.media.apiKey": "{name} API key",
   "workflow.media.credits": "{name} credits",

@@ -292,6 +292,7 @@ async function fakeUpstreamFlow() {
       catalog.models[1]?.prices.length === 2 &&
       catalog.models[1]?.prices.every((price) => price.silentCredits !== null) === true &&
       catalog.models[0]?.prices[0]?.silentCredits === null &&
+      catalog.unavailable?.length === 0 &&
       !JSON.stringify(catalog).includes("up-"),
     catalog,
   );
@@ -1009,6 +1010,15 @@ async function tasksUpstreamFlow() {
       !JSON.stringify(fullCatalog).includes("tasks") &&
       !JSON.stringify(fullCatalog).includes("router"),
     { hidden: hiddenCatalog.models.map((model) => model.id), full: fullCatalog.models.map((model) => model.id) },
+  );
+  check(
+    "a model with no route on the active processor stays in the catalog by name only, as unavailable",
+    fullCatalog.unavailable?.map((model) => model.id).join(",") === "video-one,video-frames" &&
+      fullCatalog.unavailable.every(
+        (model) => Object.keys(model).sort().join(",") === "id,kind,name,variant" && model.name.length > 0,
+      ) &&
+      hiddenCatalog.unavailable?.length === 3,
+    { unavailable: fullCatalog.unavailable },
   );
   const holdsBeforeUnrouted = holdCount();
   const unrouted = await failure(

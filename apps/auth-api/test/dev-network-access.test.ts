@@ -17,6 +17,7 @@ describe("development Auth API LAN access", () => {
       "/v1/me/analytics",
       "/v1/me/chat-color",
       "/v1/me/avatar",
+      "/v1/me/credits/transfer",
       "/v1/mobile/features?platform=ios&version=1.2.0",
       "/v1/mobile/changelog?platform=ios&after=1.4.1",
       "/v1/avatars/user-id?v=photo-version",

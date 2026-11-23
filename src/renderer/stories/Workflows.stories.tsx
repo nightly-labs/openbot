@@ -373,6 +373,21 @@ export const VideoCustomLength: Story = {
   ),
 };
 
+const UNAVAILABLE_VIDEO_MODEL = { id: "openbot-kling-4.0-omni", name: "Kling 4.0 · Omni", kinds: ["video"] } as const;
+
+export const VideoModelUnavailable: Story = {
+  name: "Video, model not available",
+  render: () => (
+    <NodeGallery
+      selected="saved"
+      catalogs={{ ...STORY_CATALOGS, imageModelsReady: true, unavailableModels: [UNAVAILABLE_VIDEO_MODEL] }}
+      fields={{ saved: { media: "video", model: UNAVAILABLE_VIDEO_MODEL.id, aspect: "16:9", duration: 5 } }}
+    >
+      <ImageNode id="saved" prompt="A drone shot over a coastal town at sunrise" />
+    </NodeGallery>
+  ),
+};
+
 const STORY_CLIP = new URL("../../../packages/ui/src/assets/plush/fishing.webm", import.meta.url).href;
 
 export const VideoWithClip: Story = {

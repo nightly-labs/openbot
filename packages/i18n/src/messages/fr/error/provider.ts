@@ -421,6 +421,8 @@ export const messages = {
     "Hermes a perdu sa connexion pendant ce message, il ne sait donc pas si le travail est terminé. Vérifiez ce que l’agent a fait avant de renvoyer le message.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot n’a pas pu utiliser ce modèle : le modèle n’a pas accepté son réglage de réflexion. Sélectionnez un autre modèle pour cet agent, puis renvoyez votre message.",
+  "error.provider.copilotAnswerIncomplete":
+    "Le modèle s’est arrêté avant la fin de sa réponse. Renvoyez votre message ou sélectionnez un autre modèle pour cet agent.",
   "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",
   "error.provider.claudeContextFull":
     "Cette conversation est devenue trop longue pour Claude. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",

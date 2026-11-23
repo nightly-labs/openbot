@@ -5,8 +5,13 @@ import {
   type WorkflowCatalogSource,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaPriceRequest,
+  type WorkflowMediaUnavailableModel,
   workflowCatalogMediaModel,
 } from "@openbot/contracts/ipc";
+import {
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-unavailable-v1";
 import {
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
@@ -25,6 +30,7 @@ import {
   decodeRemoteCreditMediaCredits,
   decodeRemoteWorkflowMediaCatalog,
   decodeRemoteWorkflowMediaPrice,
+  decodeRemoteWorkflowMediaUnavailable,
 } from "@openbot/team-client/workflow-decoding";
 import type { WorkspaceRequest } from "@/features/workspace/context/host-request-actions";
 import {
@@ -35,6 +41,7 @@ import {
 import type { WorkflowMediaModels } from "@/features/workspace/model/workspace-types";
 
 const NO_ENTRIES: readonly WorkflowMediaCatalogModel[] = [];
+const NO_UNAVAILABLE: readonly WorkflowMediaUnavailableModel[] = [];
 
 export async function loadWorkflowMediaModels({
   request,
@@ -64,13 +71,22 @@ export async function loadWorkflowMediaModels({
     : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
       ? WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog
       : null;
-  const [credit, services, agentModels] = await Promise.all([
+  const [credit, services, agentModels, unavailable] = await Promise.all([
     has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY) ? catalog(WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog) : NO_ENTRIES,
     servicePath ? catalog(servicePath) : NO_ENTRIES,
     loadAgentModels(serverId).catch((): AgentModelOption[] => {
       partial = true;
       return [];
     }),
+    has(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY)
+      ? request(
+          "POST",
+          WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES.list,
+          decodeRemoteWorkflowMediaUnavailable,
+          {},
+          serverId,
+        ).catch(() => NO_UNAVAILABLE)
+      : NO_UNAVAILABLE,
   ]);
   const listed = (entries: readonly WorkflowMediaCatalogModel[], source: WorkflowCatalogSource) =>
     entries.filter((entry) => entry.provider === source).flatMap((entry) => workflowCatalogMediaModel(entry) ?? []);
@@ -84,7 +100,7 @@ export async function loadWorkflowMediaModels({
     const ids = new Set(live.map((model) => model.id));
     return [...live, ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider && !ids.has(model.id))];
   });
-  return { models: [...listed(credit, "openbot"), ...fixed, ...service], partial };
+  return { models: [...listed(credit, "openbot"), ...fixed, ...service], unavailable, partial };
 }
 
 export async function loadWorkflowMediaPrice({

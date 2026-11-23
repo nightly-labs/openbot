@@ -39,6 +39,7 @@ export interface AcpConnectionOptions {
   privateTemp?: Omit<ProviderTempOptions, "provider"> | undefined;
   label(): string;
   redact(text: string): string;
+  peek?: ((message: unknown) => void) | undefined;
   diagnostic(message: string, origin: DiagnosticOrigin): void;
   exit(error: Error): void;
   client(): Client;
@@ -115,12 +116,26 @@ export class AcpConnection {
         return error;
       }),
     );
-    const stream = ndJsonStream(
+    const lines = ndJsonStream(
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Readable.toWeb(stdout) as unknown as ReadableStream<Uint8Array>,
     );
+    const peek = this.options.peek;
+    const stream = peek
+      ? {
+          writable: lines.writable,
+          readable: lines.readable.pipeThrough(
+            new TransformStream({
+              transform(message, controller) {
+                peek(message);
+                controller.enqueue(message);
+              },
+            }),
+          ),
+        }
+      : lines;
     this.#connection = new ClientSideConnection(() => this.options.client(), stream);
     let lastDiagnostic: string | null = null;
     let crashDiagnostic: string | null = null;

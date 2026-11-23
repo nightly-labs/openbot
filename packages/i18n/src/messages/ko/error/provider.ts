@@ -398,6 +398,8 @@ export const messages = {
     "이 메시지를 처리하는 중에 Hermes의 연결이 끊겨 작업이 완료되었는지 알 수 없습니다. 메시지를 다시 보내기 전에 에이전트가 한 일을 확인하세요.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot이 이 모델을 사용할 수 없습니다. 모델이 사고 설정을 받아들이지 않았습니다. 이 에이전트에 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.copilotAnswerIncomplete":
+    "모델이 답변을 끝내기 전에 멈췄습니다. 메시지를 다시 보내거나 이 에이전트에 다른 모델을 선택하세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
   "error.provider.claudeContextFull":
     "이 채팅이 Claude가 처리하기에 너무 길어졌어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
