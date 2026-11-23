@@ -23,6 +23,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentMarketplacePictureKey,
+  agentMarketplacePictureMatches,
   assignedSkillCount,
   DEFAULT_MCP_SERVER_ACCESS,
   githubSkillDetail,
@@ -188,11 +189,12 @@ async function changedProfileFields(
   const baseline = copy.marketplaceSource?.profile;
   const changed: AgentMarketplaceProfileField[] = [];
   for (const field of ["name", "title", "description"] as const) {
-    if (copy[field] === detail[field]) continue;
+    if (copy[field] === detail[field].trim()) continue;
     if (baseline && (await profileHash(copy[field])) === baseline[field]) continue;
     changed.push(field);
   }
-  if (agentMarketplacePictureKey(copy) !== baseline?.picture) changed.push("picture");
+  if (agentMarketplacePictureKey(copy) !== baseline?.picture && !agentMarketplacePictureMatches(copy, detail))
+    changed.push("picture");
   return changed;
 }
 

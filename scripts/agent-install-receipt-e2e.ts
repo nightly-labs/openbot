@@ -31,6 +31,7 @@ interface ScenarioOptions {
   modifiedSkills?: boolean;
   receiptAttempts?: number;
   baseline?: "unedited" | "edited" | "none";
+  paddedListing?: boolean;
   replaceFields?: AgentMarketplaceProfileField[];
 }
 
@@ -172,7 +173,13 @@ async function scenario(
       return Effect.gen(function* () {
         if (init.method === "GET") {
           assert.equal(path, `/v1/marketplace/agents/${detail.id}/listing`);
-          return decode(detail);
+          if (!options.paddedListing) return decode(detail);
+          return decode({
+            ...detail,
+            name: ` ${OLD_PROFILE.name} `,
+            title: `${OLD_PROFILE.title}\n`,
+            description: ` ${OLD_PROFILE.description}\n`,
+          });
         }
         assert.equal(init.method, "POST");
         assert.equal(path, `/v1/marketplace/agents/${detail.id}/install`);
@@ -204,7 +211,13 @@ async function scenario(
       Effect.sync(() => {
         const agent = agents.get(agentId);
         assert.ok(agent);
-        const next = { ...agent, ...profile };
+        const next = {
+          ...agent,
+          ...profile,
+          name: profile.name.trim(),
+          title: profile.title.trim(),
+          description: profile.description.trim(),
+        };
         agents.set(agentId, next);
         return next;
       }),
@@ -440,6 +453,21 @@ await scenario(
     assert.equal(agent.description, detail.description);
     assert.equal(agent.avatarSeed, detail.avatarSeed);
     assert.equal(agent.marketplaceSource?.profile?.picture, agentMarketplacePictureKey(agent));
+  },
+);
+await scenario(
+  "update does not count outer spaces in the listing text as a user edit",
+  { update: true, baseline: "none", paddedListing: true, receiptAttempts: 0 },
+  async (state, input) => {
+    assert.ok(Exit.isSuccess(state.result));
+    const agent = state.agents.get(input.agentId ?? "");
+    assert.ok(agent);
+    assert.equal(agent.name, OLD_PROFILE.name);
+    assert.equal(agent.title, OLD_PROFILE.title);
+    assert.equal(agent.description, OLD_PROFILE.description);
+    assert.equal(agent.marketplaceSource?.profile?.name, sha256(OLD_PROFILE.name));
+    assert.equal(agent.marketplaceSource?.profile?.title, sha256(OLD_PROFILE.title));
+    assert.equal(agent.marketplaceSource?.profile?.description, sha256(OLD_PROFILE.description));
   },
 );
 await scenario("receipt defect", { receiptDefect: true }, async (state) => {

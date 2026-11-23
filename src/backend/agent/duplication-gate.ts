@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { AgentEvent, AgentSummary, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type AgentSummary,
+  agentMarketplacePictureKey,
+  type SidebarLayoutSnapshot,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Schema } from "effect";
 import type { AgentService } from "../agent-service";
@@ -94,8 +99,12 @@ export class DuplicationGate {
         const routines = this.#routines.duplicate(sourceAgentId, copied.id, new Date());
         this.#assertSourceUnchanged(sourceAgentId, signature);
         if (source.marketplaceSource) {
+          const profile = source.marketplaceSource.profile;
           completedDuplicate = this.#store.setMarketplaceSource(copied.id, {
             ...structuredClone(source.marketplaceSource),
+            ...(profile && profile.picture === agentMarketplacePictureKey(source)
+              ? { profile: { ...profile, picture: agentMarketplacePictureKey(copied) } }
+              : {}),
             routineIds: source.marketplaceSource.routineIds.flatMap((routineId) => {
               const routine = routines.get(routineId);
               return routine ? [routine.id] : [];

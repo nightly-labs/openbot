@@ -226,6 +226,18 @@ export function agentMarketplacePictureKey(
   return JSON.stringify([agent.avatarUrl, agent.avatarSeed, agent.avatarHue]);
 }
 
+export function agentMarketplacePictureMatches(
+  agent: Pick<AgentSummary, "avatarUrl" | "avatarSeed" | "avatarHue">,
+  listing: Pick<AgentSummary, "avatarUrl" | "avatarSeed" | "avatarHue">,
+): boolean {
+  return (
+    agent.avatarUrl === null &&
+    listing.avatarUrl === null &&
+    agent.avatarSeed === listing.avatarSeed &&
+    agent.avatarHue === listing.avatarHue
+  );
+}
+
 export function isAgentMarketplaceProfile(value: unknown): value is AgentMarketplaceProfile {
   return isDynamicRecord(value) && AGENT_MARKETPLACE_PROFILE_FIELDS.every((field) => isString(value[field]));
 }

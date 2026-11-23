@@ -19,6 +19,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentMarketplacePictureKey,
+  agentMarketplacePictureMatches,
   decodeMarketplaceAgentDetail,
   decodeMarketplaceAgentPage,
   isAvatarHue,
@@ -376,11 +377,16 @@ function keptProfileFields(
   const kept = new Set<AgentMarketplaceProfileField>();
   for (const field of ["name", "title", "description"] as const) {
     const current = existing[field];
-    if (replace.has(field) || current === detail[field]) continue;
+    if (replace.has(field) || current === detail[field].trim()) continue;
     if (baseline && profileHash(current) === baseline[field]) continue;
     kept.add(field);
   }
-  if (!replace.has("picture") && agentMarketplacePictureKey(existing) !== baseline?.picture) kept.add("picture");
+  if (
+    !replace.has("picture") &&
+    agentMarketplacePictureKey(existing) !== baseline?.picture &&
+    !agentMarketplacePictureMatches(existing, detail)
+  )
+    kept.add("picture");
   return kept;
 }
 
@@ -390,9 +396,9 @@ function listingProfile(
   kept: ReadonlySet<AgentMarketplaceProfileField>,
 ): AgentMarketplaceProfile {
   return {
-    name: profileHash(detail.name),
-    title: profileHash(detail.title),
-    description: profileHash(detail.description),
+    name: profileHash(detail.name.trim()),
+    title: profileHash(detail.title.trim()),
+    description: profileHash(detail.description.trim()),
     picture: kept.has("picture") ? "" : agentMarketplacePictureKey(agent),
   };
 }
