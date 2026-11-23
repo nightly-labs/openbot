@@ -7940,7 +7940,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     name: "Treg",
     tagline: "OpenRouter for agent tools",
     description:
-      "Give your agent one connection to 4,200+ tools across 137 providers, plus your team's own APIs. Search by task, check prices, and call tools while Treg handles the provider keys.",
+      "Use Treg's catalog and your team's own tools from OpenBot. Research keywords and companies, generate an image or video, or publish a post through a connected account. Check the price before you call a tool.",
     category: "automation",
     creatorName: "Treg",
     version: "1.0.0",

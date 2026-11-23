@@ -1420,7 +1420,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "treg",
       version: "1.0.0",
       featured: false,
-      detailSha256: "2b70534e9fa216b4bb65fb4d8d405bff7578368693c270b98c662b2760179332",
+      detailSha256: "945af4afd3b35b43e5b43cd753bc8a368c98df285cd80806715ce94b0e8c9b29",
     },
     {
       slug: "truthifi",
@@ -10005,7 +10005,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Treg",
     tagline: "OpenRouter for agent tools",
     description:
-      "Give your agent one connection to 4,200+ tools across 137 providers, plus your team's own APIs. Search by task, check prices, and call tools while Treg handles the provider keys.",
+      "Use Treg's catalog and your team's own tools from OpenBot. Research keywords and companies, generate an image or video, or publish a post through a connected account. Check the price before you call a tool.",
     category: "automation",
     creatorName: "Treg",
     iconUrl: "https://openbot.run/plugins/icon/treg",
