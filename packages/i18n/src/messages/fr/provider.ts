@@ -125,7 +125,8 @@ export const messages = {
     "Ces modèles ne fonctionnent pas avec « Espace de travail seul » sous Windows et Linux. Pour les utiliser, modifiez « Accès » dans les réglages de l’agent.",
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
-  "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
+  "provider.picker.noModels":
+    "Aucun modèle {name} ne s’affiche ici. S’ils sont désactivés, un admin peut les activer dans Réglages du serveur > Fournisseurs > {name} > Modèles.",
   "provider.picker.endpointModelsInCustom":
     "{name} exécute vos points de terminaison personnalisés. Leurs modèles sont dans l’onglet Personnalisé.",
   "provider.picker.showCustomModels": "Voir les modèles",
@@ -146,6 +147,7 @@ export const messages = {
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Effort de raisonnement de l’agent",
   "provider.picker.effortFixed": "{effort}, fixé par {provider}",
+  "provider.picker.effortLimited": "Vos paramètres Claude ou votre organisation limitent l’effort à {effort}.",
   "provider.picker.fast": "Rapide",
   "provider.picker.fastText": "Réponses plus rapides, utilisation accrue",
   "provider.picker.speed": "Vitesse",
@@ -270,6 +272,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
   "provider.settings.geminiKeyReplacesAccount":
     "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
+  "provider.settings.museKeyInUse":
+    "Muse utilise cette clé, pas votre connexion. Pour utiliser votre connexion, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",
@@ -281,10 +285,14 @@ export const messages = {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompt",
   "provider.settings.promptCacheDescription":
-    "Durée pendant laquelle Claude garde le contexte d’un agent en cache entre les tours.",
+    "Durée pendant laquelle Claude et Pi gardent le contexte d’un agent en cache entre les tours.",
   "provider.settings.promptCacheHour": "1 heure",
-  "provider.settings.promptCacheDefault": "Défaut de Claude Code",
+  "provider.settings.promptCacheDefault": "Valeur par défaut du fournisseur",
   "provider.settings.promptCacheLoadFailed": "Impossible de charger la durée du cache de prompt de ce serveur.",
+  "provider.settings.cacheExpiryCompaction": "Compacter avant l’expiration du cache",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Quand une discussion avec 200K jetons de contexte ou plus est inactive avec un cache d’1 heure, l’agent compacte le contexte avant l’expiration du cache. Le message suivant ne relit alors pas tout le contexte sans cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Impossible de charger le réglage de compactage de ce serveur.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Utiliser ma configuration Claude Code",
   "provider.settings.claudeUserSetupDescription":

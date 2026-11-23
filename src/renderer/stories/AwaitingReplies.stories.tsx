@@ -50,6 +50,16 @@ export const OneFailed: Story = {
   },
 };
 
+export const AllFailed: Story = {
+  args: {
+    onDismiss: fn(),
+    items: [
+      { id: "reply-research", agent: research, name: research.name, state: "failed" },
+      { id: "reply-sales", agent: sales, name: sales.name, state: "failed" },
+    ],
+  },
+};
+
 export const AllReplied: Story = {
   args: {
     onDismiss: fn(),
@@ -77,6 +87,19 @@ export const ChannelSubtasks: Story = {
         state: "working",
         preview: "Draft the pricing section for the launch post",
       },
+    ],
+  },
+};
+
+export const StopAskedRequest: Story = {
+  args: {
+    onStop: fn(),
+    stopDisplay: "icon",
+    items: [
+      researchReplied,
+      { id: "reply-sales", agent: sales, name: sales.name, state: "working", stoppable: false },
+      { id: "reply-support", name: "Support", state: "asked" },
+      { id: "reply-design", name: "Design Review", state: "stopped", stoppable: false },
     ],
   },
 };

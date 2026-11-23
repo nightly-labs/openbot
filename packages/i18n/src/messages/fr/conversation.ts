@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Ouvrir dans le chat",
   "conversation.threads.archive": "Archiver",
   "conversation.threads.archived": "Archivés",
+  "conversation.threads.archivedOlder": "Voir les fils plus anciens",
   "conversation.threads.restore": "Restaurer",
   "conversation.threads.deleteUndo.title": "{title} supprimé",
   "conversation.threads.hold.threadLimit": {
@@ -144,6 +145,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "Micro ouvert",
   "conversation.voice.talkMode.push": "Appuyer pour parler",
   "conversation.voice.holdToTalk": "Maintenez pour parler",
+  "conversation.voice.downloading": "Préparation {progress} %",
   "conversation.voice.spaceKey": "Espace",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

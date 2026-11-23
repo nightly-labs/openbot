@@ -134,6 +134,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "يحتوي مفتاح المزوّد على مسافة أو حرف لا يمكن أن يحتويه المفتاح.",
   "error.provider.noModel": "لا يتوفر نموذج للمزوّد المحدد.",
   "error.provider.noModelNamed": "لا يتوفر نموذج لدى {provider}.",
+  "error.provider.acpModelsNotLoaded": "تعذّر على {provider} تحميل نماذجه. أرسل رسالتك مرة أخرى.",
   "error.provider.acpNoModels": "لم تُعلن واجهة ACP CLI عن أي نماذج ACP. لن يخمّن OpenBot نموذجًا بديلًا.",
   "error.provider.endpointRemoveBusy": "انتظر حتى ينتهي الدور النشط وقائمة الانتظار قبل إزالة نقطة النهاية هذه.",
   "error.provider.codexOutdated": "إصدار Codex CLI {version} قديم جدًا. يتطلب OpenBot الإصدار 0.156.0 أو أحدث.",
@@ -167,6 +168,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "توقف {provider} قبل أن تبدأ هذه الرسالة. أرسل الرسالة مرة أخرى.",
   "error.provider.sessionStartTimedOut":
     "لم يفتح {provider} محادثة جديدة في الوقت المحدد، لذلك لم تبدأ هذه الرسالة. على الكمبيوتر الذي يشغّل OpenBot، افتح المزوّدون، واختر {provider}، وانقر إعادة التشغيل. ثم حاول مرة أخرى.",
+  "error.provider.sessionResumeTimedOut":
+    "لم يفتح {provider} هذه المحادثة في الوقت المحدد، لذلك لم تبدأ هذه الرسالة. على الكمبيوتر الذي يشغّل OpenBot، افتح المزوّدون، واختر {provider}، وانقر إعادة التشغيل. ثم حاول مرة أخرى.",
   "error.provider.serviceUnreachable":
     "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت. سيعيد OpenBot المحاولة.",
   "error.provider.serviceUnreachableRefresh":
@@ -256,6 +259,8 @@ export const messages = {
     "تعذّر على OpenCode قراءة تفكير هذا النموذج بهذا المستوى من الجهد. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.opencodeModelNotServed":
     "لا يوفّر مزوّد النموذج هذا النموذج لحسابك الآن. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeSafetyBlocked":
+    "حظر مزوّد النموذج هذه الرسالة بسبب قواعد الأمان الخاصة به. أرسل طلبك مرة أخرى بكلمات مختلفة. إذا حظر رسائلك التالية أيضًا، فابدأ محادثة جديدة أو اختر نموذجًا آخر.",
   "error.provider.opencodeNetwork":
     "تعذّر على OpenCode الاتصال بمزوّد النموذج. تحقق من اتصال الشبكة للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.\n{detail}",
   "error.provider.codexStateBusy": "لا يزال ChatGPT يجهّز سجله المحلي بعد تشغيل سابق. انتظر بضع دقائق، ثم أعد المحاولة.",
@@ -264,6 +269,8 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "أوقف Linux المزوّد لأن حد وقت المعالج في الوقت الحقيقي لدى OpenBot هو 0. يأتي هذا الحد من نظامك. ثبّت rtkit وشغّله (`rtkit-daemon`)، ثم نفّذ `systemctl --user restart xdg-desktop-portal`، ثم أعد تشغيل OpenBot. إعادة تشغيل xdg-desktop-portal وحدها لا تكفي ما دام rtkit غير مثبّت.",
   "error.provider.cpuUnsupported": "لا يمكن لمعالج هذا الكمبيوتر تشغيل هذا المزوّد. استخدم مزوّدًا آخر.",
+  "error.provider.windowsBlocked":
+    "منعت إعدادات أمان Windows، مثل التحكم الذكي في التطبيقات، هذا المزوّد من البدء. استخدم مزوّدًا آخر.",
   "error.provider.opencodeDatabaseNewer":
     "تعذّر على OpenCode فتح قاعدة بياناته لأن إصدارًا أحدث من OpenCode غيّرها. حدّث OpenCode إلى الإصدار 2 أو أحدث، ثم أعد المحاولة.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -277,6 +284,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",
   "error.provider.channelNoAnswer":
     "أنهى {provider} الدور بدون إجابة. في القناة، انقر على «متابعة» لتشغيل المهمة مرة أخرى، أو على «إعادة الإسناد» لإعطائها لعضو آخر.",
+  "error.provider.acpProcessStopped": "توقف {provider} قبل أن يجيب. أرسل الرسالة مرة أخرى.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",
@@ -315,6 +323,8 @@ export const messages = {
     "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "توقف Gemini بسبب خطأ. أرسل رسالتك مرة أخرى. إذا توقف مرة أخرى، فاختر نموذجًا أو مزودًا آخر.",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
   "error.provider.grokServiceFailure": "خدمة Grok مشغولة أو بها خطأ. أعد المحاولة بعد بضع دقائق، أو اختر نموذجًا آخر.",
   "error.provider.grokConnectionFailed":
@@ -501,6 +511,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "هذا الإعداد غير متاح في جلسة المزوّد الحالية.",
   "error.provider.sessionSettingInvalid": "هذه القيمة غير متاحة لهذا الإعداد.",
   "error.provider.sessionSettingsBusy": "انتظر حتى ينتهي الدور الحالي قبل تغيير إعداد الجلسة.",
+  "error.provider.sessionSettingsTimedOut": "لم تستجب جلسة الوكيل في الوقت المحدد. حاول مرة أخرى.",
   "error.provider.piOutdated": "إصدار Pi {version} قديم جدًا. ثبّت Pi 1.1.0 أو أحدث لدعم RPC وMCP الأصلي.",
   "error.provider.nativeMissing": "واجهة {provider} CLI غير مثبتة. نزّلها في الإعدادات.",
   "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",
@@ -550,6 +561,8 @@ export const messages = {
   "error.provider.museTurnFailed": "فشل دور Muse.",
   "error.provider.museModelUnavailable":
     "لا يمكن لـ Muse استخدام هذا النموذج. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل، أو قد لا يملك هذا الحساب إذنًا بالوصول إلى النموذج. اختر نموذجًا آخر، ثم حاول مرة أخرى.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "تعذّر على Muse إكمال هذا الطلب. يستخدم Muse مفتاح Meta API المحفوظ، لا تسجيل دخولك. استبدل المفتاح، أو أزله في الإعدادات لاستخدام تسجيل الدخول.\n{detail}",
   "error.provider.museProfileUnsupported":
     "لا يستطيع Muse إنشاء ملف تعريف بدون الوصول إلى أدوات خارجية. استخدم مزوّدًا آخر لإنشاء ملف التعريف، ثم اختر Muse للوكيل.",
   "error.provider.museAuthUnverified": "لم يتم التحقق من مصادقة Muse. اتصل على الحاسوب المضيف، أو عيّن مفتاح Meta API.",

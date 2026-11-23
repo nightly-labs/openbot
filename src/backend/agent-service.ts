@@ -34,7 +34,9 @@ import type {
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTaskWindow,
+  AgentUsageLimitReturn,
   AgentWaitsSnapshot,
+  ArchivedAgentTasksPage,
   AskSideQuestionInput,
   AttachmentDataInput,
   AvatarImageInput,
@@ -45,6 +47,7 @@ import type {
   ChannelRoutine,
   ChannelRoutineRun,
   CodexLiveVoice,
+  CompleteMcpSignInRelayInput,
   ConversationFileSearchPage,
   ConversationMessage,
   ConversationMessageSender,
@@ -72,6 +75,7 @@ import type {
   GenerateAgentProfileInput,
   HiddenAgentsSnapshot,
   HostAnalyticsInput,
+  ListArchivedAgentTasksInput,
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   LocalBrowserSecretResponse,
@@ -82,6 +86,7 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagePinner,
+  PasswordManagerId,
   PinnedMessagesSnapshot,
   ProviderAccountCodeLoginStart,
   ProviderAccountCodeLoginStatus,
@@ -159,10 +164,12 @@ import {
   sameAgentBrowserProfile,
   sameAgentModelChoice,
   WORKFLOW_CATALOG_PROVIDERS,
+  WORKFLOW_MEDIA_CATALOG_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX,
   WORKFLOWS_USAGE_ID,
   type WorkflowCatalogProvider,
+  type WorkflowCatalogSource,
   type WorkflowMediaCatalog,
   type WorkflowMediaCredits,
   type WorkflowMediaPrice,
@@ -170,8 +177,10 @@ import {
   type WorkflowMediaProvider,
   type WorkflowMediaProviders,
   type WorkflowMediaSpecs,
+  workflowCatalogSource,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { AGENT_THREAD_READS_LIMIT } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/context-compact-v1";
@@ -243,6 +252,7 @@ import {
   type ModelChoice,
   modelUnavailableError,
   type ProviderPreference,
+  runnableStartingChoice,
   startingChoice,
   startingModel,
   workflowProvider,
@@ -327,13 +337,12 @@ import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
-import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
 import { type MailboxStore, MESSAGING_LANE } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
-import type { McpSignInOpener } from "./mcp-oauth-provider";
+import type { McpSignInAddressOutcome, McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { MessagePinRefused } from "./message-pins";
@@ -361,6 +370,7 @@ import { shortenDiagnostic } from "./stderr-diagnostics";
 import { extractJsonObject } from "./structured-output";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
+import { type CreditMediaGateway, CreditMediaWorkflows } from "./workflows/credit-media";
 import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
 import { WorkflowMediaCatalogCache } from "./workflows/media-catalog";
 import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
@@ -408,6 +418,8 @@ export interface AgentServiceOptions {
   browser: AgentBrowserHost;
   requestTimeoutMs?: number;
   contextCompactionTimeoutMs?: number;
+  cacheExpiryCompactionDelayMs?: number;
+  cacheExpiryCompaction?: () => boolean;
   memoryReviewIdleMs?: number;
   finishCheck?: boolean;
   preferredProvider?: AgentProvider;
@@ -425,7 +437,9 @@ export interface AgentServiceOptions {
   avatarDecoder?: AvatarImageDecoder | null;
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
+  hiddenModels?: (provider: AgentProvider) => ReadonlySet<string> | undefined;
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
+  passwordManagerConnected?: (manager: PasswordManagerId) => boolean;
   feedbackFacts?: FeedbackFacts | null;
   feedback?: AgentFeedback | null;
   serverClaims?: AgentServerClaims | null;
@@ -478,6 +492,7 @@ export interface AgentServiceOptions {
   computerUseOnWayland?: boolean;
   computerUseInputRefused?: () => boolean;
   codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
+  creditMedia?: CreditMediaGateway | null;
 }
 
 const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -548,7 +563,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
   readonly #mediaCatalog: WorkflowMediaCatalogCache;
+  readonly #creditMedia: CreditMediaWorkflows | null;
   readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
+  readonly #hiddenModels: AgentServiceOptions["hiddenModels"];
   readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
   readonly #providerUseChanges = Semaphore.makeUnsafe(1);
@@ -599,6 +616,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   constructor(options: AgentServiceOptions) {
     super();
     this.#mcpAgentAccess = options.mcpAgentAccess;
+    this.#hiddenModels = options.hiddenModels;
     this.#clearPictureBackground = options.clearPictureBackground;
     const {
       store,
@@ -648,6 +666,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       signIn: (provider) => this.#mediaSignIn(provider),
       warn: (message, details) => logger.warn(message, details),
     });
+    this.#creditMedia = options.creditMedia
+      ? new CreditMediaWorkflows({
+          gateway: options.creditMedia,
+          warn: (message, details) => logger.warn(message, details),
+        })
+      : null;
     this.#sidebarLayout = sidebarLayout;
     this.#libraryFolders = libraryFolders;
     this.#profileSave = new ProfileSave(store, {
@@ -865,6 +889,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hostedSites,
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+      reportFailure: (code, error, agentId) => {
+        this.#reportFailure(code, error, agentId);
+      },
       isStopping: () => this.#stopping,
       redact: (text) => this.#mcp.redact(text),
     });
@@ -1083,6 +1110,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       bundledExecutables,
       credentials: {
         ...credentials,
+        ...(options.fitImage ? { fitImage: options.fitImage } : {}),
         ...(credentials.serverEnvironment
           ? {
               agentEnvironment: (inherited) => ({
@@ -1112,6 +1140,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       mcpHandoff: this.#mcp.handoffLog(),
       redactMcp: (text) => this.#mcp.redact(text),
+      reportMcpSignIn: (provider, server, signInText) => this.#mcp.reportSignInFailure(provider, server, signInText),
     });
     this.#endpoints = new CustomEndpoints({
       store,
@@ -1131,7 +1160,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               endpoint.id,
               {
                 harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
-                models: endpoint.models.map((model) => encodedModelId(`${endpoint.id}/`, model.id)),
+                modelIds: endpoint.models.map((model) => model.id),
               },
             ]),
           ),
@@ -1150,6 +1179,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#compaction = new ContextCompaction({
       timeoutMs: options.contextCompactionTimeoutMs,
+      cacheExpiryDelayMs: options.cacheExpiryCompactionDelayMs,
+      cacheExpiryEnabled: options.cacheExpiryCompaction,
       changed: () => this.#emitRuntimeSnapshot(),
       store,
       providers: this.#providers,
@@ -1163,6 +1194,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.channels.contextCompacted(threadId);
         this.messaging.contextCompacted(threadId);
       },
+      compactBeforeCacheExpiry: (agentId, threadId) =>
+        Effect.runFork(this.#compactBeforeCacheExpiry(agentId, threadId).pipe(Effect.forkIn(this.#scope))),
     });
     this.#attention = new AttentionRegistry({
       conversation: this.#conversation,
@@ -1495,6 +1528,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       reportsCompactions: (agentId) => this.#reportsCompactions(agentId),
       quietTurn: (turnId) => this.#turn.quietChannelTurn(turnId),
+      channelNote: (turnId, messageId) => this.#turn.channelNote(turnId, messageId),
       provisionalAnswers: (agentId) => {
         const agent = this.#store.get(agentId);
         return (agent ? this.#providers.clientForAgent(agent)?.provisionalAnswers : undefined) === true;
@@ -1698,7 +1732,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               Effect.forEach(
                 this.#store
                   .list()
-                  .filter((agent) => agent.usageLimitReturn && sameUsageLimit(agent.usageLimitReturn, limit)),
+                  .filter(
+                    (agent) =>
+                      agent.usageLimitReturn?.provider === limit.provider &&
+                      agent.usageLimitReturn.model === limit.model,
+                  ),
                 (agent) => Effect.sync(() => this.#drain.scheduleDrain(agent.id)),
                 { discard: true },
               ),
@@ -1897,7 +1935,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnStopped: (agentId, taskId, turnId) =>
           this.#stoppedTurn(agentId, taskId) === turnId || (taskId === null && this.#requestedNewChats.has(agentId)),
         hasOpenWait: (agentId, deliveryIds) =>
-          this.#waits.list(agentId).waits.some((wait) => deliveryIds.includes(wait.requestMessageId)),
+          this.#waits
+            .list(agentId)
+            .waits.some(
+              (wait) =>
+                deliveryIds.includes(wait.requestMessageId) ||
+                (wait.wakeDeliveryId !== null && deliveryIds.includes(wait.wakeDeliveryId)),
+            ),
         routineAnswered: (agentId, deliveryId, answer) => {
           const agent = this.#store.get(agentId);
           const run = this.#routines.runForDelivery(deliveryId);
@@ -2038,6 +2082,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
+      ...(options.passwordManagerConnected === undefined
+        ? {}
+        : { passwordManagerConnected: options.passwordManagerConnected }),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
       feedbackWithdrawal: this.#feedbackWithdrawal,
@@ -2055,6 +2102,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
+        hiddenModels: (provider) => this.#hiddenModels?.(provider),
         agentModels: (choice) => this.#agentModels(choice),
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
         providerStatuses: () => this.getStatus().providers ?? [],
@@ -2625,6 +2673,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mcp.signInLink(input.url);
   }
 
+  receiveMcpSignInAddress(input: CompleteMcpSignInRelayInput): McpSignInAddressOutcome {
+    return this.#mcp.receiveSignInAddress(input.url, input.address);
+  }
+
   signOutMcpServer(input: SignOutMcpServerInput): Effect.Effect<McpSignInState[], AgentLifecycleFailed> {
     return this.#mcp
       .signOut(input)
@@ -2924,7 +2976,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ).bind(this);
 
   readonly generateWorkflowText = Effect.fn("AgentService.generateWorkflowText")(
-    function* (this: AgentService, input: WorkflowModelInput & { prompt: string; images: readonly string[] }) {
+    function* (
+      this: AgentService,
+      input: WorkflowModelInput & {
+        prompt: string;
+        images: readonly string[];
+        outputSchema?: DynamicRecord;
+      },
+    ) {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
@@ -2938,6 +2997,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           input.prompt,
           workflowUsageObserver(this.#store.database.usage, provider, model.id),
           input.images,
+          input.outputSchema ?? null,
         )
         .pipe(
           Effect.tapError((failure) =>
@@ -2992,10 +3052,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   readonly workflowMediaCatalog = Effect.fn("AgentService.workflowMediaCatalog")(function* (
     this: AgentService,
-    only?: WorkflowCatalogProvider,
+    only?: WorkflowCatalogSource,
   ) {
     if (this.#stopping) return { models: [] } satisfies WorkflowMediaCatalog;
-    return yield* this.#mediaCatalog.catalog(only);
+    const credit =
+      this.#creditMedia && (only === undefined || only === "openbot")
+        ? this.#creditMedia.catalog()
+        : Effect.succeed([]);
+    const services =
+      only === "openbot"
+        ? Effect.succeed({ models: [] } satisfies WorkflowMediaCatalog)
+        : this.#mediaCatalog.catalog(only);
+    const [listed, credits] = yield* Effect.all([services, credit], { concurrency: "unbounded" });
+    return {
+      models: [...credits, ...listed.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
+    } satisfies WorkflowMediaCatalog;
   }).bind(this);
 
   readonly workflowMediaPrice = Effect.fn("AgentService.workflowMediaPrice")(function* (
@@ -3003,18 +3074,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     request: WorkflowMediaPriceRequest,
   ) {
     if (this.#stopping) return { credits: null } satisfies WorkflowMediaPrice;
+    if (workflowCatalogSource(request.model) === "openbot")
+      return {
+        credits: this.#creditMedia ? yield* this.#creditMedia.price(request) : null,
+      } satisfies WorkflowMediaPrice;
     return yield* this.#mediaCatalog.price(request);
   }).bind(this);
 
   workflowMediaProviders(): WorkflowMediaProviders {
-    return workflowMediaProvidersOf(this.#mediaServiceAccounts().map(({ account }) => account));
+    return {
+      ...workflowMediaProvidersOf(this.#mediaServiceAccounts().map(({ account }) => account)),
+      openbot: this.#creditMedia?.available() === true,
+    };
   }
 
   readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (
     this: AgentService,
-    only?: WorkflowCatalogProvider,
+    only?: WorkflowCatalogSource,
   ) {
     if (this.#stopping) return { sunra: null, higgsfield: null, accounts: null } satisfies WorkflowMediaCredits;
+    const openbot =
+      this.#creditMedia && (only === undefined || only === "openbot") ? yield* this.#creditMedia.credits() : null;
+    if (only === "openbot")
+      return { sunra: null, higgsfield: null, accounts: null, openbot } satisfies WorkflowMediaCredits;
     const all = this.#mediaServiceAccounts();
     const accounts = only ? all.filter((account) => account.provider === only).slice(0, 1) : all;
     const orNull = <A>(read: Effect.Effect<A, { readonly message: string }>, service: string) =>
@@ -3033,13 +3115,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { concurrency: "unbounded" },
     );
     const listed = accounts.map(({ account }, index) => ({ ...account, credits: credits[index] ?? null }));
-    return { ...workflowMediaCreditsOf(listed), accounts: only ? null : listed } satisfies WorkflowMediaCredits;
+    return {
+      ...workflowMediaCreditsOf(listed),
+      accounts: only ? null : listed,
+      ...(only ? {} : { openbot }),
+    } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   readonly generateWorkflowMedia = Effect.fn("AgentService.generateWorkflowMedia")(
     function* (
       this: AgentService,
       input: {
+        jobId: string;
+        earlierJobIds: readonly string[];
         kind: GeneratedMediaKind;
         provider: WorkflowMediaProvider;
         model: string;
@@ -3055,6 +3143,32 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const pictures = input.images.filter(
         (image): image is { role: MediaPictureRole; attachmentId: string } => image.role !== "file",
       );
+      if (input.provider === "openbot") {
+        if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        if (!this.#creditMedia) return yield* failed(sourceText("error.billing.mediaSignInRequired"));
+        return yield* this.#creditMedia
+          .generate(
+            {
+              resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
+              store: (file) => this.#mailbox.storeGeneratedAttachment(file),
+            },
+            {
+              jobId: input.jobId,
+              earlierJobIds: input.earlierJobIds,
+              kind: input.kind,
+              model: input.catalogId,
+              prompt: input.prompt,
+              specs: input.specs,
+              images: pictures,
+            },
+          )
+          .pipe(
+            Effect.tapError((failure) =>
+              Effect.sync(() => logger.warn("Could not make workflow media with credits.", { error: failure.message })),
+            ),
+            Effect.mapError((failure) => failed(failure.message)),
+          );
+      }
       if (input.provider === "sunra") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
         const signIn = yield* this.#mediaStepSignIn("sunra", input.account);
@@ -3353,7 +3467,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
   }, Effect.uninterruptible).bind(this);
 
-  #assignNewAgentModel(agent: AgentSummary, input: Omit<CreateAgentInput, "initialMessage">, needsModel: boolean) {
+  #assignNewAgentModel(
+    agent: AgentSummary,
+    input: Omit<CreateAgentInput, "initialMessage">,
+    needsModel: boolean,
+    startOnRunnableProvider = false,
+  ) {
     return this.#endpoints
       .runExclusive(() =>
         Effect.gen({ self: this }, function* () {
@@ -3386,7 +3505,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ...(account ? { providerAccountId: account } : {}),
             });
           }
-          const starting = this.#startingChoice();
+          const starting = startOnRunnableProvider ? this.#runnableStartingChoice() : this.#startingChoice();
           if (starting) return yield* this.#landOnStartingChoice(agent, starting);
           yield* lifecycleStep("check starting model", () => {
             this.#providers.requireProviderOn(agent.provider);
@@ -3414,6 +3533,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
   }
 
+  #runnableStartingChoice(): ModelChoice | null {
+    return runnableStartingChoice(this.#endpoints.available(), this.#preference(), this.getStatus().providers ?? [], {
+      developmentDefaults: this.#developmentDefaults,
+      providerAvailable: (provider) => this.#providerAvailable(provider),
+    });
+  }
+
   readonly #landOnStartingChoice = Effect.fn("AgentService.landOnStartingChoice")(function* (
     this: AgentService,
     agent: AgentSummary,
@@ -3436,7 +3562,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   readonly createAgentProfile = Effect.fn("AgentService.createAgentProfile")(function* (
     this: AgentService,
-    input: Omit<CreateAgentInput, "initialMessage"> & { title?: string },
+    input: Omit<CreateAgentInput, "initialMessage"> & { title?: string; startOnRunnableProvider?: boolean },
   ) {
     let agent = yield* this.#store
       .createAgent(input)
@@ -3452,7 +3578,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             (failure) => new AgentLifecycleFailed({ operation: "prepare agent workspace", cause: failure.cause }),
           ),
         );
-        agent = yield* this.#assignNewAgentModel(agent, input, false);
+        agent = yield* this.#assignNewAgentModel(agent, input, false, input.startOnRunnableProvider);
         if (input.title)
           agent = yield* this.#store
             .updateAgent({ agentId: agent.id, title: input.title })
@@ -4075,16 +4201,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : reasoningEffort,
       };
     };
-    if (
-      agent.usageLimitReturn &&
-      this.#usageLimitReady(agent.usageLimitReturn) &&
-      this.#usageLimits.returnConfirmed(usageLimitOf(agent.usageLimitReturn))
-    )
+    const returnTo = agent.usageLimitReturn && this.#returnTarget(agent.usageLimitReturn);
+    if (returnTo && this.#usageLimitReady(returnTo) && this.#usageLimits.returnConfirmed(usageLimitOf(returnTo)))
       return {
         input: {
-          ...move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort),
-          ...(agent.usageLimitReturn.fastMode ? { fastMode: true } : {}),
-          ...(agent.usageLimitReturn.fastMode && agent.usageLimitReturn.ultrafast ? { ultrafast: true } : {}),
+          ...move(returnTo, returnTo.reasoningEffort),
+          ...(returnTo.fastMode ? { fastMode: true } : {}),
+          ...(returnTo.fastMode && returnTo.ultrafast ? { ultrafast: true } : {}),
         },
         move: "return",
       };
@@ -4099,7 +4222,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #returnCheckPending(agentId: string): boolean {
     const returnTo = this.#store.get(agentId)?.usageLimitReturn;
-    return returnTo !== undefined && this.#usageLimits.returnPending(usageLimitOf(returnTo));
+    return returnTo !== undefined && this.#usageLimits.returnPending(usageLimitOf(this.#returnTarget(returnTo)));
+  }
+
+  #returnTarget(returnTo: AgentUsageLimitReturn): AgentUsageLimitReturn {
+    if (this.#usageLimitReady(returnTo) || !this.#pooled(returnTo)) return returnTo;
+    this.#readPoolWhenStale(returnTo.provider);
+    const pick = this.#poolPick(returnTo.provider, returnTo.model, null, true);
+    if (pick === null) return returnTo;
+    const { providerAccountId: _savedAccount, ...choice } = returnTo;
+    return pick === DEFAULT_PROVIDER_ACCOUNT_ID ? choice : { ...choice, providerAccountId: pick };
   }
 
   #hasWaitingWork(agentId: string): boolean {
@@ -4199,8 +4331,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.accountPool(choice.provider) !== null;
   }
 
-  #poolPick(provider: AgentProvider, model: string | null, current: string | null): string | null {
-    return pickPoolAccount(this.#readyPoolMembers(provider, model), current, Date.now() / 1000);
+  #poolPick(provider: AgentProvider, model: string | null, current: string | null, openOnly = false): string | null {
+    return pickPoolAccount(this.#readyPoolMembers(provider, model), current, Date.now() / 1000, openOnly);
   }
 
   #readyPoolMembers(provider: AgentProvider, model: string | null) {
@@ -4271,7 +4403,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #mayContinueStoppedWork(agentId: string): boolean {
     const returnTo = this.#store.get(agentId)?.usageLimitReturn;
     return (
-      Boolean(returnTo && this.#usageLimitReady(returnTo)) ||
+      Boolean(returnTo && this.#usageLimitReady(this.#returnTarget(returnTo))) ||
       this.#usageLimitBackup(agentId, true) !== undefined ||
       this.#poolBackup(agentId)
     );
@@ -4680,6 +4812,68 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     yield* this.#compaction.request(input.agentId, externalThreadId);
   }, Effect.uninterruptible).bind(this);
+
+  readonly #compactBeforeCacheExpiry = Effect.fn("AgentService.compactBeforeCacheExpiry")(function* (
+    this: AgentService,
+    agentId: string,
+    externalThreadId: string,
+  ) {
+    if (yield* this.#holdsBackgroundWork(externalThreadId)) return;
+    const reserved = yield* lifecycleStep("compact before cache expiry", () =>
+      this.#reserveCacheExpiryCompaction(agentId, externalThreadId),
+    ).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("The compaction before the prompt cache expires did not start.", { error: failure.cause });
+          return false;
+        }),
+      ),
+    );
+    if (reserved) yield* this.#compaction.request(agentId, externalThreadId);
+  }, Effect.uninterruptible).bind(this);
+
+  readonly #holdsBackgroundWork = Effect.fn("AgentService.holdsBackgroundWork")(function* (
+    this: AgentService,
+    externalThreadId: string,
+  ) {
+    const client = this.#conversation.openClientFor(externalThreadId);
+    if (!client?.holdsBackgroundWork) return false;
+    const background = yield* Effect.result(client.holdsBackgroundWork(externalThreadId));
+    return Result.isFailure(background) || background.success;
+  }).bind(this);
+
+  #reserveCacheExpiryCompaction(agentId: string, externalThreadId: string): boolean {
+    const agent = this.#store.get(agentId);
+    const client = agent ? this.#providers.clientForAgent(agent) : null;
+    if (
+      !agent ||
+      !client ||
+      client.contextCompaction === "handoff" ||
+      !this.#providers.agentClientRunning(agent) ||
+      this.#conversation.openClientFor(externalThreadId) !== client
+    )
+      return false;
+    const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    if (this.#store.database.activeProviderSession(threadId, agent.provider)?.externalSessionId !== externalThreadId)
+      return false;
+    const taskId = this.#tasks.taskForThread(threadId);
+    const main = threadId === agent.threadId;
+    const task = taskId !== null && !this.#tasks.isRoutineThreadId(threadId);
+    const channel = this.channels.store.channelForThread(threadId) !== null;
+    if (!main && !task && !channel) return false;
+    if (
+      !this.#usageLimits.mayDrain(agentId) ||
+      this.#mailbox.hasUnfinishedDelivery(agentId) ||
+      this.#compaction.heldThreads(agentId).length > 0 ||
+      this.#conversation.loadedExecutionSnapshot(threadId)?.activeTurnId ||
+      this.#conversation.workingSnapshot(agentId)?.activeTurnId ||
+      this.#store.database.readActiveTurnId(agentId, threadId) ||
+      (main && this.#threads.mainContextBusy(agent)) ||
+      (task && taskId !== null && this.#mailbox.taskBusy(agentId, taskId))
+    )
+      return false;
+    return this.#compaction.reserve(agentId, externalThreadId, true, null, "cacheExpiry");
+  }
 
   readonly clearChannelContext = Effect.fn("AgentService.clearChannelContext")(function* (
     this: AgentService,
@@ -5290,7 +5484,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #liveVoiceAccountId(agent: Pick<AgentSummary, "provider" | "providerAccountId"> | undefined): string | undefined {
-    return this.#providers.liveVoiceAccount() ?? (agent?.provider === "codex" ? agent.providerAccountId : undefined);
+    const agentAccount = agent?.provider === "codex" ? agent.providerAccountId : undefined;
+    const ownAccount = agentAccount === DEFAULT_PROVIDER_ACCOUNT_ID ? undefined : agentAccount;
+    const planAccount = this.#providers.codexPlanAccountInPlaceOfKey();
+    const chosen = this.#providers.liveVoiceAccount();
+    const usableChoice = planAccount && chosen === DEFAULT_PROVIDER_ACCOUNT_ID ? null : chosen;
+    return usableChoice ?? ownAccount ?? planAccount ?? agentAccount;
   }
 
   providerUsageResets(provider: AgentProvider): Effect.Effect<ProviderUsageResets[]> {
@@ -6089,6 +6288,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#tasks.snapshot(agentId);
   }
 
+  listArchivedTasks(input: ListArchivedAgentTasksInput): ArchivedAgentTasksPage {
+    return this.#tasks.archivedPage(input.agentId, input.before);
+  }
+
   readTask(agentId: string, taskId: string): ConversationSnapshot {
     return structuredClone(this.#tasks.read(agentId, taskId));
   }
@@ -6757,15 +6960,31 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #steerAgentMessage(recipientAgentId: string, deliveryId: string, wait: boolean): Effect.Effect<AgentMessageSteer> {
     const agent = this.#store.get(recipientAgentId);
-    const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
-    if (!agent || !snapshot || !this.#mailbox.joinsChatTurn(deliveryId)) return Effect.succeed(null);
-    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId)) return Effect.succeed(null);
-    return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
+    if (!agent || !this.#mailbox.joinsRunningTurn(deliveryId)) return Effect.succeed(null);
+    const taskId = this.#mailbox.taskIdForDelivery(deliveryId);
+    const task = taskId === null ? null : this.#runningTask(recipientAgentId, taskId);
+    const snapshot = taskId === null ? this.#conversation.snapshotToUpdate(recipientAgentId) : task?.snapshot;
+    if (!snapshot) return Effect.succeed(null);
+    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId, taskId))
+      return Effect.succeed(null);
+    return this.#steerWhenBusy(agent, task, snapshot, deliveryId, false, wait);
   }
 
-  #personTurn(agentId: string, turnId: string): boolean {
+  #runningTask(
+    agentId: string,
+    taskId: string,
+  ): { taskId: string; threadId: string; snapshot: ConversationSnapshot } | null {
+    const threadId = this.#tasks.threadId(taskId);
+    const snapshot =
+      threadId === null
+        ? undefined
+        : this.#conversation.workingTaskSnapshots(agentId).find((candidate) => candidate.threadId === threadId);
+    return threadId !== null && snapshot ? { taskId, threadId, snapshot } : null;
+  }
+
+  #personTurn(agentId: string, turnId: string, taskId: string | null): boolean {
     const linked = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, null);
+    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, taskId);
     return (
       deliveries.length > 0 &&
       deliveries.every(({ delivery }) => {
@@ -7061,6 +7280,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emitError(code: string, error: unknown, agentId?: string, context?: FailureContext, link?: string): void {
+    const message = this.#reportFailure(code, error, agentId, context);
+    this.#emit({
+      type: "error",
+      ...(agentId !== undefined ? { agentId } : {}),
+      code,
+      message,
+      ...(context?.provider ? { provider: context.provider } : {}),
+      ...(context?.model ? { model: context.model } : {}),
+      ...(link ? { link } : {}),
+    });
+  }
+
+  #reportFailure(code: string, error: unknown, agentId?: string, context?: FailureContext): string {
     const causeCode = context?.causeCode ?? classifyFailure(error);
     this.emit("failure", {
       ...context,
@@ -7078,15 +7310,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       causeCode,
       message: shortenDiagnostic(message),
     });
-    this.#emit({
-      type: "error",
-      ...(agentId !== undefined ? { agentId } : {}),
-      code,
-      message,
-      ...(context?.provider ? { provider: context.provider } : {}),
-      ...(context?.model ? { model: context.model } : {}),
-      ...(link ? { link } : {}),
-    });
+    return message;
   }
 
   #emitRuntimeSnapshot(): void {
@@ -7229,11 +7453,6 @@ function workspaceOnlyUnavailable(provider: AgentProvider): boolean {
 
 function usageLimitOf(choice: AgentModelChoice): UsageLimitKey {
   return { provider: choice.provider, accountId: agentProviderAccount(choice), model: choice.model };
-}
-
-function sameUsageLimit(choice: AgentModelChoice, limit: UsageLimitKey): boolean {
-  const own = usageLimitOf(choice);
-  return own.provider === limit.provider && own.accountId === limit.accountId && own.model === limit.model;
 }
 
 function lifecycleStep<A>(operation: string, run: () => A): Effect.Effect<A, AgentLifecycleFailed> {

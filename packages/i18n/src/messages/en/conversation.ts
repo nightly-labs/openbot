@@ -80,6 +80,7 @@ export const messages = defineMessages("conversation", {
   "conversation.threads.toChat": "Open in the chat",
   "conversation.threads.archive": "Archive",
   "conversation.threads.archived": "Archived",
+  "conversation.threads.archivedOlder": "Show older threads",
   "conversation.threads.restore": "Restore",
   "conversation.threads.deleteUndo.title": "{title} deleted",
   "conversation.threads.hold.threadLimit": {
@@ -140,6 +141,7 @@ export const messages = defineMessages("conversation", {
   "conversation.voice.talkMode.open": "Open microphone",
   "conversation.voice.talkMode.push": "Push to talk",
   "conversation.voice.holdToTalk": "Hold to talk",
+  "conversation.voice.downloading": "Getting ready {progress}%",
   "conversation.voice.spaceKey": "Space",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

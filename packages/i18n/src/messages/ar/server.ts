@@ -20,6 +20,8 @@ export const messages = {
   "server.connection.planHint": "افتح إعدادات الحساب للتحقق من خطة الخادم.",
   "server.connection.loadingHint": "يمكنك اختيار خادم آخر أثناء تحميل هذا الخادم.",
   "server.connection.cachedHint": "يُحتفظ بالمحتوى المحمّل والمسودات. ستُستأنف إجراءات الخادم بعد إعادة الاتصال.",
+  "server.connection.computerOffline":
+    "{name} غير متصل. تأكد من أن حاسوبه يعمل، وأن OpenBot مفتوح، وأن نشر هذا الخادم مفعّل في إعدادات الخادم > الأعضاء.",
   "server.connection.conversationFailed": "تعذّر تحميل المحادثة. أعد المحاولة.",
   "server.connection.panelsFailed": "تعذّر تحميل بعض لوحات مساحة العمل. أعد المحاولة.",
   "server.connection.retry": "إعادة المحاولة",
@@ -464,6 +466,12 @@ export const messages = {
     "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل. على الخادم، يستخدمها المتصفح أيضًا بعد إعادة التشغيل التالية.",
   "server.settings.timezoneAutomatic": "تلقائي ({zone})",
   "server.settings.timezoneLoadFailed": "تعذّر تحميل المنطقة الزمنية للخادم.",
+  "server.settings.voiceModel.section": "التعرّف على الكلام",
+  "server.settings.voiceModel.description":
+    "يستخدم الوكلاء على هذا الخادم هذا النموذج لتفريغ صوت مقاطع الفيديو التي لا تحتوي على ترجمة نصية.",
+  "server.settings.voiceModel.loadFailed": "تعذّر تحميل نموذج التعرّف على الكلام الخاص بالخادم.",
+  "server.settings.voiceModel.group": "على هذا الخادم",
+  "server.settings.voiceModel.removeLabel": "إزالة {name} من هذا الخادم",
   "server.settings.turnLimit": "السلاسل في الوقت نفسه",
   "server.settings.turnLimitDescription":
     "عدد سلاسل الوكلاء التي يمكن تشغيلها في الوقت نفسه على هذا الخادم. السلاسل الأكثر تستخدم ذاكرة أكثر.",
@@ -711,6 +719,7 @@ export const messages = {
     "لا توجد كلمة مرور منفصلة لسطح المكتب البعيد. تحدد الإعدادات أدناه من يمكنه التحكم في هذا الحاسوب.",
   "server.desktop.componentInstalled": "مكوّن المضيف مثبّت",
   "server.desktop.componentNotInstalled": "مكوّن المضيف غير مثبّت",
+  "server.desktop.needsX11Session": "يتطلب جلسة X11",
   "server.desktop.sessions": "دون مراقبة: {unattended} · الجلسات النشطة: {active}/{max}",
   "server.desktop.unattendedEnabled": "مفعّل",
   "server.desktop.unattendedUnavailable": "غير متاح",
@@ -792,7 +801,7 @@ export const messages = {
   "server.update.waitingFor": "بانتظار {reasons}.",
   "server.update.disabledTitle": "التحديثات عن بُعد متوقفة",
   "server.update.disabledDescription":
-    "أوقف مستخدم {name} التحديثات من أعضاء الخادم. اطلب منه تحديث OpenBot أو تشغيل الإعداد.",
+    "أوقف مستخدم {name} التحديثات من أعضاء الخادم. اطلب منه تحديث OpenBot، أو فتح الإعدادات > التحديثات على ذلك الحاسوب وتشغيل «السماح بالتحديثات من أعضاء الخادم».",
   "server.update.managedTitle": "يتحكم Host Manager في التحديثات",
   "server.update.managedDescription": "يحدّث OpenBot Host Manager الخادم {name}. تواصل مع مسؤول المضيف.",
   "server.update.unsupportedTitle": "لا يستطيع {name} تحديث نفسه",

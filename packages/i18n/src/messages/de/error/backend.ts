@@ -56,6 +56,8 @@ export const messages = {
   "error.backend.browserSignInUnsupported":
     "Dieser entfernte Host kann keine Anmeldung von diesem Computer übernehmen.",
   "error.backend.browserSignInOpenFailed": "OpenBot konnte das Anmeldefenster nicht öffnen.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot konnte die Seite im Anmeldefenster nicht laden. Prüfe die Internetverbindung und öffne das Anmeldefenster dann erneut.",
   "error.backend.browserSignInReadFailed": "OpenBot konnte die Anmeldung im Fenster nicht lesen.",
   "error.backend.browserStopUnsupported": "Dieser entfernte Host kann das Laden einer Seite nicht stoppen.",
   "error.backend.sharedDataLocalOnly":
@@ -136,6 +138,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "Der Lauf wurde mit einem Fehler beendet, aber ohne Grund. Öffne den Lauf, um zu sehen, was der Agent getan hat.",
   "error.backend.turnNotStarted": "Der Anbieter hat diesen Durchlauf nicht gestartet.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} hat nicht rechtzeitig bestätigt, dass diese Nachricht gestartet wurde. OpenBot sendet sie nicht erneut, damit die Arbeit nicht doppelt läuft. OpenBot wartet bis zu 5 Minuten, bis der Agent startet.",
+  "error.backend.turnStartAbandoned":
+    "Der Agent hat diese Nachricht in 5 Minuten nicht gestartet. Sende die Nachricht erneut.",
   "error.backend.routineResultConnectionOff":
     "Diese Messaging-Verbindung ist aus oder entfernt. Wähle einen anderen Ort.",
   "error.backend.routineResultNoDelivery": "Diese Ausführung hat keine Antwort, die erneut gesendet werden kann.",
@@ -267,8 +273,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",
   "error.backend.mcpServerInvalid": "OpenBot kann diese MCP-Server-Konfiguration nicht speichern.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Header-Namen dürfen keine Leerzeichen oder Zeichen wie : ( ) / enthalten. Verwende einen Namen wie Authorization und trage den Schlüssel oder das Token unter Wert ein.",
   "error.backend.mcpServerNoAnswer": "Der Server hat innerhalb von {seconds} Sekunden nicht geantwortet.",
   "error.backend.mcpSignInNotAccepted": "Der Server hat diese Anmeldung nicht akzeptiert.",
+  "error.backend.mcpSignInGrantRefused":
+    "Der Server hat die Anmeldung nicht akzeptiert. Melde dich erneut an. Wenn das Problem bleibt, prüfe, ob dein Konto auf derselben Site oder in derselben Region wie diese App ist.",
   "error.backend.mcpSignInAccountRefused":
     "Der Server hat das Konto abgelehnt, mit dem du dich angemeldet hast. Prüfe, ob dieses Konto den Dienst nutzen darf. Für ein anderes Konto melde dich ab und dann wieder an.",
   "error.backend.mcpSignInClientRefused":
@@ -315,6 +325,8 @@ export const messages = {
     "Sein Tool {tool} hat ein Eingabeformat, das dieser Anbieter nicht lesen kann. Agenten mit anderen Anbietern erhalten den Server weiterhin.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne {name} unter Marketplace, Apps und wähle Anmelden.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server einen Schlüssel verlangt. Öffne {name} unter Marketplace, Apps, wähle Bearbeiten und gib unter Header den richtigen Schlüssel ein.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} konnte den MCP-Server {name} nicht starten. Öffne {name} unter Marketplace, Apps und wähle Verbindung testen, um die Ursache zu sehen.",
   "error.backend.mcpServerFailedInProvider":

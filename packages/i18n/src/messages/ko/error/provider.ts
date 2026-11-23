@@ -141,6 +141,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "제공자 키에 공백이나 키에 쓸 수 없는 문자가 있어요.",
   "error.provider.noModel": "선택한 제공자에 사용할 수 있는 모델이 없어요.",
   "error.provider.noModelNamed": "{provider}에 사용할 수 있는 모델이 없어요.",
+  "error.provider.acpModelsNotLoaded": "{provider}에서 모델을 불러오지 못했어요. 메시지를 다시 보내 주세요.",
   "error.provider.acpNoModels": "ACP CLI가 ACP 모델을 알리지 않았어요. OpenBot은 대체 모델을 추측하지 않아요.",
   "error.provider.endpointRemoveBusy":
     "이 엔드포인트를 제거하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
@@ -182,6 +183,8 @@ export const messages = {
     "이 메시지가 시작되기 전에 {provider}이(가) 멈췄어요. 메시지를 다시 보내 주세요.",
   "error.provider.sessionStartTimedOut":
     "{provider}이(가) 제시간에 새 채팅을 열지 못해서 이 메시지가 시작되지 않았어요. OpenBot을 실행하는 컴퓨터에서 제공자를 열고 {provider}을(를) 선택한 다음 다시 시작을 클릭하세요. 그런 다음 다시 시도해 주세요.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider}이(가) 제시간에 이 채팅을 열지 못해서 이 메시지가 시작되지 않았어요. OpenBot을 실행하는 컴퓨터에서 제공자를 열고 {provider}을(를) 선택한 다음 다시 시작을 클릭하세요. 그런 다음 다시 시도해 주세요.",
   "error.provider.serviceUnreachable":
     "{provider}이(가) 서비스에 연결할 수 없어요. 인터넷 연결을 확인해 주세요. OpenBot이 다시 시도할게요.",
   "error.provider.serviceUnreachableRefresh":
@@ -275,6 +278,8 @@ export const messages = {
     "OpenCode가 이 강도에서 이 모델의 추론을 읽지 못했습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.opencodeModelNotServed":
     "모델 제공자가 지금 이 모델을 계정에 제공하지 않아요. 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.opencodeSafetyBlocked":
+    "모델 제공자가 안전 규칙 때문에 이 메시지를 차단했습니다. 다른 표현으로 요청을 다시 보내세요. 다음 메시지도 차단되면 새 채팅을 시작하거나 다른 모델을 선택하세요.",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":
@@ -285,6 +290,8 @@ export const messages = {
     "OpenBot의 실시간 CPU 제한이 0이어서 Linux가 공급자를 중지했습니다. 이 제한은 시스템에서 옵니다. rtkit을 설치하고 시작한 다음(`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal`을 실행하고 OpenBot을 다시 시작하세요. rtkit이 없으면 xdg-desktop-portal만 다시 시작해서는 해결되지 않습니다.",
   "error.provider.cpuUnsupported":
     "이 컴퓨터의 프로세서에서는 이 제공자를 실행할 수 없어요. 다른 제공자를 사용해 주세요.",
+  "error.provider.windowsBlocked":
+    "스마트 앱 컨트롤 같은 Windows 보안 설정 때문에 이 공급자를 시작할 수 없습니다. 다른 공급자를 사용하세요.",
   "error.provider.opencodeDatabaseNewer":
     "더 새로운 OpenCode 버전이 데이터베이스를 변경해서 OpenCode가 데이터베이스를 열 수 없었어요. OpenCode를 버전 2 이상으로 업데이트한 후 다시 시도해 주세요.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -299,6 +306,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider}이(가) 답변 없이 멈췄어요. 메시지를 다시 보내 주세요.",
   "error.provider.channelNoAnswer":
     "{provider}이(가) 답변 없이 턴을 끝냈어요. 채널에서 '계속'을 눌러 작업을 다시 실행하거나, '다시 배정'을 눌러 다른 멤버에게 넘겨 주세요.",
+  "error.provider.acpProcessStopped": "{provider}이(가) 답변하기 전에 멈췄어요. 메시지를 다시 보내 주세요.",
   "error.provider.chatgptPageFailed": "OpenBot이 ChatGPT 연결 페이지를 열 수 없었어요.",
   "error.provider.noneReady": "준비된 에이전트 제공자가 없어요.",
   "error.provider.claudeTurnActive": "컨텍스트를 새로 고치기 전에 진행 중인 Claude 턴이 끝날 때까지 기다려 주세요.",
@@ -337,6 +345,8 @@ export const messages = {
     "{provider}이(가) 이전 턴을 끝내지 않아 이 메시지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 메시지를 다시 보내세요.",
   "error.provider.antigravityLocationUnsupported":
     "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini가 오류로 중지됐어요. 메시지를 다시 보내 주세요. 다시 중지되면 다른 모델이나 제공자를 선택해 주세요.",
   "error.provider.antigravityConnectionLost":
     "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 보내 주세요.",
   "error.provider.grokServiceFailure":
@@ -531,6 +541,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "현재 제공자 세션에서는 이 설정을 사용할 수 없어요.",
   "error.provider.sessionSettingInvalid": "이 설정에 사용할 수 없는 값이에요.",
   "error.provider.sessionSettingsBusy": "세션 설정을 변경하기 전에 현재 턴이 끝날 때까지 기다려 주세요.",
+  "error.provider.sessionSettingsTimedOut": "에이전트 세션이 제시간에 응답하지 않았어요. 다시 시도하세요.",
   "error.provider.piOutdated":
     "Pi {version}이(가) 너무 오래되었어요. 네이티브 RPC 및 MCP 지원을 위해 Pi 1.1.0 이상을 설치하세요.",
   "error.provider.nativeMissing": "{provider} CLI가 설치되어 있지 않아요. 설정에서 다운로드하세요.",
@@ -583,6 +594,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse 턴에 실패했어요.",
   "error.provider.museModelUnavailable":
     "Muse에서 이 모델을 사용할 수 없어요. 이 에이전트가 실행되는 국가에서 Muse를 사용할 수 없거나, 이 계정에 모델 접근 권한이 없을 수 있어요. 다른 모델을 선택한 다음 다시 시도하세요.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse가 이 요청을 완료하지 못했어요. Muse는 로그인이 아닌 저장된 Meta API 키를 사용해요. 키를 교체하거나, 설정에서 키를 제거해 로그인을 사용하세요.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse는 외부 도구에 접근하지 않고는 프로필을 생성할 수 없어요. 다른 제공자로 프로필을 생성한 후 에이전트에 Muse를 선택하세요.",
   "error.provider.museAuthUnverified":

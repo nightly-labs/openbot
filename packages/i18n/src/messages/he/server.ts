@@ -19,6 +19,8 @@ export const messages = {
   "server.connection.planHint": "יש לפתוח את הגדרות החשבון כדי לבדוק את תוכנית השרת.",
   "server.connection.loadingHint": "אפשר לבחור שרת אחר בזמן שהשרת הזה נטען.",
   "server.connection.cachedHint": "תוכן שנטען וטיוטות נשמרים. פעולות השרת יתחדשו אחרי החיבור מחדש.",
+  "server.connection.computerOffline":
+    "{name} לא מחובר. יש לוודא שהמחשב שלו פועל, ש-OpenBot פתוח, ושפרסום השרת הזה מופעל בהגדרות השרת > חברים.",
   "server.connection.conversationFailed": "לא ניתן לטעון את השיחה. אפשר לנסות שוב.",
   "server.connection.panelsFailed": "חלק מהחלוניות של סביבת העבודה לא נטענו. אפשר לנסות שוב.",
   "server.connection.retry": "ניסיון חוזר",
@@ -438,6 +440,12 @@ export const messages = {
     "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה אינה מציינת את אזור הזמן של השולח. בשרת, גם הדפדפן משתמש בו אחרי ההפעלה מחדש הבאה.",
   "server.settings.timezoneAutomatic": "אוטומטי ({zone})",
   "server.settings.timezoneLoadFailed": "לא ניתן לטעון את אזור הזמן של השרת.",
+  "server.settings.voiceModel.section": "זיהוי דיבור",
+  "server.settings.voiceModel.description":
+    "הסוכנים בשרת הזה משתמשים במודל הזה כדי לתמלל את הקול של סרטונים שאין להם כתוביות.",
+  "server.settings.voiceModel.loadFailed": "לא ניתן לטעון את מודל זיהוי הדיבור של השרת.",
+  "server.settings.voiceModel.group": "בשרת הזה",
+  "server.settings.voiceModel.removeLabel": "הסרת {name} מהשרת הזה",
   "server.settings.turnLimit": "שרשורים בו־זמנית",
   "server.settings.turnLimitDescription":
     "כמה שרשורים של סוכנים יכולים לרוץ בו־זמנית בשרת הזה. יותר שרשורים משתמשים ביותר זיכרון.",
@@ -645,6 +653,7 @@ export const messages = {
     "אין סיסמה נפרדת לשולחן עבודה מרוחק. ההגדרות שלהלן קובעות מי יכול לשלוט במחשב הזה.",
   "server.desktop.componentInstalled": "רכיב המארח מותקן",
   "server.desktop.componentNotInstalled": "רכיב המארח אינו מותקן",
+  "server.desktop.needsX11Session": "נדרש סשן X11",
   "server.desktop.sessions": "ללא השגחה: {unattended} · סשנים פעילים: {active}/{max}",
   "server.desktop.unattendedEnabled": "מופעל",
   "server.desktop.unattendedUnavailable": "אינו זמין",
@@ -728,7 +737,7 @@ export const messages = {
   "server.update.waitingFor": "ממתין: {reasons}.",
   "server.update.disabledTitle": "עדכונים מרחוק כבויים",
   "server.update.disabledDescription":
-    "המשתמש של {name} כיבה עדכונים מחברי השרת. יש לבקש ממנו לעדכן את OpenBot או להפעיל את ההגדרה.",
+    "המשתמש של {name} כיבה עדכונים מחברי השרת. יש לבקש ממנו לעדכן את OpenBot, או לפתוח במחשב שלו הגדרות > עדכונים ולהפעיל את ״אישור עדכונים מחברי שרת״.",
   "server.update.managedTitle": "Host Manager שולט בעדכונים",
   "server.update.managedDescription": "OpenBot Host Manager מעדכן את {name}. יש ליצור קשר עם מנהל המארח.",
   "server.update.unsupportedTitle": "{name} אינו יכול לעדכן את עצמו",

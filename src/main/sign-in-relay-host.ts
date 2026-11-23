@@ -34,6 +34,7 @@ export interface RelaySignIn {
 }
 
 interface RelayTarget extends RelaySignIn {
+  keepsEarlier?: true;
   deliver: (query: URLSearchParams, pageUrl: string) => Effect.Effect<boolean>;
   refuse?: (query: URLSearchParams, pageUrl: string) => Effect.Effect<unknown>;
 }
@@ -54,11 +55,12 @@ interface Flow {
 }
 
 export interface SignInRelayHostDependencies {
-  mcp: Pick<McpHostSignIns, "startRelay" | "relayStatus" | "cancel">;
+  mcp: Pick<McpHostSignIns, "startRelay">;
   providers: Pick<ProviderHostSignIns, "startRelay" | "relayStatus" | "cancel">;
   accounts: Pick<ProviderAccountsHost, "startRelay" | "relayStatus" | "cancelSignIn">;
   receiveMcpGrant: (state: string, code: string) => boolean;
   receiveMcpRefusal: (state: string) => boolean;
+  cancelMcpSignInPage: (state: string) => boolean;
   printedLink: (agentId: string, url: string) => boolean;
   atHost?: (sessionId: string) => boolean;
   now?: () => number;
@@ -88,12 +90,13 @@ export class SignInRelayHost {
     input: TestMcpServerInput,
     deepLinkRedirectUrl?: string,
   ) {
-    const { mcp, receiveMcpGrant, receiveMcpRefusal } = this.#dependencies;
-    yield* mcp.startRelay(input, deepLinkRedirectUrl);
+    const { mcp, receiveMcpGrant, receiveMcpRefusal, cancelMcpSignInPage } = this.#dependencies;
+    const signIn = yield* mcp.startRelay(input, deepLinkRedirectUrl);
     const url = input.config.url;
     return this.#open(memberId, {
       key: `mcp\n${url}`,
-      status: () => mcp.relayStatus(url),
+      keepsEarlier: true,
+      status: signIn.status,
       deliver: (query) =>
         Effect.sync(() => {
           const state = query.get("state");
@@ -107,7 +110,14 @@ export class SignInRelayHost {
           const state = query.get("state");
           return state ? receiveMcpRefusal(state) : false;
         }),
-      cancel: () => Effect.sync(() => mcp.cancel(url)),
+      cancel: () =>
+        Effect.suspend(() => {
+          const page = signIn.status().pageUrl;
+          const state = page ? new URL(page).searchParams.get("state") : null;
+          if (state === null) return signIn.cancel;
+          cancelMcpSignInPage(state);
+          return Effect.void;
+        }),
     });
   });
 
@@ -235,7 +245,8 @@ export class SignInRelayHost {
 
   #open(memberId: string, target: RelayTarget): { flowId: string; expiresAt: number } {
     this.#expire();
-    for (const [id, flow] of this.#flows) if (flow.target.key === target.key) this.#flows.delete(id);
+    if (!target.keepsEarlier)
+      for (const [id, flow] of this.#flows) if (flow.target.key === target.key) this.#flows.delete(id);
     for (const [id, flow] of this.#flows) {
       if (this.#flows.size < FLOW_LIMIT) break;
       this.#flows.delete(id);

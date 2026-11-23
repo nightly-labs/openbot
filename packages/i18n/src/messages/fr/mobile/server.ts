@@ -339,6 +339,7 @@ export const messages = {
   "mobile.server.route.timezone": "Fuseau horaire",
   "mobile.server.route.personality": "Personnalité de l’agent",
   "mobile.server.route.agents": "Agents",
+  "mobile.server.route.voiceModel": "Reconnaissance vocale",
   "mobile.server.settings.storage": "Stockage",
   "mobile.server.route.storage": "Stockage",
   "mobile.server.route.storageFiles": "Tous les fichiers",
@@ -469,6 +470,19 @@ export const messages = {
     "Connectez-vous à ce serveur en tant que propriétaire ou admin pour changer son fuseau horaire.",
   "mobile.server.settings.timezoneUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer son fuseau horaire ici.",
+  "mobile.server.settings.voiceModelDescription":
+    "Les agents de ce serveur utilisent ce modèle pour transcrire le son des vidéos sans sous-titres.",
+  "mobile.server.settings.voiceModelLoading": "Chargement de la reconnaissance vocale…",
+  "mobile.server.settings.voiceModelLoadFailed": "Impossible de charger le modèle de reconnaissance vocale du serveur.",
+  "mobile.server.settings.voiceModelSaveFailed": "Impossible de changer le modèle de reconnaissance vocale. Réessayez.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour changer ici sa reconnaissance vocale.",
+  "mobile.server.settings.voiceModelReady": "Prêt",
+  "mobile.server.settings.voiceModelDownloading": "Téléchargement : {percent}",
+  "mobile.server.settings.voiceModelSize": "Téléchargement de {size}",
+  "mobile.server.settings.voiceModelDownload": "Télécharger",
+  "mobile.server.settings.voiceModelCancel": "Arrêter",
+  "mobile.server.settings.voiceModelRemove": "Supprimer",
   "mobile.server.settings.keySection": "Clé du serveur",
   "mobile.server.settings.keyChanged": "Dernier changement",
   "mobile.server.settings.keyChange": "Changer la clé",
@@ -911,7 +925,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Votre discussion « Message à vous-même » et les personnes que vous autorisez joignent OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "Les personnes que vous autorisez joignent OpenBot. Les autres reçoivent un code à vous transmettre.",
+    "Votre discussion « Message à vous-même » et les personnes que vous autorisez joignent OpenBot. Les autres reçoivent un code à vous transmettre.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp a retiré ce serveur des appareils connectés. Associez à nouveau le numéro.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1152,10 +1166,15 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Impossible de modifier les modèles. Réessayez.",
   "mobile.server.providers.promptCache": "Cache des prompts",
   "mobile.server.providers.promptCacheHint":
-    "Durée pendant laquelle Claude garde le contexte d'un agent en cache entre les tours. Le changement s'applique au prochain démarrage de Claude.",
-  "mobile.server.providers.promptCacheDefault": "Par défaut de Claude Code",
+    "Durée pendant laquelle Claude et Pi gardent le contexte d’un agent en cache entre les tours. Le changement s’applique au prochain démarrage du fournisseur.",
+  "mobile.server.providers.promptCacheDefault": "Valeur par défaut du fournisseur",
   "mobile.server.providers.promptCacheHour": "1 heure",
   "mobile.server.providers.promptCacheLoadFailed": "Impossible de charger la durée du cache des prompts de ce serveur.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compacter avant l’expiration du cache",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Quand une discussion avec 200K jetons de contexte ou plus est inactive avec un cache d’1 heure, l’agent compacte le contexte avant l’expiration du cache. Le message suivant ne relit alors pas tout le contexte sans cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Impossible de charger le réglage de compactage de ce serveur.",
   "mobile.server.providers.compactWindow": "Compacter les chats à",
   "mobile.server.providers.compactWindowHint":
     "Claude Code résume les anciens tours d’un chat quand le chat atteint cette taille. Plus bas garde des tours rapides et économiques. Plus haut garde plus de détails. Un modèle avec une fenêtre plus petite compacte à sa propre limite.",
@@ -1212,6 +1231,8 @@ export const messages = {
     "ChatGPT utilise cette clé, pas votre forfait ChatGPT. OpenAI facture chaque requête sur la clé. L’usage du forfait n’est pas affiché.",
   "mobile.server.providers.codexKeyAlternative":
     "Ou connectez-vous avec une clé API OpenAI. OpenAI facture chaque requête sur la clé.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse utilise cette clé, pas votre connexion. Pour utiliser votre connexion, supprimez la clé.",
   "mobile.server.providers.sectionUse": "Utilisation",
   "mobile.server.providers.unused": "Aucun agent ne l’utilise",
   "mobile.server.providers.usedByCount": { one: "1 agent l’utilise", other: "{count} agents l’utilisent" },
@@ -1384,7 +1405,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "En attente : {reasons}.",
   "mobile.server.update.disabledTitle": "Les mises à jour à distance sont désactivées",
   "mobile.server.update.disabledDescription":
-    "L’utilisateur de {name} a désactivé les mises à jour par les membres du serveur. Demandez-lui de mettre à jour OpenBot ou d’activer ce réglage.",
+    "L’utilisateur de {name} a désactivé les mises à jour par les membres du serveur. Demandez-lui de mettre à jour OpenBot, ou d’ouvrir Réglages > Mises à jour sur son ordinateur et d’activer « Autoriser les mises à jour par les membres du serveur ».",
   "mobile.server.update.managedTitle": "Un Host Manager contrôle les mises à jour",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager met à jour {name}. Contactez l’administrateur de l’hôte.",

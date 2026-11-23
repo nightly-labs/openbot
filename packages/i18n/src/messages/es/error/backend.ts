@@ -57,6 +57,8 @@ export const messages = {
     "Este host remoto no admite tomar el control de una pestaña del navegador.",
   "error.backend.browserSignInUnsupported": "Este host remoto no puede recibir un inicio de sesión de este equipo.",
   "error.backend.browserSignInOpenFailed": "OpenBot no pudo abrir la ventana de inicio de sesión.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot no pudo cargar la página en la ventana de inicio de sesión. Comprueba la conexión a internet y vuelve a abrir la ventana de inicio de sesión.",
   "error.backend.browserSignInReadFailed": "OpenBot no pudo leer el inicio de sesión de la ventana.",
   "error.backend.browserStopUnsupported": "Este host remoto no puede detener la carga de una página.",
   "error.backend.sharedDataLocalOnly": "Los datos compartidos se gestionan en el equipo que ejecuta estos agentes.",
@@ -134,6 +136,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "La ejecución se detuvo con un error, pero no llegó ningún motivo. Abre la ejecución para ver qué hizo el agente.",
   "error.backend.turnNotStarted": "El proveedor no inició este turno.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} no confirmó a tiempo que inició este mensaje. OpenBot no lo envía de nuevo, para que el trabajo no se ejecute dos veces. OpenBot espera hasta 5 minutos a que el agente empiece.",
+  "error.backend.turnStartAbandoned": "El agente no inició este mensaje en 5 minutos. Envía el mensaje de nuevo.",
   "error.backend.routineResultConnectionOff":
     "Esta conexión de mensajería está desactivada o eliminada. Elige otro lugar.",
   "error.backend.routineResultNoDelivery": "Esta ejecución no tiene una respuesta para enviar de nuevo.",
@@ -256,8 +261,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot mantiene hasta {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Ya existe un servidor MCP llamado {name}.",
   "error.backend.mcpServerInvalid": "OpenBot no puede guardar esta configuración del servidor MCP.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Los nombres de encabezado no pueden tener espacios ni símbolos como : ( ) /. Usa un nombre como Authorization y pon la clave o el token en Valor.",
   "error.backend.mcpServerNoAnswer": "El servidor no respondió en {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "El servidor no aceptó ese inicio de sesión.",
+  "error.backend.mcpSignInGrantRefused":
+    "El servidor no aceptó el inicio de sesión. Inicia sesión de nuevo. Si el problema continúa, comprueba que tu cuenta esté en el mismo sitio o región que esta app.",
   "error.backend.mcpSignInAccountRefused":
     "El servidor rechazó la cuenta con la que iniciaste sesión. Comprueba que esa cuenta puede usar el servicio. Para usar otra cuenta, cierra sesión y vuelve a iniciar sesión.",
   "error.backend.mcpSignInClientRefused":
@@ -303,6 +312,8 @@ export const messages = {
     "Su herramienta {tool} tiene un formato de entrada que este proveedor no puede leer. Los agentes con otros proveedores siguen recibiendo el servidor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} no pudo usar el servidor MCP {name} porque el servidor pide iniciar sesión. Abre {name} en Marketplace, Apps, y elige Iniciar sesión.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} no pudo usar el servidor MCP {name} porque el servidor pide una clave. Abre {name} en Marketplace, Apps, elige Editar y escribe la clave correcta en Cabeceras.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} no pudo iniciar el servidor MCP {name}. Abre {name} en Marketplace, Apps, y elige Probar conexión para ver la causa.",
   "error.backend.mcpServerFailedInProvider":

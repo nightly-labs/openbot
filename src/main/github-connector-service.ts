@@ -27,6 +27,7 @@ import {
   GitHubDeviceFlowError,
   type GitHubFetch,
   type GitHubTokenSet,
+  githubUnreachable,
   pollGitHubDeviceToken,
   refreshGitHubToken,
   requestGitHubDeviceCode,
@@ -386,16 +387,21 @@ export class GitHubConnectorService {
     if (!this.#agentConnected()) return {};
     const tokenFile = shellQuote(this.#credentialFile().replaceAll("\\", "/"));
     const repositoriesFile = shellQuote(this.#repositoriesFile().replaceAll("\\", "/"));
-    const first = gitConfigCount(inherited.GIT_CONFIG_COUNT);
+    const inheritedGitConfig = inherited.GIT_CONFIG_PARAMETERS;
     const ownGhConfig =
       inherited.GH_CONFIG_DIR === undefined
         ? "unset GH_CONFIG_DIR"
         : `GH_CONFIG_DIR=${shellQuote(inherited.GH_CONFIG_DIR)}; export GH_CONFIG_DIR`;
+    const ownGitConfig = [
+      `m=$(printf '\\047%s\\047' ${GIT_USE_HTTP_PATH_KEY}=true)`,
+      `case $GIT_CONFIG_PARAMETERS in (*"$m"*) a=\${GIT_CONFIG_PARAMETERS##*"$m"};; (*) a=;; esac`,
+      `a=${shellQuote(inheritedGitConfig ?? "")}$a; GIT_CONFIG_PARAMETERS=\${a# }; export GIT_CONFIG_PARAMETERS`,
+    ].join("; ");
     const helper = [
       '!f() { test "$1" = get || exit 0; p=; s=; h=; u=',
       "while IFS='=' read -r k v; do case $k in (path) p=$v;; (protocol) s=$v;; (host) h=$v;; (username) u=$v;; esac; done",
       `t=; test -n "$p" && t=$(awk -F '\\t' -v r="$p" 'BEGIN { sub(/\\/+$/, "", r); sub(/\\.git$/, "", r) } tolower($1) == tolower(r) { print $2; exit }' ${repositoriesFile} 2>/dev/null)`,
-      `test -n "$t" || { o=$({ printf 'protocol=%s\\nhost=%s\\n' "$s" "$h"; test -z "$p" || printf 'path=%s\\n' "$p"; test -z "$u" || printf 'username=%s\\n' "$u"; echo; } | (${ownGhConfig}; GIT_CONFIG_COUNT=${first} GIT_ASKPASS= SSH_ASKPASS= GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never exec git credential fill) 2>/dev/null) || o=`,
+      `test -n "$t" || { o=$({ printf 'protocol=%s\\nhost=%s\\n' "$s" "$h"; test -z "$p" || printf 'path=%s\\n' "$p"; test -z "$u" || printf 'username=%s\\n' "$u"; echo; } | (${ownGhConfig}; ${ownGitConfig}; GIT_ASKPASS= SSH_ASKPASS= GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never exec git credential fill) 2>/dev/null) || o=`,
       "c=$(printf '%s\\n' \"$o\" | while IFS= read -r l; do case $l in (username=?*|password=?*) printf '%s\\n' \"$l\";; esac; done)",
       "case $c in (*password=*) printf '%s\\n' \"$c\"; exit 0;; esac; }",
       "echo username=x-access-token; printf 'password='",
@@ -403,13 +409,12 @@ export class GitHubConnectorService {
     ].join("; ");
     return {
       GH_CONFIG_DIR: this.#ghConfigDirectory(),
-      GIT_CONFIG_COUNT: String(first + 3),
-      [`GIT_CONFIG_KEY_${first}`]: GIT_CREDENTIAL_KEY,
-      [`GIT_CONFIG_VALUE_${first}`]: "",
-      [`GIT_CONFIG_KEY_${first + 1}`]: GIT_CREDENTIAL_KEY,
-      [`GIT_CONFIG_VALUE_${first + 1}`]: helper,
-      [`GIT_CONFIG_KEY_${first + 2}`]: GIT_USE_HTTP_PATH_KEY,
-      [`GIT_CONFIG_VALUE_${first + 2}`]: "true",
+      GIT_CONFIG_PARAMETERS: [
+        ...(inheritedGitConfig ? [inheritedGitConfig] : []),
+        gitConfigParameter(GIT_CREDENTIAL_KEY, ""),
+        gitConfigParameter(GIT_CREDENTIAL_KEY, helper),
+        gitConfigParameter(GIT_USE_HTTP_PATH_KEY, "true"),
+      ].join(" "),
     };
   }
 
@@ -607,14 +612,7 @@ export class GitHubConnectorService {
     if (Result.isFailure(attempt2)) {
       const cause = attempt2.failure.cause;
       if (signal?.aborted) return yield* new GitHubOperationError({ cause: signal.reason });
-      return yield* new GitHubOperationError({
-        cause: new GitHubDeviceFlowError(
-          "unreachable",
-          sourceText("error.connector.githubUnreachable", {
-            detail: cause instanceof Error ? cause.message : String(cause),
-          }),
-        ),
-      });
+      return yield* new GitHubOperationError({ cause: githubUnreachable(cause) });
     }
     const response = attempt2.success;
     const answer = schema.safeParse(yield* githubCall(() => response.json().catch(() => null)));
@@ -935,8 +933,8 @@ function registerTokenSecrets(tokens: Pick<GitHubTokenSet, "accessToken" | "refr
   if (tokens.refreshToken) registerSecretValue(tokens.refreshToken);
 }
 
-function gitConfigCount(value: string | undefined): number {
-  return value && /^\d+$/u.test(value) ? Number(value) : 0;
+function gitConfigParameter(key: string, value: string): string {
+  return shellQuote(`${key}=${value}`);
 }
 
 function shellQuote(value: string): string {

@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Możesz wybrać inny serwer, gdy ten się wczytuje.",
   "server.connection.cachedHint":
     "Wczytana zawartość i wersje robocze są zachowane. Działania serwera wznowią się po ponownym połączeniu.",
+  "server.connection.computerOffline":
+    "{name} jest offline. Sprawdź, czy jego komputer jest włączony, OpenBot jest otwarty, a opcja Opublikuj ten serwer jest włączona w Ustawienia serwera > Członkowie.",
   "server.connection.conversationFailed": "Nie udało się wczytać rozmowy. Spróbuj ponownie.",
   "server.connection.panelsFailed": "Nie udało się wczytać niektórych paneli obszaru roboczego. Spróbuj ponownie.",
   "server.connection.retry": "Ponów",
@@ -400,6 +402,12 @@ export const messages = {
     "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy. Na serwerze przeglądarka też używa jej po następnym ponownym uruchomieniu.",
   "server.settings.timezoneAutomatic": "Automatycznie ({zone})",
   "server.settings.timezoneLoadFailed": "Nie udało się wczytać strefy czasowej serwera.",
+  "server.settings.voiceModel.section": "Rozpoznawanie mowy",
+  "server.settings.voiceModel.description":
+    "Agenci na tym serwerze używają tego modelu, aby transkrybować dźwięk filmów bez napisów.",
+  "server.settings.voiceModel.loadFailed": "Nie udało się wczytać modelu rozpoznawania mowy serwera.",
+  "server.settings.voiceModel.group": "Na tym serwerze",
+  "server.settings.voiceModel.removeLabel": "Usuń {name} z tego serwera",
   "server.settings.turnLimit": "Wątki jednocześnie",
   "server.settings.turnLimitDescription":
     "Ile wątków agentów może działać jednocześnie na tym serwerze. Więcej wątków zużywa więcej pamięci.",
@@ -609,6 +617,7 @@ export const messages = {
     "Nie ma osobnego hasła do pulpitu zdalnego. Ustawienia poniżej określają, kto może sterować tym komputerem.",
   "server.desktop.componentInstalled": "Komponent hosta zainstalowany",
   "server.desktop.componentNotInstalled": "Komponent hosta niezainstalowany",
+  "server.desktop.needsX11Session": "Wymaga sesji X11",
   "server.desktop.sessions": "Tryb bez nadzoru: {unattended} · Aktywne sesje: {active}/{max}",
   "server.desktop.unattendedEnabled": "włączony",
   "server.desktop.unattendedUnavailable": "niedostępny",
@@ -691,7 +700,7 @@ export const messages = {
   "server.update.waitingFor": "Oczekiwanie na: {reasons}.",
   "server.update.disabledTitle": "Zdalne aktualizacje są wyłączone",
   "server.update.disabledDescription":
-    "Użytkownik serwera {name} wyłączył aktualizacje od członków serwera. Poproś go o zaktualizowanie OpenBot lub włączenie tego ustawienia.",
+    "Użytkownik serwera {name} wyłączył aktualizacje od członków serwera. Poproś go o zaktualizowanie OpenBot lub o otwarcie sekcji Ustawienia > Aktualizacje na jego komputerze i włączenie „Zezwalaj członkom serwera na aktualizacje”.",
   "server.update.managedTitle": "Aktualizacjami zarządza Host Manager",
   "server.update.managedDescription":
     "OpenBot Host Manager aktualizuje serwer {name}. Skontaktuj się z administratorem hosta.",

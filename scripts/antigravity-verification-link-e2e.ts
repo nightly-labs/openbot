@@ -19,6 +19,23 @@ const ACCESS_TOKEN = "fake-verification-access-token";
 const GOOGLE_LINK =
   "https://accounts.google.com/signin/continue?sarp=1&scc=1&continue=https://developers.google.com/gemini-code-assist/auth/auth_success_gemini&plt=from-google";
 const ANSWER_LINK = "https://accounts.google.com/signin/continue?sarp=1&scc=1&plt=from-answer";
+const LOG_LINK = "https://accounts.google.com/v3/signin/continue?sarp=1&scc=1&plt=from-log";
+const VALIDATION_LOG = `E 403 retrieveUserQuotaSummary ${JSON.stringify(
+  JSON.stringify({
+    error: {
+      code: 403,
+      status: "PERMISSION_DENIED",
+      details: [
+        {
+          "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+          reason: "VALIDATION_REQUIRED",
+          domain: "cloudcode-pa.googleapis.com",
+          metadata: { validation_url: LOG_LINK },
+        },
+      ],
+    },
+  }),
+).replaceAll("&", "\\\\u0026")}\n`;
 const VERIFY_MESSAGE = "Google must verify your account before Gemini can answer.";
 
 process.env.HOME = home;
@@ -287,6 +304,12 @@ try {
   const rpc = await runCase("JSON-RPC error", "RPC-VERIFY", true);
   assert.equal(rpc.error?.link, GOOGLE_LINK, "A refused prompt also gets the Verify account button.");
   rpc.passed = true;
+
+  await mkdir(join(appData, "log"), { recursive: true });
+  await writeFile(join(appData, "log", "antigravity.log"), VALIDATION_LOG);
+  const logged = await runCase("link in the Antigravity log", "WARN-VERIFY", false);
+  assert.equal(logged.error?.link, LOG_LINK, "A /v3/signin link from the Antigravity log opens the verification page.");
+  logged.passed = true;
 
   const normal = await runNormalAnswer("normal answer about verification");
   normal.passed = true;

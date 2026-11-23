@@ -31,6 +31,8 @@ export const messages = {
     "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Spróbuj ponownie: następne połączenie użyje niższej jakości.",
   "error.remote.streamTooSlow":
     "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Użyj szybszej sieci, a następnie spróbuj ponownie.",
+  "error.remote.noPictureSwitchEncoder":
+    "Host nie wysłał obrazu. Spróbuj ponownie: następne połączenie użyje ustawienia wideo, które działa na większej liczbie komputerów.",
   "error.remote.teamSessionExpired": "Sesja zespołu wygasła.",
   "error.remote.finishTestBeforeSwitch": "Zakończ test zdalnego pulpitu, zanim przełączysz ekran.",
   "error.remote.displayNotFound": "Nie znaleziono zdalnego ekranu.",
@@ -93,7 +95,9 @@ export const messages = {
     "OpenBot nie może zweryfikować tego serwera, ponieważ brakuje jego klucza bezpieczeństwa lub klucz się zmienił. Poproś właściciela serwera o sprawdzenie serwera.",
   "error.remote.connectionNotStarted":
     "OpenBot nie mógł nawiązać połączenia z tym serwerem. Jeśli problem się powtarza, zamknij OpenBot i otwórz go ponownie.",
-  "error.remote.hostDidNotConnect": "Host WebRTC nie połączył się.",
+  "error.remote.connectionServiceUnreachable":
+    "Ten komputer nie może połączyć się z usługą połączeń OpenBot. Sprawdź jego połączenie z internetem. OpenBot połączy się ponownie automatycznie.",
+  "error.remote.serverAnswerTimeout": "Serwer nie odpowiedział na czas. OpenBot połączy się ponownie automatycznie.",
   "error.remote.connectionCancelled": "Zdalne połączenie zostało anulowane.",
   "error.remote.hostDisconnected":
     "Połączenie z serwerem zostało przerwane. Sprawdź, czy działanie się zakończyło, i spróbuj ponownie.",

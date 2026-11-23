@@ -162,6 +162,7 @@ export function emptyInstanceTransferService(
     ownerNotificationLevel: preference<"all" | "needs-me" | "nothing" | null>("ownerNotificationLevel", "needs-me"),
     browsingMemory: preference("browsingMemory", { enabled: true }),
     claudeUserSetup: preference("claudeUserSetup", false),
+    cacheExpiryCompaction: preference("cacheExpiryCompaction", true),
     claudeCompactWindow: preference<number | null>("claudeCompactWindow", null),
     machineAlerts: preference("machineAlerts", DEFAULT_MACHINE_ALERT_SETTINGS),
     modelVisibility: preference<{ provider: string; hidden: string[] }[]>("modelVisibility", []),

@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "このサーバーの読み込み中に、別のサーバーを選択できます。",
   "server.connection.cachedHint":
     "読み込み済みのコンテンツと下書きは保持されます。再接続後にサーバーの操作が再開されます。",
+  "server.connection.computerOffline":
+    "{name} はオフラインです。そのコンピューターの電源が入っていて OpenBot が開いていること、また「サーバーの設定」>「メンバー」で「このサーバーを公開」がオンになっていることを確認してください。",
   "server.connection.conversationFailed": "会話を読み込めませんでした。もう一度お試しください。",
   "server.connection.panelsFailed": "一部のワークスペースパネルを読み込めませんでした。もう一度お試しください。",
   "server.connection.retry": "再試行",
@@ -383,6 +385,12 @@ export const messages = {
     "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "server.settings.timezoneAutomatic": "自動 ({zone})",
   "server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
+  "server.settings.voiceModel.section": "音声認識",
+  "server.settings.voiceModel.description":
+    "このサーバーのエージェントは、字幕のない動画の音声をこのモデルで文字起こしします。",
+  "server.settings.voiceModel.loadFailed": "サーバーの音声認識モデルを読み込めませんでした。",
+  "server.settings.voiceModel.group": "このサーバー",
+  "server.settings.voiceModel.removeLabel": "このサーバーから {name} を削除",
   "server.settings.turnLimit": "同時に実行するスレッド",
   "server.settings.turnLimitDescription":
     "このサーバーで同時に実行できるエージェントのスレッド数です。スレッドが多いほどメモリーを多く使います。",
@@ -532,6 +540,7 @@ export const messages = {
     "リモートデスクトップ用の別のパスワードはありません。このコンピューターを操作できるユーザーは下の設定で選びます。",
   "server.desktop.componentInstalled": "ホストコンポーネント導入済み",
   "server.desktop.componentNotInstalled": "ホストコンポーネント未導入",
+  "server.desktop.needsX11Session": "X11 セッションが必要",
   "server.desktop.sessions": "無人アクセス: {unattended} · アクティブなセッション: {active}/{max}",
   "server.desktop.unattendedEnabled": "有効",
   "server.desktop.unattendedUnavailable": "利用不可",
@@ -615,7 +624,7 @@ export const messages = {
   "server.update.waitingFor": "{reasons} を待っています。",
   "server.update.disabledTitle": "リモートアップデートはオフです",
   "server.update.disabledDescription":
-    "{name} のユーザーが、サーバーメンバーからのアップデートをオフにしました。OpenBot をアップデートするか、設定をオンにするよう依頼してください。",
+    "{name} のユーザーが、サーバーメンバーからのアップデートをオフにしました。OpenBot をアップデートするか、そのコンピューターで「設定」>「アップデート」を開いて「サーバーのメンバーからのアップデートを許可する」をオンにするよう依頼してください。",
   "server.update.managedTitle": "アップデートは Host Manager が管理しています",
   "server.update.managedDescription":
     "OpenBot Host Manager が {name} をアップデートします。ホストの管理者に連絡してください。",

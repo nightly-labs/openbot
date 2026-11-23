@@ -4,11 +4,13 @@ import {
   type ChannelMessage,
   type ChannelPage,
   type ChannelTask,
+  type ConversationMessageSender,
   channelBrowserAgent,
   channelRoutingConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
   mcpSignInEvent,
+  settingLinkEvent,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -135,6 +137,7 @@ function conversation(all: ChannelMessage[]): ChannelMessage[] {
       channelRoutingConversationEvent(message.message) === null &&
       !isChannelChangeMarker(message.message) &&
       mcpSignInEvent(message.message) === null &&
+      settingLinkEvent(message.message) === null &&
       !isMemberThinking(message) &&
       !(
         message.message.itemType === "commentary" &&
@@ -157,7 +160,8 @@ function historyMessage({
   taskId,
   superseded,
   message,
-}: ChannelMessage): ChannelMessage {
+}: ChannelMessage): ChannelMessage & { answeredBy?: ConversationMessageSender } {
+  const answeredBy = message.uiBlock?.state.respondedBy;
   return {
     id,
     channelId,
@@ -165,6 +169,7 @@ function historyMessage({
     author,
     taskId,
     superseded,
+    ...(answeredBy ? { answeredBy } : {}),
     message: {
       id: message.id,
       author: message.author,

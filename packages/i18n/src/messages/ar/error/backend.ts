@@ -52,6 +52,8 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "لا يدعم هذا المضيف البعيد التحكم في علامة تبويب المتصفح.",
   "error.backend.browserSignInUnsupported": "لا يمكن لهذا المضيف البعيد استقبال تسجيل دخول من هذا الحاسوب.",
   "error.backend.browserSignInOpenFailed": "تعذّر على OpenBot فتح نافذة تسجيل الدخول.",
+  "error.backend.browserSignInLoadFailed":
+    "تعذّر على OpenBot تحميل الصفحة في نافذة تسجيل الدخول. تحقّق من الاتصال بالإنترنت، ثم افتح نافذة تسجيل الدخول مرة أخرى.",
   "error.backend.browserSignInReadFailed": "تعذّر على OpenBot قراءة تسجيل الدخول من النافذة.",
   "error.backend.browserStopUnsupported": "لا يمكن لهذا المضيف البعيد إيقاف تحميل الصفحة.",
   "error.backend.sharedDataLocalOnly": "تتم إدارة البيانات المشتركة على الحاسوب الذي يشغّل هؤلاء الوكلاء.",
@@ -121,6 +123,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "توقف التشغيل بسبب خطأ، لكن لم يصل معه أي سبب. افتح التشغيل لترى ما فعله الوكيل.",
   "error.backend.turnNotStarted": "لم يبدأ المزوّد هذا الدور.",
+  "error.backend.turnStartUnconfirmed":
+    "لم يؤكد {provider} في الوقت المحدد أنه بدأ هذه الرسالة. لا يرسلها OpenBot مرة أخرى، حتى لا يتكرر العمل. ينتظر OpenBot حتى 5 دقائق ليبدأ الوكيل.",
+  "error.backend.turnStartAbandoned": "لم يبدأ الوكيل هذه الرسالة خلال 5 دقائق. أرسل الرسالة مرة أخرى.",
   "error.backend.routineResultConnectionOff": "اتصال المراسلة هذا متوقف أو تمت إزالته. اختر مكانًا آخر.",
   "error.backend.routineResultNoDelivery": "لا توجد لهذا التشغيل إجابة لإرسالها مرة أخرى.",
   "error.backend.channelMemoryLimit": "يمكن أن تحتوي القناة على {limit} ذكريات كحد أقصى.",
@@ -231,8 +236,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "يحتفظ OpenBot بـ {limit} خوادم MCP كحد أقصى.",
   "error.backend.mcpServerNameTaken": "يوجد بالفعل خادم MCP باسم {name}.",
   "error.backend.mcpServerInvalid": "لا يمكن لـ OpenBot حفظ إعداد خادم MCP هذا.",
+  "error.backend.mcpHeaderNameInvalid":
+    "لا يمكن أن تحتوي أسماء الترويسات على مسافات أو رموز مثل : ( ) /. استخدم اسمًا مثل Authorization، وضع المفتاح أو الرمز المميز في القيمة.",
   "error.backend.mcpServerNoAnswer": "لم يُجب الخادم خلال {seconds} ثانية.",
   "error.backend.mcpSignInNotAccepted": "لم يقبل الخادم تسجيل الدخول هذا.",
+  "error.backend.mcpSignInGrantRefused":
+    "لم يقبل الخادم تسجيل الدخول. سجّل الدخول مرة أخرى. إذا استمرت المشكلة، فتأكد من أن حسابك على نفس الموقع أو المنطقة التي يستخدمها هذا التطبيق.",
   "error.backend.mcpSignInAccountRefused":
     "رفض الخادم الحساب الذي سجّلت الدخول به. تحقّق من أن هذا الحساب يمكنه استخدام الخدمة. لاستخدام حساب آخر، سجّل الخروج ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInClientRefused":
@@ -275,6 +284,8 @@ export const messages = {
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
     "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح {name} في المتجر، التطبيقات، واختر تسجيل الدخول.",
+  "error.backend.mcpServerKeyForProvider":
+    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب مفتاحًا. افتح {name} في المتجر، التطبيقات، واختر تعديل، ثم أدخل المفتاح الصحيح في الترويسات.",
   "error.backend.mcpServerFailedForProvider":
     "تعذّر على {provider} تشغيل خادم MCP {name}. افتح {name} في المتجر، التطبيقات، واختر اختبار الاتصال لمعرفة السبب.",
   "error.backend.mcpServerFailedInProvider":

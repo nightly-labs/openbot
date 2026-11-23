@@ -280,7 +280,7 @@ function parseApp(slug: string, value: unknown): PluginApp {
   const server = parseServer(slug, value.server);
   const base = baseServerConfig(server);
   const errors = mcpConfigErrors(normalizeMcpConfig(base));
-  const firstError = errors.name ?? errors.command ?? errors.url;
+  const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
   if (firstError) throw new Error(`Plugin ${slug} server is invalid: ${firstError}`);
   checkCredentialFlows(slug, server, base);
   const app: PluginApp = { id: text("id"), name: text("name"), description: text("description"), iconUrl, server };
@@ -518,7 +518,7 @@ function checkCredentialFlows(slug: string, server: PluginServer, base: McpServe
               .map((field) => ({ key: field.header ?? "", value: `sample${field.prefix ?? ""}` })),
           };
     const errors = mcpConfigErrors(normalizeMcpConfig(applied));
-    const firstError = errors.name ?? errors.command ?? errors.url;
+    const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
     if (firstError) throw new Error(`Plugin ${slug} credential is invalid: ${firstError}`);
   }
 }

@@ -1,4 +1,4 @@
-import { SIDEBAR_FOLDER_LEVELS } from "@openbot/contracts/ipc";
+import { SIDEBAR_FOLDER_LEVELS, workflowTriggerFields } from "@openbot/contracts/ipc";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import { ROUTINE_INSTRUCTION_RULE } from "../routine-tool-schema";
 
@@ -8,6 +8,17 @@ export interface ToolGuidanceOptions {
 
 const RECIPIENT_RULE =
   "Choose recipients for new work from your own sidebar section first: a section_teammates block in your instructions, or the latest openbot_section_teammates block in a user message, lists them. Go outside it only when no section teammate fits, more expertise is needed, or the user names another agent. With no section list, choose by name, title, and description, and give ungrouped agents no priority. Recipients that the user names and replies to existing messages come first. Use openbot.list_agents to compare descriptions and status, and openbot.list_sections only to see other sections. Send only to the selected stable ids.";
+
+const TRIGGER_FIELD_RULE = `A trigger with no answer gives fixed fields: ${(
+  ["schedule", "github", "discord", "telegram", "slack"] as const
+)
+  .map(
+    (trigger) =>
+      `${trigger} ${workflowTriggerFields({ kind: "trigger", fields: { trigger } })
+        .map((field) => field.name)
+        .join(" ")}`,
+  )
+  .join("; ")}.`;
 
 export function toolGuidance(
   namespace: string,
@@ -119,7 +130,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "connect_routine_agents":
     case "disconnect_routine_agents":
       return [
-        `Manage scheduled work for yourself or another local agent with openbot.list_routines, openbot.create_routine, openbot.update_routine, openbot.delete_routine, and openbot.test_routine when the user asks for it. Omit agentId for yourself; get another agent's stable id from openbot.list_agents. Call openbot.list_routines first: update a matching routine instead of a second one, and get the routine id. ${ROUTINE_INSTRUCTION_RULE} When you did the work in this chat first, put the tools, tabs, and steps that worked in the instruction. A schedule runs at most every 3 minutes. To watch a folder when the user gives no interval, use 15 minutes and keep the folder path and the handling in the instruction; after a validation error, fix the interval and keep the rest. Set missedPolicy when the user says what happens after OpenBot or its server was off, and limitPolicy for the account usage limit. To change one policy, pass only that policy; confirm both from the returned routine. For one-time work, such as a reminder, use the once schedule with a local date and time: the routine runs one time and stays paused as a record. Do not use a yearly custom schedule for one-time work.`,
+        `Manage scheduled work for yourself or another local agent with openbot.list_routines, openbot.create_routine, openbot.update_routine, openbot.delete_routine, and openbot.test_routine when the user asks for it, or corrects a fact that a routine uses. Omit agentId for yourself; get another agent's stable id from openbot.list_agents. Call openbot.list_routines first: update a matching routine instead of a second one, and get the routine id. ${ROUTINE_INSTRUCTION_RULE} When you did the work in this chat first, put the tools, tabs, and steps that worked in the instruction. A schedule runs at most every 3 minutes. To watch a folder when the user gives no interval, use 15 minutes and keep the folder path and the handling in the instruction; after a validation error, fix the interval and keep the rest. Set missedPolicy when the user says what happens after OpenBot or its server was off, and limitPolicy for the account usage limit. To change one policy, pass only that policy; confirm both from the returned routine. For one-time work, such as a reminder, use the once schedule with a local date and time: the routine runs one time and stays paused as a record. Do not use a yearly custom schedule for one-time work.`,
         "When work must start on an event from another system, use openbot.create_webhook_routine, not a polling schedule. Give a name that no routine of the agent has, and set eventType or filters only when the user names events. Give the user the URL, the request format, and where to get the secret, as the result says; never ask for, guess, or store the secret. To change the events, read the routine with openbot.list_routines and use openbot.update_webhook_routine, and keep the filters that the user did not mention. Only a person's message can start these tools or openbot.delete_routine for it, not a routine run or an agent. The user tests it, makes its secret, or pastes a Composio secret in Routines settings.",
         "A routine can pass its agent's answer on to other agents. openbot.list_routine_flows reads an agent's routines and links, and openbot.connect_routine_agents and openbot.disconnect_routine_agents add and remove links. Read the flow before a change, and keep the links that the user did not mention.",
       ].join("\n");
@@ -131,7 +142,8 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "read_workflow_runs":
       return [
         "Read a workflow, change it in one openbot.edit_workflow call: give each new node a ref; add with from also connects. To insert: disconnect, add with from, connect on. Send no at; move if asked; tidy cleans up. The result maps refs to ids; do not reread.",
-        "Fields by kind: trigger trigger (manual|schedule|webhook|github|discord|telegram|slack), schedule {kind:daily|weekdays|weekly|hourly|custom,time:HH:mm,weekday:0-6,minute,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule (yes/no) or check (priority = high and count > 2), edges branch yes|no; both: provider, model, effort only if asked; approval question; output target notify|chat-channel channelId|channel connectionId, placeId (openbot.messaging_list_places)|github|discord|telegram|slack; prompt text; image prompt, media image|video, model only if asked. text, note, shape have no edges. answer on agent, llm, webhook trigger: lines name: text|number|yes/no|list|a|b, name? optional. {{name}} gives an earlier field.",
+        "Fields by kind: trigger trigger (manual|schedule|webhook|github|discord|telegram|slack), schedule {kind:daily|weekdays|weekly|hourly|custom,time:HH:mm,weekday:0-6,minute,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule (yes/no) or check (priority = high and count > 2), edges branch yes|no; both: provider, model, effort only if asked; approval question; output target notify|chat-channel channelId|channel connectionId, placeId (openbot.messaging_list_places)|github|discord|telegram|slack, message (sent in place of the input); prompt text; image prompt, media image|video, model only if asked. text, note, shape have no edges. answer on agent, llm, webhook trigger: lines name: text|number|yes/no|list|a|b, name? optional. {{name}} gives an earlier field in task, prompt, system, question and output message, title, labels, person.",
+        TRIGGER_FIELD_RULE,
         "Only a person-started turn can change, delete or run a workflow; OpenBot confirms deletes. Run one only if asked or to test a build, with a case as input. No tool waits for a run: read it once; report what ran and runs.",
       ].join("\n");
     case "crm_find":

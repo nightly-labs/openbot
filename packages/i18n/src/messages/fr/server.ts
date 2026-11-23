@@ -22,6 +22,8 @@ export const messages = {
   "server.connection.loadingHint": "Vous pouvez sélectionner un autre serveur pendant le chargement de celui-ci.",
   "server.connection.cachedHint":
     "Le contenu chargé et les brouillons sont conservés. Les actions du serveur reprendront après la reconnexion.",
+  "server.connection.computerOffline":
+    "{name} est hors ligne. Vérifiez que son ordinateur est allumé, qu'OpenBot est ouvert et que Publier ce serveur est activé dans Réglages du serveur > Membres.",
   "server.connection.conversationFailed": "Impossible de charger la conversation. Réessayez.",
   "server.connection.panelsFailed": "Certains panneaux de l’espace de travail n’ont pas pu se charger. Réessayez.",
   "server.connection.retry": "Réessayer",
@@ -394,6 +396,12 @@ export const messages = {
     "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
+  "server.settings.voiceModel.section": "Reconnaissance vocale",
+  "server.settings.voiceModel.description":
+    "Les agents de ce serveur utilisent ce modèle pour transcrire le son des vidéos sans sous-titres.",
+  "server.settings.voiceModel.loadFailed": "Impossible de charger le modèle de reconnaissance vocale du serveur.",
+  "server.settings.voiceModel.group": "Sur ce serveur",
+  "server.settings.voiceModel.removeLabel": "Supprimer {name} de ce serveur",
   "server.settings.turnLimit": "Fils en même temps",
   "server.settings.turnLimitDescription":
     "Le nombre de fils d’agents qui peuvent s’exécuter en même temps sur ce serveur. Plus de fils utilisent plus de mémoire.",
@@ -551,6 +559,7 @@ export const messages = {
     "Il n’y a pas de mot de passe distinct pour le bureau à distance. Les réglages ci-dessous choisissent qui peut contrôler cet ordinateur.",
   "server.desktop.componentInstalled": "Composant hôte installé",
   "server.desktop.componentNotInstalled": "Composant hôte non installé",
+  "server.desktop.needsX11Session": "Session X11 requise",
   "server.desktop.sessions": "Sans surveillance : {unattended} · Sessions actives : {active}/{max}",
   "server.desktop.unattendedEnabled": "activé",
   "server.desktop.unattendedUnavailable": "non disponible",
@@ -634,7 +643,7 @@ export const messages = {
   "server.update.waitingFor": "En attente : {reasons}.",
   "server.update.disabledTitle": "Les mises à jour à distance sont désactivées",
   "server.update.disabledDescription":
-    "L’utilisateur de {name} a désactivé les mises à jour par les membres du serveur. Demandez-lui de mettre à jour OpenBot ou d’activer ce réglage.",
+    "L’utilisateur de {name} a désactivé les mises à jour par les membres du serveur. Demandez-lui de mettre à jour OpenBot, ou d’ouvrir Réglages > Mises à jour sur son ordinateur et d’activer « Autoriser les mises à jour par les membres du serveur ».",
   "server.update.managedTitle": "Un Host Manager contrôle les mises à jour",
   "server.update.managedDescription": "OpenBot Host Manager met à jour {name}. Contactez l’administrateur de l’hôte.",
   "server.update.unsupportedTitle": "{name} ne peut pas se mettre à jour",

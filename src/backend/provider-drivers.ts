@@ -6,6 +6,7 @@ import {
   type AgentAuthState,
   type AgentModelOption,
   type AgentProviderId,
+  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_PROMPT_CACHE_TTL,
   type KeyOnlyProviderId,
@@ -36,6 +37,7 @@ import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import { acpSessionSteers, steerAcpSession } from "./acp-session-steering";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { CODEX_VARIABLE_PROVIDER, readCodexModelSource } from "./agent/codex-model-source";
+import type { ImageFitter } from "./agent/image-reader";
 import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
 import type { TurnContext } from "./agent/turn-context";
@@ -140,6 +142,7 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
     | ((cli: AgentCliInfo, region: SignInRegion) => Effect.Effect<readonly string[], ProviderClientOperationError>);
   readonly env: (cli: AgentCliInfo, region: SignInRegion) => Record<string, string>;
   readonly savedSignIn?: (cli: AgentCliInfo, env: NodeJS.ProcessEnv) => Effect.Effect<string | null>;
+  readonly pipedInput?: true;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -321,6 +324,13 @@ const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
 };
 
+const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
+  argv: () => Effect.succeed([...antigravityArgv({ ...process.env, ...ANTIGRAVITY_ENV }), "--login"]),
+  env: () => ({ ...ANTIGRAVITY_ENV }),
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  pipedInput: true,
+};
+
 const CLINE_ARGV: readonly string[] = ["--acp"];
 
 const CLINE_ENV: Readonly<Record<string, string>> = {
@@ -427,6 +437,7 @@ export interface ProviderClientContext {
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
   readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  readonly fitImage?: ImageFitter | null;
 }
 
 const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
@@ -501,6 +512,10 @@ interface ProviderModelCatalog {
   ): Effect.Effect<{ source: ProviderModelSource | null; startSettings: string | null }, unknown>;
 }
 
+function steeringFields(model: ModelListResponse["data"][number]): Pick<AgentModelOption, "steersTurns"> {
+  return model.steersTurns ? { steersTurns: true } : {};
+}
+
 export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
@@ -549,7 +564,7 @@ function piClient(
           },
         }
       : {}),
-    extraEnv: () => ({ ...context.agentEnvironment?.() }),
+    extraEnv: () => ({ ...piCacheEnvironment(context), ...context.agentEnvironment?.() }),
     ...piKeyProvider(provider, context),
     ...(context.providerStateDirectory ? { providerStateDirectory: context.providerStateDirectory } : {}),
     mcpServers: context.mcpServers,
@@ -558,6 +573,10 @@ function piClient(
     ...(context.mcpEndpoint ? { mcpEndpoint: context.mcpEndpoint } : {}),
     ...(history ? { history } : {}),
   });
+}
+
+function piCacheEnvironment(context: ProviderClientContext): Readonly<Record<string, string>> {
+  return (context.promptCacheTtl?.() ?? DEFAULT_PROMPT_CACHE_TTL.ttl) === "1h" ? { PI_CACHE_RETENTION: "long" } : {};
 }
 
 function piKeyProvider(provider: "pi" | KeyOnlyProviderId, context: ProviderClientContext) {
@@ -773,6 +792,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         confinement,
         withAccountEnvironment(context),
         context.history?.("grok"),
+        context.fitImage,
       ),
     createProfileClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
@@ -809,6 +829,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       hiddenWhenSignedOut: true,
       partialListAtStart: true,
       relistAfterStart: true,
+      modelFields: steeringFields,
       fallback: modelsAfterOpenCodeDiscoveryFailure,
     },
     resolveCli: resolveOpencodeCli,
@@ -837,11 +858,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
         customEndpoint: (modelId) => {
           const endpoint = customProviderOfModel(modelId, openCodeEndpoints(context)());
+          const contextWindow = endpoint?.models.find(
+            (model) => composedCustomModelId(endpoint.id, model.id) === modelId,
+          )?.contextWindow;
           return endpoint
             ? {
                 name: endpoint.name,
                 hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0,
                 stallMs: CUSTOM_ENDPOINT_SILENCE_MS,
+                ...(contextWindow === undefined ? {} : { contextWindow }),
               }
             : null;
         },
@@ -853,6 +878,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           Effect.runSync(readOpenCodeRefusalStatus(sessionId, { ...process.env, ...context.agentEnvironment?.() })),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -885,6 +911,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "antigravity",
     signIn: ANTIGRAVITY_SIGN_IN,
+    codeSignIn: { kind: "cli", flow: "paste", command: ANTIGRAVITY_CODE_SIGN_IN },
     accounts: {
       homeVariable: "GEMINI_HOME",
       signIn: ANTIGRAVITY_SIGN_IN,
@@ -897,7 +924,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       timeoutMs: 30_000,
       acpLogout: true,
     },
-    catalog: { slowList: true, ownOrder: true },
+    catalog: { slowList: true, ownOrder: true, relistWhileRunning: true },
     resolveCli: resolveAntigravityCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
@@ -914,6 +941,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.antigravitySignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -990,6 +1018,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
             }),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1037,6 +1066,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.clineSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1102,6 +1132,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.kimiSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1150,6 +1181,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1206,6 +1238,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1260,6 +1293,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.mistralSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1320,6 +1354,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1347,7 +1382,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       slowList: true,
       partialListAtStart: true,
       relistAfterStart: true,
-      modelFields: (model) => (model.steersTurns ? { steersTurns: true } : {}),
+      modelFields: steeringFields,
     },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
@@ -1416,6 +1451,7 @@ function customAgentChild(
               ),
             ),
           mcpServers: context.mcpServers,
+          fitImage: context.fitImage,
           reportMcpDrops: context.reportMcpDrops,
           mcpToolRuntimes: context.mcpToolRuntimes,
           mcpEndpoint: context.mcpEndpoint,

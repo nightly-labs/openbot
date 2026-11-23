@@ -26,9 +26,19 @@ export function mcpServerDraftChanged(draft: McpServerDraft, saved: McpServerCon
   return JSON.stringify(config) !== JSON.stringify(normalizeMcpConfig(saved));
 }
 
-export function mcpServerDraftErrors(config: McpServerConfig): { name: boolean; command: boolean; url: boolean } {
+export function mcpServerDraftErrors(config: McpServerConfig): {
+  name: boolean;
+  command: boolean;
+  url: boolean;
+  headers: string | null;
+} {
   const errors = mcpConfigErrors(config);
-  return { name: Boolean(errors.name), command: Boolean(errors.command), url: Boolean(errors.url) };
+  return {
+    name: Boolean(errors.name),
+    command: Boolean(errors.command),
+    url: Boolean(errors.url),
+    headers: errors.headers ?? null,
+  };
 }
 
 export function mcpServerDetail(config: McpServerConfig): string {

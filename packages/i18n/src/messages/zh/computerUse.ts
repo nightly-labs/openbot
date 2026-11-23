@@ -18,6 +18,7 @@ export const messages = {
   "computerUse.permissions.description": "权限由 macOS 管理。",
   "computerUse.ready.title": "Computer Use 已就绪",
   "computerUse.ready.description": "OpenBot 可以看到并操作这台电脑上的应用，该系统不需要额外权限。",
+  "computerUse.limited.title": "Computer Use 在此桌面上受限",
   "computerUse.openSettingsFailed.title": "无法打开系统设置",
   "computerUse.restartRequired.title": "需要重启",
   "computerUse.restartRequired.description":

@@ -148,6 +148,7 @@ export const messages = {
     "La clave del proveedor contiene un espacio o un carácter que una clave no puede contener.",
   "error.provider.noModel": "El proveedor seleccionado no tiene ningún modelo disponible.",
   "error.provider.noModelNamed": "{provider} no tiene ningún modelo disponible.",
+  "error.provider.acpModelsNotLoaded": "{provider} no pudo cargar sus modelos. Vuelve a enviar tu mensaje.",
   "error.provider.acpNoModels":
     "La CLI de ACP no anunció ningún modelo ACP. OpenBot no adivinará un modelo alternativo.",
   "error.provider.endpointRemoveBusy":
@@ -188,6 +189,8 @@ export const messages = {
     "{provider} se detuvo antes de que empezara este mensaje. Envía el mensaje de nuevo.",
   "error.provider.sessionStartTimedOut":
     "{provider} no abrió un chat nuevo a tiempo, así que este mensaje no empezó. En el ordenador que ejecuta OpenBot, abre Proveedores, selecciona {provider} y haz clic en Reiniciar. Luego vuelve a intentarlo.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} no abrió este chat a tiempo, así que este mensaje no empezó. En el ordenador que ejecuta OpenBot, abre Proveedores, selecciona {provider} y haz clic en Reiniciar. Luego vuelve a intentarlo.",
   "error.provider.serviceUnreachable":
     "{provider} no puede conectarse a su servicio. Comprueba tu conexión a internet. OpenBot lo intentará de nuevo.",
   "error.provider.serviceUnreachableRefresh":
@@ -284,6 +287,8 @@ export const messages = {
     "OpenCode no pudo leer el razonamiento de este modelo con este esfuerzo. Selecciona un esfuerzo menor u otro modelo y vuelve a enviar tu mensaje.",
   "error.provider.opencodeModelNotServed":
     "El proveedor del modelo no ofrece este modelo a tu cuenta ahora. Elige otro modelo y envía tu mensaje de nuevo.",
+  "error.provider.opencodeSafetyBlocked":
+    "El proveedor del modelo bloqueó este mensaje por sus reglas de seguridad. Envía tu solicitud de nuevo con otras palabras. Si también bloquea tus próximos mensajes, inicia un chat nuevo o elige otro modelo.",
   "error.provider.opencodeNetwork":
     "OpenCode no pudo conectarse al proveedor del modelo. Comprueba la conexión de red del equipo que ejecuta OpenBot e inténtalo de nuevo.\n{detail}",
   "error.provider.codexStateBusy":
@@ -293,6 +298,8 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux detuvo el proveedor porque OpenBot tiene un límite de CPU en tiempo real de 0. El límite viene de tu sistema. Instala e inicia rtkit (`rtkit-daemon`), ejecuta `systemctl --user restart xdg-desktop-portal` y luego reinicia OpenBot. Reiniciar solo xdg-desktop-portal no sirve mientras falte rtkit.",
   "error.provider.cpuUnsupported": "El procesador de este equipo no puede ejecutar este proveedor. Usa otro proveedor.",
+  "error.provider.windowsBlocked":
+    "La configuración de seguridad de Windows, como el Control inteligente de aplicaciones, impidió que este proveedor se iniciara. Usa otro proveedor.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode no pudo abrir su base de datos porque una versión más reciente de OpenCode la cambió. Actualiza OpenCode a la versión 2 o posterior y vuelve a intentarlo.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -308,6 +315,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} se detuvo sin respuesta. Envía el mensaje de nuevo.",
   "error.provider.channelNoAnswer":
     "{provider} terminó el turno sin respuesta. En el canal, haz clic en Continuar para ejecutar la tarea de nuevo, o en Reasignar para dársela a otro miembro.",
+  "error.provider.acpProcessStopped": "{provider} se detuvo antes de responder. Envía el mensaje de nuevo.",
   "error.provider.chatgptPageFailed": "OpenBot no pudo abrir la página de conexión de ChatGPT.",
   "error.provider.noneReady": "Ningún proveedor de agentes está listo.",
   "error.provider.claudeTurnActive": "Espera a que termine el turno activo de Claude antes de actualizar su contexto.",
@@ -348,6 +356,8 @@ export const messages = {
     "{provider} no terminó su turno anterior, por lo que no aceptó este mensaje. OpenBot inició una nueva sesión de {provider} con el historial del chat. Vuelve a enviar tu mensaje.",
   "error.provider.antigravityLocationUnsupported":
     "Google no permite que Gemini funcione desde la ubicación de red del equipo que ejecuta este agente. Usa Gemini en otro equipo o elige otro proveedor para este agente.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini se detuvo por un error. Vuelve a enviar tu mensaje. Si se detiene de nuevo, elige otro modelo u otro proveedor.",
   "error.provider.antigravityConnectionLost":
     "Gemini perdió la conexión con su agente y se detuvo. Envía un mensaje para continuar.",
   "error.provider.grokServiceFailure":
@@ -546,6 +556,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Este ajuste no está disponible en la sesión actual del proveedor.",
   "error.provider.sessionSettingInvalid": "Este valor no está disponible para el ajuste.",
   "error.provider.sessionSettingsBusy": "Espera a que termine el turno actual antes de cambiar un ajuste de la sesión.",
+  "error.provider.sessionSettingsTimedOut": "La sesión del agente no respondió a tiempo. Inténtalo de nuevo.",
   "error.provider.piOutdated":
     "Pi {version} es demasiado antiguo. Instala Pi 1.1.0 o posterior para la compatibilidad nativa con RPC y MCP.",
   "error.provider.nativeMissing": "La CLI de {provider} no está instalada. Descárgala en Ajustes.",
@@ -599,6 +610,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Falló el turno de Muse.",
   "error.provider.museModelUnavailable":
     "Muse no puede usar este modelo. Es posible que Muse no esté disponible en el país donde se ejecuta este agente, o que esta cuenta no tenga acceso al modelo. Elige otro modelo y vuelve a intentarlo.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse no pudo completar esta solicitud. Muse usa tu clave de API de Meta guardada, no tu inicio de sesión. Reemplaza la clave o elimínala en Ajustes para usar tu inicio de sesión.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse no puede generar un perfil sin acceso a herramientas externas. Usa otro proveedor para generar el perfil y luego selecciona Muse para el agente.",
   "error.provider.museAuthUnverified":

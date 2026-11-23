@@ -32,7 +32,7 @@ import {
   Type,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { children, createEffect, createSignal, createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { children, createEffect, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
@@ -41,6 +41,7 @@ import { PickerMenu } from "./WorkflowPicker";
 import {
   customStepName,
   Hint,
+  makingTake,
   PORT_NAME,
   resizeCursor,
   resizeHandles,
@@ -207,6 +208,12 @@ export function download(url: string, name: string) {
   link.href = url;
   link.download = name;
   link.click();
+}
+
+export function downloadMedia(board: WfnBoard, attachmentId: string, url: string, name: string) {
+  const save = board.catalogs().download;
+  if (save) void save(attachmentId).catch(() => undefined);
+  else download(url, name);
 }
 
 export function NodeToolbar(props: {
@@ -689,7 +696,7 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
   };
   let items: HTMLSpanElement | undefined;
   createEffect(
-    () => (showsStrip(board, props.id) ? board.shown(props.id)?.id : undefined),
+    () => (showsStrip(board, props.id) ? (makingTake(board, props.id)?.id ?? board.shown(props.id)?.id) : undefined),
     (id, before) => {
       const item = id ? items?.querySelector<HTMLElement>('[aria-pressed="true"]') : null;
       if (!items || !item) return;
@@ -746,7 +753,11 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
                     name: resultName(t, result),
                     time: resultTime(format, result.at),
                   })}
-                  aria-pressed={result.id === board.shown(props.id)?.id ? "true" : "false"}
+                  aria-pressed={
+                    makingTake(board, props.id) === undefined && result.id === board.shown(props.id)?.id
+                      ? "true"
+                      : "false"
+                  }
                   data-failed={result.failed ? "" : undefined}
                   onClick={() => board.pick(props.id, result.id)}
                 >
@@ -765,7 +776,14 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
             )}
           </For>
           <For each={board.pending(props.id)} keyed={(take) => take.id}>
-            {(take, at) => <PendingTake number={list().length + at() + 1} since={take().at} />}
+            {(take, at) => (
+              <PendingTake
+                number={list().length + at() + 1}
+                since={take().at}
+                current={makingTake(board, props.id)?.id === take().id}
+                onPick={() => board.pick(props.id, take().id)}
+              />
+            )}
           </For>
         </span>
         <Button
@@ -782,23 +800,29 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
   );
 }
 
-function PendingTake(props: { number: number; since: string }) {
+function PendingTake(props: { number: number; since: string; current: boolean; onPick: () => void }) {
   const { t } = useText();
-  const seconds = useSince(() => props.since);
+  const since = useSince(() => props.since);
+  const seconds = () => since() ?? 0;
+  const label = () => t("workflow.media.takeMaking", { number: props.number, time: clock(seconds()) });
   return (
-    <span
-      class="wfn-strip-item wfn-strip-take"
-      role="img"
-      aria-label={t("workflow.media.takeMaking", { number: props.number, time: clock(seconds()) })}
-    >
-      <svg class="wfn-take-ring" viewBox="0 0 36 36" aria-hidden="true">
-        <circle class="wfn-take-track" cx="18" cy="18" r="16" pathLength="100" />
-        <circle class="wfn-take-fill" cx="18" cy="18" r="16" pathLength="100" />
-      </svg>
-      <span class="wfn-take-label" aria-hidden="true">
-        {clock(seconds())}
-      </span>
-    </span>
+    <Hint label={label()}>
+      <LabelTooltipTrigger
+        type="button"
+        class="wfn-strip-item wfn-strip-take"
+        aria-label={label()}
+        aria-pressed={props.current ? "true" : "false"}
+        onClick={props.onPick}
+      >
+        <svg class="wfn-take-ring" viewBox="0 0 36 36" aria-hidden="true">
+          <circle class="wfn-take-track" cx="18" cy="18" r="16" pathLength="100" />
+          <circle class="wfn-take-fill" cx="18" cy="18" r="16" pathLength="100" />
+        </svg>
+        <span class="wfn-take-label" aria-hidden="true">
+          {clock(seconds())}
+        </span>
+      </LabelTooltipTrigger>
+    </Hint>
   );
 }
 
@@ -817,11 +841,18 @@ export function useElapsed(running: () => boolean) {
   return () => Math.max(0, Math.floor((now() - start) / 1000));
 }
 
-function useSince(since: () => string) {
+export function useSince(since: () => string | undefined) {
   const [now, setNow] = createSignal(Date.now());
-  const timer = setInterval(() => setNow(Date.now()), 250);
-  onCleanup(() => clearInterval(timer));
-  return () => Math.max(0, Math.floor((now() - Date.parse(since())) / 1000));
+  createEffect(since, (at) => {
+    if (at === undefined) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  });
+  return () => {
+    const at = since();
+    return at === undefined ? undefined : Math.max(0, Math.floor((now() - Date.parse(at)) / 1000));
+  };
 }
 
 export function useStepRun(id: string) {

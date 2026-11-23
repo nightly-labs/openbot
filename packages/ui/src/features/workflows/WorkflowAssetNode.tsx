@@ -7,7 +7,15 @@ import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { usePictureShape } from "./picture-shape";
 import { useBoard, type WfnBoard } from "./workflow-board";
-import { asString, download, NodeShell, NodeToolbar, ToolAction, useField, useLocked } from "./workflow-node-parts";
+import {
+  asString,
+  downloadMedia,
+  NodeShell,
+  NodeToolbar,
+  ToolAction,
+  useField,
+  useLocked,
+} from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
 
 type AssetFilter = "recent" | "images" | "files";
@@ -394,7 +402,7 @@ export function AssetNode(props: { id: string; file?: string }) {
                       text={t("workflow.node.toolbar.download")}
                       label={t("workflow.asset.download")}
                       icon={<Download />}
-                      onClick={() => download(url(), current().name)}
+                      onClick={() => downloadMedia(board, current().id, url(), current().name)}
                     />
                   )}
                 </Show>
@@ -473,7 +481,7 @@ export function AssetNode(props: { id: string; file?: string }) {
           <ImageLightbox
             opening={opening()}
             onDownload={(attachment) => {
-              if (attachment.previewUrl) download(attachment.previewUrl, attachment.name);
+              if (attachment.previewUrl) downloadMedia(board, attachment.id, attachment.previewUrl, attachment.name);
             }}
             onClose={() => setViewer(undefined)}
           />

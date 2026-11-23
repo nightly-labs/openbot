@@ -19,6 +19,7 @@ export const CHAT_VISUAL_UPDATE_MODEL_CONTEXT = "ui/update-model-context";
 export const CHAT_VISUAL_OPEN_IMAGE = "openbot/notifications/open-image";
 export const CHAT_VISUAL_KEY_DOWN = "openbot/notifications/keydown";
 export const CHAT_VISUAL_SELECTION_CHANGED = "openbot/notifications/selection-changed";
+export const CHAT_VISUAL_FOCUSED = "openbot/notifications/focused";
 
 export type ChatVisualDisplayMode = "inline" | "fullscreen";
 const DISPLAY_MODES: readonly ChatVisualDisplayMode[] = ["inline", "fullscreen"];
@@ -200,7 +201,8 @@ export type ChatVisualMessage =
   | { type: "refused"; id: number | string }
   | { type: "open-image"; src: string; name: string }
   | { type: "key"; key: ChatVisualKey }
-  | { type: "selection"; text: string; rect: ChatVisualRect };
+  | { type: "selection"; text: string; rect: ChatVisualRect }
+  | { type: "focused" };
 
 export function chatVisualFrameHeight(reported?: number, requested?: number): number {
   const limit = requested !== undefined && Number.isFinite(requested) ? clampHeight(requested) : undefined;
@@ -285,6 +287,8 @@ export function parseChatVisualMessage(data: unknown): ChatVisualMessage | null 
       if (!metaKey && !ctrlKey && key !== "Escape") return null;
       return { type: "key", key: { key, code, metaKey, ctrlKey, shiftKey, altKey } };
     }
+    case CHAT_VISUAL_FOCUSED:
+      return { type: "focused" };
     case CHAT_VISUAL_SELECTION_CHANGED: {
       const { text, top, left, bottom, right } = params;
       if (!isBoundedString(text, CHAT_VISUAL_CONTEXT_LIMIT)) return null;
@@ -385,6 +389,7 @@ const report=()=>{const height=Math.ceil(root.getBoundingClientRect().height);if
 new ResizeObserver(report).observe(root);
 addEventListener("DOMContentLoaded",report);
 addEventListener("load",report);
+addEventListener("focus",(event)=>{if(event.isTrusted)send({method:"${CHAT_VISUAL_FOCUSED}",params:{}});});
 const fields=new Set(["INPUT","TEXTAREA","SELECT"]);
 addEventListener("keydown",(event)=>{
 if(!event.isTrusted||event.isComposing)return;

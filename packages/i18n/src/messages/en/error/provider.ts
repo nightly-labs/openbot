@@ -140,6 +140,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.keyInvalidCharacters": "The provider key contains a space or a character that a key cannot contain.",
   "error.provider.noModel": "The selected provider has no available model.",
   "error.provider.noModelNamed": "{provider} has no model available.",
+  "error.provider.acpModelsNotLoaded": "{provider} could not load its models. Send your message again.",
   "error.provider.acpNoModels": "ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.",
   "error.provider.endpointRemoveBusy": "Wait for the active turn and queue to finish before you remove this endpoint.",
   "error.provider.codexOutdated": "Codex CLI {version} is too old. OpenBot requires 0.156.0 or newer.",
@@ -176,6 +177,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.stoppedBeforeStart": "{provider} stopped before this message started. Send the message again.",
   "error.provider.sessionStartTimedOut":
     "{provider} did not open a new chat in time, so this message did not start. On the computer that runs OpenBot, open Providers, select {provider} and click Restart. Then try again.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} did not open this chat in time, so this message did not start. On the computer that runs OpenBot, open Providers, select {provider} and click Restart. Then try again.",
   "error.provider.serviceUnreachable":
     "{provider} cannot connect to its service. Check your internet connection. OpenBot will try again.",
   "error.provider.serviceUnreachableRefresh":
@@ -267,6 +270,8 @@ export const messages = defineMessages("error.provider", {
     "OpenCode could not read the reasoning of this model at this effort. Select a lower effort or another model, then send your message again.",
   "error.provider.opencodeModelNotServed":
     "The model provider does not offer this model to your account now. Choose another model, then send your message again.",
+  "error.provider.opencodeSafetyBlocked":
+    "The model provider blocked this message because of its safety rules. Send your request again with different words. If it also blocks your next messages, start a new chat or choose another model.",
   "error.provider.opencodeNetwork":
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
   "error.provider.codexStateBusy":
@@ -276,6 +281,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.realtimeLimitZero":
     "Linux stopped the provider because OpenBot has a real-time CPU limit of 0. The limit comes from your system. Install and start rtkit (`rtkit-daemon`), run `systemctl --user restart xdg-desktop-portal`, then restart OpenBot. Restarting xdg-desktop-portal alone does not help while rtkit is missing.",
   "error.provider.cpuUnsupported": "The processor of this computer cannot run this provider. Use a different provider.",
+  "error.provider.windowsBlocked":
+    "Windows security settings, such as Smart App Control, stopped this provider from starting. Use a different provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode could not open its database because a newer OpenCode version changed it. Update OpenCode to version 2 or later, then try again.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -291,6 +298,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
   "error.provider.channelNoAnswer":
     "{provider} ended the turn with no answer. In the channel, click Continue to run the task again, or Reassign to give it to another member.",
+  "error.provider.acpProcessStopped": "{provider} stopped before it answered. Send the message again.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",
@@ -329,6 +337,8 @@ export const messages = defineMessages("error.provider", {
     "{provider} did not end its earlier turn, so it did not accept this message. OpenBot started a new {provider} session with the chat history. Send your message again.",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini stopped because of an error. Send your message again. If it stops again, choose another model or provider.",
   "error.provider.antigravityConnectionLost":
     "Gemini lost the connection to its agent and stopped. Send a message to continue.",
   "error.provider.grokServiceFailure":
@@ -520,6 +530,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.sessionSettingUnavailable": "This setting is not available in the current provider session.",
   "error.provider.sessionSettingInvalid": "This value is not available for the setting.",
   "error.provider.sessionSettingsBusy": "Wait for the current turn to finish before changing a session setting.",
+  "error.provider.sessionSettingsTimedOut": "The agent's session did not answer in time. Try again.",
   "error.provider.piOutdated": "Pi {version} is too old. Install Pi 1.1.0 or later for native RPC and MCP support.",
   "error.provider.nativeMissing": "The {provider} CLI is not installed. Download it in Settings.",
   "error.provider.nativeNotStarted": "The {provider} CLI could not start.",
@@ -571,6 +582,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.museTurnFailed": "Muse turn failed.",
   "error.provider.museModelUnavailable":
     "Muse cannot use this model. Muse may not be available in the country where this agent runs, or this account has no access to the model. Choose another model, then try again.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse could not complete this request. Muse uses your saved Meta API key, not your sign-in. Replace the key, or remove it in Settings to use your sign-in.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse cannot generate a profile without access to external tools. Use another provider to generate the profile, then select Muse for the agent.",
   "error.provider.museAuthUnverified":

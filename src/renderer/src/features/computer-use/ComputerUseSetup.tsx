@@ -219,7 +219,21 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
         </Show>
       </Show>
 
-      <Show when={state()?.status === "ready" && permissions().length === 0}>
+      <Show when={state()?.status === "ready" && permissions().length === 0 && state()?.message}>
+        {(limit) => (
+          <Alert tone="warning" class="computer-use-alert" role="status">
+            <AlertIcon>
+              <TriangleAlert />
+            </AlertIcon>
+            <AlertContent>
+              <AlertTitle>{t("computerUse.limited.title")}</AlertTitle>
+              <AlertDescription>{errorMessage(limit(), t("status.computerUse.inputRefused"))}</AlertDescription>
+            </AlertContent>
+          </Alert>
+        )}
+      </Show>
+
+      <Show when={state()?.status === "ready" && permissions().length === 0 && !state()?.message}>
         <Alert tone="success" class="computer-use-alert" role="status">
           <AlertIcon>
             <CircleCheck />

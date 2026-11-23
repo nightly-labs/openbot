@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Je kunt een andere server kiezen terwijl deze laadt.",
   "server.connection.cachedHint":
     "Geladen inhoud en concepten blijven bewaard. Serveracties gaan verder zodra de verbinding terug is.",
+  "server.connection.computerOffline":
+    "{name} is offline. Controleer of de computer aan staat, OpenBot open is en Publiceer deze server aan staat in Serverinstellingen > Leden.",
   "server.connection.conversationFailed": "Het gesprek kon niet laden. Probeer het opnieuw.",
   "server.connection.panelsFailed": "Sommige panelen van de werkruimte konden niet laden. Probeer het opnieuw.",
   "server.connection.retry": "Opnieuw",
@@ -404,6 +406,12 @@ export const messages = {
     "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft. Op een server gebruikt ook de browser deze tijdzone na de volgende herstart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
+  "server.settings.voiceModel.section": "Spraakherkenning",
+  "server.settings.voiceModel.description":
+    "Agents op deze server gebruiken dit model om het geluid van video’s zonder ondertiteling uit te schrijven.",
+  "server.settings.voiceModel.loadFailed": "Kan het spraakherkenningsmodel van de server niet laden.",
+  "server.settings.voiceModel.group": "Op deze server",
+  "server.settings.voiceModel.removeLabel": "{name} van deze server verwijderen",
   "server.settings.turnLimit": "Threads tegelijk",
   "server.settings.turnLimitDescription":
     "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",
@@ -613,6 +621,7 @@ export const messages = {
     "Er is geen apart wachtwoord voor extern bureaublad. Met de instellingen hieronder kies je wie deze computer mag bedienen.",
   "server.desktop.componentInstalled": "Hostonderdeel geïnstalleerd",
   "server.desktop.componentNotInstalled": "Hostonderdeel niet geïnstalleerd",
+  "server.desktop.needsX11Session": "X11-sessie nodig",
   "server.desktop.sessions": "Onbeheerd: {unattended} · Actieve sessies: {active}/{max}",
   "server.desktop.unattendedEnabled": "ingeschakeld",
   "server.desktop.unattendedUnavailable": "niet beschikbaar",
@@ -696,7 +705,7 @@ export const messages = {
   "server.update.waitingFor": "Wacht op {reasons}.",
   "server.update.disabledTitle": "Updates op afstand staan uit",
   "server.update.disabledDescription":
-    "De gebruiker van {name} heeft updates van serverleden uitgezet. Vraag diegene om OpenBot bij te werken of de instelling aan te zetten.",
+    "De gebruiker van {name} heeft updates van serverleden uitgezet. Vraag diegene om OpenBot bij te werken, of om op die computer Instellingen > Updates te openen en “Sta updates van serverleden toe” aan te zetten.",
   "server.update.managedTitle": "Een Host Manager regelt updates",
   "server.update.managedDescription":
     "OpenBot Host Manager werkt {name} bij. Neem contact op met de beheerder van de host.",

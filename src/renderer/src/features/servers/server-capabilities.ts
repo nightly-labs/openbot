@@ -98,6 +98,8 @@ export function serverSupportsCapability(
       capability === "browsing-memory-v1" ||
       capability === "browser-teach-v1" ||
       capability === "prompt-cache-ttl-v1" ||
+      capability === "prompt-cache-ttl-pi-v1" ||
+      capability === "cache-expiry-compaction-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
@@ -252,8 +254,13 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
 export function localCodeSignInProviders(platform: string | undefined): readonly AgentProviderId[] {
   const paste = platform !== undefined && pasteCodeSignInSupported(platform);
   return AGENT_PROVIDERS.filter((provider) => {
-    const codeSignIn = agentProviderDescriptor(provider).localCodeSignIn;
-    return codeSignIn === "device" || (codeSignIn === "paste" && paste);
+    const descriptor = agentProviderDescriptor(provider);
+    const codeSignIn = descriptor.localCodeSignIn;
+    return (
+      codeSignIn === "device" ||
+      (codeSignIn === "paste" && paste) ||
+      (platform === "win32" && descriptor.windowsCodeSignIn === "paste")
+    );
   });
 }
 

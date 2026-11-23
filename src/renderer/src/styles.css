@@ -57,7 +57,7 @@
 @import "@openbot/ui/features/usage/usage-machine-meter.css";
 @import "./features/usage/usage.css";
 @import "./features/schedule/schedule.css";
-@import "@openbot/ui/features/agents/agent-picker.css";
+@import "@openbot/ui/components/search-picker.css";
 @import "@openbot/ui/features/tasks/tasks.css";
 @import "@openbot/ui/styles/chart.css";
 @import "@openbot/ui/features/files/files.css";

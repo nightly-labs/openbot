@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Открыть в чате",
   "conversation.threads.archive": "Архивировать",
   "conversation.threads.archived": "В архиве",
+  "conversation.threads.archivedOlder": "Показать прежние ветки",
   "conversation.threads.restore": "Восстановить",
   "conversation.threads.deleteUndo.title": "Удалено: {title}",
   "conversation.threads.hold.threadLimit": {
@@ -144,6 +145,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "Открытый микрофон",
   "conversation.voice.talkMode.push": "Нажать и говорить",
   "conversation.voice.holdToTalk": "Удерживайте, чтобы говорить",
+  "conversation.voice.downloading": "Подготовка {progress}%",
   "conversation.voice.spaceKey": "Пробел",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

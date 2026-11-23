@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Bu sunucu yüklenirken başka bir sunucu seçebilirsiniz.",
   "server.connection.cachedHint":
     "Yüklenen içerik ve taslaklar korunur. Sunucu işlemleri yeniden bağlandıktan sonra devam eder.",
+  "server.connection.computerOffline":
+    "{name} çevrimdışı. Bilgisayarının açık olduğundan, OpenBot'un açık olduğundan ve Sunucu ayarları > Üyeler bölümünde Bu sunucuyu yayımla seçeneğinin etkin olduğundan emin olun.",
   "server.connection.conversationFailed": "Konuşma yüklenemedi. Tekrar deneyin.",
   "server.connection.panelsFailed": "Bazı çalışma alanı panelleri yüklenemedi. Tekrar deneyin.",
   "server.connection.retry": "Tekrar dene",
@@ -388,6 +390,12 @@ export const messages = {
     "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır. Bir sunucuda tarayıcı da bir sonraki yeniden başlatmadan sonra bunu kullanır.",
   "server.settings.timezoneAutomatic": "Otomatik ({zone})",
   "server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
+  "server.settings.voiceModel.section": "Konuşma tanıma",
+  "server.settings.voiceModel.description":
+    "Bu sunucudaki ajanlar, altyazısı olmayan videoların sesini yazıya dökmek için bu modeli kullanır.",
+  "server.settings.voiceModel.loadFailed": "Sunucunun konuşma tanıma modeli yüklenemedi.",
+  "server.settings.voiceModel.group": "Bu sunucuda",
+  "server.settings.voiceModel.removeLabel": "{name} modelini bu sunucudan kaldır",
   "server.settings.turnLimit": "Aynı anda mesaj dizileri",
   "server.settings.turnLimitDescription":
     "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",
@@ -550,6 +558,7 @@ export const messages = {
     "Uzak masaüstü için ayrı bir parola yok. Bu bilgisayarı kimin kontrol edebileceğini aşağıdaki ayarlar belirler.",
   "server.desktop.componentInstalled": "Ana makine bileşeni yüklendi",
   "server.desktop.componentNotInstalled": "Ana makine bileşeni yüklenmedi",
+  "server.desktop.needsX11Session": "X11 oturumu gerekli",
   "server.desktop.sessions": "Katılımsız: {unattended} · Etkin oturumlar: {active}/{max}",
   "server.desktop.unattendedEnabled": "etkin",
   "server.desktop.unattendedUnavailable": "kullanılamıyor",
@@ -632,7 +641,7 @@ export const messages = {
   "server.update.waitingFor": "{reasons} bekleniyor.",
   "server.update.disabledTitle": "Uzaktan güncellemeler kapalı",
   "server.update.disabledDescription":
-    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya ayarı açmasını isteyin.",
+    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya o bilgisayarda Ayarlar > Güncellemeler bölümünü açıp “Sunucu üyelerinin güncelleme yapmasına izin ver” seçeneğini açmasını isteyin.",
   "server.update.managedTitle": "Güncellemeleri OpenBot Host Manager yönetiyor",
   "server.update.managedDescription":
     "OpenBot Host Manager, {name} sunucusunu günceller. Ana makine yöneticisiyle iletişime geçin.",

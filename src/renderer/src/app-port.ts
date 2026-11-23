@@ -32,6 +32,7 @@ export interface AppPort {
   acpRegistry: OpenBotDesktopApi["acpRegistry"];
   hostedSites: OpenBotDesktopApi["hostedSites"];
   billing: OpenBotDesktopApi["billing"];
+  credits: OpenBotDesktopApi["credits"];
   referral: OpenBotDesktopApi["referral"];
   license: OpenBotDesktopApi["license"];
   auth: CompanySignInCalls &

@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "Sohbette aç",
   "conversation.threads.archive": "Arşivle",
   "conversation.threads.archived": "Arşivlenenler",
+  "conversation.threads.archivedOlder": "Eski dizileri göster",
   "conversation.threads.restore": "Geri yükle",
   "conversation.threads.deleteUndo.title": "{title} silindi",
   "conversation.threads.hold.threadLimit": {
@@ -143,6 +144,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "Açık mikrofon",
   "conversation.voice.talkMode.push": "Bas konuş",
   "conversation.voice.holdToTalk": "Konuşmak için basılı tutun",
+  "conversation.voice.downloading": "Hazırlanıyor %{progress}",
   "conversation.voice.spaceKey": "Boşluk",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

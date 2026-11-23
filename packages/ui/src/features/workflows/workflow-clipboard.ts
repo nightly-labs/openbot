@@ -11,4 +11,4 @@ export interface Clip {
 
 export const CLIP_TYPE = "application/x-openbot-workflow-nodes";
 
-export const [copied, setCopied] = createSignal<{ key: string; clip: Clip; from: string }>();
+export const [copied, setCopied] = createSignal<{ key: string; clip: Clip; from: string; server: string }>();

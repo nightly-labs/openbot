@@ -41,6 +41,12 @@ so the cost of a change is paid by code you cannot edit, for as long as the supp
 - A capability that every protocol in the window implies is not sent again. A new protocol version
   can make all earlier capabilities implied; when it is the minimum, delete them from the lists.
 - Malformed known payloads fail closed as `protocol_error`. Unknown optional events are ignored.
+- A workflow change that an older OpenBot cannot show or run (a new node kind, field value, limit or
+  graph rule) raises `WORKFLOW_FORMAT` and adds a rule to `WORKFLOW_FORMAT_RULES`
+  (`src/ipc-workflow-format.ts`). Put new step data in `fields`, not in a new node, edge or stroke
+  property. A client sends content of a newer format only when the host's `hostFormat` is at least
+  that format. The format needs no new capability. Add a fixture with the new data to
+  `scripts/workflow-format-e2e.ts`: it opens, saves, runs, exports and transfers each fixture.
 
 ## One channel list, two mirrors
 

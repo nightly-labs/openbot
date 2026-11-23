@@ -31,6 +31,7 @@ export function ChatVisualReply(props: {
   onMessage: (text: string) => void;
   onContext: (text: string) => void;
   onQuote: (quoteId: string, text: string) => void;
+  onUse?: () => void;
 }) {
   const { props: view, openExternalMessageUrl, previewAttachment } = useConversationViewScope();
   const visual = () => chatVisualReply(props.message) ?? props.initial;
@@ -64,6 +65,7 @@ export function ChatVisualReply(props: {
       onOpenLink={(url) => void openExternalMessageUrl(url)}
       onMessage={props.onMessage}
       onContext={props.onContext}
+      onUse={props.onUse}
       onQuote={(text) => props.onQuote(pageQuoteId(), text)}
       quoteShortcut={deviceQuoteShortcut(view.platform)}
       onOpenInSidePanel={() => void previewAttachment(visual().attachment)}

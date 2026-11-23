@@ -231,7 +231,7 @@ export function createMarketplaceController(
   props: MarketplaceControllerProps,
   serverSlots?: (tools: McpServerTools) => MarketplaceServerSlots,
 ) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const calls = () => props.calls ?? desktopMarketplaceCalls();
   const skillCalls = () => calls().agentSkills(props.hostServerId);
   const agents = createMemo(() => props.agents);
@@ -1015,7 +1015,7 @@ export function createMarketplaceController(
     const here = flowsHere(app);
     const saved = savedKeyFlow(here, row);
     const [first, ...rest] = saved ? [saved, ...here.filter((flow) => flow !== saved)] : here;
-    if (!first) return Promise.resolve(config);
+    if (!first) return startedApp(app, config);
     return new Promise((resolve) => {
       setConnecting({
         subject: { name: app.name, iconUrl: app.iconUrl, config },
@@ -1035,11 +1035,19 @@ export function createMarketplaceController(
     return calls().mcp.testMcpServer({ config }, serverId);
   }
 
+  async function startedApp(app: MarketplacePluginApp, config: McpServerConfig): Promise<McpServerConfig | null> {
+    const result = await testPluginApp(config);
+    if (!result.error) return config;
+    setError(t("marketplace.error.appNotConnected", { name: app.name, reason: sourceText(result.error) }));
+    return null;
+  }
+
   const signInRelay = () => (props.pluginSignInRelay ? calls().signInRelay : undefined);
   const [relayed, setRelayed] = createSignal<MarketplaceSignInRelayState | null>(null);
   const [hostTabbed, setHostTabbed] = createSignal<{ url: string; tabId: string } | null>(null);
   let stopSignIn: (() => void) | undefined;
   let copySignIn: (() => Promise<void>) | undefined;
+  let pasteSignIn: ((address: string) => Promise<void>) | undefined;
 
   async function signInPluginApp(config: McpServerConfig) {
     const serverId = props.pluginServerId;
@@ -1051,8 +1059,11 @@ export function createMarketplaceController(
     const stop = () => void mcp.cancelMcpSignIn({ url: config.url }, serverId).catch(() => undefined);
     const copyLink = calls().copySignInLink;
     const copy = copyLink ? () => copyLink(config.url, serverId) : undefined;
+    const pasteAddress = calls().signInRelay?.paste;
+    const paste = pasteAddress ? (address: string) => pasteAddress(config.url, address, serverId) : undefined;
     stopSignIn = stop;
     copySignIn = copy;
+    pasteSignIn = paste;
     if (relay) void followSignInRelay(relay, config.url, serverId, () => waiting);
     if (relay?.hostTab && props.pluginHostView)
       void followSignInHostTab(relay.hostTab, config.url, serverId, () => waiting);
@@ -1060,6 +1071,7 @@ export function createMarketplaceController(
       waiting = false;
       if (stopSignIn === stop) stopSignIn = undefined;
       if (copy && copySignIn === copy) copySignIn = undefined;
+      if (paste && pasteSignIn === paste) pasteSignIn = undefined;
     });
   }
 
@@ -1125,6 +1137,11 @@ export function createMarketplaceController(
   async function copySignInLink(): Promise<void> {
     if (!copySignIn) throw new Error(t("error.mcp.relayEnded"));
     await copySignIn();
+  }
+
+  async function pasteSignInAddress(address: string): Promise<void> {
+    if (!pasteSignIn) throw new Error(t("error.mcp.relayEnded"));
+    await pasteSignIn(address);
   }
 
   function cancelSignIn(): void {
@@ -1807,6 +1824,7 @@ export function createMarketplaceController(
     pasteSignInRelay,
     cancelSignIn,
     copySignInLink: () => (calls().copySignInLink ? copySignInLink : undefined),
+    pasteSignInAddress: () => (calls().signInRelay ? pasteSignInAddress : undefined),
     openPluginUrl,
     mcpServerApp,
     signInPluginServer,

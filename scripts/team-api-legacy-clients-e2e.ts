@@ -49,6 +49,7 @@ import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/ca
 import {
   BROWSER_VAULT_SKIP_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_WEB_CLIENT_PROTOCOL,
   TEAM_WEBRTC_CLIENT_PROTOCOL,
@@ -1002,7 +1003,11 @@ try {
   const withoutTertiary = (protocol: number) =>
     teamCapabilitiesForProtocol(protocol).filter((capability) => capability !== TEAM_USAGE_TERTIARY_CAPABILITY);
 
-  async function currentUsageEvent(capabilities: readonly string[], sent: AccountUsage = reading): Promise<JsonObject> {
+  async function currentUsageEvent(
+    capabilities: readonly string[],
+    sent: AccountUsage = reading,
+    before?: AccountUsage,
+  ): Promise<JsonObject> {
     const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
       TEAM_PROTOCOL_V1_WEBSOCKET,
       `openbot-token.${member.token}`,
@@ -1024,6 +1029,7 @@ try {
     try {
       await scoped;
       const usage = nextMessage(opened, (value) => (isRecord(value) && value.type === "usage-changed" ? value : null));
+      if (before) hostAgents.emit("event", { type: "usage-changed", usage: before });
       hostAgents.emit("event", { type: "usage-changed", usage: sent });
       return await usage;
     } finally {
@@ -1138,6 +1144,73 @@ try {
       const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
       assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
       assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));
+      return { relayed: relayed.status, malformed: "invalid" };
+    });
+
+    const failedRead = { id: "grok", primary: null, secondary: null, readFailed: true } as const;
+    const withFailedRead: AccountUsage = { limits: [...reading.limits, failedRead] };
+    const failedReadOnly: AccountUsage = { limits: [failedRead] };
+    const withoutReadFailed = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+      (capability) => capability !== TEAM_USAGE_READ_FAILED_CAPABILITY,
+    );
+
+    await step("usage-read-failed-v1: an older client reads the usage route without the failed read", async () => {
+      Object.defineProperty(hostAgents, "getUsage", {
+        value: () => Effect.succeed(withFailedRead),
+        configurable: true,
+      });
+      try {
+        const results: { protocol: number; limits: number }[] = [];
+        for (const protocol of [TEAM_PROTOCOL_V9, 8, TEAM_PROTOCOL_V7]) {
+          const without = await current(protocol, teamCapabilitiesForProtocol(protocol), "/v1/agents/usage");
+          assert.equal(without.status, 200, `Protocol ${protocol}: ${JSON.stringify(without.body)}.`);
+          const limits = record(without.body, "usage").limits;
+          assert.ok(Array.isArray(limits) && limits.length === 2, `Protocol ${protocol} got the failed read.`);
+          assert.ok(!JSON.stringify(without.body).includes("readFailed"), `Protocol ${protocol} got readFailed.`);
+          results.push({ protocol, limits: limits.length });
+        }
+        return results;
+      } finally {
+        Object.defineProperty(hostAgents, "getUsage", { value: () => Effect.succeed(reading), configurable: true });
+      }
+    });
+
+    await step(
+      "usage-read-failed-v1: the usage-changed event follows the capability; an older client gets no empty event",
+      async () => {
+        const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10), withFailedRead);
+        const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+        assert.ok(decoded.kind === "known" && decoded.event.type === "usage-changed", JSON.stringify(wire));
+        assert.deepEqual(decoded.event.usage.limits[2], failedRead);
+        const without = await currentUsageEvent(withoutReadFailed, withFailedRead);
+        assert.ok(!JSON.stringify(without).includes("readFailed"), "A client without the capability got readFailed.");
+        const usage = record(without.usage, "usage");
+        assert.ok(Array.isArray(usage.limits) && usage.limits.length === 2, JSON.stringify(usage));
+        const next = await currentUsageEvent(withoutReadFailed, reading, failedReadOnly);
+        const nextUsage = record(next.usage, "usage");
+        assert.ok(Array.isArray(nextUsage.limits) && nextUsage.limits.length === 2, JSON.stringify(nextUsage));
+        return { withCapability: "readFailed", without: "released", failedReadOnly: "not sent" };
+      },
+    );
+
+    await step("usage-read-failed-v1: a WebRTC event follows the capability; a bad value fails closed", async () => {
+      const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10), withFailedRead);
+      const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { usageReadFailed: true }));
+      assert.ok(relayed.status === "known" && relayed.event.type === "usage-changed");
+      assert.deepEqual(relayed.event.usage.limits[2], failedRead);
+      const without = createTeamProtocolV8Event(2, wire, {});
+      assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("readFailed"));
+      const usage = record(wire.usage, "usage");
+      assert.ok(Array.isArray(usage.limits));
+      const opencode = record(usage.limits[0], "opencode");
+      for (const bad of [
+        { ...failedRead, readFailed: "yes" },
+        { ...opencode, readFailed: true },
+      ]) {
+        const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
+        assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid", JSON.stringify(bad));
+        assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));
+      }
       return { relayed: relayed.status, malformed: "invalid" };
     });
   } finally {
@@ -1661,6 +1734,7 @@ try {
       sourceText("error.backend.authRequestInactive"),
       `The answer did not reach the agent service: ${JSON.stringify(frame)}.`,
     );
+    assert.equal(error?.status, 409, `A closed secure authentication request was not a 409: ${JSON.stringify(frame)}.`);
     return { status: error?.status };
   });
 

@@ -145,6 +145,7 @@ export interface HostStatus {
   apiOnline: boolean;
   remoteDesktopReady: boolean;
   remoteDesktopScreenRecordingDenied: boolean;
+  remoteDesktopNeedsX11Session: boolean;
   remoteDesktopUnattended: boolean;
   remoteDesktopActiveSessions: number;
   remoteDesktopMaxSessions: number;

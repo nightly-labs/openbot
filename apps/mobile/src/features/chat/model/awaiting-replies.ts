@@ -19,6 +19,7 @@ export function awaitingReplies(
   waits: Readonly<Record<string, MobileAgentWait>> = {},
 ): AwaitingReply[] {
   const lastUserIndex = messages.findLastIndex((message) => message.author === "user");
+  const lastRequestIndex = lastRequestIndexByRecipient(messages);
   const rows: AwaitingReply[] = [];
   const shown = new Set<string>();
   messages.forEach((message, index) => {
@@ -45,7 +46,8 @@ export function awaitingReplies(
         continue;
       }
       const state = deliveryState(delivery.status);
-      if (!state || (state === "failed" && index < lastUserIndex)) continue;
+      const superseded = index < lastUserIndex || index < (lastRequestIndex.get(delivery.recipientAgentId) ?? index);
+      if (!state || (state === "failed" && superseded)) continue;
       const wait = state === "failed" ? null : (waits[delivery.recipientAgentId] ?? null);
       rows.push({ id, agentId: delivery.recipientAgentId, state, preview: null, deliveryId: null, wait });
     }
@@ -62,6 +64,16 @@ export function awaitingReplies(
     });
   }
   return [...rows.filter((row) => row.wait), ...rows.filter((row) => !row.wait)];
+}
+
+function lastRequestIndexByRecipient(messages: readonly ConversationMessage[]): Map<string, number> {
+  const last = new Map<string, number>();
+  messages.forEach((message, index) => {
+    const exchange = message.exchange;
+    if (exchange?.direction !== "outgoing" || exchange.expectsReply === false) return;
+    for (const delivery of exchange.deliveries) last.set(delivery.recipientAgentId, index);
+  });
+  return last;
 }
 
 function deliveryState(status: QueueDelivery["status"]): Exclude<AwaitingReplyState, "replied"> | null {

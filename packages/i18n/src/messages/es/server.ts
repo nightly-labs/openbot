@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Puedes seleccionar otro servidor mientras este se carga.",
   "server.connection.cachedHint":
     "El contenido cargado y los borradores se conservan. Las acciones del servidor se reanudarán tras la reconexión.",
+  "server.connection.computerOffline":
+    "{name} está sin conexión. Comprueba que su equipo esté encendido, que OpenBot esté abierto y que Publicar este servidor esté activado en Ajustes del servidor > Miembros.",
   "server.connection.conversationFailed": "No se pudo cargar la conversación. Inténtalo de nuevo.",
   "server.connection.panelsFailed": "Algunos paneles del espacio de trabajo no se pudieron cargar. Inténtalo de nuevo.",
   "server.connection.retry": "Reintentar",
@@ -392,6 +394,12 @@ export const messages = {
     "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente. En un servidor, el navegador también la usa después del próximo reinicio.",
   "server.settings.timezoneAutomatic": "Automática ({zone})",
   "server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
+  "server.settings.voiceModel.section": "Reconocimiento de voz",
+  "server.settings.voiceModel.description":
+    "Los agentes de este servidor usan este modelo para transcribir el sonido de los vídeos que no tienen subtítulos.",
+  "server.settings.voiceModel.loadFailed": "No se pudo cargar el modelo de reconocimiento de voz del servidor.",
+  "server.settings.voiceModel.group": "En este servidor",
+  "server.settings.voiceModel.removeLabel": "Quitar {name} de este servidor",
   "server.settings.turnLimit": "Hilos a la vez",
   "server.settings.turnLimitDescription":
     "Cuántos hilos de agentes pueden ejecutarse a la vez en este servidor. Más hilos usan más memoria.",
@@ -554,6 +562,7 @@ export const messages = {
     "No hay una contraseña aparte para el escritorio remoto. Los ajustes de abajo eligen quién puede controlar este equipo.",
   "server.desktop.componentInstalled": "Componente del host instalado",
   "server.desktop.componentNotInstalled": "Componente del host sin instalar",
+  "server.desktop.needsX11Session": "Requiere sesión X11",
   "server.desktop.sessions": "Acceso desatendido: {unattended} · Sesiones activas: {active}/{max}",
   "server.desktop.unattendedEnabled": "activado",
   "server.desktop.unattendedUnavailable": "no disponible",
@@ -637,7 +646,7 @@ export const messages = {
   "server.update.waitingFor": "Esperando {reasons}.",
   "server.update.disabledTitle": "Las actualizaciones remotas están desactivadas",
   "server.update.disabledDescription":
-    "El usuario de {name} desactivó las actualizaciones de los miembros del servidor. Pídele que actualice OpenBot o que active el ajuste.",
+    "El usuario de {name} desactivó las actualizaciones de los miembros del servidor. Pídele que actualice OpenBot o que abra Ajustes > Actualizaciones en su equipo y active «Permitir actualizaciones de los miembros del servidor».",
   "server.update.managedTitle": "Un Host Manager controla las actualizaciones",
   "server.update.managedDescription": "OpenBot Host Manager actualiza {name}. Contacta con el administrador del host.",
   "server.update.unsupportedTitle": "{name} no puede actualizarse por sí mismo",

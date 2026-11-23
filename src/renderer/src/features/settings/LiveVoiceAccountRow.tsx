@@ -1,4 +1,4 @@
-import type { ProviderAccountStatus } from "@openbot/contracts/ipc";
+import { DEFAULT_PROVIDER_ACCOUNT_ID, type ProviderAccountStatus } from "@openbot/contracts/ipc";
 import {
   Item,
   ItemActions,
@@ -18,6 +18,7 @@ import { createSignal, Show } from "solid-js";
 export interface LiveVoiceAccountChoice {
   accounts: readonly ProviderAccountStatus[];
   accountId: string | null;
+  defaultUsesKey: boolean;
   choose: (accountId: string | null) => Promise<void>;
 }
 
@@ -31,18 +32,22 @@ export function LiveVoiceAccountRow(props: {
   const { t, errorMessage } = useText();
   const [error, setError] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
+  const usesKey = (accountId: string) =>
+    isApiKeyAccount(accountId, "codex") || (props.choice.defaultUsesKey && accountId === DEFAULT_PROVIDER_ACCOUNT_ID);
+  const chosen = () => {
+    const accountId = props.choice.accountId;
+    return accountId && !usesKey(accountId) ? accountId : null;
+  };
   const choices = () => {
-    const ids = props.choice.accounts
-      .filter((account) => !isApiKeyAccount(account.id, "codex"))
-      .map((account) => account.id);
-    return ids.length > 1 || props.choice.accountId ? [AUTOMATIC_ACCOUNT, ...ids] : [];
+    const ids = props.choice.accounts.filter((account) => !usesKey(account.id)).map((account) => account.id);
+    return ids.length > 1 || chosen() ? [AUTOMATIC_ACCOUNT, ...ids] : [];
   };
   const name = (accountId: string) =>
     accountId === AUTOMATIC_ACCOUNT
       ? t("settings.voice.live.accountAutomatic")
       : providerAccountName(t, props.choice.accounts, accountId);
   const choose = (accountId: string) => {
-    if (saving() || accountId === (props.choice.accountId ?? AUTOMATIC_ACCOUNT)) return;
+    if (saving() || accountId === (chosen() ?? AUTOMATIC_ACCOUNT)) return;
     setError(null);
     setSaving(true);
     props.choice
@@ -62,7 +67,7 @@ export function LiveVoiceAccountRow(props: {
           <Select<string>
             class="settings-modal-select"
             options={choices()}
-            value={props.choice.accountId ?? AUTOMATIC_ACCOUNT}
+            value={chosen() ?? AUTOMATIC_ACCOUNT}
             onChange={(next) => next && choose(next)}
             disabled={props.disabled || saving()}
             placement="bottom-end"

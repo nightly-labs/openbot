@@ -14,6 +14,12 @@ export interface HostSignInPage<R> {
 
 export type HostSignInPageMode = "tab" | "relay";
 
+export interface HostSignInRun<R> {
+  pageUrl: () => string | null;
+  result: () => R | null;
+  interrupt: Effect.Effect<void>;
+}
+
 interface HostSignIn<R> extends HostSignInPage<R> {
   mode: HostSignInPageMode;
   pageUrl: string | null;
@@ -35,7 +41,7 @@ export class HostSignInPages<K, R> {
     run: (openPage: (url: string) => Promise<void>) => Effect.Effect<A, E>,
     resultOf: (exit: Exit.Exit<A, E>) => R,
     mode: HostSignInPageMode = "tab",
-  ) {
+  ): Effect.fn.Return<HostSignInRun<R>> {
     const signIn: HostSignIn<R> = { mode, tabId: null, pageUrl: null, result: null };
     this.#signIns.set(key, signIn);
     const fiber = yield* Effect.forkIn(
@@ -48,6 +54,11 @@ export class HostSignInPages<K, R> {
       Fiber.await(fiber).pipe(Effect.flatMap((exit) => this.#finish(key, signIn, resultOf(exit)))),
       this.#scope,
     );
+    return {
+      pageUrl: () => (signIn.mode === "relay" && signIn.result === null ? signIn.pageUrl : null),
+      result: () => signIn.result,
+      interrupt: Fiber.interrupt(fiber).pipe(Effect.asVoid),
+    };
   });
 
   pageUrl(key: K): string | null {

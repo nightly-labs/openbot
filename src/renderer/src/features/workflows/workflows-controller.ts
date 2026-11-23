@@ -68,7 +68,7 @@ export interface WorkflowRequest {
   taken: () => void;
 }
 
-type WorkflowBase = { revision: number; graph: WorkflowGraph };
+type WorkflowBase = { revision: number; graph: WorkflowGraph; readOnly?: true };
 
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
 
@@ -170,7 +170,11 @@ export function createWorkflowsController(
   let current = visited?.detail.summary.id ?? "";
   const bases = new Map<string, WorkflowBase>();
   const setBase = (detail: WorkflowDetail) =>
-    bases.set(detail.summary.id, { revision: detail.revision, graph: detail.graph });
+    bases.set(detail.summary.id, {
+      revision: detail.revision,
+      graph: detail.graph,
+      ...(detail.needsNewerApp ? { readOnly: true } : {}),
+    });
   if (visited) setBase(visited.detail);
   let limit = RUN_PAGE;
   let disposed = false;
@@ -379,13 +383,13 @@ export function createWorkflowsController(
     if (foreignCount(workflowId) !== queuedOn.seen) {
       if (canvasShows(workflowId)) return;
       const now = bases.get(workflowId);
-      if (!now || !queuedOn.from) return;
+      if (!now || now.readOnly || !queuedOn.from) return;
       const merged = mergeWorkflowGraphs(queuedOn.from.graph, edit.graph, now.graph);
       if (stableJson(merged) === stableJson(now.graph)) return;
       return save({ workflowId, graph: merged }, { from: now, seen: foreignCount(workflowId) });
     }
     const from = bases.get(workflowId);
-    if (!from) return;
+    if (!from || from.readOnly) return;
     saving = { workflowId, json: stableJson(edit.graph) };
     let result: WorkflowSaveResult;
     try {
@@ -407,7 +411,7 @@ export function createWorkflowsController(
     if (newer.revision <= known.revision) return;
     takeForeign(newer);
     putDetail(workflowId, () => newer);
-    if (canvasShows(workflowId)) return;
+    if (canvasShows(workflowId) || newer.needsNewerApp) return;
     const merged = mergeWorkflowGraphs(from.graph, edit.graph, newer.graph);
     if (stableJson(merged) !== stableJson(newer.graph)) {
       await save({ workflowId, graph: merged }, { from: bases.get(workflowId), seen: foreignCount(workflowId) });
@@ -804,6 +808,19 @@ export function createWorkflowsController(
     onRename: (workflowId, title) => {
       tracked("rename", () => host.workflows.rename({ workflowId, title })).catch(report);
     },
+    get onSetPaused() {
+      if (!host.pauseSupported()) return undefined;
+      return (workflowId: string, paused: boolean) => {
+        host.workflows.setPaused({ workflowId, paused }).catch(report);
+      };
+    },
+    get onExport() {
+      if (!host.portableSupported()) return undefined;
+      return (workflowId: string) => {
+        flush();
+        return queued(() => host.workflows.exportFile(workflowId));
+      };
+    },
     onDelete: (workflowId) => {
       flush();
       return queued(async () => {
@@ -832,6 +849,9 @@ export function createWorkflowsController(
       return row;
     });
 
+  const hostDownload = host.downloadMedia;
+  const downloadMedia = hostDownload ? (attachmentId: string) => reported(hostDownload(attachmentId)) : undefined;
+
   return {
     detail: () => stored()?.detail,
     failed,
@@ -842,6 +862,7 @@ export function createWorkflowsController(
     slack,
     pictures,
     uploadPicture,
+    downloadMedia,
     readOnly: () => lock() !== undefined,
     github,
     props,

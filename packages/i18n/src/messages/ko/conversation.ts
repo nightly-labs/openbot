@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "채팅에서 열기",
   "conversation.threads.archive": "보관",
   "conversation.threads.archived": "보관됨",
+  "conversation.threads.archivedOlder": "이전 스레드 보기",
   "conversation.threads.restore": "복원",
   "conversation.threads.deleteUndo.title": "{title}을(를) 삭제했어요",
   "conversation.threads.hold.threadLimit": {
@@ -141,6 +142,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "마이크 항상 켜기",
   "conversation.voice.talkMode.push": "눌러서 말하기",
   "conversation.voice.holdToTalk": "누르고 있는 동안 말하기",
+  "conversation.voice.downloading": "준비 중 {progress}%",
   "conversation.voice.spaceKey": "스페이스",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

@@ -99,6 +99,7 @@ export const messages = defineMessages("browser", {
   "browser.secret.submitting": "Submitting…",
   "browser.secret.takeOver": "Take over",
   "browser.secret.failed": "The request could not be completed. Check the connection and try again.",
+  "browser.secret.ended": "This sign-in request has ended. Ask the agent to try again.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot did not use your saved login because the agent ran a script on this page. To use it, ask the agent to reload the page and try again.",
   "browser.secret.vaultSkip.fieldKind":

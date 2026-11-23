@@ -19,7 +19,7 @@ import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { RoutineSchedulePicker } from "../conversation/RoutineSchedulePicker";
 import { RoutineWebhookSecretField } from "../conversation/RoutineWebhookEndpoint";
-import { AnswerAction, AnswerProblems, AnswerSummary } from "./workflow-answer-parts";
+import { AnswerAction, AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { DISCORD_TRIGGER_DEFAULTS, DiscordIcon, DiscordTriggerRows } from "./workflow-discord-parts";
 import { GITHUB_TRIGGER_DEFAULTS, GitHubIcon, GitHubTriggerRows, useGitHubTriggerReady } from "./workflow-github-parts";
@@ -242,7 +242,6 @@ export function TriggerNode(props: {
           </Show>
         </Show>
         <Show when={trigger() === "webhook"}>
-          <AnswerSummary id={props.id} field="answer" />
           <AnswerProblems id={props.id} />
         </Show>
         <Show when={trigger() === "message"}>

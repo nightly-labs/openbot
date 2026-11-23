@@ -1,3 +1,4 @@
+import { isOpenableAttachmentName } from "@openbot/contracts/attachment-files";
 import {
   type AttachmentSummary,
   type BrowserBounds,
@@ -113,6 +114,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!agentId || agentSkillsMode(deps.props.server, deps.props.runtime) === "hidden") return;
     setSkillSettingsRequest({ agentId, skillId: skill.skillId });
     setActiveRightPanel("settings", agentId);
+  }
+  function clearSkillSettingsRequest(agentId: string): void {
+    setSkillSettingsRequest((current) => (current?.agentId === agentId ? null : current));
   }
   const [instructionsSettingsRequest, setInstructionsSettingsRequest] = createSignal<{ agentId: string } | null>(null);
   function openInstructionsSettings(agentId: string): void {
@@ -360,6 +364,18 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   const attachmentDownloads = attachmentFiles.downloads;
 
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
+    if (action === "open" && previewsInsteadOfReveal(attachment)) {
+      void previewAttachment(attachment);
+      return;
+    }
+    attachmentFileAction(attachment, action);
+  }
+
+  function previewsInsteadOfReveal(attachment: AttachmentSummary) {
+    return canPreviewAttachment(attachment) && !isOpenableAttachmentName(attachment.name);
+  }
+
+  function attachmentFileAction(attachment: AttachmentSummary, action: FileAction) {
     if (action === "open" && deps.props.runtime && canPreviewAttachment(attachment)) {
       void previewAttachment(attachment);
       return;
@@ -677,7 +693,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!file) return;
     const source = file.source;
     if (source.kind === "attachment") {
-      attachmentAction(source.attachment, action);
+      attachmentFileAction(source.attachment, action);
       return;
     }
     if (source.kind === "workspace-folder") return;
@@ -711,6 +727,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   return {
     skillSettingsRequest,
     openSkillSettings,
+    clearSkillSettingsRequest,
     instructionsSettingsRequest,
     openInstructionsSettings,
     agentSettingRowRequest,

@@ -123,7 +123,8 @@ export const messages = defineMessages("provider", {
     "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
-  "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.noModels":
+    "No {name} models show here. If they are turned off, an admin can turn them on in Server settings > Providers > {name} > Models.",
   "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
   "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":
@@ -143,6 +144,7 @@ export const messages = defineMessages("provider", {
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Agent reasoning effort",
   "provider.picker.effortFixed": "{effort}, set by {provider}",
+  "provider.picker.effortLimited": "Your Claude settings or organization limit the effort to {effort}.",
   "provider.picker.fast": "Fast",
   "provider.picker.fastText": "Faster responses, increased usage",
   "provider.picker.speed": "Speed",
@@ -313,6 +315,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.codexKeyInUse":
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "provider.settings.codexKeyAlternative": "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "provider.settings.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "provider.settings.addKey": "Add key",
   "provider.settings.changeKey": "Change key",
   "provider.settings.runtime": "Runtime",
@@ -332,10 +335,14 @@ export const messages = defineMessages("provider", {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt cache",
   "provider.settings.promptCacheDescription":
-    "How long Claude keeps the context of an agent in the cache between turns.",
+    "How long Claude and Pi keep the context of an agent in the cache between turns.",
   "provider.settings.promptCacheHour": "1 hour",
-  "provider.settings.promptCacheDefault": "Claude Code default",
+  "provider.settings.promptCacheDefault": "Provider default",
   "provider.settings.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "provider.settings.cacheExpiryCompaction": "Compact before the cache expires",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "When a chat with 200K or more tokens of context is idle with a 1 hour cache, the agent compacts the context before the cache expires. Then the next message does not read the full context again with no cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Could not load the compaction setting of this server.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Use my Claude Code setup",
   "provider.settings.claudeUserSetupDescription":

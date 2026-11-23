@@ -100,6 +100,7 @@ export interface VoiceStoreDeps {
 
 interface VoiceThreadHooks {
   openDraftKey: () => string | undefined;
+  besideDraftKey?: () => string | undefined;
   appendTranscript: (key: string, text: string) => void;
   send: (key: string) => Promise<void>;
   reportError: (message: string) => void;
@@ -122,7 +123,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     const destination = { ...target, threadKey };
     const fail = (message: string) =>
       threadKey === undefined ? deps.setConversationError(target, message) : deps.thread?.reportError(message);
-    const stillOpen = () => deps.viewIsMounted() && deps.thread?.openDraftKey() === threadKey;
+    const stillOpen = () =>
+      deps.viewIsMounted() &&
+      (deps.thread?.openDraftKey() === threadKey ||
+        (threadKey !== undefined && deps.thread?.besideDraftKey?.() === threadKey));
     if (threadKey === undefined) {
       deps.setVoiceLimitReached?.(target, false);
       deps.clearConversationError(target);
@@ -131,7 +135,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceSubmitRequest = undefined;
     const generation = ++resources.voiceRequestGeneration;
     deps.setVoicePhase("preparing");
-    deps.setVoiceModelProgress(0);
+    deps.setVoiceModelProgress(null);
     let stream: MediaStream | undefined;
     let cloud: VoiceCloudStream | undefined;
     try {
@@ -278,7 +282,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   }
 
   const removeVoiceModelListener = conversationRuntime(deps.props).voice.onModelStatus((status) => {
-    if (deps.voicePhase() !== "preparing" || status.modelId !== preparingModelId) return;
+    if (deps.voicePhase() !== "preparing" || status.modelId !== preparingModelId || status.phase !== "downloading")
+      return;
     deps.setVoiceModelProgress(status.progress);
   });
   onCleanup(removeVoiceModelListener);

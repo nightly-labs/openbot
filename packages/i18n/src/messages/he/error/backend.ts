@@ -51,6 +51,8 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "המארח המרוחק הזה אינו תומך בשליטה בלשונית דפדפן.",
   "error.backend.browserSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות מהמחשב הזה.",
   "error.backend.browserSignInOpenFailed": "OpenBot לא הצליח לפתוח את חלון ההתחברות.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot לא הצליח לטעון את הדף בחלון ההתחברות. בדקו את החיבור לאינטרנט, ואז פתחו שוב את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",
@@ -119,6 +121,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "ההרצה נעצרה עם שגיאה, אך לא התקבלה סיבה. פתחו את ההרצה כדי לראות מה הסוכן עשה.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} לא אישר בזמן שהוא התחיל את ההודעה הזו. OpenBot לא שולח אותה שוב, כדי שהעבודה לא תרוץ פעמיים. OpenBot ממתין עד 5 דקות שהסוכן יתחיל.",
+  "error.backend.turnStartAbandoned": "הסוכן לא התחיל את ההודעה הזו תוך 5 דקות. שלחו את ההודעה שוב.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",
   "error.backend.channelMemoryLimit": "בערוץ יכולים להיות עד {limit} זיכרונות.",
@@ -231,8 +236,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot שומר עד {limit} שרתי MCP.",
   "error.backend.mcpServerNameTaken": "כבר קיים שרת MCP בשם {name}.",
   "error.backend.mcpServerInvalid": "OpenBot אינו יכול לשמור את תצורת שרת ה-MCP הזו.",
+  "error.backend.mcpHeaderNameInvalid":
+    "שמות כותרות לא יכולים להכיל רווחים או סמלים כמו : ( ) /. השתמשו בשם כמו Authorization, והזינו את המפתח או האסימון בשדה ערך.",
   "error.backend.mcpServerNoAnswer": "השרת לא ענה תוך {seconds} שניות.",
   "error.backend.mcpSignInNotAccepted": "השרת לא קיבל את ההתחברות הזו.",
+  "error.backend.mcpSignInGrantRefused":
+    "השרת לא קיבל את ההתחברות. התחבר שוב. אם הבעיה נמשכת, ודא שהחשבון שלך נמצא באותו אתר או אזור כמו האפליקציה הזו.",
   "error.backend.mcpSignInAccountRefused":
     "השרת דחה את החשבון שאיתו התחברת. יש לוודא שלחשבון הזה יש גישה לשירות. כדי להשתמש בחשבון אחר, יש להתנתק ואז להתחבר שוב.",
   "error.backend.mcpSignInClientRefused":
@@ -274,6 +283,8 @@ export const messages = {
     "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Sign in.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש מפתח. יש לפתוח את {name} בחנות, אפליקציות, לבחור עריכה ולהזין את המפתח הנכון בכותרות.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Test connection כדי לראות את הסיבה.",
   "error.backend.mcpServerFailedInProvider":

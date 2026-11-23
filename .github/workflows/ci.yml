@@ -466,6 +466,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:hosted-update-idle-wait
 
+      - name: Run the hosted watchdog E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:hosted-watchdog
+
       - name: Run the messaging pause and resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-pause-resume
@@ -738,6 +742,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
 
+      - name: Run the credit media workflow E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-workflow
+
+      - name: Run the workflow paid media E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-paid-media
+
+      - name: Run the credit media payer switch E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-payer-switch
+
       - name: Run the workflow Discord E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-discord
@@ -770,6 +786,22 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-answers
 
+      - name: Run the workflow output templates E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-output-templates
+
+      - name: Run the workflow trigger fields E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-trigger-fields
+
+      - name: Run the workflow file codec E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-file-codec
+
+      - name: Run the workflow format E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-format
+
       - name: Run the workflow schedule E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-schedule
@@ -781,6 +813,14 @@ jobs:
       - name: Run the workflow step settings E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-step-settings
+
+      - name: Run the workflow Team API E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-team-api
+
+      - name: Run the instance transfer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:instance-transfer
 
       - name: Run the Discord files to GitHub E2E test
         if: ${{ !cancelled() }}
@@ -869,6 +909,7 @@ jobs:
             .openbot-build/agent-create-retry-e2e/
             .openbot-build/update-host-takeover-e2e/
             .openbot-build/hosted-update-idle-wait-e2e/
+            .openbot-build/hosted-watchdog-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/
@@ -932,6 +973,9 @@ jobs:
             .openbot-build/antigravity-failing-session-e2e/
             .openbot-build/antigravity-verification-link-e2e/
             .openbot-build/workflow-model-steps-e2e/
+            .openbot-build/credit-media-workflow-e2e/
+            .openbot-build/workflow-paid-media-e2e/
+            .openbot-build/credit-media-payer-switch-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
             .openbot-build/workflow-slack-e2e/
@@ -940,8 +984,14 @@ jobs:
             .openbot-build/workflow-join-e2e/
             .openbot-build/workflow-agent-step-e2e/
             .openbot-build/workflow-answers-e2e/
+            .openbot-build/workflow-output-templates-e2e/
+            .openbot-build/workflow-trigger-fields-e2e/
+            .openbot-build/workflow-file-codec-e2e/
+            .openbot-build/workflow-format-e2e/
             .openbot-build/provider-image-mime-e2e/
             .openbot-build/workflow-step-settings-e2e/
+            .openbot-build/workflow-team-api-e2e/
+            .openbot-build/instance-transfer-everything-e2e/
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/

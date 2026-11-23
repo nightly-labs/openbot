@@ -81,6 +81,7 @@ export const messages = {
   "conversation.threads.toChat": "فتح في الدردشة",
   "conversation.threads.archive": "أرشفة",
   "conversation.threads.archived": "مؤرشفة",
+  "conversation.threads.archivedOlder": "عرض السلاسل الأقدم",
   "conversation.threads.restore": "استعادة",
   "conversation.threads.deleteUndo.title": "تم حذف {title}",
   "conversation.threads.hold.threadLimit": {
@@ -145,6 +146,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "ميكروفون مفتوح",
   "conversation.voice.talkMode.push": "اضغط للتحدث",
   "conversation.voice.holdToTalk": "اضغط مطولًا للتحدث",
+  "conversation.voice.downloading": "جارٍ التجهيز {progress}%",
   "conversation.voice.spaceKey": "مسافة",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",

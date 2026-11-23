@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
+import { EventEmitter } from "node:events";
 import {
   existsSync,
   mkdirSync,
@@ -41,6 +42,7 @@ import {
   type CustomProviderResult,
   type CustomProviderSummary,
   DEFAULT_AGENT_DEFAULTS,
+  DEFAULT_VOICE_SETTINGS,
   decodeHostPasswordManagerList,
   decodeHostPasswordManagerStatus,
   decodeHostProviderAccountModels,
@@ -53,10 +55,13 @@ import {
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
   isAccountUsage,
+  isLocalVoiceModelId,
   isQueueSnapshot,
   isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type LibraryFolderAction,
+  LOCAL_VOICE_MODEL_IDS,
+  type LocalVoiceModelId,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
   type PinnedMessagesSnapshot,
@@ -74,7 +79,10 @@ import {
   type StoredFileRow,
   type UpdateChannelRoutineInput,
   type UpdateRoutineInput,
+  VOICE_MODEL_IDS,
   type VoiceLiveEvent,
+  type VoiceModelStatus,
+  type VoiceSettings,
   type WhatsAppAccount,
   type WhatsAppLinkState,
   type WhatsAppStatusReactionsList,
@@ -91,6 +99,10 @@ import {
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_ACTIVE_QUEUES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import {
+  AGENT_ARCHIVED_THREADS_CAPABILITY,
+  AGENT_ARCHIVED_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
@@ -203,6 +215,11 @@ import {
   BROWSING_MEMORY_ROUTES,
 } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import {
+  CACHE_EXPIRY_COMPACTION_CAPABILITY,
+  CACHE_EXPIRY_COMPACTION_CODECS,
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import {
   CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-folders-v1";
@@ -239,6 +256,7 @@ import {
   decodeTeamProtocolSupportExpanded,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -285,6 +303,10 @@ import {
   HOST_TURN_LIMITS_ROUTES,
 } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import {
+  HOST_VOICE_MODEL_CAPABILITY,
+  HOST_VOICE_MODEL_ROUTES,
+} from "@openbot/contracts/team-protocol/host-voice-model-v1";
+import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_ROUTES,
@@ -327,6 +349,14 @@ import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
   PASSWORD_MANAGERS_ROUTES,
@@ -340,6 +370,10 @@ import {
   PENDING_PROMPTS_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY, PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import {
+  PROMPT_CACHE_TTL_CAPABILITY,
+  PROMPT_CACHE_TTL_PI_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
@@ -514,6 +548,10 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "../src/main/busy-message-mode-preference-store";
+import {
+  cacheExpiryCompactionControl,
+  createCacheExpiryCompactionPreferenceStore,
+} from "../src/main/cache-expiry-compaction-preference-store";
 import { createChannelFolders } from "../src/main/channel-folders";
 import {
   claudeCompactWindowControl,
@@ -528,6 +566,7 @@ import { CustomProviderStore } from "../src/main/custom-provider-store";
 import { githubSkillSource } from "../src/main/github-skill-source";
 import type { HostEventsApi } from "../src/main/host-events-api";
 import { HostTurnLimitsPreferenceStore } from "../src/main/host-turn-limits-preference-store";
+import { HostVoiceModelService, type VoiceModels } from "../src/main/host-voice-model";
 import {
   INSTANCE_TRANSFER_FORMAT,
   INSTANCE_TRANSFER_MANIFEST,
@@ -536,6 +575,7 @@ import {
 import { LibraryFoldersService, type LibraryFoldersSources } from "../src/main/library-folders-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
+import { ModelReleaseCatalog, ModelVisibility } from "../src/main/model-visibility";
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
 import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
 import { ProviderAccountsHost } from "../src/main/provider-accounts-host";
@@ -617,6 +657,57 @@ const busyMessageModePreferences = new BusyMessageModePreferenceStore(join(root,
 const hostTurnLimitsPath = join(root, "host-turn-limits.json");
 const hostTurnLimits = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
 await runCauseEffect(hostTurnLimits.load());
+
+class FakeVoiceModels extends EventEmitter<{ modelStatus: [VoiceModelStatus] }> implements VoiceModels {
+  settings: VoiceSettings = { ...DEFAULT_VOICE_SETTINGS };
+  readonly statuses = new Map<string, VoiceModelStatus>(
+    VOICE_MODEL_IDS.map((modelId) => [modelId, { modelId, phase: "missing", progress: null, message: null }]),
+  );
+
+  set(modelId: LocalVoiceModelId, phase: VoiceModelStatus["phase"], progress: number | null): VoiceModelStatus {
+    const status: VoiceModelStatus = { modelId, phase, progress, message: null };
+    this.statuses.set(modelId, status);
+    this.emit("modelStatus", status);
+    return status;
+  }
+
+  getModelStatuses() {
+    return Effect.sync(() => [...this.statuses.values()].map((status) => ({ ...status })));
+  }
+
+  getSettings() {
+    return { ...this.settings };
+  }
+
+  setSettings(settings: VoiceSettings) {
+    return Effect.sync(() => {
+      record("setVoiceSettings", settings.modelId);
+      this.settings = { ...settings };
+      return { ...settings };
+    });
+  }
+
+  downloadModel(modelId: LocalVoiceModelId): Effect.Effect<VoiceModelStatus> {
+    return Effect.gen({ self: this }, function* () {
+      record("downloadVoiceModel", modelId);
+      yield* Effect.yieldNow;
+      this.set(modelId, "downloading", 5);
+      return yield* Effect.never;
+    });
+  }
+
+  cancelModelDownload(modelId: LocalVoiceModelId) {
+    return Effect.sync(() => this.set(modelId, "missing", null));
+  }
+
+  removeModel(modelId: LocalVoiceModelId) {
+    return Effect.sync(() => {
+      record("removeVoiceModel", modelId);
+      return this.set(modelId, "missing", null);
+    });
+  }
+}
+const fakeVoiceModels = new FakeVoiceModels();
 const transferUploads = join(root, "user-data", "instance-transfer-uploads");
 const checks: Check[] = [];
 const calls: RecordedCall[] = [];
@@ -864,6 +955,7 @@ function activeQueue(agentId: string): QueueSnapshot {
 let queueSnapshotHold: { agentId: string; hold: QueueHold } | null = null;
 
 let groupedUsageLimit: AccountUsageLimit | null = null;
+let readFailedUsageLimit: AccountUsageLimit | null = null;
 
 const ANTIGRAVITY_GROUPS = [
   {
@@ -1371,6 +1463,7 @@ const fakeAgents: TeamApiAgents = {
         { id: "claude", primary: null, secondary: SPENT_WEEK },
         { id: "codex", accountId: "a0123456789abcdef", primary: null, secondary: SPENT_WEEK, creditsAvailable: false },
         ...(groupedUsageLimit ? [groupedUsageLimit] : []),
+        ...(readFailedUsageLimit ? [readFailedUsageLimit] : []),
       ],
     }),
   getAnalytics: unused("getAnalytics"),
@@ -1788,6 +1881,31 @@ const fakeAgentTasks: TeamApiAgentTasks = {
     return { agentId, tasks: [task("task-queued", queue), asking], limit: 10 };
   },
   readTask: unused("readTask"),
+  listArchivedTasks: (input) => {
+    record("listArchivedTasks", input);
+    return {
+      tasks: [
+        {
+          id: "task-archived",
+          agentId: input.agentId,
+          threadId: "thread-task-archived",
+          origin: "agent",
+          title: "Archived thread",
+          state: "closed",
+          outcome: "completed",
+          hold: null,
+          activeTurnId: null,
+          progress: null,
+          error: null,
+          queuedMessages: [],
+          createdAt: "2026-11-01T07:00:00.000Z",
+          updatedAt: "2026-11-01T08:00:00.000Z",
+          closedAt: "2026-11-01T08:00:00.000Z",
+        },
+      ],
+      hasMore: input.before === null,
+    };
+  },
   readTaskPage: (input) => {
     record("readTaskPage", input);
     return {
@@ -2559,6 +2677,14 @@ try {
     skills: chatSkills,
     admin: {
       skills: githubSkillsAdmin,
+      modelVisibility: new ModelVisibility({
+        path: join(root, "model-visibility.json"),
+        catalog: new ModelReleaseCatalog({ XDG_CACHE_HOME: join(root, "cache") }, root),
+        listModels: () => FAST_MODE_MODELS,
+        listAgents: () => agents,
+        customEndpoints: () => [],
+        modelsChanged: () => {},
+      }),
       customAgents: {
         list: () => Effect.succeed(customAgentList),
         save: (input) =>
@@ -2662,6 +2788,7 @@ try {
           ),
       },
       turnLimits: hostTurnLimits,
+      voiceModel: new HostVoiceModelService(fakeVoiceModels),
       localServers: {
         list: () => Effect.sync(() => ({ servers: [...localServerList], limit: 5 })),
         create: (name) =>
@@ -2727,10 +2854,17 @@ try {
         createClaudeUserSetupPreferenceStore(join(root, "claude-user-setup.json")),
         () => record("claudeUserSetupChanged"),
       ),
+      cacheExpiryCompaction: cacheExpiryCompactionControl(
+        createCacheExpiryCompactionPreferenceStore(join(root, "cache-expiry-compaction.json")),
+      ),
       claudeCompactWindow: claudeCompactWindowControl(
         createClaudeCompactWindowPreferenceStore(join(root, "claude-compact-window.json")),
         () => record("claudeCompactWindowChanged"),
       ),
+      promptCacheTtl: {
+        get: () => ({ ttl: "1h" as const }),
+        set: (ttl) => Effect.succeed({ ttl }),
+      },
       providerEnvironment,
       providerDetection: {
         detection: {
@@ -4030,6 +4164,102 @@ try {
       "an admin returns both limits to their defaults",
       adminReset.status === 200 && isDeepStrictEqual(adminReset.body, automatic),
       summary(adminReset),
+    );
+  }
+
+  {
+    const v10 = { capabilities: [HOST_VOICE_MODEL_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const route = HOST_VOICE_MODEL_ROUTES;
+    const modelOf = (body: Json, modelId: string) =>
+      list(field(body, "models")).find((model) => field(model, "modelId") === modelId);
+    const unsupported = await call("POST", route.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: [],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const memberRead = await call("POST", route.settings, { token: bobToken, json: {}, ...v10 });
+    const memberChange = await call("POST", route.change, {
+      token: bobToken,
+      json: { action: "select", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "a member cannot read or change the server speech model, and a client without host-voice-model-v1 gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.hostVoiceModelUnsupported")) &&
+        errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberChange, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("setVoiceSettings").length === 0,
+      [summary(unsupported), summary(memberRead), summary(memberChange)],
+    );
+    const adminRead = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    const models = list(field(adminRead.body, "models"));
+    check(
+      "an admin reads the selected speech model and only the models that the server downloads",
+      adminRead.status === 200 &&
+        field(adminRead.body, "modelId") === DEFAULT_VOICE_SETTINGS.modelId &&
+        models.length === LOCAL_VOICE_MODEL_IDS.length &&
+        models.every((model) => isLocalVoiceModelId(field(model, "modelId")) && field(model, "phase") === "missing"),
+      summary(adminRead),
+    );
+    const cloudChoice = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "select", modelId: "groq-whisper-large-v3" },
+      ...v10,
+    });
+    check(
+      "the host refuses a cloud model as the server speech model and saves nothing",
+      cloudChoice.status === 400 && callsOf("setVoiceSettings").length === 0,
+      summary(cloudChoice),
+    );
+    const selected = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "select", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "an admin selects the server speech model, and the host saves it with the old language",
+      selected.status === 200 &&
+        field(selected.body, "modelId") === "whisper-turbo" &&
+        fakeVoiceModels.getSettings().modelId === "whisper-turbo" &&
+        fakeVoiceModels.getSettings().language === DEFAULT_VOICE_SETTINGS.language,
+      summary(selected),
+    );
+    const download = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "download", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "the download route answers when the download starts, not when it ends",
+      download.status === 200 &&
+        field(modelOf(download.body, "whisper-turbo"), "phase") === "downloading" &&
+        callsOf("downloadVoiceModel").length === 1 &&
+        fakeVoiceModels.listenerCount("modelStatus") === 0,
+      summary(download),
+    );
+    const cancelled = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "cancel", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "an admin stops the download of the server speech model",
+      cancelled.status === 200 && field(modelOf(cancelled.body, "whisper-turbo"), "phase") === "missing",
+      summary(cancelled),
+    );
+    fakeVoiceModels.set("whisper-turbo", "ready", 100);
+    const removed = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "remove", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "an admin removes a downloaded server speech model",
+      removed.status === 200 &&
+        field(modelOf(removed.body, "whisper-turbo"), "phase") === "missing" &&
+        isDeepStrictEqual(callsOf("removeVoiceModel"), [["whisper-turbo"]]),
+      summary(removed),
     );
   }
 
@@ -5901,6 +6131,71 @@ try {
   }
 
   {
+    const visibilityCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MODEL_VISIBILITY_CAPABILITY];
+    const keptCapabilities = [...visibilityCapabilities, MODEL_VISIBILITY_KEPT_CAPABILITY];
+    const ada = agents.find((item) => item.id === "agent-ada");
+    assert.ok(ada, "agent-ada is missing.");
+    const backups = ada.backupModels;
+    ada.backupModels = { automatic: true, order: [{ provider: "codex", model: "gpt-standard" }] };
+    const hide = await call("POST", MODEL_VISIBILITY_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "codex", shown: [] },
+      capabilities: visibilityCapabilities,
+    });
+    const unsupported = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: visibilityCapabilities,
+    });
+    const kept = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    const listing = await call("POST", MODEL_VISIBILITY_ROUTES.listing, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    const released = await call("GET", TEAM_API_ROUTES.agents.models, {
+      token: bobToken,
+      capabilities: keptCapabilities,
+    });
+    const ids = list(released.body).map((model) => field(model, "id"));
+    check(
+      "a turned-off model that an agent uses stays in the model list, and only model-visibility-kept-v1 marks it",
+      hide.status === 200 &&
+        errorIs(unsupported, 400, sourceText("error.team.modelVisibilityUnsupported")) &&
+        kept.status === 200 &&
+        isDeepStrictEqual(kept.body, { models: [{ provider: "codex", id: "gpt-standard" }] }) &&
+        listing.status === 200 &&
+        list(field(listing.body, "models")).every((entry) => field(entry, "id") !== "gpt-standard") &&
+        released.status === 200 &&
+        ids.includes("gpt-standard") &&
+        !ids.includes("gpt-fast") &&
+        list(released.body).every((model) => field(model, "listing") === undefined),
+      [summary(hide), summary(unsupported), summary(kept), summary(listing), summary(released)],
+    );
+    const reset = await call("POST", MODEL_VISIBILITY_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "codex", shown: null },
+      capabilities: visibilityCapabilities,
+    });
+    if (backups) ada.backupModels = backups;
+    else delete ada.backupModels;
+    const none = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    check(
+      "after a reset no model is kept",
+      reset.status === 200 && none.status === 200 && isDeepStrictEqual(none.body, { models: [] }),
+      [summary(reset), summary(none)],
+    );
+  }
+
+  {
     const sourceCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, PROVIDER_MODEL_SOURCE_CAPABILITY];
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
@@ -6491,6 +6786,13 @@ try {
       [summary(compatibility), summary(older)],
     );
     check(
+      "the host advertises prompt-cache-ttl-pi-v1 with prompt-cache-ttl-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(PROMPT_CACHE_TTL_PI_CAPABILITY) &&
+        decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(PROMPT_CACHE_TTL_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PROMPT_CACHE_TTL_PI_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    check(
       "the host advertises vault-member-save-v1 to a protocol 10 peer only",
       decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(VAULT_MEMBER_SAVE_CAPABILITY) &&
         !list(field(older.body, "capabilities")).includes(VAULT_MEMBER_SAVE_CAPABILITY),
@@ -7016,6 +7318,47 @@ try {
   }
 
   {
+    const path = TEAM_API_ROUTES.agents.usage;
+    readFailedUsageLimit = { id: "grok", primary: null, secondary: null, readFailed: true };
+    const read = (headers?: Record<string, string>, protocol: number = TEAM_PROTOCOL_V10) =>
+      call("GET", path, { token: bobToken, protocol, ...(headers ? { headers } : {}) });
+    const grokLimit = (body: unknown) =>
+      isDynamicRecord(body) && Array.isArray(body.limits)
+        ? (body.limits.find((limit) => isDynamicRecord(limit) && limit.id === "grok") ?? null)
+        : "no limits";
+    const withFlag = await read(teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES));
+    const plain = await read(
+      teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== TEAM_USAGE_READ_FAILED_CAPABILITY),
+      ),
+    );
+    const older = await read(undefined, TEAM_PROTOCOL_V9);
+    const decoded =
+      withFlag.status === 200 ? decodeTeamProtocolV8CurrentHttpResponse("GET", path, 200, withFlag.body) : null;
+    check(
+      "a client with usage-read-failed-v1 reads the failed Grok usage read, and its decoder keeps it",
+      withFlag.status === 200 &&
+        isAccountUsage(decoded) &&
+        isDeepStrictEqual(grokLimit(decoded), readFailedUsageLimit) &&
+        decoded.limits.length === 3,
+      [summary(withFlag), decoded],
+    );
+    check(
+      "a client without usage-read-failed-v1, and a protocol 9 client, read the usage without it, as before",
+      plain.status === 200 &&
+        grokLimit(plain.body) === null &&
+        older.status === 200 &&
+        grokLimit(older.body) === null &&
+        isDynamicRecord(plain.body) &&
+        Array.isArray(plain.body.limits) &&
+        plain.body.limits.length === 2,
+      [summary(plain), summary(older)],
+    );
+    readFailedUsageLimit = null;
+  }
+
+  {
     const withSkillProblems = teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES);
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
       protocol: TEAM_PROTOCOL_V10,
@@ -7467,6 +7810,79 @@ try {
         errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("readTaskPage").length === 1,
       [summary(hidden), summary(missing)],
+    );
+  }
+
+  {
+    const capabilities = [AGENT_ARCHIVED_THREADS_CAPABILITY];
+    const v10 = { capabilities, protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises agent-archived-threads-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_ARCHIVED_THREADS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_ARCHIVED_THREADS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const first = { agentId: "agent-ada", before: null };
+    const unsupported = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, json: first });
+    check(
+      "the archived thread route without the capability gets 400 threadRemoteUnsupported, and reads nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("listArchivedTasks").length === 0,
+      summary(unsupported),
+    );
+    const page = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, ...v10, json: first });
+    const next = {
+      agentId: "agent-ada",
+      before: { updatedAt: "2026-11-01T08:00:00.000Z", threadId: "thread-task-archived" },
+    };
+    const after = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, ...v10, json: next });
+    const tasks = list(field(page.body, "tasks"));
+    check(
+      "a member reads the archived threads page by page: the host gets the place, and answers archived tasks and hasMore",
+      page.status === 200 &&
+        tasks.length === 1 &&
+        field(tasks[0], "id") === "task-archived" &&
+        field(tasks[0], "state") === "closed" &&
+        field(page.body, "hasMore") === true &&
+        after.status === 200 &&
+        field(after.body, "hasMore") === false &&
+        isDeepStrictEqual(callsOf("listArchivedTasks"), [[first], [next]]),
+      [summary(page), summary(after), callsOf("listArchivedTasks")],
+    );
+    const extra = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { ...first, limit: 100 },
+    });
+    const noPlace = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada" },
+    });
+    const badPlace = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", before: { updatedAt: "2026-11-01T08:00:00.000Z", threadId: "" } },
+    });
+    check(
+      "the frozen codec refuses an unknown field, a missing place, and a place with an empty thread id",
+      extra.status === 400 &&
+        noPlace.status === 400 &&
+        badPlace.status === 400 &&
+        callsOf("listArchivedTasks").length === 2,
+      [summary(extra), summary(noPlace), summary(badPlace)],
+    );
+    const missing = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { ...first, agentId: "agent-none" },
+    });
+    check(
+      "an unknown agent gets 404 and reads nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) && callsOf("listArchivedTasks").length === 2,
+      summary(missing),
     );
   }
 
@@ -8776,6 +9192,57 @@ try {
   }
 
   {
+    const setup = { token: adaToken, protocol: TEAM_PROTOCOL_V10, capabilities: [CACHE_EXPIRY_COMPACTION_CAPABILITY] };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const before = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const off = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, { ...setup, json: { enabled: false } });
+    const after = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const saved = parseJson(readFileSync(join(root, "cache-expiry-compaction.json"), "utf8"));
+    check(
+      "the host advertises cache-expiry-compaction-v1 to a protocol 10 peer only, the switch is on by default, and an admin turns it off, which the host saves",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(CACHE_EXPIRY_COMPACTION_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CACHE_EXPIRY_COMPACTION_CAPABILITY) &&
+        isDeepStrictEqual(before.body, { enabled: true }) &&
+        isDeepStrictEqual(off.body, { enabled: false }) &&
+        isDeepStrictEqual(after.body, { enabled: false }) &&
+        CACHE_EXPIRY_COMPACTION_CODECS.get(CACHE_EXPIRY_COMPACTION_ROUTES.update)?.response(200, off.body) !==
+          undefined &&
+        isDeepStrictEqual(saved, { version: 1, enabled: false }),
+      [summary(compatibility), summary(before), summary(off), summary(after)],
+    );
+    const member = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, {
+      ...setup,
+      token: bobToken,
+      json: { enabled: true },
+    });
+    const memberRead = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, {
+      ...setup,
+      token: bobToken,
+      json: {},
+    });
+    const noCapability = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V10,
+      json: { enabled: true },
+    });
+    const unchanged = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const on = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, { ...setup, json: { enabled: true } });
+    check(
+      "a member cannot read or set the compaction switch (403), a client without cache-expiry-compaction-v1 gets 400, and neither changes it",
+      member.status === 403 &&
+        memberRead.status === 403 &&
+        errorIs(noCapability, 400, sourceText("error.team.cacheExpiryCompactionUnsupported")) &&
+        isDeepStrictEqual(unchanged.body, { enabled: false }) &&
+        isDeepStrictEqual(on.body, { enabled: true }),
+      [summary(member), summary(memberRead), summary(noCapability), summary(on)],
+    );
+  }
+
+  {
     const setup = { token: adaToken, protocol: TEAM_PROTOCOL_V9, capabilities: [CLAUDE_COMPACT_WINDOW_CAPABILITY] };
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
@@ -9846,14 +10313,29 @@ try {
         bitwardenCalls.length === 0,
       summary(plainHttp),
     );
+    const wrongKeySettled = bitwardenSettled(bitwardenConnector);
+    const wrongKey = await connectAs(adaToken, { ...input, clientSecret: "wrong-client-secret" });
+    const wrongKeyStatus = await wrongKeySettled;
+    check(
+      "a wrong API key names the sign-in step, does not unlock, and leaves no CLI data",
+      field(wrongKey.body, "state") === "connecting" &&
+        !wrongKeyStatus.connected &&
+        wrongKeyStatus.error === sourceText("error.connector.bitwardenHostSignInFailed") &&
+        bitwardenCalls.some((entry) => entry.args[0] === "login") &&
+        !bitwardenCalls.some((entry) => entry.args[0] === "unlock") &&
+        !existsSync(bitwardenFile) &&
+        !existsSync(bitwardenData),
+      { wrongKey: summary(wrongKey), wrongKeyStatus },
+    );
+    bitwardenCalls.length = 0;
     const wrongSettled = bitwardenSettled(bitwardenConnector);
     const wrong = await connectAs(adaToken, { ...input, masterPassword: "wrong-master-password" });
     const wrongStatus = await wrongSettled;
     check(
-      "a wrong master password leaves no connection, no stored file and no signed-in CLI data",
+      "a wrong master password names the unlock step and leaves no connection, no stored file and no signed-in CLI data",
       field(wrong.body, "state") === "connecting" &&
         !wrongStatus.connected &&
-        wrongStatus.error === sourceText("error.connector.bitwardenHostFailed") &&
+        wrongStatus.error === sourceText("error.connector.bitwardenHostUnlockFailed") &&
         bitwardenCalls.some((entry) => entry.args[0] === "login") &&
         bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length === 1 &&
         !existsSync(bitwardenFile) &&

@@ -1,11 +1,13 @@
 import {
   checkWorkflowAnswer,
   lastJsonObject,
+  nodeAnswerProblemsWithoutPaths,
   parseWorkflowAnswerSpec,
   WORKFLOW_ANSWER_FIELD,
   type WorkflowAnswer,
   type WorkflowAnswerField,
   type WorkflowAnswerSource,
+  type WorkflowAnswerValue,
   type WorkflowAnswerValueProblem,
   type WorkflowFields,
   type WorkflowGraph,
@@ -14,22 +16,36 @@ import {
   workflowAnswerFixText,
   workflowAnswerInstruction,
   workflowAnswerLines,
+  workflowAnswerProblemName,
   workflowAnswerSources,
+  workflowAnswerTemplateText,
   workflowAnswerValueText,
+  workflowNodeAnswerNames,
+  workflowTriggerFields,
+  workflowTriggerRecord,
 } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { StoredWorkflowStep } from "./workflow-run-store";
+import { workflowScheduleRecord } from "./workflow-triggers";
 
 export function answerFields(fields: WorkflowFields | null | undefined): WorkflowAnswerField[] {
   const spec = fields?.[WORKFLOW_ANSWER_FIELD];
   return typeof spec === "string" && spec.trim() ? parseWorkflowAnswerSpec(spec).fields : [];
 }
 
-function givenAnswer({ node, fields }: WorkflowAnswerSource, output: string): WorkflowAnswer {
+function givenAnswer({ node, fields, builtIn }: WorkflowAnswerSource, output: string): WorkflowAnswer {
+  if (builtIn) return triggerAnswer(node, output);
   const record = lastJsonObject(output);
   if (!record) return {};
   const given = node.kind === "trigger" && Object.hasOwn(record, "data") ? record.data : record;
   return checkWorkflowAnswer(fields, given).answer;
+}
+
+function triggerAnswer(node: WorkflowNode, output: string): WorkflowAnswer {
+  const fields = workflowTriggerFields(node);
+  const record = node.fields.trigger === "schedule" ? workflowScheduleRecord(output) : lastJsonObject(output);
+  return record ? checkWorkflowAnswer(fields, workflowTriggerRecord(fields, record)).answer : {};
 }
 
 type GivenAnswer = { source: WorkflowAnswerSource; answer: WorkflowAnswer };
@@ -56,22 +72,61 @@ export function stepAnswer(
   return Object.fromEntries(givenAnswers(graph, nodeId, latest).flatMap(({ answer }) => Object.entries(answer)));
 }
 
-const QUOTED_TYPES: ReadonlySet<WorkflowAnswerField["type"]> = new Set(["text", "list"]);
+export type TemplateReader = "model" | "person" | "lines";
+
+function readerText(
+  reader: TemplateReader,
+  field: WorkflowAnswerField,
+  value: WorkflowAnswerValue | undefined,
+): string {
+  if (reader === "model") return workflowAnswerTemplateText(field, value);
+  if (reader === "lines" && Array.isArray(value)) return value.join("\n");
+  return workflowAnswerValueText(value);
+}
 
 export function templateValues(
   graph: WorkflowGraph,
   nodeId: string,
   latest: ReadonlyMap<string, StoredWorkflowStep>,
+  reader: TemplateReader = "model",
 ): Map<string, string> {
   const values = new Map<string, string>();
   for (const { fields } of workflowAnswerSources(graph, nodeId)) for (const field of fields) values.set(field.name, "");
   for (const { source, answer } of givenAnswers(graph, nodeId, latest))
     for (const field of source.fields) {
       if (!Object.hasOwn(answer, field.name)) continue;
-      const text = workflowAnswerValueText(answer[field.name]);
-      values.set(field.name, QUOTED_TYPES.has(field.type) ? JSON.stringify(text) : text);
+      const value = answer[field.name];
+      values.set(field.name, readerText(reader, field, value));
     }
   return values;
+}
+
+export type AnswerGap = { kind: "setup" | "source"; names: string };
+
+export function stepAnswerGap(
+  graph: WorkflowGraph,
+  node: WorkflowNode,
+  endedWithoutAnswer: (nodeId: string) => boolean,
+): AnswerGap | null {
+  const sources = workflowAnswerSources(graph, node.id);
+  const typed = sources.some((source) => !source.builtIn);
+  const problems = nodeAnswerProblemsWithoutPaths(graph, node).filter((problem) => typed && problem.code !== "check");
+  if (problems.length > 0)
+    return { kind: "setup", names: [...new Set(problems.map(workflowAnswerProblemName))].join(", ") };
+  const used = workflowNodeAnswerNames(node);
+  if (used.length === 0) return null;
+  const lost = used.filter((name) => {
+    const giving = sources.flatMap((source) => {
+      const field = source.fields.find((candidate) => candidate.name === name);
+      return field ? [{ source, field }] : [];
+    });
+    return (
+      giving.length > 0 &&
+      giving.some(({ field }) => !field.optional) &&
+      giving.every(({ source }) => endedWithoutAnswer(source.node.id))
+    );
+  });
+  return lost.length > 0 ? { kind: "source", names: lost.join(", ") } : null;
 }
 
 export function readableAnswerInputs(
@@ -97,8 +152,43 @@ export function modelAnswerAsk(fields: readonly WorkflowAnswerField[]): string {
   return `Answer with only one JSON object, with no other text, with these fields:\n${workflowAnswerInstruction(fields)}`;
 }
 
+export function workflowAnswerJsonSchema(fields: readonly WorkflowAnswerField[]): DynamicRecord {
+  return {
+    type: "object",
+    properties: Object.fromEntries(fields.map((field) => [field.name, answerValueSchema(field)])),
+    required: fields.filter((field) => !field.optional).map((field) => field.name),
+    additionalProperties: false,
+  };
+}
+
+function answerValueSchema(field: WorkflowAnswerField): DynamicRecord {
+  switch (field.type) {
+    case "text":
+      return { type: "string" };
+    case "number":
+      return { type: "number" };
+    case "integer":
+      return { type: "integer" };
+    case "yes/no":
+      return { type: "boolean" };
+    case "list":
+      return { type: "array", items: { type: "string" } };
+    case "choice":
+      return { type: "string", enum: [...field.labels] };
+  }
+}
+
+export const WORKFLOW_ANSWER_TOOL = "workflow_answer";
+
 export function agentAnswerAsk(fields: readonly WorkflowAnswerField[]): string {
-  return `End your reply with one JSON object with these fields:\n${workflowAnswerInstruction(fields)}`;
+  return `Give your answer with the openbot.${WORKFLOW_ANSWER_TOOL} tool, as {"answer":{…}}, with these fields:\n${workflowAnswerInstruction(fields)}\nWhen it is not in your tool list, run it with openbot.tool_call. It checks the fields at once; when it tells you a problem, correct the answer and call it again. When you cannot call it, end your reply with the same JSON object.`;
+}
+
+export function toolAnswerFixAsk(
+  fields: readonly WorkflowAnswerField[],
+  problems: readonly WorkflowAnswerValueProblem[],
+): string {
+  return `The answer did not fit: ${workflowAnswerFixText(problems)}. Call ${WORKFLOW_ANSWER_TOOL} again with the corrected answer, with these fields:\n${workflowAnswerInstruction(fields)}`;
 }
 
 export function answerFixAsk(
@@ -111,8 +201,30 @@ export function answerFixAsk(
 export type ReadAnswer = { output: string } | { problems: WorkflowAnswerValueProblem[] };
 
 export function readAnswer(fields: readonly WorkflowAnswerField[], text: string): ReadAnswer {
-  const { answer, problems } = checkWorkflowAnswer(fields, lastJsonObject(text) ?? {});
+  const record = lastJsonObject(text);
+  if (!record) return { problems: [{ name: fields.map((field) => field.name).join(", "), problem: "json" }] };
+  return readGivenAnswer(fields, record);
+}
+
+export function readGivenAnswer(fields: readonly WorkflowAnswerField[], value: unknown): ReadAnswer {
+  const { answer, problems } = checkWorkflowAnswer(fields, value, "refuse");
   return problems.length > 0 ? { problems } : { output: JSON.stringify(answer) };
+}
+
+export function runInputProblems(trigger: WorkflowNode, input: string): WorkflowAnswerValueProblem[] {
+  const fields = workflowAnswerFieldsOf(trigger);
+  if (fields.length === 0) return [];
+  const record = lastJsonObject(input);
+  if (!record) return [{ name: fields.map((field) => field.name).join(", "), problem: "json" }];
+  const given = Object.hasOwn(record, "data") ? record.data : record;
+  return checkWorkflowAnswer(fields, given, "refuseMiscased").problems;
+}
+
+export function withRunAnswerSpec(node: WorkflowNode, runNode: WorkflowNode | undefined): WorkflowNode {
+  if (!runNode || runNode.kind !== node.kind) return node;
+  const spec = runNode.fields[WORKFLOW_ANSWER_FIELD];
+  const fields = Object.fromEntries(Object.entries(node.fields).filter(([name]) => name !== WORKFLOW_ANSWER_FIELD));
+  return { ...node, fields: spec === undefined ? fields : { ...fields, [WORKFLOW_ANSWER_FIELD]: spec } };
 }
 
 export function answerProblemNames(problems: readonly WorkflowAnswerValueProblem[]): string {
@@ -125,7 +237,7 @@ export function webhookAnswerEvent(
 ): { event: ReceivedWebhookEvent } | { problems: WorkflowAnswerValueProblem[] } {
   const fields = workflowAnswerFieldsOf(trigger);
   if (fields.length === 0) return { event };
-  const { answer, problems } = checkWorkflowAnswer(fields, event.data);
+  const { answer, problems } = checkWorkflowAnswer(fields, event.data, "refuseMiscased");
   if (problems.length > 0) return { problems };
   const data = Object.fromEntries(
     Object.entries(answer).map(([name, value]) => [name, typeof value === "object" ? [...value] : value]),

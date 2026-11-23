@@ -348,7 +348,7 @@ export const messages = {
   "connector.whatsapp.linkNumber": "番号をリンク",
   "connector.whatsapp.ownNumberNote": "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
   "connector.whatsapp.dedicatedNote":
-    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp がこのコンピューターをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "connector.whatsapp.helpLoggedOutHost":

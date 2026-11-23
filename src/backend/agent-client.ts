@@ -22,6 +22,9 @@ export interface DiagnosticOrigin {
 export interface AgentClient {
   readonly provider: AgentProvider;
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
+  readonly compactsOnDemand?: boolean;
+  promptCacheTtlMs?(externalThreadId: string): number | null;
+  contextWindow?(externalThreadId: string): number | null;
   readonly compactsItself?: boolean;
   readonly provisionalAnswers?: boolean;
   readonly turnContext?: boolean;
@@ -32,7 +35,9 @@ export interface AgentClient {
   readonly deferredMcpTools?: (externalThreadId: string) => boolean;
   readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
   readonly catalogAsMcpTools?: (model: string) => boolean;
+  readonly sessionMcpServerName?: (config: McpServerConfig, cwd: string) => string;
   readonly imageInput?: (externalThreadId: string) => boolean;
+  readonly structuredOutput?: boolean;
   readonly canReleaseProcess?: () => boolean;
   readonly runsBackgroundWork?: () => boolean;
   readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
@@ -118,6 +123,13 @@ export class ProviderModelNotOfferedError extends Error {
   constructor(providerName: string, model: string) {
     super(sourceText("error.provider.acpModelNotOffered", { provider: providerName, model }));
     this.name = "ProviderModelNotOfferedError";
+  }
+}
+
+export class ProviderModelLimitedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProviderModelLimitedError";
   }
 }
 

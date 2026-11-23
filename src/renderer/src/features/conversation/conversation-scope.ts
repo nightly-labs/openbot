@@ -17,11 +17,15 @@ import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
+import type { AgentMessage } from "@openbot/ui/data";
+import { awaitingReplyEnded } from "@openbot/ui/features/conversation/AwaitingReplies";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
+import type { AgentThreadVoice } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { prefersReducedMotion, usesTouchLayout } from "@openbot/ui/utils";
 import { errorReference } from "@openbot/user-errors";
+import type { VirtualItem } from "@tanstack/virtual-core";
 import {
   createContext,
   createEffect,
@@ -99,6 +103,29 @@ function builtInBrowserPage(url: string): boolean {
   return (page?.protocol === "http:" || page?.protocol === "https:") && relayableSignInLink(url) === null;
 }
 
+function newAnswerAtEnd(
+  rows: readonly AgentMessage[],
+  drawnBefore: ReadonlyMap<VirtualItem["key"], number>,
+  rowKey: (message: AgentMessage) => string,
+): AgentMessage | undefined {
+  let answer: AgentMessage | undefined;
+  for (let index = rows.length - 1; index >= Math.max(0, rows.length - NEW_ROWS_LIMIT); index -= 1) {
+    const row = rows[index];
+    if (!row) return undefined;
+    if (drawnBefore.has(row.id) || drawnBefore.has(rowKey(row))) return answer;
+    if (row.author === "agent" && row.kind === "text" && row.itemType !== "commentary") answer = row;
+  }
+  return undefined;
+}
+
+function answerStartOffset(element: HTMLDivElement, messageId: string): number | undefined {
+  const marker = element.querySelector<HTMLElement>(`[data-chat-search-message="${CSS.escape(messageId)}"]`);
+  const row = marker?.closest<HTMLElement>(".virtual-chat-row") ?? marker;
+  if (!row) return undefined;
+  const top = row.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+  return Math.max(0, top - ANSWER_START_GAP_PX);
+}
+
 const CHAT_GLIDE_TIME_CONSTANT_MS = 70;
 const CHAT_GLIDE_MAX_STEP_MS = 34;
 const CHAT_PUSH_DURATION_MS = 280;
@@ -107,6 +134,8 @@ const CHAT_GLIDE_OPEN_DELAY_MS = 600;
 const MEDIA_SETTLE_MS = 150;
 const MEDIA_LAYOUT_EVENTS = ["load", "error", "loadedmetadata"] as const;
 const SENT_MESSAGE_PIN_MS = 400;
+const NEW_ROWS_LIMIT = 8;
+const ANSWER_START_GAP_PX = 16;
 const WAITING_QUESTION_CARD = '.question-prompt-bubble:not([data-state="done"])';
 
 export function createConversationViewScope(props: ConversationProps) {
@@ -274,6 +303,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const {
     skillSettingsRequest,
     openSkillSettings,
+    clearSkillSettingsRequest,
     instructionsSettingsRequest,
     openInstructionsSettings,
     agentSettingRowRequest,
@@ -354,7 +384,7 @@ export function createConversationViewScope(props: ConversationProps) {
       const result = await save?.catch(() => null);
       if (result?.saved === true) return "saved";
     }
-    return sendCardMessage(reply, target) ? "sent" : null;
+    return sendCardReplyNow(reply, target) ? "sent" : null;
   }
   const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills, installedSkillsLoadFailed } = skills;
@@ -463,14 +493,16 @@ export function createConversationViewScope(props: ConversationProps) {
   const awaitingReplies = channel
     ? createMemo(() => {
         const hidden = hiddenAwaitingReplyIds();
-        return channel
-          .awaitingReplies()
-          .filter((row) => !(hidden.has(row.id) && (row.state === "replied" || row.state === "failed")));
+        return channel.awaitingReplies().filter((row) => !(hidden.has(row.id) && awaitingReplyEnded(row.state)));
       })
     : queue.awaitingReplies;
   const dismissAwaitingReplies = () => {
     setHiddenAwaitingReplyIds((ids) => new Set([...ids, ...awaitingReplies().map((row) => row.id)]));
     setComposerFocusRequest((value) => value + 1);
+  };
+  const stopAwaitingReply = (rowId: string) => {
+    const row = awaitingReplies().find((item) => item.id === rowId);
+    if (row?.agent && row.deliveryId) props.onCancelQueuedMessage(row.deliveryId, row.agent.id);
   };
   const activity = createActivityStore({
     props,
@@ -817,6 +849,7 @@ export function createConversationViewScope(props: ConversationProps) {
     toggleAgentMessage,
     updateAnswers,
     timelineIndexById,
+    keepPageDrawn,
     unreadBoundaryMessageId,
     updateScrollFade,
     updateVirtualScrollMargin,
@@ -913,6 +946,7 @@ export function createConversationViewScope(props: ConversationProps) {
   });
   const messagePins = createMessagePinsStore({ props });
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
+  const [besideFocusRequest, setBesideFocusRequest] = createSignal(0);
   const requestThreadFocus = () => setThreadFocusRequest((current) => current + 1);
   const voice = createVoiceStore({
     props,
@@ -945,19 +979,24 @@ export function createConversationViewScope(props: ConversationProps) {
     },
     thread: {
       openDraftKey: () => threadComposer.openDraftKey(),
+      besideDraftKey,
       appendTranscript: (key, text) => {
         threadComposer.setText(key, appendVoiceTranscript(threadComposer.draft(key).text, text));
-        if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+        requestDraftFocus(key);
       },
       send: async (key) => {
         flush();
         const threads = props.threads;
-        if (!threads || threadComposer.openDraftKey() !== key) return;
+        if (!threads) return;
+        const besideId =
+          key !== threadComposer.openDraftKey() && key === besideDraftKey() ? shownPanelThreadId() : null;
+        const destination = besideId === null ? threads : threads.side.thread(besideId);
+        if (!destination || (besideId === null && threadComposer.openDraftKey() !== key)) return;
         if (threadQueue.editsDraft(key)) {
           await threadComposer.importsEnded(key);
           await threadQueue.save(key);
-        } else await threadComposer.send(threads, threadComposer.draft(key).text.trim());
-        if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+        } else await threadComposer.send(destination, threadComposer.draft(key).text.trim(), key);
+        requestDraftFocus(key);
       },
       reportError: (message) => actionToast.error(message),
       reportLimit: () => toast.warning(currentText().t("composer.voice.limitReached")),
@@ -1014,18 +1053,22 @@ export function createConversationViewScope(props: ConversationProps) {
     event.preventDefault();
     event.stopPropagation();
   };
-  const startThreadVoiceRecording = () => {
-    const key = threadComposer.openDraftKey();
-    if (key !== undefined) void startVoiceRecording(key);
-  };
-  const threadVoiceOwned = () => {
-    const key = threadComposer.openDraftKey();
-    return key !== undefined && voicePhase() !== "idle" && voiceThreadKey() === key;
-  };
+  function besideDraftKey(): string | undefined {
+    const id = activeRightPanel() === "thread" ? shownPanelThreadId() : null;
+    return id === null ? undefined : threadComposer.sideDraftKey(id);
+  }
+  function requestDraftFocus(key: string): void {
+    if (threadComposer.openDraftKey() === key) setThreadFocusRequest((current) => current + 1);
+    else if (besideDraftKey() === key) setBesideFocusRequest((current) => current + 1);
+  }
+  const threadDraftShown = (key: string | undefined) =>
+    key === threadComposer.openDraftKey() || (key !== undefined && key === besideDraftKey());
+  const threadVoiceOwned = (key: string | undefined) =>
+    key !== undefined && voicePhase() !== "idle" && voiceThreadKey() === key;
   createEffect(
-    () => ({ key: threadComposer.openDraftKey(), owner: voiceThreadKey(), recording: voicePhase() === "recording" }),
-    ({ key, owner, recording }) => {
-      if (recording && owner !== key) stopVoiceRecording();
+    () => ({ shown: threadDraftShown(voiceThreadKey()), recording: voicePhase() === "recording" }),
+    ({ shown, recording }) => {
+      if (recording && !shown) stopVoiceRecording();
     },
   );
   const voiceLiveText = () => {
@@ -1037,10 +1080,27 @@ export function createConversationViewScope(props: ConversationProps) {
       ? live.text
       : "";
   };
-  const threadVoiceLiveText = () => {
+  const threadVoiceLiveText = (key: string | undefined) => {
     const live = voiceLiveTranscript();
-    const key = threadComposer.openDraftKey();
     return live && key !== undefined && live.threadKey === key ? live.text : "";
+  };
+  const threadVoice = (key: string | undefined): AgentThreadVoice | undefined => {
+    if (props.runtime) return undefined;
+    const owned = threadVoiceOwned(key);
+    return {
+      phase: owned ? voicePhase() : "idle",
+      blocked: !owned && voicePhase() !== "idle",
+      liveText: threadVoiceLiveText(key),
+      levels: voiceLevels(),
+      elapsedSeconds: voiceElapsedSeconds(),
+      modelProgress: voiceModelProgress(),
+      onStart: () => {
+        if (key !== undefined) void startVoiceRecording(key);
+      },
+      onCancel: cancelVoiceRecording,
+      onFinish: stopVoiceRecording,
+      onSend: stopVoiceRecordingAndSend,
+    };
   };
   const voiceLimitNotice = () => {
     const reached = voiceLimitReached();
@@ -1210,6 +1270,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardReplyNow,
     sendCardFile,
     retryPendingSend,
     editPendingSend,
@@ -1313,6 +1374,7 @@ export function createConversationViewScope(props: ConversationProps) {
   let chatGlideFrame: number | undefined;
   let chatGlideAfter = Number.POSITIVE_INFINITY;
   let sentMessagePinUntil = 0;
+  let answerStartFrame: number | undefined;
   function followSentMessage(): void {
     setStickToLatest(true);
     stopChatGlides();
@@ -1336,6 +1398,7 @@ export function createConversationViewScope(props: ConversationProps) {
     element.scrollTop = latestScrollTop(element);
   }
   function glideConversationBottom(element: HTMLDivElement): void {
+    if (answerStartFrame !== undefined) return;
     if (performance.now() < sentMessagePinUntil) {
       stopChatGlides();
       followConversationBottom(element);
@@ -1885,6 +1948,53 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
+  let drawnRows: { identity: string; live: boolean; drawn: ReadonlyMap<VirtualItem["key"], number> } | undefined;
+  createEffect(
+    () => ({
+      identity: `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}`,
+      loaded: props.loaded,
+      live: !props.discontinuous,
+      rows: timelineMessages(),
+      drawn: timelineIndexById(),
+    }),
+    ({ identity, loaded, live, rows, drawn }) => {
+      const before = drawnRows;
+      drawnRows = loaded ? { identity, live, drawn } : undefined;
+      if (before?.identity !== identity || !before.live || !live) return;
+      if (!stickToLatest || readerLeftLatest || unreadOpening.holding) return;
+      const answer = newAnswerAtEnd(rows, before.drawn, (row) => handedOverRowKeys().get(row.id) ?? row.id);
+      if (answer) showAnswerStart(answer.id);
+    },
+  );
+  function showAnswerStart(messageId: string): void {
+    const revealedAt = performance.now();
+    const readerMoved = () =>
+      readerDragging || sentMessagePinUntil > revealedAt || (readerIntent?.at ?? 0) >= revealedAt;
+    const place = (settle: boolean) => {
+      if (answerStartFrame !== undefined) cancelAnimationFrame(answerStartFrame);
+      answerStartFrame = requestAnimationFrame(() => {
+        answerStartFrame = undefined;
+        const element = scrollElement;
+        if (!element) return;
+        const cardWaits = requiredInteractionScrollTop(element) !== undefined;
+        const start = readerMoved() || cardWaits ? undefined : answerStartOffset(element, messageId);
+        if (settle) {
+          if (!stickToLatest && start !== undefined) element.scrollTop = start;
+        } else if (start !== undefined && !readerLeftLatest && start < element.scrollHeight - element.clientHeight) {
+          leaveLatest();
+          element.scrollTop = start;
+          place(true);
+        } else if (stickToLatest) glideConversationBottom(element);
+        updateScrollFade(element);
+        updateUnreadDividerVisibility();
+      });
+    };
+    place(false);
+  }
+  onCleanup(() => {
+    if (answerStartFrame !== undefined) cancelAnimationFrame(answerStartFrame);
+  });
+
   function scrollToUnreadDivider(element: HTMLDivElement): void {
     const divider = unreadMessagesDivider;
     if (!divider?.isConnected) return;
@@ -2432,11 +2542,11 @@ export function createConversationViewScope(props: ConversationProps) {
     threadComposer,
     threadQueue,
     threadFocusRequest,
+    besideFocusRequest,
     requestThreadFocus,
     branchThread,
     startNewThread,
-    threadVoiceLiveText,
-    threadVoiceOwned,
+    threadVoice,
     replyJump,
     messagePins,
     voiceConversationAvailable,
@@ -2522,6 +2632,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
+    stopAwaitingReply,
     clearComposerError,
     setComposerErrorForTarget,
     clearChatErrors,
@@ -2581,6 +2692,7 @@ export function createConversationViewScope(props: ConversationProps) {
     toggleAgentMessage,
     updateAnswers,
     timelineIndexById,
+    keepPageDrawn,
     unreadBoundaryMessageId,
     moveChatSearch,
     newMessageCount,
@@ -2638,6 +2750,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setPageContext,
     skillSettingsRequest,
     openSkillSettings,
+    clearSkillSettingsRequest,
     instructionsSettingsRequest,
     openInstructionsSettings,
     changeMarkerActions,
@@ -2695,7 +2808,6 @@ export function createConversationViewScope(props: ConversationProps) {
     showComposerActions,
     showScrollToLatest,
     startVoiceRecording,
-    startThreadVoiceRecording,
     stopVoiceRecording,
     stopVoiceRecordingAndSend,
     cancelVoiceRecording,
@@ -2717,6 +2829,7 @@ export function createConversationViewScope(props: ConversationProps) {
     dismissVoiceLimitNotice,
     voiceLiveText,
     voicePhase,
+    voiceThreadKey,
     voiceModelProgress,
   };
 }

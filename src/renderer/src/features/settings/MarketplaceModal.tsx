@@ -221,6 +221,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             signInHostName={props.pluginSignInRelay ? props.pluginHostName : undefined}
             onCancelSignIn={controller.cancelSignIn}
             onCopySignInLink={props.pluginHostName ? undefined : controller.copySignInLink()}
+            onPasteSignInAddress={props.pluginHostName ? undefined : controller.pasteSignInAddress()}
             signInExtra={
               <>
                 <Show when={controller.signInHostPage()} keyed>

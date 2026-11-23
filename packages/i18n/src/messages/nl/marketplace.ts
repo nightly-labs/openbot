@@ -653,6 +653,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Installeer {name} op de computer waarop deze agents draaien: de app ervan vereist inloggen in de browser.",
   "marketplace.error.appInvalid": "{name} kan niet worden toegevoegd: {reason}",
+  "marketplace.error.appNotConnected": "{name} kan niet worden gekoppeld: {reason}",
   "marketplace.error.uninstallNoServer": "Kies een lokale server om een plug-in te verwijderen.",
   "marketplace.error.uninstallPartial": "Een deel van {name} kon niet worden verwijderd. {failures}",
   "marketplace.error.actionFailed": "Kan de marktplaatsactie niet voltooien. Probeer het opnieuw.",

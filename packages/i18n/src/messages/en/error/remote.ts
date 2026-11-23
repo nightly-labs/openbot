@@ -30,6 +30,8 @@ export const messages = defineMessages("error.remote", {
     "The connection to the host is too slow for the picture. Try again: the next connection uses a lower quality.",
   "error.remote.streamTooSlow":
     "The connection to the host is too slow for the picture. Use a faster network, then try again.",
+  "error.remote.noPictureSwitchEncoder":
+    "The host did not send a picture. Try again: the next connection uses a video setting that works on more computers.",
   "error.remote.teamSessionExpired": "The team session has expired.",
   "error.remote.finishTestBeforeSwitch": "Finish the remote desktop test before switching displays.",
   "error.remote.displayNotFound": "Remote display not found.",
@@ -90,7 +92,9 @@ export const messages = defineMessages("error.remote", {
     "OpenBot cannot verify this server because its security key is missing or changed. Ask the server owner to check the server.",
   "error.remote.connectionNotStarted":
     "OpenBot could not start the connection to this server. If this continues, quit OpenBot and open it again.",
-  "error.remote.hostDidNotConnect": "The WebRTC host did not connect.",
+  "error.remote.connectionServiceUnreachable":
+    "This computer cannot reach the OpenBot connection service. Check its internet connection. OpenBot connects again automatically.",
+  "error.remote.serverAnswerTimeout": "The server did not answer in time. OpenBot connects again automatically.",
   "error.remote.connectionCancelled": "The remote connection was cancelled.",
   "error.remote.hostDisconnected":
     "The connection to the server was lost. Check whether the action finished, then try again.",

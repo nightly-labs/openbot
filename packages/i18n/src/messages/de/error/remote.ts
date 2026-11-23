@@ -32,6 +32,8 @@ export const messages = {
     "Die Verbindung zum Host ist zu langsam für das Bild. Versuche es erneut: Die nächste Verbindung nutzt eine niedrigere Qualität.",
   "error.remote.streamTooSlow":
     "Die Verbindung zum Host ist zu langsam für das Bild. Nutze ein schnelleres Netzwerk und versuche es erneut.",
+  "error.remote.noPictureSwitchEncoder":
+    "Der Host hat kein Bild gesendet. Versuche es erneut: Die nächste Verbindung nutzt eine Videoeinstellung, die auf mehr Computern funktioniert.",
   "error.remote.teamSessionExpired": "Die Teamsitzung ist abgelaufen.",
   "error.remote.finishTestBeforeSwitch": "Beende den Remote-Desktop-Test, bevor du den Bildschirm wechselst.",
   "error.remote.displayNotFound": "Remote-Bildschirm nicht gefunden.",
@@ -94,7 +96,10 @@ export const messages = {
     "OpenBot kann diesen Server nicht prüfen, weil sein Sicherheitsschlüssel fehlt oder sich geändert hat. Bitte den Serverbesitzer, den Server zu prüfen.",
   "error.remote.connectionNotStarted":
     "OpenBot konnte die Verbindung zu diesem Server nicht starten. Wenn das weiter passiert, beende OpenBot und öffne es erneut.",
-  "error.remote.hostDidNotConnect": "Der WebRTC-Host hat sich nicht verbunden.",
+  "error.remote.connectionServiceUnreachable":
+    "Dieser Computer erreicht den Verbindungsdienst von OpenBot nicht. Prüfe seine Internetverbindung. OpenBot verbindet sich automatisch wieder.",
+  "error.remote.serverAnswerTimeout":
+    "Der Server hat nicht rechtzeitig geantwortet. OpenBot verbindet sich automatisch wieder.",
   "error.remote.connectionCancelled": "Die entfernte Verbindung wurde abgebrochen.",
   "error.remote.hostDisconnected":
     "Die Verbindung zum Server wurde unterbrochen. Prüfe, ob die Aktion abgeschlossen wurde, und versuche es dann erneut.",

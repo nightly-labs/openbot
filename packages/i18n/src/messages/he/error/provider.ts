@@ -137,6 +137,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "מפתח הספק מכיל רווח או תו שאסור שיופיע במפתח.",
   "error.provider.noModel": "לספק שנבחר אין מודל זמין.",
   "error.provider.noModelNamed": "ל-{provider} אין מודל זמין.",
+  "error.provider.acpModelsNotLoaded": "{provider} לא הצליח לטעון את המודלים שלו. יש לשלוח שוב את ההודעה.",
   "error.provider.acpNoModels": "ה-CLI של ACP לא פרסם אף מודל ACP. OpenBot לא ינחש מודל חלופי.",
   "error.provider.endpointRemoveBusy": "יש להמתין לסיום הפעולה הפעילה והתור לפני הסרת נקודת הקצה הזו.",
   "error.provider.codexOutdated": "Codex CLI {version} ישן מדי. OpenBot דורש גרסה 0.156.0 ומעלה.",
@@ -169,6 +170,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "{provider} נעצר לפני שההודעה הזו התחילה. יש לשלוח את ההודעה שוב.",
   "error.provider.sessionStartTimedOut":
     "{provider} לא פתח צ׳אט חדש בזמן, ולכן ההודעה הזו לא התחילה. במחשב שמריץ את OpenBot, יש לפתוח את ספקים, לבחור את {provider} וללחוץ על הפעלה מחדש. אחר כך יש לנסות שוב.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} לא פתח את הצ׳אט הזה בזמן, ולכן ההודעה הזו לא התחילה. במחשב שמריץ את OpenBot, יש לפתוח את ספקים, לבחור את {provider} וללחוץ על הפעלה מחדש. אחר כך יש לנסות שוב.",
   "error.provider.serviceUnreachable":
     "{provider} לא מצליח להתחבר לשירות שלו. יש לבדוק את החיבור לאינטרנט. OpenBot ינסה שוב.",
   "error.provider.serviceUnreachableRefresh":
@@ -257,6 +260,8 @@ export const messages = {
     "OpenCode לא הצליח לקרוא את החשיבה של המודל הזה ברמת המאמץ הזו. יש לבחור רמת מאמץ נמוכה יותר או מודל אחר, ואז לשלוח את ההודעה שוב.",
   "error.provider.opencodeModelNotServed":
     "ספק המודל לא מציע כרגע את המודל הזה לחשבון שלך. יש לבחור מודל אחר ולשלוח את ההודעה שוב.",
+  "error.provider.opencodeSafetyBlocked":
+    "ספק המודל חסם את ההודעה הזאת בגלל כללי הבטיחות שלו. יש לשלוח את הבקשה שוב במילים אחרות. אם הוא חוסם גם את ההודעות הבאות, יש להתחיל צ'אט חדש או לבחור מודל אחר.",
   "error.provider.opencodeNetwork":
     "OpenCode לא הצליח להתחבר לספק המודלים. יש לבדוק את חיבור הרשת של המחשב שמריץ את OpenBot ואז לנסות שוב.\n{detail}",
   "error.provider.codexStateBusy":
@@ -266,6 +271,8 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux עצר את הספק כי ל-OpenBot יש מגבלת מעבד בזמן אמת של 0. המגבלה מגיעה מהמערכת שלך. יש להתקין ולהפעיל את rtkit (`rtkit-daemon`), להריץ `systemctl --user restart xdg-desktop-portal`, ואז להפעיל מחדש את OpenBot. הפעלה מחדש של xdg-desktop-portal בלבד לא תעזור כל עוד rtkit חסר.",
   "error.provider.cpuUnsupported": "המעבד של המחשב הזה לא יכול להריץ את הספק הזה. השתמש בספק אחר.",
+  "error.provider.windowsBlocked":
+    "הגדרות האבטחה של Windows, כמו Smart App Control, מנעו מהספק הזה להתחיל. השתמש בספק אחר.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode לא הצליח לפתוח את מסד הנתונים שלו כי גרסה חדשה יותר של OpenCode שינתה אותו. יש לעדכן את OpenCode לגרסה 2 ומעלה ואז לנסות שוב.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -279,6 +286,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} עצר בלי תשובה. יש לשלוח את ההודעה שוב.",
   "error.provider.channelNoAnswer":
     "{provider} סיים את התור בלי תשובה. בערוץ, יש ללחוץ על המשך כדי להריץ את המשימה שוב, או על הקצאה מחדש כדי לתת אותה לחבר אחר.",
+  "error.provider.acpProcessStopped": "{provider} נעצר לפני שענה. יש לשלוח את ההודעה שוב.",
   "error.provider.chatgptPageFailed": "OpenBot לא הצליח לפתוח את דף החיבור של ChatGPT.",
   "error.provider.noneReady": "אין ספק סוכנים מוכן.",
   "error.provider.claudeTurnActive": "יש להמתין לפעולה הפעילה של Claude לפני רענון ההקשר שלו.",
@@ -317,6 +325,8 @@ export const messages = {
     "{provider} לא סיים את התור הקודם שלו, ולכן לא קיבל את ההודעה הזו. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
   "error.provider.antigravityLocationUnsupported":
     "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini נעצר בגלל שגיאה. יש לשלוח את ההודעה שוב. אם הוא נעצר שוב, יש לבחור מודל או ספק אחר.",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
   "error.provider.grokServiceFailure":
     "השירות של Grok עמוס או שיש בו שגיאה. יש לנסות שוב בעוד כמה דקות, או לבחור מודל אחר.",
@@ -502,6 +512,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "ההגדרה הזו אינה זמינה בסשן הנוכחי של הספק.",
   "error.provider.sessionSettingInvalid": "הערך הזה אינו זמין עבור ההגדרה.",
   "error.provider.sessionSettingsBusy": "יש להמתין לסיום הפעולה הנוכחית לפני שינוי הגדרת סשן.",
+  "error.provider.sessionSettingsTimedOut": "הסשן של הסוכן לא הגיב בזמן. יש לנסות שוב.",
   "error.provider.piOutdated": "Pi {version} ישן מדי. יש להתקין Pi 1.1.0 ומעלה לתמיכה מקורית ב-RPC וב-MCP.",
   "error.provider.nativeMissing": "ה-CLI של {provider} אינו מותקן. יש להוריד אותו בהגדרות.",
   "error.provider.nativeNotStarted": "לא ניתן להפעיל את ה-CLI של {provider}.",
@@ -550,6 +561,8 @@ export const messages = {
   "error.provider.museTurnFailed": "הפעולה של Muse נכשלה.",
   "error.provider.museModelUnavailable":
     "Muse לא יכול להשתמש במודל הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל, או שלחשבון הזה אין גישה למודל. בחר מודל אחר ונסה שוב.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse לא הצליח להשלים את הבקשה. Muse משתמש במפתח Meta API השמור, לא בהתחברות שלך. יש להחליף את המפתח, או להסיר אותו בהגדרות כדי להשתמש בהתחברות.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse לא יכול ליצור פרופיל בלי גישה לכלים חיצוניים. יש להשתמש בספק אחר כדי ליצור את הפרופיל, ואז לבחור ב-Muse עבור הסוכן.",
   "error.provider.museAuthUnverified": "האימות של Muse לא אומת. יש להתחבר במחשב המארח, או להגדיר מפתח API של Meta.",

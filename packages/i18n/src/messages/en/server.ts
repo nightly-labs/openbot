@@ -18,6 +18,8 @@ export const messages = defineMessages("server", {
   "server.connection.planHint": "Open account settings to check the server plan.",
   "server.connection.loadingHint": "You can select another server while this one loads.",
   "server.connection.cachedHint": "Loaded content and drafts are kept. Server actions will resume after reconnection.",
+  "server.connection.computerOffline":
+    "{name} is offline. Make sure that its computer is on, OpenBot is open, and Publish this server is on in Server settings > Members.",
   "server.connection.conversationFailed": "The conversation could not load. Try again.",
   "server.connection.panelsFailed": "Some workspace panels could not load. Try again.",
   "server.connection.retry": "Retry",
@@ -442,6 +444,12 @@ export const messages = defineMessages("server", {
     "New routines use this timezone when the message does not give the sender's timezone. On a server, the browser also uses it after the next restart.",
   "server.settings.timezoneAutomatic": "Automatic ({zone})",
   "server.settings.timezoneLoadFailed": "Could not load the server timezone.",
+  "server.settings.voiceModel.section": "Speech recognition",
+  "server.settings.voiceModel.description":
+    "Agents on this server use this model to transcribe the sound of videos that have no captions.",
+  "server.settings.voiceModel.loadFailed": "Could not load the speech recognition model of the server.",
+  "server.settings.voiceModel.group": "On this server",
+  "server.settings.voiceModel.removeLabel": "Remove {name} from this server",
   "server.settings.turnLimit": "Threads at the same time",
   "server.settings.turnLimitDescription":
     "How many agent threads can run at the same time on this server. More threads use more memory.",
@@ -646,6 +654,7 @@ export const messages = defineMessages("server", {
     "There is no separate remote desktop password. The settings below choose who can control this computer.",
   "server.desktop.componentInstalled": "Host component installed",
   "server.desktop.componentNotInstalled": "Host component not installed",
+  "server.desktop.needsX11Session": "Needs an X11 session",
   "server.desktop.sessions": "Unattended: {unattended} · Active sessions: {active}/{max}",
   "server.desktop.unattendedEnabled": "enabled",
   "server.desktop.unattendedUnavailable": "not available",
@@ -730,7 +739,7 @@ export const messages = defineMessages("server", {
   "server.update.waitingFor": "Waiting for {reasons}.",
   "server.update.disabledTitle": "Remote updates are off",
   "server.update.disabledDescription":
-    "The user of {name} turned off updates from server members. Ask them to update OpenBot or to turn the setting on.",
+    "The user of {name} turned off updates from server members. Ask them to update OpenBot, or to open Settings > Updates on that computer and turn on “Allow updates from server members”.",
   "server.update.managedTitle": "A Host Manager controls updates",
   "server.update.managedDescription": "OpenBot Host Manager updates {name}. Contact the host administrator.",
   "server.update.unsupportedTitle": "{name} cannot update itself",

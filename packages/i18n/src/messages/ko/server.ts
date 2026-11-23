@@ -19,6 +19,8 @@ export const messages = {
   "server.connection.planHint": "계정 설정을 열어 서버 요금제를 확인하세요.",
   "server.connection.loadingHint": "서버를 불러오는 동안 다른 서버를 선택할 수 있어요.",
   "server.connection.cachedHint": "불러온 내용과 초안은 유지돼요. 다시 연결되면 서버 작업이 재개돼요.",
+  "server.connection.computerOffline":
+    "{name}이(가) 오프라인이에요. 그 컴퓨터가 켜져 있고 OpenBot이 열려 있는지, 서버 설정 > 멤버에서 이 서버 게시가 켜져 있는지 확인하세요.",
   "server.connection.conversationFailed": "대화를 불러올 수 없었어요. 다시 시도해 주세요.",
   "server.connection.panelsFailed": "일부 워크스페이스 패널을 불러올 수 없었어요. 다시 시도해 주세요.",
   "server.connection.retry": "다시 시도",
@@ -389,6 +391,11 @@ export const messages = {
     "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요. 서버에서는 다음 재시작 후 브라우저도 이 시간대를 사용해요.",
   "server.settings.timezoneAutomatic": "자동 ({zone})",
   "server.settings.timezoneLoadFailed": "서버 시간대를 불러올 수 없었어요.",
+  "server.settings.voiceModel.section": "음성 인식",
+  "server.settings.voiceModel.description": "이 서버의 에이전트는 자막이 없는 동영상의 소리를 이 모델로 받아 적어요.",
+  "server.settings.voiceModel.loadFailed": "서버의 음성 인식 모델을 불러오지 못했어요.",
+  "server.settings.voiceModel.group": "이 서버",
+  "server.settings.voiceModel.removeLabel": "이 서버에서 {name} 제거",
   "server.settings.turnLimit": "동시 실행 스레드",
   "server.settings.turnLimitDescription":
     "이 서버에서 동시에 실행할 수 있는 에이전트 스레드 수입니다. 스레드가 많을수록 메모리를 더 사용합니다.",
@@ -589,6 +596,7 @@ export const messages = {
     "원격 데스크톱용 별도 비밀번호는 없어요. 아래 설정에서 이 컴퓨터를 제어할 수 있는 사람을 선택해요.",
   "server.desktop.componentInstalled": "호스트 구성 요소 설치됨",
   "server.desktop.componentNotInstalled": "호스트 구성 요소 설치되지 않음",
+  "server.desktop.needsX11Session": "X11 세션 필요",
   "server.desktop.sessions": "무인 접속: {unattended} · 활성 세션: {active}/{max}",
   "server.desktop.unattendedEnabled": "사용 중",
   "server.desktop.unattendedUnavailable": "사용 불가",
@@ -670,7 +678,7 @@ export const messages = {
   "server.update.waitingFor": "{reasons}을(를) 기다리는 중이에요.",
   "server.update.disabledTitle": "원격 업데이트가 꺼져 있어요",
   "server.update.disabledDescription":
-    "{name}의 사용자가 서버 멤버의 업데이트를 꺼 두었어요. OpenBot을 업데이트하거나 설정을 켜 달라고 요청하세요.",
+    "{name}의 사용자가 서버 멤버의 업데이트를 꺼 두었어요. OpenBot을 업데이트하거나, 그 컴퓨터에서 설정 > 업데이트를 열고 ‘서버 멤버의 업데이트 허용’을 켜 달라고 요청하세요.",
   "server.update.managedTitle": "Host Manager가 업데이트를 제어해요",
   "server.update.managedDescription": "OpenBot Host Manager가 {name}을(를) 업데이트해요. 호스트 관리자에게 문의하세요.",
   "server.update.unsupportedTitle": "{name}은(는) 스스로 업데이트할 수 없어요",

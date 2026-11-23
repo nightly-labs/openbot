@@ -645,7 +645,7 @@ export class AttentionRegistry {
           throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
         });
       }
-      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers });
+      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers }, { privileged: false });
     }
     const pending = [...this.#approvals.values()].find(
       (entry) => entry.approval.agentId === agentId && this.#localHandles.get(entry) === input.requestId,
@@ -951,8 +951,9 @@ export class AttentionRegistry {
   ) {
     const { pending, secret } = yield* attentionStep(() => {
       const value = this.#takeovers.get(input.requestId);
-      if (!value?.secret || value.request.agentId !== input.agentId || value.submitting)
-        throw new Error(sourceText("error.backend.authRequestInactive"));
+      if (!value?.secret || value.request.agentId !== input.agentId)
+        throw new InactiveAttentionRequest(sourceText("error.backend.authRequestInactive"));
+      if (value.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
       return { pending: value, secret: value.secret };
     });
     if (input.decision === "cancel") {
