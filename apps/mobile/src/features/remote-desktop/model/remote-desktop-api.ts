@@ -3,9 +3,6 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
 import { currentText } from "@/shared/lib/text";
 
-// The released remote screen routes, as the desktop app's `RemoteServerClient` uses them. The phone
-// reads only the fields it shows.
-
 export interface RemoteDesktopDisplay {
   id: string;
   label: string;
@@ -22,7 +19,6 @@ export interface RemoteDesktopHost {
 
 export interface RemoteDesktopViewerSession {
   id: string;
-  /** Used once by the viewer page, within a minute. Never logged. */
   viewerGrant: string;
   displays: RemoteDesktopDisplay[];
   selectedDisplayId: string | null;
@@ -67,7 +63,6 @@ function decodeSession(value: unknown): RemoteDesktopViewerSession {
   };
 }
 
-/** A refused request names the host's reason in its error, so only a status the host sent as a value is checked here. */
 function requireStatus(status: number): void {
   if (status >= 400) throw new Error(currentText().t("mobile.server.remoteDesktop.failed"));
 }
@@ -90,7 +85,6 @@ export async function endRemoteDesktopSession(connection: RemoteDesktopConnectio
   await connection.fetchRaw("DELETE", TEAM_API_ROUTES.remoteScreen.session(sessionId));
 }
 
-/** The host moves every open stream to the display. The viewer connects again by itself. */
 export async function selectRemoteDesktopDisplay(
   connection: RemoteDesktopConnection,
   displayId: string,

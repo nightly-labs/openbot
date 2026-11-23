@@ -6,15 +6,10 @@ const ACTION_SOUNDS_THEME_STORAGE_KEY = "openbot:action-sounds-theme";
 
 type PreferenceStorage = Pick<Storage, "getItem">;
 
-/** The choices for this page after the browser did not save them. They win over older saved values. */
 let unsavedPreference: boolean | undefined;
 let unsavedTheme: SoundTheme | undefined;
 let started = false;
 
-/**
- * The sounds are off until the user turns them on: an update must not start new sounds. Reading
- * `window.localStorage` throws when the browser blocks storage, so it is read inside the guard.
- */
 export function isActionSoundEnabled(storage?: PreferenceStorage): boolean {
   if (unsavedPreference !== undefined) return unsavedPreference;
   try {
@@ -34,12 +29,10 @@ export function readActionSoundTheme(storage?: PreferenceStorage): SoundTheme {
   }
 }
 
-/** The sound menu value: "off", or the saved theme. */
 export function readActionSoundChoice(): SoundChoice {
   return isActionSoundEnabled() ? readActionSoundTheme() : "off";
 }
 
-/** Returns false when blocked or full storage keeps the choice for this page only. */
 function savePreference(key: string, value: string): boolean {
   try {
     window.localStorage.setItem(key, value);
@@ -49,10 +42,6 @@ function savePreference(key: string, value: string): boolean {
   }
 }
 
-/**
- * Saves a sound menu choice and plays it. "off" keeps the theme, so the next time the user turns
- * the sounds on, the menu shows the theme from before.
- */
 export function setActionSoundChoice(choice: SoundChoice): void {
   const enabled = choice !== "off";
   unsavedPreference = savePreference(ACTION_SOUNDS_STORAGE_KEY, String(enabled)) ? undefined : enabled;
@@ -64,8 +53,6 @@ export function setActionSoundChoice(choice: SoundChoice): void {
   unsavedTheme = savePreference(ACTION_SOUNDS_THEME_STORAGE_KEY, choice) ? undefined : choice;
   setEnabled(true);
   setTheme(choice);
-  // The menu's own click is skipped while the sounds are off, and it does not name a theme, so the
-  // preview plays here.
   play("success", { theme: choice });
 }
 
@@ -74,10 +61,6 @@ function applySavedChoice(): void {
   setEnabled(isActionSoundEnabled());
 }
 
-/**
- * Plays the cues that shared controls name in their `data-cuelume-*` attributes, and follows a change
- * that another tab saves. Later calls do nothing.
- */
 export function startActionSounds(): void {
   if (started) return;
   started = true;
@@ -88,10 +71,6 @@ export function startActionSounds(): void {
   bind();
 }
 
-/**
- * Plays a cue for an action that no control click reports, such as a reply that failed. It reads the
- * saved choice, so a page that did not call `startActionSounds`, such as a story, stays silent.
- */
 export function playActionSound(sound: SoundName, options?: PlayOptions): void {
   if (isActionSoundEnabled()) play(sound, options);
 }

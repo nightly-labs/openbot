@@ -223,6 +223,13 @@ export const messages = {
     "現在のシークレットは使えなくなります。ホストはそれを使ったリクエストを拒否します。",
   "mobile.agent.webhook.rotateConfirm": "再生成",
   "mobile.agent.webhook.rotateFailed": "シークレットを再生成できませんでした。もう一度お試しください。",
+  "mobile.agent.webhook.giveToAgent": "署名シークレットを {name} に渡す",
+  "mobile.agent.webhook.giveTitle": "新しい署名シークレットを {name} に渡しますか？",
+  "mobile.agent.webhook.giveBody":
+    "現在のシークレットは使えなくなります。{name} は新しいシークレットを API キーとして保存し、送信元に追加できます。",
+  "mobile.agent.webhook.giveConfirm": "渡す",
+  "mobile.agent.webhook.giveFailed": "署名シークレットをエージェントに渡せませんでした。もう一度お試しください。",
+  "mobile.agent.webhook.given": "{name} が新しい署名シークレットを受け取りました。",
   "mobile.agent.webhook.activity": "アクティビティ",
   "mobile.agent.webhook.activityFailed": "アクティビティを読み込めませんでした。もう一度お試しください。",
   "mobile.agent.webhook.activity.ignored": "無視",
@@ -318,6 +325,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "このプロバイダーで利用できるモデルはありません。",
   "mobile.agent.runtime.searchModels": "モデルを検索",
   "mobile.agent.runtime.noMatches": "検索に一致するモデルはありません。",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "検索に一致するモデルはありません。openrouter.ai のプライバシー、プロバイダー、ガードレールの設定によって、このリストのモデルが非表示になることがあります。",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "このプロバイダーは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、先に「権限」を変更してください。",
   "mobile.agent.runtime.usageLimit": "使用量の上限に達しました",
@@ -395,10 +404,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "プロファイルを管理",
   "mobile.agent.browserProfile.footer":
     "各プロファイルは独自のサインインと Cookie を保持します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.agent.browserProfile.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。エージェントはこれらのサイトに再度サインインする必要があります。",
   "mobile.agent.browserProfile.saveFailed": "OpenBot はエージェントのブラウザープロファイルを変更できませんでした。",
   "mobile.agent.planCard.label": "長いタスクの前に計画を表示",
   "mobile.agent.planCard.footer":
     "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
+  "mobile.agent.builtinMemory.label": "OpenBot のメモリー",
+  "mobile.agent.builtinMemory.footer":
+    "エージェントが自分のメモリーを保存して読み込みます。Mem0 などのメモリーアプリだけを使うにはオフにします。保存済みのメモリーは残ります。",
   "mobile.agent.workspace.title": "ワークスペースのフォルダー",
   "mobile.agent.workspace.footer": "ホストのコンピューター上にある、このエージェントのフォルダーです。",
   "mobile.agent.advanced.behavior": "動作",
@@ -415,10 +429,11 @@ export const messages = {
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot をアップデートしてください。",
   "mobile.agent.newChat.title": "新しいチャット",
   "mobile.agent.newChat.starting": "新しいチャットを始めています…",
-  "mobile.agent.newChat.footer": "エージェントはこのチャットを忘れます。設定はそのままです。",
+  "mobile.agent.newChat.footer":
+    "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。設定はそのままです。",
   "mobile.agent.newChat.confirmTitle": "{name} と新しいチャットを始めますか？",
   "mobile.agent.newChat.confirmBody":
-    "エージェントはこのチャットを忘れます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+    "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "mobile.agent.newChat.confirm": "新しいチャットを始める",
   "mobile.agent.newChat.failed": "新しいチャットを始められませんでした",
   "mobile.agent.newChat.failedBody": "ホストは新しいチャットを始められませんでした。",
@@ -481,6 +496,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "このホストでは、リモートデバイスからエージェントを公開できません。",
   "mobile.agent.usage.tokensWithoutCacheReads": "キャッシュ読み取りを除くトークン",
   "mobile.agent.usage.estimatedCost": "推定コスト",
+  "mobile.agent.usage.noCostEstimate": "コストの推定なし",
   "mobile.agent.usage.daily": "日別の使用量",
   "mobile.agent.usage.tokens": "トークン",
   "mobile.agent.usage.cost": "コスト",
@@ -601,7 +617,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "チャットが開いていません",
   "mobile.agent.home.noChatOpenBody": "リストからチャットを選んでください。",
   "mobile.agent.home.chatListWidth": "チャットリストの幅",
-  "mobile.agent.home.serverTitle": "{name}、サーバーを開く",
   "mobile.agent.home.waiting": "接続を待っています",
   "mobile.agent.home.waitingBody": "このサーバーが接続されると、エージェントの一覧が読み込まれます。",
   "mobile.agent.home.noAgents": "このサーバーにエージェントはいません",

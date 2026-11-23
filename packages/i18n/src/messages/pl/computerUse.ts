@@ -19,6 +19,7 @@ export const messages = {
   "computerUse.ready.title": "Sterowanie komputerem jest gotowe",
   "computerUse.ready.description":
     "OpenBot widzi aplikacje na tym komputerze i może ich używać. Ten system nie wymaga dodatkowych uprawnień.",
+  "computerUse.limited.title": "Sterowanie komputerem jest ograniczone na tym pulpicie",
   "computerUse.openSettingsFailed.title": "Nie udało się otworzyć Ustawień systemowych",
   "computerUse.restartRequired.title": "Wymagane ponowne uruchomienie",
   "computerUse.restartRequired.description":

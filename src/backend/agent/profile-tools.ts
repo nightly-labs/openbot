@@ -38,7 +38,6 @@ const profileFields = {
     .max(INPUT_LIMITS.agentDescription)
     .describe(`A short summary of the agent's work, at most ${INPUT_LIMITS.agentDescription} characters.`),
   avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
-  // A number schema, not z.literal: Gemini rejects a request whose tool schema has a non-string enum.
   avatarHue: z
     .number()
     .int()
@@ -169,7 +168,6 @@ export const updateProfileToolSchema = z
   })
   .strict();
 
-/** One `update_agents` call reaches at most this many agents. */
 const UPDATE_AGENTS_LIMIT = 100;
 
 const updateProfileFields = updateProfileToolSchema.shape;
@@ -214,10 +212,6 @@ export const PROFILE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "delete_agent",
 ]);
 
-/**
- * Only the user can widen what an agent may do. An agent can restrict itself or a teammate, and a
- * request for the value the agent already has changes nothing.
- */
 export function widensAgentSettings(
   target: AgentSummary,
   access: AgentAccess | undefined,
@@ -228,7 +222,6 @@ export function widensAgentSettings(
   );
 }
 
-/** Only a restriction is written, so a user change between the check and this write is never undone. */
 export function restrictionInput(
   access: AgentAccess | undefined,
   computerUse: boolean | undefined,
@@ -238,12 +231,6 @@ export function restrictionInput(
 
 const UNSUPPORTED_PROFILE_FIELDS = "Remove unsupported profile fields.";
 
-/**
- * Describe a failed profile tool call. Schema failures omit submitted instructions and unknown field
- * names. A schema parsed with `reportInput` gives the checked value, so a trimmed field reports its
- * trimmed length. `unsupportedFields` gives the text for an object at `path` that has fields the tool
- * does not take.
- */
 export function profileToolErrorMessage(
   error: unknown,
   unsupportedFields: (path: readonly PropertyKey[]) => string = () => UNSUPPORTED_PROFILE_FIELDS,
@@ -268,11 +255,6 @@ const PROFILE_TOOL_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
 const BACKUP_MODELS_FIELDS = Object.keys(backupModelsToolSchema.shape).join(", ");
 const BACKUP_MODEL_FIELDS = Object.keys(backupModelToolSchema.shape).join(", ");
 
-/**
- * Describe a failed profile tool call, as `profileToolErrorMessage` does. A field that `create_agent`,
- * `update_profile` or `update_agents` does not take gets the fields that its object takes, never the
- * name that the call sent, so the agent can correct the call (#10024).
- */
 export function profileAgentToolErrorMessage(tool: string, error: unknown): string {
   return profileToolErrorMessage(error, (path) => {
     const toolFields = path.length === 0 ? PROFILE_TOOL_FIELDS.get(tool) : undefined;

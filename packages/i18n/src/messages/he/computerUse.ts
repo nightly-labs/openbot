@@ -19,6 +19,7 @@ export const messages = {
   "computerUse.ready.title": "שליטה במחשב מוכנה",
   "computerUse.ready.description":
     "OpenBot יכול לראות אפליקציות במחשב הזה ולפעול בהן. המערכת הזו אינה דורשת הרשאה נוספת.",
+  "computerUse.limited.title": "שליטה במחשב מוגבלת בשולחן העבודה הזה",
   "computerUse.openSettingsFailed.title": "לא ניתן היה לפתוח את System Settings",
   "computerUse.restartRequired.title": "נדרשת הפעלה מחדש",
   "computerUse.restartRequired.description":

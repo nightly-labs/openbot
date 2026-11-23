@@ -1,12 +1,3 @@
-// Checks the output of workflows into an OpenBot channel on the real SQLite, the real channel service
-// and the real workflow service, on a temporary profile. No agent, provider, account or network is
-// started. An output with no channel fails; a post shows the input in the channel as a note of the
-// workflow, and starts no task; empty text posts nothing; a missing or an archived channel fails the step
-// with its sentence; a second post with the same operation id adds nothing; after a restart between the
-// post and the end of the step, the step ends as done and the channel keeps one note.
-//
-// Run: bun scripts/workflow-channel-output-e2e.ts
-// Writes .openbot-build/workflow-channel-output-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -111,7 +102,6 @@ async function close() {
   database.close();
 }
 
-/** Waits for the output step of a run to end. */
 async function outputStep(workflows: WorkflowsHandle, runId: string): Promise<WorkflowStep> {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -223,8 +213,6 @@ try {
     notesOf(opened.channels).filter((entry) => entry.message.text === "Once").length === 1,
   );
 
-  // A restart between the post and the end of the step: the first pass after it ends the step and posts
-  // nothing more.
   const run = await runOnce(opened.workflows, digest);
   const posted = await outputStep(opened.workflows, run.id);
   const notesBefore = notesOf(opened.channels).length;

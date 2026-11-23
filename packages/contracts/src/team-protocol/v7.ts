@@ -10,10 +10,6 @@ import {
 } from "./v7-base";
 
 export const TEAM_PROTOCOL_V7 = 7 as const;
-/**
- * A peer that reads Pi (`pi`) and Muse (`muse`). The host answers it on protocol 7; a peer
- * without it stays on protocol 6 or older, which never names these providers.
- */
 export const TEAM_PI_MUSE_CAPABILITY = "local-providers-v3";
 export const TEAM_PROTOCOL_V7_CAPABILITIES = [
   ...TEAM_PROTOCOL_V7Base_CAPABILITIES,

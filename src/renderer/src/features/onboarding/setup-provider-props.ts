@@ -6,20 +6,11 @@ import type { HostProviderSettings } from "../settings/ProviderSettingsSection";
 import { providerKeyApi } from "../settings/provider-key-api";
 import type { SetupProviderProps } from "./SetupProviderPicker";
 
-/**
- * The providers of this computer and the actions on them, as the setup screens take them.
- *
- * Setup records the default provider of this computer, so the actions work only here. While
- * `local()` is false a joined server is active: the list then shows its status and offers no
- * action, and no custom endpoint, because an endpoint merges into the OpenCode process of the
- * computer that runs the agents.
- */
 export function useSetupProviderProps(local: () => boolean = () => true): SetupProviderProps {
   const { agentStatus } = useAgents();
   const providers = useProviders();
   const endpoints = useCustomProviders();
   const detection = useProviderDetection();
-  /** Managed runtimes: a row downloads its CLI. Without them a row opens a sign-in guide. */
   const downloads = () => local() && providers.providerRuntimeDownloadsAvailable();
   const guides = () => local() && !providers.providerRuntimeDownloadsAvailable();
   return {
@@ -73,7 +64,6 @@ export function useSetupProviderProps(local: () => boolean = () => true): SetupP
     get onDeleteCustomProvider() {
       return local() ? endpoints.deleteCustomProvider : undefined;
     },
-    // Detection looks only at this computer, so a joined server gets no found rows.
     get providerDetection() {
       return local() ? detection.detection() : undefined;
     },
@@ -86,10 +76,6 @@ export function useSetupProviderProps(local: () => boolean = () => true): SetupP
   };
 }
 
-/**
- * The providers of the joined server's host that this window manages over `providers-v1`, or
- * undefined for any other server. The same gates as the host's Settings tab.
- */
 export function useHostProviderSettings(): () => HostProviderSettings | undefined {
   const { agentStatus } = useAgents();
   const providers = useProviders();

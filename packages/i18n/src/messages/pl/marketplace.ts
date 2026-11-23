@@ -702,6 +702,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Zainstaluj {name} na komputerze, na którym działają ci agenci: jej aplikacja wymaga logowania w przeglądarce.",
   "marketplace.error.appInvalid": "Nie można dodać aplikacji {name}: {reason}",
+  "marketplace.error.appNotConnected": "Nie można połączyć aplikacji {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Wybierz lokalny serwer, aby odinstalować wtyczkę.",
   "marketplace.error.uninstallPartial": "Nie udało się usunąć części elementów wtyczki {name}. {failures}",
   "marketplace.error.actionFailed": "Nie udało się wykonać akcji w Marketplace. Spróbuj ponownie.",

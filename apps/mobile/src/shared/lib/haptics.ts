@@ -7,12 +7,9 @@ async function play(feedback: () => Promise<void>): Promise<void> {
   if (!ready || !enabled) return;
   try {
     await feedback();
-  } catch {
-    // Missing hardware or a native failure must not interrupt the user's action.
-  }
+  } catch {}
 }
 
-/** Shared mobile feedback. From a worklet, call through scheduleOnRN. */
 export const haptics = {
   selection: (): Promise<void> => play(() => ExpoHaptics.selectionAsync()),
   impact: (style: "light" | "medium" | "heavy" | "soft" | "rigid" = "light"): Promise<void> =>
@@ -27,7 +24,6 @@ export const haptics = {
         }[style],
       ),
     ),
-  /** The tick when a long press opens a menu, so the user knows the finger can lift. */
   longPress: (): Promise<void> =>
     play(() =>
       isAndroid

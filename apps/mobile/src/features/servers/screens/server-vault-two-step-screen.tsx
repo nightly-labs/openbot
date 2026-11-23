@@ -1,8 +1,3 @@
-// The setup of a two-step key for a Vault login, in three pages of the Server settings sheet after the
-// login page: the ways to give the key (paste or type it, scan it with the camera, or read it from a
-// screenshot), the camera, and a check of the first code on the site. The key stays in memory (`useTwoStepSetup`) until the login page takes it.
-// The host gets it only when the user saves the login.
-
 import { parseTwoStepKey, TWO_STEP_KEY_LIMIT } from "@openbot/contracts/two-step-code";
 import { scanFromURLAsync } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -28,10 +23,8 @@ import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** The shape of a setup key, in the groups that sites show. A key is not translated. */
 const EXAMPLE_KEY = "JBSW Y3DP EHPK 3PXP";
 
-/** The icon and the text at the top of a setup page. */
 function SetupIntro({ text }: { text: string }) {
   const accent = String(useCSSVariable("--openbot-accent"));
   return (
@@ -49,7 +42,6 @@ function SetupIntro({ text }: { text: string }) {
   );
 }
 
-/** The page that shows while no setup is in progress, such as after the app reloads. */
 function NoSetup() {
   const { t } = useText();
   return (
@@ -59,7 +51,6 @@ function NoSetup() {
   );
 }
 
-/** The QR code in a picture from the photo library. Null when the user closed the picker. */
 async function readQrImage(): Promise<string | "none" | null> {
   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] });
   const asset = result.canceled ? undefined : result.assets[0];
@@ -68,7 +59,6 @@ async function readQrImage(): Promise<string | "none" | null> {
   return found[0]?.data ?? "none";
 }
 
-/** Setup, step 1: the key of the site. */
 export function ServerVaultTwoStepScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -79,7 +69,6 @@ export function ServerVaultTwoStepScreen() {
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
-  // Back from this page ends the setup. Done ends it first, so then this does nothing.
   const startedFor = useRef(formId);
   useEffect(
     () => () => {
@@ -180,7 +169,6 @@ export function ServerVaultTwoStepScreen() {
   );
 }
 
-/** Setup, step 3: the user enters the code on the site, so a wrong key shows before it is saved. */
 export function ServerVaultTwoStepCheckScreen() {
   const { t } = useText();
   const formId = useTwoStepSetup((state) => state.formId);
@@ -200,7 +188,6 @@ export function ServerVaultTwoStepCheckScreen() {
         onSave={() => {
           finish();
           void haptics.notification("success");
-          // Back to the login page, past the key page. The scan step replaced itself with this page.
           router.dismiss(2);
         }}
       />

@@ -408,7 +408,8 @@ export const messages = {
   "connector.whatsapp.numbersTitle": "الأرقام",
   "connector.whatsapp.linkNumber": "ربط رقم",
   "connector.whatsapp.ownNumberNote": "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot.",
-  "connector.whatsapp.dedicatedNote": "يصل الأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
+  "connector.whatsapp.dedicatedNote":
+    "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
   "connector.whatsapp.helpLoggedOut": "أزال WhatsApp هذا الحاسوب من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpLoggedOutHost": "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpError":
@@ -512,7 +513,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "اختياري. إذا تُرك فارغًا، تعرض القائمة رقم الهاتف.",
   "connector.whatsapp.add": "إضافة",
   "connector.whatsapp.groupTitle": "إضافة مجموعة",
-  "connector.whatsapp.groupDescription": "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك.",
+  "connector.whatsapp.groupDescription":
+    "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك عندما يذكرون الرقم أو يردّون على رسائله.",
   "connector.whatsapp.groupSearch": "بحث في المجموعات",
   "connector.whatsapp.groupsLoading": "جارٍ قراءة المجموعات…",
   "connector.whatsapp.groupsLoadFailed": "تعذّرت قراءة المجموعات على OpenBot",
@@ -669,8 +671,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "لا يستطيع الوكلاء تسجيل الدخول ببيانات الدخول المشتركة حتى تسجّل الدخول مرة أخرى.",
   "connector.protonPass.reconnect": "إعادة الاتصال",
-  "connector.protonPass.planTitle": "يحتاج Proton Pass إلى خطة مدفوعة",
-  "connector.protonPass.planDescription": "تعمل Proton Pass CLI مع خطة Proton مدفوعة فقط. غيّر خطتك، ثم اتصل مرة أخرى.",
+  "connector.protonPass.planTitle": "يحتاج Proton Pass إلى خطة تتضمن Pass Plus",
+  "connector.protonPass.planDescription":
+    "تحتاج Proton Pass CLI إلى خطة Proton تتضمن Pass Plus. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطتك، ثم اتصل مرة أخرى.",
   "connector.protonPass.vaultTitle": "الخزنة المشتركة",
   "connector.protonPass.vaultDescription":
     "يستطيع الوكلاء تسجيل الدخول ببيانات الدخول في هذه الخزنة. انقل بيانات دخول إليها لمشاركتها.",

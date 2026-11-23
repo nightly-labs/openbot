@@ -1,9 +1,7 @@
 import { DISCONNECTED_LINK_ACCOUNT, type LinkAccountDesktopApi, type LinkAccountStatus } from "@openbot/contracts/ipc";
 
-/** How long the mock waits for the user to approve the sign-in on link.com. */
 const MOCK_SIGN_IN_MS = 4_000;
 
-/** Starts disconnected. Connect waits a few seconds, as for the user's approval in Link, then connects. */
 export function createMockLinkAccount(): LinkAccountDesktopApi {
   let status = DISCONNECTED_LINK_ACCOUNT;
   let timer: ReturnType<typeof setTimeout> | null = null;

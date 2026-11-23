@@ -18,7 +18,6 @@ import { useWindowPage } from "../window/window-page-context";
 import { conversationPort } from "./conversation-port";
 import { preserveKnownDirectUnread } from "./conversation-read-state";
 
-/** Keep live messages and completed reads that arrived after the recovery page was read. */
 function recoveredDirectConversation(
   page: DirectConversationPage,
   cached: DirectConversationSnapshot | undefined,
@@ -54,51 +53,11 @@ function recoveredDirectConversation(
   };
 }
 
-/**
- * Person-to-person conversations on the active team server: the thread list, the
- * page of messages open for each member, and who is typing.
- *
- * **This domain owns `activeDirectMemberId`, and that is a deliberate departure
- * from the inventory in the plan**, which parked it in a `selection` context
- * alongside `activeAgentId`. `selection` exists to break one cycle: `selectAgent`
- * writes to agents, conversation and direct messages at once while conversation
- * has to read `activeAgent()` back. The direct-message half has no such cycle -
- * twelve of the thirteen readers of `activeDirectMemberId` are the functions in
- * this file, and the command that writes it (`selectDirectMember`) already has
- * to live above every domain it touches. Splitting the id away from the
- * conversations it indexes would buy nothing and cost an extra edge.
- *
- * Three consequences of that ownership, in the order they bite:
- *
- * - **`selectDirectMember` is still in the controller and calls
- *   `openDirectConversation` for its second half.** Its first half closes agent
- *   setup, prunes agent history and clears the settings request - three domains
- *   this one is nested under, so it can never move down here. What did move is
- *   everything from "stop typing at the person we are leaving" onward.
- * - **`markDirectMessagesRead` keys its in-flight operations by server**
- *   (`${serverId}\0${memberId}`) and re-checks `activeServerId()` after every
- *   await. Those checks are what stop a read for the previous server landing on
- *   the new one; they are the idiom the keyed server scope removes later, and
- *   until then removing one is a silent cross-server bug.
- * - **Nothing is torn down by hand.** The provider is mounted inside the keyed
- *   server scope, so a switch disposes it outright. `directConversationPages`,
- *   `directOlderLoading`, `directOlderErrors` and `directConversationLoading`
- *   used to survive a switch, which was a leak rather than a decision; they no
- *   longer do, and that is the one behaviour this move changes.
- *
- * The load counter is a plain nonce rather than a per-member map because only
- * one direct conversation is open at a time: any newer request, for any member,
- * invalidates the one in flight. A request left in flight by a server switch
- * needs no nonce at all - its owner is gone.
- */
 const DirectMessages = createSimpleContext({
   name: "Direct messages",
   init: () => {
     const { appFocused, peopleEnabled } = usePlatform();
     const windowPage = useWindowPage();
-    // Every automatic read below asks whether the user can see the message it is about to mark
-    // read. A rail page, such as Usage or Settings, covers the workspace content, so a conversation under it is not visible
-    // however focused the window is.
     const conversationVisible = () => appFocused() && !windowPage.conversationCovered();
     const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { currentTeamMember, directPeople } = usePresence();
@@ -134,9 +93,7 @@ const DirectMessages = createSimpleContext({
         const threads = await conversationPort().servers.listDirectThreads();
         if (!scopeIsCurrent() || request !== directThreadsRequest) return;
         setDirectThreads(threads);
-      } catch {
-        // A failed refresh does not mean the server has no conversations.
-      }
+      } catch {}
     }
 
     function pruneInactiveDirectHistory(memberId: string): void {
@@ -418,8 +375,6 @@ const DirectMessages = createSimpleContext({
           ...current,
           [memberId]: {
             ...snapshot,
-            // Inbound messages arrive in sequence order, so append and only
-            // sort when an out-of-order delivery actually happened.
             messages: (() => {
               const last = snapshot.messages[snapshot.messages.length - 1];
               if (!last || message.sequence >= last.sequence) return [...snapshot.messages, message];
@@ -462,24 +417,14 @@ const DirectMessages = createSimpleContext({
       });
     }
 
-    /**
-     * Leaves the open direct conversation without opening another. The commands
-     * that call it - creating an agent, selecting one - live above this domain
-     * because each also writes to agents and conversation.
-     */
     function clearDirectSelection(): void {
       setActiveDirectMemberId(null);
     }
 
-    /** Invalidates the conversation load in flight. Runs before a server switch commits. */
     function cancelDirectConversationRequests(): void {
       directConversationRequest += 1;
     }
 
-    /** The direct-message slice of the teardown `selectServer` runs. */
-    // A member can leave the team while their conversation is open. Dropping the
-    // selection is what closes the pane; the request bump stops the load that was
-    // already on its way from re-opening it.
     createEffect(
       () => ({
         memberId: activeDirectMemberId(),

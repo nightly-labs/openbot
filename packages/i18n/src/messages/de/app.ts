@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "{name} konnte nicht neu gestartet werden",
   "app.provider.included": "{name} ist in OpenBot enthalten.",
   "app.clipboard.copyFailed": "Der Text konnte nicht kopiert werden.",
-  "app.voice.tooLong": "Sprachaufnahmen sind auf zwei Minuten begrenzt.",
+  "app.voice.tooLong": "Sprachaufnahmen sind auf 10 Minuten begrenzt.",
   "app.avatar.type": "Wähle ein PNG-, JPEG-, GIF- oder WebP-Bild.",
   "app.avatar.size": "Wähle ein Bild mit weniger als 10 MB.",
   "app.avatar.processingUnavailable": "Bildverarbeitung ist nicht verfügbar.",
@@ -95,6 +95,7 @@ export const messages = {
     "Meine KI-Agenten arbeiten jetzt mit OpenBot auf meinem eigenen Computer. Meine Chats und Dateien bleiben bei mir. Probier es aus: {site}",
   "app.socialFollow.redditTitle": "Wie ich OpenBot nutze",
   "app.rail.usageRings": "Nutzung von {name}: {windows}. Nutzung öffnen",
+  "app.rail.usageUnavailable": "Nutzung von {name} nicht verfügbar. Nutzung öffnen",
   "app.rail.customAgentUsage": "Nutzung von {name}. Nutzung öffnen",
   "app.rail.moreUsage": {
     one: "{count} weiteres Konto. Nutzung öffnen",

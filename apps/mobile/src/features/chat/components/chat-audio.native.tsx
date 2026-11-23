@@ -1,5 +1,4 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import * as Sharing from "expo-sharing";
 import { useVideoPlayer, type VideoPlayer } from "expo-video";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -15,39 +14,25 @@ import { useText } from "@/shared/lib/text";
 import { MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { useAudioWaveform, WAVEFORM_BARS } from "../model/audio-waveforms";
 import { playbackTime } from "../model/playback-time";
-import { shareTypeOptions } from "../model/share-file-type";
 import type { AttachmentTint } from "./chat-attachment";
-import { runFileAction } from "./chat-video.native";
+import { shareMediaFile } from "./chat-video.native";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
 
-/** How often the position moves, in seconds. */
 const TIME_STEP = 0.1;
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
-/** The speeds the speed button goes through, in order, from normal speed. */
 const SPEEDS = [1, 1.5, 2, 0.5] as const;
-/** The waveform, in points: as on desktop, thin round bars from a dot to the full height. */
 const BAR_WIDTH = 3;
 const BAR_GAP = 2;
 const BAR_MIN = 3;
 const WAVE_HEIGHT = 24;
-/**
- * A seek takes a moment, and the player reports the old time until it lands. The card shows the
- * new time until a report is this close to it, in seconds, or until the wait below has passed.
- */
 const SEEK_TOLERANCE = 0.75;
 const SEEK_WAIT_MS = 1_500;
-/** How far a screen reader's swipe moves the position, in seconds. */
 const ACCESSIBILITY_STEP = 5;
 
-/** One audio file plays at a time: a second one pauses the first. */
 let playing: VideoPlayer | null = null;
 
-/**
- * Follows a player: whether it plays, where it is, its length, and whether it failed. `seekTo`
- * moves the player and shows the new time at once. Without a player nothing plays yet.
- */
 function usePlayback(player: VideoPlayer | null) {
   const [state, setState] = useState({ playing: false, time: 0, duration: 0, failed: false, ready: false });
   const pendingSeek = useRef<{ target: number; until: number } | null>(null);
@@ -69,7 +54,6 @@ function usePlayback(player: VideoPlayer | null) {
       player.addListener("timeUpdate", ({ currentTime }) => {
         const pending = pendingSeek.current;
         if (pending) {
-          // A report from before the seek landed would move the bars back for a moment.
           if (Math.abs(currentTime - pending.target) > SEEK_TOLERANCE && Date.now() < pending.until) return;
           pendingSeek.current = null;
         }
@@ -81,7 +65,6 @@ function usePlayback(player: VideoPlayer | null) {
         else if (status === "readyToPlay")
           update(player.duration > 0 ? { ready: true, duration: player.duration } : { ready: true });
       }),
-      // The player stays at the end; the next play starts again from the beginning.
       player.addListener("playToEnd", () => {
         player.pause();
         pendingSeek.current = null;
@@ -104,23 +87,13 @@ interface AudioAttachmentProps {
   tint?: AttachmentTint;
 }
 
-/**
- * An audio file from the chat, such as an MP3, drawn as desktop draws a voice message: a play
- * button, the waveform, which the user taps or drags to move the position, the time and the
- * speed. The card has the same height in every state. The file downloads when the chat shows its
- * history and does not scroll, so the card knows its length and shape before the first play.
- */
 export function ChatAudioAttachment(props: AudioAttachmentProps) {
   const { attachment, serverId } = props;
   const settled = useListSettled();
   const historyShown = useHistoryShown();
   const ready = settled && historyShown;
   const query = useMediaFile(serverId, attachment, ready);
-  // A file that an earlier card downloaded is there at once. Its player also waits until the chat
-  // shows and the list is not in a fast fling, as the download does.
   const uri = ready ? (query.data ?? null) : null;
-  // The player is made with the file: each player is a native media player, and a card without its
-  // file has nothing to play.
   return uri ? (
     <AudioWithPlayer {...props} query={query} uri={uri} />
   ) : (
@@ -147,13 +120,10 @@ function AudioCard({
   const text = useText();
   const { t, format, sourceText } = text;
   const [muted, foreground] = useThemeColor(["muted", "foreground"]);
-  // On the message color the icon has the text color of the user's messages, which reads on that
-  // color. Without a message color the button has the chat background and the text color.
   const accentForeground = tint ? tint.foreground : String(foreground);
   const { width } = useWindowDimensions();
   const playback = usePlayback(player);
   const waveform = useAudioWaveform(`${serverId}:${attachment.id}`, uri);
-  // While a finger is on the waveform, the bars follow it and the player waits for the release.
   const [scrub, setScrub] = useState<number | null>(null);
   const [resumeAfterScrub, setResumeAfterScrub] = useState(false);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
@@ -163,7 +133,6 @@ function AudioCard({
   const loading = !failed && (!uri || !playback.ready);
   const duration = playback.duration;
   const position = Math.min(scrub ?? playback.time, duration || 0);
-  // A drag stops the sound only for a moment, so the button keeps its pause icon.
   const shownPlaying = playback.playing || resumeAfterScrub;
   const started = shownPlaying || position > 0;
 
@@ -185,7 +154,6 @@ function AudioCard({
     setScrub(null);
   }
 
-  // A drag stops the sound while the finger moves, and plays again from the new place on release.
   function startScrub() {
     if (!player?.playing) return;
     setResumeAfterScrub(true);
@@ -204,21 +172,13 @@ function AudioCard({
     void haptics.selection();
     const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1;
     setSpeed(next);
-    // On iOS a new rate starts a paused player, so a paused card takes the speed at the next play.
     if (player?.playing) player.playbackRate = next;
   }
 
   async function share() {
     if (!uri) return;
     setSharing(true);
-    await runFileAction(
-      async () => {
-        if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-        await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, attachment.mimeType), dialogTitle: attachment.name });
-      },
-      t("mobile.chat.attachment.openFailed"),
-      text,
-    );
+    await shareMediaFile(uri, attachment, text);
     setSharing(false);
   }
 
@@ -249,7 +209,6 @@ function AudioCard({
             variant="primary"
             className={`size-11 rounded-full ${tint ? "" : "bg-background"}`}
             style={tint ? { backgroundColor: tint.color } : undefined}
-            // The press highlight is the theme accent, which would flash over the agent color.
             feedbackVariant="scale"
             isDisabled={loading || failed}
             accessibilityLabel={
@@ -265,7 +224,6 @@ function AudioCard({
             ) : shownPlaying ? (
               <Pause size={20} color={String(accentForeground)} fill={String(accentForeground)} />
             ) : (
-              // Moved right by its own weight, so the triangle looks centred in the circle.
               <Play
                 size={20}
                 color={String(accentForeground)}
@@ -333,7 +291,6 @@ function AudioCard({
             <Button
               variant="secondary"
               size="sm"
-              // A fixed width, so the button does not change size with its label.
               className="h-6 w-12 min-w-0 rounded-full px-0"
               isDisabled={loading || failed}
               accessibilityLabel={t("mobile.chat.audio.speed")}
@@ -351,7 +308,6 @@ function AudioCard({
   );
 }
 
-/** Takes `count` bars from the peaks, each the loudest of the peaks it covers. */
 function resample(peaks: readonly number[], count: number): number[] {
   if (count >= peaks.length) return [...peaks];
   return Array.from({ length: count }, (_, bar) => {
@@ -361,11 +317,6 @@ function resample(peaks: readonly number[], count: number): number[] {
   });
 }
 
-/**
- * The waveform as the position bar. A tap moves the position there; a drag follows the finger and
- * moves it on release. A vertical drag stays with the chat, so the list still scrolls. A file with
- * no shape yet shows flat bars, as desktop does.
- */
 function AudioWaveform({
   peaks,
   progress,
@@ -383,23 +334,19 @@ function AudioWaveform({
   peaks: readonly number[] | null;
   progress: number;
   showProgress: boolean;
-  /** The color of the played bars. */
   playedColor: string;
   disabled: boolean;
   label: string;
   value: string;
   onScrubStart: () => void;
   onScrub: (fraction: number) => void;
-  /** The place where a drag ended, or null when the system cancelled it. */
   onScrubEnd: (fraction: number | null) => void;
-  /** The place of a tap. */
   onSeek: (fraction: number) => void;
   onStep: (direction: 1 | -1) => void;
 }) {
   const muted = useThemeColor("muted");
   const [trackWidth, setTrackWidth] = useState(0);
   const count = Math.max(1, Math.min(WAVEFORM_BARS, Math.floor((trackWidth + BAR_GAP) / (BAR_WIDTH + BAR_GAP))));
-  // Each bar is its place in the waveform, which is a stable key.
   const bars = useMemo(
     () => (peaks ? resample(peaks, count) : new Array<number>(count).fill(0)).map((peak, place) => ({ peak, place })),
     [peaks, count],
@@ -443,7 +390,6 @@ function AudioWaveform({
           else if (nativeEvent.actionName === "decrement") onStep(-1);
         }}
         className="min-w-0 flex-1 flex-row items-center justify-between"
-        // A recording plays left to right in every language, as the touch position counts it.
         style={{ height: WAVE_HEIGHT + 4, direction: "ltr" }}
         onLayout={(event) => setTrackWidth(Math.round(event.nativeEvent.layout.width))}
       >

@@ -147,6 +147,8 @@ export const messages = {
   "routine.card.webhookCreated": "Webhookroutine gemaakt",
   "routine.card.webhookSecretNote":
     "Genereer het ondertekeningsgeheim opnieuw om het te krijgen. De agent krijgt het geheim niet.",
+  "routine.card.webhookSecretAgentNote":
+    "Genereer het ondertekeningsgeheim opnieuw om het te krijgen, of geef het aan {name}.",
   "routine.card.webhookUpdated": "Webhookroutine bijgewerkt",
   "routine.card.webhookChanged": "Wijzigingen niet opgeslagen",
   "routine.card.webhookSaveFailed": "Kan de events niet opslaan.",
@@ -304,7 +306,13 @@ export const messages = {
   "routine.webhook.senderSecretLabel": "Geheim van afzender",
   "routine.webhook.senderSecretConfirm": "Gebruiken",
   "routine.webhook.senderSecretFailed": "Kan het geheim van de afzender niet opslaan.",
-  "routine.webhook.statusFailed": "Kan niet controleren of de host met de relay verbonden is.",
+  "routine.webhook.giveSecret": "Ondertekeningsgeheim aan {name} geven",
+  "routine.webhook.giveSecretTitle": "Nieuw ondertekeningsgeheim aan {name} geven?",
+  "routine.webhook.giveSecretDescription":
+    "Het huidige geheim werkt direct niet meer. {name} slaat het nieuwe geheim op als API-sleutel en kan het aan de afzender toevoegen. Je hoeft het niet te kopiëren.",
+  "routine.webhook.giveSecretConfirm": "Geven",
+  "routine.webhook.giveSecretFailed": "Kan het ondertekeningsgeheim niet aan {name} geven.",
+  "routine.webhook.secretGiven": "{name} heeft het nieuwe ondertekeningsgeheim.",
   "routine.webhook.stepDone": "Klaar",
   "routine.webhook.stepUrl": "Kopieer het endpoint naar de verzendende dienst",
   "routine.webhook.stepUrlHint": "De afzender doet een POST-verzoek met een JSON-body van maximaal 64 KiB.",

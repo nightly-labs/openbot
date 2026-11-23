@@ -19,62 +19,38 @@ import { attachmentReferenceTone } from "./AttachmentReference";
 import { MediaFilePreview } from "./MediaFilePreview";
 import type { VideoStageMenu } from "./VideoStage";
 
-/**
- * Reads attachments that have no `previewUrl`: the browser client gets none. Absent (desktop), a card
- * shows only what its `previewUrl` gives.
- */
 export interface AttachmentMediaSource {
-  /** The loaded URL of an attachment. Reactive. */
   url(attachmentId: string): string | undefined;
-  /**
-   * Loads the file for inline display. Resolves false when it cannot show inline. An image loads up to
-   * `thumbnailLimit`, or up to `generatedImageLimit` with `"generated"`: the image that the user asked an
-   * agent to make.
-   */
   load(attachment: AttachmentSummary, limit?: "thumbnail" | "generated"): Promise<boolean>;
-  /** An image up to this size loads when its card shows. */
   thumbnailLimit: number;
-  /** A generated image up to this size loads when its message shows. */
   generatedImageLimit: number;
-  /** Audio or video up to this size loads on a click. Above it, the card offers only the download. */
   mediaLimit: number;
 }
 
-/** The download of an attachment from a joined server, from the click until the file arrives. */
 export type AttachmentDownloadState = { phase: "downloading"; received: number; total: number } | { phase: "failed" };
 
-/** Shows and controls the downloads of a joined server. Absent, a card shows no download state. */
 export interface AttachmentDownloads {
-  /** The download of an attachment. Reactive. Undefined when none runs and the last one did not fail. */
   state(attachmentId: string): AttachmentDownloadState | undefined;
-  /** Absent, the client cannot stop a download, so the card shows its progress without a stop button. */
   stop?: ((attachment: AttachmentSummary) => void) | undefined;
-  /** Repeats the action of the failed download. */
   retry(attachment: AttachmentSummary): void;
 }
 
-/** The address of a file on a joined server. The desktop gets such a file whole, not in ranges. */
 const REMOTE_PREVIEW_URL = /^openbot-remote-attachment:/;
 
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];
   mediaSource?: AttachmentMediaSource | undefined;
   downloads?: AttachmentDownloads | undefined;
-  /** `origin` is the clicked card, for a viewer that zooms out of it. */
   onPreview: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
 }) {
   const { t, format } = useText();
-  // An image whose preview does not load was deleted from the host, or never arrived. The card
-  // keeps its place in the message and says so, instead of an empty frame.
   const [missing, setMissing] = createSignal<ReadonlySet<string>>(new Set());
   const mediaKind = (attachment: AttachmentSummary) =>
     playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name));
   const isMissing = (attachment: AttachmentSummary) => missing().has(attachment.id);
   const markMissing = (attachment: AttachmentSummary) => setMissing((current) => new Set(current).add(attachment.id));
   const [loadingMedia, setLoadingMedia] = createSignal<ReadonlySet<string>>(new Set());
-  // Set by the click that loads a file, until the file starts. A kept `autoplay` would start the file
-  // again each time its player is made again, as when the host sends the message again.
   const [playRequested, setPlayRequested] = createSignal<ReadonlySet<string>>(new Set());
   const started = (attachment: AttachmentSummary) => {
     if (!playRequested().has(attachment.id)) return;
@@ -84,7 +60,6 @@ export function AttachmentCards(props: {
       return next;
     });
   };
-  // A video that cannot play or load goes back to its card, which has its name and its buttons.
   const [unplayable, setUnplayable] = createSignal<ReadonlySet<string>>(new Set());
   const markUnplayable = (attachment: AttachmentSummary) =>
     setUnplayable((current) => new Set(current).add(attachment.id));
@@ -97,7 +72,6 @@ export function AttachmentCards(props: {
     props.mediaSource !== undefined &&
     attachment.size <= props.mediaSource.mediaLimit &&
     !sourceUrl(attachment);
-  /** A video that can load shows its player before it has a file: Play in the player loads it. */
   const showsPlayer = (attachment: AttachmentSummary) =>
     !isMissing(attachment) &&
     (Boolean(imageUrl(attachment)) || (mediaKind(attachment) === "video" && canLoadMedia(attachment)));
@@ -121,8 +95,6 @@ export function AttachmentCards(props: {
       });
     return format.fileSize(attachment.size);
   };
-  // Sound keeps its old rule. A video shows its first frame, but not from a joined server: that file
-  // arrives whole, so the player gets nothing before Play.
   const mediaPreload = (attachment: AttachmentSummary) => {
     if (mediaKind(attachment) === "video")
       return REMOTE_PREVIEW_URL.test(attachment.previewUrl ?? "") ? "none" : "metadata";
@@ -157,7 +129,6 @@ export function AttachmentCards(props: {
           )
             void source.load(attachment);
           let card: HTMLDivElement | undefined;
-          // A video shows only its player. Its name and size show on hover, and its actions on a right click.
           const videoMenu = (): VideoStageMenu => {
             const actions = [
               { label: t("common.download"), onSelect: () => props.onAction(attachment, "download") },
@@ -189,6 +160,7 @@ export function AttachmentCards(props: {
               onPlay={() => started(attachment)}
               onError={() => markUnplayable(attachment)}
               menu={videoMenu()}
+              onDownload={() => props.onAction(attachment, "download")}
             />
           );
           return (
@@ -200,7 +172,6 @@ export function AttachmentCards(props: {
               data-status={isMissing(attachment) ? "missing" : undefined}
               data-download={download(attachment)?.phase}
             >
-              {/* A video shows as a generated video does: only the player. Its row shows during a download. */}
               <Show when={showsVideo(attachment)}>{player()}</Show>
               <Button
                 variant="ghost"
@@ -237,7 +208,6 @@ export function AttachmentCards(props: {
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      // A loaded copy exists, so its error does not mean that the host lost the file.
                       onError={() => {
                         if (attachment.previewUrl) markMissing(attachment);
                       }}
@@ -250,7 +220,6 @@ export function AttachmentCards(props: {
                 </span>
               </Button>
               <Show when={!isMissing(attachment)}>
-                {/* A video loads from Play in its own player. */}
                 <Show when={canLoadMedia(attachment) && mediaKind(attachment) === "audio"}>
                   <Button
                     variant="ghost"

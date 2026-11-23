@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.site", {
-  // Hosted site errors.
   "error.site.absolutePath": "Choose an absolute site directory path.",
   "error.site.rootSymlink": "Symlinks are not allowed in hosted sites.",
   "error.site.notDirectory": "The site source must be a directory.",
@@ -31,7 +30,6 @@ export const messages = defineMessages("error.site", {
     other:
       "This server is at its limit of {count} active sites. To publish another site, delete a site or use a cloud server with a plan that has more sites.",
   },
-  // Shown when the servers with no plan use all the sites of their shared pool.
   "error.site.sharedLimit":
     "The servers of your account with no plan share their active sites, and all of them are in use. To publish a site here, delete a site on one of these servers, add users to your license, or use a cloud server with a plan that has more sites.",
   "error.site.accountLimit":

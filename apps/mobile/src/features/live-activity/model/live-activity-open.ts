@@ -1,11 +1,3 @@
-/**
- * Opens the props that the host sealed with `sealLiveActivity` from `@openbot/team-client`, or
- * returns `null` when the tag does not match. The keys are base64url text.
- *
- * The widget extension runs it in a bare JavaScript context with no crypto library. The `widget`
- * directive turns it into a string, so it uses nothing from outside its body, and it has its own
- * SHA-256. Its test opens what the host module seals.
- */
 export function openSealedLiveActivity(sealed: string, sealKey: string, tagKey: string): string | null {
   "widget";
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";

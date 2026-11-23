@@ -112,8 +112,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "売り切れ",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · {date} に終了",
+  "mobile.server.hosted.serverDataKept": "{plan} · データは{date}まで保持",
   "mobile.server.hosted.state.payment": "支払い待ち",
   "mobile.server.hosted.state.setup": "セットアップ中",
+  "mobile.server.hosted.state.restoring": "データを復元中",
   "mobile.server.hosted.state.starting": "起動中",
   "mobile.server.hosted.state.running": "稼働中",
   "mobile.server.hosted.state.stopped": "停止中",
@@ -224,6 +226,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "待機中です。ホストはメモリが許す数のターンを実行します。",
   "mobile.server.threads.hold.agentBusy": "このエージェントの他の作業が終わるのを待っています。",
   "mobile.server.threads.hold.oneTurn": "待機中です。このエージェントのプロバイダーは一度に1ターンずつ実行します。",
+  "mobile.server.threads.hold.signIn": "待機中です。このエージェントのプロバイダーへのサインインが必要です。",
   "mobile.server.threads.offline": "このサーバーに接続するとスレッドが表示されます。",
   "mobile.server.threads.loading": "スレッドを読み込み中…",
   "mobile.server.threads.loadFailed": "一部のエージェントのスレッドを読み込めませんでした。",
@@ -329,6 +332,7 @@ export const messages = {
   "mobile.server.route.timezone": "タイムゾーン",
   "mobile.server.route.personality": "エージェントの性格",
   "mobile.server.route.agents": "エージェント",
+  "mobile.server.route.voiceModel": "音声認識",
   "mobile.server.settings.storage": "ストレージ",
   "mobile.server.route.storage": "ストレージ",
   "mobile.server.route.storageFiles": "すべてのファイル",
@@ -454,6 +458,19 @@ export const messages = {
     "タイムゾーンを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.settings.timezoneUnsupported":
     "ここでタイムゾーンを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.voiceModelDescription":
+    "このサーバーのエージェントは、字幕のない動画の音声をこのモデルで文字起こしします。",
+  "mobile.server.settings.voiceModelLoading": "音声認識を読み込み中…",
+  "mobile.server.settings.voiceModelLoadFailed": "サーバーの音声認識モデルを読み込めませんでした。",
+  "mobile.server.settings.voiceModelSaveFailed": "音声認識モデルを変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.voiceModelUnsupported":
+    "ここで音声認識を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.voiceModelReady": "準備完了",
+  "mobile.server.settings.voiceModelDownloading": "ダウンロード中: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} のダウンロード",
+  "mobile.server.settings.voiceModelDownload": "ダウンロード",
+  "mobile.server.settings.voiceModelCancel": "ダウンロードを停止",
+  "mobile.server.settings.voiceModelRemove": "削除",
   "mobile.server.settings.keySection": "サーバーキー",
   "mobile.server.settings.keyChanged": "最終変更",
   "mobile.server.settings.keyChange": "キーを変更",
@@ -538,6 +555,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "エージェントを追加",
   "mobile.server.browserProfiles.agentsHint":
     "タップすると、エージェントにこのプロファイルを割り当てるか、共有プロファイルに戻します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.server.browserProfiles.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。移動したエージェントはこれらのサイトに再度サインインする必要があります。",
   "mobile.server.browserProfiles.clear": "データを消去",
   "mobile.server.browserProfiles.clearTitle": "{name} のデータを消去しますか?",
   "mobile.server.browserProfiles.clearBody":
@@ -705,6 +724,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Proton Pass で、OpenBot と共有する保管庫だけを読み取れるアクセスキーを作成し、ここに貼り付けてください。キーは {host} が保持し、この電話には保存されません。",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "ご利用の Proton プランには Proton Pass のコマンドラインツールが含まれていません。Pass Plus を含む Proton プランが必要です。Mail Plus などのほかの有料プランには含まれません。アカウントのプランを変更してから、もう一度接続してください。",
   "mobile.server.connectors.passwordManager.unavailable": "{name} はこのサーバーでは利用できません。",
   "mobile.server.connectors.passwordManager.howItWorks":
     "この電話で {name} にサインインしてください。その後 {host} が共有保管庫とその読み取り専用アクセスキーを作成し、そのキーだけを保持します。エージェントがパスワードを見ることはありません。",
@@ -734,8 +755,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "読み取り専用",
   "mobile.server.connectors.passwordManager.keyExpires": "読み取り専用。{date} に期限切れになります。",
   "mobile.server.connectors.passwordManager.keyExpired": "{date} に期限切れ",
-  "mobile.server.connectors.passwordManager.plan":
-    "{name} のコマンドラインツールには有料プランが必要です。アカウントのプランを変更してから、もう一度接続してください。",
   "mobile.server.connectors.passwordManager.expiredTitle": "{name} のキーの期限が切れました",
   "mobile.server.connectors.passwordManager.expiredBody":
     "再接続するまで、{host} のエージェントは共有ログインでサインインできません。",
@@ -870,7 +889,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "mobile.server.connectors.whatsapp.helpError":
@@ -958,7 +977,8 @@ export const messages = {
     "省略できます。空の場合、一覧には電話番号が表示されます。",
   "mobile.server.connectors.whatsapp.add": "追加",
   "mobile.server.connectors.whatsapp.groupTitle": "グループを追加",
-  "mobile.server.connectors.whatsapp.groupDescription": "このグループのメンバーは、エージェントに作業を依頼できます。",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "このグループのメンバーは、この番号をメンションするか、そのメッセージに返信すると、エージェントに作業を依頼できます。",
   "mobile.server.connectors.whatsapp.groupSearch": "グループを検索",
   "mobile.server.connectors.whatsapp.groupsLoading": "グループを読み込んでいます…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot はグループを読み込めませんでした",
@@ -1110,10 +1130,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "モデルを変更できませんでした。もう一度お試しください。",
   "mobile.server.providers.promptCache": "プロンプトキャッシュ",
   "mobile.server.providers.promptCacheHint":
-    "ターンの間に Claude がエージェントのコンテキストをキャッシュに保持する時間です。変更は Claude の次回起動時に適用されます。",
-  "mobile.server.providers.promptCacheDefault": "Claude Code のデフォルト",
+    "ターンの間に Claude と Pi がエージェントのコンテキストをキャッシュに保持する時間です。変更はプロバイダーの次回起動時に適用されます。",
+  "mobile.server.providers.promptCacheDefault": "プロバイダーの既定",
   "mobile.server.providers.promptCacheHour": "1 時間",
   "mobile.server.providers.promptCacheLoadFailed": "このサーバーのプロンプトキャッシュ時間を読み込めませんでした。",
+  "mobile.server.providers.cacheExpiryCompaction": "キャッシュの期限切れ前に圧縮",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "20 万トークン以上のコンテキストを持つチャットが 1 時間のキャッシュでアイドル状態のとき、エージェントはキャッシュの期限切れ前にコンテキストを圧縮します。これにより、次のメッセージはキャッシュなしでコンテキスト全体を読み直しません。",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "このサーバーの圧縮設定を読み込めませんでした。",
   "mobile.server.providers.compactWindow": "チャットを圧縮するサイズ",
   "mobile.server.providers.compactWindowHint":
     "チャットがこのサイズに達すると、Claude Code は古いターンを要約します。小さくするとターンが速く安くなります。大きくすると詳細が多く残ります。ウィンドウが小さいモデルは、その上限で圧縮します。",
@@ -1168,6 +1192,8 @@ export const messages = {
     "ChatGPT は ChatGPT のプランではなく、このキーを使います。OpenAI は各リクエストをキーに課金します。プランの使用量は表示されません。",
   "mobile.server.providers.codexKeyAlternative":
     "または OpenAI の API キーでログインします。OpenAI は各リクエストをキーに課金します。",
+  "mobile.server.providers.museKeyInUse":
+    "Muse はサインインではなく、このキーを使います。サインインを使うには、キーを削除してください。",
   "mobile.server.providers.sectionUse": "使用",
   "mobile.server.providers.unused": "使用しているエージェントはありません",
   "mobile.server.providers.usedByCount": { other: "{count} 個のエージェントが使用中" },
@@ -1233,6 +1259,9 @@ export const messages = {
   "mobile.server.mcp.connected": { other: "接続済み · ツール {count} 個" },
   "mobile.server.mcp.signInOnComputer":
     "この MCP サーバーはサインインを求めています。コンピューターの OpenBot からサインインして、もう一度テストしてください。",
+  "mobile.server.mcp.signIn": "サインイン",
+  "mobile.server.mcp.signInHere":
+    "この MCP サーバーはサインインを求めています。サインインをタップしてから、もう一度テストしてください。",
   "mobile.server.mcp.signedInDescription": "{server} はこの MCP サーバーにサインインしています。",
   "mobile.server.mcp.signOut": "サインアウト",
   "mobile.server.mcp.saveFailed": "変更を保存できませんでした。もう一度お試しください。",
@@ -1283,6 +1312,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 時間",
   "mobile.server.planLimits.window.hours": { other: "{count} 時間" },
   "mobile.server.planLimits.window.minutes": "{minutes} 分",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "アップデート",
   "mobile.server.settings.updateAvailable": "アップデートあり",
   "mobile.server.route.updates": "アップデート",
@@ -1335,7 +1365,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons} を待っています。",
   "mobile.server.update.disabledTitle": "リモートアップデートはオフです",
   "mobile.server.update.disabledDescription":
-    "{name} のユーザーが、サーバーメンバーからのアップデートをオフにしました。OpenBot をアップデートするか、設定をオンにするよう依頼してください。",
+    "{name} のユーザーが、サーバーメンバーからのアップデートをオフにしました。OpenBot をアップデートするか、そのコンピューターで「設定」>「アップデート」を開いて「サーバーのメンバーからのアップデートを許可する」をオンにするよう依頼してください。",
   "mobile.server.update.managedTitle": "アップデートは Host Manager が管理しています",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager が {name} をアップデートします。ホストの管理者に連絡してください。",
@@ -1457,7 +1487,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} を {role} に追加しました",
   "mobile.server.audit.roleMemberRemoved": "{member} を {role} から削除しました",
   "mobile.server.audit.agentLevel": "{role} の {agent}：{change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "エージェントをインポート",
   "mobile.server.route.import": "エージェントをインポート",
   "mobile.server.import.unsupported":
@@ -1535,7 +1564,6 @@ export const messages = {
   "mobile.server.import.channel": "チャンネル",
   "mobile.server.import.notImportedTitle": "インポートされなかった項目",
   "mobile.server.import.resultWarnings": "移行されなかった項目があります",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "移行",
   "mobile.server.route.transfer": "移行",
   "mobile.server.route.transferExport": "エクスポート",
@@ -1612,6 +1640,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "エージェントのチャンネル、ルーティンフロー、ワークフロー、共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "mobile.server.transfer.copySubmit": { other: "エージェント {count} 件をコピー" },
+  "mobile.server.transfer.copyDuplicatesTitle": "重複するエージェントをコピーしますか？",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} には次の名前のエージェントがすでにあります: {names}。コピーすると、それぞれ 2 つ目のエージェントが追加されます。各コピーは別のエージェントで、チャット、ファイル、メモリーはそれぞれ独立しています。",
+  "mobile.server.transfer.copyDuplicatesConfirm": "重複をコピー",
   "mobile.server.transfer.copying": "コピー中…",
   "mobile.server.transfer.copyFailed": "コピーが完了しませんでした。",
   "mobile.server.transfer.copied": { other: "エージェント {count} 件を {server} にコピーしました。" },
@@ -1619,4 +1651,41 @@ export const messages = {
   "mobile.server.transfer.copyNext": "コピーしたエージェントには、{server} の承認ルールが適用されます。",
   "mobile.server.transfer.copyNoServer":
     "エージェントをコピーするには、オーナーまたは管理者として別のサーバーに接続してください。",
+  "mobile.server.route.ownerTransfer": "所有権を移す",
+  "mobile.server.ownerTransfer.unavailable": "所有権を移すには、所有者としてこのサーバーに接続してください。",
+  "mobile.server.ownerTransfer.hosted": "このサーバーは OpenBot がホストしているため、所有者を変更できません。",
+  "mobile.server.ownerTransfer.lede":
+    "新しい所有者にメールが届きます。そのメールアドレスでサインインした状態で承認する必要があります。その後、あなたはこのサーバーから削除されます。",
+  "mobile.server.ownerTransfer.email": "新しい所有者のメールアドレス",
+  "mobile.server.ownerTransfer.send": "送信",
+  "mobile.server.ownerTransfer.sending": "送信中…",
+  "mobile.server.ownerTransfer.stays":
+    "エージェント、チャット、ルーティン、プロバイダーのサインイン、保存したキー、Vault のログイン、ブラウザのサインイン、接続済みアプリはサーバーに残ります。新しい所有者はそれらを使えます。",
+  "mobile.server.ownerTransfer.expiry": "リクエストは 7 日後に期限切れになります。",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} を所有者にしますか？",
+  "mobile.server.ownerTransfer.confirmBody":
+    "{email} が承認すると、{server} の所有者になり、あなたはアクセスできなくなります。データはサーバーに残ります。リクエストは 7 日後に期限切れになります。",
+  "mobile.server.ownerTransfer.confirm": "移す",
+  "mobile.server.ownerTransfer.sendFailed": "リクエストを送信できませんでした。",
+  "mobile.server.ownerTransfer.loadFailed": "保留中の移行を読み込めませんでした。",
+  "mobile.server.ownerTransfer.pending": "新しい所有者の承認待ち",
+  "mobile.server.ownerTransfer.expires": "期限: {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} はこのメールアドレスでサインインした状態で承認する必要があります。それまではあなたが所有者です。",
+  "mobile.server.ownerTransfer.cancel": "取り消す",
+  "mobile.server.ownerTransfer.cancelTitle": "移行を取り消しますか？",
+  "mobile.server.ownerTransfer.cancelBody": "{email} は承認できなくなります。",
+  "mobile.server.ownerTransfer.keep": "残す",
+  "mobile.server.ownerTransfer.cancelFailed": "移行を取り消せませんでした。",
+  "mobile.server.ownerTransfer.incomingTitle": "{server} の所有者になりますか？",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} があなたを {server} の所有者にしようとしています。サーバーを完全に管理でき、エージェント、チャット、ルーティン、保存したサインインはそのまま残ります。{name} はアクセスできなくなります。 サーバーを動かしているコンピューターにまだサインインできる人は、あなたの OpenBot アカウントを使えます。そのコンピューターのパスワードと SSH キーを変更してください。",
+  "mobile.server.ownerTransfer.accept": "承認",
+  "mobile.server.ownerTransfer.decline": "拒否",
+  "mobile.server.ownerTransfer.accepted": "あなたは {server} の所有者になりました。",
+  "mobile.server.ownerTransfer.acceptFailed": "移行を承認できませんでした",
+  "mobile.server.ownerTransfer.declineFailed": "移行を拒否できませんでした",
+  "mobile.server.ownerTransfer.tryAgain": "後でもう一度お試しください。",
+  "mobile.server.providers.updateAll": "すべて更新",
+  "mobile.server.providers.updateAllFailed": "一部の更新を開始できませんでした。もう一度お試しください。",
 } as const satisfies PartialTranslation<typeof source>;

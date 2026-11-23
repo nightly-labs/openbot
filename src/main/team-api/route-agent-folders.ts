@@ -7,7 +7,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireListedAgent, requireVisibleBodyAgent } from "./request-helpers";
 
-/** The wire codec permits an empty path; the folder checks do not. */
 function parsed<T>(parse: (value: unknown) => T, body: DynamicRecord): T {
   try {
     return parse(body);
@@ -16,11 +15,6 @@ function parsed<T>(parse: (value: unknown) => T, body: DynamicRecord): T {
   }
 }
 
-/**
- * The folders that one agent can change besides its workspace, and the host folders to pick them
- * from. A folder gives the agent write access on the host, so only an owner or an admin reads or
- * changes them. Frozen by `agent-folders-v1`.
- */
 export async function routeAgentFolders(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -33,7 +27,6 @@ export async function routeAgentFolders(
   if (!folders || !capabilities.has(AGENT_FOLDERS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.agentFoldersUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the agent-folders wire codec.
   const body = await readJson(request);
   requireVisibleBodyAgent(body, hiddenAgentIds);
   const agentId = typeof body.agentId === "string" ? body.agentId : "";
@@ -41,7 +34,6 @@ export async function routeAgentFolders(
   try {
     return await answer(context, folders, agentId, body);
   } catch (error) {
-    // Another device can delete the agent while the change waits for the one before it.
     requireListedAgent(folders, agentId);
     throw error;
   }

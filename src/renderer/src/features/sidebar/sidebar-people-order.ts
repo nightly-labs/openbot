@@ -46,7 +46,5 @@ export function writeSidebarPeopleOrder(
 ): void {
   try {
     storage.setItem(SIDEBAR_PEOPLE_ORDER_STORAGE_KEY, JSON.stringify(orderByServer));
-  } catch {
-    // A private ordering preference must not block sidebar navigation.
-  }
+  } catch {}
 }

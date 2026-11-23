@@ -185,6 +185,8 @@ export const messages = {
   "routine.card.open": "Открыть регулярную задачу {name}",
   "routine.card.webhookCreated": "Создана регулярная задача с вебхуком",
   "routine.card.webhookSecretNote": "Чтобы получить секрет подписи, создайте его заново. Агент не получает секрет.",
+  "routine.card.webhookSecretAgentNote":
+    "Чтобы получить секрет подписи, создайте его заново или передайте агенту {name}.",
   "routine.card.webhookUpdated": "Обновлена регулярная задача с вебхуком",
   "routine.card.webhookChanged": "Изменения не сохранены",
   "routine.card.webhookSaveFailed": "Не удалось сохранить события.",
@@ -364,7 +366,13 @@ export const messages = {
   "routine.webhook.senderSecretLabel": "Секрет отправителя",
   "routine.webhook.senderSecretConfirm": "Использовать",
   "routine.webhook.senderSecretFailed": "Не удалось сохранить секрет отправителя.",
-  "routine.webhook.statusFailed": "Не удалось проверить, подключён ли хост к ретранслятору.",
+  "routine.webhook.giveSecret": "Передать секрет подписи агенту {name}",
+  "routine.webhook.giveSecretTitle": "Передать новый секрет подписи агенту {name}?",
+  "routine.webhook.giveSecretDescription":
+    "Текущий секрет перестанет работать сразу. Агент {name} сохранит новый секрет как API-ключ и сможет добавить его у отправителя. Копировать его не нужно.",
+  "routine.webhook.giveSecretConfirm": "Передать",
+  "routine.webhook.giveSecretFailed": "Не удалось передать секрет подписи агенту {name}.",
+  "routine.webhook.secretGiven": "У агента {name} теперь новый секрет подписи.",
 
   "routine.settings.instruction": "Инструкция",
   "routine.settings.instructionPlaceholderAgent": "Опишите, что должен делать этот агент.",

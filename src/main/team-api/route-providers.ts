@@ -66,27 +66,18 @@ import {
 } from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput, signInCodexWithApiKey } from "../ipc/provider-handlers";
 import { isObject } from "../ipc/validation";
-import type { TeamApiAdmin } from "./dependencies";
+import type { TeamApiAdmin, TeamApiProviderAccounts } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
+import { requireRoomForKeyAccount } from "./route-provider-accounts";
 
-/** The bound `providers-v1` and `providers-v2` put on a runtime message. */
 const RUNTIME_MESSAGE_LIMIT = 1024;
 
-/**
- * The providers of this computer, managed from a joined server: sign-in with a device code, provider
- * API keys, the managed CLI runtimes and the custom endpoints. Frozen by `providers-v1`, by
- * `providers-v2` for the runtime routes that include Gemini, by `providers-v3` for the Claude
- * and Grok sign-in on another device, by `providers-v4` for the runtimes and sign-in of Cursor
- * and Cline, and by `providers-v8`, which names a provider by any id and lists the runtimes as rows.
- *
- * `requireAdmin` runs on every route. A key or a header value only arrives here; no response
- * carries one, and no error message quotes the request.
- */
 export async function routeProviders(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
+  providerAccounts?: TeamApiProviderAccounts | undefined,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
@@ -116,15 +107,12 @@ export async function routeProviders(
   try {
     switch (url.pathname) {
       case PROVIDERS_ADMIN_ROUTES.codeLoginStart: {
-        // `providers-v1` signs in Codex only; its response has no `paste` shape.
         const id = parsed(provider, body);
         if (id !== "codex")
           throw new Error(sourceText("error.provider.noCodeSignIn", { provider: agentProviderName(id) }));
-        // The admin types the code in their own browser; nothing it is traded for comes back.
         return json(200, await runCauseEffect(service.startProviderCodeLogin(id)));
       }
       case PROVIDERS_ADMIN_ROUTES.codeLoginCancel: {
-        // A v1 client never started a Claude or Grok sign-in, so it cannot cancel one either.
         const id = parsed(provider, body);
         if (id === "codex") await runCauseEffect(service.cancelProviderCodeLogin(id));
         return json(200, {});
@@ -132,7 +120,6 @@ export async function routeProviders(
       case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginStart:
         return json(200, await runCauseEffect(service.startProviderCodeLogin(parsed(signInProvider, body))));
       case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit: {
-        // The code is a credential: it goes to the CLI's stdin, and no error quotes it.
         const input = parsed(codeSubmitInput, body);
         service.submitProviderCodeLogin(input.provider, input.code);
         return json(200, {});
@@ -140,12 +127,9 @@ export async function routeProviders(
       case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginCancel:
         await runCauseEffect(service.cancelProviderCodeLogin(parsed(signInProvider, body)));
         return json(200, {});
-      // A provider id that this host does not know gets a 400. The sign-in service refuses a known
-      // provider that has no code sign-in.
       case PROVIDERS_V8_ROUTES.codeLoginStart:
         return json(200, await runCauseEffect(service.startProviderCodeLogin(parsed(hostProvider, body))));
       case PROVIDERS_V8_ROUTES.codeLoginSubmit: {
-        // The code is a credential: it goes to the CLI's stdin, and no error quotes it.
         const input = parsed(codeSubmitInputV8, body);
         service.submitProviderCodeLogin(input.provider, input.code);
         return json(200, {});
@@ -166,7 +150,6 @@ export async function routeProviders(
         return json(200, await runCauseEffect(service.startProviderCodeLogin(parsed(signInProviderV4, body))));
       case PROVIDERS_V5_ROUTES.codeLoginSubmit:
       case PROVIDERS_V4_ROUTES.codeLoginSubmit: {
-        // The code is a credential: it goes to the CLI's stdin, and no error quotes it.
         const input = parsed(codeSubmitInputV4, body);
         service.submitProviderCodeLogin(input.provider, input.code);
         return json(200, {});
@@ -198,7 +181,6 @@ export async function routeProviders(
           V8_ROUTES.has(url.pathname) ? keyProviderV8 : V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider,
           body,
         );
-        // `codex-api-key-v1`: the key is in Codex's own login, which the agent status reads.
         if (id === "codex") {
           const codex = service.getStatus().providers?.find((candidate) => candidate.id === "codex");
           return json(200, { status: codex?.apiKeyInUse ? "saved" : "missing" });
@@ -216,11 +198,11 @@ export async function routeProviders(
               : wireApiKeyInput,
           body,
         );
-        // `codex-api-key-v1`: Codex keeps the key in its own login, as on this computer, not in the key store.
         if (input.provider === "codex") {
           await signInCodexWithApiKey(service, input.key);
           return json(200, {});
         }
+        requireRoomForKeyAccount(capabilities, providerAccounts, input.provider);
         const save = () =>
           credentials
             .set(input.provider, input.key)
@@ -229,10 +211,7 @@ export async function routeProviders(
                 (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
               ),
             );
-        // A key-only provider runs on Pi. The download outlasts the request, so the route only starts it.
-        // Until Pi is ready no process uses the key, so only the key changes; Pi then starts the provider.
         const piPending = await runCauseEffect(runtimes.startKeyProviderCli(input.provider));
-        // Otherwise the same step as the local handler: the key and the process that uses it change together.
         await runCauseEffect(piPending ? save() : service.changeProviderCredential(input.provider, save));
         return json(200, {});
       }
@@ -280,16 +259,13 @@ export async function routeProviders(
       case CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customList:
         return json(200, customProviders.list().map(wireEditCustomProvider));
       case CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate: {
-        // The endpoint keeps its harness and the settings of each kept model: the wire has neither.
         const result = await runCauseEffect(
           customProviders.peerUpdate(parsed(parseUpdateCustomProvider, releasedSaveBody(body))),
         );
         return json(200, wireResult(url.pathname, result));
       }
       case CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate: {
-        // The endpoint moves to the named harness and keeps the settings of each kept model.
         const { harness, ...input } = parsed(parseUpdateCustomProvider, harnessChoiceBody(body));
-        // The frozen codec requires a harness, so a body with none does not get here.
         if (!harness) throw new Error("Unknown harness.");
         const result = await runCauseEffect(customProviders.peerHarnessUpdate(input, harness));
         return json(200, wireResult(url.pathname, result));
@@ -308,8 +284,6 @@ export async function routeProviders(
         );
         return json(200, wireResult(url.pathname, result));
       }
-      // The delete route of `providers-v1`, `custom-provider-harness-v1`, `custom-provider-edit-v1` and
-      // `custom-provider-harness-choice-v1`.
       default:
         return json(
           200,
@@ -321,8 +295,6 @@ export async function routeProviders(
     }
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    // A busy provider or a failed download is a sentence for the admin, not a host fault. A provider
-    // process can quote its key, so the message leaves this computer redacted.
     if (error instanceof Error) throw new HttpError(409, redactText(error.message));
     throw error;
   }
@@ -352,10 +324,6 @@ function isProvidersRoute(pathname: string): boolean {
   return ROUTES.has(pathname);
 }
 
-/**
- * The `providers-v1` endpoint summary: the header names, the harness and the model context windows
- * stay on this computer, as they did.
- */
 function wireCustomProvider({
   headerNames: _headerNames,
   harness: _harness,
@@ -364,11 +332,6 @@ function wireCustomProvider({
   return { ...provider, models: provider.models.map(wireCustomModel) };
 }
 
-/**
- * A Team API save or edit names the endpoint and each model by its released fields only. A field
- * that the protocol does not have is removed before the parse, so that it cannot refuse a save the
- * host used to accept, and a peer always adds an endpoint on OpenCode.
- */
 function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): DynamicRecord {
   if (!Array.isArray(body.models)) return body;
   return {
@@ -387,7 +350,6 @@ function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): Dynami
   };
 }
 
-/** A `custom-provider-harness-choice-v1` save or edit: the released fields, and the harness that it names. */
 function harnessChoiceBody(body: DynamicRecord): DynamicRecord {
   return { ...releasedSaveBody(body), harness: body.harness };
 }
@@ -396,20 +358,14 @@ function wireCustomModel({ id, name }: CustomProviderModel): CustomProviderModel
   return { id, name };
 }
 
-/** The `custom-provider-harness-v1` summary: the `providers-v1` one, and the harness that runs the endpoint. */
 function wireHarnessCustomProvider(provider: CustomProviderSummary): CustomProviderSummary {
   return { ...wireCustomProvider(provider), harness: provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS };
 }
 
-/**
- * The `custom-provider-edit-v1` summary: the `custom-provider-harness-v1` one, and the header names,
- * so an edit can keep the headers. The header values stay on this computer.
- */
 function wireEditCustomProvider(provider: CustomProviderSummary): CustomProviderSummary {
   return { ...wireHarnessCustomProvider(provider), headerNames: provider.headerNames ?? [] };
 }
 
-/** A save, an edit or a delete answers with the summaries of the protocol that the route belongs to. */
 function wireResult(route: string, result: CustomProviderResult): CustomProviderResult {
   const wire =
     EDIT_ROUTES.has(route) || CHOICE_ROUTES.has(route)
@@ -420,14 +376,9 @@ function wireResult(route: string, result: CustomProviderResult): CustomProvider
   return { ...result, providers: result.providers.map(wire) };
 }
 
-/**
- * The providers that `providers-v1` knows. Gemini (`antigravity`) stays on this computer, so a peer
- * that names it gets the same refusal as for a provider that does not exist.
- */
 const WIRE_PROVIDERS = ["codex", "claude", "grok", "opencode"] as const satisfies readonly ManagedProviderId[];
 type WireProviderId = (typeof WIRE_PROVIDERS)[number];
 
-/** The `providers-v1` runtime snapshot. It has no entry for a local-only provider. */
 interface WireProviderRuntimeSnapshot extends Omit<ProviderRuntimeSnapshot, "providers"> {
   providers: Record<WireProviderId, ProviderRuntimeStatus>;
 }
@@ -440,14 +391,12 @@ function provider(body: DynamicRecord): WireProviderId {
 
 type SignInProviderId = (typeof PROVIDERS_SIGN_IN_V3_PROVIDERS)[number];
 
-/** The providers `providers-v3` signs in. */
 function signInProvider(body: DynamicRecord): SignInProviderId {
   const id = parseProviderId(body.provider);
   if (!isOneOf(PROVIDERS_SIGN_IN_V3_PROVIDERS, id)) throw new Error("Unknown provider.");
   return id;
 }
 
-/** The error never quotes the code. The CLI checks what the code is; this uses the local check. */
 function codeSubmitInput(body: DynamicRecord): { provider: SignInProviderId; code: string } {
   return { provider: signInProvider(body), code: pastedCode(body) };
 }
@@ -455,14 +404,12 @@ function codeSubmitInput(body: DynamicRecord): { provider: SignInProviderId; cod
 function pastedCode(body: DynamicRecord): string {
   if (typeof body.code !== "string") throw new Error("Invalid sign-in code.");
   const code = normalizePastedCode(body.code);
-  // From here on, an error or a log line that quotes the code is masked, as for a provider key.
   registerSecretValue(code);
   return code;
 }
 
 type SignInProviderIdV4 = (typeof PROVIDERS_V4_SIGN_IN_PROVIDERS)[number];
 
-/** The providers `providers-v4` signs in. */
 function signInProviderV4(body: DynamicRecord): SignInProviderIdV4 {
   const id = parseProviderId(body.provider);
   if (!isOneOf(PROVIDERS_V4_SIGN_IN_PROVIDERS, id)) throw new Error("Unknown provider.");
@@ -473,7 +420,6 @@ function codeSubmitInputV4(body: DynamicRecord): { provider: SignInProviderIdV4;
   return { provider: signInProviderV4(body), code: pastedCode(body) };
 }
 
-// `providers-v5` does not name Inception, DeepSeek or OpenRouter; `providers-v8` sets their keys.
 function peerApiKeyInput(body: DynamicRecord) {
   const input = parseProviderApiKeyInput(body);
   if (isKeyOnlyProvider(input.provider)) throw new Error("Unknown provider.");
@@ -492,14 +438,9 @@ function managedProvider(body: DynamicRecord): ManagedProviderId {
   return id;
 }
 
-/**
- * The managed runtimes that `providers-v2` knows: Gemini, and not Cursor, which stays on this
- * computer. A peer that names Cursor gets the same refusal as for a provider that does not exist.
- */
 const WIRE_PROVIDERS_V2 = [...WIRE_PROVIDERS, "antigravity"] as const satisfies readonly ManagedProviderId[];
 type WireProviderIdV2 = (typeof WIRE_PROVIDERS_V2)[number];
 
-/** The `providers-v2` runtime snapshot. It has no entry for Cursor. */
 interface WireProviderRuntimeSnapshotV2 extends Omit<ProviderRuntimeSnapshot, "providers"> {
   providers: Record<WireProviderIdV2, ProviderRuntimeStatus>;
 }
@@ -513,7 +454,6 @@ function managedProviderV2(body: DynamicRecord): WireProviderIdV2 {
 
 type WireProviderIdV4 = (typeof PROVIDERS_V4_RUNTIME_PROVIDERS)[number];
 
-/** The `providers-v4` runtime snapshot: every managed runtime, Cursor and Cline included. */
 interface WireProviderRuntimeSnapshotV4 extends Omit<ProviderRuntimeSnapshot, "providers"> {
   providers: Record<WireProviderIdV4, ProviderRuntimeStatus>;
 }
@@ -533,7 +473,6 @@ function parsed<T>(parse: (value: DynamicRecord) => T, body: DynamicRecord): T {
   }
 }
 
-/** A long download error is cut to the wire bound, so the snapshot never fails closed on the client. */
 function wireSnapshot(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeSnapshot {
   return {
     revision: snapshot.revision,
@@ -547,7 +486,6 @@ function wireSnapshot(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeSna
   };
 }
 
-/** The `providers-v2` runtime snapshot: every managed runtime that a peer can see. */
 function wireSnapshotV2(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeSnapshotV2 {
   const wire = wireSnapshot(snapshot);
   return { ...wire, providers: { ...wire.providers, antigravity: wireStatus(snapshot.providers.antigravity) } };
@@ -574,7 +512,6 @@ function managedProviderV5(body: DynamicRecord): ManagedProviderId {
   if (!isOneOf(PROVIDERS_V5_RUNTIME_PROVIDERS, id)) throw new Error("Unknown provider.");
   return id;
 }
-/** The `providers-v5` runtime snapshot: the v4 runtimes, Pi and Muse. Later runtimes go only to `providers-v8`. */
 interface WireProviderRuntimeSnapshotV5 extends Omit<ProviderRuntimeSnapshot, "providers"> {
   providers: Record<(typeof PROVIDERS_V5_RUNTIME_PROVIDERS)[number], ProviderRuntimeStatus>;
 }
@@ -586,7 +523,6 @@ function wireSnapshotV5(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeS
   };
 }
 
-/** A `providers-v8` provider: any provider of this host. The wire accepts an id that this host does not know. */
 function hostProvider(body: DynamicRecord) {
   return parseProviderId(body.provider);
 }
@@ -601,23 +537,17 @@ function managedProviderV8(body: DynamicRecord): ManagedProviderId {
   return id;
 }
 
-/** A `providers-v8` provider with a Download: a managed runtime, or Hermes, which its own installer installs. */
 function downloadableProviderV8(body: DynamicRecord): DownloadableProviderId {
   const id = hostProvider(body);
   if (!isDownloadableProvider(id)) throw new Error(sourceText("error.team.providerNotManaged"));
   return id;
 }
 
-/** A `providers-v8` provider whose key this host keeps: a managed runtime, or a key-only provider on Pi. */
 function keyProviderV8(body: DynamicRecord) {
   const id = hostProvider(body);
   return isKeyOnlyProvider(id) ? id : managedProviderV8(body);
 }
 
-/**
- * The `providers-v8` runtime snapshot: one row for each managed runtime, keyed by `id`, and one for
- * each installer provider that has a status. A client before the Hermes installer drops that row.
- */
 function wireSnapshotV8(snapshot: ProviderRuntimeSnapshot) {
   const installers = INSTALLER_PROVIDERS.flatMap((id) => {
     const status = snapshot.providers[id];

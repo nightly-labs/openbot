@@ -42,6 +42,11 @@ export const messages = {
   "update.idleRestart.description": "Nowe uruchomienia rutyn czekają do ponownego uruchomienia.",
   "update.idleRestart.waitingFor": "Oczekiwanie na: {reasons}.",
   "update.idleRestart.cancel": "Anuluj restart",
+  "update.idleRestart.restartNow": "Uruchom ponownie teraz",
+  "update.idleRestart.restartNowTitle": "Uruchomić ponownie OpenBot teraz?",
+  "update.idleRestart.restartNowDescription":
+    "Niezakończone tury agentów i uruchomienia rutyn zostaną teraz zatrzymane.",
+  "update.idleRestart.keepWaiting": "Czekaj dalej",
   "update.idleRestart.cancelFailed": "Nie udało się anulować ponownego uruchomienia.",
   "update.idleRestart.requestFailed": "Nie udało się zaplanować ponownego uruchomienia.",
   "update.idleRestart.failedTitle": "OpenBot nie uruchomił się ponownie",

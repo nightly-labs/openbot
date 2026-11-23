@@ -8,7 +8,10 @@ export const messages = {
   "error.update.downloadStalled": "La descarga de la actualización dejó de responder. Inténtalo de nuevo.",
   "error.update.installFailed":
     "No se pudo instalar la actualización. Cierra y vuelve a abrir OpenBot e inténtalo de nuevo.",
+  "error.update.notInstalled": "El último reinicio no instaló la actualización. Reinicia para intentarlo de nuevo.",
   "error.update.downloadFailed": "No se pudo descargar la actualización. Inténtalo de nuevo.",
+  "error.update.signatureNotConfirmed":
+    "OpenBot no pudo verificar la actualización. Inténtalo de nuevo. Si el error continúa, descarga OpenBot desde openbot.run/download.",
   "error.update.checkFailed": "No se pudieron buscar actualizaciones. Inténtalo de nuevo.",
   "error.update.checkStalled": "La búsqueda de actualizaciones dejó de responder. Inténtalo de nuevo.",
   "error.update.checkOffline":

@@ -7,12 +7,10 @@ import { LandingIcon } from "../landing/LandingIcon";
 import type { ReportSiteText } from "../transactional/page-text";
 import { TransactionalPage } from "../transactional/TransactionalPage";
 
-/** The reasons that `/v1/sites/reports` accepts. */
 const REPORT_REASONS = ["phishing", "malware", "abuse", "copyright", "other"] as const;
 
 const DETAILS_LIMIT = 1_000;
 
-/** An example value, not text: it is the same in all languages. */
 const HOSTNAME_EXAMPLE = "example.openbot.site";
 
 type ReportStatus = "idle" | "sending" | "sent" | "failed";
@@ -22,7 +20,6 @@ function fieldText(data: FormData, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** The `error.message` of a refused report, when the server sent one that a person can read. */
 async function serverMessage(response: Response): Promise<string | null> {
   if (response.status >= 500) return null;
   const body = await response.json().catch(() => null);
@@ -30,11 +27,6 @@ async function serverMessage(response: Response): Promise<string | null> {
   return isString(body.error.message) && body.error.message ? body.error.message : null;
 }
 
-/**
- * The form state and the send to `/v1/sites/reports`. The endpoint accepts only a same-origin form
- * body, so the page sends `application/x-www-form-urlencoded` with `fetch`, and the browser adds the
- * `Origin` and `Sec-Fetch-Site` headers that it checks.
- */
 function createReportForm(text: ReportSiteText) {
   const [status, setStatus] = createSignal<ReportStatus>("idle");
   const [hostnameError, setHostnameError] = createSignal<string>();
@@ -91,7 +83,6 @@ function SentNotice(props: { text: ReportSiteText }) {
   );
 }
 
-/** The report form for a hosted site. `hostname` is the site that linked here, or empty. */
 export function ReportSitePage(props: { hostname: string; lang: string; text: ReportSiteText }) {
   const form = createReportForm(props.text);
   const hostnameId = createUniqueId();
@@ -158,7 +149,6 @@ export function ReportSitePage(props: { hostname: string; lang: string; text: Re
               aria-describedby={`${detailsId}-count`}
               onInput={(event) => setDetailsLength(event.currentTarget.value.length)}
             />
-            {/* One expression: the server writes a constant as text, but the client expects a slot. */}
             <span id={`${detailsId}-count`} class="contact-count">
               {`${detailsLength()} / ${DETAILS_LIMIT}`}
             </span>

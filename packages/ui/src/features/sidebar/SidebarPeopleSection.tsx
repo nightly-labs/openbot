@@ -1,9 +1,3 @@
-/**
- * The People section. It takes its id as a prop rather than importing the constant because the
- * section list is what decides where People sits in the order, and `data-section-id` has to carry
- * the same id the layout used - see `SIDEBAR_DRAG_SELECTORS`.
- */
-
 import { Button } from "@openbot/ui";
 import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";

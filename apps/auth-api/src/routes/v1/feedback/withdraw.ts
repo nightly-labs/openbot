@@ -14,11 +14,6 @@ import {
   requestUser,
 } from "../../../server/request-auth";
 
-/**
- * Takes a report that this account sent off the public repository: the issue moves to a private
- * repository, or the comment is deleted. Only the account whose mark ends the text can do it. An
- * issue that is not there anymore answers `gone`, so the app can show the report as removed.
- */
 export const Route = createFileRoute("/v1/feedback/withdraw")({
   server: {
     handlers: {

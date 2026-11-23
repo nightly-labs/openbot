@@ -1,14 +1,3 @@
-// Runs agent tasks end to end in this worktree's running dev app, through the real preload bridge,
-// IPC, agent service and provider. It changes the data of the profile, so start the app with
-// `bun run dev` (never `--shared`), and pass the id of an agent whose provider is signed in and runs
-// turns at the same time (not a custom ACP agent):
-// `bun scripts/agent-tasks-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// It checks the task limit and its hold, a raised limit that starts the waiting task, Stop, a
-// provider switch queued while a task runs, and that the task list reports the `error` field. Each
-// task turn is a real provider turn, so keep the prompts short. At the end it stops and closes the
-// tasks it started and gives the agent its task limit back.
-// Writes .openbot-build/agent-tasks-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -26,7 +15,6 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -39,7 +27,6 @@ const agentArgument = argument("agent");
 assert.ok(agentArgument, "Pass --agent=<agent id> of an agent whose provider is signed in.");
 const agentId: string = agentArgument;
 
-// Long enough that the first task still runs while the script reads the second one.
 const LONG_PROMPT = "Write a numbered list of 40 short facts about rivers. Do not use tools.";
 const SHORT_PROMPT = "Reply with the single word ready. Do not use tools.";
 const WAIT_MS = 120_000;
@@ -114,7 +101,6 @@ async function startTask(text: string): Promise<AgentTask> {
   return task;
 }
 
-/** Reads the task list until `ready` accepts it. The app pushes no event to this script, so it reads again. */
 async function waitForTasks(
   label: string,
   ready: (snapshot: AgentTasksSnapshot) => boolean,
@@ -143,7 +129,6 @@ assert.ok(
 const originalLimit = before.taskLimit ?? null;
 
 try {
-  // 1. With a limit of 1, the second task waits for the first one, and says why.
   await setTaskLimit(1);
   const first = await startTask(LONG_PROMPT);
   await waitForTasks("the first task runs", (snapshot) => taskIn(snapshot, first.id).state === "running");
@@ -161,7 +146,6 @@ try {
   assert.equal(held.limit, 1);
   assert.equal(taskIn(held, second.id).hold, "task-limit");
 
-  // 2. A higher limit starts the waiting task while the first one still runs.
   await setTaskLimit(2);
   const raised = await waitForTasks(
     "the second task starts",
@@ -170,7 +154,6 @@ try {
   report.raisedLimit = { second: taskIn(raised, second.id).state, limit: raised.limit };
   assert.equal(raised.limit, 2);
 
-  // 3. A provider switch while a task runs is queued for the next turn.
   const models = await page.evaluate(() => window.openbot.agent.listModels());
   const target = models.filter(isAgentModelOption).find((model) => model.provider !== before.provider) ?? null;
   const running = await listTasks();
@@ -200,7 +183,6 @@ try {
     report.providerSwitch = { refused: false, target: null };
   }
 
-  // 4. Stop ends each task's turn as interrupted.
   for (const taskId of [first.id, second.id]) {
     await page.evaluate(({ id, task }) => window.openbot.agent.stopTask({ agentId: id, taskId: task }), {
       id: agentId,
@@ -214,10 +196,8 @@ try {
     states: [first.id, second.id].map((taskId) => taskIn(stopped, taskId).state),
     outcomes: [first.id, second.id].map((taskId) => taskIn(stopped, taskId).outcome),
   };
-  // The second task can finish its short turn before Stop reaches it.
   assert.equal(taskIn(stopped, first.id).outcome, "interrupted");
 
-  // 5. The list reports the stored error of each task: null after a turn that did not fail.
   report.errorField = { present: stopped.tasks.every((task) => "error" in task) };
   assert.ok(report.errorField.present);
   report.passed = true;

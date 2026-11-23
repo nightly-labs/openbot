@@ -1,0 +1,19 @@
+.talk-key-recorder {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.talk-key-recorder-button {
+  min-width: 112px;
+}
+
+.talk-key-recorder-caps {
+  display: inline-flex;
+  gap: var(--openbot-space-1);
+}
+
+.talk-key-recorder-prompt {
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}

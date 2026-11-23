@@ -4,7 +4,6 @@ import type { BrowserElement, BrowserSnapshot } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import { CardValueScrub } from "./browser-cdp-snapshot";
 
-// A test card number. It is not a real account.
 const NUMBER = "4242424242424242";
 const SECURITY_CODE = "737";
 

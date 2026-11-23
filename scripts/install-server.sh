@@ -29,7 +29,6 @@ RELEASES=https://github.com/nightly-labs/openbot/releases
 service_user=""
 auth_api_url=""
 display_size=""
-# Set by the line before this script, which the command from the app sends. Child processes do not get it.
 claim=${OPENBOT_CLAIM:-}
 unset OPENBOT_CLAIM
 server_name=""
@@ -89,7 +88,6 @@ case $(uname -m) in
   *) fail "OpenBot has no release for this machine." ;;
 esac
 
-# A signed-in server keeps its account and does not use the claim, so it would not join this one.
 refuse_signed_in() {
   local status
   status=$(openbot status 2>/dev/null) || return 0
@@ -97,7 +95,6 @@ refuse_signed_in() {
     fail "This server is signed in to an account. To add it to another account, run \"sudo openbot logout\" and then this command again."
   fi
 }
-# Before the download, so that a server with an account stops at once.
 if [ -n "$claim" ] && command -v openbot >/dev/null; then refuse_signed_in; fi
 
 missing=()
@@ -126,7 +123,6 @@ chmod 0700 "$work/OpenBot.AppImage"
 
 setup="$work/squashfs-root/resources/hosting/openbot-server-setup"
 [ -f "$setup" ] || fail "OpenBot $version cannot install as a server. Try again after the next release."
-# A release before --display-size refuses a fourth argument.
 if [ -n "$display_size" ] && ! grep -q OPENBOT_DISPLAY_SIZE "$setup"; then
   fail "OpenBot $version has no --display-size. Install without it, or try again after the next release."
 fi
@@ -135,9 +131,7 @@ bash "$setup" "$service_user" "$work/squashfs-root" "$auth_api_url" ${display_si
 if [ -n "$claim" ]; then
   refuse_signed_in
   echo
-  # The claim goes on standard input: the openbot command takes no claim argument.
   printf '%s\n' "$claim" | openbot login --claim ${server_name:+--name "$server_name"}
-  # The whole answer first: with pipefail, grep -q can end the pipe early and fail it.
   status=$(openbot status)
   grep -q '^Server: \(.* (\)\{0,1\}online)\{0,1\}$' <<<"$status" ||
     fail "The server is not online. Run \"openbot status\" and \"openbot logs\" to see why."

@@ -5,10 +5,6 @@ import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves the table
-// or its marker; a newer or incomplete history is accepted; a sender can point to no connection, or
-// have a kind other than contact or group; a connection with senders can be deleted and leave them
-// behind. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -29,7 +25,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A Telegram connection, the row that migration 51 must keep, from schema 25 on. */
 function seedConnection(db: DatabaseSync): void {
   db.prepare(`INSERT INTO projection_messaging_connections
     (connection_id, platform, workspace_id, workspace_name, enabled, bot_user_id, app_id, orchestrator_agent_id,
@@ -55,10 +50,6 @@ function seed(db: DatabaseSync, version: number): void {
       VALUES ('connection-1', '400', 'Maintainers', '2026-01-03')`).run();
 }
 
-/**
- * Every row of every table, by table name. Migration 47 replaces the empty task table with the thread
- * table; `agent-thread-migration.test.ts` checks that move.
- */
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
 function contents(db: DatabaseSync): Contents {
@@ -73,7 +64,6 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** The source rows, and each agent memory has no site, as migration 60 adds it. */
 function withNoMemorySite(before: Contents): Contents {
   return {
     ...before,
@@ -86,7 +76,7 @@ function senderTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 68 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -98,7 +88,6 @@ describe("messaging allowed senders migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db, version);
-      // The earlier migrations run first; the rows after them are what v51 must keep.
       if (version < 50) migrateUpTo(db, 50);
       if (version < 25) seedConnection(db);
       const before = contents(db);
@@ -153,9 +142,9 @@ describe("messaging allowed senders migration", () => {
     const db = databaseAt(50);
     seed(db, 50);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(69,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=69; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(senderTables(db)).toEqual([]);

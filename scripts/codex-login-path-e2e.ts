@@ -1,12 +1,3 @@
-// Adapted from the report in nightly-labs/openbot#2686: "Codex CLI reports 'not found'".
-// OpenBot started the way Finder, the Dock or a login item starts it: PATH=/usr/bin:/bin:/usr/sbin:/sbin.
-// An npm Codex is a `#!/usr/bin/env node` script, so `codex --version` and the app-server process
-// must run with the login shell's folders, or with the folder that Codex was found in.
-// The stand-in Codex runs on a stand-in interpreter that is only in those folders. The login shell
-// is bash, set in $SHELL, and only `~/.bash_profile` adds the folder: zsh does not see it.
-// Bun reads HOME once, at start, so the cases run in a second process that starts with the stand-in
-// home. `bun run test:codex:login-path`; exit 0 = every case passed. Writes
-// .openbot-build/codex-login-path-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -27,8 +18,6 @@ if (process.env[ROOT_VARIABLE] === undefined) {
   const root = await mkdtemp(join(tmpdir(), "openbot-codex-login-path-e2e-"));
   const home = join(root, "home");
   await mkdir(home, { recursive: true });
-  // Only bash's login profile adds the folder, as for a user whose shell is bash. It also leaves out
-  // the system folders that /etc/profile adds, so a Codex installed on this computer is not found.
   await writeFile(join(home, ".bash_profile"), `export PATH="${join(home, "tools")}:/usr/bin:/bin"\n`);
   for (const name of [".zprofile", ".zshrc", ".profile"]) await writeFile(join(home, name), "");
   const env: NodeJS.ProcessEnv = {
@@ -36,7 +25,6 @@ if (process.env[ROOT_VARIABLE] === undefined) {
     [ROOT_VARIABLE]: root,
     HOME: home,
     SHELL: "/bin/bash",
-    // OpenBot started from Finder, the Dock or a login item.
     PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
   };
   delete env.ZDOTDIR;
@@ -61,7 +49,6 @@ const report: Report = { passed: false, cases: {} };
 const clients: AgentClient[] = [];
 let passed = false;
 
-/** An interpreter at `folder/name`, and a Codex in `codexFolder` that `#!/usr/bin/env name` runs. */
 async function writeStandIn(folder: string, name: string, codexFolder: string, recorded: string): Promise<string> {
   await mkdir(folder, { recursive: true });
   await mkdir(codexFolder, { recursive: true });
@@ -84,7 +71,6 @@ async function writeStandIn(folder: string, name: string, codexFolder: string, r
   return codex;
 }
 
-/** Starts the app-server process through the Codex driver, and returns the PATH it started with. */
 async function appServerPath(cli: CodexCliInfo, recorded: string): Promise<string> {
   const client = requireProviderDriver("codex").createClient(cli, 30_000, NO_PROVIDER_CREDENTIALS);
   clients.push(client);
@@ -114,7 +100,6 @@ try {
   const home = join(root, "home");
   const tools = join(home, "tools");
 
-  // 1. A Codex on the login shell's PATH, whose interpreter is only there.
   const loginRecorded = join(root, "login-path.txt");
   const loginCodex = await writeStandIn(tools, "openbot-e2e-node", tools, loginRecorded);
   const loginCli = await runCauseEffect(resolveCodexCli({ bundledExecutable: null }));
@@ -124,7 +109,6 @@ try {
   assert.ok(loginSession.split(":").includes(tools), "The app-server process starts with the login PATH.");
   report.cases.loginPath = { executable: loginCli.executable, version: loginCli.version, sessionPath: loginSession };
 
-  // 2. A Volta Codex that the login shell's PATH does not name. Its interpreter is beside it only.
   await rm(loginCodex);
   const volta = join(home, ".volta", "bin");
   const voltaRecorded = join(root, "volta-path.txt");
@@ -135,12 +119,10 @@ try {
   assert.ok(voltaSession.split(":").includes(volta), "The app-server process starts with Codex's own folder.");
   report.cases.fallbackFolder = { executable: voltaCli.executable, sessionPath: voltaSession };
 
-  // 3. The status names the copy that failed, the download or the user's own, in catalog text.
   const broken = join(root, "broken-codex");
   await writeFile(broken, "#!/bin/sh\nexit 1\n");
   await chmod(broken, 0o755);
   const failure = async (input: Parameters<typeof resolveCodexCli>[0]) => {
-    // The lookup must fail. If it finds a CLI, the run fails here.
     const error = await Effect.runPromise(Effect.flip(resolveCodexCli(input)));
     return providerFailureStatus("codex", error.cause, null);
   };
