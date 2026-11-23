@@ -155,14 +155,18 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
   };
 }
 
-export function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
+export function elicitationFieldQuestions(
+  params: unknown,
+  subject: string,
+  fieldOptions?: (id: string, property: DynamicRecord) => Array<{ label: string; description: string }> | null,
+): AgentPromptQuestion[] {
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
   const message = getString(params, "message")?.trim() || undefined;
   return Object.entries(properties).flatMap(([id, property], index) => {
     if (!isRecord(property)) return [];
     const description = getString(property, "description");
     const question = description ?? message ?? `${subject} needs more information.`;
-    const options = elicitationOptions(property);
+    const options = fieldOptions ? fieldOptions(id, property) : elicitationOptions(property);
     const hidden = options?.slice(INPUT_LIMITS.promptOptions).map((option) => option.label) ?? [];
     const detail = [
       index === 0 && description && message && message !== description ? message : undefined,
@@ -181,6 +185,170 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
       },
     ];
   });
+}
+
+/** An option of an ACP choice schema: the value that the reply carries, and the label that the card shows. */
+interface AcpChoice {
+  value: string;
+  label: string;
+  description: string;
+}
+
+/** The options of an ACP choice schema: `oneOf` or `anyOf` with a `const` each, or `enum`. */
+function acpChoices(schema: DynamicRecord | null): AcpChoice[] | null {
+  if (!schema) return null;
+  const listed = Array.isArray(schema.oneOf) ? schema.oneOf : Array.isArray(schema.anyOf) ? schema.anyOf : null;
+  if (listed) {
+    return listed.filter(isRecord).flatMap((option) => {
+      const value = getString(option, "const");
+      if (!value) return [];
+      return [
+        {
+          value,
+          label: elicitationOptionLabel(getString(option, "title") ?? value),
+          description: (getString(option, "description") ?? "").slice(0, INPUT_LIMITS.promptOptionDescription),
+        },
+      ];
+    });
+  }
+  if (Array.isArray(schema.enum)) {
+    return schema.enum
+      .filter(isString)
+      .map((value) => ({ value, label: elicitationOptionLabel(value), description: "" }));
+  }
+  return null;
+}
+
+/** The options of an ACP choice field, and whether the user can choose more than one. Null for another field. */
+function acpFieldChoices(property: unknown): { choices: AcpChoice[]; multiple: boolean } | null {
+  if (!isRecord(property)) return null;
+  const choices = acpChoices(property.type === "array" ? getRecord(property, "items") : property);
+  return choices ? { choices, multiple: property.type === "array" } : null;
+}
+
+/** OpenCode asks for the typed answer of the choice field `<id>` in the text field `<id>_custom`. */
+const CUSTOM_ANSWER_SUFFIX = "_custom";
+
+/** The ids of the choice fields that have a `<id>_custom` text field for their typed answer. */
+function customAnswerFields(properties: DynamicRecord): Set<string> {
+  const ids = new Set<string>();
+  for (const [id, property] of Object.entries(properties)) {
+    if (!id.endsWith(CUSTOM_ANSWER_SUFFIX) || !isRecord(property) || property.type !== "string") continue;
+    if (Array.isArray(property.oneOf) || Array.isArray(property.anyOf) || Array.isArray(property.enum)) continue;
+    const choice = id.slice(0, -CUSTOM_ANSWER_SUFFIX.length);
+    if (acpFieldChoices(properties[choice])) ids.add(choice);
+  }
+  return ids;
+}
+
+/**
+ * The options that the card shows for an ACP field, or null for a text question. A list of choices is
+ * a choice question only with its `<id>_custom` field, as OpenCode asks. Without it, it stays a text
+ * question, as before.
+ */
+function openCodeFieldChoices(
+  id: string,
+  property: unknown,
+  typedAnswers: Set<string>,
+): ReturnType<typeof acpFieldChoices> {
+  const choices = acpFieldChoices(property);
+  return choices && (!choices.multiple || typedAnswers.has(id)) ? choices : null;
+}
+
+/**
+ * The questions of OpenCode's form (`AcpFlavor.openCodeForms`). A choice field and its `<id>_custom`
+ * text field are one question: the card's typed answer fills the text field. A list of choices with
+ * such a field takes more than one answer. The options and the detail of the hidden tail come from
+ * `elicitationFieldQuestions`, so the card caps them the same way.
+ */
+export function openCodeFormQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
+  const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
+  const typedAnswers = customAnswerFields(properties);
+  const fieldOptions = (id: string, property: DynamicRecord) => {
+    const choices = openCodeFieldChoices(id, property, typedAnswers);
+    return choices ? choices.choices.map(({ label, description }) => ({ label, description })) : null;
+  };
+  return elicitationFieldQuestions(params, subject, fieldOptions).flatMap((question) => {
+    const choice = question.id.endsWith(CUSTOM_ANSWER_SUFFIX) ? question.id.slice(0, -CUSTOM_ANSWER_SUFFIX.length) : "";
+    if (typedAnswers.has(choice)) return [];
+    const choices = openCodeFieldChoices(question.id, properties[question.id], typedAnswers);
+    return [choices?.multiple ? { ...question, multiSelect: true } : question];
+  });
+}
+
+/**
+ * The reply to OpenCode's form (`AcpFlavor.openCodeForms`). No answers, or a card that the user
+ * closed, declines. A card with each question skipped accepts with no values, so OpenCode reads them
+ * as unanswered and continues. A form that requires a value, or a confirmation with no field, still
+ * declines then.
+ */
+export function openCodeFormResult(
+  params: unknown,
+  answers: Record<string, string[]> | null,
+): { action: "accept"; content: Record<string, ElicitationFieldValue> } | { action: "decline" } {
+  if (!answers || Object.keys(answers).length === 0) return { action: "decline" };
+  const schema = getRecord(params, "requestedSchema");
+  const properties = getRecord(schema, "properties") ?? {};
+  const typedAnswers = customAnswerFields(properties);
+  const content: Record<string, ElicitationFieldValue> = {};
+  for (const [id, values] of Object.entries(answers)) {
+    if (values.length === 0) continue;
+    const property = getRecord(properties, id) ?? undefined;
+    const choices = openCodeFieldChoices(id, property, typedAnswers);
+    if (!choices) {
+      content[id] = elicitationValue(property, values);
+      continue;
+    }
+    const optionValue = (answer: string) =>
+      choices.choices.find((option) => option.label === answer || option.value === answer)?.value;
+    // A single choice: an option's label gives its value, and a typed answer stays as before.
+    if (!typedAnswers.has(id)) {
+      content[id] = optionValue(values[0] ?? "") ?? elicitationValue(property, values);
+      continue;
+    }
+    const picked = values.map(optionValue).filter(isString);
+    const typed = values.filter((answer) => optionValue(answer) === undefined).join(", ");
+    // A multi-select whose answers were all typed sends `[]` on purpose: the typed text goes to the
+    // `_custom` field, and OpenCode reads the empty list as no option picked.
+    if (choices.multiple) content[id] = picked;
+    else if (picked[0] !== undefined) content[id] = picked[0];
+    if (typed) content[`${id}${CUSTOM_ANSWER_SUFFIX}`] = typed;
+  }
+  if (Object.keys(content).length > 0) return { action: "accept", content };
+  const required = getArray(schema, "required").filter(isString);
+  const fields = Object.keys(answers).some((id) => id in properties);
+  return fields && required.length === 0 ? { action: "accept", content: {} } : { action: "decline" };
+}
+
+/**
+ * The reply to the form of an ACP agent other than OpenCode: the answered fields. A card with no
+ * answer declines, also when the user skipped each question: another agent can read an empty accept
+ * as consent.
+ */
+export function elicitationFormResult(
+  params: unknown,
+  answers: Record<string, string[]> | null,
+): { action: "accept"; content: Record<string, ElicitationFieldValue> } | { action: "decline" } {
+  const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
+  const content: Record<string, ElicitationFieldValue> = {};
+  for (const [id, values] of Object.entries(answers ?? {})) {
+    if (values.length === 0) continue;
+    content[id] = elicitationValue(getRecord(properties, id) ?? undefined, values);
+  }
+  return Object.keys(content).length > 0 ? { action: "accept", content } : { action: "decline" };
+}
+
+/**
+ * The questions of the form of an ACP agent other than OpenCode: one page for each field, except a
+ * `<id>_custom` text field whose choice field has options, which the choice page already covers.
+ */
+export function acpFormQuestions(params: unknown): AgentPromptQuestion[] {
+  const fields = elicitationFieldQuestions(params, "ACP");
+  const choices = new Set(fields.filter(({ options }) => options?.length).map(({ id }) => id));
+  const required = new Set(getArray(getRecord(params, "requestedSchema"), "required").filter(isString));
+  return fields.filter(
+    ({ id }) => required.has(id) || !(id.endsWith("_custom") && choices.has(id.slice(0, -"_custom".length))),
+  );
 }
 
 function mcpSignInPage(params: unknown): { url: string; address: string } | null {
