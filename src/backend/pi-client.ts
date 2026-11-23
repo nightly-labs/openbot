@@ -39,7 +39,7 @@ import { PendingServerRequests } from "./pending-server-requests";
 import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
-import { piMessageItems, piPrompt, piText } from "./pi-messages";
+import { piMessageItems, piPrompt, piText, piWroteToolCallAsText } from "./pi-messages";
 import { PI_REQUEST_TIMEOUT_MS, PiProcessClosedError, PiRpc } from "./pi-rpc";
 import { piWindowsShellArguments } from "./pi-windows-shell";
 import type { SpawnTarget } from "./process-confinement";
@@ -1058,7 +1058,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         this.#notify("item/completed", thread, { item });
       }
       const stop = getString(message, "stopReason");
-      turn.failure = stop === "error" ? this.#failureText(getString(message, "errorMessage")) : null;
+      // A tool call written as text ran nothing, and the chat showed only its markup (#7441). A later
+      // message of the run, such as the answer to a steer, replaces this failure.
+      turn.failure =
+        stop === "error"
+          ? this.#failureText(getString(message, "errorMessage"))
+          : piWroteToolCallAsText(message)
+            ? sourceText("error.provider.toolCallAsText")
+            : null;
       turn.failureCause = stop === "error" ? piFailureCause(getString(message, "errorMessage")) : null;
       if (stop === "aborted") turn.stopped = true;
     } else if (record.type === "tool_execution_start" || record.type === "tool_execution_end") {

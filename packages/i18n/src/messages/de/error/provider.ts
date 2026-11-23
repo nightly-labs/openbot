@@ -312,6 +312,8 @@ export const messages = {
     "Das OpenCode-Modell hat den Durchlauf nach seinem Nachdenken ohne Antwort beendet. Versuche es erneut oder wähle ein anderes Modell.",
   "error.provider.acpNoAnswer":
     "{provider} hat den Durchlauf ohne Antwort beendet. Sende die Nachricht erneut oder starte einen neuen Chat.",
+  "error.provider.toolCallAsText":
+    "Das Modell wollte ein Werkzeug verwenden, hat die Anfrage aber als Text geschrieben, daher lief nichts. Sende die Nachricht erneut oder wähle ein anderes Modell.",
   "error.provider.noAnswerAfterSteps":
     "{provider} hat einige Schritte ausgeführt und den Durchgang dann ohne Antwort beendet. Frag den Agenten, was er getan hat, bevor du dieselbe Anfrage noch einmal sendest.",
   "error.provider.acpRefusedNoReason": "{provider} hat ohne Antwort aufgehört. Sende die Nachricht erneut.",
