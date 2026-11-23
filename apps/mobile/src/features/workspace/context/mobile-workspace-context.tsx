@@ -2256,10 +2256,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return conversationMessageId(receipt, agentId);
       },
       respondToPrompt: async (agentId, input) => {
-        const activeServer = currentActiveServer();
         const agent = agentsRef.current.find((candidate) => candidate.id === agentId);
+        const agentServer = serversRef.current.find((server) => server.id === agent?.serverId);
         const snapshot = conversationStore.get(agentId);
-        const waits = liveState.get().threadWaitsByServer[activeServer.id] ?? [];
+        const waits = (agentServer ? liveState.get().threadWaitsByServer[agentServer.id] : undefined) ?? [];
         const message = snapshot?.messages.find(
           (item) =>
             item.questionPrompt?.requestId === input.requestId &&
@@ -2273,18 +2273,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             wait.agentId === agentId &&
             String(wait.requestId) === String(input.requestId),
         );
-        if (
-          agent?.serverId !== activeServer.id ||
-          !showsOnline(activeServer) ||
-          (!message?.questionPrompt && !hostWaits)
-        ) {
+        if (!agentServer || !showsOnline(agentServer) || (!message?.questionPrompt && !hostWaits)) {
           throw new Error(currentText().t("mobile.workspace.error.formUnavailable"));
         }
-        await request("POST", TEAM_API_ROUTES.respond.prompt, ignoreResponse, {
-          requestId: input.requestId,
-          answers: input.answers,
-        });
-        void loadConversation(agentId).catch(() => undefined);
+        await request(
+          "POST",
+          TEAM_API_ROUTES.respond.prompt,
+          ignoreResponse,
+          { requestId: input.requestId, answers: input.answers },
+          agentServer.id,
+        );
+        void loadConversation(agentId, agentServer.id).catch(() => undefined);
       },
       hideAgent: (agentId) => {
         const server = currentActiveServer();
