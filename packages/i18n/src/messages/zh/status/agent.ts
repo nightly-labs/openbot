@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.planApprovalHeader": "计划审批",
+  "status.agent.planApprovalEmpty": "代理没有写计划。",
+  "status.agent.planApprovalDetail": "批准计划后，代理将开始实施。如需修改，请写下要修改的内容。",
+  "status.agent.planApproveDetail": "代理开始实施计划。",
+  "status.agent.planStop": "停止规划",
+  "status.agent.planStopDetail": "计划模式关闭，代理等待你的下一条消息。",
   "status.agent.claudeWriteOutside": "写入 {path}，位置在助手工作区、共享文件夹和临时文件夹之外。",
   "status.agent.contextCleared": "上下文已清空，将从这里开始新对话。",
   "status.agent.instructionsChanged": "更新了它的指令",

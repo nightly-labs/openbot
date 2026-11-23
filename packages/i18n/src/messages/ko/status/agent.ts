@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.planApprovalHeader": "계획 승인",
+  "status.agent.planApprovalEmpty": "에이전트가 계획을 작성하지 않았습니다.",
+  "status.agent.planApprovalDetail": "계획을 승인하면 에이전트가 구현을 시작합니다. 변경하려면 바꿀 내용을 입력하세요.",
+  "status.agent.planApproveDetail": "에이전트가 계획 구현을 시작합니다.",
+  "status.agent.planStop": "계획 중지",
+  "status.agent.planStopDetail": "계획 모드가 꺼지고 에이전트가 다음 메시지를 기다립니다.",
   "status.agent.claudeWriteOutside": "에이전트의 워크스페이스, 공유 폴더, 임시 폴더 밖에 있는 {path}에 써요.",
   "status.agent.contextCleared": "컨텍스트를 지웠어요. 여기서 새 채팅이 시작돼요.",
   "status.agent.instructionsChanged": "지침을 업데이트했어요",

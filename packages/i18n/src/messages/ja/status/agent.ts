@@ -2,6 +2,13 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.planApprovalHeader": "プランの承認",
+  "status.agent.planApprovalEmpty": "エージェントはプランを書いていません。",
+  "status.agent.planApprovalDetail":
+    "プランを承認すると、エージェントが実装を始めます。変更するには、変更内容を書いてください。",
+  "status.agent.planApproveDetail": "エージェントがプランの実装を始めます。",
+  "status.agent.planStop": "プランをやめる",
+  "status.agent.planStopDetail": "プランモードがオフになり、エージェントは次のメッセージを待ちます。",
   "status.agent.claudeWriteOutside":
     "{path} に書き込みます。これはエージェントのワークスペース、共有フォルダー、一時フォルダーの外です。",
   "status.agent.contextCleared": "コンテキストを消去しました。ここから新しいチャットが始まります。",

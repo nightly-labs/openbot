@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.planApprovalHeader": "אישור התוכנית",
+  "status.agent.planApprovalEmpty": "הסוכן לא כתב תוכנית.",
+  "status.agent.planApprovalDetail": "אשרו את התוכנית כדי שהסוכן יבצע אותה. כדי לשנות אותה, כתבו מה לשנות.",
+  "status.agent.planApproveDetail": "הסוכן מתחיל לבצע את התוכנית.",
+  "status.agent.planStop": "הפסקת התכנון",
+  "status.agent.planStopDetail": "מצב התכנון כבה, והסוכן ממתין להודעה הבאה שלכם.",
   "status.agent.claudeWriteOutside": "כתיבה אל {path}, מחוץ לסביבת העבודה של הסוכן, לתיקייה המשותפת ולתיקיות הזמניות.",
   "status.agent.contextCleared": "ההקשר נוקה. צ'אט חדש מתחיל כאן.",
   "status.agent.instructionsChanged": "עדכן את ההוראות שלו",

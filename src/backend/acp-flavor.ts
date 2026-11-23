@@ -7,6 +7,7 @@ import {
   type SessionUpdate,
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { type CauseCode, classifyFailure } from "@openbot/telemetry";
@@ -163,13 +164,17 @@ export interface AcpFlavor {
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
   promptUsage?(response: PromptResponse): DynamicRecord | null;
   promptRun?(response: PromptResponse): string | undefined;
-  userQuestions?: {
-    method: string;
-    reply(
-      questions: readonly { id: string; question: string }[],
-      answers: Readonly<Record<string, readonly string[]>>,
-    ): DynamicRecord;
-  };
+  userQuestions?: AcpUserRequest;
+  planApproval?: AcpUserRequest;
+}
+
+export interface AcpUserRequest {
+  method: string;
+  questions?(params: DynamicRecord): DynamicRecord[];
+  reply(
+    questions: readonly { id: string; question: string }[],
+    answers: Readonly<Record<string, readonly string[]>>,
+  ): DynamicRecord;
 }
 
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
@@ -246,10 +251,45 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
         : { outcome: "cancelled" };
     },
   },
+  planApproval: {
+    method: "x.ai/exit_plan_mode",
+    questions: (params) => [grokPlanQuestion(params)],
+    reply: (questions, answers) => grokPlanReply(answers[questions[0]?.id ?? ""]?.[0]?.trim()),
+  },
   retryNotice: grokRetryNotice,
   turnStallMs: 12 * 60_000,
   turnFailure: grokTurnFailure,
 };
+
+const GROK_PLAN_APPROVE = sourceText("status.messaging.approve");
+const GROK_PLAN_STOP = sourceText("status.agent.planStop");
+const GROK_PLAN_UNANSWERED =
+  "The user could not answer the plan approval, so plan mode is off. Do not edit files yet. Show the plan to the user and wait for their reply.";
+
+function grokPlanQuestion(params: DynamicRecord): DynamicRecord {
+  const plan = typeof params.planContent === "string" ? params.planContent.trim() : "";
+  const limit = INPUT_LIMITS.promptQuestion;
+  return {
+    header: sourceText("status.agent.planApprovalHeader"),
+    question: !plan
+      ? sourceText("status.agent.planApprovalEmpty")
+      : plan.length > limit
+        ? `${plan.slice(0, limit - 1)}…`
+        : plan,
+    detail: sourceText("status.agent.planApprovalDetail"),
+    options: [
+      { label: GROK_PLAN_APPROVE, description: sourceText("status.agent.planApproveDetail") },
+      { label: GROK_PLAN_STOP, description: sourceText("status.agent.planStopDetail") },
+    ],
+  };
+}
+
+function grokPlanReply(answer: string | undefined): DynamicRecord {
+  if (!answer) return { outcome: "abandoned", feedback: GROK_PLAN_UNANSWERED };
+  if (answer === GROK_PLAN_APPROVE) return { outcome: "approved" };
+  if (answer === GROK_PLAN_STOP) return { outcome: "abandoned" };
+  return { outcome: "request_changes", feedback: answer };
+}
 
 function grokTurnFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
