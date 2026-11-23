@@ -4487,6 +4487,7 @@ export class ProviderRuntime implements ProviderPort {
     if (client.provider === "codex" && !(yield* this.#readCodexRoute(client))) {
       if (this.#clients.get(client.provider) === client) {
         this.#lastUsage.delete(client.provider);
+        this.#ownResetCredits.delete(client.provider);
         this.#usageUnreported.add(client.provider);
       }
       return { limits: [] } satisfies AccountUsage;
