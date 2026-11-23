@@ -32,6 +32,7 @@ interface Report {
   chatCards?: { incoming: number; outgoing: number };
   promptFraming?: { channelResult: boolean; startTask: boolean };
   otherMemberReturned?: number;
+  requeuedAfterRestart?: boolean;
   passed: boolean;
   failure?: string;
 }
@@ -211,6 +212,9 @@ try {
   };
   assert.ok(report.promptFraming.channelResult, "The self-sent result is not framed as a channel result.");
   assert.ok(!report.promptFraming.startTask, "The self-sent result is framed as a start_task brief.");
+  await Effect.runPromise(mailbox.markStarting(selfDelivery.id));
+  report.requeuedAfterRestart = await Effect.runPromise(mailbox.requeueAfterRestart(selfDelivery.id, false));
+  assert.ok(report.requeuedAfterRestart, "A restart dropped the self-sent result instead of queuing it again.");
   report.passed = true;
 } catch (error) {
   report.failure = error instanceof Error ? error.message : String(error);

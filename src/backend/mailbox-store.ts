@@ -3200,7 +3200,6 @@ export class MailboxStore {
     const key = `${RESTARTED_RESULT_KEY_PREFIX}${deliveryId}`;
     const teammateResult =
       message?.sender.kind === "agent" &&
-      message.sender.agentId !== delivery?.recipientAgentId &&
       message.replyToMessageId !== null &&
       message.expectsReply === false &&
       !message.channelId;
