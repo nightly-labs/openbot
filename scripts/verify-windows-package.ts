@@ -42,6 +42,12 @@ await Promise.all([
   access(executablePath),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/package.json")),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/dist/index.js")),
+  access(
+    resolve(
+      resourcesPath,
+      "app.asar.unpacked/node_modules/@indutny/simple-windows-notifications/prebuilds/win32-x64/@indutny+simple-windows-notifications.node",
+    ),
+  ),
   access(resolve(resourcesPath, "app.asar")),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
