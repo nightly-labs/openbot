@@ -20,7 +20,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import type { QueuedUpload } from "../context/queued-messages-context";
-import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
+import { queuedMessageLocks, queuedMessagePreview, runsInNewThread } from "../model/queued-message-view";
 import { ChatGlassButton } from "./chat-glass-icon-button";
 import type { ChatQueueController } from "./use-chat-queue";
 
@@ -213,7 +213,7 @@ function ChatQueueCard({
           >
             <Pencil color={foreground} size={18} strokeWidth={2} />
           </CardAction>
-          {queue.canRunAsThread ? (
+          {queue.canRunAsThread && next && runsInNewThread(next) ? (
             <CardAction
               accessibilityLabel={t("mobile.chat.queue.runNextInNewThread")}
               disabled={locked || editedElsewhere || Boolean(locks?.heldForEdit)}

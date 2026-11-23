@@ -4,6 +4,10 @@ export function queuedMessagePreview(delivery: QueueDelivery): string {
   return delivery.text.trim() || delivery.attachments.map((file) => file.name).join(", ");
 }
 
+export function runsInNewThread(delivery: QueueDelivery): boolean {
+  return delivery.sender.kind === "user";
+}
+
 interface QueueActionState {
   busy: boolean;
   online: boolean;

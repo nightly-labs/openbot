@@ -24,7 +24,7 @@ import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { AttachmentThumbnail, showsAsImage, useAttachmentFile } from "../components/attachment-preview";
 import { useQueuedChat } from "../context/queued-messages-context";
-import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
+import { queuedMessageLocks, queuedMessagePreview, runsInNewThread } from "../model/queued-message-view";
 
 const TASK_ROUTE = "task/[taskId]";
 
@@ -134,7 +134,7 @@ export function QueuedMessageActionsScreen() {
             <Typography>{t("mobile.chat.queue.moveFirst")}</Typography>
           </SettingsRow>
         )}
-        {reply || !queue.canRunAsThread ? null : (
+        {reply || !queue.canRunAsThread || !runsInNewThread(delivery) ? null : (
           <SettingsRow
             leading={<GitBranch color={foreground} size={22} />}
             disclosure={false}
