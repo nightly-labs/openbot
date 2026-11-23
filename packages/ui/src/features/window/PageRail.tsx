@@ -172,8 +172,12 @@ function UsageRings(props: {
             .map((window) => t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }))
             .join(", "),
         });
-  const ringRow = () =>
-    rows().reduce((lowest, row) => ((row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest));
+  const ringRow = () => {
+    const read = rows().filter((row) => !row.readFailed);
+    return (read.length > 0 ? read : rows()).reduce((lowest, row) =>
+      (row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest,
+    );
+  };
   const windows = () => [...ringRow().ringWindows].reverse().slice(0, 2);
   const unavailable = () => props.row.readFailed && windows().length === 0;
   const outerRadius = (RING.size - RING.stroke) / 2;
@@ -237,12 +241,22 @@ function ringLeft(ring: UsageRing): number {
   return Math.min(...[ring.row, ...ring.shared].map((row) => row.remainingPercent ?? 100));
 }
 
+function providerRings(rings: readonly UsageRing[]): UsageRing[] {
+  const byProvider = new Map<AccountUsageProviderRow["provider"], UsageRing>();
+  for (const ring of rings) {
+    const first = byProvider.get(ring.row.provider);
+    if (first) first.shared.push(ring.row, ...ring.shared);
+    else byProvider.set(ring.row.provider, { row: ring.row, shared: [...ring.shared] });
+  }
+  return [...byProvider.values()];
+}
+
 function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: HTMLElement) => void }) {
   const { t } = useText();
   const rows = () => props.rings.flatMap((ring) => [ring.row, ...ring.shared]);
   return (
     <RailButton
-      label={t("app.rail.moreUsage", { count: props.rings.length })}
+      label={t("app.rail.moreUsage", { count: rows().length })}
       card={() => <UsageCard rows={rows()} />}
       class="window-rail-usage window-rail-usage-more"
       onClick={props.onOpen}
@@ -257,7 +271,7 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
         />
       </svg>
       <span class="window-rail-usage-count" aria-hidden="true">
-        {t("app.rail.moreUsageCount", { count: props.rings.length })}
+        {t("app.rail.moreUsageCount", { count: rows().length })}
       </span>
     </RailButton>
   );
@@ -571,7 +585,8 @@ export function PageRail(props: PageRailProps) {
   });
   const [ringSlots, setRingSlots] = createSignal(START_RING_PLACES);
   const ringLayout = createMemo(() => {
-    const all = rings();
+    if (rings().length <= ringSlots()) return { shown: rings(), more: [] };
+    const all = providerRings(rings());
     if (all.length <= ringSlots()) return { shown: all, more: [] };
     const kept = new Set([...all].sort((a, b) => ringLeft(a) - ringLeft(b)).slice(0, ringSlots() - 1));
     return { shown: all.filter((ring) => kept.has(ring)), more: all.filter((ring) => !kept.has(ring)) };
