@@ -12,7 +12,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The desktop's new-agent form: look, name, purpose and model, and the suggestions under it. */
 export const NewAgent: Story = {
   render: () => (
     <WithWorkspace>
@@ -21,7 +20,6 @@ export const NewAgent: Story = {
   ),
 };
 
-/** A name and at least one agent; the first agent leads. */
 export const NewChannel: Story = {
   render: () => (
     <WithWorkspace options={{ channels: [] }}>
@@ -30,7 +28,6 @@ export const NewChannel: Story = {
   ),
 };
 
-/** A name of at most 40 characters. Type "Work" to see the note that the name is taken. */
 export const NewFolder: Story = {
   render: () => (
     <WithWorkspace options={{ folders: true }}>
@@ -39,7 +36,6 @@ export const NewFolder: Story = {
   ),
 };
 
-/** The desktop's agent settings panel at the side panel's width. */
 export const AgentSettings: Story = {
   render: () => (
     <WithWorkspace>

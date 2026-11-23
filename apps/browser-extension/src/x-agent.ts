@@ -10,18 +10,12 @@ import { decodeAgents } from "./workspace";
 import type { XLabels, XSendResult, XStatusAnswer } from "./x-messages";
 import { xPostMessage } from "./x-post-message";
 
-/**
- * A connection to the server that the user chose. The side panel's connection, when the panel is open,
- * or the offscreen page's. The account service gives one sign-in one session per server, and the
- * server keeps one connection per session, so only one of the two is open at a time.
- */
 export interface XTarget {
   hostId: string;
   request: TeamApiRequest;
   capabilities: readonly string[];
 }
 
-/** The agent from the X listing on the server, if the user installed it. */
 async function xAgentId(target: XTarget): Promise<string | null> {
   const agents = await target.request("GET", TEAM_API_ROUTES.agents.all, decodeAgents);
   return agents.find((agent) => agent.marketplaceSource?.listingId === X_AGENT_LISTING_ID)?.id ?? null;
@@ -42,26 +36,19 @@ export async function xStatus(target: XTarget): Promise<XStatusAnswer> {
   try {
     return (await xAgentId(target)) ? { ready: true, labels: labels() } : { ready: false, reason: "no-x-agent" };
   } catch (error) {
-    // The reason goes to the content script's console note of a development build.
     const detail = error instanceof Error ? error.message.slice(0, 160) : "";
     return { ready: false, reason: detail ? `server-failed (${detail})` : "server-failed" };
   }
 }
 
-/**
- * Sends the post and the user's words to a new thread of the X agent, and asks the panel to open it.
- * Every attempt of one post has the same `clientMessageId`, so the server makes its thread once.
- */
 export async function xSend(target: XTarget, payload: XReplyPayload, clientMessageId: string): Promise<XSendResult> {
   const { t } = currentText();
-  /** Set before the request that carries the post: a failure after it may have reached the server. */
   let sending = false;
   try {
     const agentId = await xAgentId(target);
     if (!agentId) return { ok: false, error: t("extension.x.noAgent"), reached: false };
     const text = xPostMessage(payload);
     let taskId: string | null = null;
-    // Each post gets its own thread, so the chat of the agent stays one post per thread.
     sending = true;
     if (target.capabilities.includes(AGENT_TASKS_CAPABILITY)) {
       taskId = (await runTeamEffect(startAgentTask(target.request, { agentId, text, clientMessageId }))).id;

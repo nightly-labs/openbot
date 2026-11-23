@@ -7,7 +7,6 @@ import { createSignal, Show } from "solid-js";
 import { SignInIssue, signInWithWeb } from "./account";
 import type { ExtensionSession } from "./extension-storage";
 
-/** The brand name, as the sign-in screen shows it; it is not translated. */
 const PRODUCT_NAME = "OpenBot";
 
 interface SignInScreenProps {
@@ -21,10 +20,6 @@ interface SignInScreenProps {
 
 const variant = import.meta.env.DEV ? "dev" : "production";
 
-/**
- * Sign-in through openbot.run first: a person who is signed in there only allows the extension, and
- * company sign-in works as on the web. The email code of the phone app stays as the other way.
- */
 export function SignInScreen(props: SignInScreenProps) {
   const { t, sourceText } = useText();
   const [withCode, setWithCode] = createSignal(false);

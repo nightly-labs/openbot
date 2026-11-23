@@ -1,5 +1,3 @@
-/* The avatar editor of the agent settings, the channel picture and the server look: faces, shapes,
-   eyes, colours and the photo upload. */
 .avatar-editor {
   position: relative;
   z-index: var(--openbot-layer-popover);
@@ -62,7 +60,6 @@
   gap: var(--openbot-space-2);
 }
 
-/* The heading is upper case. The style tabs keep the case of other tabs. */
 .avatar-style-tabs {
   text-transform: none;
   letter-spacing: normal;
@@ -104,7 +101,6 @@
   opacity: 0.58;
 }
 
-/* The height follows the text: a hint that wraps to two lines must stay inside the padding. */
 .avatar-image-upload {
   display: grid;
   width: calc(100% - 20px);
@@ -178,7 +174,6 @@
   font-weight: 580;
 }
 
-/* Balanced, so the hint breaks into two even lines and no "·" is left alone at a line end. */
 .avatar-image-upload small {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
@@ -202,7 +197,6 @@
   padding: 4px 10px 12px;
 }
 
-/* Ten shapes fill two rows of five. */
 .avatar-shape-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
@@ -237,8 +231,6 @@
     0 1px 3px var(--openbot-shadow-popover-ambient);
 }
 
-/* The drawing keeps room above the body for the thinking dots, so the body sits low in its box.
-   The optical offset lifts it to the middle of the tile and of its selected outline. */
 .avatar-face-choice .agent-avatar {
   --agent-avatar-optical-offset: calc(30px * -0.14);
 
@@ -246,15 +238,12 @@
   height: 30px;
 }
 
-/* The server plush has no thinking dots, so it needs no optical offset. It is an image, so the
-   button padding would make it narrower than the agent faces without `max-width: none`. */
 .avatar-face-choice .server-appearance-choice {
   --server-plush-logo-size: 30px;
 
   max-width: none;
 }
 
-/* The eyes are the only change in this grid, so its faces are larger. */
 .avatar-eyes-grid .avatar-face-choice {
   height: 46px;
 }
@@ -276,8 +265,6 @@
   padding: 4px 10px 12px;
 }
 
-/* Automatic and the 17 colours fill two rows of nine. A column is narrower than the button
-   padding, so the tile has none; with it, each tile overflowed onto the next one's ring. */
 .avatar-color-choice {
   width: 100%;
   height: 32px;

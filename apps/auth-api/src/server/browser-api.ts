@@ -319,7 +319,6 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   if (!token || !user) return failure(401, "sign_in_required", "Sign in is required.");
   if (path === "session" && request.method === "GET") return json({ user });
   if (path === "extension/code" && request.method === "POST") {
-    // The person allowed the OpenBot browser extension on this account (`issueBrowserExtensionCode`).
     const body = yield* readJsonObject(request);
     const extensionId = yield* requiredString(body, "extensionId");
     const clientChallenge = yield* requiredString(body, "clientChallenge");

@@ -9,7 +9,6 @@ const config = {
     "../src/renderer/**/*.stories.@(ts|tsx)",
     "../apps/auth-api/src/**/*.stories.@(ts|tsx)",
     "../apps/status/src/**/*.stories.@(ts|tsx)",
-    // The browser extension's screens, with its own stylesheet and a story server of test data.
     "../apps/browser-extension/src/**/*.stories.@(ts|tsx)",
   ],
   addons: ["@storybook/addon-a11y"],

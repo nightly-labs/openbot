@@ -1,5 +1,3 @@
-// Story support: the side panel's frame, and a loader that renders a screen once the story workspace
-// has its data. Storybook only.
 import "../extension.css";
 import "./stories.css";
 import type { JSX } from "@solidjs/web";
@@ -9,7 +7,6 @@ import { installStoryChrome, type StoryServerOptions, storyWorkspace } from "./s
 
 installStoryChrome();
 
-/** The side panel at Chrome's default width. */
 export function PanelFrame(props: { children: JSX.Element }) {
   return (
     <div class="ext-story-stage">
@@ -18,7 +15,6 @@ export function PanelFrame(props: { children: JSX.Element }) {
   );
 }
 
-/** Loads a story workspace, runs `setup` (such as opening a chat), then renders the screen. */
 export function WithWorkspace(props: {
   options?: StoryServerOptions;
   setup?: (workspace: Workspace) => void;
@@ -33,7 +29,6 @@ export function WithWorkspace(props: {
   );
 }
 
-/** `WithWorkspace` with no frame, for a screen that a scene puts in its own frame. */
 export function LoadWorkspace(props: {
   options?: StoryServerOptions;
   setup?: (workspace: Workspace) => void;

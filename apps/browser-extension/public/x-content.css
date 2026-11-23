@@ -1,9 +1,3 @@
-/* The OpenBot look of X's reply button (`x-content.ts`). Chrome adds this file to X with the content
-   script, so the page's rules cannot block it.
-
-   When a reply mentions @OpenBot_, the button turns from X's blue into the OpenBot gradient (blue,
-   violet, the OpenBot pink) and grows to show the OpenBot mark before its label. While it waits, the
-   gradient moves slowly. When the mention goes, it runs the same way back. */
 html body [data-openbot-x] {
   position: relative;
   isolation: isolate;
@@ -12,7 +6,6 @@ html body [data-openbot-x] {
   align-items: center;
   border-color: transparent;
   color: rgb(255 255 255);
-  /* The colour under the round edge of the gradient: its pink end. */
   background-color: rgb(236 72 153);
   background-image: linear-gradient(
     110deg,
@@ -23,7 +16,6 @@ html body [data-openbot-x] {
     rgb(244 114 182) 100%
   );
   background-position: 100% 0;
-  /* X's button has a clear border: the gradient covers it too, once, so no copy shows at an edge. */
   background-origin: border-box;
   background-repeat: no-repeat;
   background-size: 320% 100%;
@@ -39,7 +31,6 @@ html body [data-openbot-x] * {
   color: rgb(255 255 255);
 }
 
-/* The OpenBot mark. Its width grows from nothing, so the button grows with it. */
 html body [data-openbot-x]::before {
   content: "";
   width: 18px;
@@ -62,7 +53,6 @@ html body [data-openbot-x="armed"]::before {
   animation: openbot-x-grow 560ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* A soft pink ring that leaves the button now and then. */
 html body [data-openbot-x="armed"]::after {
   content: "";
   position: absolute;

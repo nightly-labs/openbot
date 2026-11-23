@@ -9,19 +9,12 @@ import {
 } from "@openbot/contracts/team-protocol/client-browser-v1";
 import type { AskKind } from "./client-browser-messages";
 
-// The commands of agents on the tabs of the OpenBot group, through the Chrome DevTools Protocol. Only
-// the worker runs this file: an offscreen page has no `chrome.debugger`. Page scripts run in an isolated
-// world, so the page's own scripts cannot change what they read. The texts here go to the agent, not to
-// the user, so they are English, as the host's tool texts are.
-
-/** The debugger stays attached while an agent works, and detaches after this time with no command. */
 const ATTACH_IDLE_MS = 30_000;
 const LOAD_WAIT_MS = 15_000;
 const SCREENSHOT_WAIT_MS = 15_000;
 const SNAPSHOT_TEXT = 40_000;
 const SNAPSHOT_ELEMENTS = 400;
 
-/** A failure with the contract's code. The message goes to the agent. */
 export class BrowserCommandError extends Error {
   constructor(
     readonly code: ClientBrowserFailureCode,
@@ -31,23 +24,11 @@ export class BrowserCommandError extends Error {
   }
 }
 
-/** What the worker decides for each command. */
 export interface CommandContext {
-  /** The OpenBot tab group, or null when it has no tab now. */
   groupId: number | null;
-  /**
-   * Resolves when the person allows `kind` on the site of `url`, and throws `denied` or `timeout`
-   * otherwise. A `site` ask passes at once on a site that the person allowed always.
-   */
   allow: (kind: AskKind, url: string, detail: string) => Promise<void>;
-  /** Puts a tab into the OpenBot group, and makes the group when it has no tab. */
   addToGroup: (tabId: number) => Promise<void>;
-  /**
-   * Runs `action` and says what happened to the downloads that it started: each one waits for the
-   * person, unless `allowed` (the person allowed this download before the click).
-   */
   watchDownloads: (url: string, allowed: boolean, action: () => Promise<void>) => Promise<string[]>;
-  /** The pill over the tab while the agent works there, such as "Chief is using this tab". */
   workingLabel: string;
 }
 
@@ -56,14 +37,11 @@ interface Attached {
 }
 
 const attached = new Map<number, Attached>();
-/** The pill text of the command that runs now. The worker runs one command at a time. */
 let workingLabel = "";
-/** The snapshot number of each tab: an agent names it with a ref, as with the host's browser. */
 const revisions = new Map<number, number>();
 
 export const isWebUrl = (url: string | undefined): url is string => Boolean(url && /^https?:\/\//iu.test(url));
 
-/** An address that looks like an OAuth or other authorization grant: it signs the agent in somewhere. */
 export function looksLikeGrant(url: string | undefined): boolean {
   if (!url || !URL.canParse(url)) return false;
   const parsed = new URL(url);
@@ -82,7 +60,6 @@ export function clientTab(tab: chrome.tabs.Tab): ClientTab | null {
 
 export function installExecutor(): void {
   chrome.debugger.onDetach.addListener((source) => {
-    // The person pressed Cancel on Chrome's bar, or the tab closed: the next command attaches again.
     if (source.tabId !== undefined) forget(source.tabId);
   });
   chrome.tabs.onRemoved.addListener((tabId) => {
@@ -102,7 +79,6 @@ function errorText(error: unknown): string {
 
 type ProtocolParams = chrome.debugger.Params;
 
-/** The protocol's answer to one command, as a record. Each caller reads the fields that it needs. */
 async function send(tabId: number, method: string, params?: ProtocolParams): Promise<DynamicRecord> {
   let answer: unknown;
   try {
@@ -125,14 +101,12 @@ async function attach(tabId: number): Promise<Attached> {
   }
   clearTimeout(entry.idle);
   entry.idle = undefined;
-  // Each command shows the overlay again: a new page has none.
   await overlay(tabId, { step: "show", label: workingLabel, x: 0, y: 0 });
   return entry;
 }
 
 type OverlayInput = Parameters<typeof pageOverlay>[0];
 
-/** Draws in the tab what the agent does. The overlay is only a picture: it never fails a command. */
 async function overlay(tabId: number, input: OverlayInput): Promise<void> {
   await inPage(tabId, pageOverlay, input).catch(() => undefined);
 }
@@ -156,7 +130,6 @@ export async function detachAll(): Promise<void> {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** The id of an isolated world in the tab's main frame. A navigation ends the world, so each call makes one. */
 async function world(tabId: number): Promise<number> {
   const tree = await send(tabId, "Page.getFrameTree");
   const frame = isDynamicRecord(tree.frameTree) ? tree.frameTree.frame : null;
@@ -168,7 +141,6 @@ async function world(tabId: number): Promise<number> {
   return created.executionContextId;
 }
 
-/** Runs `script` with `input` in the page and returns its JSON object. `script` uses nothing outside itself. */
 async function inPage<I>(tabId: number, script: (input: I) => object, input: I): Promise<DynamicRecord> {
   const answer = await send(tabId, "Runtime.evaluate", {
     expression: `(${script.toString()})(${JSON.stringify(input)})`,
@@ -185,10 +157,8 @@ async function inPage<I>(tabId: number, script: (input: I) => object, input: I):
   return value;
 }
 
-/** Waits until the tab has loaded, at most `LOAD_WAIT_MS`. */
 async function waitForLoad(tabId: number): Promise<chrome.tabs.Tab> {
   const deadline = Date.now() + LOAD_WAIT_MS;
-  // A navigation that a click starts begins a moment later.
   await sleep(250);
   for (;;) {
     const tab = await chrome.tabs.get(tabId).catch(() => null);
@@ -219,7 +189,6 @@ function targetWords(target: ClientBrowserTarget): string {
   return `(${target.x}, ${target.y})`;
 }
 
-/** Runs one command. Each command asks the worker first (`allow`), and fails closed. */
 export async function runCommand(command: ClientBrowserCommand, context: CommandContext): Promise<ClientBrowserResult> {
   workingLabel = context.workingLabel;
   if (command.kind === "open") return openTab(command.url, context);
@@ -346,11 +315,9 @@ async function viewport(id: number): Promise<{ x: number; y: number; width: numb
 }
 
 async function screenshot(id: number, tab: chrome.tabs.Tab): Promise<ClientBrowserResult> {
-  // Chrome paints only the tab that shows in its window.
   if (!tab.active) await chrome.tabs.update(id, { active: true });
   await attach(id);
   const size = await viewport(id);
-  // The agent sees the page, not OpenBot's overlay.
   await overlay(id, { step: "hide", label: "", x: 0, y: 0 });
   try {
     return await capture(id, size);
@@ -450,10 +417,7 @@ async function click(
   await attach(id);
   const found = await locate(id, target, false);
   if (looksLikeGrant(url) || looksLikeGrant(found.href)) await context.allow("sign-in", url, found.label);
-  // A download link asks before the click. Chrome holds a download that a click starts until the person
-  // answers (`watchDownloads`); `chrome.debugger` cannot stop downloads.
   if (found.download) await context.allow("download", url, found.href || found.label);
-  // The cursor glides to the target and ripples as the click lands.
   await overlay(id, { step: "click", label: workingLabel, x: found.x, y: found.y });
   const downloads = await context.watchDownloads(url, found.download, () => mouseClick(id, found.x, found.y));
   const tab = await waitForLoad(id);
@@ -471,18 +435,15 @@ async function typeText(
   await context.allow("site", url, targetWords(command.target));
   await attach(id);
   const found = await locate(id, command.target, false);
-  // Always asked, also on an approved site. The card does not show the text.
   if (found.password) await context.allow("password", url, found.label);
   else if (found.payment) await context.allow("payment", url, found.label);
   if (looksLikeGrant(url)) await context.allow("sign-in", url, found.label);
   await overlay(id, { step: "point", label: workingLabel, x: found.x, y: found.y });
-  // Focuses the field and selects its text, so the new text replaces it.
   await locate(id, command.target, true);
   if (command.text) await send(id, "Input.insertText", { text: command.text });
   else await pressKey(id, "Backspace");
   if (command.submit) await pressKey(id, "Enter");
   const tab = command.submit ? await waitForLoad(id) : await chrome.tabs.get(id);
-  // The typed text is not repeated: it can be secret.
   return result(
     `Typed ${command.text.length} characters into ${found.label}${command.submit ? " and pressed Enter" : ""}.`,
     tab,
@@ -499,7 +460,6 @@ async function scroll(id: number, deltaX: number, deltaY: number): Promise<Clien
     deltaX,
     deltaY,
   });
-  // Smooth scrolling ends a moment after the wheel event.
   await sleep(300);
   const after = await viewport(id);
   return result(
@@ -537,7 +497,6 @@ const NAMED_KEYS: Record<string, { code: string; keyCode: number; text?: string 
 };
 const MODIFIERS: Record<string, number> = { Alt: 1, Control: 2, Ctrl: 2, Meta: 4, Cmd: 4, Shift: 8 };
 
-/** A key as Playwright names it, such as `Enter`, `a` or `Control+A`. */
 async function pressKey(id: number, key: string): Promise<void> {
   const parts = key.split("+");
   const main = parts.pop() || "+";
@@ -555,14 +514,11 @@ async function pressKey(id: number, key: string): Promise<void> {
     const code = /[A-Z]/u.test(upper) ? `Key${upper}` : /\d/u.test(main) ? `Digit${main}` : "";
     event = { key: main, code, keyCode: upper.charCodeAt(0), text: main };
   } else throw new BrowserCommandError("failed", `Unknown key: ${main}.`);
-  // A shortcut types no text.
   const text = modifiers & (2 | 4) ? undefined : event.text;
   const base = { modifiers, key: event.key, code: event.code, windowsVirtualKeyCode: event.keyCode };
   await send(id, "Input.dispatchKeyEvent", text ? { ...base, type: "keyDown", text } : { ...base, type: "rawKeyDown" });
   await send(id, "Input.dispatchKeyEvent", { ...base, type: "keyUp" });
 }
-
-// Page scripts. Each runs in the page as `(script)(input)`, so it may use only its input and the DOM.
 
 const INTERACTIVE =
   "a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=link], [role=checkbox], [role=radio], [role=tab], [role=menuitem], [role=option], [role=switch], [role=textbox], [role=combobox], [role=searchbox], [contenteditable=''], [contenteditable=true]";
@@ -627,13 +583,6 @@ function pageSnapshot(input: { text: number; elements: number; interactive: stri
   };
 }
 
-/**
- * The overlay that shows the person what the agent does in the tab: a glow around the page with the
- * agent's name, and a cursor that glides to each click. It lives in a shadow root on <html>, outside
- * the body that snapshots read, and every click passes through it. Styles go through the CSSOM and
- * motion through the Web Animations API, which a page's CSP and Trusted Types allow. With no new show
- * it fades out by itself, also when the debugger detached without removing it.
- */
 async function pageOverlay(input: {
   step: "show" | "hide" | "remove" | "point" | "click";
   label: string;
@@ -641,12 +590,9 @@ async function pageOverlay(input: {
   y: number;
 }) {
   const TAG = "openbot-agent-overlay";
-  // OpenBot's logo color (`--openbot-logo-production`), and the logo's eye color for outlines.
   const ACCENT = "214 173 242";
-  // OpenBot's pink (`--openbot-file-pink`): deeper than the logo color, so the edge shows on white pages.
   const EDGE = "217 138 201";
   const INK = "#040007";
-  /** The overlay fades out this long after the last command, a little after the debugger detaches. */
   const LIFE_MS = 36_000;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let host = document.querySelector<HTMLElement>(TAG);
@@ -659,8 +605,6 @@ async function pageOverlay(input: {
     Object.assign(host.style, { position: "fixed", inset: "0", zIndex: "2147483647", pointerEvents: "none" });
     const root = host.attachShadow({ mode: "open" });
     const glow = document.createElement("div");
-    // The glow around the whole page that the agent controls: a solid pink edge, a bright band inside
-    // it, and a wide soft light, which breathes slowly while the agent works.
     Object.assign(glow.style, {
       position: "fixed",
       inset: "0",
@@ -738,7 +682,6 @@ async function pageOverlay(input: {
   if (input.step === "hide") return { done: true };
   const label = root.getElementById("label");
   if (label && input.label) label.textContent = input.label;
-  // Each command starts the fade-out again.
   for (const animation of host.getAnimations()) if (animation.id === "life") animation.cancel();
   const life = host.animate([{ opacity: 1 }, { opacity: 1, offset: 0.98 }, { opacity: 0 }], {
     duration: LIFE_MS,
@@ -746,7 +689,6 @@ async function pageOverlay(input: {
   });
   life.id = "life";
   if (input.step === "show") return { done: true };
-  // The tip of the arrow is at (3, 2) of the cursor.
   const cursor = root.getElementById("cursor");
   if (!(cursor instanceof SVGElement)) return { done: false };
   const to = `translate(${input.x - 3}px, ${input.y - 2}px)`;

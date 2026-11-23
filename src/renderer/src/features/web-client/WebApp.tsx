@@ -210,9 +210,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
   const [marketplaceListing, setMarketplaceListing] = createSignal(takeMarketplaceLink());
   const [startLink, setStartLink] = createSignal(takeStartLink());
-  // The browser extension asks for this account; after sign-in the page asks the person instead of opening the workspace.
   const extensionConnect = takeExtensionConnect();
-  // A request with no window from a person who is not signed in here: the extension opens the window.
   createEffect(
     () => state.loaded && !state.account,
     (signedOut) => {

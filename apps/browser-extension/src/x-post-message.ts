@@ -2,10 +2,6 @@ import type { XPost, XReplyPayload } from "@openbot/contracts/browser-extension-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { currentText } from "@openbot/ui/text";
 
-/**
- * The message that the X agent gets: the user's words, then the post that the user answers on X with
- * the posts of its thread around it. Each post is a quote, so the chat shows where the words end.
- */
 export function xPostMessage(payload: XReplyPayload): string {
   const { t } = currentText();
   const before = payload.posts.slice(0, payload.replyTo);

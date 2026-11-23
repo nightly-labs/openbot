@@ -5,14 +5,8 @@ import { createSignal, onCleanup } from "solid-js";
 
 export type DictationPhase = "idle" | "starting" | "recording" | "transcribing";
 
-/** The page that asks for the microphone in a tab: a side panel cannot show the browser's question. */
 export const MICROPHONE_PAGE = "microphone.html";
 
-/**
- * Dictation into the composer. The panel records the microphone, and the server turns the recording
- * into text (`voice-transcription-v1`); the panel never transcribes. As on the phone, Stop keeps the
- * words: they go into the draft, and the user sends them.
- */
 export function createDictation(options: {
   transcribe: (wav: Uint8Array) => Promise<string>;
   onText: (text: string) => void;
@@ -21,14 +15,12 @@ export function createDictation(options: {
   const [phase, setPhase] = createSignal<DictationPhase>("idle");
   const [seconds, setSeconds] = createSignal(0);
   const [error, setError] = createSignal<string | null>(null);
-  /** The microphone loudness of the waveform, oldest first. */
   const [levels, setLevels] = createSignal<number[]>(new Array(VOICE_LEVEL_COUNT).fill(0));
   let stopMeter: (() => void) | null = null;
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
   let tick: number | undefined;
   let limit: number | undefined;
-  /** A new start, a cancel and the end of the chat make an older recording void. */
   let generation = 0;
 
   const release = () => {
@@ -109,7 +101,6 @@ export function createDictation(options: {
   return { phase, seconds, levels, error, clearError: () => setError(null), start, stop, cancel };
 }
 
-/** What the user can do when the microphone did not open. */
 async function microphoneProblem(cause: unknown): Promise<string> {
   const { t } = currentText();
   const name = cause instanceof DOMException ? cause.name : "";
@@ -120,7 +111,6 @@ async function microphoneProblem(cause: unknown): Promise<string> {
     .then((status) => status.state)
     .catch(() => "prompt");
   if (permission === "denied") return t("extension.chat.dictation.microphoneBlocked");
-  // The side panel cannot ask. A tab of the extension can, and the panel then has the answer.
   await chrome.tabs.create({ url: chrome.runtime.getURL(MICROPHONE_PAGE) });
   return t("extension.chat.dictation.allowInTab");
 }

@@ -4,14 +4,8 @@ import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { OUTBOX_FLUSH_MESSAGE } from "./x-messages";
 import { OUTBOX_KEY, type QueuedPost, readOutbox } from "./x-outbox";
 
-/** How long a post that arrived during "Send now" stays ticked off before the card lets it go. */
 const SENT_SHOWN_MS = 1_500;
 
-/**
- * The posts from X that wait for the server, on the home. The summary says how many; it opens to each
- * post with how long it has waited, and "Send now" sends them at once. A post that arrives while the
- * card sends is ticked off, then leaves.
- */
 export function XOutboxCard() {
   const { t } = useText();
   const [waiting, setWaiting] = createSignal<QueuedPost[]>([]);
@@ -24,7 +18,6 @@ export function XOutboxCard() {
     const read = () =>
       void readOutbox().then(
         (posts) => {
-          // A post that left the queue while the card sends has arrived.
           if (sending()) {
             const arrived = waiting().filter((post) => !posts.some((entry) => entry.id === post.id));
             if (arrived.length) setSent((current) => [...current, ...arrived]);
@@ -47,7 +40,6 @@ export function XOutboxCard() {
 
   const rows = createMemo(() => [...sent(), ...waiting()].sort((left, right) => left.createdAt - right.createdAt));
   const isSent = (post: QueuedPost) => sent().some((entry) => entry.id === post.id);
-  /** Seconds to the worker's next try; 0 while it tries. */
   const nextIn = () => {
     const due = Math.min(...waiting().map((post) => post.nextAt));
     return Number.isFinite(due) ? Math.max(0, Math.ceil((due - now()) / 1_000)) : 0;
@@ -97,7 +89,6 @@ export function XOutboxCard() {
         </button>
         <div class="ph-outbox-body">
           <div class="ph-outbox-inner">
-            {/* A long queue scrolls inside the card, so the chats stay in view under it. */}
             <ul class="ph-outbox-list">
               <For each={rows()}>
                 {(post) => <OutboxRow post={post} sent={isSent(post)} sending={sending()} now={now()} />}
@@ -162,7 +153,6 @@ function OutboxRow(props: { post: QueuedPost; sent: boolean; sending: boolean; n
   );
 }
 
-/** Seconds as m:ss. */
 function clock(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }

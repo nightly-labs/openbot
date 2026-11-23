@@ -1,6 +1,5 @@
 import { defineMessages } from "../../message";
 
-/** The browser extension (`apps/browser-extension`): the side panel that chats with the agents of a server. */
 export const messages = defineMessages("extension", {
   "extension.signIn.title": "Sign in to OpenBot",
   "extension.signIn.description": "Sign in on openbot.run, then allow the extension to use your account.",
@@ -45,7 +44,6 @@ export const messages = defineMessages("extension", {
   "extension.chat.empty": "Ask {name} anything.",
   "extension.chat.loadFailed": "Could not load this chat.",
   "extension.chat.sendFailed": "The message was not sent.",
-  // Dictation: the panel records, and the server turns the recording into text for the draft.
   "extension.chat.dictation.start": "Dictate message",
   "extension.chat.dictation.stop": "Stop dictation",
   "extension.chat.dictation.transcribing": "The server is writing the text…",
@@ -55,7 +53,6 @@ export const messages = defineMessages("extension", {
   "extension.chat.dictation.microphoneBlocked":
     "The microphone is blocked for OpenBot. Allow it in the site settings of your browser, then try again.",
   "extension.chat.dictation.allowInTab": "Allow the microphone in the new tab, then press the microphone again.",
-  // X: the reply button when the reply mentions @OpenBot_, and the message that the X agent gets.
   "extension.x.armed": "Post the reply and send this post to your OpenBot agent",
   "extension.x.outbox.title": {
     one: "A post from X waits for your server",
@@ -82,7 +79,6 @@ export const messages = defineMessages("extension", {
   "extension.x.message.after": "The author continues:",
   "extension.x.message.article": "Article:",
   "extension.x.message.pictures": "Pictures:",
-  // Shared tabs: agents use the tabs of the "OpenBot" tab group, after the person allows each site.
   "extension.browser.share": "Share tabs with agents",
   "extension.browser.line": {
     one: "Agents can use the OpenBot tab group · {count} tab",
@@ -127,7 +123,6 @@ export const messages = defineMessages("extension", {
   "extension.browser.notification.title": "{agent} asks to use your tab",
   "extension.browser.notification.body": "Open OpenBot in the side panel to allow or deny it.",
   "extension.browser.overlay.working": "{agent} is using this tab",
-  // The tab that asks for the microphone, because the side panel cannot ask.
   "extension.microphone.title": "Microphone for dictation",
   "extension.microphone.asking": "Allow OpenBot to use your microphone.",
   "extension.microphone.allowed": "The microphone is allowed. Go back to the side panel.",

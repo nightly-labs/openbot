@@ -35,16 +35,11 @@ import { currentText } from "@openbot/ui/text";
 const decodeModels = guardedListDecoder(isClientAgentModelOption, "models");
 const ignore = () => null;
 
-/**
- * The agent settings of a joined server, as the web client changes them (`web-runtime.ts`). The host
- * checks each change: a member who may not change a setting gets the host's refusal in the panel.
- */
 export function createAgentSettingsApi(request: TeamApiRequest, capabilities: readonly string[]) {
   const has = (capability: string) => capabilities.includes(capability);
   const send = (method: string, path: string, body?: TeamProtocolV2Json) => request(method, path, ignore, body);
 
   return {
-    /** The models the panel's picker lists, and the providers' state. */
     async catalog(): Promise<{ models: ClientAgentModelOption[]; status: AgentStatus }> {
       const [models, status] = await Promise.all([
         request("GET", TEAM_API_ROUTES.agents.models, decodeModels),
@@ -56,7 +51,6 @@ export function createAgentSettingsApi(request: TeamApiRequest, capabilities: re
       return { models, status };
     },
 
-    /** A model change waits for the agent's turn (`agent-pending-runtime-v1`); colours have their own routes. */
     async updateAgent(input: UpdateAgentInput): Promise<void> {
       const runtimeChange = has(AGENT_PENDING_RUNTIME_CAPABILITY) ? pendingRuntimeUpdateBody(input) : null;
       if (runtimeChange) {
@@ -103,7 +97,6 @@ export function createAgentSettingsApi(request: TeamApiRequest, capabilities: re
       );
     },
 
-    /** The Permissions level, which only an owner or an admin reads. Null for anyone else. */
     async adminSettings(agentId: string): Promise<AgentAdminSettings | null> {
       if (!has(AGENT_ADMIN_CAPABILITY)) return null;
       return runTeamEffect(getAgentAdminSettings(request, agentId)).catch(() => null);
@@ -112,13 +105,11 @@ export function createAgentSettingsApi(request: TeamApiRequest, capabilities: re
       return runTeamEffect(updateAgentAdminSettings(request, input));
     },
 
-    /** The agent forgets the messages before now and keeps its setup. */
     startNewChat: has(CONTEXT_RESET_CAPABILITY)
       ? async (agentId: string) => {
           await send("POST", CONTEXT_RESET_ROUTES.clear, { agentId });
         }
       : null,
-    /** Deletes the messages of the agent's own chat. */
     deleteHistory: has(CHAT_HISTORY_CAPABILITY)
       ? async (agentId: string) => {
           await send("POST", CHAT_HISTORY_ROUTES.agentDelete, { agentId });

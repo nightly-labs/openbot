@@ -58,16 +58,8 @@ function Home(props: {
   );
 }
 
-/**
- * The chats, newest first, with unread counts. The server name opens the server menu, and "+" opens
- * New agent, New channel and New folder.
- */
 export const Chats: Story = { render: () => <Home options={{ unread: { "x-desk": 3, research: 1 } }} /> };
 
-/**
- * Pinned agents and channels at the top, in the member's order, as the desktop sidebar and the phone
- * show them; a pinned chat is not listed again below.
- */
 export const Pinned: Story = {
   render: () => (
     <Home
@@ -85,22 +77,18 @@ export const Pinned: Story = {
   ),
 };
 
-/** Folders (one inside another) with their agents and channels, then the other chats. */
 export const FoldersAndChannels: Story = {
   render: () => <Home options={{ folders: true, channels: [STORY_CHANNEL], unread: { chief: 2 } }} />,
 };
 
-/** A channel whose agents work now. */
 export const ChannelWorking: Story = {
   render: () => <Home options={{ channels: [{ ...STORY_CHANNEL, activeTasks: 2, unreadCount: 0 }] }} />,
 };
 
 export const NoAgents: Story = { render: () => <Home options={{ agents: [] }} /> };
 
-/** The connection to the server dropped; it comes back by itself. */
 export const Offline: Story = { render: () => <Home offline /> };
 
-/** A post from X that waits for the server, as the worker keeps it. */
 function waitingPost(id: string, handle: string, text: string, minutesAgo: number, message = "") {
   return {
     id,
@@ -128,7 +116,6 @@ function waitingPost(id: string, handle: string, text: string, minutesAgo: numbe
   };
 }
 
-/** Posts from X that wait for the server: the card opens to each post; "Send now" sends them at once. */
 export const PostsFromXWait: Story = {
   render: () => {
     installStoryChrome({
@@ -141,7 +128,6 @@ export const PostsFromXWait: Story = {
   },
 };
 
-/** A long queue scrolls inside the card, so the chats stay in view under it. */
 export const ManyPostsFromXWait: Story = {
   render: () => {
     const handles = ["@bob", "@alice", "@carol", "@dmitri", "@erin", "@farah", "@gus", "@hana", "@ivo", "@jun"];

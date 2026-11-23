@@ -1,46 +1,3 @@
-// Uses the browser extension (`apps/browser-extension`) against this worktree's `bun run dev` stack. The
-// app of this worktree is the host; the extension signs in to the local Auth API and reaches the host
-// through Signal and WebRTC, as the web client does. It sends real prompts, so they are short. Pass an
-// agent of the host whose provider is signed in, and the Auth API address that the stack log prints:
-// `bun scripts/browser-extension-e2e.ts --allow-mutations --agent=<agent id> --auth-api=http://localhost:<port>
-//  [--email=openbot-dev-host@example.com] [--browser-executable=<path>]`
-//
-// 1. Builds the extension for the local Auth API and loads it into Chromium.
-// 2. Signs in to the web app at `/app` with the development code. The web app refuses a code for an
-//    extension id that is not valid. The panel's "Sign in with openbot.run" opens the web app in the
-//    sign-in window: Cancel tells the panel no, Allow signs the panel in with no code. The home lists
-//    the host and the agent.
-// 3. Opens the agent's main chat and sends a message. The host has it, and the streamed answer shows.
-//    The chat's settings button opens the desktop's agent settings; a title change reaches the host,
-//    and the run puts the old title back.
-// 4. Starts a new thread from the thread menu. The host lists the thread with the message, and the
-//    chat header names it.
-// 5. Dictation: a fake microphone plays a spoken sentence (macOS `say`). The panel records it, the
-//    host transcribes it with its own speech model (`voice-transcription-v1`), and the words go into the
-//    draft. The host needs a ready model: `bun run voice:prepare` once. Chrome's fake capture device
-//    waits for the macOS microphone permission of the test browser, so the page's `getUserMedia` gives
-//    a Web Audio stream of the file instead. The browser's own permission question is not tested.
-// 6. The "+" menu of the home makes a folder, a channel with the agent, and an agent. The host has
-//    each; the agent answers a message in the channel, and the answer shows; the new agent's chat
-//    opens. The run deletes the three again.
-// 6b. Shared tabs (`client-browser-v1`): a local page with a button joins the "OpenBot" tab group when
-//    "Share tabs with agents" starts sharing. The agent gets one real prompt to use its browser tools on
-//    that Chrome tab; the panel shows the approval card, and "Always for this site" lets the snapshot and
-//    the click run. The page's button was clicked, and the site is stored. Then Remove forgets the site,
-//    Stop sharing ends the group, and the server's answer to the last presence says `sharing: false`.
-// 7. X: the account service answers the selectors by hash. A local copy of an X post page names its
-//    reply button with a test id that only the served selectors know, so the button changes only with
-//    them. Without the X Desk agent on the host, a reply that mentions @OpenBot_ keeps X's button. The
-//    E2E seeds the local Marketplace and installs X Desk on the host. Then the button changes, and a
-//    click sends the post, the post above it and the author's next post (not the reply of another
-//    person) with the user's words to a new X Desk thread, and the page posts the reply at once. The
-//    queue of waiting posts is then empty, and the panel is still online. A post that waits, as after a
-//    failed send, shows on the home, and "Send now" delivers it. A 2-day-old post that waits over a
-//    browser restart goes out at the next start, or when the panel opens (the report says which).
-//    It signs out and signs in again: openbot.run remembers that the account allowed the extension, so
-//    no sign-in window opens.
-// 8. Signs out from the server menu, and the sign-in screen comes back.
-// Writes .openbot-build/browser-extension-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -82,7 +39,6 @@ const channelName = `Extension channel ${run}`;
 const newAgentName = `Extension agent ${run}`;
 const shareButton = `Mark clicked ${run}`;
 const shareText = `Use openbot_browser: call list_tabs, then snapshot the Chrome tab (its id starts with "chrome:"), then click the button labelled "${shareButton}". Reply with the single word done. Extension tabs ${run}.`;
-// A page that an agent uses through the extension: a heading and a button that marks the body.
 const SHARE_FIXTURE = `<!doctype html><html><head><meta charset="utf-8"><title>Shared tab ${run}</title></head><body>
 <h1>Shared tab ${run}</h1>
 <button type="button" id="mark">${shareButton}</button>
@@ -90,9 +46,6 @@ const SHARE_FIXTURE = `<!doctype html><html><head><meta charset="utf-8"><title>S
 document.getElementById("mark").addEventListener("click", () => { document.body.dataset.clicked = String(Date.now()); });
 </script></body></html>`;
 
-// The copy of an X post page: a post above, the post (as X marks the post of a post page), the reply
-// box, the author's next post, and the reply of another person. The page "posts" by writing the reply
-// and the time into the body.
 const X_FIXTURE = `<!doctype html><html><head><meta charset="utf-8"><title>X</title></head><body>
 <main>
 <article data-testid="tweet"><div data-testid="User-Name"><span>Alice</span><span>@alice</span></div>
@@ -119,7 +72,6 @@ document.querySelector('[data-testid="replyComposerSubmit"]').addEventListener("
   box.textContent = "";
 });
 </script></body></html>`;
-// The served selectors: X "renamed" its reply button, and only these selectors know the new name.
 const servedRules: XPageRules = {
   mention: X_PAGE_RULES_DEFAULT.mention,
   selectors: {
@@ -162,7 +114,6 @@ interface Report {
   dictation?: { micShown: boolean; transcript: string; draftHasWords: boolean };
   x?: {
     serviceRules: { answersRules: boolean; sameHashAnswersNull: boolean };
-    /** Null when X Desk was on the host before the run, so the check without it could not run. */
     unchangedWithoutAgent: boolean | null;
     armedWithServedRules: boolean;
     xAgentId: string;
@@ -204,7 +155,6 @@ interface Report {
 const report: Report = { agentId, pageErrors: [], screenshots: [], passed: false };
 const host = await connectChannelE2e(NAME);
 
-// 1. A development build: it may reach `localhost`, and it talks to the stack's Auth API.
 const build = spawnSync("bun", ["run", "build", "--", "--mode", "development"], {
   cwd: EXTENSION,
   env: { ...process.env, VITE_OPENBOT_API_URL: authApi, VITE_OPENBOT_X_RULES_URL: `${xBase}/x-rules` },
@@ -212,12 +162,10 @@ const build = spawnSync("bun", ["run", "build", "--", "--mode", "development"], 
 });
 assert.equal(build.status, 0, "The extension build failed.");
 const dist = resolve(EXTENSION, "dist");
-// The fake microphone plays this file in a loop.
 const speech = resolve(OUT, "speech.wav");
 const said = spawnSync("say", ["-o", speech, "--data-format=LEI16@16000", spokenText], { stdio: "inherit" });
 assert.equal(said.status, 0, "macOS `say` could not write the speech file.");
 const profile = mkdtempSync(resolve(tmpdir(), "openbot-extension-e2e-"));
-// Branded Chrome no longer loads an unpacked extension from the command line; Chromium does.
 const launchOptions = {
   ...(browserExecutable ? { executablePath: browserExecutable } : { channel: "chromium" }),
   viewport: { width: 360, height: 720 },
@@ -240,13 +188,10 @@ await context.addInitScript((base64) => {
 }, readFileSync(speech).toString("base64"));
 const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Waits for the avatars' felt pictures to decode and for entrance animations to end, so a screenshot shows the result. */
 async function settle(page: Page): Promise<void> {
-  // A paused animation, such as an idle avatar's, never finishes, so the wait stops after 3 s.
   await page.evaluate(() =>
     Promise.race([
       Promise.all([
-        // The same picture through an <img> decodes once the SVG's copy can paint.
         ...[...document.querySelectorAll(".agent-avatar svg image")].map((image) => {
           const picture = new Image();
           picture.src = image.getAttribute("href") ?? "";
@@ -271,10 +216,6 @@ async function shot(page: Page, label: string): Promise<void> {
 }
 
 let panel: Page | null = null;
-/**
- * Goes back to the home when a chat covers it. A chat that slid away keeps its Back button in the page,
- * so the home's server menu tells where the panel is.
- */
 async function toHome(target: Page): Promise<void> {
   const server = target.getByRole("button", { name: english("extension.home.serverMenu") });
   const atHome = await server.click({ trial: true, timeout: 2_000 }).then(
@@ -283,7 +224,6 @@ async function toHome(target: Page): Promise<void> {
   );
   if (!atHome) await target.getByRole("button", { name: english("common.back"), exact: true }).click();
 }
-/** What the run made on the host, so it goes away also when a step fails. */
 const made: { folderId: string | null; channelId: string | null; agentId: string | null } = {
   folderId: null,
   channelId: null,
@@ -296,8 +236,6 @@ async function removeMade(): Promise<boolean> {
   made.agentId = null;
   if (value.channelId) await host.page.evaluate((id) => window.openbot.agent.deleteChannel(id), value.channelId);
   if (value.agentId) {
-    // The host does not delete an agent with an open turn. A new agent's hello can end in a question,
-    // which keeps its turn open, so the run stops it.
     const agentId = value.agentId;
     await host.page.evaluate(async (id) => {
       const turnId = (await window.openbot.agent.readConversation(id)).activeTurnId;
@@ -329,7 +267,6 @@ try {
     return found.name;
   }, agentId);
 
-  // 2. The web app is signed in first, as a person who uses openbot.run is.
   const web = await context.newPage();
   web.on("pageerror", (error) => report.pageErrors.push(error.stack ?? error.message));
   await web.goto(`${authApi}/app`);
@@ -340,7 +277,6 @@ try {
   const code = (await codeLine.textContent())?.replace(/^Development code: /, "").replace(/[^A-Za-z0-9]/g, "");
   assert.ok(code && code.length === 8, "The web app shows no development code.");
   await web.keyboard.type(code);
-  // The session cookie is HttpOnly; the sign-in screen goes away when the web app has the account.
   await web.waitForFunction(() => !document.querySelector(".account-login-screen"), null, { timeout: 60_000 });
   const refused = await web.evaluate(async () => {
     const response = await fetch("/api/browser/extension/code", {
@@ -354,19 +290,15 @@ try {
   assert.deepEqual(refused, { status: 403, code: "browser_extension_not_allowed" }, "A bad extension id got a code.");
   await web.close();
 
-  // The side panel page, in a tab of the side panel's width.
   const page = await context.newPage();
   panel = page;
   page.on("pageerror", (error) => report.pageErrors.push(error.stack ?? error.message));
   await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
   const signInButton = page.getByRole("button", { name: english("extension.signIn.withWeb") });
-  /** The addresses of the sign-in windows, for a failure. */
   const signInAddresses: string[] = [];
   context.on("page", (opened) => signInAddresses.push(`page: ${opened.url()}`));
-  /** Opens the sign-in window and answers in it. `chrome.identity` opens it as a window of this profile. */
   async function answerSignIn(choice: string): Promise<void> {
     const opened = context.waitForEvent("page", {
-      // The extension asks first with no window (`silent=1`); this is the window that asks the person.
       predicate: (candidate) => candidate.url().includes("extension=") && !candidate.url().includes("silent=1"),
       timeout: UI_WAIT_MS,
     });
@@ -378,7 +310,6 @@ try {
     });
     signInAddresses.push(`${choice} opened: ${window.url()}`);
     await window.getByRole("heading", { name: english("webClient.extension.title") }).waitFor({ timeout: 60_000 });
-    // The web app's loading screen leaves after the session check; the question is under it until then.
     await window.waitForFunction(() => !document.querySelector(".app-loading"), null, { timeout: 60_000 });
     await shot(window, choice === "allow" ? "0-allow" : "0-cancel").catch((error: unknown) => {
       throw new Error(`The sign-in window changed: ${signInAddresses.join(" | ")}`, { cause: error });
@@ -402,7 +333,6 @@ try {
   report.signIn = { invalidExtensionRefused: true, cancelShown: true, homeShowsServer: true, homeShowsAgent: true };
   await shot(page, "1-home");
 
-  // 3. The main chat: the message reaches the host, and the answer streams into the panel.
   await agentButton.click();
   const composer = page.getByRole("textbox", { name: english("extension.chat.ask", { name: agentName }) });
   await composer.waitFor({ timeout: UI_WAIT_MS });
@@ -429,8 +359,6 @@ try {
   report.mainChat = { messageOnHost: true, answerShown: true };
   await shot(page, "2-main-chat");
 
-  // 3b. The agent's settings: the desktop panel opens from the chat's top bar, and a title change
-  // reaches the host. The run puts the old title back.
   const agentTitle = () =>
     host.page.evaluate(
       async (id) => (await window.openbot.agent.listAgents()).find((entry) => entry.id === id)?.title ?? "",
@@ -458,7 +386,6 @@ try {
   report.settings = { nameShown: settingsShowName, titleSaved: true, titleRestored: true };
   assert.ok(settingsShowName, "The settings panel does not show the agent's name.");
 
-  // 4. A new thread from the thread menu. The host names the thread itself, so the new task is found by id.
   const before = new Set(
     (await host.page.evaluate((id) => window.openbot.agent.listTasks(id), agentId)).tasks.map((entry) => entry.id),
   );
@@ -487,13 +414,10 @@ try {
   report.thread = { taskId: task.id, messageOnHost: true, headerNamesThread: true };
   await shot(page, "3-thread");
 
-  // 5. Dictation, as the phone app draws it. The mic shows only for a host that transcribes; Stop puts the
-  // words into the draft, not to the agent.
   const mic = page.getByRole("button", { name: english("extension.chat.dictation.start") });
   await mic.waitFor({ timeout: UI_WAIT_MS });
   await composer.fill("");
   await mic.click();
-  // The file is about 2 s long; a 4 s recording holds all of it at least once.
   await page.getByRole("status").getByText("0:04").waitFor({ timeout: UI_WAIT_MS });
   await shot(page, "4-dictation-listening");
   await page.getByRole("button", { name: english("extension.chat.dictation.stop") }).click();
@@ -510,7 +434,6 @@ try {
   assert.ok(draftHasWords, `The draft does not have the spoken words: ${transcript}`);
   await composer.fill("");
 
-  // 6. The "+" menu of the home: a folder, a channel that the agent answers in, and an agent.
   await page.getByRole("button", { name: english("common.back"), exact: true }).click();
   const createMenu = page.getByRole("button", { name: english("sidebar.new.menuWithChannel") });
   const createButton = page.getByRole("button", { name: english("common.create"), exact: true });
@@ -567,7 +490,6 @@ try {
     .findLast((entry) => entry.author.kind === "agent" && entry.message.text.trim());
   assert.ok(channelAnswer, "The channel has no answer.");
   await page.getByText(channelAnswer.message.text.trim(), { exact: true }).first().waitFor({ timeout: UI_WAIT_MS });
-  // The person's own message has no author line; the agent's answer has one.
   const own = channelPage.messages.find((entry) => entry.message.text.includes(channelText));
   const ownMessageUnlabelled =
     own?.author.kind === "member" &&
@@ -608,7 +530,6 @@ try {
   assert.ok(channelOnHost, "The channel does not have the chosen agent.");
   assert.ok(ownMessageUnlabelled, "The panel shows the person's own channel message as another member's.");
 
-  // 6b. Shared tabs. The page is the newest web tab, so "Share tabs with agents" puts it in the group.
   const shareFixture = await context.newPage();
   shareFixture.on("pageerror", (error) => report.pageErrors.push(error.stack ?? error.message));
   const shareUrl = `${xBase}/share-fixture/`;
@@ -620,7 +541,6 @@ try {
     page.evaluate<string>(
       `chrome.storage.local.get("${key}").then((items) => JSON.stringify(items["${key}"] ?? null))`,
     );
-  /** The group of the page: its id and title, or null when the page is in no group. */
   const fixtureGroup = () =>
     worker.evaluate<string>(
       `chrome.tabs.query({}).then(async (tabs) => { const tab = tabs.find((entry) => entry.url === ${JSON.stringify(shareUrl)}); if (!tab || tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return "null"; const group = await chrome.tabGroups.get(tab.groupId); return JSON.stringify({ id: group.id, title: group.title }); })`,
@@ -631,7 +551,6 @@ try {
   await sharingLine.waitFor({ timeout: UI_WAIT_MS });
   const group = await waitFor(host.page, "the page is in the OpenBot group", fixtureGroup, (value) => value !== "null");
   const inOpenBotGroup = JSON.parse(group).title === "OpenBot";
-  // The worker writes what the server accepted after each presence.
   await waitFor(
     host.page,
     "the server accepted the presence",
@@ -644,7 +563,6 @@ try {
   await composer.waitFor({ timeout: UI_WAIT_MS });
   await composer.fill(shareText);
   await composer.press("Enter");
-  // The agent's snapshot of a site that is not allowed yet shows the card.
   const always = page.getByRole("button", { name: english("extension.browser.ask.allowAlways") });
   await always.waitFor({ timeout: 180_000 });
   await shot(page, "6b-approval-card");
@@ -692,7 +610,6 @@ try {
   assert.ok(siteRevoked, "Remove did not forget the site.");
   await shareFixture.close();
 
-  // 7. X. The account service's route: the rules by hash.
   const service = await fetch(`${authApi}${X_PAGE_RULES_ROUTE}`).then((response) => response.json());
   const sameService = await fetch(`${authApi}${X_PAGE_RULES_ROUTE}?hash=${service.hash}`).then((response) =>
     response.json(),
@@ -721,12 +638,9 @@ try {
   let unchangedWithoutAgent: boolean | null = null;
   if (!(await xAgent())) {
     await writeReply();
-    // The panel asks the offscreen page as the content script does; when that answer is "not ready",
-    // the page has had the same answer, and the next frame shows the button.
     await waitFor(
       host.page,
       "the offscreen page is open",
-      // A string: the scripts compile without the extension's `chrome` types.
       () => worker.evaluate<boolean>("chrome.offscreen.hasDocument()"),
       (open) => open,
     );
@@ -753,13 +667,11 @@ try {
   const tasksBefore = new Set(
     (await host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId)).tasks.map((entry) => entry.id),
   );
-  // A new page load asks again; the content script keeps an answer for 30 s.
   await writeReply();
   await xPage
     .locator('[data-testid="replyComposerSubmit"][data-openbot-x="armed"]')
     .waitFor({ timeout: 60_000 })
     .catch(async (error: unknown) => {
-      // What the extension knew: the offscreen page's answer and the selectors that the worker kept.
       const known = await page.evaluate<string>(
         'Promise.all([chrome.runtime.sendMessage({ kind: "openbot-x-offscreen", action: "status" }), chrome.storage.local.get("openbot.x-rules.v1")]).then((value) => JSON.stringify(value))',
       );
@@ -768,7 +680,6 @@ try {
   await shot(xPage, "7-x-armed");
   const clickedAt = Date.now();
   await reply.click();
-  // X posts the reply at once; the worker sends the post to OpenBot beside it.
   await xPage.waitForFunction(() => document.body.dataset.posted !== undefined, null, { timeout: 5_000 });
   const posted = await xPage.evaluate(() => ({
     text: document.body.dataset.posted ?? "",
@@ -823,13 +734,10 @@ try {
   assert.ok(postedAtOnce, "The page did not post the reply at once.");
   await xPage.close();
 
-  // The X post opened X Desk's thread in the panel. The panel's connection stays online while the
-  // offscreen page has its own connection to the same server.
   await page.getByRole("button", { name: english("common.back"), exact: true }).click();
   const offline = page.getByText(english("extension.connection.offline", { server: hostName }));
   await offline.waitFor({ state: "hidden", timeout: 45_000 }).catch(async (error: unknown) => {
     await shot(page, "x-panel-offline");
-    // Which pages of the extension were open: a second panel or the offscreen page takes the session.
     const contexts = await worker.evaluate<string>(
       "chrome.runtime.getContexts({}).then((list) => JSON.stringify(list.map((entry) => [entry.contextType, entry.documentUrl])))",
     );
@@ -838,8 +746,6 @@ try {
     });
   });
 
-  // A post that waits, as after a send that failed while the server was down: the home says so, and
-  // "Send now" delivers it with its own id.
   const queuedText = `Queued post ${run}`;
   const queuedId = crypto.randomUUID();
   const queued = {
@@ -891,11 +797,8 @@ try {
   );
   report.xQueue = { waitingShown: true, sentByRetry: true, queueEmpty: (await outbox()) === 0 };
   assert.ok(report.xQueue.queueEmpty, "The queue keeps a post that the server has.");
-  // The X Desk thread opened in the panel; the sign-out starts from the home.
   await toHome(page);
 
-  // Sign in again after a sign-out. openbot.run knows that this account allowed the extension, so the
-  // extension's check with no window gets the code: no sign-in window opens, and nobody clicks Allow.
   await toHome(page);
   await serverTitle.click();
   await page.getByRole("menuitem", { name: english("extension.home.signOut") }).click();
@@ -911,8 +814,6 @@ try {
   await shot(page, "9b-signed-in-again");
   assert.ok(!askedPerson, `The second sign-in opened the sign-in window: ${windows.join(", ")}`);
 
-  // A post waits over a browser restart. It is 2 days old, so only the week of a post that no attempt
-  // sent keeps it. The browser quits; its next start sends the post with no page open.
   const restartText = `Restart post ${run}`;
   const restartPost = {
     ...queued,
@@ -932,8 +833,6 @@ try {
   const listXTasks = (): Promise<AgentTasksSnapshot> =>
     host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId);
   const restartArrived = (snapshot: AgentTasksSnapshot) => snapshot.tasks.some((entry) => !restartBefore.has(entry.id));
-  // A browser start sends the posts that wait (`runtime.onStartup`). Where the browser does not say so,
-  // the panel that the user opens sends them.
   let deliveredBy: "start" | "panel" = "start";
   let restartTasks = await waitFor(
     host.page,
@@ -955,7 +854,6 @@ try {
       restartArrived,
       120_000,
     ).catch(async (error: unknown) => {
-      // What the new browser had: its worker, its pages, and the post that waits with its last failure.
       const restarted = context.serviceWorkers()[0];
       const known = restarted
         ? await restarted.evaluate<string>(
@@ -983,8 +881,6 @@ try {
   report.xRestart = { sentAfterRestart: true, deliveredBy, twoDayOldKept: true, queueEmpty: queueAfterRestart === 0 };
   assert.equal(queueAfterRestart, 0, "The queue keeps the post after the restart sent it.");
 
-  // 8. Sign out: the panel forgets the session and shows the sign-in screen.
-  // The post that arrived opened its X Desk thread in the panel.
   await shot(reopened, "10-x-after-restart");
   await toHome(reopened);
   const reopenedServer = reopened.getByRole("button", { name: english("extension.home.serverMenu") });
@@ -1001,7 +897,6 @@ try {
   throw error;
 } finally {
   const path = writeReport(NAME, report);
-  // Machine-readable: the report path, for a runner that keeps the artifact.
   process.stdout.write(`${path}\n`);
   await context.close().catch(() => undefined);
   rmSync(profile, { recursive: true, force: true });

@@ -21,7 +21,6 @@ interface ChatScreenProps {
   onOpen: (agentId: string, taskId: string | null) => void;
 }
 
-/** The chat: the top bar with the thread menu, the messages with their files, and the composer. */
 export function ChatScreen(props: ChatScreenProps) {
   const chat = () => props.workspace.state.chat;
   const agent = createMemo(() => props.workspace.state.agents.find((entry) => entry.id === chat()?.agentId));
@@ -55,27 +54,22 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
       : props.chat.taskId === null
         ? null
         : (thread()?.title ?? null);
-  /** The agent works on an answer that has not started to stream. */
   const answering = () => {
     if (props.chat.activeTurnId === null && !props.chat.sending) return false;
     const last = props.chat.messages.at(-1);
     return !(last && last.author !== "user" && last.status === "streaming");
   };
-  /** The agent as the shared chat parts read it, with its exact colour. */
   const profile = createMemo(() => toAgentProfile({ ...props.agent, avatarColor: color() ?? null }));
-  /** One line for each turn, as the desktop picks it; the next turn picks again. */
   const activityLabel = createMemo(() => {
     void props.chat.activeTurnId;
     return nextAgentActivityLabel();
   });
-  /** The agents a mention chip can name. */
   const mentionAgents = createMemo(() => composerAgents(state().agents, state().colors));
   function openLink(url: string) {
     const safe = safeBrowserUrl(url);
     if (safe) window.open(safe, "_blank", "noopener");
   }
 
-  // Keep the newest message in view while the answer streams in.
   createEffect(
     () => [messages().length, messages().at(-1)?.text.length, answering()] as const,
     () => {
@@ -93,8 +87,6 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
 
   return (
     <div class="ch-chat" style={bubbleColors(props.agent, color())}>
-      {/* The top bar of the home, with the agent in place of the server: back, then the agent's mark
-          and name, which open the agent's chats when the server has threads. */}
       <header class="ch-topbar">
         <button
           type="button"
@@ -212,12 +204,9 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
             </div>
           }
         >
-          {/* Keyed by id: a new snapshot from the host brings new objects, and a bubble that stays must not
-              play its entrance again. */}
           <For each={messages()} keyed={(message) => message.id}>
             {(message) => (
               <>
-                {/* Files and images sit above their message, on the side of who sent them. */}
                 <Show when={message().attachments?.length ? message().attachments : undefined}>
                   {(files) => (
                     <div class={message().author === "user" ? "ch-files ch-files-user" : "ch-files"}>
@@ -239,7 +228,6 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
                     when={message().author !== "user"}
                     fallback={<div class="ch-bubble ch-user">{message().text}</div>}
                   >
-                    {/* Markdown with mention chips, as the phone app and the desktop dock show an answer. */}
                     <div class="ch-bubble ch-agent message-markdown">
                       <MarkdownMessageText
                         body={message().text}
@@ -257,7 +245,6 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
           </For>
         </Show>
         <Show when={answering()}>
-          {/* As in the desktop chat: the agent's face in its working mood, and the line of what it does. */}
           <AgentActivityIndicator agent={profile()} label={activityLabel()} />
         </Show>
       </div>

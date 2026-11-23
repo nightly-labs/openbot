@@ -29,12 +29,10 @@ function SignIn(props: { login: CentralAuthState }) {
   );
 }
 
-/** "Sign in with openbot.run" first, and the email code as the other way. */
 export const SignedOut: Story = { render: () => <SignIn login={{ status: "signed_out" }} /> };
 
 export const CheckingSession: Story = { render: () => <SignIn login={{ status: "loading" }} /> };
 
-/** The email code was sent; a development server shows the code. */
 export const CodeSent: Story = {
   render: () => (
     <SignIn
@@ -50,7 +48,6 @@ export const CodeSent: Story = {
   ),
 };
 
-/** The person closed the openbot.run window or chose Cancel there. */
 export const Cancelled: Story = {
   render: () => (
     <SignIn
@@ -73,7 +70,6 @@ export const AccountServiceDown: Story = {
   ),
 };
 
-/** The tab that asks for the microphone when the side panel cannot. */
 function Microphone(props: { answer: "asking" | "allowed" | "blocked" }) {
   const media = navigator.mediaDevices;
   if (media)

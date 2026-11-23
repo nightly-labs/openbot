@@ -63,11 +63,9 @@ import { createStore, flush } from "solid-js";
 import { createAgentSettingsApi } from "./agent-settings";
 import { createAttachmentMedia, type HostFile } from "./attachment-media";
 
-/** The open chat: the agent's main chat (`taskId` null), one of its threads, or a thread not started yet. */
 export interface OpenChat {
   agentId: string;
   taskId: string | null;
-  /** A new thread before its first message. Sending starts it. */
   draftThread: boolean;
   status: "loading" | "ready" | "failed";
   messages: ConversationMessage[];
@@ -78,30 +76,24 @@ export interface OpenChat {
   error: string | null;
 }
 
-/** A pinned chat of the member: an agent or a channel. */
 export interface SidebarPin {
   kind: "agent" | "channel";
   id: string;
 }
 
-/** The open channel chat, read as pages of `channel-chats-v1`. */
 export interface OpenChannel {
   channelId: string;
   status: "loading" | "ready" | "failed";
   messages: ChannelMessage[];
-  /** The newest message of the page, which a read mark names. */
   throughSequence: number;
-  /** The channel's tasks, for the agents that work now. */
   tasks: ChannelTask[];
   sending: boolean;
   error: string | null;
 }
 
-/** A folder of the sidebar layout, which every client of the server shares. */
 export interface WorkspaceFolder {
   id: string;
   name: string;
-  /** 0 at the top of the list; a folder in a folder is 1, and so on. */
   depth: number;
 }
 
@@ -109,34 +101,23 @@ export interface WorkspaceState {
   status: "loading" | "ready" | "failed";
   error: string | null;
   agents: ClientAgentSummary[];
-  /** `agent-colors-v1`: the exact colour of an agent that has one. */
   colors: Record<string, AvatarColor>;
-  /** The member's pinned agents and channels, in their order (`sidebar-pins-v1`). Empty on an older host. */
   pins: SidebarPin[];
-  /** Unread messages in each agent's main chat. */
   unread: Record<string, number>;
-  /** The threads of each agent that the panel read, newest first. */
   threads: Record<string, AgentTask[]>;
-  /** The server's sidebar folders in tree order, with how deep each one is. */
   folders: WorkspaceFolder[];
-  /** The folder of each agent or channel that is in one. */
   folderOf: Record<string, string>;
-  /** The channels that are not archived (`channel-chats-v1`). Empty on a host without channels. */
   channels: ChannelSummary[];
   channel: OpenChannel | null;
-  /** This account's member id on the server (`/v1/me`), which marks its own messages in a channel. */
   memberId: string | null;
   chat: OpenChat | null;
 }
 
 export const decodeAgents = guardedListDecoder(isClientAgentSummary, "agents");
 const decodeModels = guardedListDecoder(isClientAgentModelOption, "models");
-/** Every host has the folders of the released protocol (`team-protocol/v1.ts`); the name has no constant. */
 const SIDEBAR_LAYOUT_CAPABILITY = "sidebar-layout";
-/** As the phone app: at most one read of the channels in this time, and one after the last change. */
 const CHANNEL_READ_INTERVAL_MS = 250;
 
-/** Item types of an answer that the chat shows: its text, and the files and images that an agent sends or makes. */
 const SHOWN_ITEM_TYPES: ReadonlySet<string | undefined> = new Set([
   undefined,
   "agentMessage",
@@ -144,10 +125,6 @@ const SHOWN_ITEM_TYPES: ReadonlySet<string | undefined> = new Set([
   "image_generation",
 ]);
 
-/**
- * A row of the chat: the person's messages and the agent's answers, with their files. Tool steps and
- * notes stay in the app.
- */
 export function isChatMessage(message: ConversationMessage): boolean {
   const files = (message.attachments?.length ?? 0) > 0;
   if (message.author === "user") return message.text.trim().length > 0 || files;
@@ -155,11 +132,6 @@ export function isChatMessage(message: ConversationMessage): boolean {
   return SHOWN_ITEM_TYPES.has(message.itemType) && (message.text.length > 0 || files);
 }
 
-/**
- * The state of one server, as the phone app keeps it: agents and their looks, pins, unread counts, the
- * open chat and its threads. Every read goes through the connection's `request`; events from the host
- * keep it current, and a streamed answer is appended as it comes, as in the web client.
- */
 export function createWorkspace(
   request: TeamApiRequest,
   capabilities: readonly string[],
@@ -187,7 +159,6 @@ export function createWorkspace(
     request(method, path, (value) => value, body);
   let readsTimer: ReturnType<typeof setTimeout> | null = null;
   let chatGeneration = 0;
-  /** A create that failed keeps its id for a retry of the same form, so the host does not make it twice. */
   const createOperationId = retryOperationIds(() => crypto.randomUUID());
   const channelsApi = has(CHANNEL_CHATS_CAPABILITY) ? teamChannelsApi(request) : null;
   const changedChannels = new Set<string>();
@@ -203,7 +174,6 @@ export function createWorkspace(
       draft.unread = unread;
     });
   }
-  /** Events come in bursts: read the counts once after the burst. */
   function refreshReadsSoon(): void {
     if (readsTimer) clearTimeout(readsTimer);
     readsTimer = setTimeout(() => {
@@ -217,11 +187,9 @@ export function createWorkspace(
     return value;
   }
 
-  /** Shows a layout: its folders in tree order, and the folder of each agent. */
   function showLayout(layout: SidebarLayoutSnapshot): void {
     const parents = sidebarFolderParents(layout);
     const sections = new Map(layout.sections.map((section) => [section.id, section]));
-    // The people and unassigned sections are in `order` too; they are not folders.
     const folders = sidebarFolderTreeOrder(layout.order, parents).flatMap((id) => {
       const section = sections.get(id);
       return section ? [{ id, name: section.name, depth: sidebarFolderAncestors(parents, id).length }] : [];
@@ -234,7 +202,6 @@ export function createWorkspace(
     });
   }
 
-  /** The folders of the sidebar. A host with `sidebar-folders-v1` has nested folders on its own routes. */
   async function readLayout(): Promise<void> {
     if (!has(SIDEBAR_LAYOUT_CAPABILITY)) return;
     showLayout(
@@ -244,7 +211,6 @@ export function createWorkspace(
     );
   }
 
-  /** Makes a folder at the top of the list. */
   async function createFolder(name: string): Promise<void> {
     showLayout(
       await request(
@@ -273,7 +239,6 @@ export function createWorkspace(
     });
   }
 
-  /** Reads the open channel again, and marks it read up to its newest message. */
   async function reloadChannel(): Promise<void> {
     const open = state.channel;
     if (!channelsApi || !open) return;
@@ -332,7 +297,6 @@ export function createWorkspace(
     });
   }
 
-  /** Sends to the open channel. A leading @name sends the message to that agent, as on the desktop. */
   async function sendToChannel(text: string): Promise<void> {
     const open = state.channel;
     if (!channelsApi || !open || open.sending) return;
@@ -349,7 +313,6 @@ export function createWorkspace(
       if (!draft.channel) return;
       draft.channel.sending = true;
       draft.channel.error = null;
-      // Shown until the host's copy of the channel arrives.
       draft.channel.messages.push({
         id: `pending-${operationId}`,
         channelId,
@@ -393,7 +356,6 @@ export function createWorkspace(
     }
   }
 
-  /** Makes a channel, as the desktop dialog does, and returns its id. */
   async function createChannel(draft: ChannelDraft): Promise<string> {
     if (!channelsApi) throw new Error(currentText().t("extension.create.failed"));
     const channel = await channelsApi.channelCommand({
@@ -410,7 +372,6 @@ export function createWorkspace(
     return channel.id;
   }
 
-  /** The host tells each change of a channel, also each part of a streamed answer: read once per burst. */
   function channelChangedSoon(channelId: string): void {
     changedChannels.add(channelId);
     if (channelTimer) return;
@@ -434,7 +395,6 @@ export function createWorkspace(
           ? runTeamEffect(readSidebarPins(request)).then((value) => value.items)
           : Promise.resolve([]),
         readReads(),
-        // The folders only group the list: without them the panel still shows every agent.
         readLayout().catch(() => undefined),
         readChannels().catch(() => undefined),
         readMemberId().catch(() => undefined),
@@ -476,7 +436,6 @@ export function createWorkspace(
     return value;
   }
 
-  /** Reads the open chat again, and marks it read up to its last message. */
   async function reloadChat(): Promise<void> {
     const chat = state.chat;
     if (!chat || chat.draftThread) return;
@@ -540,7 +499,6 @@ export function createWorkspace(
         error: null,
       };
     });
-    // A store write shows to reads only after a flush; `reloadChat` reads the new chat.
     flush();
     void reloadChat();
     void loadThreads(agentId).catch(() => undefined);
@@ -562,7 +520,6 @@ export function createWorkspace(
         error: null,
       };
     });
-    // `send` may follow at once ("@agent text" from the home search) and reads the new chat.
     flush();
   }
 
@@ -573,7 +530,6 @@ export function createWorkspace(
     });
   }
 
-  /** Sends to the open chat. A draft thread starts with this message. */
   async function send(text: string): Promise<void> {
     const chat = state.chat;
     if (!chat || chat.sending) return;
@@ -584,7 +540,6 @@ export function createWorkspace(
       if (!draft.chat) return;
       draft.chat.sending = true;
       draft.chat.error = null;
-      // Shown until the host's copy of the conversation arrives.
       draft.chat.messages.push({
         id: `pending-${clientMessageId}`,
         author: "user",
@@ -612,7 +567,6 @@ export function createWorkspace(
           text,
           attachmentDraftIds: [],
           replyToMessageId: null,
-          // The host uses this zone for a routine that the agent creates from the message.
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           clientMessageId,
         });
@@ -635,7 +589,6 @@ export function createWorkspace(
     }
   }
 
-  /** The models a new agent can start on, when the host lets a member choose one (`agent-create-model`). */
   async function agentCatalog(): Promise<{ models: ClientAgentModelOption[]; status: AgentStatus } | null> {
     if (!has(TEAM_AGENT_CREATE_MODEL_CAPABILITY)) return null;
     const [models, status] = await Promise.all([
@@ -648,7 +601,6 @@ export function createWorkspace(
     return { models, status };
   }
 
-  /** Creates the agent of the form, as the web client does, and returns its id. */
   async function createAgent(draft: FirstAgentDraft): Promise<string> {
     const withModel = has(TEAM_AGENT_CREATE_MODEL_CAPABILITY) && isKnownAgentProvider(draft.provider);
     const profile = {
@@ -681,8 +633,6 @@ export function createWorkspace(
     setState((draft) => {
       if (!draft.agents.some((entry) => entry.id === agent.id)) draft.agents.push(agent);
     });
-    // The create route keeps the nearest hue; the exact colour goes on `agent-colors-v1` after it. The agent
-    // exists, so a failed colour change does not fail the create.
     const color = draft.avatarColor;
     if (color && has(AGENT_COLORS_CAPABILITY))
       await runTeamEffect(setAgentColor(request, { agentId: agent.id, color })).then(
@@ -695,7 +645,6 @@ export function createWorkspace(
     return agent.id;
   }
 
-  /** Appends a streamed part of an answer to the open chat, as `applyDelta` in the web client does. */
   function appendDelta(event: {
     threadId: string;
     turnId: string;
@@ -806,7 +755,6 @@ export function createWorkspace(
     agentCatalog,
     createAgent,
     createFolder,
-    /** The agent settings calls of this server. */
     settings: createAgentSettingsApi(request, capabilities),
     foldersAvailable: () => has(SIDEBAR_LAYOUT_CAPABILITY),
     channelsAvailable: () => channelsApi !== null,
@@ -819,7 +767,6 @@ export function createWorkspace(
       setState((draft) => {
         if (draft.channel) draft.channel.error = null;
       }),
-    /** The user closed the error card over the composer. */
     clearChatError: () =>
       setState((draft) => {
         if (draft.chat) draft.chat.error = null;
@@ -827,7 +774,6 @@ export function createWorkspace(
     handleEvent,
     reloadChat,
     threadsAvailable: () => has(AGENT_TASKS_CAPABILITY),
-    /** Dictation, when the server transcribes for its members. */
     transcribe: has(VOICE_TRANSCRIPTION_CAPABILITY) ? transcribe : null,
     media,
     dispose: () => {

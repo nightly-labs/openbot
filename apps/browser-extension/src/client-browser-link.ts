@@ -15,23 +15,14 @@ import { currentText } from "@openbot/ui/text";
 import { BROWSER_CHANGED_MESSAGE, BROWSER_PRESENCE_MESSAGE, BROWSER_RUN_MESSAGE } from "./client-browser-messages";
 import { savePresenceAck } from "./extension-storage";
 
-/** The server ends a presence after 75 s with none; the contract asks for one every 30 s. */
 const HEARTBEAT_MS = 30_000;
 
 export interface ClientBrowserLink {
-  /** Takes the server's events; runs each `client-browser-command`. */
   handleEvent: (event: RemoteTeamEvent) => void;
-  /** Sends the presence again, as after a reconnection. */
   refresh: () => void;
   dispose: () => void;
 }
 
-/**
- * The tabs that the user shares, on one server connection: the side panel's, or the offscreen page's.
- * It sends the presence when it changes and every 30 s, passes each command to the worker, and posts the
- * worker's answer. A server without `client-browser-v1` gets nothing; `onPresence` still reports the
- * worker's state, for the panel.
- */
 export function createClientBrowserLink(options: {
   request: TeamApiRequest;
   capabilities: readonly string[];
@@ -39,7 +30,6 @@ export function createClientBrowserLink(options: {
 }): ClientBrowserLink {
   const supported = options.capabilities.includes(CLIENT_BROWSER_CAPABILITY);
   let disposed = false;
-  /** Whether this connection told the server that the user shares, so that a stop reaches it. */
   let shared = false;
   let sending: Promise<void> = Promise.resolve();
 
@@ -57,7 +47,6 @@ export function createClientBrowserLink(options: {
   }
 
   function sync(): void {
-    // One at a time, so a stop never overtakes the presence before it.
     sending = sending.then(syncNow).catch(() => undefined);
   }
 
@@ -78,10 +67,8 @@ export function createClientBrowserLink(options: {
       );
       if (answer.id !== event.id) throw new Error("Another command.");
     } catch {
-      // The texts of an answer go to the agent, as the host's tool texts do: English.
       answer = { id: event.id, ok: false, code: "failed", error: "The extension could not run the command." };
     }
-    // A late answer gets 404 from the server, which changes nothing.
     await options.request("POST", CLIENT_BROWSER_ROUTES.result, () => undefined, answer).catch(() => undefined);
   }
 

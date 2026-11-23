@@ -563,7 +563,6 @@ export class RemoteEventStream {
             } else if (event.type === "live-voice") {
               this.#onLiveVoice(serverId, event);
             } else if (event.type === "client-browser-command") {
-              // This client does not share Chrome tabs (`client-browser-v1`), so no host sends it a command.
             } else {
               if (!agentEventsReady) {
                 if (bufferedAgentEvents.length >= REMOTE_EVENT_INITIAL_BUFFER_LIMIT) {

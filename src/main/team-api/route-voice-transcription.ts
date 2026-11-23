@@ -11,11 +11,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readBinary } from "./request-helpers";
 
-/**
- * Dictation for a member: the host turns the member's WAV recording into text with its own speech
- * recognition. The text goes back to the member only. Any member can ask, as the text reaches no agent.
- * Frozen by `voice-transcription-v1`.
- */
 export async function routeVoiceTranscription(
   context: TeamApiRequestContext,
   voice: TeamApiVoiceTranscription | undefined,
@@ -37,7 +32,6 @@ export async function routeVoiceTranscription(
   try {
     return json(200, await runCauseEffect(voice.transcribe(audio)));
   } catch (error) {
-    // A model that is not ready, a missing key or a refused voice server is a sentence for the member.
     if (error instanceof Error && isFixedSourceText(error.message)) throw new HttpError(409, error.message);
     throw error;
   }

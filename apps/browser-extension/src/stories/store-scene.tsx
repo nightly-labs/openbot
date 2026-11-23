@@ -1,5 +1,3 @@
-// A Chrome window at the Web Store's 1280×800, with a web page and the OpenBot side panel, for the
-// store pictures. The sites are made up. Storybook only.
 import "./store-scene.css";
 import { ArrowLeft, ArrowRight, Lock, PanelRight, Pin, Plus, Puzzle, Search, Star, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -8,15 +6,12 @@ import openBotIcon from "../../public/icons/icon-32.png";
 
 export interface SceneTab {
   title: string;
-  /** The site's mark: a letter on a colour. */
   mark: string;
   color: string;
   active?: boolean;
-  /** The tab is in the "OpenBot" tab group, which agents may use. */
   shared?: boolean;
 }
 
-/** The window: tabs, the address bar, the page, and the side panel on the right. */
 export function BrowserScene(props: { tabs: SceneTab[]; url: string; page: JSX.Element; panel: JSX.Element }) {
   const shared = () => props.tabs.filter((tab) => tab.shared);
   const others = () => props.tabs.filter((tab) => !tab.shared);
@@ -82,7 +77,6 @@ function Tab(props: { tab: SceneTab }) {
   );
 }
 
-/** A news article that the user reads. */
 export function ArticlePage() {
   return (
     <div class="site site-news">
@@ -119,7 +113,6 @@ export function ArticlePage() {
   );
 }
 
-/** Search results of a flight site, in a tab that the user shares with agents. */
 export function FlightsPage() {
   const flights = [
     { time: "9:40 → 13:05", price: "$142", note: "Direct · 3 h 25 min · Bag included", best: true },
@@ -174,7 +167,6 @@ export function FlightsPage() {
   );
 }
 
-/** A product page that Price Watch watches. */
 export function ShopPage() {
   return (
     <div class="site site-shop">
@@ -243,7 +235,6 @@ export function ShopPage() {
   );
 }
 
-/** The launch plan of a team, in a shared document. */
 export function DocsPage() {
   const items = [
     { done: true, text: "Freeze the release branch", owner: "Builder" },
@@ -285,7 +276,6 @@ export function DocsPage() {
   );
 }
 
-/** A mail inbox, beside the home. */
 export function MailPage() {
   const mails = [
     {

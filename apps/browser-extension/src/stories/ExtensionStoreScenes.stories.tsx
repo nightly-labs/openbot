@@ -8,9 +8,6 @@ import {
 } from "./store-panels";
 import { ArticlePage, BrowserScene, DocsPage, FlightsPage, MailPage, ShopPage } from "./store-scene";
 
-// The store pictures as a user sees them: a Chrome window at 1280×800 with a page and the OpenBot
-// side panel. Take the screenshot of the window. The sites are made up.
-
 const meta = {
   title: "Extension/Store scenes",
   parameters: { layout: "fullscreen" },
@@ -19,7 +16,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** All your agents beside your mail. */
 export const AgentsBesideYourMail: Story = {
   render: () => (
     <BrowserScene
@@ -35,7 +31,6 @@ export const AgentsBesideYourMail: Story = {
   ),
 };
 
-/** Ask about the page you read. */
 export const AskAboutThePage: Story = {
   render: () => (
     <BrowserScene
@@ -50,7 +45,6 @@ export const AskAboutThePage: Story = {
   ),
 };
 
-/** Agents work in the tabs that you share with them, and ask first. */
 export const AgentsUseYourTabs: Story = {
   render: () => (
     <BrowserScene
@@ -67,7 +61,6 @@ export const AgentsUseYourTabs: Story = {
   ),
 };
 
-/** An agent watches a price and acts when it drops. */
 export const WatchAPrice: Story = {
   render: () => (
     <BrowserScene
@@ -82,7 +75,6 @@ export const WatchAPrice: Story = {
   ),
 };
 
-/** Your agents work together in a channel, beside your team's plan. */
 export const TeamInAChannel: Story = {
   render: () => (
     <BrowserScene

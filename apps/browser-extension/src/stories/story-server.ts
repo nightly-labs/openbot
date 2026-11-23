@@ -1,5 +1,3 @@
-// Story support: a server of test data that answers the Team API routes that the extension's screens
-// read, and a small `chrome` for a page outside an extension. Storybook only; nothing here ships.
 import {
   type AgentStatus,
   type AttachmentSummary,
@@ -129,7 +127,6 @@ export const STORY_STATUS: AgentStatus = {
   fullAccess: true,
 };
 
-/** Files of every kind that the chat shows: a picture, a document, a sheet, audio and an archive. */
 export const STORY_FILES: AttachmentSummary[] = [
   file("image", "q3-revenue.png", "image/png", 48_000, "image", "image"),
   file("pdf", "Q3 report.pdf", "application/pdf", 1_240_000, "file", "pdf"),
@@ -244,24 +241,17 @@ export const STORY_CHANNEL_MESSAGES: ChannelMessage[] = [
   ),
 ];
 
-/** What the story server has, and which features it has. */
 export interface StoryServerOptions {
   agents?: ClientAgentSummary[];
-  /** The main chat of each agent. */
   chats?: Record<string, ConversationMessage[]>;
-  /** The agent that is answering now, with no text yet. */
   answering?: string;
   unread?: Record<string, number>;
   folders?: boolean;
   channels?: ChannelSummary[];
   channelMessages?: ChannelMessage[];
-  /** The agents whose channel tasks run now. */
   channelWorkers?: string[];
-  /** Reading a chat fails, so the error card shows over the composer. */
   failChat?: boolean;
-  /** Dictation, as a server with a speech model has it. */
   dictation?: boolean;
-  /** The member's pinned chats (`sidebar-pins-v1`), in order. */
   pins?: { kind: "agent" | "channel"; id: string }[];
 }
 
@@ -283,7 +273,6 @@ function storyPicture(): string {
   return canvas.toDataURL("image/png").split(",")[1] ?? "";
 }
 
-/** A workspace of the real extension, connected to the story server, and loaded. */
 export async function storyWorkspace(options: StoryServerOptions = {}): Promise<Workspace> {
   const agents = options.agents ?? STORY_AGENTS;
   const channels = options.channels ?? [];
@@ -374,10 +363,6 @@ export async function storyWorkspace(options: StoryServerOptions = {}): Promise<
 type StoredValue = chrome.storage.StoredValue;
 type ChangeListener = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => void;
 
-/**
- * The `chrome` that the screens call, for a page outside an extension: storage in memory with its
- * change events, and messages that nobody answers. `stored` fills the storage first.
- */
 export function installStoryChrome(stored: { [key: string]: StoredValue } = {}): void {
   const items = new Map<string, StoredValue>(Object.entries(stored));
   const listeners = new Set<ChangeListener>();
@@ -413,7 +398,6 @@ export function installStoryChrome(stored: { [key: string]: StoredValue } = {}):
       onMessage: { addListener: () => undefined, removeListener: () => undefined },
     },
     identity: {
-      // The openbot.run window does not open in Storybook; the screen shows the cancelled sign-in.
       launchWebAuthFlow: async () => {
         throw new Error("No sign-in window in Storybook.");
       },
@@ -424,7 +408,6 @@ export function installStoryChrome(stored: { [key: string]: StoredValue } = {}):
       remove: async () => undefined,
     },
   };
-  // Chrome gives every page a `chrome` that a page cannot replace; the story adds its parts to it.
   if (typeof chrome !== "object") {
     Object.defineProperty(globalThis, "chrome", { value: stub, configurable: true, writable: true });
     return;

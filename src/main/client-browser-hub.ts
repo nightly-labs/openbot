@@ -15,17 +15,11 @@ import {
 import { Effect } from "effect";
 import { type ClientBrowser, ClientBrowserFailed } from "../backend/agent/client-browser-tools";
 
-// The host end of `client-browser-v1`: the Chrome tabs that members share with the agents of this host.
-// It keeps the presence of each logical session that shares, and the commands that wait for a result.
-// It logs nothing: tabs, pages and typed text are user data.
-
-/** Sends the command to the event connections of the member's session; false when none is open. */
 type Deliver = (memberId: string, sessionId: string, event: ClientBrowserCommandEvent) => boolean;
 
 interface Presence {
   memberId: string;
   tabs: ClientTab[];
-  /** Higher is newer. The newest session of a member that started to share gets the commands. */
   order: number;
   expiry: ReturnType<typeof setTimeout>;
 }
@@ -47,12 +41,10 @@ export class ClientBrowserHub implements ClientBrowser {
   readonly #timing: { commandMs: number; presenceMs: number };
   #order = 0;
 
-  /** The contract's limits; a test gives shorter ones. */
   constructor(timing = { commandMs: CLIENT_BROWSER_COMMAND_TIMEOUT_MS, presenceMs: CLIENT_BROWSER_PRESENCE_TTL_MS }) {
     this.#timing = timing;
   }
 
-  /** The presence that a session sent. `sharing: false` ends it. */
   setPresence(memberId: string, sessionId: string, presence: ClientBrowserPresence): void {
     const current = this.#presence.get(sessionId);
     if (!presence.sharing || (current && current.memberId !== memberId)) this.sessionEnded(sessionId);
@@ -64,7 +56,6 @@ export class ClientBrowserHub implements ClientBrowser {
     this.#presence.set(sessionId, { memberId, tabs: presence.tabs, order: kept?.order ?? ++this.#order, expiry });
   }
 
-  /** The session stopped sharing, closed its last event connection, or sent no presence in time. */
   sessionEnded(sessionId: string): void {
     const presence = this.#presence.get(sessionId);
     if (presence) clearTimeout(presence.expiry);
@@ -95,7 +86,6 @@ export class ClientBrowserHub implements ClientBrowser {
         agentName: agent.name.slice(0, CLIENT_BROWSER_LIMITS.agentName),
         command,
       };
-      // A client closes its event stream on an event that the contract refuses, so such a command stays here.
       try {
         clientBrowserCommandEvent(event);
       } catch {
@@ -117,7 +107,6 @@ export class ClientBrowserHub implements ClientBrowser {
           duration: this.#timing.commandMs,
           orElse: () => Effect.succeed(refused(event.id, "timeout")),
         }),
-        // A cancelled tool call, a timeout or a result: a later result of the command finds nothing.
         Effect.ensuring(Effect.sync(() => this.#pending.delete(event.id))),
         Effect.flatMap((answer) =>
           answer.ok
@@ -128,7 +117,6 @@ export class ClientBrowserHub implements ClientBrowser {
     });
   }
 
-  /** The result of a command. False for a command that does not wait, or that another member or session got. */
   resolve(memberId: string, sessionId: string, answer: ClientBrowserAnswer): boolean {
     const pending = this.#pending.get(answer.id);
     if (!pending || pending.memberId !== memberId || pending.sessionId !== sessionId) return false;

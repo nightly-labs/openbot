@@ -603,9 +603,7 @@ const TEARDOWN_ORDER = {
   hostEvents: 85.5,
   signalIngress: 86,
   host: 90,
-  /** After the host, so no member answers; before the agent service, so no tool call waits for Chrome. */
   clientBrowser: 98,
-  /** Before the team WebRTC bridge: the computer proxy streams stop before their channels. */
   browserEgress: 99,
   teamWebRtcBridge: 100,
   routineFlows: 103,
@@ -1305,11 +1303,8 @@ export async function createApplicationServices({
   );
   const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
   teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
-  // The Chrome tabs that members share with the agents (`client-browser-v1`).
   const clientBrowser = new ClientBrowserHub();
   teardown.push(TEARDOWN_ORDER.clientBrowser, "the shared Chrome tabs of members", () => clientBrowser.dispose());
-  // Only a hosted, self-hosted or container server: one unit or container holds OpenBot and every
-  // agent process. The desktop app does not hold turns for memory.
   const hostMemory =
     hostedServer || serverModeEnvironment
       ? new ServerMemory({
@@ -3230,12 +3225,7 @@ export async function createApplicationServices({
         return () => service.off("liveVoice", listener);
       },
     },
-    // Present, so the host advertises `client-browser-v1`. Any member can share Chrome tabs.
     clientBrowser,
-    // Present, so the host advertises `voice-transcription-v1`. A member's dictation uses the speech
-    // recognition of this host: its voice server, or its model when it is ready. A model that is not on
-    // this host yet starts its download, as the first dictation on this computer does, and the member
-    // tries again later. The voice services start after the host; a request comes only later.
     voiceTranscription: {
       transcribe: (audio) => {
         if (voiceServer.dictates()) return voiceServer.transcribe(audio, voice.getSettings().language);
@@ -3250,7 +3240,6 @@ export async function createApplicationServices({
                 cause: new Error(sourceText(preparing ? "error.voice.host.preparing" : "error.voice.host.notSetUp")),
               }),
             );
-            // The download runs in the voice service; its status and its errors show in Settings → Voice.
             return preparing && status.phase === "missing"
               ? Effect.forkDetach(Effect.ignore(voice.prepareModel())).pipe(Effect.andThen(refusal))
               : refusal;
@@ -3258,7 +3247,6 @@ export async function createApplicationServices({
         );
       },
     },
-    // Present, so the host advertises `hosted-sites-v1`. Members list; only admins delete.
     hostedSites,
     agentImport,
     hermesImport: {

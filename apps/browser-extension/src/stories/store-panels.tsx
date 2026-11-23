@@ -1,5 +1,3 @@
-// The side panels of the store pictures, with realistic content. The panel-only stories and the
-// browser scenes both show them. Storybook only.
 import type { ClientAgentSummary } from "@openbot/contracts/ipc";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import { BrowserAsks } from "../BrowserSharing";
@@ -19,7 +17,6 @@ import {
   type StoryServerOptions,
 } from "./story-server";
 
-/** A time this many minutes ago, so the lists say "now", "12 min" and so on. */
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
 const AGENTS: ClientAgentSummary[] = [
@@ -142,7 +139,6 @@ const SERVER: StoryServerOptions = {
   dictation: true,
 };
 
-/** The home: pinned agents and a channel, and every chat with its news. */
 export function StoreHomePanel() {
   installStoryChrome();
   return (
@@ -188,7 +184,6 @@ function Chat(props: { agentId: string; options: StoryServerOptions; asks?: bool
   );
 }
 
-/** Chief reads the article in the tab and answers for the user's plan. */
 export function StoreArticleChatPanel() {
   installStoryChrome();
   return (
@@ -217,7 +212,6 @@ export function StoreArticleChatPanel() {
   );
 }
 
-/** Travel compared the shared tabs, and asks before it acts on a new site. */
 export function StoreTravelPanel() {
   installStoryChrome({
     [ASKS_KEY]: [
@@ -255,7 +249,6 @@ export function StoreTravelPanel() {
   );
 }
 
-/** Price Watch watched the product on the page and put it in the cart when the price dropped. */
 export function StorePriceWatchPanel() {
   installStoryChrome();
   return (
@@ -288,7 +281,6 @@ export function StorePriceWatchPanel() {
   );
 }
 
-/** A channel: the user and several agents work on one launch; Builder and Research work now. */
 export function StoreChannelPanel() {
   installStoryChrome();
   const you = { kind: "member" as const, id: MEMBER_ID, name: "You" };

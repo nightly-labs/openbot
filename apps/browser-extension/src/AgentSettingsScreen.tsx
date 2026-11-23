@@ -12,18 +12,12 @@ import { createMemo, createStore, onSettled, Show } from "solid-js";
 import type { AgentSettingsApi } from "./agent-settings";
 import type { Workspace } from "./workspace";
 
-/** A provider this build does not know keeps the desktop's starting choice, as there. */
 function knownProvider(provider: AgentProviderRef): AgentProviderId {
   return isKnownAgentProvider(provider) ? provider : "codex";
 }
 
-/** The panel fills the side panel, which is the panel's own smallest width. */
 const PANEL_WIDTH = 360;
 
-/**
- * The desktop's agent settings for an agent of the open server: profile, look, model, chat colour,
- * permissions, a new chat and the history. The host checks each change.
- */
 export function AgentSettingsScreen(props: {
   workspace: Workspace;
   settings: AgentSettingsApi;
@@ -46,8 +40,6 @@ export function AgentSettingsScreen(props: {
     const color = props.workspace.state.colors[agent.id];
     return toAgentProfile({ ...agent, avatarColor: color ?? null });
   });
-  // The panel reads these props in its effects. A ternary in JSX becomes a getter that makes a memo when
-  // read, and a memo made in an effect callback halts Solid, so each one is a memo here.
   const autoApprove = createMemo(() =>
     state.admin ? state.admin.autoApprove || state.admin.autoApproveLocked : undefined,
   );

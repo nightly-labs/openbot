@@ -12,7 +12,6 @@ import {
   rememberExtensionAllowed,
 } from "./web-extension-connect";
 
-/** The brand name, as the sign-in screen shows it; it is not translated. */
 const PRODUCT_NAME = "OpenBot";
 
 interface WebExtensionConnectProps {
@@ -23,11 +22,6 @@ interface WebExtensionConnectProps {
   accountFetch: typeof fetch;
 }
 
-/**
- * The question after sign-in when the OpenBot browser extension asked for this account. Allow gets a
- * one-time code for the extension's challenge and goes to the extension's own address; Cancel tells
- * the extension no. Either way the extension's sign-in window closes.
- */
 export function WebExtensionConnect(props: WebExtensionConnectProps) {
   const { t, sourceText } = useText();
   const [pending, setPending] = createSignal(false);
@@ -63,8 +57,6 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
     }
   }
 
-  // A request with no window: the code when this account allowed the extension here before, else the
-  // extension opens the window with this question.
   onSettled(() => {
     if (!props.request.silent) return;
     if (extensionAllowedBy(props.request.extensionId, props.accountId)) void allow();

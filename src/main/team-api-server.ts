@@ -620,7 +620,6 @@ export class TeamApiServer {
   #stopMachineAlertListener: (() => void) | null = null;
   #stopLiveVoiceListener: (() => void) | null = null;
   #stopClientBrowserListener: (() => void) | null = null;
-  /** The live voice sessions of members, so that each ends with the logical session that started it. */
   readonly #liveVoiceSessions = new TeamLiveVoiceSessions();
   #stopNotificationLevelsListener: (() => void) | null = null;
   #stopSidebarPinsListener: (() => void) | null = null;
@@ -723,12 +722,10 @@ export class TeamApiServer {
         if (event.type === "ended") this.#liveVoiceSessions.remove(event.sessionId);
         if (memberId) this.#sendLiveVoice(memberId, event);
       }) ?? null;
-    // A command for a member's shared Chrome goes only to the session that shares it.
     this.#stopClientBrowserListener =
       this.#options.clientBrowser?.subscribe((memberId, sessionId, event) =>
         this.#sendClientBrowserCommand(memberId, sessionId, event),
       ) ?? null;
-    // A change on one device of a member shows at once on their other devices.
     this.#stopNotificationLevelsListener =
       this.#options.agentNotificationLevels?.subscribe((memberId) => this.#sendNotificationLevels(memberId)) ?? null;
     this.#stopSidebarPinsListener =
@@ -938,11 +935,6 @@ export class TeamApiServer {
     }
   }
 
-  /**
-   * Sends a command for a member's shared Chrome to the event connections of that member's session that
-   * read `client-browser-v1`. It is outside the frozen event vocabulary, so it bypasses the encoders like
-   * `live-voice` does. False when no such connection is open.
-   */
   #sendClientBrowserCommand(memberId: string, sessionId: string, event: ClientBrowserCommandEvent): boolean {
     const payload = JSON.stringify(event);
     let sent = false;
@@ -960,10 +952,6 @@ export class TeamApiServer {
     return sent;
   }
 
-  /**
-   * Sends a member's own notification levels to each connection of that member, and to no other member.
-   * The list leaves out the agents that the connection cannot see, as `/v1/agent-notification-levels` does.
-   */
   #sendNotificationLevels(memberId: string): void {
     const levels = this.#options.agentNotificationLevels;
     if (!levels) return;
@@ -2221,9 +2209,7 @@ export class TeamApiServer {
         this.#options.liveActivityPush?.disconnected(sessionId);
         this.#options.pushNotifications?.disconnected(sessionId);
         this.#options.browser.releaseUserControlHeldBy({ kind: "session", sessionId });
-        // Its shared Chrome tabs went with it.
         this.#options.clientBrowser?.sessionEnded(sessionId);
-        // Nobody hears a voice whose client has gone, and the voice would still send requests to the agent.
         const liveVoice = this.#options.liveVoice;
         if (liveVoice)
           for (const voice of this.#liveVoiceSessions.ofTeamSession(sessionId)) {
@@ -2722,7 +2708,6 @@ export class TeamApiServer {
         if (capability === LIVE_VOICE_CAPABILITY) return this.#options.liveVoice !== undefined;
         if (capability === VOICE_TRANSCRIPTION_CAPABILITY) return this.#options.voiceTranscription !== undefined;
         if (capability === CLIENT_BROWSER_CAPABILITY) return this.#options.clientBrowser !== undefined;
-        // Each account signs in with the browser, so it needs the sign-in routes too.
         if (capability === MCP_ACCOUNTS_CAPABILITY)
           return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
         if (capability === MCP_SIGN_IN_CAPABILITY)

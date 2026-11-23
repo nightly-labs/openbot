@@ -7,23 +7,14 @@ import { createSignal, onSettled, Show } from "solid-js";
 import { DictationMic, DictationStrip } from "./DictationStrip";
 import { createDictation } from "./dictation";
 
-/**
- * The composer of the agent and channel chats: the desktop's compact pill, the error cards over it as
- * in the desktop chat (`composer-stack.css`), and the phone app's dictation when the server transcribes:
- * the mic turns into Stop, and the strip of the recording dot, the time and the wave takes the place of
- * the draft. Stop keeps the words.
- */
 export function ChatComposer(props: {
   placeholder: string;
-  /** The error of the open chat. The card closes with the close button, Escape, or the next send. */
   error: string | null;
-  /** The chat the error belongs to, so a new chat does not show the card of the last one. */
   conversationKey: string;
   onDismissError: () => void;
   sending: boolean;
   transcribe: ((wav: Uint8Array) => Promise<string>) | null;
   onSend: (text: string) => Promise<void>;
-  /** Gives the parent a way to put the focus in the text box. */
   onFocusReady?: (focus: () => void) => void;
 }) {
   const { t } = useText();
@@ -43,12 +34,10 @@ export function ChatComposer(props: {
     : null;
   const dictating = () => (dictation?.phase() ?? "idle") !== "idle";
   const recording = () => dictation?.phase() === "recording";
-  // As on the phone: while words still come, a send would leave them behind.
   const canSend = () => draft().trim().length > 0 && !props.sending && !dictating();
 
   onSettled(() => {
     props.onFocusReady?.(() => field?.focus());
-    // Escape drops a recording, as it closes a menu.
     const drop = (event: KeyboardEvent) => {
       if (event.key === "Escape" && dictation?.phase() === "recording") dictation.cancel();
     };

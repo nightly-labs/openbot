@@ -12,11 +12,6 @@ import { Effect, Schema } from "effect";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { type DynamicToolResult, isRecord } from "../protocol";
 
-// The browser tools on the tabs that a member shares from the member's own Chrome (`client-browser-v1`).
-// A shared tab has the id `chrome:<member key>:<browser tab id>`. Only a person who requested the turn
-// can be the member, so an agent never reaches the tabs of another person. The main process sends each
-// command to the member's extension and waits for its result.
-
 const TAB_PREFIX = "chrome:";
 
 export class ClientBrowserFailed extends Schema.TaggedError<ClientBrowserFailed>()("ClientBrowserFailed", {
@@ -24,9 +19,7 @@ export class ClientBrowserFailed extends Schema.TaggedError<ClientBrowserFailed>
   message: Schema.String,
 }) {}
 
-/** The browsers that members share now. The main process owns them. */
 export interface ClientBrowser {
-  /** The tabs that the member shares now, or null when the member does not share. */
   tabs(memberId: string): ClientTab[] | null;
   call(
     memberId: string,
@@ -35,7 +28,6 @@ export interface ClientBrowser {
   ): Effect.Effect<ClientBrowserResult, ClientBrowserFailed>;
 }
 
-/** A short key of the member, so that a tab id does not show the member id. */
 function memberKey(memberId: string): string {
   return createHash("sha256").update(memberId).digest("hex").slice(0, 8);
 }
@@ -44,7 +36,6 @@ function sharedTab(memberId: string, tab: ClientTab): ClientTab {
   return { ...tab, id: `${TAB_PREFIX}${memberKey(memberId)}:${tab.id}` };
 }
 
-/** Whether a browser tool call is for a member's Chrome. */
 export function isClientBrowserCall(tool: string, args: unknown): boolean {
   if (!isRecord(args)) return false;
   return tool === "open" ? args.browser === "chrome" : isString(args.tabId) && args.tabId.startsWith(TAB_PREFIX);
@@ -53,7 +44,6 @@ export function isClientBrowserCall(tool: string, args: unknown): boolean {
 const NOTE =
   'chromeTabs are tabs of the person\'s own Chrome, shared with you. They take snapshot, screenshot, navigate, click, type, press, scroll, wait_for and close_tab; open with browser: "chrome" opens one there. The person approves each new site; a denied action is final.';
 
-/** Adds the shared Chrome tabs of the people who requested the turn to a `list_tabs` result. */
 export function withClientTabs(
   result: DynamicToolResult,
   browser: ClientBrowser | null,
@@ -70,7 +60,6 @@ export function withClientTabs(
 
 const TOOLS = "snapshot, screenshot, navigate, click, type, press, scroll, wait_for and close_tab";
 const UNSUPPORTED = `On a Chrome tab, use only ${TOOLS}.`;
-/** OpenBot's secret card and takeover work only in the OpenBot browser. */
 const PERSON_TYPES_SECRETS =
   "On a Chrome tab, the person types passwords and other secrets. Ask the person to type it in that tab, then go on.";
 const NOT_SHARED =
@@ -98,7 +87,6 @@ function clientTarget(target: Target): ClientBrowserTarget | string {
   return target.kind === "css" ? { css: target.selector } : { text: target.text };
 }
 
-/** The command of a tool call, or the reason that the call cannot run on a Chrome tab. */
 function clientCommand(tool: string, args: unknown, tabId: string): ClientBrowserCommand | string {
   if (tool === "submit_secret" || tool === "request_takeover") return PERSON_TYPES_SECRETS;
   let call: ReturnType<typeof parseBrowserToolCall>;
@@ -162,10 +150,6 @@ function toolResult(memberId: string, result: ClientBrowserResult): DynamicToolR
   ];
 }
 
-/**
- * Runs one browser tool call on a member's Chrome. `requesters` are the people who requested the turn.
- * `open` uses the first of them who shares; a tab id names its member.
- */
 export const runClientBrowserTool = Effect.fn("runClientBrowserTool")(function* (
   browser: ClientBrowser | null,
   requesters: readonly string[],

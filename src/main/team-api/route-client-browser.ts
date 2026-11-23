@@ -10,11 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
 
-/**
- * The Chrome tabs that a member shares with the agents of this host, and the results of their
- * commands. Any member can share. A result counts only from the member and logical session that got
- * the command. Frozen by `client-browser-v1`.
- */
 export async function routeClientBrowser(
   context: TeamApiRequestContext,
   clientBrowser: TeamApiClientBrowser | undefined,
@@ -27,7 +22,6 @@ export async function routeClientBrowser(
     return "unmatched";
   if (!clientBrowser || !capabilities.has(CLIENT_BROWSER_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.clientBrowserUnsupported"));
-  // `readJson` has already run the body through the client browser wire codec.
   const body = await readJson(request);
   if (url.pathname === CLIENT_BROWSER_ROUTES.presence) {
     let presence: ReturnType<typeof decodeClientBrowserPresence>;

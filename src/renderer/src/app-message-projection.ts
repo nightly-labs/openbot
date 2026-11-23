@@ -51,7 +51,6 @@ function feedbackSentTitle(text: string): string {
   return "";
 }
 
-/** The text that a message shows: an agent reply without its markers, a user message as it was written. */
 function conversationMessageBody(message: ConversationMessage): string {
   return message.author === "user" ? message.text : cleanAgentMessageText(message.text);
 }

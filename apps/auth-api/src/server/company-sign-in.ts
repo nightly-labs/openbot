@@ -203,7 +203,6 @@ export class CompanySignInService {
   readonly #database: D1Database;
   readonly #secret: string | null;
   readonly #development: boolean;
-  /** `BROWSER_EXTENSION_IDS`: the published extensions that may get a sign-in from the web app. */
   readonly #browserExtensionIds: ReadonlySet<string>;
   readonly #fetch: Fetch;
   readonly #now: () => number;
@@ -736,14 +735,6 @@ export class CompanySignInService {
     return { code: yield* this.#issueCode(userId, flow.client_challenge) };
   });
 
-  /**
-   * A one-time code that gives the OpenBot browser extension a session of the web app's account. The
-   * web app asks for it when the person allows the extension, and sends it to the extension's own
-   * `https://<id>.chromiumapp.org/` address. The extension spends it with the verifier of
-   * `clientChallenge` at `/v1/browser-extension/exchange`, which is `exchange` with a device, as on the
-   * phone after a company sign-in. Only a listed extension gets a code; a development API takes any
-   * extension id, because an unpacked extension gets an id from its folder.
-   */
   readonly issueBrowserExtensionCode = Effect.fn("CompanySignIn.issueBrowserExtensionCode")(function* (
     this: CompanySignInService,
     userId: string,
@@ -767,7 +758,6 @@ export class CompanySignInService {
     return { code: yield* this.#issueCode(userId, input.clientChallenge) };
   });
 
-  /** Stores the hash of a new one-time code for `exchange`, which the verifier of `clientChallenge` spends. */
   readonly #issueCode = Effect.fn("CompanySignIn.issueCode")(function* (
     this: CompanySignInService,
     userId: string,

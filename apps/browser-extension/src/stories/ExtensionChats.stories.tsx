@@ -35,24 +35,20 @@ function AgentChat(props: { options?: StoryServerOptions; agentId?: string }) {
   );
 }
 
-/** Markdown, a table, and the files of an answer: a picture, a document, a sheet, audio and an archive. */
 export const Conversation: Story = {
   render: () => <AgentChat options={{ chats: { chief: STORY_CHIEF_MESSAGES } }} />,
 };
 
-/** The agent works on an answer: its face in the working mood and the line of what it does, as on the desktop. */
 export const Answering: Story = {
   render: () => <AgentChat options={{ chats: { chief: STORY_CHIEF_MESSAGES.slice(0, 1) }, answering: "chief" }} />,
 };
 
 export const EmptyChat: Story = { render: () => <AgentChat /> };
 
-/** The server transcribes: the microphone shows beside Send. */
 export const WithDictation: Story = {
   render: () => <AgentChat options={{ chats: { chief: STORY_CHIEF_MESSAGES.slice(0, 2) }, dictation: true }} />,
 };
 
-/** A failed read or send: the error card over the composer, as on the desktop. */
 export const ErrorOverComposer: Story = { render: () => <AgentChat options={{ failChat: true }} /> };
 
 function ChannelChat(props: { options?: StoryServerOptions }) {
@@ -66,10 +62,8 @@ function ChannelChat(props: { options?: StoryServerOptions }) {
   );
 }
 
-/** Your messages on the right; each run of an agent's messages has its face and name. */
 export const Channel: Story = { render: () => <ChannelChat /> };
 
-/** Builder and Research work now: their faces in the working mood, and their names. */
 export const ChannelWorking: Story = {
   render: () => (
     <ChannelChat
@@ -86,10 +80,6 @@ const LONG_AGENTS = [
   agent({ id: "long-two", name: "International Compliance Reviewer", avatarHue: 55 }),
 ];
 
-/**
- * Worst case: a long channel name, long agent names, a long link, a word with no break, a wide table,
- * code, and three workers with long names. Every line wraps or ends in "…" inside the panel.
- */
 export const ChannelLongContent: Story = {
   render: () => (
     <ChannelChat

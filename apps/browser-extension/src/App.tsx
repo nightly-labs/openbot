@@ -39,7 +39,6 @@ import {
   type XStatusAnswer,
 } from "./x-messages";
 
-/** How long a sign-in code request keeps its idempotency key, as on the web. */
 const EMAIL_START_KEY_LIFE_MS = 10 * 60_000;
 
 export function App() {
@@ -152,7 +151,6 @@ export function App() {
   );
 }
 
-/** What the layer over the home shows. A new value makes a new screen, so a form opens empty. */
 type PushedScreen =
   | { kind: "chat" | "channel" | "new-agent" | "new-channel" | "new-folder" | "browser-sharing" }
   | { kind: "agent-settings"; agentId: string };
@@ -162,11 +160,9 @@ interface ServerState {
   hostId: string | null;
   status: "listing" | "connecting" | "ready" | "failed" | "empty";
   message: string | null;
-  /** The peer lost the server after it connected; it reconnects by itself. */
   offline: boolean;
 }
 
-/** One signed-in account: its servers, the connection to the chosen one, and the phone screens. */
 function ServerView(props: { session: ExtensionSession; onSignOut: () => void; onSessionEnded: () => void }) {
   const { t } = useText();
   const [view, setView] = createStore<ServerState>({
@@ -182,7 +178,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
   let connection: HostConnection | null = null;
   let capabilities: readonly string[] = [];
   let attempt = 0;
-  /** The tabs that the user shares, on this panel's connection (`client-browser-v1`). */
   let browserLink: ClientBrowserLink | null = null;
   const [presence, setPresence] = createSignal<ClientBrowserPresence>({ sharing: false, tabs: [] });
   const [canShare, setCanShare] = createSignal(false);
@@ -222,7 +217,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       });
       await next.load();
       if (current !== attempt) return;
-      // The server answers now: the posts from X that wait for it go out.
       void chrome.runtime.sendMessage({ kind: OUTBOX_FLUSH_MESSAGE }).catch(() => undefined);
       await openChatFromX();
     } catch (error) {
@@ -249,7 +243,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
           });
           if (update.state !== "online") return;
           void workspace()?.reloadChat();
-          // The server forgets a presence with its connection; the reconnection sends it again.
           browserLink?.refresh();
         },
         sessionEnded: props.onSessionEnded,
@@ -270,14 +263,12 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     }
   }
 
-  /** A post sent from X started a thread: the panel shows it, on the server that has it. */
   async function openChatFromX() {
     const chat = await takeChatToOpen();
     if (!chat) return;
     if (chat.hostId === view.hostId && workspace()) openAgent(chat.agentId, chat.taskId);
   }
 
-  /** The panel's connection, for a post from X while the panel is open. */
   function xTarget(): XTarget | null {
     if (view.status !== "ready" || !connection || !view.hostId) return null;
     return { hostId: view.hostId, request: connection.request, capabilities };
@@ -285,9 +276,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
 
   onSettled(() => {
     void start();
-    // The panel's connection takes the session of this sign-in; the offscreen page's closes, and the
-    // worker passes the posts from X to the panel while it is open.
-    // A new worker drops the port; the panel holds a new one.
     let closed = false;
     let port: chrome.runtime.Port | null = null;
     const holdPort = () => {
@@ -322,7 +310,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       return true;
     };
     chrome.runtime.onMessage.addListener(fromX);
-    // The panel can be open already when the post arrives.
     const changed = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       if (changes[OPEN_CHAT_KEY]?.newValue !== undefined && view.status === "ready") void openChatFromX();
     };
@@ -341,7 +328,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     };
   });
 
-  /** The shared tabs for the home's line: null while the user does not share. */
   const sharing = () => (presence().sharing ? { tabs: presence().tabs.length, supported: canShare() } : null);
 
   function push(kind: Exclude<PushedScreen["kind"], "agent-settings">) {
@@ -359,7 +345,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
   function startThread(agentId: string, text: string) {
     const current = workspace();
     if (!current) return;
-    // A host without threads gets the message in the agent's main chat.
     if (current.threadsAvailable()) current.newThread(agentId);
     else current.openChat(agentId, null);
     push("chat");
@@ -468,7 +453,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
           </p>
         </Match>
       </Switch>
-      {/* The approval cards of shared tabs, over every screen. */}
       <BrowserAsks />
     </>
   );

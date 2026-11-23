@@ -1,14 +1,3 @@
-// `bun run dev:extension`: a Chrome window with the browser extension (`apps/browser-extension`) for this
-// worktree's `bun run dev` stack. It builds the extension for the stack's Auth API, starts Chrome for
-// Testing with the extension in its own profile, signs the side panel in to the dev host's account, and
-// leaves Chrome open. The profile stays in `.openbot-build/dev-extension-chrome`, so the next start is
-// already signed in. Run it again after an extension change: it rebuilds the extension and reloads it in
-// the open Chrome.
-//
-// `--fresh` starts with an empty profile. `--email=<address>` signs in another account (default: the
-// dev host's). `--browser=<path>` names the browser; branded Google Chrome does not load an unpacked
-// extension from the command line, so the default is Playwright's Chromium (`bunx playwright install
-// chromium`).
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -26,13 +15,11 @@ const WAIT_MS = 60_000;
 const english = translateFor("en");
 const email = argument("email") ?? "openbot-dev-host@example.com";
 
-// 1. The Auth API of this worktree's stack.
 const stack = readDevStackRecords().find((record) => resolve(record.projectRoot) === ROOT);
 const apiPort = stack?.ports.find((port) => port.name === "api")?.port;
 assert.ok(apiPort, "Start this worktree's dev stack first: bun run dev");
 const authApi = `http://localhost:${apiPort}`;
 
-// 2. A development build: it may reach `localhost`, and it talks to the stack's Auth API.
 const build = spawnSync("bun", ["run", "build", "--", "--mode", "development"], {
   cwd: EXTENSION,
   env: { ...process.env, VITE_OPENBOT_API_URL: authApi },
@@ -41,7 +28,6 @@ const build = spawnSync("bun", ["run", "build", "--", "--mode", "development"], 
 assert.equal(build.status, 0, "The extension build failed.");
 const dist = resolve(EXTENSION, "dist");
 
-/** Playwright's Chromium: the installed revision, else the newest one in its cache. */
 function browserPath(): string {
   const named = argument("browser");
   if (named) return named;
@@ -73,8 +59,6 @@ function browserPath(): string {
   throw new Error("No Chromium found. Run `bunx playwright install chromium`, or pass --browser=<path>.");
 }
 
-// 3. Chrome, started as a person starts it, so the extension sees downloads as it does in use. A Chrome
-// that this profile has open already is reused.
 const portFile = resolve(PROFILE, "DevToolsActivePort");
 async function openChrome(): Promise<string | null> {
   if (!existsSync(portFile)) return null;
@@ -97,7 +81,6 @@ else {
   if (!existsSync(preferences))
     writeFileSync(
       preferences,
-      // Developer mode: without it, Chrome turns an unpacked extension off when it reloads.
       JSON.stringify({
         download: { default_directory: downloadsDirectory, prompt_for_download: false },
         extensions: { ui: { developer_mode: true } },
@@ -108,11 +91,9 @@ else {
     browserPath(),
     [
       `--user-data-dir=${PROFILE}`,
-      // A free port, which Chrome writes to `DevToolsActivePort`. The dev app owns 9333 and up.
       "--remote-debugging-port=0",
       "--no-first-run",
       "--no-default-browser-check",
-      // Chrome 137 and later ignore `--load-extension` without this.
       "--disable-features=DisableLoadExtensionCommandLineSwitch",
       `--disable-extensions-except=${dist}`,
       `--load-extension=${dist}`,
@@ -130,10 +111,7 @@ else {
 }
 const downloads = resolve(PROFILE, "downloads");
 assert.ok(endpoint, "Chrome did not start.");
-// On macOS a Chrome whose last window closed keeps running, and with no window Playwright cannot
-// connect. A new window comes first.
 if (reused) {
-  // Each target in the list has an "id".
   const targets = await (await fetch(`${endpoint}/json/list`)).text();
   if (!targets.includes('"id"')) await fetch(`${endpoint}/json/new?about:blank`, { method: "PUT" });
 }
@@ -141,7 +119,6 @@ const browser = await chromium.connectOverCDP(endpoint);
 try {
   const context = browser.contexts()[0];
   assert.ok(context, "Chrome has no window.");
-  // A component extension of Chrome also has a `background.js`; this extension's comes from `dist`.
   const ours = (worker: { url(): string }) =>
     worker.url().endsWith("/background.js") &&
     !worker.url().startsWith("chrome-extension://admccjkmockfdflocgggjfgdacdodkdf/");
@@ -150,12 +127,6 @@ try {
     (await context.waitForEvent("serviceworker", { predicate: ours, timeout: WAIT_MS }));
   const extensionId = new URL(worker.url()).host;
   {
-    // Chrome loads the new build from `dist`, as the Reload button of chrome://extensions does. A new
-    // start needs it too: a profile keeps the service worker of the build that it ran last, and Chrome
-    // starts that one again while the manifest version is the same. Chrome turns an unpacked extension
-    // off when it reloads outside developer mode, so the page turns developer mode and the extension on
-    // first. The wait starts first: the new worker starts at once.
-    // The reload closes the extension's pages; a window with only the panel page would close with them.
     await context.newPage();
     const restarted = context.waitForEvent("serviceworker", {
       predicate: (next) => ours(next) && next !== worker,
@@ -172,7 +143,6 @@ try {
     await restarted;
   }
 
-  // 4. The side panel page in a tab, signed in to the stack, unless the profile is signed in already.
   const panel =
     context.pages().find((page) => page.url() === "about:blank" || page.url().endsWith("/sidepanel.html")) ??
     (await context.newPage());
@@ -184,7 +154,6 @@ try {
     const web = await context.newPage();
     await web.goto(`${authApi}/app`);
     const emailField = web.getByRole("textbox", { name: english("account.login.email") });
-    // The web app of this profile may be signed in already.
     if (
       await emailField.waitFor({ timeout: 15_000 }).then(
         () => true,
@@ -201,7 +170,6 @@ try {
       await web.waitForFunction(() => !document.querySelector(".account-login-screen"), null, { timeout: WAIT_MS });
     }
     await web.close();
-    // "Sign in with openbot.run" opens the web app's window, which asks to allow the extension once.
     const opened = context.waitForEvent("page", {
       predicate: (page) => page.url().includes("extension=") && !page.url().includes("silent=1"),
       timeout: WAIT_MS,
@@ -213,7 +181,6 @@ try {
     }
     await serverMenu.waitFor({ timeout: WAIT_MS });
   }
-  // Playwright took the downloads over when it connected; Chrome gets them back.
   await (await browser.newBrowserCDPSession()).send("Browser.setDownloadBehavior", { behavior: "default" });
   process.stdout.write(
     [
@@ -225,6 +192,5 @@ try {
     ].join("\n") + "\n",
   );
 } finally {
-  // Only the connection ends; Chrome stays open.
   await browser.close();
 }

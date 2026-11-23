@@ -609,15 +609,10 @@ export type TeamApiLiveVoice = Pick<AgentService, "startLiveVoice" | "stopLiveVo
   subscribe(listener: (event: VoiceLiveEvent, memberId: string | null) => void): () => void;
 };
 
-/**
- * `voice-transcription-v1`: dictation for a member, with the speech recognition of this host. Fails
- * with a fixed sentence when the host has no recognizer ready.
- */
 export interface TeamApiVoiceTranscription {
   transcribe(audio: Uint8Array): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError>;
 }
 
-/** `client-browser-v1`: the Chrome tabs that members share with the agents of this host. */
 export type TeamApiClientBrowser = Pick<ClientBrowserHub, "setPresence" | "resolve" | "sessionEnded" | "subscribe">;
 
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;

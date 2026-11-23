@@ -7,8 +7,6 @@
 @import "@openbot/ui/features/account/otp-input.css";
 @import "@openbot/ui/features/account/auth.css";
 @import "@openbot/ui/styles/sr-only.css";
-/* What an answer draws, in the desktop app's order: tabs, menus and scroll edges of code blocks and
-   tables, reference chips, charts, then the conversation's markdown, code and previews. */
 @import "@openbot/ui/styles/sliding-tabs.css";
 @import "@openbot/ui/styles/action-menu.css";
 @import "@openbot/ui/styles/scroll-edges.css";
@@ -25,11 +23,6 @@
 
 @source "../../../packages/ui/src";
 
-/*
- * The side panel uses the phone app's canvas and controls (apps/mobile) with the desktop app's bars, menus and fields.
- * tokens-native.css cannot be imported here (it is uniwind syntax), so its light values that
- * tokens-light.css does not have are written below.
- */
 :root {
   color-scheme: dark;
   --ext-canvas: var(--openbot-bg-native-canvas);
@@ -37,7 +30,6 @@
   --ext-control-active: var(--openbot-bg-control-active);
   --ext-bubble-agent: color-mix(in srgb, var(--ext-control) 60%, var(--ext-canvas));
   --ext-ease-push: cubic-bezier(0.32, 0.72, 0, 1);
-  /* The phone app's menu curve, `Easing.out(Easing.ease)`. */
   --ext-menu-ease: cubic-bezier(0, 0, 0.58, 1);
   font-family: var(--openbot-font-sans);
 }
@@ -69,8 +61,6 @@ textarea {
   font: inherit;
 }
 
-/* The panel's own controls take the text colour of their place. A shared button (`.ui-button`) keeps
-   the colour of its variant: this rule is stronger than the `:where()` colours of the primitives. */
 button:not(.ui-button),
 input,
 textarea {
@@ -122,7 +112,6 @@ textarea:focus-visible {
   font-size: 14px;
 }
 
-/* Avatars: the generated bloub paints past its box, as in the desktop app. */
 .agent-avatar {
   display: grid;
   flex: 0 0 auto;
@@ -135,13 +124,10 @@ textarea:focus-visible {
   width: 128%;
   height: 128%;
   overflow: visible;
-  /* The felt art sits low in its drawing; a row moves it up to the row's centre, as the desktop does. */
   translate: 0 var(--agent-avatar-optical-offset, 0);
   pointer-events: none;
 }
 
-/* The desktop app's action menu (`.ui-action-menu`): a solid sheet with a hairline ring, 6px padding,
-   32px rows with 10px corners, 1px separators that run to the edges, 16px icons. */
 .ext-menu {
   position: absolute;
   z-index: 6;
@@ -156,9 +142,6 @@ textarea:focus-visible {
     inset 0 1px 0 color-mix(in srgb, var(--openbot-text-primary) 5%, transparent),
     0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 11%, transparent),
     0 12px 32px var(--openbot-shadow-menu);
-  /* The phone app's menu (heroui-native `Menu`, placement bottom, offset 9): it comes down 9px from
-     its trigger while it scales from 0.97 and fades in, in 200ms, and goes back up as it fades out,
-     in 150ms. */
   transform-origin: top;
   animation: ext-menu-in 200ms var(--ext-menu-ease) both;
 }
@@ -196,7 +179,6 @@ textarea:focus-visible {
   cursor: pointer;
   font-size: var(--openbot-text-lg);
   text-align: start;
-  /* The phone app's press: the item scales to 0.98 in 200ms and its fill changes in 150ms. */
   transition:
     transform 200ms var(--ext-menu-ease),
     background-color 150ms var(--ext-menu-ease);
@@ -236,7 +218,6 @@ textarea:focus-visible {
   color: var(--openbot-text-muted);
 }
 
-/* A chevron that opens a menu turns over while the menu is open, as the phone app's drawer chevron does. */
 .ext-menu-chevron {
   transition: transform 240ms var(--ext-menu-ease);
 }
@@ -245,7 +226,6 @@ textarea:focus-visible {
   transform: rotate(180deg);
 }
 
-/* The two screens: the chat slides in from the right over the home, as a phone push does. */
 .ext-stack {
   position: relative;
   height: 100%;
@@ -274,7 +254,6 @@ textarea:focus-visible {
   transform: translateX(-28%);
 }
 
-/* ---------- Home ---------- */
 .ph-home {
   position: relative;
   display: flex;
@@ -290,8 +269,6 @@ textarea:focus-visible {
   scrollbar-width: none;
 }
 
-/* The top bar of the desktop app's sidebar (`.sidebar-topbar` in the renderer): 38px, the server's
-   20px mark, the name at 14px semibold, a 14px chevron, a line under it. */
 .ph-bar {
   position: relative;
   z-index: 5;
@@ -402,7 +379,6 @@ textarea:focus-visible {
   place-items: center;
 }
 
-/* The unread count: the felt plum pill with cream digits, cut out of the canvas. */
 .ph-unread {
   position: absolute;
   inset-inline-end: -4px;
@@ -433,8 +409,6 @@ textarea:focus-visible {
   color: var(--openbot-text-muted);
 }
 
-/* A chat row at the panel's scale: 52px, a 36px avatar, the name at 14px and the preview at 13px.
-   The row is inset 8px from the panel's edges, and its hover fill has the desktop row's corners. */
 .ph-row {
   --ph-row-avatar: 36px;
   display: flex;
@@ -457,7 +431,6 @@ textarea:focus-visible {
   background: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
 }
 
-/* Measured: the felt art's centre sits 16% of the box below the box's centre at this size. */
 .ph-row .ph-avatar > .agent-avatar {
   --agent-avatar-optical-offset: calc(var(--ph-row-avatar) * -0.16);
   width: var(--ph-row-avatar);
@@ -528,8 +501,6 @@ textarea:focus-visible {
   color: var(--openbot-text-muted);
 }
 
-/* The search field of the home: the chat's composer field (`.ext-field`) with a search icon. The
-   compound selector outranks `.ext-field`, which comes later in this file. */
 .ext-field.ph-search {
   flex-direction: row;
   align-items: center;
@@ -558,7 +529,6 @@ textarea:focus-visible {
   color: var(--openbot-text-muted);
 }
 
-/* ---------- Chat ---------- */
 .ch-chat {
   position: relative;
   display: flex;
@@ -567,7 +537,6 @@ textarea:focus-visible {
   background: var(--ext-canvas);
 }
 
-/* The chat's top bar: the home bar (`.ph-bar`) with a back button and the agent in place of the server. */
 .ch-topbar {
   position: relative;
   z-index: 5;
@@ -630,14 +599,12 @@ textarea:focus-visible {
   cursor: default;
 }
 
-/* The row avatars' measured offset (`.ph-row .ph-avatar > .agent-avatar`), at the bar's 20px. */
 .ch-title-mark.agent-avatar {
   --agent-avatar-optical-offset: calc(var(--openbot-icon-lg) * -0.16);
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
 }
 
-/* A long name ends in "…" in the bar. The line under it gives up its width first. */
 .ch-title-name {
   min-width: 0;
   flex: 0 1 auto;
@@ -694,7 +661,6 @@ textarea:focus-visible {
   animation: ch-up-in 240ms var(--openbot-ease-out) backwards;
 }
 
-/* The files of a message, above it on the side of who sent them. */
 .ch-files {
   max-width: 88%;
   align-self: flex-start;
@@ -704,7 +670,6 @@ textarea:focus-visible {
   align-self: flex-end;
 }
 
-/* An answer with a table, code, a picture or a formula takes the whole width; its blocks scroll inside. */
 .ch-agent:has(table, pre, img, .katex-display) {
   width: 100%;
   max-width: 100%;
@@ -751,9 +716,6 @@ textarea:focus-visible {
   color: var(--openbot-text-muted);
 }
 
-/* The composer: the desktop chat composer (`.composer[data-compact]`). A 48px bordered pill on the
-   surface, the text at 15px, a 28px send button that fills with the text colour when there is text. */
-/* The bottom of the home and of the chat: one bar and one field, so both are in the same place. */
 .ext-bottom-bar {
   display: flex;
   flex: none;
@@ -774,13 +736,10 @@ textarea:focus-visible {
   transition: border-color 150ms var(--ext-menu-ease);
 }
 
-/* The input has the focus most of the time, so the focus line is quiet and has no ring. */
 .ext-field:focus-within {
   border-color: var(--openbot-text-dim);
 }
 
-/* The chat's bar holds the error cards over the composer. The cards tuck under the field, so the
-   field is on top of them, as the desktop composer is on top of its stack. */
 .ch-bottom {
   flex-direction: column;
 }
@@ -813,7 +772,6 @@ textarea:focus-visible {
 
 .ch-field textarea:focus-visible,
 .ph-search input:focus-visible {
-  /* The field around the input shows the focus. */
   outline: none;
 }
 
@@ -852,9 +810,6 @@ textarea:focus-visible {
   cursor: default;
 }
 
-/* Dictation, as the phone app draws it (`composer-dictation.tsx`): the mic beside Send turns into a red
-   Stop square, and the strip of the breathing recording dot, the time and the wave of the user's speech
-   takes the place of the draft. The phone's controls are 40px; the panel keeps its 28px controls. */
 .ch-mic {
   position: relative;
   display: grid;
@@ -880,7 +835,6 @@ textarea:focus-visible {
   opacity: 0.45;
 }
 
-/* The mic shrinks away as Stop grows in, at the same time, as the phone's presence value moves both. */
 .ch-mic-glyph,
 .ch-mic-stop {
   grid-area: 1 / 1;
@@ -924,7 +878,6 @@ textarea:focus-visible {
   padding-inline-start: 4px;
 }
 
-/* The red dot of a recording breathes while the user speaks. */
 .ch-strip-dot {
   width: 8px;
   height: 8px;
@@ -940,7 +893,6 @@ textarea:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-/* The wave reads left to right in every language, as a media timeline does. */
 .ch-wave {
   min-width: 0;
   height: 22px;
@@ -963,7 +915,6 @@ textarea:focus-visible {
   align-items: center;
 }
 
-/* The height, not a scale: a scale squashes the round ends. The bar takes the agent's colour. */
 .ch-wave-bar {
   width: 3px;
   border-radius: 1.5px;
@@ -1015,7 +966,6 @@ textarea:focus-visible {
   }
 }
 
-/* The "+" of the home bar: the new agent, channel and folder of the desktop sidebar's menu. */
 .ph-create {
   display: grid;
   width: var(--openbot-control-sm);
@@ -1046,8 +996,6 @@ textarea:focus-visible {
   inset-inline-end: 8px;
 }
 
-/* A folder of the server's sidebar: a header that closes it, then its chats. A folder in a folder
-   moves in 12px for each level. */
 .ph-folder .ph-section {
   padding-inline-start: calc(12px + var(--ph-folder-depth, 0) * 12px);
 }
@@ -1092,17 +1040,14 @@ textarea:focus-visible {
   color: var(--openbot-text-muted);
 }
 
-/* A channel's faces fill the row's avatar square. */
 .ph-avatar .channel-avatar {
   --agent-row-avatar-size: var(--ph-row-avatar);
 }
 
-/* A pinned channel's faces at the size of a pinned agent, as the desktop's pinned rail draws them. */
 .ph-pin-channel .channel-avatar {
   --agent-row-avatar-size: 58px;
 }
 
-/* The channel in the chat's top bar, at the bar's 20px. */
 .ch-channel-title {
   cursor: default;
 }
@@ -1112,7 +1057,6 @@ textarea:focus-visible {
   flex: none;
 }
 
-/* The author over a run of messages in a channel: the agent's face and name. */
 .ch-author {
   display: flex;
   align-items: center;
@@ -1137,7 +1081,6 @@ textarea:focus-visible {
   height: 18px;
 }
 
-/* A form in the panel: the chat's top bar, the fields, and the button at the bottom. */
 .ext-form-screen {
   display: flex;
   height: 100%;
@@ -1173,7 +1116,6 @@ textarea:focus-visible {
 
 .ext-form-members {
   display: flex;
-  /* A fieldset is as wide as its content by default; at 0 a long description ends in "…". */
   min-width: 0;
   flex-direction: column;
   gap: 2px;
@@ -1222,13 +1164,10 @@ textarea:focus-visible {
   flex: none;
 }
 
-/* The desktop's new-agent form fills the panel in place of the window. */
 .ext-new-agent {
   overflow-y: auto;
 }
 
-/* The desktop's agent settings panel fills the side panel: no resize handle, and no window edge to
-   sit against. */
 .ext-settings-screen {
   position: relative;
   height: 100%;
@@ -1251,15 +1190,11 @@ textarea:focus-visible {
   margin-inline-start: auto;
 }
 
-/* The agents at work in a channel show only their working faces in the panel. The status for screen
-   readers still names them and says what they do. */
 .ch-list .channel-activity-names,
 .ch-list .channel-activity-content .agent-activity-label {
   display: none;
 }
 
-/* The posts from X that wait for the server: a card in the warning tone at the top of the list. Its
-   summary opens to each post; a long queue scrolls inside the card, so the chats stay in view. */
 .ph-outbox {
   --ph-outbox-tone: var(--openbot-warning);
 
@@ -1276,7 +1211,6 @@ textarea:focus-visible {
   animation: ph-outbox-in 220ms var(--openbot-ease-out) both;
 }
 
-/* Every post arrived: the card turns to the success tone for the moment before it leaves. */
 .ph-outbox[data-done] {
   --ph-outbox-tone: var(--openbot-success);
 }
@@ -1335,7 +1269,6 @@ textarea:focus-visible {
   transform: rotate(180deg);
 }
 
-/* The posts open from 0 to their height, so the card grows with no jump. */
 .ph-outbox-body {
   display: grid;
   grid-template-rows: 0fr;
@@ -1440,7 +1373,6 @@ textarea:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-/* The one action, in the card's tone, as the desktop's notices tint theirs. */
 .ph-outbox-send {
   display: flex;
   height: 32px;
@@ -1499,7 +1431,6 @@ textarea:focus-visible {
   }
 }
 
-/* Shared tabs: the line on the home while the user shares, the settings screen, and the approval cards. */
 .ph-sharing {
   display: flex;
   min-width: 0;
@@ -1603,7 +1534,6 @@ textarea:focus-visible {
   background: color-mix(in srgb, var(--openbot-danger) 12%, transparent);
 }
 
-/* The cards sit over every screen, at the bottom, where the panel's own bars are. */
 .ext-asks {
   position: absolute;
   inset-inline: 8px;
@@ -1675,8 +1605,6 @@ textarea:focus-visible {
   color: var(--openbot-warning);
 }
 
-/* The three answers share one row at the panel's default width. A language with longer words wraps
-   them. */
 .ext-ask-buttons {
   display: flex;
   flex-wrap: wrap;

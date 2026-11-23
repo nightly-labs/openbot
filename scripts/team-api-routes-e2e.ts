@@ -2412,10 +2412,6 @@ const machineMetrics = {
   checkedAt: "2026-10-27T12:00:00.000Z",
 };
 const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-alerts.json"));
-// Codex live voice as the agent service runs it for a member: each start records its owner and
-// answers the offer, and the test sends the transcript and the end as the service does.
-// Dictation as the host runs it for a member: an empty recording stands for a model that is not on the
-// host yet, and any other recording is heard as its length.
 const voiceTranscription: TeamApiVoiceTranscription = {
   transcribe: (audio) => {
     record("transcribe", audio.byteLength);
@@ -2425,7 +2421,6 @@ const voiceTranscription: TeamApiVoiceTranscription = {
   },
 };
 
-// The real hub of shared Chrome tabs, with a short command wait so that the timeout check is quick.
 const clientBrowser = new ClientBrowserHub({ commandMs: 1_500, presenceMs: 60_000 });
 
 const liveVoiceListeners = new Set<(event: VoiceLiveEvent, memberId: string | null) => void>();
@@ -3083,8 +3078,6 @@ try {
     liveVoice,
     voiceTranscription,
     clientBrowser,
-    // The disk of the host answers here, and the host scan and a file delete for the Library folders
-    // check; clearing a cache is not part of this run.
     storage: {
       usage: (input) =>
         Effect.sync(() => {
@@ -14834,7 +14827,6 @@ try {
     );
   }
 
-  // ---- Dictation for a member (voice-transcription-v1) ----
   {
     const route = VOICE_TRANSCRIPTION_ROUTES.transcribe;
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
@@ -14848,7 +14840,6 @@ try {
         !list(field(older.body, "capabilities")).includes(VOICE_TRANSCRIPTION_CAPABILITY),
       [summary(compatibility), summary(older)],
     );
-    /** A WAV file of 16 kHz mono 16-bit PCM silence, as the clients send it. */
     const wav = (samples: number) => {
       const bytes = new Uint8Array(44 + samples * 2);
       const view = new DataView(bytes.buffer);
@@ -14895,7 +14886,6 @@ try {
     );
   }
 
-  // ---- A member's shared Chrome tabs (client-browser-v1) ----
   {
     const v10 = { protocol: TEAM_PROTOCOL_V10, capabilities: [CLIENT_BROWSER_CAPABILITY] };
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
@@ -14933,8 +14923,6 @@ try {
       [summary(unsupported), summary(tooMany), summary(badTab)],
     );
 
-    // Each socket also declares chat-colors-v1: the host answers that declaration with the colour list,
-    // so the list shows that the host has read the capabilities of the socket.
     const openChromeSocket = async (token: string, capabilities: string[]) => {
       const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
         TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -14980,7 +14968,6 @@ try {
       return { socket, events, ready, until };
     };
     const bobSocket = await openChromeSocket(bobToken, [CLIENT_BROWSER_CAPABILITY]);
-    // A second connection of the same session that does not read the capability gets no command.
     const bobOld = await openChromeSocket(bobToken, []);
     const adaSocket = await openChromeSocket(adaToken, [CLIENT_BROWSER_CAPABILITY]);
     const shared = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
@@ -15125,7 +15112,6 @@ try {
     });
   }
 
-  // ---- Server restart (host-restart-v1) ----
   {
     const capabilities = [HOST_RESTART_CAPABILITY];
     const restarts = () => callsOf("restartHost").length;

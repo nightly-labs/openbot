@@ -7,10 +7,8 @@ import { createMemo, createStore, For, Show } from "solid-js";
 import { avatarAgent } from "./agent-look";
 import type { Workspace } from "./workspace";
 
-/** The folder name limit of the desktop sidebar and the phone app. */
 const FOLDER_NAME_MAX = 40;
 
-/** The frame of a form in the panel: the top bar with back and the title, the fields, and one button. */
 function FormScreen(props: {
   title: string;
   submitLabel: string;
@@ -55,7 +53,6 @@ function FormScreen(props: {
   );
 }
 
-/** A channel needs a name and its agents; the lead is the first agent, as in the desktop dialog. */
 export function NewChannelScreen(props: {
   workspace: Workspace;
   onClose: () => void;
@@ -176,7 +173,6 @@ export function NewChannelScreen(props: {
   );
 }
 
-/** A folder for the sidebar of every client of this server. Its name is unique and at most 40 characters. */
 export function NewFolderScreen(props: { workspace: Workspace; onClose: () => void; onCreated: () => void }) {
   const { t, errorMessage } = useText();
   const [form, setForm] = createStore<{ name: string; busy: boolean; error: string | null }>({

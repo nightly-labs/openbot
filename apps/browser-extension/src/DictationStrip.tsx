@@ -1,25 +1,13 @@
 import { Mic, Square } from "@openbot/ui";
 import { createSignal, For, onSettled } from "solid-js";
 
-// The phone app's dictation (`apps/mobile/src/features/chat/components/composer-dictation.tsx`), drawn
-// for the panel: the microphone that turns into Stop, and the strip of the recording dot, the time
-// and the wave of the user's speech.
-
-/** One bar of the wave, the space after it, and the box it moves in. */
 const WAVE_BAR = 3;
 const WAVE_PITCH = 5;
 const WAVE_HEIGHT = 22;
-/** The wave takes one sample of the voice each this many milliseconds, and moves one bar left. */
 const WAVE_SAMPLE_MS = 70;
-/** The samples kept: more than the widest strip has bars. */
 const WAVE_SAMPLES = 120;
-/** The first bars on the left fade in over this many bars, so the oldest speech leaves softly. */
 const WAVE_FADE_BARS = 6;
 
-/**
- * The mic beside Send. A tap starts dictation; while it records, the mic turns into Stop, and a tap
- * stops it and keeps the words.
- */
 export function DictationMic(props: { active: boolean; disabled: boolean; label: string; onPress: () => void }) {
   return (
     <button
@@ -37,10 +25,6 @@ export function DictationMic(props: { active: boolean; disabled: boolean; label:
   );
 }
 
-/**
- * A wave of the user's speech: each bar is the loudest moment of a short slice of time, the newest
- * comes in at the right, and the wave glides left as the user speaks.
- */
 function DictationWave(props: { level: () => number }) {
   let box: HTMLDivElement | undefined;
   let row: HTMLDivElement | undefined;
@@ -73,7 +57,6 @@ function DictationWave(props: { level: () => number }) {
       resize.disconnect();
     };
   });
-  // One bar more than fits: it comes in from under the right edge while the wave glides.
   const bars = () => Math.min(WAVE_SAMPLES, count() + 1);
   const slots = () => Array.from({ length: bars() }, (_, index) => index);
   return (
@@ -96,7 +79,6 @@ function DictationWave(props: { level: () => number }) {
   );
 }
 
-/** The row in place of the draft while the user speaks: the recording dot, the time, and the wave. */
 export function DictationStrip(props: { level: () => number; seconds: number }) {
   return (
     <div class="ch-strip" role="status">

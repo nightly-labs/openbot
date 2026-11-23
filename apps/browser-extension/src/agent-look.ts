@@ -2,18 +2,15 @@ import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import type { AvatarColor, ClientAgentSummary } from "@openbot/contracts/ipc";
 import type { AppFormat } from "@openbot/i18n";
 
-/** The agent with its exact colour (`agent-colors-v1`), as `AgentAvatar` reads it. A photo is not loaded. */
 export function avatarAgent(agent: ClientAgentSummary, color: AvatarColor | undefined) {
   return { avatarSeed: agent.avatarSeed, avatarHue: agent.avatarHue, avatarColor: color ?? null, avatarUrl: null };
 }
 
-/** The fill of the person's bubbles in a chat: the agent's head colour, as the phone app draws it. */
 export function bubbleColors(agent: ClientAgentSummary, color: AvatarColor | undefined) {
   const fill = avatarHeadColor(agent.avatarSeed, agent.avatarHue, color ?? null);
   return { "--ext-agent": fill, "--ext-on-agent": readableOn(fill) };
 }
 
-/** Black or white text, whichever has the higher contrast on `hex` (WCAG relative luminance). */
 function readableOn(hex: string) {
   const parts = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   if (!parts) return "#ffffff";
@@ -25,7 +22,6 @@ function readableOn(hex: string) {
   return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.0569 ? "#ffffff" : "#141414";
 }
 
-/** The time of a row: the hour today, the date before. */
 export function rowTime(value: string | null, format: AppFormat): string {
   if (!value) return "";
   const date = new Date(value);
@@ -36,12 +32,10 @@ export function rowTime(value: string | null, format: AppFormat): string {
     : format.date(date, { month: "short", day: "numeric" });
 }
 
-/** Newest first; an agent with no message yet goes last. */
 export function byRecent(left: ClientAgentSummary, right: ClientAgentSummary): number {
   return (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "");
 }
 
-/** The agents as a mention chip and a channel's faces read them. */
 export function composerAgents(agents: readonly ClientAgentSummary[], colors: Record<string, AvatarColor>) {
   return agents.map((entry) => ({
     id: entry.id,

@@ -24,26 +24,18 @@ interface HomeScreenProps {
   onStartThread: (agentId: string, text: string) => void;
   onSelectHost: (hostId: string) => void;
   onSignOut: () => void;
-  /** The tabs that the user shares with agents, or null while the user does not share. */
   sharing: { tabs: number; supported: boolean } | null;
-  /** The server can use shared tabs (`client-browser-v1`), so the server menu offers to share. */
   canShare: boolean;
   onShareTabs: () => void;
   onManageSharing: () => void;
 }
 
-/** A row of the list: an agent's chat or a channel. */
 type ChatItem = { kind: "agent"; agent: ClientAgentSummary } | { kind: "channel"; channel: ChannelSummary };
 
 const itemId = (item: ChatItem) => (item.kind === "agent" ? item.agent.id : item.channel.id);
-/** When the row last changed: an agent's last message, or a channel's. */
 const itemTime = (item: ChatItem) =>
   item.kind === "agent" ? (item.agent.updatedAt ?? "") : (item.channel.lastMessage?.at ?? item.channel.createdAt);
 
-/**
- * The phone app's home: the server name with the "+" menu of the desktop sidebar, the pinned agents,
- * the folders with their chats, the other chats, and the search bar.
- */
 export function HomeScreen(props: HomeScreenProps) {
   const { t } = useText();
   const [query, setQuery] = createSignal("");
@@ -51,7 +43,6 @@ export function HomeScreen(props: HomeScreenProps) {
   const menu = createMenuPresence(menuOpen);
   const [createOpen, setCreateOpen] = createSignal(false);
   const createMenu = createMenuPresence(createOpen);
-  /** The folders the user closed in this panel. */
   const [closed, setClosed] = createSignal<ReadonlySet<string>>(new Set());
   const host = () => props.hosts.find((entry) => entry.hostId === props.hostId);
   onSettled(() => {
@@ -66,7 +57,6 @@ export function HomeScreen(props: HomeScreenProps) {
   });
   const state = () => props.workspace.state;
   const sorted = createMemo(() => [...state().agents].sort(byRecent));
-  /** The pinned chats, in the member's order: agents and channels, as the desktop and the phone show them. */
   const pinned = createMemo(() =>
     state().pins.flatMap((pin): ChatItem[] => {
       if (pin.kind === "agent") {
@@ -78,7 +68,6 @@ export function HomeScreen(props: HomeScreenProps) {
     }),
   );
   const isPinned = (item: ChatItem) => state().pins.some((pin) => pin.kind === item.kind && pin.id === itemId(item));
-  /** Every chat that is not pinned, newest first. */
   const items = createMemo((): ChatItem[] =>
     [
       ...sorted().map((agent): ChatItem => ({ kind: "agent", agent })),
@@ -94,7 +83,6 @@ export function HomeScreen(props: HomeScreenProps) {
       return !folder || !state().folders.some((entry) => entry.id === folder);
     }),
   );
-  /** A folder in a closed folder is hidden too. */
   const shownFolders = createMemo(() => {
     const hidden = new Set<string>();
     let closedDepth: number | null = null;
@@ -120,7 +108,6 @@ export function HomeScreen(props: HomeScreenProps) {
     setCreateOpen(false);
     props.onCreate(kind);
   }
-  /** `@name text` names an agent and the first message of a new thread. */
   const mention = createMemo(() => /^@(\S*)(?:\s+([\s\S]*))?$/.exec(query().trim()));
   const matches = createMemo(() => {
     const at = mention();
@@ -144,7 +131,6 @@ export function HomeScreen(props: HomeScreenProps) {
 
   return (
     <div class="ph-home">
-      {/* The top bar of the desktop app's sidebar: the server's mark and name open the server menu. */}
       <header class="ph-bar">
         <button
           type="button"
@@ -386,7 +372,6 @@ function ItemRow(props: HomeScreenProps & { item: ChatItem }) {
   );
 }
 
-/** A channel's row: its member faces, its name, and the last message with its author. */
 function ChannelRow(props: { channel: ChannelSummary; workspace: Workspace; onOpen: (channelId: string) => void }) {
   const { t, format } = useText();
   const state = () => props.workspace.state;

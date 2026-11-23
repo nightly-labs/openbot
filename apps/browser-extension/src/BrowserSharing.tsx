@@ -12,9 +12,7 @@ import {
   SITES_KEY,
 } from "./client-browser-messages";
 
-/** Reads one key of the extension storage now and after each change. */
 function storedValue<T>(key: string, decode: (value: unknown) => T, initial: T): () => T {
-  // In a box: Solid reads a function as a computation, and `T` may be one.
   const [value, setValue] = createSignal<{ current: T }>({ current: initial });
   onSettled(() => {
     const read = () =>
@@ -32,13 +30,8 @@ function storedValue<T>(key: string, decode: (value: unknown) => T, initial: T):
   return () => value().current;
 }
 
-/** A site as the person knows it: its host name. */
 const siteName = (origin: string) => (URL.canParse(origin) ? new URL(origin).host : origin);
 
-/**
- * The line on the home while the user shares tabs: how many tabs agents can use, and Manage. When the
- * server cannot use shared tabs, the line says so.
- */
 export function SharingLine(props: { tabs: number; supported: boolean; serverName: string; onManage: () => void }) {
   const { t } = useText();
   return (
@@ -56,12 +49,10 @@ export function SharingLine(props: { tabs: number; supported: boolean; serverNam
   );
 }
 
-/** Starts sharing: the worker makes the OpenBot tab group with the current tab. */
 export async function startSharing(): Promise<void> {
   await chrome.runtime.sendMessage({ kind: BROWSER_SHARE_MESSAGE, on: true }).catch(() => undefined);
 }
 
-/** The settings of shared tabs: what agents may do, the sites allowed always, and Stop sharing. */
 export function BrowserSharingScreen(props: { onBack: () => void }) {
   const { t } = useText();
   const sites = storedValue(SITES_KEY, decodeSites, []);
@@ -127,7 +118,6 @@ export function BrowserSharingScreen(props: { onBack: () => void }) {
   );
 }
 
-/** What the agent wants to do, in words. */
 function actionWords(ask: BrowserAsk, t: ReturnType<typeof useText>["t"]): string {
   const detail = ask.detail;
   switch (ask.action) {
@@ -173,7 +163,6 @@ function askTitle(ask: BrowserAsk, t: ReturnType<typeof useText>["t"]): string {
   }
 }
 
-/** One approval card: the agent, what it wants to do and where, and the choices. */
 export function AskCard(props: { ask: BrowserAsk; onAnswer: (choice: AskChoice) => void }) {
   const { t } = useText();
   const sensitive = () => props.ask.kind !== "site";
@@ -224,7 +213,6 @@ export function AskCard(props: { ask: BrowserAsk; onAnswer: (choice: AskChoice) 
   );
 }
 
-/** The approval cards that wait, over every screen of the panel. The worker waits for the answers. */
 export function BrowserAsks() {
   const { t } = useText();
   const asks = storedValue(ASKS_KEY, decodeAsks, []);

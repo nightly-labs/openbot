@@ -506,7 +506,6 @@ export interface OpenBotToolRouterOptions {
   apiKeys?: AgentApiKeys | null | undefined;
   vaultItems?: VaultItems | null | undefined;
   codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
-  /** The Chrome tabs that members share (`client-browser-v1`); null where this process has none. */
   clientBrowser?: ClientBrowser | null | undefined;
   hooks: OpenBotToolRouterHooks;
 }
@@ -853,9 +852,7 @@ export class OpenBotToolRouter {
               client.respond(toolRequest.id, channelRefusal);
               return;
             }
-            // The browser tools read the repaired arguments, such as `tab_id`, so this check does too.
             const callArgs = repairBrowserToolInput(toolRequest.params.tool, toolRequest.params.arguments).value;
-            // A tab of a member's own Chrome, or `open` there: only the people who requested the turn share one.
             if (isClientBrowserCall(toolRequest.params.tool, callArgs)) {
               const signal = toolRequest.signal;
               if (signal?.aborted) return;

@@ -10,10 +10,6 @@ import { useText } from "@openbot/ui/text";
 import { createMemo, createStore, onSettled } from "solid-js";
 import type { Workspace } from "./workspace";
 
-/**
- * The desktop's new-agent form (name, purpose, look and model) for the open server. The model picker
- * shows when the host lets a member choose the model; else the host gives its default.
- */
 export function NewAgentScreen(props: {
   workspace: Workspace;
   onClose: () => void;
@@ -26,7 +22,6 @@ export function NewAgentScreen(props: {
     status: AgentStatus | null;
     busy: boolean;
     error: string | null;
-    /** The user picked a model, so the catalog that arrives later does not replace it. */
     modelTouched: boolean;
   }>({
     draft: createFirstAgentDraft(),
@@ -37,7 +32,6 @@ export function NewAgentScreen(props: {
     modelTouched: false,
   });
   let disposed = false;
-  // Memos, not ternaries in JSX: the form reads them in its effects (see AgentSettingsScreen).
   const modelOptions = createMemo(() => (state.models.length > 0 ? state.models : undefined));
   const agentStatus = createMemo(() => state.status ?? undefined);
 

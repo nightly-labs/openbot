@@ -30,10 +30,8 @@ import type { HostFile } from "./attachment-media";
 import { type ExtensionSession, hostKeys, readHostProtocols, saveHostProtocol } from "./extension-storage";
 
 const FILE_DOWNLOAD: RemoteLargeDownload = { maxBytes: TEAM_PROTOCOL_V2_MAX_FILE_BYTES };
-/** Two minutes of speech on a server with no GPU, as the phone waits for a voice server. */
 const TRANSCRIPTION_TIMEOUT_MS = 125_000;
 
-/** Why the panel cannot use a server. The panel shows a line for each one. */
 export type HostProblem = "identity_changed" | "update_required" | "unavailable";
 
 export class HostConnectionError extends Error {
@@ -48,27 +46,18 @@ export class HostConnectionError extends Error {
 export interface HostConnectionEvents {
   event: (event: RemoteTeamEvent) => void;
   state: (update: RemoteTeamConnectionUpdate) => void;
-  /** The account service ended the session, or refused it for this server. */
   sessionEnded: () => void;
 }
 
 export interface HostConnection {
   listHosts: () => Promise<RemoteTeamHost[]>;
-  /** Connects to one server and returns its capabilities. A second call moves to another server. */
   connect: (host: RemoteTeamHost) => Promise<string[]>;
   request: TeamApiRequest;
-  /** The bytes of one attachment, as the web client reads them (`TEAM_API_ROUTES.attachment`). */
   download: (attachmentId: string) => Promise<HostFile>;
-  /** The text of a WAV recording, from the speech recognition of the server (`voice-transcription-v1`). */
   transcribe: (wav: Uint8Array) => Promise<string>;
   dispose: () => Promise<void>;
 }
 
-/**
- * One connection to one server at a time, as the web client makes it: `RemoteTeamDirectoryClient`
- * for the session and the ticket, `createRemoteTeamPeer` for WebRTC. The extension speaks the web
- * client's protocol range, because it is built from the same contracts.
- */
 export async function createHostConnection(
   session: ExtensionSession,
   events: HostConnectionEvents,
@@ -136,7 +125,6 @@ export async function createHostConnection(
       if (connectedHostId !== null && connectedHostId !== host.hostId)
         await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
       connectedHostId = host.hostId;
-      // Pin after the directory checked the key, and never replace a pinned key without a handover.
       const pinned = await keys.get(host.hostId);
       if (pinned && pinned !== host.devicePublicKey)
         throw new HostConnectionError(
@@ -174,7 +162,6 @@ export async function createHostConnection(
     request: async (method, path, decode, body, upload) =>
       decode(await send(method, path, body, upload ? { upload } : {})),
     async download(attachmentId) {
-      // A file read asks for the larger limit; without it the connection refuses a file above the phone's.
       const value = await send("GET", TEAM_API_ROUTES.attachment(attachmentId), {}, { largeDownload: FILE_DOWNLOAD });
       if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
         throw new Error(currentText().t("extension.connection.requestFailed"));
@@ -204,7 +191,6 @@ function isRefusedSession(error: unknown): boolean {
   return error instanceof RemoteDirectoryError && (error.status === 401 || error.status === 403);
 }
 
-/** The host's own words for a refused request, cut to a line. */
 function hostRefusal(result: RemoteTeamCommandResult): string | null {
   const reason = result.ok ? (isDynamicRecord(result.body) ? result.body.error : undefined) : result.error;
   if (!isString(reason) || !reason.trim()) return null;

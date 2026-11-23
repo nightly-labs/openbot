@@ -23,7 +23,6 @@ const HOST: RemoteTeamHost = {
   role: "owner",
 };
 
-/** The home while the user shares tabs, with the approval cards that wait over it. */
 function Home(props: { tabs: number; supported?: boolean; asks?: BrowserAsk[] }) {
   installStoryChrome(props.asks ? { [ASKS_KEY]: props.asks.map((ask) => ({ ...ask })) } : {});
   return (
@@ -58,13 +57,10 @@ function ask(kind: BrowserAsk["kind"], action: BrowserAsk["action"], detail: str
   return { id: `${kind}-${action}`, agentName: "Chief", site, kind, action, detail };
 }
 
-/** Sharing: the line on the home says how many tabs agents can use, and Manage opens the settings. */
 export const SharingLine: Story = { render: () => <Home tabs={2} /> };
 
-/** A server without `client-browser-v1`: the line asks for a server update. */
 export const SharingServerTooOld: Story = { render: () => <Home tabs={1} supported={false} /> };
 
-/** The settings: what agents may do, the sites allowed always (each with Remove), and Stop sharing. */
 export const SettingsWithSites: Story = {
   render: () => {
     installStoryChrome({
@@ -82,7 +78,6 @@ export const SettingsWithSites: Story = {
   },
 };
 
-/** No site is allowed always yet: agents ask on each new site. */
 export const SettingsNoSites: Story = {
   render: () => {
     installStoryChrome({});
@@ -94,31 +89,26 @@ export const SettingsNoSites: Story = {
   },
 };
 
-/** An agent acts on a site for the first time: Allow once, Always for this site, or Deny. */
 export const AskNewSite: Story = {
   render: () => <Home tabs={1} asks={[ask("site", "click", 'button "Add to cart"', "https://shop.example.com")]} />,
 };
 
-/** Typing into a password field asks every time, also on an allowed site. The card has no "Always". */
 export const AskPassword: Story = {
   render: () => (
     <Home tabs={1} asks={[ask("password", "type", 'input password "Password"', "https://accounts.example.com")]} />
   ),
 };
 
-/** A click that starts a download asks every time; the card names the file. */
 export const AskDownload: Story = {
   render: () => (
     <Home tabs={1} asks={[ask("download", "click", "invoice-2026-11.pdf", "https://billing.example.com")]} />
   ),
 };
 
-/** A page that looks like an OAuth grant asks before each click or key. */
 export const AskSignInGrant: Story = {
   render: () => <Home tabs={1} asks={[ask("sign-in", "click", 'button "Authorize"', "https://github.com")]} />,
 };
 
-/** Payment fields ask like password fields. Two cards wait at once: the newest is last. */
 export const AskPaymentAndSite: Story = {
   render: () => (
     <Home

@@ -15,7 +15,6 @@ export const saveBrowserScreenshot = Effect.fn("saveBrowserScreenshot")(function
 ) {
   if (!result.success || !savesFile(args)) return result;
   const image = result.contentItems.find((item) => item.type === "inputImage");
-  // A shared Chrome tab (`client-browser-tools.ts`) gives a JPEG.
   const match = image && /^data:image\/(png|jpeg);base64,(.+)$/su.exec(image.imageUrl);
   if (!match) return withNote(result, "The image was not saved as a file.");
   const [, extension, data] = match;

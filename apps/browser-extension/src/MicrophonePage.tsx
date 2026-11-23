@@ -2,10 +2,6 @@ import { Button } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, onSettled, Show } from "solid-js";
 
-/**
- * The tab that asks for the microphone. The side panel cannot show the browser's question, so it opens
- * this page of the extension. The answer is for the whole extension, so the panel can then record.
- */
 export function MicrophonePage() {
   const { t } = useText();
   const [state, setState] = createSignal<"asking" | "allowed" | "blocked">("asking");

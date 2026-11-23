@@ -5,27 +5,18 @@ import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { createSignal } from "solid-js";
 
-/** A file that the host sent: its name, its type and its bytes as Base64. */
 export interface HostFile {
   name: string;
   mimeType: string;
   base64: string;
 }
 
-/** An image above this size keeps its file card: a thumbnail must not cost a large download. */
 const THUMBNAIL_BYTES = 2 * 1024 * 1024;
-/** The image that the person asked an agent to make. */
 const GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
-/** Audio and video load on a click, up to the phone's limit. */
 const MEDIA_BYTES = MOBILE_ATTACHMENT_BYTES;
 const CACHE_BYTES = 64 * 1024 * 1024;
-/** The chat shares the host connection, so only a few files download at the same time. */
 const CONCURRENT_DOWNLOADS = 2;
 
-/**
- * The only types that get an object URL. A blob URL has the extension's origin, so a type that a
- * browser can run as a page (HTML, SVG, XHTML) would get the session of this extension.
- */
 const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "image/png",
   "image/jpeg",
@@ -41,29 +32,20 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "video/quicktime",
   "video/mp4",
 ]);
-/** An SVG gets a `data:` URL: an `<img>` runs no SVG script, and the document has no origin of its own. */
 const SVG_TYPE = "image/svg+xml";
 
 interface Entry {
   url: string;
   bytes: number;
-  /** A `data:` URL has nothing to revoke. */
   object: boolean;
 }
 
 export interface AttachmentMedia extends AttachmentMediaSource {
-  /** Saves the file in the browser's downloads. */
   save(attachment: AttachmentSummary): Promise<void>;
-  /** Revokes every object URL. */
   dispose(): void;
 }
 
-/**
- * The images, audio and video of the attachments of one server, read through its connection, as the
- * web client reads them (`web-attachment-media.ts`). The host gives no preview URL to a remote client.
- */
 export function createAttachmentMedia(download: (attachmentId: string) => Promise<HostFile>): AttachmentMedia {
-  // Insertion order is the use order: the first entry is the least recently used.
   const entries = new Map<string, Entry>();
   const [shown, setShown] = createSignal<ReadonlyMap<string, string>>(new Map());
   const loading = new Map<string, Promise<boolean>>();
@@ -108,7 +90,6 @@ export function createAttachmentMedia(download: (attachmentId: string) => Promis
       );
       return true;
     } catch {
-      // The card keeps its icon and its download button.
       return false;
     } finally {
       release();
@@ -134,7 +115,6 @@ export function createAttachmentMedia(download: (attachmentId: string) => Promis
     },
     async save(attachment) {
       const bytes = base64ToBytes((await download(attachment.id)).base64);
-      // Saved as plain bytes: the browser stores the file and never shows it as a page of this origin.
       const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
       const link = document.createElement("a");
       link.href = url;
@@ -150,7 +130,6 @@ export function createAttachmentMedia(download: (attachmentId: string) => Promis
   };
 }
 
-/** The allowed type of an attachment, from its own type or else its name. */
 function mediaType(attachment: AttachmentSummary): string | null {
   const declared =
     attachment.mimeType.split(";")[0]?.trim().toLowerCase() || attachmentMimeTypeForName(attachment.name);

@@ -1,19 +1,3 @@
-// Frozen optional client-browser-v1 wire contract. Keep IPC types and limits out of this file.
-//
-// What it grants, recorded here because freezing it makes it permanent: a member can share tabs of the
-// member's own browser (the OpenBot Chrome extension: the tabs of its "OpenBot" tab group) with the
-// agents of the host. Only an agent in a turn that this member requested uses them. The client sends
-// `POST /v1/client-browser/presence` when sharing starts or changes, and every 30 s while it shares. The
-// host keeps the presence per member and logical session, and ends it at `sharing: false`, when the last
-// event connection of the session closes, or after `CLIENT_BROWSER_PRESENCE_TTL_MS` without a presence.
-// The newest session of a member that started to share gets the commands.
-//
-// The host sends each command as the `client-browser-command` event, only to the event connections of
-// that member and session that have this capability. The client answers once with
-// `POST /v1/client-browser/result`, from the same member and session. The host waits at most
-// `CLIENT_BROWSER_COMMAND_TIMEOUT_MS` (the person's approval included). It answers 404 to a late, unknown
-// or foreign answer, which changes nothing. The client may refuse any command (`denied`). A result body
-// must fit the 1 MiB JSON request limit of the host. Widening any of it needs a second capability string.
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "../runtime-values";
 import { adminRoute, empty, type OptionalRouteCodec } from "./admin-wire";
 
@@ -26,9 +10,7 @@ export const CLIENT_BROWSER_ROUTES = {
 
 export const CLIENT_BROWSER_EVENT = "client-browser-command";
 
-/** The host ends a presence that has had no update for this time. */
 export const CLIENT_BROWSER_PRESENCE_TTL_MS = 75_000;
-/** The longest time that the host waits for the result of one command. */
 export const CLIENT_BROWSER_COMMAND_TIMEOUT_MS = 120_000;
 
 export const CLIENT_BROWSER_LIMITS = {
@@ -45,29 +27,22 @@ export const CLIENT_BROWSER_LIMITS = {
   scroll: 100_000,
   waitMs: 30_000,
   coordinate: 100_000,
-  /** The text of a result, such as a page snapshot. */
   resultText: 64_000,
-  /** A JPEG as base64. The whole result body must fit the 1 MiB JSON request limit of the host. */
   image: 800_000,
   error: 2_000,
 } as const;
 
-/** A tab that the member shares. `id` is the browser's own tab id. */
 export type ClientTab = { id: string; url: string; title: string; active: boolean };
 
 export type ClientBrowserPresence = { sharing: boolean; tabs: ClientTab[] };
 
-/** `ref` is a ref from the last snapshot of the tab. `x` and `y` are CSS pixels in the viewport. */
 export type ClientBrowserTarget = { ref: string } | { css: string } | { text: string } | { x: number; y: number };
 
 export type ClientBrowserCommand =
-  /** Opens a new tab in the shared group. */
   | { kind: "open"; url: string }
   | { kind: "navigate"; tabId: string; url: string }
   | { kind: "navigate"; tabId: string; direction: "back" | "forward" | "reload" }
-  /** Page text and the numbered interactive elements, as `[ref]` lines. */
   | { kind: "snapshot"; tabId: string }
-  /** The visible page as a JPEG. */
   | { kind: "screenshot"; tabId: string }
   | { kind: "click"; tabId: string; target: ClientBrowserTarget }
   | { kind: "type"; tabId: string; target: ClientBrowserTarget; text: string; submit: boolean }
@@ -85,7 +60,6 @@ export type ClientBrowserCommandEvent = {
   command: ClientBrowserCommand;
 };
 
-/** `tab` is the tab that the command opened or acted on; `image` is a base64 JPEG (screenshot only). */
 export type ClientBrowserResult = { text: string; image: string | null; tab: ClientTab | null };
 
 export const CLIENT_BROWSER_FAILURE_CODES = ["denied", "not-shared", "not-found", "timeout", "failed"] as const;
@@ -140,7 +114,6 @@ function target(value: unknown): ClientBrowserTarget {
   return invalid();
 }
 
-/** The request of the presence route. The transport has already run it through the codec below. */
 export function decodeClientBrowserPresence(value: unknown): ClientBrowserPresence {
   if (!isDynamicRecord(value) || !isBoolean(value.sharing) || !Array.isArray(value.tabs)) return invalid();
   if (value.tabs.length > CLIENT_BROWSER_LIMITS.tabs) return invalid();
@@ -158,7 +131,6 @@ export function decodeClientBrowserResult(value: unknown): ClientBrowserResult {
   };
 }
 
-/** The request of the result route. */
 export function decodeClientBrowserAnswer(value: unknown): ClientBrowserAnswer {
   if (!isDynamicRecord(value)) return invalid();
   const id = text(value.id, CLIENT_BROWSER_LIMITS.commandId, 1);
@@ -210,7 +182,6 @@ export function decodeClientBrowserCommand(value: unknown): ClientBrowserCommand
   }
 }
 
-/** Null for any other event. A malformed command event throws, so the stream fails closed. */
 export function clientBrowserCommandEvent(value: unknown): ClientBrowserCommandEvent | null {
   if (!isDynamicRecord(value) || value.type !== CLIENT_BROWSER_EVENT) return null;
   return {

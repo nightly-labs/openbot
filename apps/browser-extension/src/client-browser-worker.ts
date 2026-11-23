@@ -35,37 +35,25 @@ import {
   SITES_KEY,
 } from "./client-browser-messages";
 
-// The worker's part of tab sharing: the OpenBot tab group, the approvals, and the commands. The page
-// that holds the server connection passes each command here and posts the answer to the server.
-
-/** How long a card waits for the person. The host waits 120 s for the whole command. */
 const ASK_WAIT_MS = 100_000;
-/** Chrome stops an idle worker after 30 s; an API call while a card waits keeps it. */
 const KEEP_ALIVE_MS = 20_000;
-/** The closest of Chrome's group colors to OpenBot's logo color. */
 const GROUP_COLOR = "pink";
 const CHANGE_DELAY_MS = 400;
 const ASK_NOTIFICATION = "openbot-browser-ask-";
-/** A download from a site where an agent worked in this time waits for the person. */
 const DOWNLOAD_GUARD_MS = 30_000;
-/** How long a click waits for a download to start before it answers; a download link waits longer. */
 const DOWNLOAD_START_MS = 500;
 const DOWNLOAD_LINK_START_MS = 3_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** A site where an agent works now. A download that starts there waits for the person. */
 interface DownloadGuard {
   event: ClientBrowserCommandEvent;
   labels: AskLabels;
   until: number;
-  /** Downloads that the person allowed before the click that starts them. */
   allowed: number;
-  /** What happened to the downloads of the click that runs now; null when no click watches. */
   outcomes: Promise<string>[] | null;
 }
 
-/** The site of a web address, or null. */
 function siteOf(url: string): string | null {
   return isWebUrl(url) && URL.canParse(url) ? new URL(url).origin : null;
 }
@@ -76,13 +64,10 @@ interface Options {
 }
 
 export interface ClientBrowserWorker {
-  /** Whether the user shares tabs now. */
   sharing: () => Promise<boolean>;
-  /** A side panel closed: the offscreen page keeps the shared tabs on the server. */
   panelClosed: () => void;
 }
 
-/** A page of this extension, also one in a tab. A content script has the address of its web page. */
 function fromExtensionPage(sender: chrome.runtime.MessageSender): boolean {
   return Boolean(sender.url?.startsWith(chrome.runtime.getURL("")));
 }
@@ -93,7 +78,6 @@ async function readSharing(): Promise<{ groupId: number | null } | null> {
   return { groupId: isNumber(value.groupId) ? value.groupId : null };
 }
 
-/** The OpenBot group. A browser start gives a restored group a new id, so the title finds it again. */
 async function findGroup(saved: number | null): Promise<number | null> {
   if (saved !== null) {
     const group = await chrome.tabGroups.get(saved).catch(() => null);
@@ -120,7 +104,6 @@ async function presence(): Promise<ClientBrowserPresence> {
   };
 }
 
-/** The web tab that the user looks at. A panel in a tab of its own (as the E2E opens it) is not one. */
 async function currentWebTab(): Promise<chrome.tabs.Tab | null> {
   const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (active && isWebUrl(active.url)) return active;
@@ -154,12 +137,9 @@ async function writeAsks(asks: BrowserAsk[]): Promise<void> {
 
 export function startClientBrowser(options: Options): ClientBrowserWorker {
   installExecutor();
-  /** The cards that wait, by id. Each ends with the person's choice or `timeout`. */
   const waiting = new Map<string, (choice: AskChoice | "timeout") => void>();
-  /** One command at a time: the cards come one after another, and the debugger has one user. */
   let queue: Promise<unknown> = Promise.resolve();
   let changeTimer: ReturnType<typeof setTimeout> | undefined;
-  /** The sites where agents work now, by origin. */
   const downloadGuards = new Map<string, DownloadGuard>();
 
   function guardSite(site: string, event: ClientBrowserCommandEvent, labels: AskLabels): DownloadGuard {
@@ -171,14 +151,12 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     return guard;
   }
 
-  /** Gives the shared tabs to the offscreen page while no side panel holds the connection. */
   async function hold(): Promise<void> {
     if (options.panelOpen() || !(await readSharing())) return;
     await options.ensureOffscreen();
     await chrome.runtime.sendMessage({ kind: BROWSER_HOLD_MESSAGE }).catch(() => undefined);
   }
 
-  /** Tells the page with the connection that the presence changed. */
   function changed(): void {
     clearTimeout(changeTimer);
     changeTimer = setTimeout(() => {
@@ -206,7 +184,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     downloadGuards.clear();
     for (const finish of [...waiting.values()]) finish("deny");
     await detachAll();
-    // The tabs stay open; with no group, nothing shows them as shared.
     if (groupId === null) return;
     const ids = (await chrome.tabs.query({ groupId })).flatMap((tab) => (tab.id === undefined ? [] : [tab.id]));
     if (ids.length) await chrome.tabs.ungroup(ids).catch(() => undefined);
@@ -308,7 +285,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     }
   }
 
-  /** The guard of the site that a download comes from, while an agent works there. */
   function guardOf(item: chrome.downloads.DownloadItem): DownloadGuard | null {
     for (const url of [item.referrer, item.finalUrl, item.url]) {
       const site = siteOf(url);
@@ -379,7 +355,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     return undefined;
   });
 
-  // The group's tabs changed: a tab joined or left, loaded another page, or became the active one.
   chrome.tabs.onUpdated.addListener((_tabId, change, tab) => {
     if (
       change.groupId !== undefined ||
@@ -388,8 +363,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       changed();
   });
   chrome.tabs.onRemoved.addListener(() => changed());
-  // Chrome holds a new download until a listener names its file. A download from a site where an agent
-  // works waits for the person: Allow once lets it go on, Deny or no answer cancels it.
   chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
     const guard = guardOf(item);
     if (!guard) {
@@ -424,10 +397,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       void chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT }).catch(() => undefined);
   });
 
-  // A card of a worker that Chrome stopped can get no answer any more.
   void chrome.storage.local.remove(ASKS_KEY).catch(() => undefined);
-  // After a browser start, the offscreen page shares the tabs again. An open panel holds its port to the
-  // worker within a second, so the worker waits for it first.
   setTimeout(() => void hold().catch(() => undefined), 2_000);
 
   return {

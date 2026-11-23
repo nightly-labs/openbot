@@ -7,9 +7,6 @@ import { runApiResponse } from "../../../server/effect-runtime";
 import { readJsonObject } from "../../../server/json-body";
 import { apiError, companySignInErrorResponse, json, requestCompanySignIn } from "../../../server/request-auth";
 
-// The OpenBot browser extension gives the one-time code that the web app sent to it after the person
-// allowed it (`/api/browser/extension/code`), the verifier of its challenge and its device. The session
-// is a mobile session of platform `unknown`, so the device list shows it and the person can end it.
 export const Route = createFileRoute("/v1/browser-extension/exchange")({
   server: {
     handlers: {

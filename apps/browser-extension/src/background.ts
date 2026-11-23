@@ -25,21 +25,16 @@ import {
 } from "./x-messages";
 import { type QueuedPost, readOutbox, retryWait, stillSendable, writeOutbox } from "./x-outbox";
 
-// A click on the toolbar button opens the side panel, which Chrome keeps across restarts. The worker
-// also answers the content script on X: the selectors, and through the offscreen page the server.
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-/** The newest selectors from the account service, and when the worker last asked. */
 const RULES_KEY = "openbot.x-rules.v1";
 const RULES_CHECK_MS = 60 * 60 * 1_000;
 const OFFSCREEN_PAGE = "offscreen.html";
 const PANEL_PAGE = "sidepanel.html";
-/** Wakes the worker when the next post from X is due. */
 const OUTBOX_ALARM = "openbot-x-outbox";
 
 let creating: Promise<void> | null = null;
 
-/** The rules from the account service, or null when the built-in rules are the newest. */
 async function remoteRules(): Promise<XPageRules | null> {
   const saved = (await chrome.storage.local.get(RULES_KEY))[RULES_KEY];
   const stored = isDynamicRecord(saved) ? decodeXPageRules(saved.rules) : null;
@@ -55,7 +50,6 @@ async function remoteRules(): Promise<XPageRules | null> {
     let next = body.hash === have ? stored : null;
     if (body.rules !== null) {
       const decoded = decodeXPageRules(body.rules);
-      // A copy that does not have its hash was cut or changed on the way: keep what the worker has.
       if (!decoded || (await xPageRulesHash(decoded)) !== body.hash) return stored;
       next = decoded;
     }
@@ -68,7 +62,6 @@ async function remoteRules(): Promise<XPageRules | null> {
     });
     return next;
   } catch {
-    // Offline or a bad answer: the stored or built-in rules stay, and the next page load asks again.
     return stored;
   }
 }
@@ -94,34 +87,25 @@ async function storageAnswer(request: StorageRequest) {
   return {};
 }
 
-/** A page of this extension, also one in a tab. A content script has the address of its web page. */
 function fromExtensionPage(sender: chrome.runtime.MessageSender): boolean {
   return Boolean(sender.url?.startsWith(chrome.runtime.getURL("")));
 }
 
-/** The side panels that are open. Each holds a port; Chrome closes the port with the panel. */
 const panels = new Set<chrome.runtime.Port>();
 
 chrome.runtime.onConnect.addListener((port) => {
-  // The panel's page, also when it runs in a tab. A content script cannot have this address.
   if (port.name !== PANEL_PORT || !port.sender?.url?.startsWith(chrome.runtime.getURL(PANEL_PAGE))) return;
   panels.add(port);
-  // The panel's connection takes the session of this sign-in, so the offscreen page's closes.
   void chrome.offscreen.closeDocument().catch(() => undefined);
   port.onDisconnect.addListener(() => {
     panels.delete(port);
     clientBrowser.panelClosed();
   });
-  // The panel asks for the posts that wait once its connection is ready (`OUTBOX_FLUSH_MESSAGE`).
 });
 
-/** The tabs that the user shares with agents: the OpenBot tab group, its approvals and commands. */
 const clientBrowser = startClientBrowser({ panelOpen: () => panels.size > 0, ensureOffscreen });
 
-/** Passes `status` or `send` to an open side panel, or else to the offscreen page. */
 async function ask<T>(request: XRequest, decode: (value: unknown) => T): Promise<T> {
-  // An open side panel answers with its own connection. With no panel, no page answers, and the
-  // offscreen page connects in its place.
   const panel = await chrome.runtime.sendMessage({ ...request, kind: X_PANEL_MESSAGE }).catch(() => undefined);
   if (isDynamicRecord(panel)) return decode(panel);
   await ensureOffscreen();
@@ -130,17 +114,12 @@ async function ask<T>(request: XRequest, decode: (value: unknown) => T): Promise
 
 let flushing: Promise<void> | null = null;
 
-/**
- * The texts of the notifications, in the user's language. The worker cannot load a language, so it
- * keeps the texts that the panel or the offscreen page sent with the last `status`.
- */
 const LABELS_KEY = "openbot.x-labels.v1";
 
 async function savedLabels(): Promise<XLabels | null> {
   return decodeXLabels((await chrome.storage.local.get(LABELS_KEY))[LABELS_KEY]);
 }
 
-/** A short line of the post, so the user knows which one. */
 function postLine(post: QueuedPost): string {
   const target = post.payload.posts[post.payload.replyTo];
   const text = (post.payload.message || target?.text || "").replace(/\s+/g, " ").trim();
@@ -159,7 +138,6 @@ async function notify(id: string, title: string, body: string, post: QueuedPost)
     .catch(() => undefined);
 }
 
-/** Sends each post whose time has come, and wakes the worker for the next one. */
 function flushOutbox(force = false): Promise<void> {
   flushing ??= (async () => {
     try {
@@ -182,13 +160,11 @@ function flushOutbox(force = false): Promise<void> {
           decodeXSendResult,
         ).catch(() => null);
         if (answer?.ok) {
-          // A post that waited: the user learns that it arrived. One that arrived at once needs no word.
           if (post.attempts > 0 && labels)
             await notify(`openbot-x-sent-${post.id}`, labels.sentTitle, labels.sentBody, post);
           continue;
         }
         const attempts = post.attempts + 1;
-        // No answer at all may also mean that the post arrived and only the answer was lost.
         const reached = answer === null || answer.ok || answer.reached;
         kept.push({
           ...post,
@@ -198,7 +174,6 @@ function flushOutbox(force = false): Promise<void> {
           reachedAt: post.reachedAt ?? (reached ? Date.now() : null),
         });
       }
-      // A post that arrived while this ran stays in the queue.
       const added = (await readOutbox()).filter((post) => !stored.some((entry) => entry.id === post.id));
       const next = [...kept, ...added];
       await writeOutbox(next);
@@ -212,7 +187,6 @@ function flushOutbox(force = false): Promise<void> {
   return flushing;
 }
 
-/** X posts the reply at once; the post waits here until the server has it. */
 async function queuePost(payload: XReplyPayload): Promise<void> {
   const post: QueuedPost = {
     id: crypto.randomUUID(),
@@ -223,7 +197,6 @@ async function queuePost(payload: XReplyPayload): Promise<void> {
     error: null,
     reachedAt: null,
   };
-  // On disk before the first attempt, so a browser that quits now keeps the post.
   await writeOutbox([...(await readOutbox()), post]);
   if (flushing) await flushing;
   await flushOutbox();
@@ -232,13 +205,9 @@ async function queuePost(payload: XReplyPayload): Promise<void> {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === OUTBOX_ALARM) void flushOutbox();
 });
-// After a browser start, every post that waited goes out at once: the server may be back. Chrome loads
-// an unpacked or updated extension again at its start, and then says "installed" in place of "startup".
 chrome.runtime.onStartup.addListener(() => void flushOutbox(true));
 chrome.runtime.onInstalled.addListener(() => void flushOutbox(true));
-// A worker that Chrome started again for any event sends the posts whose time has come.
 void flushOutbox();
-// A click on a notification opens the panel, which shows the post's thread.
 chrome.notifications.onClicked.addListener((id) => {
   if (id.startsWith("openbot-x-sent-"))
     void chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT }).catch(() => undefined);
@@ -246,22 +215,18 @@ chrome.notifications.onClicked.addListener((id) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // The offscreen page has no `chrome.storage`. Only that page of this extension may use the worker's.
   const storage = decodeStorageRequest(message);
   if (storage) {
     if (sender.tab || sender.url !== chrome.runtime.getURL(OFFSCREEN_PAGE)) return undefined;
     void storageAnswer(storage).then(sendResponse, () => sendResponse({}));
     return true;
   }
-  // The offscreen page had no work for a while: its connection closes with it, unless it keeps the
-  // shared tabs on the server.
   if (isDynamicRecord(message) && message.kind === X_IDLE_MESSAGE && !sender.tab) {
     void clientBrowser.sharing().then((sharing) => {
       if (!sharing) void chrome.offscreen.closeDocument().catch(() => undefined);
     });
     return undefined;
   }
-  // The panel's "Send now" for the posts that wait.
   if (isDynamicRecord(message) && message.kind === OUTBOX_FLUSH_MESSAGE && fromExtensionPage(sender)) {
     void flushOutbox(true).then(
       () => sendResponse({}),
@@ -269,7 +234,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     );
     return true;
   }
-  // Only a content script asks; a page of the extension talks to the offscreen page itself.
   const request = decodeXRequest(message, X_MESSAGE);
   if (!request || !sender.tab) return undefined;
   if (request.action === "rules") {
@@ -282,7 +246,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (request.action === "status") {
     void ask(request, decodeXStatus).then(
       (status) => {
-        // The texts of the notifications, for when no page is open to give them.
         if (status.labels) void chrome.storage.local.set({ [LABELS_KEY]: { ...status.labels } }).catch(() => undefined);
         sendResponse(status);
       },
@@ -290,8 +253,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     );
     return true;
   }
-  // The side panel shows the agent's answer. Chrome opens it only during the user's click, and only
-  // when no panel is open: a second panel would take the session of the first.
   if (!panels.size && sender.tab.id !== undefined)
     void chrome.sidePanel.open({ tabId: sender.tab.id }).catch(() => undefined);
   void queuePost(request.payload).catch(() => undefined);

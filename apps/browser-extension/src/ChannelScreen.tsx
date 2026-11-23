@@ -14,7 +14,6 @@ import { ChatComposer } from "./ChatComposer";
 import { stickToBottom } from "./stick-to-bottom";
 import { isChatMessage, type OpenChannel, type Workspace } from "./workspace";
 
-/** A channel chat: the people's messages and the answers of its agents, each with its face and name. */
 export function ChannelScreen(props: {
   workspace: Workspace;
   onBack: () => void;
@@ -42,19 +41,16 @@ function ChannelView(props: {
   let list: HTMLDivElement | undefined;
   const state = () => props.workspace.state;
   const agents = createMemo(() => composerAgents(state().agents, state().colors));
-  /** The person's bubbles take the colour of the lead agent, as a chat takes its agent's. */
   const colors = createMemo(() => {
     const lead =
       state().agents.find((agent) => agent.id === props.channel.leadAgentId) ??
       state().agents.find((agent) => props.channel.members.some((member) => member.agentId === agent.id));
     return lead ? bubbleColors(lead, state().colors[lead.id]) : undefined;
   });
-  /** The rows the chat shows: no superseded drafts, no tool steps. */
   const entries = createMemo(() =>
     props.open.messages.filter((entry) => !entry.superseded && isChatMessage(entry.message)),
   );
   const mine = (entry: ChannelMessage) => entry.author.kind === "member" && entry.author.id === state().memberId;
-  /** The name over a message: once for each run of one author, and never over my own. */
   const showsAuthor = (index: number) => {
     const entry = entries()[index];
     const before = entries()[index - 1];
@@ -62,11 +58,6 @@ function ChannelView(props: {
       entry && !mine(entry) && (before?.author.id !== entry.author.id || before.author.kind !== entry.author.kind),
     );
   };
-  /**
-   * The agents at work, with their faces, as the desktop channel shows them: the owners of the running
-   * tasks. While the person's message is on its way, or the host counts work that the page has not
-   * shown yet, the lead stands for the channel.
-   */
   const workers = createMemo((): ChannelWorker[] => {
     const owners = new Set(
       props.open.tasks.flatMap((task) => (task.state === "running" && task.ownerAgentId ? [task.ownerAgentId] : [])),

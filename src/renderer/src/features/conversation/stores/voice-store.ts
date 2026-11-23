@@ -23,7 +23,6 @@ import { conversationOwnerId } from "./composer-store";
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_000;
 const STREAM_INTERVAL_MS = 250;
 
-/** The recording waveform: how many level samples it shows, and how often a new one arrives. */
 export { VOICE_LEVEL_COUNT } from "@openbot/ui/voice-recording";
 
 export interface VoiceCloudStream {
