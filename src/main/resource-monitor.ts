@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { cpus, totalmem } from "node:os";
 import { join } from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
+import { getHeapStatistics } from "node:v8";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import {
@@ -17,6 +18,12 @@ import {
 import { providerProcessIds } from "../backend/provider-processes";
 import type { AnalyticsResourceSource } from "./analytics";
 import { AnalyticsOperationFailure, toAnalyticsOperationFailure } from "./analytics-effects";
+import {
+  MainLoopProfiler,
+  type MainLoopProfileSummary,
+  PROFILE_STALL_MS,
+  summarizeCpuProfile,
+} from "./main-loop-profile";
 import { readPreferenceFile, writePreferenceFile } from "./preference-file";
 import {
   addCount,
@@ -53,22 +60,21 @@ const PERSIST_INTERVAL_MS = 15 * 60_000;
 const RESOURCE_SUMMARY_FILE = "openbot-resource-summary-v1.json";
 const SAMPLES_FILE = "resources.ndjson";
 const MAX_SAMPLES_BYTES = 1024 * 1024;
+const STALL_PROFILES_FILE = "stall-profiles.ndjson";
+const MAX_STALL_PROFILES_BYTES = 256 * 1024;
+const PROFILE_START_INTERVAL_MS = 30 * 60_000;
+const PROFILE_KEEP_INTERVAL_MS = 6 * 60 * 60_000;
+const PROFILE_LONGER_STALL_FACTOR = 10;
 const PS_TIMEOUT_MS = 5_000;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
 const MAX_ACTIVE_TURNS = 1_000;
 const MAX_PENDING_GONE = 1_000;
-/** Bounds on the renderer reports between two samples. A window reports at most once a minute. */
 const MAX_PENDING_RENDERER_COUNT = 1_000_000;
 const MAX_PENDING_INPUT_DELAYS = 1_000;
-/** A window renderer that does not answer in this time, such as one in a long task, has no heap figure in the sample. */
 const WINDOW_MEMORY_TIMEOUT_MS = 2_000;
-/** Bounds on the figures that a window renderer sends. A renderer can send any number. */
 const MAX_WINDOW_HEAP_BYTES = 1024 ** 4;
 const MAX_WINDOW_DOM_NODES = 1_000_000_000;
-/** The histogram's timer interval. Each recorded delay includes it, so it is subtracted. */
 const LOOP_RESOLUTION_MS = 20;
-// The `serviceName` that `agent-database-host-process.ts` and the voice `*-host-process.ts` files
-// give `utilityProcess.fork`. Electron reports it as the `name` of a metric and of a gone process.
 const UTILITY_GROUPS = new Map<string, ProcessGroup & ChildType>([
   ["OpenBot databases", "database_host"],
   ["OpenBot voice transcription", "voice_host"],
@@ -81,50 +87,49 @@ export interface ResourceMonitorOptions {
   trace: TraceFile;
   statementTimings: StatementTimings;
   tabProcessIds: () => number[];
-  /**
-   * The pages of the app windows (not browser tabs), for their heap figures. Without it, a sample
-   * has no heap figures.
-   */
   appWindowContents?: () => readonly WebContents[];
-  /**
-   * Whether a turn runs now. The turn count of the samples can keep a turn that ended with no
-   * completion event, so the loop rest asks the turns themselves.
-   */
   turnRunning: () => boolean;
+  appPath: string;
 }
 
-/** One sample as `resources.ndjson` and the diagnostics export hold it. Group and provider names only. */
+export interface MainLoopStallProfile extends MainLoopProfileSummary {
+  stallMs: number;
+  phase: LoopPhase;
+  turnActive: boolean;
+  hostKind: DeviceClass["hostKind"];
+}
+
 interface ResourceSample {
   at: string;
   rssMb: Partial<Record<ProcessGroup | "total", number>>;
-  /** Windows only: Electron reports private memory on no other platform. */
   privateMb: Partial<Record<ProcessGroup, number>>;
   cpuPct: Partial<Record<ProcessGroup | "total", number>>;
   providers: Partial<Record<ResourceProvider, { rssMb: number; cpuPct: number | null; processes: number }>>;
-  /** The app window renderers together. Null when one of them did not answer. */
   windowMemory: WindowMemory | null;
   mainLoopMs: { p99: number; max: number; phase: LoopPhase } | null;
+  mainHeapMb: { used: number; limit: number };
   database: { statements: number; maxMs: number };
   activeTurns: number;
   browserTabs: number;
   providerTreeSupported: boolean;
 }
 
-/**
- * Samples the CPU and memory of OpenBot's own processes and of the provider CLIs it starts, once a
- * minute, and keeps a summary for each local day. The summary goes into the diagnostics export, and
- * analytics sends the summary of the last closed day once. A failed sample is skipped: this must not
- * become the failure it would have recorded.
- */
 export class ResourceMonitor implements AnalyticsResourceSource {
   readonly #options: ResourceMonitorOptions;
   readonly #summaryPath: string;
   readonly #samplesFile: { directory: string; path: string; maxBytes: number };
   readonly #device: DeviceClass;
+  readonly #profilesFile: { directory: string; path: string; maxBytes: number };
+  readonly #profiler = new MainLoopProfiler();
+  #profileStartedAt: number | null = null;
+  #profileKeptAt: number | null = null;
+  #profileStartStallMs = 0;
+  #profileKeptStallMs = 0;
+  #lastStallProfile: (MainLoopStallProfile & { at: string }) | null = null;
+  #onStallProfile: (profile: MainLoopStallProfile) => void = () => {};
   readonly #loop = monitorEventLoopDelay({ resolution: LOOP_RESOLUTION_MS });
   readonly #activeTurns = new Set<string>();
   readonly #writes = Semaphore.makeUnsafe(1);
-  /** The load and the samples. `close` waits for them. */
   readonly #scope = Scope.makeUnsafe();
   #day: ResourceDay = emptyDay(localDay(new Date()));
   #previous: ResourceDay | null = null;
@@ -132,22 +137,13 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   #lastSample: ResourceSample | null = null;
   #lastSampleAt: number | null = null;
   #previousCpuSeconds: Map<number, number> | null = null;
-  /**
-   * Process exits since the last sample. A stop signal can end the child processes before the main
-   * process starts its teardown, so an exit counts only when the app still runs at the next sample.
-   * The trace gets each exit at once: a main process that stops within the minute would lose it.
-   */
-  #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null }[] = [];
-  /** Renderer reports since the last sample: long tasks, inputs, and the delays the browser timed. */
+  #previousAppCpuSeconds = new Map<string, number>();
+  #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null; appWindow: boolean }[] = [];
   #rendererTiming: { longTasks: number; inputs: number; inputDelaysMs: number[] } = {
     longTasks: 0,
     inputs: 0,
     inputDelaysMs: [],
   };
-  /**
-   * The main-loop window that the next sample closes: when it started in `performance.now()` time
-   * (milliseconds after the process started), and whether a turn ran in it.
-   */
   #loopWindowStartedAt = 0;
   #turnInLoopWindow = false;
   #resumedAt: number | null = null;
@@ -155,7 +151,6 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   #timer: NodeJS.Timeout | null = null;
   #sampling = false;
   #closed = false;
-  /** False until the saved days are read, so a quit before that does not overwrite them. */
   #loaded = false;
   #onDayClosed: () => void = () => {};
 
@@ -164,6 +159,11 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#summaryPath = join(options.userDataPath, RESOURCE_SUMMARY_FILE);
     const directory = join(options.userDataPath, "logs");
     this.#samplesFile = { directory, path: join(directory, SAMPLES_FILE), maxBytes: MAX_SAMPLES_BYTES };
+    this.#profilesFile = {
+      directory,
+      path: join(directory, STALL_PROFILES_FILE),
+      maxBytes: MAX_STALL_PROFILES_BYTES,
+    };
     this.#device = deviceClass({
       totalMemoryBytes: totalmem(),
       cpuCount: cpus().length,
@@ -172,16 +172,15 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     });
   }
 
-  /** Loads the saved days and starts sampling. `onDayClosed` runs when a closed day waits to be sent. */
-  start(onDayClosed: () => void): void {
+  start(onDayClosed: () => void, onStallProfile: (profile: MainLoopStallProfile) => void = () => {}): void {
     if (this.#closed || this.#timer) return;
+    this.#onStallProfile = onStallProfile;
     this.#onDayClosed = onDayClosed;
     app.on("render-process-gone", this.#rendererGone);
     app.on("child-process-gone", this.#childGone);
     powerMonitor.on("suspend", this.#suspend);
     powerMonitor.on("resume", this.#resume);
     app.on("browser-window-focus", this.#measureLoop);
-    // The start is measured even with no window: the first sample stops the timer if nobody uses the app.
     this.#measureLoop();
     this.#startLoopWindow();
     this.#fork(
@@ -197,14 +196,12 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     );
   }
 
-  /** Counts from an app window since its last report. The next sample adds them to the day. */
   observeRendererTiming(report: { longTasks: number; inputs: number; inputDelaysMs: readonly number[] }): void {
     if (this.#closed) return;
     const pending = this.#rendererTiming;
     pending.longTasks = Math.min(MAX_PENDING_RENDERER_COUNT, pending.longTasks + report.longTasks);
     const kept = report.inputDelaysMs.slice(0, Math.max(0, MAX_PENDING_INPUT_DELAYS - pending.inputDelaysMs.length));
     pending.inputDelaysMs.push(...kept);
-    // An input whose delay is dropped is not counted, so it does not show as a 0 ms input in the p95.
     const dropped = report.inputDelaysMs.length - kept.length;
     pending.inputs = Math.min(MAX_PENDING_RENDERER_COUNT, pending.inputs + report.inputs - dropped);
   }
@@ -233,18 +230,17 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     });
   }
 
-  /** The last sample and the summaries of today and the last closed day, for the diagnostics export. */
   diagnostics() {
     return {
       device: this.#device,
       sampleIntervalMs: SAMPLE_INTERVAL_MS,
       lastSample: this.#lastSample,
+      lastStallProfile: this.#lastStallProfile,
       today: summarizeDay(this.#day),
       previousDay: this.#previous ? summarizeDay(this.#previous) : null,
     };
   }
 
-  /** Stops sampling, waits for a sample that runs, and saves the day. */
   readonly close = Effect.fn("ResourceMonitor.close")(function* (this: ResourceMonitor) {
     if (this.#closed) return;
     this.#closed = true;
@@ -255,6 +251,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     powerMonitor.off("resume", this.#resume);
     app.off("browser-window-focus", this.#measureLoop);
     this.#loop.disable();
+    this.#profiler.discard();
     yield* Scope.close(this.#scope, Exit.void);
     if (this.#loaded) yield* this.#persist().pipe(Effect.ignore);
   });
@@ -286,11 +283,14 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#timer = null;
   }
 
-  // Sleep is not load. The first sample after a resume has no CPU baseline, so it records no CPU.
-  readonly #suspend = () => this.#unschedule();
+  readonly #suspend = () => {
+    this.#profiler.discard();
+    this.#unschedule();
+  };
   readonly #resume = () => {
     this.#lastSampleAt = null;
     this.#previousCpuSeconds = null;
+    this.#previousAppCpuSeconds = new Map();
     this.#loop.reset();
     this.#measureLoop();
     this.#startLoopWindow();
@@ -298,21 +298,12 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#schedule();
   };
 
-  /**
-   * The histogram wakes the main process every 20 ms, which is most of its idle energy use. It runs
-   * while a window has the focus or a turn runs, and from a start or a resume to the next sample.
-   * Node keeps the last tick when the timer stops, so a new start resets it: else the paused time
-   * would count as one long delay.
-   */
   readonly #measureLoop = () => {
     if (!this.#closed && this.#loop.enable()) this.#loop.reset();
   };
 
-  /**
-   * Stops the histogram at a sample, after its window is read, when nobody uses the app. A server
-   * has no window and runs on mains power, and its remote clients feel each stall, so it never rests.
-   */
   #restLoop(): void {
+    if (this.#profiler.running) return;
     if (this.#options.server || this.#options.turnRunning() || BrowserWindow.getFocusedWindow() !== null) return;
     this.#loop.disable();
   }
@@ -322,33 +313,32 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#turnInLoopWindow = this.#activeTurns.size > 0;
   }
 
-  readonly #rendererGone = (_event: Event, _contents: WebContents, details: RenderProcessGoneDetails) =>
-    this.#recordGone("renderer", details.reason, null);
-  // OpenBot starts and stops its utility processes itself, such as the voice host after idle time.
+  readonly #rendererGone = (_event: Event, contents: WebContents, details: RenderProcessGoneDetails) =>
+    this.#recordGone("renderer", details.reason, null, this.#options.appWindowContents?.().includes(contents) ?? false);
   readonly #childGone = (_event: Event, details: Details) => {
     if (details.type === "Utility" && details.reason === "killed") return;
     this.#recordGone("child", details.reason, childType(details));
   };
 
-  #recordGone(kind: "renderer" | "child", reason: string, type: ChildType | null): void {
+  #recordGone(kind: "renderer" | "child", reason: string, type: ChildType | null, appWindow = false): void {
     const known = goneReason(reason);
     if (!known) return;
     const name = type ? `child_gone:${type}` : `${kind}_gone`;
     this.#options.trace.record({ kind: "crash", name, durationMs: 0, outcome: known });
     Effect.runFork(this.#options.trace.flush());
-    if (this.#gone.length < MAX_PENDING_GONE) this.#gone.push({ kind, reason: known, type });
+    if (this.#gone.length < MAX_PENDING_GONE) this.#gone.push({ kind, reason: known, type, appWindow });
   }
 
   #countGone(day: ResourceDay): void {
-    for (const { kind, reason, type } of this.#gone) {
+    for (const { kind, reason, type, appWindow } of this.#gone) {
       addCount(day, kind === "renderer" ? COUNTER.rendererGone : COUNTER.childGone);
+      if (appWindow) addCount(day, COUNTER.windowGone);
       if (type) addCount(day, COUNTER.childType(type));
       addCount(day, COUNTER.goneReason(reason));
     }
     this.#gone = [];
   }
 
-  /** An input that the browser did not time took less than 16 ms to handle; it counts as no delay. */
   #countRendererTiming(day: ResourceDay): void {
     const { longTasks, inputs, inputDelaysMs } = this.#rendererTiming;
     if (longTasks > 0) addCount(day, COUNTER.rendererLongTasks, longTasks);
@@ -389,6 +379,42 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       .pipe(toAnalyticsOperationFailure, Effect.uninterruptible);
   }
 
+  readonly #profileStalls = Effect.fn("ResourceMonitor.profileStalls")(function* (
+    this: ResourceMonitor,
+    mainLoopMs: { max: number; phase: LoopPhase } | null,
+    turnActive: boolean,
+  ) {
+    const stalled = mainLoopMs !== null && mainLoopMs.max >= PROFILE_STALL_MS;
+    const now = Date.now();
+    if (this.#profiler.running) {
+      const profile = yield* this.#profiler.stop();
+      if (!profile || !stalled) return;
+      this.#profileKeptAt = now;
+      this.#profileKeptStallMs = Math.max(this.#profileStartStallMs, mainLoopMs.max);
+      const summary: MainLoopStallProfile = {
+        stallMs: Math.round(mainLoopMs.max),
+        phase: mainLoopMs.phase,
+        turnActive,
+        hostKind: this.#device.hostKind,
+        ...summarizeCpuProfile(profile, this.#options.appPath),
+      };
+      this.#lastStallProfile = { at: new Date(now).toISOString(), ...summary };
+      yield* this.#writes
+        .withPermit(appendRotatingLines(this.#profilesFile, [JSON.stringify(this.#lastStallProfile)]))
+        .pipe(Effect.ignore);
+      this.#onStallProfile(summary);
+      return;
+    }
+    if (!stalled || mainLoopMs.phase === "startup" || mainLoopMs.phase === "resume") return;
+    if (this.#profileStartedAt !== null && now - this.#profileStartedAt < PROFILE_START_INTERVAL_MS) return;
+    const longerStall = mainLoopMs.max >= this.#profileKeptStallMs * PROFILE_LONGER_STALL_FACTOR;
+    if (this.#profileKeptAt !== null && now - this.#profileKeptAt < PROFILE_KEEP_INTERVAL_MS && !longerStall) return;
+    this.#profileStartedAt = now;
+    this.#profileStartStallMs = mainLoopMs.max;
+    yield* this.#profiler.start();
+    this.#measureLoop();
+  });
+
   readonly #sample = Effect.fn("ResourceMonitor.sample")(function* (this: ResourceMonitor) {
     const now = new Date();
     const today = localDay(now);
@@ -412,16 +438,27 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     const rss = new Map<ProcessGroup, number>();
     const privateMemory = new Map<ProcessGroup, number>();
     const cpu = new Map<ProcessGroup, number>();
+    const appCpuSeconds = new Map<string, number>();
+    const processorCount = cpus().length;
     for (const metric of metrics) {
       const group = processGroup(metric, tabPids);
       rss.set(group, (rss.get(group) ?? 0) + metric.memory.workingSetSize / 1024);
       const privateKb = metric.memory.privateBytes;
       if (privateKb !== undefined) privateMemory.set(group, (privateMemory.get(group) ?? 0) + privateKb / 1024);
-      cpu.set(group, (cpu.get(group) ?? 0) + metric.cpu.percentCPUUsage);
+      const processKey = `${metric.pid}:${metric.creationTime}`;
+      const cumulativeSeconds = metric.cpu.cumulativeCPUUsage;
+      if (cumulativeSeconds !== undefined) appCpuSeconds.set(processKey, cumulativeSeconds);
+      const usage = appProcessCpuPct(
+        metric,
+        this.#previousAppCpuSeconds.get(processKey),
+        elapsedSeconds,
+        processorCount,
+      );
+      cpu.set(group, (cpu.get(group) ?? 0) + usage);
     }
+    this.#previousAppCpuSeconds = appCpuSeconds;
 
     let providerTreeSupported = process.platform !== "win32";
-    // A failed `ps` gives a total with no providers in it, which is too low.
     const totalKnown = () => providerTreeSupported || process.platform === "win32";
     let trees: ProviderTreeUsage[] = [];
     if (providerTreeSupported) {
@@ -468,7 +505,6 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     const totalCpu = measured && treeCpu !== null ? sum(cpu.values()) + treeCpu : null;
     if (totalCpu !== null && totalKnown()) recordValue(day, METRIC.cpu("total"), totalCpu);
 
-    // Each window's p99, so one long task shows in the peak and not in every percentile.
     const mainLoopMs =
       this.#loop.count > 0
         ? {
@@ -489,7 +525,6 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       recordPeak(day, METRIC.mainLoop, mainLoopMs.max);
       if (mainLoopMs.max >= MAIN_LOOP_STALL_MS) {
         addCount(day, COUNTER.mainLoopStall);
-        // The line's time is the end of the minute that held the stall.
         this.#options.trace.record({
           kind: "stall",
           name: "main_loop",
@@ -499,6 +534,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       }
     }
 
+    yield* this.#profileStalls(mainLoopMs, turnInLoopWindow).pipe(Effect.ignoreCause);
     const statements = this.#options.statementTimings.drain();
     for (const duration of statements) recordValue(day, METRIC.database, duration);
     if (statements.length > 0) {
@@ -509,6 +545,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#countRendererTiming(day);
 
     const providerProcesses = sum(trees.map((tree) => tree.processCount));
+    const heap = getHeapStatistics();
     recordPeak(day, METRIC.activeTurns, this.#activeTurns.size);
     recordPeak(day, METRIC.browserTabs, tabPids.size);
     recordPeak(day, METRIC.providerProcesses, providerProcesses);
@@ -543,6 +580,10 @@ export class ResourceMonitor implements AnalyticsResourceSource {
         max: Math.round(mainLoopMs.max),
         phase: mainLoopMs.phase,
       },
+      mainHeapMb: {
+        used: Math.round(heap.used_heap_size / 1024 ** 2),
+        limit: Math.round(heap.heap_size_limit / 1024 ** 2),
+      },
       database: { statements: statements.length, maxMs: Math.round(Math.max(0, ...statements)) },
       activeTurns: this.#activeTurns.size,
       browserTabs: tabPids.size,
@@ -555,6 +596,18 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     if (closedDay || Date.now() - this.#persistedAt >= PERSIST_INTERVAL_MS) yield* this.#persist().pipe(Effect.ignore);
     if (closedDay) this.#onDayClosed();
   });
+}
+
+function appProcessCpuPct(
+  metric: ProcessMetric,
+  previousSeconds: number | undefined,
+  elapsedSeconds: number,
+  processorCount: number,
+): number {
+  const seconds = metric.cpu.cumulativeCPUUsage;
+  if (seconds === undefined) return metric.cpu.percentCPUUsage * processorCount;
+  if (previousSeconds === undefined || elapsedSeconds <= 0) return 0;
+  return (Math.max(0, seconds - previousSeconds) / elapsedSeconds) * 100;
 }
 
 function processGroup(metric: ProcessMetric, tabPids: ReadonlySet<number>): ProcessGroup {
@@ -590,9 +643,7 @@ function childType(details: Details): ChildType {
 interface WindowMemory {
   jsHeapUsedMb: number;
   jsHeapTotalMb: number;
-  /** Blink's garbage-collected heap: DOM nodes, styles and other page objects. Null when Chromium does not report it. */
   domHeapMb: number | null;
-  /** ArrayBuffer and typed array memory outside the V8 heap. Null when Chromium does not report it. */
   arrayBufferMb: number | null;
   domNodes: number | null;
   windows: number;
@@ -611,13 +662,6 @@ const decodeDomCounters = Schema.decodeUnknownOption(
   Schema.Struct({ nodes: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: MAX_WINDOW_DOM_NODES })) }),
 );
 
-/**
- * The heaps of the app window renderers, through the DevTools protocol from main: the page runs no
- * script for it, and the figures are exact (`performance.memory` is rounded and cached for minutes).
- * Each renderer process is read once. The session sends only the two read commands and ends at once.
- * A renderer that has another debugger session, is loading or does not answer makes the result null:
- * a part would be too low.
- */
 const measureWindowMemory = Effect.fnUntraced(function* (
   contents: readonly WebContents[],
   tabPids: ReadonlySet<number>,
@@ -684,7 +728,6 @@ const readWindowHeap = (page: WebContents) =>
         });
       const usage = decodeHeapUsage(yield* command("Runtime.getHeapUsage"));
       if (Option.isNone(usage)) return Option.none();
-      // The node count is extra: a renderer that does not give it still has its heap figures.
       const counters = yield* command("Memory.getDOMCounters").pipe(
         Effect.map(decodeDomCounters),
         Effect.orElseSucceed(() => Option.none()),
@@ -697,7 +740,6 @@ function loopDelayMs(nanoseconds: number): number {
   return Math.max(0, nanoseconds / 1e6 - LOOP_RESOLUTION_MS);
 }
 
-/** All processes, for the provider trees. The output stays in memory: it holds executable paths. */
 const listProcesses = Effect.callback<{ text: string; pid: number | undefined }, AnalyticsOperationFailure>(
   (resume) => {
     const child = execFile(

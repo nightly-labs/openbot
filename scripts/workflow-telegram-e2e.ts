@@ -1,13 +1,3 @@
-// Checks Telegram triggers and outputs of workflows on the real SQLite and the real workflow service, on
-// a temporary profile. The Telegram connection is a row in the real table; only the send to Telegram is
-// a stand-in, so no bot, provider, account or network is started. A new group conversation starts the
-// matching workflow; a reaction acts on its message; a reply does not post the trigger's raw event; a
-// message that Telegram gives again while its run is open is not skipped; a post needs no trigger
-// message; a webhook payload that copies the event cannot make an output reply to or react on a
-// Telegram message.
-//
-// Run: bun scripts/workflow-telegram-e2e.ts
-// Writes .openbot-build/workflow-telegram-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -33,7 +23,6 @@ const WAIT_MS = 5_000;
 
 interface Report {
   checks: string[];
-  /** The sends without their text: the action, the thread and the message. */
   sends: { connectionId: string; action: string; threadKey: string | null; messageId: string | null }[];
   passed: boolean;
   failure?: string;
@@ -46,7 +35,6 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   report.checks.push(name);
 };
 
-/** `hang` keeps the next sends open, so that their run stays open. */
 let answer: "posted" | "hang" = "posted";
 
 const node = (id: string, kind: WorkflowNode["kind"], fields: WorkflowNode["fields"], x: number): WorkflowNode => ({
@@ -55,7 +43,6 @@ const node = (id: string, kind: WorkflowNode["kind"], fields: WorkflowNode["fiel
   at: { x, y: 0 },
   fields,
 });
-/** A trigger with a reply output and a reaction output, both on the trigger's message. */
 const graphOf = (trigger: WorkflowNode): WorkflowGraph => ({
   nodes: [
     trigger,
@@ -149,7 +136,6 @@ async function workflowWith(workflows: WorkflowsHandle, title: string, graph: Wo
   return created.summary.id;
 }
 
-/** Waits for the newest run of a workflow to reach a state. */
 async function newestRun(
   workflows: WorkflowsHandle,
   workflowId: string,
@@ -205,7 +191,6 @@ try {
     sends.every((send) => send.action === "react" || !send.text.includes(EXTERNAL_EVENT_START)),
   );
 
-  // The reaction does not answer, so the run stays open.
   answer = "hang";
   const repeated = mentionOf("deploy again");
   check("a second message starts a run", (await runCauseEffect(workflows.receiveTelegram(repeated))) === "started");

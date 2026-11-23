@@ -1,29 +1,25 @@
-import type { LibraryFolder } from "@openbot/contracts/ipc";
-import { Button, ChevronRight, Folder } from "@openbot/ui";
+import type { LibraryFolder, StoredFileWorkflowFolder } from "@openbot/contracts/ipc";
+import { Button, ChevronRight, Folder, Waypoints } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import type { LibraryDropMark } from "./library-folder-drag";
 import type { LibraryLocation } from "./library-folders-view";
 
 interface LibraryPathHeadProps {
   place: LibraryLocation;
-  /** The name of the place: "All files", the agent, or the folder. */
   title: string;
-  /** The agent of the place, when the place is an agent or a folder. */
   agent: AgentProfile | undefined;
-  /** The folders above the folder of the place, from the top level down. */
   parents: readonly LibraryFolder[];
+  workflowFolder?: StoredFileWorkflowFolder | null | undefined;
   onGo: (place: LibraryLocation) => void;
-  /** The controls at the end of the row. */
+  dropMark: (agentId: string, folderId: string | null) => LibraryDropMark | undefined;
   children: JSX.Element;
 }
 
-/** The top row of the Library with folders: the path of the place, then the controls of the page. */
 export function LibraryPathHead(props: LibraryPathHeadProps) {
-  /** The agent of the current folder. It is the first step of the path. */
   const parentAgent = () => (props.place.kind === "folder" ? props.agent : undefined);
-  /** The agent whose files are the place. Its avatar is at the start of the title. */
   const headAgent = () => (props.place.kind === "agent" ? props.agent : undefined);
   return (
     <header class="library-path-head">
@@ -36,6 +32,9 @@ export function LibraryPathHead(props: LibraryPathHeadProps) {
                 variant="ghost"
                 size="sm"
                 class="library-crumb"
+                data-library-agent={agent.id}
+                data-library-drop="go"
+                data-drop={props.dropMark(agent.id, null) === "into" ? "into" : undefined}
                 onClick={() => props.onGo({ kind: "agent", agentId: agent.id })}
               >
                 <AgentAvatar agent={agent} class="library-path-avatar" />
@@ -55,6 +54,10 @@ export function LibraryPathHead(props: LibraryPathHeadProps) {
                 variant="ghost"
                 size="sm"
                 class="library-crumb"
+                data-library-agent={folder().agentId}
+                data-library-folder={folder().id}
+                data-library-drop="go"
+                data-drop={props.dropMark(folder().agentId, folder().id) === "into" ? "into" : undefined}
                 onClick={() => props.onGo({ kind: "folder", agentId: folder().agentId, folderId: folder().id })}
               >
                 <span class="library-truncate" dir="auto">
@@ -65,12 +68,33 @@ export function LibraryPathHead(props: LibraryPathHeadProps) {
             </>
           )}
         </For>
+        <Show when={props.place.kind === "workflow" ? props.workflowFolder : undefined} keyed>
+          {(folder) => (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="library-crumb"
+                onClick={() => props.onGo({ kind: "workflowFolder", folderId: folder.id })}
+              >
+                <span class="library-truncate" dir="auto">
+                  {folder.name}
+                </span>
+              </Button>
+              <ChevronRight class="library-path-rule" aria-hidden="true" />
+            </>
+          )}
+        </Show>
         <h2 class="library-path-current">
           <Show when={headAgent()} keyed>
             {(agent) => <AgentAvatar agent={agent} class="library-path-avatar" />}
           </Show>
-          <Show when={props.place.kind === "folder"}>
+          <Show when={props.place.kind === "folder" || props.place.kind === "workflowFolder"}>
             <Folder aria-hidden="true" />
+          </Show>
+          <Show when={props.place.kind === "workflow"}>
+            <Waypoints aria-hidden="true" />
           </Show>
           <span class="library-truncate" dir="auto">
             {props.title}

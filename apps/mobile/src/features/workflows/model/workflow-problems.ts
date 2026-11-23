@@ -14,16 +14,10 @@ const GRAPH_PROBLEM = {
 } as const satisfies Record<WorkflowGraphProblem, MobileTextKey>;
 
 export interface DraftProblems {
-  /** The problem of each step, which its row and its page show. */
   steps: ReadonlyMap<string, string>;
-  /** The first problem, with the step that has it, for the line at the top of the editor. */
   first: { nodeId: string | null; text: string } | null;
 }
 
-/**
- * What stops a save, step by step: the checks of the phone first, then the edge rules of the host, so
- * the editor names the step before the host refuses the graph.
- */
 export function draftProblems(draft: WorkflowDraft, agents: readonly MobileAgent[], t: MobileTranslate): DraftProblems {
   const steps = new Map<string, string>();
   const nodes = new Map(draft.graph.nodes.map((node) => [node.id, node]));

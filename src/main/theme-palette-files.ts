@@ -11,21 +11,14 @@ import { Effect, Option, Schema } from "effect";
 
 const logger = createOpenBotLogger("theme-palette-files");
 
-/** The folder in `userData` where other programs, such as Omarchy, write palette files. */
 export const THEME_PALETTE_DIRECTORY = "themes";
 
-/** A palette is a few hundred bytes. A larger file is not one, so it is not read. */
 const MAX_PALETTE_FILE_BYTES = 64 * 1024;
 
-/** The Settings list stays short, and a folder full of files does not slow the start. */
 const MAX_PALETTE_FILES = 32;
 
 const color = Schema.String.check(Schema.isPattern(APP_THEME_PALETTE_COLOR_PATTERN));
 
-/**
- * The file that another program writes. It is untrusted: it is decoded here, and only a hex color
- * passes to a CSS property. Extra keys are ignored, so a newer template still reads.
- */
 const ThemePaletteFile = Schema.Struct({
   name: Schema.String.check(Schema.isTrimmed(), Schema.isMinLength(1), Schema.isMaxLength(64)).check(
     Schema.isPattern(/^[^\p{Cc}]+$/u),
@@ -49,14 +42,12 @@ const ThemePaletteFile = Schema.Struct({
 
 const decodeThemePaletteFile = Schema.decodeUnknownOption(Schema.fromJsonString(ThemePaletteFile));
 
-/** The id of a palette file, or null when the name is not one. */
 function paletteId(fileName: string): string | null {
   if (!fileName.endsWith(".json")) return null;
   const id = fileName.slice(0, -".json".length);
   return isAppThemePaletteId(id) ? id : null;
 }
 
-/** One palette, or null when the file is missing, too large, not JSON or not a palette. */
 const readThemePalette = Effect.fn("ThemePaletteFiles.readOne")(function* (directory: string, id: string) {
   const path = join(directory, `${id}.json`);
   const text = yield* Effect.tryPromise(async () => {
@@ -78,10 +69,6 @@ const readThemePalette = Effect.fn("ThemePaletteFiles.readOne")(function* (direc
   } satisfies AppThemePalette;
 });
 
-/**
- * Every valid palette in the folder, by id. A missing or unreadable folder has none: a palette is an
- * extra, so it never stops the start.
- */
 export const readThemePalettes = Effect.fn("ThemePaletteFiles.read")(function* (directory: string) {
   const names = yield* Effect.tryPromise(() => readdir(directory)).pipe(Effect.orElseSucceed(() => []));
   const ids = names
@@ -93,11 +80,6 @@ export const readThemePalettes = Effect.fn("ThemePaletteFiles.read")(function* (
   return palettes.filter((palette) => palette !== null);
 });
 
-/**
- * Calls `onChange` after each change in the folder, and returns the function that stops. The folder
- * is made first, so a program that writes a palette later is seen without a restart. Omarchy
- * replaces the file with a rename, which the folder watch reports.
- */
 export const watchThemePalettes = Effect.fn("ThemePaletteFiles.watch")(function* (
   directory: string,
   onChange: () => void,

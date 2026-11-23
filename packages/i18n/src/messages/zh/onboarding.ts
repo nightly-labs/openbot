@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
-  // The saved setup could not be read. Retry, or set up again with no saved state.
   "onboarding.readFailed.title": "OpenBot 无法读取你的设置。",
   "onboarding.readFailed.description": "你的本地数据没有变化。请重试；如果问题仍然存在，请重新设置 OpenBot。",
   "onboarding.readFailed.setUpAgain": "重新设置",
@@ -83,6 +82,14 @@ export const messages = {
   "onboarding.choice.subscription": "使用我的 AI 订阅",
   "onboarding.choice.subscriptionDetail": "ChatGPT、Claude 或 Grok",
   "onboarding.choice.startFreeInstead": "改用免费模型",
+  "onboarding.existing.title": "欢迎回来。",
+  "onboarding.existing.description": "你的账户已在使用 OpenBot。打开一台服务器，在这里继续。",
+  "onboarding.existing.open": "打开 {name}",
+  "onboarding.existing.openDetail": "在这里打开它的助手和对话。",
+  "onboarding.existing.offlineDetail": "当前离线。开机后即可打开。",
+  "onboarding.existing.startNew": "在这台电脑上重新开始",
+  "onboarding.existing.startNewDetail": "在这里创建新团队。你的服务器会保留其助手和对话。",
+  "onboarding.existing.openFailed": "OpenBot 无法打开 {name}。",
   "onboarding.consent.notice": "继续即表示你接受{terms}并已阅读{privacy}。",
   "onboarding.consent.analyticsTitle": "帮助改进 OpenBot",
   "onboarding.consent.analyticsDetail": "与你的账号共享使用情况。绝不发送聊天或文件。",
@@ -99,7 +106,7 @@ export const messages = {
   "onboarding.action.connect": "连接",
   "onboarding.action.open": "打开 OpenBot",
   "onboarding.action.next": "下一步",
-  "onboarding.server.title": "设置 {server}",
+  "onboarding.server.title": "欢迎使用 {server}",
   "onboarding.server.description": "OpenBot 不包含 AI 订阅。在创建助手之前，请先为该服务器连接你自己的服务商。",
   "onboarding.server.label": "选择该服务器的 AI 服务商",
   "onboarding.server.hint": "登录状态保存在服务器上。之后可以为每个助手单独更改服务商。",

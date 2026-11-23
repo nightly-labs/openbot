@@ -1,14 +1,3 @@
-/*
- * Where the reader is in a long chat, on the end edge of the transcript (right in LTR, left in RTL).
- *
- * One tick per message the reader wrote, at the same spacing for each. The ticks the reader has passed
- * are stronger, and the tick of the current section is the longest. With a mouse, the ticks fade in
- * small when the pointer comes near, and grow when it is on the rail. Pointing at a tick brings in a
- * card through a blur, over a blur of the transcript, with the message and the start of its reply.
- *
- * The anchor sticks to the top of the scroll container with the viewport's height, and its negative
- * margin gives that height back, so the transcript under it does not move.
- */
 .chat-scroll-rail {
   --chat-scroll-rail-pitch: var(--openbot-space-2);
   --chat-scroll-rail-hit: clamp(12px, var(--chat-scroll-rail-inset, 20px), 20px);
@@ -21,9 +10,6 @@
   pointer-events: none;
 }
 
-/* Only the ticks take the pointer, so the messages beside them stay selectable. The nav reaches into
-   the container's side padding, so the ticks stand beside the messages. It is wider than the hit areas
-   by the room a tick takes when it grows. */
 .chat-scroll-rail-nav {
   position: absolute;
   top: 50%;
@@ -35,8 +21,6 @@
   transform: translateY(-50%);
 }
 
-/* A chat with more sections than the rail holds scrolls the ticks inside the rail, so every section
-   stays in reach; the track keeps the current one in view. */
 .chat-scroll-rail-track {
   position: relative;
   transition: opacity var(--chat-scroll-rail-quick) ease;
@@ -63,8 +47,6 @@
   display: flex;
 }
 
-/* A hit area as tall as the spacing and as wide as the side padding, so it does not cover the edge of
-   a message. */
 .chat-scroll-rail .chat-scroll-rail-link {
   position: relative;
   flex: none;
@@ -72,21 +54,18 @@
   height: auto;
   margin-inline-start: auto;
   padding: 0;
-  /* The button's border would move the ticks out of the side padding. */
   border: 0;
   border-radius: 0;
   outline: none;
   pointer-events: auto;
 }
 
-/* With a mouse, the ticks show only when the pointer is near the rail or a tick has focus. */
 @media (hover: hover) {
   .chat-scroll-rail:not([data-near]) .chat-scroll-rail-nav:not(:has(:focus-visible)) .chat-scroll-rail-track {
     opacity: 0;
   }
 }
 
-/* The ticks are small until the pointer or the focus is on the rail. */
 .chat-scroll-rail-tick {
   position: absolute;
   top: 50%;
@@ -114,19 +93,14 @@
   width: var(--openbot-space-2);
 }
 
-/* The ticks beside the one under the pointer grow a little, less the farther they are. */
 .chat-scroll-rail-nav:is(:hover, :has(:focus-visible))
-  :is(.chat-scroll-rail-item[data-open] + * + *, .chat-scroll-rail-item:has(+ * + [data-open]))
+  .chat-scroll-rail-item[data-open-distance="2"]
   .chat-scroll-rail-tick {
   width: 10px;
 }
 
 .chat-scroll-rail-nav:is(:hover, :has(:focus-visible))
-  :is(
-    .chat-scroll-rail-item[data-state="active"],
-    .chat-scroll-rail-item[data-open] + *,
-    .chat-scroll-rail-item:has(+ [data-open])
-  )
+  :is(.chat-scroll-rail-item[data-state="active"], .chat-scroll-rail-item[data-open-distance="1"])
   .chat-scroll-rail-tick {
   width: var(--openbot-space-3);
 }
@@ -136,9 +110,6 @@
   background: var(--openbot-text-primary);
 }
 
-/* The card stands level with its tick, toward the transcript. It is in a portal, because the mask that
-   fades the transcript's edges stops the blur of the messages under it. It comes in through a blur of
-   its own. */
 .chat-scroll-rail-card {
   --chat-scroll-rail-quick: var(--openbot-duration-overlay);
   --chat-scroll-rail-ease: var(--openbot-ease-out);
@@ -198,8 +169,6 @@
   line-clamp: 2;
 }
 
-/* The rules above name their own transitions, which outrank the global reduced-motion rule, so the
-   card would still blur in. */
 @media (prefers-reduced-motion: reduce) {
   .chat-scroll-rail .chat-scroll-rail-track,
   .chat-scroll-rail .chat-scroll-rail-tick,

@@ -2,6 +2,7 @@
 
 import {
   type AgentDockInputRect,
+  type DynamicIslandAction,
   type DynamicIslandPreference,
   IDLE_DYNAMIC_ISLAND_PRESENTATION,
 } from "@openbot/contracts/ipc";
@@ -9,8 +10,6 @@ import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dynamicIslandIpcHandlers } from "./dynamic-island-handlers";
 
-// Same reason as define-ipc-group.test.ts: electron cannot be imported outside an Electron process, so
-// registrations are captured.
 const { registrations } = vi.hoisted(() => ({
   registrations: new Map<string, (event: unknown, payload?: unknown) => unknown>(),
 }));
@@ -26,6 +25,7 @@ vi.mock("electron", () => ({
 const MAIN_ID = 1;
 const ISLAND_ID = 2;
 const OTHER_ID = 3;
+const CHAT_ID = 4;
 
 const PREFERENCE: DynamicIslandPreference = {
   enabled: true,
@@ -46,6 +46,7 @@ function register() {
   const regions: Array<[number, AgentDockInputRect[]]> = [];
   const xwayland: boolean[] = [];
   const saved: DynamicIslandPreference[] = [];
+  const actions: DynamicIslandAction[] = [];
   const { dynamicIsland } = dynamicIslandIpcHandlers({
     dynamicIsland: {
       mainRendererIds: new Set([MAIN_ID]),
@@ -59,7 +60,10 @@ function register() {
           return preference;
         }),
       publish: () => undefined,
-      performAction: () => Effect.void,
+      performAction: (action) =>
+        Effect.sync(() => {
+          actions.push(action);
+        }),
       performHaptic: () => undefined,
       setInteractive: () => undefined,
       setInputRegion: (rendererId, rects) => {
@@ -70,6 +74,7 @@ function register() {
       Effect.sync(() => {
         xwayland.push(enabled);
       }),
+    chatRendererIds: () => new Set([CHAT_ID]),
     keepXWayland: () => Effect.void,
   });
   for (const [name, bind] of Object.entries(dynamicIsland)) bind(`dynamicIsland:${name}`);
@@ -78,7 +83,7 @@ function register() {
     if (!listener) throw new Error(`No handler for ${name}.`);
     return listener(event(senderId), payload);
   };
-  return { regions, xwayland, saved, call };
+  return { regions, xwayland, saved, actions, call };
 }
 
 beforeEach(() => registrations.clear());
@@ -112,6 +117,20 @@ describe("dynamic island handlers", () => {
     expect(() => call("setXWayland", MAIN_ID, { enabled: "yes" })).toThrow("XWayland state is required");
     await call("setXWayland", MAIN_ID, { enabled: true });
     expect(xwayland).toEqual([true]);
+  });
+
+  it("opens a takeover page in the main window only for a chat window, with a whole page", async () => {
+    const { actions, call } = register();
+    const page = { serverId: "local", agentId: "agent-1", tabId: "tab-1" };
+    expect(() => call("openBrowserTakeover", MAIN_ID, page)).toThrow("outside the chat windows");
+    expect(() => call("openBrowserTakeover", ISLAND_ID, page)).toThrow("outside the chat windows");
+    expect(() => call("openBrowserTakeover", OTHER_ID, page)).toThrow("outside the chat windows");
+    expect(() => call("openBrowserTakeover", CHAT_ID, { ...page, tabId: "" })).toThrow("page is invalid");
+    expect(() => call("openBrowserTakeover", CHAT_ID, { serverId: "local", agentId: "agent-1" })).toThrow(
+      "page is invalid",
+    );
+    await call("openBrowserTakeover", CHAT_ID, page);
+    expect(actions).toEqual([{ type: "open-browser-takeover", ...page }]);
   });
 
   it("rejects a renderer outside the app", () => {

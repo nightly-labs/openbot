@@ -32,7 +32,6 @@ const meta = {
     hidden: false,
     suspended: false,
     contextKey: "local:chief",
-    defaultWidth: () => 320,
     maxWidth: () => 640,
     onWidthChange: fn(),
     onOpenTab: fn(),

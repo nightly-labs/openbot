@@ -1,12 +1,10 @@
 // @vitest-environment node
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
+import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves a table or
-// its marker; a newer or incomplete history is accepted; a proxy has a bad id, scheme, port or a
-// password without a user name; a profile points at no proxy, or at a proxy of no profile; a deleted
-// proxy or profile leaves its assignment behind. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -15,10 +13,12 @@ afterEach(() => {
 const PROFILE = "a".repeat(32);
 const PROXY = "b".repeat(32);
 const PROXY_TABLES = { browser_profile_proxies: [], browser_proxies: [] };
-// Migrations 58, 59 and 61 run after 56 and add these empty tables.
 const LATER_TABLES = {
   agent_usage_skill_loads: [],
   projection_messaging_pings: [],
+  projection_messaging_history: [],
+  ...CRM_TABLES_AFTER_MIGRATION,
+  ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
   projection_pinned_thread_messages: [],
 };
 
@@ -37,7 +37,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A memory, and from schema 45 on a named browser profile: the rows that migration 56 must keep. */
 function seed(db: DatabaseSync, version: number): void {
   db.prepare(`INSERT INTO projection_agent_memories
     (memory_id, agent_id, text, normalized_text, origin, source_turn_id, created_at, updated_at, last_event_sequence)
@@ -50,7 +49,6 @@ function seed(db: DatabaseSync, version: number): void {
 
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
@@ -62,7 +60,6 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** The source rows, and each agent memory has no site, as migration 60 adds it. */
 function withNoMemorySite(before: Contents): Contents {
   return {
     ...before,
@@ -75,7 +72,7 @@ function proxyTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 61 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 68 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -117,7 +114,6 @@ describe("browser proxy migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db, version);
-      // The earlier migrations run first; the rows after them are what v56 must keep.
       if (version < 55) migrateUpTo(db, 55);
       const before = contents(db);
       migrateOpenBotDatabase(db);
@@ -147,9 +143,9 @@ describe("browser proxy migration", () => {
     const db = databaseAt(55);
     seed(db, 55);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(62,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(69,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=62; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=69; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(proxyTables(db)).toEqual([]);

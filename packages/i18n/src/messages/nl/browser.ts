@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "{name} sluiten",
   "browser.tab.closeUnnamed": "Browsertabblad sluiten",
   "browser.newTab": "Nieuw browsertabblad",
-  "browser.hide": "Browser verbergen",
+  "browser.backToChat": "Terug naar chat",
   "browser.goBack": "Terug",
   "browser.goForward": "Vooruit",
   "browser.reload": "Pagina opnieuw laden",
@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Browserpop-up sluiten",
   "browser.pip.reattachFailed": "OpenBot kon de browser niet terugzetten.",
   "browser.pip.closeFailed": "OpenBot kon de browserpop-up niet sluiten.",
+  "browser.window.open": "Browser openen in nieuw venster",
+  "browser.window.openFailed": "OpenBot kon het browservenster niet openen.",
   "browser.popupBlocked.title": "Pop-up geblokkeerd",
   "browser.popupBlocked.dismiss": "Pop-upmelding sluiten",
   "browser.liveView.label": "Live weergave van de pagina op de server",
@@ -67,6 +69,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Deze tekst is te lang om te plakken. Plak minder dan 100.000 tekens.",
   "browser.liveView.copyTooLarge": "De selectie is te lang om te kopiëren. Selecteer minder tekst.",
   "browser.liveView.copyFailed": "Kan de tekst niet kopiëren. Klik op de pagina en probeer het opnieuw.",
+  "browser.liveView.pageCopied": "De pagina heeft tekst gekopieerd. Kies Kopiëren om die op je klembord te zetten.",
   "browser.previews.label": "Browservoorbeelden",
   "browser.previews.resize": "Grootte van rechterpaneel wijzigen",
   "browser.previews.empty": "Geen browsertabbladen",
@@ -98,6 +101,19 @@ export const messages = {
   "browser.secret.submitting": "Versturen…",
   "browser.secret.takeOver": "Overnemen",
   "browser.secret.failed": "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer het opnieuw.",
+  "browser.secret.ended": "Dit aanmeldverzoek is beëindigd. Vraag de agent het nog eens te proberen.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent een script op deze pagina heeft uitgevoerd. Vraag de agent de pagina opnieuw te laden en het nog eens te proberen.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent het verkeerde veld op de pagina heeft gekozen.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat de agent geen van de opgeslagen logins voor deze site heeft gekozen. Vertel de agent welk account hij moet gebruiken.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen wachtwoord voor deze site heeft.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen authenticatorsleutel heeft.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat je wachtwoordmanager niet gelezen kon worden.",
   "browser.error.openAddress": "Kan het adres niet openen in dit tabblad.",
   "browser.error.channelNoBrowserMember": "Geen lid kan een nieuw tabblad openen in dit kanaal.",
   "browser.error.closeTab": "Kan het browsertabblad niet sluiten.",

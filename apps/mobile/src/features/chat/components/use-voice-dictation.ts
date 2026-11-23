@@ -1,9 +1,7 @@
 import { referenceFrom } from "@openbot/user-errors";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Linking } from "react-native";
+import { AppState } from "react-native";
 import { type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
-import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import {
   isLocalRecognition,
@@ -19,11 +17,9 @@ import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
 import { isIOS } from "@/shared/lib/platform";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
-import { currentText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import {
   applyDictationResult,
-  type DictationNotice,
   type DictationPhase,
   type DictationTranscript,
   dictationDraft,
@@ -31,12 +27,19 @@ import {
   dictationNotice,
   emptyDictationTranscript,
   hasRecognitionLocale,
+  isRepeatedFinal,
   microphoneOffNotice,
   pickRecognitionLocale,
   retriesWithSystemService,
   spokenText,
 } from "../model/voice-dictation";
-import { type ModelRecognition, modelCaptureAvailable, useModelDictation } from "./use-model-dictation";
+import {
+  type ModelRecognition,
+  modelCaptureAvailable,
+  showNotice,
+  trackTurn,
+  useModelDictation,
+} from "./use-model-dictation";
 
 type Recognizer = NonNullable<typeof speechRecognition>;
 type StartOptions = Parameters<Recognizer["start"]>[0];
@@ -45,66 +48,28 @@ type SupportedLocales = { locales: string[]; installedLocales: string[] };
 interface DictationSession {
   base: string;
   transcript: DictationTranscript;
-  /** Null until permission and the locale are known. */
   options: StartOptions | null;
-  /**
-   * The native recognizer runs for this session. Events before that belong to
-   * an earlier one: `abort()` reports its `end` later, sometimes after the next
-   * mic press.
-   */
   native: boolean;
   heard: boolean;
-  /** `pending` restarts with the system service when the failed session ends. */
   fallback: "none" | "pending" | "used";
-  /** For analytics: when the recognizer started to listen, and when the user stopped it. */
   listeningAt: number | null;
   stoppingAt: number | null;
-  /** For analytics: why the session ended without text, when it did not end normally. */
   ending: "cancelled" | "permission_denied" | "operation_failed" | null;
 }
 
-/** One analytics event for each dictation session. It has no words of the transcript. */
-function trackTurn(current: DictationSession): void {
-  const now = performance.now();
-  const failed = current.ending === "permission_denied" || current.ending === "operation_failed";
-  const options = current.options;
-  mobileAnalytics.track("voice_turn", {
-    server_kind: "remote",
-    // iOS can use Apple's service where on-device recognition is not available, so iOS does not say which ran.
-    transcription: !options ? undefined : !options.requiresOnDeviceRecognition ? "cloud" : isIOS ? undefined : "local",
-    result: failed ? "failed" : current.ending === "cancelled" || !current.heard ? "cancelled" : "succeeded",
-    failure_code: !failed
-      ? undefined
-      : current.ending === "permission_denied"
-        ? "permission_denied"
-        : "operation_failed",
-    audio_duration_seconds:
-      current.listeningAt === null ? 0 : ((current.stoppingAt ?? now) - current.listeningAt) / 1_000,
-    // The time from the stop to the final text.
-    duration_ms: current.stoppingAt === null ? undefined : now - current.stoppingAt,
-  });
+function transcriptionOf(options: StartOptions | null): "cloud" | "local" | undefined {
+  return !options ? undefined : !options.requiresOnDeviceRecognition ? "cloud" : isIOS ? undefined : "local";
 }
 
-// The recognizer is one native session for the whole app, and every mounted
-// chat receives its events. Only the composer that started the session reacts.
 let owner: symbol | null = null;
 
-// A stop that never reports its end must not hold the composer. The draft
-// already has the last partial result, so nothing is lost.
 const STOP_TIMEOUT_MS = 3000;
 
 let cachedAvailable: boolean | null = null;
 
-/**
- * iOS answers for the phone's default locale and the network state at the time
- * of the call, which can change or differ from the dictation language. So iOS
- * only needs the module, and a failed start explains itself. Android answers
- * whether any recognition service is installed, which does not change.
- */
 function recognitionAvailable(): boolean {
   if (!speechRecognition) return false;
   if (isIOS) return true;
-  // Each chat asked again when it opened: on Android a synchronous package manager query.
   if (cachedAvailable !== null) return cachedAvailable;
   try {
     cachedAvailable = speechRecognition.isRecognitionAvailable();
@@ -114,9 +79,6 @@ function recognitionAvailable(): boolean {
   return cachedAvailable;
 }
 
-// On Android the service makes a recognizer on the main thread to list its languages, which each
-// chat did during its open animation. The list stays for one visit to the app: the user can install
-// a language in the meantime.
 let cachedLocales: Promise<SupportedLocales> | null = null;
 let forgetsLocalesOnReturn = false;
 
@@ -128,7 +90,6 @@ function supportedLocales(module: Recognizer): Promise<SupportedLocales> {
     });
   }
   cachedLocales ??= module.getSupportedLocales({}).catch((): SupportedLocales => {
-    // The next chat asks again.
     cachedLocales = null;
     return { locales: [], installedLocales: [] };
   });
@@ -136,8 +97,6 @@ function supportedLocales(module: Recognizer): Promise<SupportedLocales> {
 }
 
 async function recognitionOptions(module: Recognizer, supported: Promise<SupportedLocales>) {
-  // The phone's language list, not the app's locale. OpenBot has one
-  // localization, so the app's own locale can be English on a Polish phone.
   const chosen = useDictationLanguage.getState().value;
   const preferred =
     chosen !== AUTOMATIC_DICTATION_LANGUAGE
@@ -145,57 +104,24 @@ async function recognitionOptions(module: Recognizer, supported: Promise<Support
       : [...phoneLanguages(), Intl.DateTimeFormat().resolvedOptions().locale];
   const locales = await supported;
   const lang = pickRecognitionLocale(preferred, locales.locales);
-  // iOS applies this only where the recognizer supports it, and uses Apple's
-  // service otherwise. Android fails without an installed language model, so
-  // ask for on-device recognition only for an installed locale.
   const requiresOnDeviceRecognition =
     isIOS || (module.supportsOnDeviceRecognition() && hasRecognitionLocale(lang, locales.installedLocales));
   return { lang, requiresOnDeviceRecognition };
 }
 
-function showNotice(notice: DictationNotice, error?: unknown): void {
-  void haptics.notification("error");
-  const { t } = currentText();
-  showFailureAlert(
-    error,
-    "voice",
-    t(notice.title),
-    t(notice.message),
-    notice.openSettings
-      ? [
-          { text: t("common.cancel"), style: "cancel" },
-          { text: t("mobile.chat.dictation.openSettings"), onPress: () => void Linking.openSettings() },
-        ]
-      : undefined,
-  );
-}
-
 export interface VoiceDictation {
   available: boolean;
   phase: DictationPhase;
-  /** Input level from 0 to 1, for the listening indicator. */
   level: SharedValue<number>;
-  /**
-   * Starts listening. The speech goes after `base` in the draft. False when it
-   * cannot start: no recognizer, or another session still runs.
-   */
   start: (base: string) => boolean;
-  /** Stops listening and keeps the text. Resolves after the final result. */
   finish: () => Promise<void>;
-  /** Stops listening and puts back the draft from before the mic. */
   cancel: () => void;
 }
 
-/**
- * Live dictation into the composer draft with the phone's recognizer, in one
- * language. Each result replaces the spoken part of the draft, so the user sees
- * the text while speaking. Nothing is sent here.
- */
 function useSystemDictation({
   enabled,
   onDraft,
 }: {
-  /** False stops listening and keeps the text, for example when the chat goes offline. */
   enabled: boolean;
   onDraft: (text: string) => void;
 }): VoiceDictation {
@@ -207,8 +133,6 @@ function useSystemDictation({
   const session = useRef<DictationSession | null>(null);
   const finished = useRef<(() => void)[]>([]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Read after the chat opens, so a mic press does not wait for the service. A press before then
-  // asks the service itself.
   const locales = useRef<Promise<SupportedLocales> | null>(null);
   useEffect(() => {
     const module = speechRecognition;
@@ -229,7 +153,7 @@ function useSystemDictation({
   }, []);
 
   const settle = useCallback(() => {
-    if (session.current) trackTurn(session.current);
+    if (session.current) trackTurn(session.current, transcriptionOf(session.current.options));
     if (owner === id) owner = null;
     session.current = null;
     if (stopTimer.current) clearTimeout(stopTimer.current);
@@ -245,7 +169,6 @@ function useSystemDictation({
       speechRecognition.addListener("start", () => {
         if (owner !== id || !session.current?.native || phaseRef.current !== "starting") return;
         session.current.listeningAt ??= performance.now();
-        // The recognizer's session silences haptics, and the composer's controls tap while the user speaks.
         speechNative?.allowHapticsWhileRecording?.();
         update("listening");
         void haptics.impact("light");
@@ -254,10 +177,9 @@ function useSystemDictation({
         const current = session.current;
         if (owner !== id || !current?.native) return;
         current.heard = true;
-        current.transcript = applyDictationResult(current.transcript, {
-          isFinal: event.isFinal,
-          text: event.results[0]?.transcript ?? "",
-        });
+        const result = { isFinal: event.isFinal, text: event.results[0]?.transcript ?? "" };
+        if (isIOS && isRepeatedFinal(current.transcript, result)) return;
+        current.transcript = applyDictationResult(current.transcript, result);
         onDraftRef.current(dictationDraft(current.base, spokenText(current.transcript)));
       }),
       speechRecognition.addListener("error", (event) => {
@@ -273,12 +195,9 @@ function useSystemDictation({
           current.fallback = "pending";
           return;
         }
-        // The user stopped it. Android reports its own stop as a "client" error,
-        // and with nothing said any error there loses nothing. No message.
         if (phaseRef.current === "stopping" && (!current.heard || event.error === "client")) return;
         const notice = dictationNotice(event.error);
         if (notice) current.ending = event.error === "not-allowed" ? "permission_denied" : "operation_failed";
-        // The recognizer's error name is a fixed identifier, so it can be the code of the failure.
         if (notice) showNotice(notice, { reference: referenceFrom("speech", event.error) });
       }),
       speechRecognition.addListener("end", () => {
@@ -293,7 +212,6 @@ function useSystemDictation({
         settle();
       }),
       speechRecognition.addListener("volumechange", ({ value }) => {
-        // The platform reports -2 to 10, and anything below 0 is silence.
         if (owner === id && session.current?.native)
           level.set(withTiming(Math.min(1, Math.max(0, value / 10)), { duration: 100 }));
       }),
@@ -321,8 +239,6 @@ function useSystemDictation({
       };
       session.current = current;
       update("starting");
-      // A cancel, or a cancel and a new press, can happen during either wait.
-      // Only this session may continue.
       const stillCurrent = () => owner === id && session.current === current && phaseRef.current === "starting";
       void (async () => {
         try {
@@ -362,7 +278,6 @@ function useSystemDictation({
   const finish = useCallback((): Promise<void> => {
     if (owner !== id || !speechRecognition) return Promise.resolve();
     if (phaseRef.current === "starting") {
-      // No speech yet: the permission prompt or the recognizer is still opening.
       speechRecognition.abort();
       settle();
       return Promise.resolve();
@@ -396,18 +311,13 @@ function useSystemDictation({
   const foreground = useAppForeground();
   useEffect(() => {
     if (owner !== id) return;
-    // Android reports the app as in the background while its permission dialog
-    // is open, so the first press must not stop itself there.
     if (!enabled || (!foreground && phaseRef.current !== "starting")) void finish();
   }, [enabled, foreground, finish, id]);
 
   useEffect(
     () => () => {
-      // No recognizer event reaches this hook after it unmounts, so a `finish` that waits would wait
-      // forever. The draft already holds the last result.
       for (const resolve of finished.current.splice(0)) resolve();
       if (owner !== id) return;
-      // The draft already holds the last result, so leaving the chat keeps it.
       speechRecognition?.abort();
       owner = null;
       if (stopTimer.current) clearTimeout(stopTimer.current);
@@ -418,11 +328,6 @@ function useSystemDictation({
   return { available, phase, level, start, finish, cancel };
 }
 
-/**
- * The recognizer that Settings > Voice chose, when it can run now. A model on the phone needs its
- * download and enough memory, ElevenLabs needs a key, and both need a speech module with a
- * microphone. Otherwise the phone's recognizer listens, so the microphone always works.
- */
 function useActiveRecognition(): "system" | ModelRecognition {
   const recognition = useVoiceSettings((state) => state.recognition);
   const hasKey = useVoiceSettings((state) => state.hasElevenLabsKey);
@@ -439,22 +344,13 @@ function useActiveRecognition(): "system" | ModelRecognition {
   return "system";
 }
 
-/**
- * Live dictation into the composer draft with the recognizer of Settings > Voice: the phone's own,
- * Parakeet on the phone, or ElevenLabs Scribe. Nothing is sent here.
- */
 export function useVoiceDictation({
   enabled,
   onDraft,
   endsOnPause = false,
 }: {
-  /** False stops listening and keeps the text, for example when the chat goes offline. */
   enabled: boolean;
   onDraft: (text: string) => void;
-  /**
-   * A voice conversation: a recognizer that gives its text only at the end, the voice server, ends
-   * the session after the pause of Settings > Voice, so the turn can go.
-   */
   endsOnPause?: boolean;
 }): VoiceDictation {
   const engine = useActiveRecognition();

@@ -120,9 +120,17 @@ export const messages = {
   "provider.picker.download": "Descarga de {name}",
   "provider.picker.search": "Buscar modelos",
   "provider.picker.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "provider.picker.openrouterNoMatches":
+    "Ningún modelo coincide con tu búsqueda. Tus ajustes de privacidad, proveedores y guardrails en openrouter.ai pueden ocultar modelos de esta lista.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Estos modelos no funcionan con «Solo espacio de trabajo» en Windows y Linux. Para usarlos, cambia «Acceso» en los ajustes del agente.",
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
-  "provider.picker.noModels": "No hay modelos disponibles de {name}.",
+  "provider.picker.noModels":
+    "Aquí no se muestran modelos de {name}. Si están desactivados, un administrador puede activarlos en Ajustes del servidor > Proveedores > {name} > Modelos.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} ejecuta tus endpoints personalizados. Sus modelos están en la pestaña Personalizado.",
+  "provider.picker.showCustomModels": "Ver modelos",
   "provider.picker.museNoModels":
     "Muse no envió modelos para esta cuenta. Es posible que Muse no esté disponible en el país donde se ejecuta este agente. Elige un modelo de otro proveedor.",
   "provider.picker.customEmpty":
@@ -150,6 +158,8 @@ export const messages = {
   "provider.picker.selectEffort": "Seleccionar esfuerzo",
   "provider.picker.custom": "Personalizado",
   "provider.picker.cliReady": "{cli} listo",
+  "provider.picker.modelSourceProvider": "Usa {name} de tu configuración de {cli}",
+  "provider.picker.modelSourceCatalog": "Usa una lista de modelos de tu configuración de {cli}",
   "provider.status.signInRequired": "Es necesario iniciar sesión",
   "provider.model.free": "Gratis",
   "provider.model.new": "Nuevo",
@@ -169,22 +179,36 @@ export const messages = {
   "provider.geminiKey.title": "Clave de API de Gemini",
   "provider.geminiKey.description":
     "Guarda una clave de API de Gemini en este equipo. Una clave guardada se usa en lugar de tu cuenta de Google. Para iniciar sesión con Google, elimina la clave y selecciona Conectar en la fila de Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Guarda una clave de API de Gemini en el host. Una clave guardada se usa en lugar de tu cuenta de Google. Para iniciar sesión con Google, elimina la clave y selecciona Conectar en la fila de Gemini.",
   "provider.geminiKey.label": "Clave de API de Gemini",
   "provider.claudeKey.title": "Clave de API de Anthropic",
   "provider.claudeKey.description":
     "Guarda una clave de API de Anthropic en el host. Anthropic factura cada solicitud al crédito de API de la clave, no a tu plan de Claude. Para usarla en un agente, selecciona la cuenta «Clave de API» en el menú de modelos del agente. Si Claude no tiene sesión iniciada, todos los agentes usan la clave.",
   "provider.claudeKey.label": "Clave de API de Anthropic",
+  "provider.cursorKey.title": "Clave de API de Cursor",
+  "provider.cursorKey.description":
+    "Cada cuenta de Cursor después de la primera usa una clave de API. Crea una clave en el panel de Cursor, en Integrations, y pégala aquí. La clave se guarda en este equipo.",
+  "provider.cursorKey.descriptionHost":
+    "Cada cuenta de Cursor después de la primera usa una clave de API. Crea una clave en el panel de Cursor, en Integrations, y pégala aquí. La clave se guarda en el host.",
+  "provider.cursorKey.label": "Clave de API de Cursor",
   "provider.inceptionKey.title": "Clave de API de Inception",
   "provider.inceptionKey.description":
     "Guarda una clave de API de Inception en este equipo para usar los modelos Mercury. OpenBot los ejecuta en la CLI de Pi que descarga.",
+  "provider.inceptionKey.descriptionHost":
+    "Guarda una clave de API de Inception en el host para usar los modelos Mercury. OpenBot los ejecuta en la CLI de Pi que descarga.",
   "provider.inceptionKey.label": "Clave de API de Inception",
   "provider.deepseekKey.title": "Clave de API de DeepSeek",
   "provider.deepseekKey.description":
     "Guarda una clave de API de DeepSeek en este equipo para usar los modelos de DeepSeek. OpenBot los ejecuta en la CLI de Pi que descarga.",
+  "provider.deepseekKey.descriptionHost":
+    "Guarda una clave de API de DeepSeek en el host para usar los modelos de DeepSeek. OpenBot los ejecuta en la CLI de Pi que descarga.",
   "provider.deepseekKey.label": "Clave de API de DeepSeek",
   "provider.openrouterKey.title": "Clave de API de OpenRouter",
   "provider.openrouterKey.description":
     "Guarda una clave de API de OpenRouter en este equipo para usar los modelos que ofrece OpenRouter. OpenBot los ejecuta en la CLI de Pi que descarga.",
+  "provider.openrouterKey.descriptionHost":
+    "Guarda una clave de API de OpenRouter en el host para usar los modelos que ofrece OpenRouter. OpenBot los ejecuta en la CLI de Pi que descarga.",
   "provider.openrouterKey.label": "Clave de API de OpenRouter",
   "provider.openCodeKey.title": "Iniciar sesión en OpenCode Go",
   "provider.openCodeKey.description":
@@ -201,6 +225,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "No se pudo volver a conectar.",
   "provider.account.add": "Añadir cuenta",
   "provider.account.addLabel": "Añadir otra cuenta de {name}",
+  "provider.account.addWithCode": "Añadir cuenta con código",
   "provider.account.count": { one: "{count} cuenta", other: "{count} cuentas" },
   "provider.account.numbered": "Cuenta {number}",
   "provider.account.apiKey": "Clave de API",
@@ -247,15 +272,27 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
   "provider.settings.geminiKeyReplacesAccount":
     "Se usa una clave de API de Gemini guardada en lugar de un inicio de sesión de Google. Para usar un plan de Google y sus modelos, elimina la clave.",
+  "provider.settings.museKeyInUse":
+    "Muse usa esta clave, no tu inicio de sesión. Para usar tu inicio de sesión, elimina la clave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
   "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Sin usar: {version} · instalada por ti",
+  "provider.settings.otherVersionDownloaded": "Sin usar: {version} · descargada por OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Algunos modelos necesitan una parte que esta versión no tiene. Descarga la versión de OpenBot para usarlos.",
+  "provider.settings.useInstalledVersion": "Usar la instalada",
+  "provider.settings.useDownloadedVersion": "Usar la de OpenBot",
   "provider.settings.cache": "Caché",
   "provider.settings.promptCache": "Caché de prompts",
   "provider.settings.promptCacheDescription":
-    "Cuánto tiempo guarda Claude el contexto de un agente en la caché entre turnos.",
+    "Cuánto tiempo Claude y Pi guardan el contexto de un agente en la caché entre turnos.",
   "provider.settings.promptCacheHour": "1 hora",
-  "provider.settings.promptCacheDefault": "Predeterminado de Claude Code",
+  "provider.settings.promptCacheDefault": "Predeterminado del proveedor",
   "provider.settings.promptCacheLoadFailed": "No se pudo cargar la duración de la caché de prompts de este servidor.",
+  "provider.settings.cacheExpiryCompaction": "Compactar antes de que caduque la caché",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Cuando un chat con 200K o más tokens de contexto está inactivo con una caché de 1 hora, el agente compacta el contexto antes de que caduque la caché. Así el siguiente mensaje no vuelve a leer todo el contexto sin caché.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "No se pudo cargar el ajuste de compactación de este servidor.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Usar mi configuración de Claude Code",
   "provider.settings.claudeUserSetupDescription":
@@ -270,6 +307,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Predeterminado de Claude Code",
   "provider.settings.compactWindowTokens": "{size} tokens",
   "provider.settings.compactWindowLoadFailed": "No se pudo cargar el tamaño de compactación de este servidor.",
+  "provider.settings.environment": "Entorno",
+  "provider.settings.environmentVariables": "Variables",
+  "provider.settings.environmentDescription":
+    "Claves de API, URL base y otros ajustes que recibe cada proceso de {name}. Un cambio se aplica cuando terminan los turnos en curso.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, con OPENAI_API_KEY como clave, envía las solicitudes de modelo de ChatGPT a esa dirección.",
+  "provider.settings.environmentShellNote": "Los comandos que ejecutan los agentes pueden leer estos valores.",
+  "provider.settings.environmentAdd": "Añadir variable",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Valor",
+  "provider.settings.environmentSaved": "Guardada",
+  "provider.settings.environmentSensitive": "Sensible",
+  "provider.settings.environmentNameLabel": "Nombre de la variable {index}",
+  "provider.settings.environmentValueLabel": "Valor de {name}",
+  "provider.settings.environmentSensitiveLabel": "Mantener {name} en secreto",
+  "provider.settings.environmentRemoveLabel": "Quitar {name}",
+  "provider.settings.environmentUnnamed": "variable {index}",
+  "provider.settings.environmentPending":
+    "Al guardar, {name} se reinicia cuando terminan sus turnos en curso. Los valores sensibles se quedan en el servidor.",
+  "provider.settings.environmentDone": "Guardado. {name} se reinicia cuando terminan sus turnos en curso.",
+  "provider.settings.environmentDiscard": "Descartar",
+  "provider.settings.environmentSave": "Guardar",
+  "provider.settings.environmentLoadFailed": "No se pudieron cargar las variables de {name}.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece en el selector de modelos.",
@@ -290,4 +350,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "No se pudo quitar la descarga.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} en tu terminal mantiene su propia sesión.",
+  "provider.settings.updateAll": "Actualizar todo",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,15 +1,5 @@
-/**
- * The LaTeX delimiters that desktop, web and mobile read in a message, so each app typesets the
- * same text. Inline math is `$...$` or `\(...\)`; display math is `$$...$$` or `\[...\]`.
- *
- * A single `$` opens math only before a character that is not a space, and closes it only after a
- * character that is not a space and before a character that is not a digit. So "costs $5 and $10"
- * stays text.
- */
 export interface ChatMath {
-  /** The source that the math replaces, delimiters included. */
   raw: string;
-  /** The LaTeX between the delimiters. */
   tex: string;
   display: boolean;
 }
@@ -19,13 +9,11 @@ const DISPLAY_DELIMITERS = [
   ["\\[", "\\]"],
 ] as const;
 
-/** The first index in `source` where inline math can start, if any. */
 export function chatMathStart(source: string): number | undefined {
   const index = source.search(/\$|\\[([]/u);
   return index === -1 ? undefined : index;
 }
 
-/** The math at the start of `source`, inside a line of text. */
 export function inlineChatMath(source: string): ChatMath | null {
   for (const [open, close] of DISPLAY_DELIMITERS) {
     if (source.startsWith(open)) return delimitedMath(source, open, close, true);
@@ -50,17 +38,12 @@ export function inlineChatMath(source: string): ChatMath | null {
   return null;
 }
 
-/** The first index in `source` where a display math block can start at the start of a line. */
 export function chatMathBlockStart(source: string): number | undefined {
   const match = /(?:^|\n) {0,3}(?:\$\$|\\\[)/u.exec(source);
   if (!match) return undefined;
   return match[0].startsWith("\n") ? match.index + 1 : match.index;
 }
 
-/**
- * A display math block at the start of `source`: `$$` or `\[` at the start of a line, and the
- * closing delimiter at the end of a line.
- */
 export function blockChatMath(source: string): ChatMath | null {
   const indent = /^ {0,3}/u.exec(source)?.[0].length ?? 0;
   const rest = source.slice(indent);
@@ -75,9 +58,15 @@ export function blockChatMath(source: string): ChatMath | null {
   return null;
 }
 
+export function chatMathBlockInterrupts(source: string, end: number): boolean {
+  for (let line = source.indexOf("\n") + 1; line > 0 && line < end; line = source.indexOf("\n", line) + 1) {
+    if (blockChatMath(source.slice(line))) return true;
+  }
+  return false;
+}
+
 function delimitedMath(source: string, open: string, close: string, display: boolean): ChatMath | null {
   for (let index = open.length; index < source.length; index += 1) {
-    // `\\` is a LaTeX line break, so its second backslash does not start `\)` or `\]`.
     if (source.startsWith("\\\\", index)) {
       index += 1;
       continue;
@@ -86,7 +75,6 @@ function delimitedMath(source: string, open: string, close: string, display: boo
       const tex = source.slice(open.length, index);
       return tex.trim() ? { raw: source.slice(0, index + close.length), tex: tex.trim(), display } : null;
     }
-    // `\$` is a dollar sign, not the end of `$$`.
     if (source[index] === "\\" && close.startsWith("$")) index += 1;
   }
   return null;

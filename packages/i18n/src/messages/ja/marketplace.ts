@@ -91,6 +91,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "一部のアプリまたはスキルがインストールされていません。再接続するとインストールされます。",
   "marketplace.app.notConnected": "未接続",
+  "marketplace.app.paused": "一時停止中",
   "marketplace.app.custom": "MCP サーバー",
   "marketplace.app.githubTagline": "リポジトリ、Issue、プルリクエスト",
   "marketplace.app.onePasswordTagline": "共有したログイン情報でサイトにサインイン",
@@ -115,6 +116,10 @@ export const messages = {
   "marketplace.app.remove.action": "削除",
   "marketplace.app.remove.confirmTitle": "{name} を削除しますか？",
   "marketplace.app.remove.keep": "残す",
+  "marketplace.app.replace.title": "{server} を置き換えますか?",
+  "marketplace.app.replace.description":
+    "{server} という名前のサーバーがすでにありますが、{name} ではありません。{name} に置き換えますか? そのアドレスと保存されたキーは削除されます。",
+  "marketplace.app.replace.action": "置き換え",
   "marketplace.app.connection": "接続",
   "marketplace.app.access.use": "使用可能",
   "marketplace.app.access.noAgents": "エージェントなし",
@@ -132,6 +137,7 @@ export const messages = {
     "{host} の OpenBot は古いバージョンのため、アプリを接続できません。{host} の OpenBot をアップデートするか、オーナーにアップデートを依頼してください。",
   "marketplace.app.blocked.member":
     "{host} でアプリを接続できるのはオーナーまたは管理者だけです。{name} の接続か、メンバーもアプリを接続できるよう {host} の OpenBot のアップデートを依頼してください。",
+  "marketplace.app.blocked.mac": "{name} は OpenBot を実行している Mac でのみ動作します。",
   "marketplace.app.connectAgain": "もう一度接続",
   "marketplace.app.automation.askOnInstall": "インストール時に macOS にアクセスを求める",
   "marketplace.app.automation.title": "Apple アプリへのアクセス",
@@ -251,6 +257,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield で、木のテーブルに置いた陶器のマグカップの商品写真を作ってください。",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield で、夕暮れの波の 5 秒の動画を作ってください。",
+  "marketplace.plugin.sunra.tagline": "AI による画像、動画、音声、3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra を使うと、エージェントは GPT Image、Nano Banana、Seedream、FLUX、Seedance、Kling、Veo などのモデルで画像、動画、音声、3D モデルを作成し、クレジット残高を確認し、結果を取得できます。結果はユーザーの Sunra アカウント内のプロジェクトに保存されます。各ユーザーはブラウザで自分の Sunra アカウントにサインインします。Sunra は生成ごとに先に費用を提示し、確認されてからそのアカウントのクレジットを使います。",
+  "marketplace.plugin.sunra.app":
+    "Sunra の MCP サーバー経由で、画像・動画・音声・3D の生成、クレジット、結果を扱います。ブラウザでサインインします。",
+  "marketplace.plugin.sunra.prompt.balance": "Sunra のクレジットはどれくらい残っていますか？",
+  "marketplace.plugin.sunra.prompt.poster": "Sunra で、雨の夜市のポスターを縦長で作ってください。",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Sunra で、川を流れる紙の船の 5 秒の動画を作ってください。先に費用を教えてください。",
   "marketplace.plugin.elevenlabs.tagline": "音声、ボイス、音声エージェント",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs を使うと、エージェントがテキストを音声に変換し、ボイスを扱い、ElevenLabs の音声エージェントとその会話を作成、テスト、確認できます。生成された音声は短時間だけ有効なダウンロードリンクで返されます。各ユーザーはブラウザーで自分の ElevenLabs アカウントにサインインし、生成ごとにそのアカウントのクレジットを使います。",
@@ -387,7 +402,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "この決定を保管庫に新しいノートとして保存してください。",
   "marketplace.plugin.obsidian.prompt.log": "今日の作業のまとめを「作業ログ」ノートに追加してください。",
   "marketplace.plugin.obsidian.hint.apiKey":
-    'Obsidian で Settings > Local REST API を開きます。API キーをコピーし、"Enable non-encrypted (HTTP) server" をオンにしてください。',
+    "Obsidian で Settings > Local REST API を開き、API キーをコピーしてください。",
   "marketplace.plugin.resend.tagline": "トランザクションメール",
   "marketplace.plugin.resend.description":
     "Resend を使うと、エージェントは 1 つの API でトランザクションメールを送信し、配信を確認できます。Resend ダッシュボードの API キーは、1 つの環境変数としてローカルサーバーに渡されます。",
@@ -398,14 +413,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "新しいフロー用のパスワードリセットメールの下書きを作成してください。",
   "marketplace.plugin.omnisend.tagline": "メールとSMSのマーケティング",
   "marketplace.plugin.omnisend.description":
-    "Omnisend を使うと、エージェントはキャンペーンとフォームのレポートを読み、連絡先とセグメントを探し、キャンペーン、オートメーション、メールテンプレート、フォーム、商品を作成・編集できます。各ユーザーはブラウザで自分の Omnisend アカウントにサインインし、同意画面でアクセスレベルを選びます。書き込みアクセスがあると、エージェントはキャンペーンの送信やデータの削除もできます。レポートだけが必要な場合は読み取り専用アクセスを選んでください。",
+    "Omnisend を使うと、エージェントはキャンペーンとフォームのレポートを読み、連絡先とセグメントを探し、キャンペーン、オートメーション、メールテンプレート、フォーム、商品を作成・編集できます。各ユーザーは自分の Omnisend アカウントの API キーで接続します。エージェントはキーが許可する操作ができ、キャンペーンの送信やデータの削除も含まれる場合があります。",
   "marketplace.plugin.omnisend.app":
-    "キャンペーン、オートメーション、連絡先、セグメント、フォーム、レポート。ブラウザでサインインし、Omnisend の MCP サーバー経由で使います。",
+    "キャンペーン、オートメーション、連絡先、セグメント、フォーム、レポート。API キーを使い、Omnisend の MCP サーバー経由で使います。",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "先週のキャンペーンの成果は、その前の週と比べてどうでしたか?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP セグメントには何件の連絡先があり、今月どう変わりましたか?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
   "marketplace.plugin.postiz.tagline": "SNS投稿の予約",
+  "marketplace.plugin.omnisend.hint.apiKey": "Omnisend で Store settings > API keys を開き、キーを作成してください。",
   "marketplace.plugin.postiz.description":
     "Postiz を使うと、エージェントが SNS チャンネルを一覧表示し、X、LinkedIn、Instagram、TikTok など 30 以上のネットワークで投稿の下書き、予約、公開を行えます。メディアのアップロードや AI による画像と動画の作成もできます。ブラウザで Postiz アカウントにサインインするか、Postiz の Settings › Developers にある API キーを貼り付けてください。Postiz のすべてのクラウドプランに API アクセスが含まれます。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
   "marketplace.plugin.postiz.app":
@@ -414,6 +430,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "来週に予約されている投稿はどれですか?",
   "marketplace.plugin.postiz.prompt.draft":
     "新しいリリースについての LinkedIn 投稿の下書きを作成して。ただし予約はしないで。",
+  "marketplace.plugin.trypost.tagline": "ソーシャルメディアの予約投稿",
+  "marketplace.plugin.trypost.description":
+    "TryPost を使うと、エージェントは接続済みのチャンネルを一覧し、X、LinkedIn、Instagram、Facebook、TikTok、YouTube、Threads、Bluesky、Mastodon、Pinterest などへの投稿を下書き、予約、キューへの追加、公開できます。分析の確認、アイデアと承認の管理、投稿時間の設定もできます。ブラウザで TryPost アカウントにサインインし、ワークスペースを選んでください。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
+  "marketplace.plugin.trypost.app":
+    "TryPost の MCP サーバーとブラウザでのサインインによる、チャンネル、投稿、キュー、アイデア、分析。",
+  "marketplace.plugin.trypost.prompt.week": "今週予約されている投稿はどれですか？",
+  "marketplace.plugin.trypost.prompt.draft":
+    "新しいリリースについての LinkedIn 投稿を下書きしてください。ただし予約はしないでください。",
+  "marketplace.plugin.trypost.prompt.analytics": "先月の投稿のうち、エンゲージメントが最も高かったのはどれですか？",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub など 1,000 以上のアプリ",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など 1,000 以上のアプリに接続します。Composio アカウントでサインインしてください。エージェントがアプリを必要とすると、そのアプリの接続を求めます。",
@@ -574,6 +599,14 @@ export const messages = {
   "marketplace.skills.origin.local": "このコンピューターで作成",
   "marketplace.skills.origin.workspace": "このエージェントのフォルダー内",
   "marketplace.skills.origin.marketplace": "マーケットプレイスから · バージョン {version}",
+  "marketplace.skills.origin.github": "GitHub から · {repository}",
+  "marketplace.skills.github.search": "検索、または GitHub のリンクを貼り付け",
+  "marketplace.skills.github.reading": "リポジトリ内のスキルを探しています",
+  "marketplace.skills.github.trust":
+    "GitHub のスキルは OpenBot が確認したものではありません。追加する前にスキルの内容を読んでください。",
+  "marketplace.skills.github.source": "GitHub · {repository}（コミット {commit}）",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "GitHub で {repository} を開く",
   "marketplace.skills.status.notAdded": "未追加",
   "marketplace.skills.status.on": "{agents} でオン",
   "marketplace.skills.agentCount": { other: "エージェント {count} 件" },
@@ -624,6 +657,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "{name} は、これらのエージェントを実行するコンピューターにインストールしてください。そのアプリはブラウザーでのサインインが必要です。",
   "marketplace.error.appInvalid": "{name} を追加できません: {reason}",
+  "marketplace.error.appNotConnected": "{name} に接続できません: {reason}",
   "marketplace.error.uninstallNoServer": "プラグインをアンインストールするローカルサーバーを選択してください。",
   "marketplace.error.uninstallPartial": "{name} の一部を削除できませんでした。{failures}",
   "marketplace.error.actionFailed": "マーケットプレイスの操作を完了できませんでした。もう一度お試しください。",

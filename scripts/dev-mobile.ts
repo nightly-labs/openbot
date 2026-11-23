@@ -1,8 +1,3 @@
-// Starts this worktree's desktop stack and the iOS simulator app, then pairs
-// them without a camera: the desktop issues a Mobile Connect ticket over CDP and
-// `simctl openurl` hands the QR link to the development build, which redeems it.
-// The ticket is a credential, so it is never printed.
-
 import { type ChildProcess, execFile, spawn } from "node:child_process";
 import { connect } from "node:net";
 import { dirname } from "node:path";
@@ -19,7 +14,6 @@ const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const MOBILE_BUNDLE_ID = "run.openbot.mobile";
 const DEFAULT_METRO_PORT = 8081;
 const DESKTOP_TIMEOUT_MS = 5 * 60_000;
-// The first native build takes minutes.
 const METRO_TIMEOUT_MS = 20 * 60_000;
 const TICKET_TIMEOUT_MS = 3 * 60_000;
 const PAIRING_ATTEMPTS = 4;
@@ -28,7 +22,6 @@ const POLL_INTERVAL_MS = 1_000;
 
 const writeLine = (line: string) => process.stderr.write(`${line}\n`);
 const logger = createOpenBotLogger("dev-mobile", writeLine, "info");
-// The CDP client reports every connection, and pairing polls the desktop each second.
 const cdpLogger = createOpenBotLogger("dev-mobile", writeLine, "warn");
 const runCommand = promisify(execFile);
 
@@ -52,7 +45,6 @@ export function parseDevMobileArgs(argv: string[]): DevMobileOptions {
   return { pairOnly, simulator, metroPort: readMetroPort(mobileArgs), mobileArgs };
 }
 
-// `expo run:ios` takes `--port <n>`, `--port=<n>` and `-p <n>`.
 function readMetroPort(args: string[]): number {
   for (const [index, arg] of args.entries()) {
     const raw = arg.startsWith("--port=")
@@ -66,8 +58,6 @@ function readMetroPort(args: string[]): number {
   return DEFAULT_METRO_PORT;
 }
 
-// Metro lists a JavaScript runtime once the app has started it. A link opened
-// before that can reach the old build or nothing at all.
 export function hasMobileRuntime(targets: unknown): boolean {
   return (
     Array.isArray(targets) && targets.some((target) => isDynamicRecord(target) && target.appId === MOBILE_BUNDLE_ID)
@@ -137,8 +127,6 @@ async function waitFor<T>(label: string, timeoutMs: number, probe: () => Promise
   throw new Error(`Timed out waiting for ${label}.${lastError ? ` Last error: ${lastError}` : ""}`);
 }
 
-// Every worktree builds the same bundle id, so a Metro that already listens on
-// the port would report another worktree's app as this one.
 function isPortInUse(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = connect({ host: "127.0.0.1", port });
@@ -152,16 +140,12 @@ function isPortInUse(port: number): Promise<boolean> {
 
 function findWorktreeDesktop(): DevInstanceRecord | null {
   const selection = selectDevInstance(readDevInstanceRecords(), { projectRoot, service: "app" });
-  // Apps of other worktrees are also "ambiguous" when this worktree runs none. Only extra apps of
-  // this worktree stop the start.
   if (selection.kind === "ambiguous" && selection.candidates.some((record) => isSameWorktree(record, projectRoot))) {
     throw new Error("This worktree runs more than one dev app. Stop the extra one with `bun run dev:stop`.");
   }
   return selection.kind === "selected" && selection.match === "worktree" ? selection.record : null;
 }
 
-// Evaluated in the app window, so these are strings: this file is typechecked
-// against Node globals and knows nothing about `window`.
 async function evaluateInDesktop<T>(
   desktop: DevInstanceRecord,
   expression: string,
@@ -185,8 +169,6 @@ function readPairingLink(ticket: unknown): string {
 }
 
 async function createPairingLink(desktop: DevInstanceRecord): Promise<string> {
-  // The desktop publishes its host on the first request, which can fail while
-  // the dev account signs in or the Signal service starts.
   return waitFor("a Mobile Connect ticket from the desktop", TICKET_TIMEOUT_MS, async () => {
     return evaluateInDesktop(desktop, "window.openbot.auth.createMobileConnect()", readPairingLink);
   });
@@ -200,9 +182,7 @@ async function selectSimulator(requested: string | null): Promise<string> {
     try {
       await runCommand("xcrun", ["simctl", "get_app_container", udid, MOBILE_BUNDLE_ID]);
       withApp.push(udid);
-    } catch {
-      // OpenBot is not installed on this simulator.
-    }
+    } catch {}
   }
   const [udid, ...extra] = withApp;
   if (!udid) throw new Error("No booted simulator has OpenBot installed. Run without --pair-only to build it.");
@@ -214,14 +194,11 @@ async function selectSimulator(requested: string | null): Promise<string> {
 
 async function pairSimulator(desktop: DevInstanceRecord, simulator: string): Promise<void> {
   for (let attempt = 1; attempt <= PAIRING_ATTEMPTS; attempt += 1) {
-    // A new ticket each attempt: it lives two minutes and issuing one consumes
-    // the previous one, so no unused ticket stays valid.
     const link = await createPairingLink(desktop);
     const sentAt = Date.now() - 1_000;
     try {
       await runCommand("xcrun", ["simctl", "openurl", simulator, link]);
     } catch {
-      // The command error repeats its arguments, and the link holds the ticket.
       throw new Error(`simctl could not open the Mobile Connect link on simulator ${simulator}.`);
     }
     try {
@@ -256,13 +233,11 @@ async function main(): Promise<void> {
   if (desktop) logger.info("Reusing this worktree's dev app.");
   else startChild("bun run dev", "bun", ["scripts/dev-services.ts", "app"], "ignore");
   if (!options.pairOnly) {
-    // Metro reads keyboard shortcuts, so it owns the terminal input.
     startChild("bun mobile:ios", "bun", ["scripts/mobile-ios.ts", ...options.mobileArgs], "inherit");
   }
   const forward = (signal: NodeJS.Signals) => {
     for (const { child } of children) child.kill(signal);
   };
-  // Ctrl+C reaches the children through the process group. Wait for them to stop.
   process.on("SIGINT", () => {
     if (children.length === 0) process.exit(130);
   });
@@ -280,7 +255,6 @@ async function main(): Promise<void> {
     }
     await pairSimulator(desktop, await selectSimulator(options.simulator));
   } catch (error) {
-    // Keep the desktop and Metro running, so `--pair-only` can try again.
     logger.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   }

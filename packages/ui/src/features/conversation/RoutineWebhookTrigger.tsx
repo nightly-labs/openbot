@@ -6,37 +6,32 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, Show } from "solid-js";
 import { useText } from "../../text";
 import { CodeBlock } from "./CodeBlock";
-import { RoutineWebhookSecretField, RoutineWebhookUrlField } from "./RoutineWebhookEndpoint";
+import {
+  type RoutineWebhookAgentSecret,
+  RoutineWebhookSecretField,
+  RoutineWebhookUrlField,
+} from "./RoutineWebhookEndpoint";
 import { RoutineWebhookEvents } from "./RoutineWebhookEvents";
 
 export interface RoutineWebhookTriggerProps {
-  /** The URL the host made. Null until the relay registers the route. */
   url: string | null;
-  /** True when the saved routine has a webhook trigger, so a URL and a secret exist. */
   saved: boolean;
-  /** The relay connection of the host. Null when it is not known. */
   connected: boolean | null;
   eventType: string;
   filters: EventFilterDraft[];
   onEventTypeChange: (eventType: string) => void;
   onFiltersChange: (filters: EventFilterDraft[]) => void;
-  /** The signing secret that the host returned once. Null when there is nothing to show. */
   secret: string | null;
   onSecretDismiss: () => void;
-  /** Makes a new secret. The parent shows it through `secret`. */
   onRegenerateSecret: () => Promise<void>;
-  /** Replaces the secret with one that the sender made. Leave it out when the host cannot do this. */
   onUseSenderSecret?: ((secret: string) => Promise<void>) | undefined;
-  /** A control at the end of the header, such as the menu that changes the trigger. */
+  agentSecret?: RoutineWebhookAgentSecret | undefined;
   menu?: JSX.Element;
-  /** Saves a new routine, so the host makes its URL and secret. Without it the card only asks for a save. */
   onSave?: (() => void) | undefined;
   saving?: boolean | undefined;
-  /** Sends one signed test event to the saved routine. Without it the card leaves out the test step. */
   onSendTest?: (() => Promise<WebhookTestResult>) | undefined;
 }
 
-/** What the card keeps about its steps. A copy or a test in this view marks its step done. */
 interface WebhookStepsState {
   urlCopied: boolean;
   secretCopied: boolean;
@@ -52,7 +47,6 @@ const IGNORED_TEXT = {
   inactive: "routine.webhook.testIgnoredInactive",
 } as const satisfies Record<NonNullable<WebhookTestResult["reason"]>, AppTextKey>;
 
-/** A request that a sender can copy. The secret stays in an environment variable, not in the text. */
 function curlExample(url: string): string {
   return [
     `BODY='{"type":"order.created","data":{"order":{"status":"paid"}}}'`,
@@ -67,11 +61,6 @@ function curlExample(url: string): string {
   ].join("\n");
 }
 
-/**
- * The webhook trigger as one card with numbered steps: copy the URL, add the signing secret to the
- * sender, and send a test event. Each step shows a check when it is done. The events that start the
- * routine stay under the steps.
- */
 export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
   const { t, errorMessage } = useText();
   const [steps, setSteps] = createStore<WebhookStepsState>({
@@ -82,8 +71,6 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
     result: null,
     testError: null,
   });
-  // The editor can keep this card when it opens another routine, so a new endpoint clears the
-  // steps. A new secret, such as after Regenerate, must be copied again.
   let shownUrl = props.url;
   createEffect(
     () => props.url,
@@ -107,7 +94,6 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
         });
     },
   );
-  /** The sender's secret is already in the sender, so saving it here finishes step 2. */
   function senderSecretAction(): ((secret: string) => Promise<void>) | undefined {
     const action = props.onUseSenderSecret;
     if (!action) return undefined;
@@ -116,6 +102,20 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
       setSteps((state) => {
         state.secretCopied = true;
       });
+    };
+  }
+  function agentSecretAction(): RoutineWebhookAgentSecret | undefined {
+    const action = props.agentSecret;
+    if (!action) return undefined;
+    return {
+      routineId: action.routineId,
+      agentName: action.agentName,
+      give: async () => {
+        await action.give();
+        setSteps((state) => {
+          state.secretCopied = true;
+        });
+      },
     };
   }
   async function sendTest(): Promise<void> {
@@ -229,6 +229,7 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
                   onSecretDismiss={props.onSecretDismiss}
                   onRegenerateSecret={props.onRegenerateSecret}
                   onUseSenderSecret={senderSecretAction()}
+                  agentSecret={agentSecretAction()}
                   onCopy={() =>
                     setSteps((state) => {
                       state.secretCopied = true;
@@ -323,7 +324,6 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
   );
 }
 
-/** The number of a step, or a check when the step is done. The list itself gives the order. */
 function StepMarker(props: { number: number; done: boolean }) {
   const { t } = useText();
   return (

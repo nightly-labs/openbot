@@ -5,8 +5,6 @@ import { createSignal, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-// The notes are real entries from CHANGELOG.md, shortened as an editor would for the dialog.
-
 const RELEASE_0_23: WhatsNewRelease = {
   version: "0.23.0",
   date: "2026-09-27",
@@ -116,10 +114,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The first start after an update from the version before. */
 export const Default: Story = {};
 
-/** An update that skipped a version: the notes of both show as one list, with the step to do first. */
 export const SkippedVersions: Story = {
   args: {
     previousVersion: "0.21.2",
@@ -127,12 +123,10 @@ export const SkippedVersions: Story = {
   },
 };
 
-/** Three fixes or fewer stay open. */
 export const FixesOnly: Story = {
   args: { version: "0.23.1", previousVersion: "0.23.0", notes: { status: "ready", releases: [FIXES_ONLY] } },
 };
 
-/** Opened again from Settings for a version with nothing to show. After an update, it does not open. */
 export const NothingToShow: Story = {
   args: { version: "0.23.2", previousVersion: null, notes: { status: "ready", releases: [EMPTY_RELEASE] } },
 };
@@ -146,7 +140,6 @@ export const Narrow: Story = {
   globals: { viewport: "whatsNewNarrow" },
 };
 
-/** Retry loads the notes, and the dialog opens again after it closes. */
 export const Playground: Story = {
   render: (props) => {
     const [open, setOpen] = createSignal(true);

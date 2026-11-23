@@ -1,7 +1,12 @@
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { createEffect, createSignal, Show } from "solid-js";
+import { ServerPlushLogo } from "../../server-plush-logo";
 
-/** A server logo, or the server initials when there is no logo or it does not load. */
-export function ServerLogo(props: { name: string; url: string | null }) {
+export function ServerLogo(props: {
+  serverId: string;
+  url: string | null;
+  appearance?: ServerAppearance | null | undefined;
+}) {
   const [failed, setFailed] = createSignal(false);
   createEffect(
     () => props.url,
@@ -10,17 +15,15 @@ export function ServerLogo(props: { name: string; url: string | null }) {
     },
   );
   return (
-    <span class="server-settings-logo" aria-hidden="true">
-      <Show when={!failed() ? props.url : null} fallback={<span>{initials(props.name)}</span>}>
-        {(url) => <img src={url()} alt="" draggable={false} onError={() => setFailed(true)} />}
-      </Show>
-    </span>
-  );
-}
-
-function initials(value: string): string {
-  const parts = value.trim().split(/\s+/u).filter(Boolean);
-  return (
-    (parts.length > 1 ? `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}` : value.trim().slice(0, 2)).toUpperCase() || "OB"
+    <Show
+      when={!failed() ? props.url : null}
+      fallback={<ServerPlushLogo class="server-settings-plush" seed={props.serverId} appearance={props.appearance} />}
+    >
+      {(url) => (
+        <span class="server-settings-logo" aria-hidden="true">
+          <img src={url()} alt="" draggable={false} onError={() => setFailed(true)} />
+        </span>
+      )}
+    </Show>
   );
 }

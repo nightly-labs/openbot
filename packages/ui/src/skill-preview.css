@@ -24,7 +24,6 @@
   grid-column: 3;
   justify-self: end;
 }
-/* The one-line summary reads under the whole row, as the lead of the page. */
 .skill-preview-summary {
   grid-column: 1 / -1;
 }
@@ -67,15 +66,12 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  /* The canvas composites on its own layer. Firefox does not apply an ancestor's rounded
-     overflow clip to such a layer, so each level clips itself with clip-path, which does hold. */
+
   overflow: hidden;
   border-radius: inherit;
   clip-path: inset(0 round var(--openbot-radius-xl));
 }
-/* The artwork stays behind the content by paint order alone. A z-index of its own puts it on a
-   stacking context that Firefox paints without the rounded clip, and the card's corners come back
-   square; the content is positioned instead, so it still paints over the artwork. */
+
 .skill-preview-card > :not(.skill-preview-gradient) {
   position: relative;
 }
@@ -104,7 +100,6 @@
   flex-shrink: 0;
 }
 
-/* Try points to the end of the reading direction. */
 .skill-preview-request .ui-icon-button > svg[class~="lucide-arrow-right"]:dir(rtl) {
   transform: scaleX(-1);
 }
@@ -149,7 +144,6 @@
 .t-page-slide .t-page[data-page-id="2"] {
   --t-page-from-x: var(--page-slide-distance);
 }
-/* The next page comes in from the end of the reading direction. */
 .t-page-slide:dir(rtl) .t-page[data-page-id="1"] {
   --t-page-from-x: var(--page-slide-distance);
 }
@@ -190,7 +184,6 @@
   overflow: hidden;
 }
 
-/* Each page mounts on navigation, so its starting style supplies the entry state. */
 @starting-style {
   .agent-skills-pages.t-page-slide .t-page {
     opacity: 0;
@@ -222,7 +215,6 @@
   display: grid;
 }
 
-/* Start each newly loaded preview at the entrance state without delaying its content. */
 @starting-style {
   .skill-preview.t-stagger.is-shown .t-stagger-line {
     opacity: 0;
@@ -231,10 +223,6 @@
   }
 }
 
-/* The fallback is what a preview whose logo yields no tint already uses, and it is needed here: a
-   plugin listing reuses these classes without setting `--skill-logo-color`. Without it both
-   declarations are invalid at computed-value time, so the chip loses its fill to `transparent`
-   rather than falling back to the accent fill the base rule gives it. */
 .skill-preview-request .skill-preview-chip {
   color: color-mix(in srgb, var(--skill-logo-color, var(--openbot-accent-text)), var(--openbot-text-primary) 35%);
   background: color-mix(in srgb, var(--skill-logo-color, var(--openbot-accent-text)) 18%, transparent);

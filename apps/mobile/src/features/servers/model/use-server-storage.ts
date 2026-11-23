@@ -3,10 +3,6 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-/**
- * The host's storage (`storage-v1`), as the Storage page and its Files page show it. Both pages read
- * one query, so a deletion on the Files page shows on the Storage page.
- */
 export function useServerStorage(serverId: string) {
   const { canReadServerStorage } = useMobileWorkspace();
   const { loadServerStorage } = useMobileWorkspaceActions();
@@ -24,9 +20,21 @@ export function useServerStorage(serverId: string) {
   return {
     available,
     query,
-    /** The host caches a scan. A retry, a deletion or a clear measures again, as on desktop. */
     async rescan(): Promise<void> {
       await queryClient.fetchQuery({ queryKey, staleTime: 0, queryFn: () => loadServerStorage(serverId, true) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.serverDisk(queryScope, serverId) });
     },
   };
+}
+
+export function useServerDisk(serverId: string, enabled: boolean) {
+  const { loadServerDisk } = useMobileWorkspaceActions();
+  const queryScope = useQueryScope();
+  return useQuery({
+    queryKey: queryKeys.serverDisk(queryScope, serverId),
+    enabled,
+    retry: false,
+    staleTime: 0,
+    queryFn: () => loadServerDisk(serverId),
+  });
 }

@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "멤버들이 이 작업을 서로 너무 많이 넘겼습니다. 반복을 막기 위해 중단했습니다.",
   "channel.conversation.noMembers": "채널 설정에서 에이전트를 추가하면 작업을 시작할 수 있어요.",
+  "channel.conversation.waitFull": "대기 중 - 실행 중인 작업이 끝나면 {name}이(가) 시작해요",
   "channel.conversation.archivedNotice": "삭제된 채널이에요. 미리보기만 가능해요.",
   "channel.composer.label": "채널에 메시지 보내기",
   "channel.composer.placeholder": "{name}에 메시지 보내기",
@@ -21,6 +22,11 @@ export const messages = {
   "channel.panel.close": "채널 패널 닫기",
   "channel.settings.title": "채널 설정",
   "channel.settings.memories": "메모리",
+  "channel.settings.folders.title": "폴더",
+  "channel.settings.folders.description":
+    "{channel}의 모든 멤버가 이 폴더에서 파일을 변경하고 명령을 실행할 수 있어요.",
+  "channel.settings.folders.toastAdded": "이제 {channel} 멤버가 {folder}의 파일을 변경할 수 있어요",
+  "channel.settings.folders.toastRemoved": "이제 {channel} 멤버가 {folder}의 파일을 변경할 수 없어요",
   "channel.settings.isolated": "메모리를 이 채널에 유지",
   "channel.settings.isolatedDescription":
     "에이전트가 여기서 배운 내용은 채널 메모리로 저장되며, 다른 채팅에서는 보이지 않습니다.",

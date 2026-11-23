@@ -1,15 +1,5 @@
-// The child process that is the only thing in OpenBot allowed to open the shared agent database.
-//
-// It is separate from the main process for one measured reason: a runaway statement cannot be
-// interrupted. `sqlite3_step` never returns to JavaScript, so V8 never reaches an interrupt point,
-// so `worker.terminate()` never resolves and `DatabaseSync` offers no `interrupt`. A process can be
-// sent SIGKILL. That is the whole argument for this file existing.
-//
-// Runtime imports are limited to node:* and Effect. Repository shapes remain type-only, so this
-// process cannot load Electron or the openbot.db facade. Effect does not replace process deadlines.
-
-import { existsSync } from "node:fs";
-import { basename } from "node:path";
+import { accessSync, chmodSync, existsSync, constants as fileAccess, statSync } from "node:fs";
+import { basename, dirname } from "node:path";
 import { createInterface } from "node:readline";
 import { constants, DatabaseSync, type StatementSync } from "node:sqlite";
 import { Context, Effect, Layer, ManagedRuntime, Result, Schema } from "effect";
@@ -26,31 +16,21 @@ import type {
   AgentDatabaseValue,
 } from "./agent-database-protocol";
 
-/** Mirrors `AGENT_DATABASE_METADATA_TABLE`; inlined because the protocol module must stay type-only here. */
 const METADATA_TABLE = "openbot_metadata";
+
+const SCHEMA_VERSION = 1;
 
 const MAX_OPEN_DATABASES = 8;
 
-/** Virtual table modules an agent may build on. Everything else reaches a file or the engine's internals. */
 const ALLOWED_VTABLE_MODULES = new Set(["fts5", "fts5vocab", "rtree", "rtreecheck"]);
 
-/**
- * PRAGMAs those modules run from inside an agent's statement: FTS5 reads `data_version` on each
- * access, and R*Tree reads `page_size` when it creates a table. Allowed only as reads, with no
- * argument; both report a number and change nothing.
- */
 const MODULE_PRAGMAS = new Set(["data_version", "page_size"]);
 
-/**
- * Result codes `node:sqlite` reports on `error.errcode` but does not export as constants, unlike the
- * authorizer action codes.
- */
 const SQLITE_BUSY = 5;
 const SQLITE_FULL = 13;
-/** `SQLITE_READONLY_ROLLBACK`: the file has a hot journal that a read-only connection cannot roll back. */
 const SQLITE_READONLY_ROLLBACK = 776;
+const SQLITE_READONLY = 8;
 
-/** Functions SQLite can compile in that read, write, or load code from the filesystem. */
 const DENIED_FUNCTIONS = new Set(["load_extension", "readfile", "writefile", "edit", "fts3_tokenizer"]);
 
 interface OpenDatabase {
@@ -60,22 +40,17 @@ interface OpenDatabase {
 
 const open = new Map<string, OpenDatabase>();
 
-/** True only while the current statement is one `AgentTables` wrote to set up the file itself. */
 let provisioning = false;
 
-/**
- * Tables the agent behind the current statement did not create. Set per request rather than per
- * connection, because one cached connection serves every agent.
- */
 let protectedTables = new Set<string>();
 
-/**
- * The containment boundary. Read-only handles and the statement scanner both sit in front of this,
- * but this is the one that SQLite itself enforces, on the compiled statement rather than on its
- * text. Denying `SQLITE_ATTACH` alone closes both `ATTACH DATABASE` and `VACUUM INTO '<path>'` --
- * the only two ways statement text can name a file.
- */
-function authorize(action: number, first: string | null, second: string | null): number {
+function authorize(
+  action: number,
+  first: string | null,
+  second: string | null,
+  _database: string | null,
+  triggerOrView: string | null,
+): number {
   switch (action) {
     case constants.SQLITE_ATTACH:
     case constants.SQLITE_DETACH:
@@ -95,20 +70,20 @@ function authorize(action: number, first: string | null, second: string | null):
     case constants.SQLITE_INSERT:
     case constants.SQLITE_UPDATE:
     case constants.SQLITE_DELETE:
-      // The owner record. An agent may read it -- that is how `list_tables` reports the owner
-      // without a PRAGMA -- but nothing an agent writes may reassign or erase it. `provisioning` is
-      // set only while `AgentTables` writes the record itself, from SQL no agent supplied.
-      return first === METADATA_TABLE && !provisioning ? constants.SQLITE_DENY : constants.SQLITE_OK;
-    // Every agent may change the rows in every table, but only the agent that made a table may
-    // remove or reshape it. SQLite reports the target table itself, so the rule is decided on the
-    // compiled statement rather than on a guess about what the SQL text means. The two actions name
-    // it in different arguments: `DROP TABLE` in the first, `ALTER TABLE` in the second, after the
-    // database name. A virtual table's `DROP` also drops its shadow tables, each checked on its own.
+      return first === METADATA_TABLE && !(provisioning && triggerOrView === null)
+        ? constants.SQLITE_DENY
+        : constants.SQLITE_OK;
     case constants.SQLITE_DROP_TABLE:
     case constants.SQLITE_DROP_VTABLE:
       return tableOwnedByAnother(first);
     case constants.SQLITE_ALTER_TABLE:
       return tableOwnedByAnother(second);
+    case constants.SQLITE_CREATE_TRIGGER:
+    case constants.SQLITE_DROP_TRIGGER:
+    case constants.SQLITE_DROP_TEMP_TRIGGER:
+      return tableOwnedByAnother(second);
+    case constants.SQLITE_CREATE_TEMP_TRIGGER:
+      return constants.SQLITE_DENY;
     default:
       return constants.SQLITE_OK;
   }
@@ -139,13 +114,11 @@ function openDatabase(request: AgentDatabaseStatement): DatabaseSync {
     readOnly: request.mode === "read",
     allowExtension: false,
     enableForeignKeyConstraints: true,
-    // Off, so `WHERE name = "alice"` stays a visible "no such column" rather than a comparison that
-    // is silently always false. It is the most common mistake in model-written SQL.
     enableDoubleQuotedStringLiterals: false,
     timeout: request.limits.busyTimeoutMs,
   });
   try {
-    // Before the authorizer, which denies SQLITE_PRAGMA outright.
+    checkSchemaVersion(database, request.mode);
     database.exec("PRAGMA trusted_schema = OFF");
     database.exec(`PRAGMA max_page_count = ${request.limits.maxPageCount}`);
     if (typeof database.setAuthorizer !== "function") {
@@ -160,6 +133,18 @@ function openDatabase(request: AgentDatabaseStatement): DatabaseSync {
   evictOldest();
   open.set(key, { database, lastUsedAt: Date.now() });
   return database;
+}
+
+function checkSchemaVersion(database: DatabaseSync, mode: AgentDatabaseMode): void {
+  const row = database.prepare("PRAGMA user_version").get();
+  const version = row === undefined ? 0 : Number(row.user_version);
+  if (version > SCHEMA_VERSION) {
+    throw new HostFailure(
+      "newer-schema",
+      `A newer version of OpenBot made the shared tables file (schema ${version}; this version reads ${SCHEMA_VERSION}). Nothing was read or changed. Install the newer version of OpenBot to use the shared tables.`,
+    );
+  }
+  if (mode === "write" && version < SCHEMA_VERSION) database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
 function evictOldest(): void {
@@ -183,18 +168,15 @@ function closeKey(key: string): void {
   open.delete(key);
   try {
     entry.database.close();
-  } catch {
-    // A handle that will not close is already unusable, and the process is disposable.
-  }
+  } catch {}
 }
 
 function closePath(databasePath: string): void {
   for (const mode of ["read", "write"] satisfies AgentDatabaseMode[]) closeKey(`${mode}:${databasePath}`);
 }
 
-/** A failure that already carries the sentence a model should read. */
 class HostFailure extends Schema.TaggedError<HostFailure>()("AgentDatabaseHostFailure", {
-  kind: Schema.Literals(["sqlite", "not-authorized", "size-limit", "busy", "missing", "internal"]),
+  kind: Schema.Literals(["sqlite", "not-authorized", "size-limit", "busy", "missing", "newer-schema", "internal"]),
   message: Schema.String,
   sqliteCode: Schema.optional(Schema.Number),
 }) {
@@ -215,7 +197,6 @@ function cellValue(value: unknown, maxCellChars: number): AgentDatabaseValue {
   if (value === null || value === undefined) return null;
   if (value instanceof Uint8Array) return { blobBytes: value.byteLength };
   if (typeof value === "bigint") {
-    // Outside the safe range a number would silently change; the text keeps every digit.
     return Number.isSafeInteger(Number(value)) ? Number(value) : value.toString();
   }
   if (typeof value === "number") return value;
@@ -233,15 +214,11 @@ function readRows(
   const rows: AgentDatabaseValue[][] = [];
   let bytes = 0;
   let truncated = false;
-  // `iterate` rather than `all`, so a statement that would return a million rows stops costing
-  // memory at the cap instead of after it.
   for (const raw of statement.iterate(...parameters)) {
     if (rows.length >= limits.maxRows || bytes >= limits.maxResultBytes) {
       truncated = true;
       break;
     }
-    // `setReturnArrays(true)` makes every row an array at run time; the declared type still says
-    // record, so read it as one rather than asserting over the declaration.
     const cells: unknown[] = Array.isArray(raw) ? raw : Object.values(raw);
     const row = cells.map((value) => cellValue(value, limits.maxCellChars));
     bytes += JSON.stringify(row).length;
@@ -262,13 +239,8 @@ function runStatement(statement: StatementSync, parameters: readonly AgentDataba
   };
 }
 
-/**
- * SQLite's own sentence is usually the best one a model can get -- "no such table: users" and
- * "UNIQUE constraint failed: users.email" are exactly what it needs to fix its next call. Only the
- * three that would mislead are rewritten, and the absolute path is removed from every one of them
- * because these sentences are logged and shown.
- */
-function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
+function toFailure(error: unknown, request: AgentDatabaseStatement): AgentDatabaseFailure {
+  const { databasePath } = request;
   if (error instanceof HostFailure) return redactFailure(error.failure, databasePath);
   const code = typeof error === "object" && error !== null && "errcode" in error ? Number(error.errcode) : undefined;
   const message = error instanceof Error ? error.message : String(error);
@@ -277,6 +249,14 @@ function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
     return {
       kind: "size-limit",
       message: "The shared database reached its 256 MB limit. Delete rows or tables that are no longer needed.",
+      sqliteCode: code,
+    };
+  }
+  if (request.mode === "write" && code !== undefined && (code & 0xff) === SQLITE_READONLY) {
+    return {
+      kind: "sqlite",
+      message:
+        "Nothing was saved, because OpenBot does not have permission to change the shared tables file or its Data folder. The user account that runs OpenBot needs permission to change that folder and the files in it.",
       sqliteCode: code,
     };
   }
@@ -291,7 +271,7 @@ function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
     return {
       kind: "not-authorized",
       message:
-        "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, and extensions are not available, and a table another agent created cannot be dropped or altered.",
+        "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, extensions, and TEMP triggers are not available, and a table another agent created cannot be dropped, altered, or given a trigger.",
       ...(code === undefined ? {} : { sqliteCode: code }),
     };
   }
@@ -302,26 +282,69 @@ function redactFailure(failure: AgentDatabaseFailure, databasePath: string): Age
   return { ...failure, message: failure.message.replaceAll(databasePath, basename(databasePath)) };
 }
 
+function checkIntegrity(databasePath: string): Effect.Effect<AgentDatabaseRows, HostFailure> {
+  return Effect.try({
+    try: () => {
+      const database = new DatabaseSync(databasePath, { readOnly: true, timeout: 5_000 });
+      try {
+        const rows = database
+          .prepare("PRAGMA quick_check(20)")
+          .all()
+          .map((row): AgentDatabaseValue[] => [String(row.quick_check)]);
+        return { columns: ["quick_check"], rows, truncated: false, changes: 0, lastInsertRowid: null };
+      } finally {
+        database.close();
+      }
+    },
+    catch: (error) => {
+      const code =
+        typeof error === "object" && error !== null && "errcode" in error ? Number(error.errcode) : undefined;
+      const failure = redactFailure(
+        { kind: "sqlite", message: error instanceof Error ? error.message : String(error) },
+        databasePath,
+      );
+      return new HostFailure(failure.kind, failure.message, code);
+    },
+  });
+}
+
 function databaseCall<A>(request: AgentDatabaseStatement, operation: () => A): Effect.Effect<A, HostFailure> {
   return Effect.try({
     try: operation,
     catch: (error) => {
-      const failure = toFailure(error, request.databasePath);
+      const failure = toFailure(error, request);
       return new HostFailure(failure.kind, failure.message, failure.sqliteCode);
     },
   });
 }
 
-/**
- * A write that a deadline stopped can leave a hot journal. A read-only connection cannot roll it back,
- * so every read fails, and every new table too, because a schema change reads first (#6353). One read
- * on the write connection rolls the journal back; the caller then runs its read once more.
- */
 function rollBackHotJournal(request: AgentDatabaseStatement): Effect.Effect<void, HostFailure> {
   return databaseCall(request, () => {
     openDatabase({ ...request, mode: "write" })
       .prepare("SELECT 1 FROM sqlite_master LIMIT 1")
       .get();
+  });
+}
+
+function reopenWritable(request: AgentDatabaseStatement): Effect.Effect<void> {
+  return Effect.sync(() => {
+    closePath(request.databasePath);
+    const folder = dirname(request.databasePath);
+    for (const [path, ownerBits] of [
+      [folder, 0o700],
+      [request.databasePath, 0o600],
+      [`${request.databasePath}-journal`, 0o600],
+      [`${request.databasePath}-wal`, 0o600],
+      [`${request.databasePath}-shm`, 0o600],
+    ] as const) {
+      try {
+        accessSync(path, fileAccess.R_OK | fileAccess.W_OK);
+      } catch {
+        try {
+          chmodSync(path, statSync(path).mode | ownerBits);
+        } catch {}
+      }
+    }
   });
 }
 
@@ -338,7 +361,7 @@ class AgentDatabaseHost extends Context.Service<
           yield* Effect.sync(() => closePath(request.databasePath));
           return { columns: [], rows: [], truncated: false, changes: 0, lastInsertRowid: null };
         }
-        // These Effects are synchronous. Do not yield asynchronous work while authorizer state is set.
+        if (request.kind === "integrity-check") return yield* checkIntegrity(request.databasePath);
         return yield* Effect.acquireUseRelease(
           Effect.sync(() => {
             provisioning = request.provision;
@@ -358,6 +381,13 @@ class AgentDatabaseHost extends Context.Service<
               Effect.catchIf(
                 (failure) => request.mode === "read" && failure.sqliteCode === SQLITE_READONLY_ROLLBACK,
                 () => rollBackHotJournal(request).pipe(Effect.andThen(run)),
+              ),
+              Effect.catchIf(
+                (failure) =>
+                  request.mode === "write" &&
+                  failure.sqliteCode !== undefined &&
+                  (failure.sqliteCode & 0xff) === SQLITE_READONLY,
+                () => reopenWritable(request).pipe(Effect.andThen(run)),
               ),
             );
           },
@@ -382,28 +412,12 @@ function handle(request: AgentDatabaseRequest): AgentDatabaseResponse {
     : { id: request.id, ok: true, result: result.success };
 }
 
-/**
- * The two ways this file is started, and the only place either one is named.
- *
- * In the packaged app it is an Electron `utilityProcess`, which has no stdin -- the app ships the
- * `runAsNode: false` fuse, so `process.execPath` cannot be run as Node and a plain child process is
- * not available. A `utilityProcess` is talked to through `process.parentPort`, which Electron adds
- * and `@types/node` does not describe; the narrow shape below is what this file uses of it, declared
- * rather than asserted so no type is widened to reach it.
- *
- * Under a real `node` -- which is how the tests drive this file, straight from its TypeScript source
- * -- there is no parent port and the transport is newline-delimited JSON over stdio.
- */
 interface ParentPort {
   on(event: "message", listener: (message: { data: unknown }) => void): void;
   postMessage(value: unknown): void;
   start(): void;
 }
 
-/**
- * `process.parentPort` exists only when Electron forked this file as a `utilityProcess`. It is read
- * through a guard rather than Electron's own type, because this file must not import Electron.
- */
 function isParentPort(value: unknown): value is ParentPort {
   return typeof value === "object" && value !== null && "postMessage" in value && "start" in value;
 }
@@ -423,11 +437,6 @@ function closeEverything(): void {
   for (const key of [...open.keys()]) closeKey(key);
 }
 
-/**
- * Sent once, after every import above has loaded and the transport listens. The supervisor arms a
- * statement deadline only after this, so a slow start of the process is not reported as a slow
- * statement or ended as a runaway one.
- */
 const READY: AgentDatabaseHostReady = { kind: "ready" };
 
 if (parentPort) {

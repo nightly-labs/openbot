@@ -1,4 +1,3 @@
-/* Routine calendar: the runs of every routine, by day, with the next runs beside them. */
 .routine-planner {
   container-type: inline-size;
   display: grid;
@@ -72,12 +71,10 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The day cell's border and padding, so that each head starts where its day starts. */
 .routine-planner-weekdays > * {
   padding-inline: calc(1px + var(--openbot-space-1-5));
 }
 
-/* Each day is a list, not a time grid: runs at the same minute stack and stay readable. */
 .routine-planner-week {
   display: grid;
   min-width: 0;
@@ -205,7 +202,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Two lines before an ellipsis: a day column is narrow, and the name is what tells runs apart. */
 .routine-planner-run-name {
   display: -webkit-box;
   grid-area: name;
@@ -222,7 +218,6 @@
   grid-area: avatars;
 }
 
-/* A paused run would happen if the routine resumed. It keeps its place but loses its weight. */
 .routine-planner-run[data-status="paused"],
 .routine-planner-entry[data-status="paused"] {
   opacity: 0.6;
@@ -247,7 +242,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* A month has up to six rows of days: a run is one line, and the column heads name the weekdays. */
 .routine-planner[data-view="month"] .routine-planner-day {
   min-height: 7rem;
 }
@@ -272,7 +266,6 @@
   display: none;
 }
 
-/* Days of the months before and after only fill the rows. */
 .routine-planner-day[data-outside] {
   border-color: var(--openbot-border);
   background: var(--openbot-transparent);
@@ -374,10 +367,6 @@
   height: var(--openbot-control-xs);
 }
 
-/*
- * The calendar before its first routine: a faint month behind the pitch. The month and the pitch
- * share one grid cell. Sample runs land on the month one at a time and write a note.
- */
 .routine-planner-empty,
 .routine-planner-empty-board {
   display: grid;
@@ -402,7 +391,6 @@
   grid-auto-rows: 10rem;
 }
 
-/* Only hairlines. They clear behind the pitch and fade towards every edge. */
 .routine-planner-empty-cells {
   mask-image:
     radial-gradient(ellipse 36% 36% at 50% 50%, var(--openbot-transparent) 68%, var(--openbot-text-primary) 100%),
@@ -427,7 +415,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* A run lands, writes its note, holds, then fades. The animation is `LIFE` steps of `STEP_MS`. */
 .routine-planner-empty-run {
   display: grid;
   min-width: 0;
@@ -488,7 +475,6 @@
   }
 }
 
-/* Handwriting. The app has no hand font, so it uses the one of the system. */
 .routine-planner-hand {
   color: var(--openbot-accent-text);
   font-family: "Bradley Hand", "Noteworthy", "Segoe Print", cursive;
@@ -505,7 +491,6 @@
   transform-origin: left top;
 }
 
-/* Each line writes itself from left to right, at the speed of its length. */
 .routine-planner-empty-line {
   clip-path: inset(-0.4em 100% -0.4em -0.2em);
   animation: routine-planner-empty-write var(--routine-planner-empty-length) linear var(--routine-planner-empty-delay)
@@ -559,8 +544,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The one handwritten word of the title. It writes itself once. */
-/* Inline, not inline-block: a reader then hears "done." with no space before the full stop. */
 .routine-planner-empty-done {
   clip-path: inset(-0.4em 100% -0.4em -0.2em);
   animation: routine-planner-empty-write 520ms linear 500ms forwards;
@@ -586,15 +569,14 @@
   overflow-y: auto;
 }
 
-/* Less motion: one still frame with three runs and their notes. */
 .routine-planner-empty[data-still]
-:is(
-  .routine-planner-empty-run,
-  .routine-planner-empty-check,
-  .routine-planner-empty-line,
-  .routine-planner-empty-underline path,
-  .routine-planner-empty-done
-) {
+  :is(
+    .routine-planner-empty-run,
+    .routine-planner-empty-check,
+    .routine-planner-empty-line,
+    .routine-planner-empty-underline path,
+    .routine-planner-empty-done
+  ) {
   animation: none;
   clip-path: none;
   stroke-dashoffset: 0;
@@ -609,14 +591,12 @@
   height: var(--openbot-control-md);
 }
 
-/* Seven day columns need the full width: the next runs move below the week. */
 @container (max-width: 1160px) {
   .routine-planner-body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-/* A narrow pane, such as a phone or a side panel: the week becomes a list of days. */
 @container (max-width: 920px) {
   .routine-planner-week {
     grid-template-columns: minmax(0, 1fr);
@@ -640,7 +620,6 @@
     grid-column: 1;
   }
 
-  /* The month becomes a list of its own days: each day names its weekday again. */
   .routine-planner-weekdays,
   .routine-planner-day[data-outside] {
     display: none;
@@ -654,7 +633,6 @@
     display: inline;
   }
 
-  /* The pitch comes first, then one row for each run on screen. */
   .routine-planner-empty > .routine-planner-empty-board {
     grid-area: 2 / 1;
   }
@@ -700,7 +678,6 @@
   }
 }
 
-/* In right-to-left text, each line writes itself from right to left. */
 :dir(rtl) .routine-planner-empty-note {
   transform-origin: right top;
 }
@@ -709,7 +686,95 @@
   clip-path: inset(-0.4em -0.2em -0.4em 100%);
 }
 
-/* The previous and next steps point the other way in RTL. */
 :dir(rtl) .routine-planner-nav :is(svg[class~="lucide-chevron-left"], svg[class~="lucide-chevron-right"]) {
   transform: scaleX(-1);
+}
+
+.routine-planner[data-create] .routine-planner-day {
+  position: relative;
+}
+
+.routine-planner-day[data-opens] {
+  cursor: pointer;
+}
+
+.routine-planner-day[data-opens]:hover,
+.routine-planner-day[data-slot] {
+  border-color: var(--openbot-border-focus);
+}
+
+.routine-planner-add.ui-button {
+  position: absolute;
+  top: var(--openbot-space-1-5);
+  inset-inline-end: var(--openbot-space-1-5);
+  opacity: 0;
+}
+
+.routine-planner-day:hover .routine-planner-add,
+.routine-planner-day[data-slot] .routine-planner-add,
+.routine-planner-add.ui-button:focus-visible {
+  opacity: 1;
+}
+
+.routine-planner-day-add.ui-button {
+  justify-self: start;
+  color: var(--openbot-text-secondary);
+}
+
+.routine-planner-create.ui-popover-menu-surface {
+  z-index: var(--openbot-layer-popover);
+  width: 360px;
+  max-height: min(680px, calc(100vh - var(--openbot-space-8)));
+  overflow: auto;
+  border-radius: var(--openbot-radius-lg);
+  box-shadow: 0 0 0 1px var(--openbot-border);
+  padding: var(--openbot-space-3);
+}
+
+.routine-planner-create-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  margin-bottom: var(--openbot-space-3);
+}
+
+.routine-planner-create-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.routine-planner-create .settings-field:last-child {
+  margin-bottom: 0;
+}
+
+.routine-planner-create-when {
+  margin: 0 0 17px;
+}
+
+.routine-planner-create-when h3 {
+  margin: 0 0 6px;
+  margin-inline-start: 8px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.routine-planner-create-agent.ui-button {
+  justify-content: flex-start;
+  gap: var(--openbot-space-1-5);
+  width: 100%;
+}
+
+.routine-planner-create-agent .tasks-page-agent-chevron {
+  margin-inline-start: auto;
+}
+
+.routine-planner-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-3);
 }

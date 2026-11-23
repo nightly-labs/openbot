@@ -1,15 +1,3 @@
-// Frozen optional agent-folders-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or an admin reads
-// and changes the folders that one agent can change besides its workspace and the shared folder, and
-// the folders in them that it must not change. The host checks each folder as its own folder picker
-// does: it must exist, it must not hold OpenBot data, the workspaces of the agents, the home folder or
-// a disk root, and at most 32 folders of each kind are kept. A folder that a kept folder holds is not
-// added again. To pick a folder, an owner or an admin lists the folders in one folder of the host
-// computer; a request without a path lists the home folder. The list leaves out files and hidden
-// folders, has at most 500 entries, and `truncated` says that there were more. Each list also names
-// the home folder and at most 32 disks of the host, to go to them in one step. A change sends
-// `agents-changed`, as every agent change does. Widening any of it needs a second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,

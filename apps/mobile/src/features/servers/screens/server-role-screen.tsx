@@ -1,12 +1,17 @@
-import { AGENT_ACCESS_LEVELS, AGENT_ACCESS_ROLE_NAME_LIMIT, type AgentAccessLevel } from "@openbot/contracts/ipc";
-import type { MobileTextKey } from "@openbot/i18n/mobile";
+import {
+  AGENT_ACCESS_LEVELS,
+  AGENT_ACCESS_ROLE_NAME_LIMIT,
+  type AgentAccessLevel,
+  agentAccessRank,
+} from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { AccessLevelMenu } from "@/features/servers/components/access-level-menu";
+import { AGENT_ACCESS_LEVEL_KEYS } from "@/features/servers/model/server-role";
 import { everyoneLevel, roleLevel, useServerRoles } from "@/features/servers/model/use-server-roles";
 import {
   SettingsContent,
@@ -14,23 +19,15 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
-import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
-import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
-const LEVEL_KEYS = {
-  none: "mobile.server.roles.level.none",
-  view: "mobile.server.roles.level.view",
-  chat: "mobile.server.roles.level.chat",
-  manage: "mobile.server.roles.level.manage",
-} as const satisfies Record<AgentAccessLevel, MobileTextKey>;
+function memberLevel(role: AgentAccessLevel, everyone: AgentAccessLevel): AgentAccessLevel {
+  return agentAccessRank(everyone) >= agentAccessRank(role) ? everyone : role;
+}
 
-/**
- * Server sheet > Server settings > Roles > one role, or Everyone: the access that it gives to each agent.
- * Each level saves at once. A role also has its name, which saves with the header action, and Delete.
- */
 export function ServerRoleScreen() {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
@@ -49,30 +46,9 @@ export function ServerRoleScreen() {
   const name = draftName ?? role?.name ?? "";
   const trimmed = name.trim();
   const dirty = Boolean(role) && draftName !== undefined && trimmed !== role?.name;
-  /** True after Delete: the page leaves without the question about the name. */
   const leaving = useRef(false);
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && dirty, ({ repeat }) => {
-    if (leaving.current) {
-      setDiscarding(true);
-      repeat();
-      return;
-    }
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty, { leaving: () => leaving.current, warn: true });
 
   if (!available || !everyone || !list || !(role || everyonePage))
     return (
@@ -90,19 +66,35 @@ export function ServerRoleScreen() {
     );
 
   const title = role ? role.name : t("mobile.server.roles.everyone");
+  const everyoneName = t("mobile.server.roles.everyone");
   const level = (agentId: string) => (role ? roleLevel(role, agentId) : everyoneLevel(everyone, agentId));
-  const setLevel = (agentId: string, next: AgentAccessLevel) => {
-    if (next === level(agentId)) return;
-    void haptics.selection();
+  const floor = (agentId: string) => (role ? everyoneLevel(everyone, agentId) : undefined);
+  const shown = (agentId: string) => {
+    const base = floor(agentId);
+    return base === undefined ? level(agentId) : memberLevel(level(agentId), base);
+  };
+  const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
+    const levels = new Map<string, AgentAccessLevel>();
+    for (const agentId of agentIds) {
+      const base = floor(agentId);
+      const kept = base !== undefined && agentAccessRank(next) <= agentAccessRank(base) ? "none" : next;
+      if (kept !== level(agentId)) levels.set(agentId, kept);
+    }
+    if (levels.size === 0) return;
     void save((change) => {
       if (!role) {
-        change.everyone[agentId] = next;
+        for (const [agentId, value] of levels) change.everyone[agentId] = value;
         return;
       }
       const target = change.roles.find((candidate) => candidate.id === role.id);
-      if (target) target.agents[agentId] = next;
+      if (target) for (const [agentId, value] of levels) target.agents[agentId] = value;
     });
   };
+  const shownLevels = agents.map((agent) => shown(agent.id));
+  const [firstLevel] = shownLevels;
+  const commonLevel =
+    firstLevel !== undefined && shownLevels.every((value) => value === firstLevel) ? firstLevel : undefined;
+  const openEveryone = () => router.push({ pathname: "/server-settings/role", params: { serverId, everyone: "1" } });
 
   return (
     <SettingsContent>
@@ -146,35 +138,68 @@ export function ServerRoleScreen() {
             </Typography.Paragraph>
           </SettingsRow>
         ) : null}
-        {agents.map((agent) => (
+        {agents.length > 1 ? (
           <SettingsRow
-            key={agent.id}
             disclosure={false}
-            leading={
-              <BloubAvatar
-                agentId={agent.id}
-                serverId={agent.serverId}
-                hue={agent.avatarHue}
-                color={agent.avatarColor}
-                seed={agent.avatarSeed}
-                size={36}
-                animateIdle={false}
-              />
-            }
             trailing={
-              <SettingsPicker
-                value={level(agent.id)}
-                options={AGENT_ACCESS_LEVELS.map((value) => ({ value, label: t(LEVEL_KEYS[value]) }))}
+              <AccessLevelMenu
+                value={commonLevel}
+                options={AGENT_ACCESS_LEVELS.map((value) => ({ value, label: t(AGENT_ACCESS_LEVEL_KEYS[value]) }))}
+                placeholder={t("mobile.server.roles.mixed")}
                 enabled={!action.isPending}
                 dark={theme === "dark"}
-                label={t("mobile.server.roles.agentLevel", { role: title, agent: agent.name })}
-                onChange={(next) => setLevel(agent.id, next)}
+                label={t("mobile.server.roles.setAllLabel", { role: title })}
+                onChange={(next) =>
+                  give(
+                    agents.map((agent) => agent.id),
+                    next,
+                  )
+                }
               />
             }
           >
-            <Typography.Paragraph numberOfLines={1}>{agent.name}</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.server.roles.setAll")}</Typography.Paragraph>
           </SettingsRow>
-        ))}
+        ) : null}
+        {agents.map((agent) => {
+          const base = floor(agent.id);
+          const value = shown(agent.id);
+          return (
+            <SettingsRow
+              key={agent.id}
+              disclosure={false}
+              leading={
+                <BloubAvatar
+                  agentId={agent.id}
+                  serverId={agent.serverId}
+                  hue={agent.avatarHue}
+                  color={agent.avatarColor}
+                  seed={agent.avatarSeed}
+                  size={36}
+                  animateIdle={false}
+                />
+              }
+              trailing={
+                <AccessLevelMenu
+                  value={value}
+                  options={AGENT_ACCESS_LEVELS.map((option) => ({
+                    value: option,
+                    label: t(AGENT_ACCESS_LEVEL_KEYS[option]),
+                    disabled: base !== undefined && agentAccessRank(option) < agentAccessRank(base),
+                  }))}
+                  source={base !== undefined && base !== "none" && value === base ? everyoneName : undefined}
+                  enabled={!action.isPending}
+                  dark={theme === "dark"}
+                  label={t("mobile.server.roles.agentLevel", { role: title, agent: agent.name })}
+                  extra={role ? { label: t("mobile.server.roles.changeInEveryone"), onPress: openEveryone } : undefined}
+                  onChange={(next) => give([agent.id], next)}
+                />
+              }
+            >
+              <Typography.Paragraph numberOfLines={1}>{agent.name}</Typography.Paragraph>
+            </SettingsRow>
+          );
+        })}
       </SettingsSection>
       {role ? (
         <SettingsSection>

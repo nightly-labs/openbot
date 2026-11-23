@@ -1,7 +1,3 @@
-// Reads the logins of a password export in CSV format: Chrome, Edge, Safari, Firefox, 1Password,
-// Bitwarden, LastPass and Proton Pass all write a header row that names the address, user name and password
-// columns.
-
 import { sourceText } from "@openbot/i18n/source";
 
 export interface CsvLogin {
@@ -9,7 +5,6 @@ export interface CsvLogin {
   username: string;
   password: string;
   notes: string;
-  /** The two-step key or `otpauth:` link, or "" when the export has none. */
   twoStepKey: string;
 }
 
@@ -18,12 +13,10 @@ const COLUMNS = {
   username: ["username", "login_username", "user name", "login", "email"],
   password: ["password", "login_password"],
   notes: ["notes", "note", "extra", "comments"],
-  // Bitwarden, Proton Pass, and 1Password or Apple Passwords.
   twoStepKey: ["login_totp", "totp", "otpauth"],
   type: ["type"],
 } as const;
 
-/** RFC 4180 rows: quoted fields may hold commas, line breaks and doubled quotes. */
 function parseRows(source: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -58,7 +51,6 @@ function parseRows(source: string): string[][] {
   return rows.filter((cells) => cells.some((cell) => cell.trim()));
 }
 
-/** The logins in `source`. A row of another kind, such as a Bitwarden card or note, is left out. */
 export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: number } {
   const [header, ...rows] = parseRows(source);
   if (!header) throw new Error(sourceText("error.vault.csvInvalid"));
@@ -67,7 +59,6 @@ export function parseLoginCsv(source: string): { logins: CsvLogin[]; otherRows: 
   const website = column(COLUMNS.website);
   const password = column(COLUMNS.password);
   if (website < 0 || password < 0) throw new Error(sourceText("error.vault.csvInvalid"));
-  // Proton Pass writes an email and a username column, and a login can fill only one of them.
   const userNames = names.flatMap((name, index) => (COLUMNS.username.some((choice) => choice === name) ? [index] : []));
   const notes = column(COLUMNS.notes);
   const twoStepKey = column(COLUMNS.twoStepKey);

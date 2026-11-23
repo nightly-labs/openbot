@@ -69,6 +69,20 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: il modello «{model}» non è ancora disponibile qui, quindi l'agente usa il modello predefinito. Scegli di nuovo il modello quando il suo provider è pronto.",
   "error.import.transferSettingSkipped": "Importazione di {name} saltata. {reason}",
+  "error.import.transferRunsSkipped":
+    "{name}: la cronologia delle esecuzioni della routine «{routine}» non viene importata.",
+  "error.import.transferSharedSkillsSkipped": "Impossibile leggere le skill condivise, quindi non sono nel file.",
+  "error.import.transferSharedSkillsNotAdded": "Impossibile aggiungere a questo server le skill condivise del file.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Impossibile salvare le scelte di {count} membro.",
+    other: "Impossibile salvare le scelte di {count} membri.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Su questo server è già presente una skill condivisa con questo nome e file diversi.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} preferenza del server nel file non è valida qui, quindi non viene importata.",
+    other: "{count} preferenze del server nel file non sono valide qui, quindi non vengono importate.",
+  },
   "error.import.transferRoutineFlowSkipped": "L'importazione ha escluso un flusso di routine. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: gli agenti personalizzati non vengono importati, perché eseguono un comando. Controlla il comando «{command}» e aggiungi di nuovo l'agente nelle Impostazioni.",
@@ -79,9 +93,11 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: inserisci di nuovo la sua chiave API nelle Impostazioni.",
   "error.import.transferAgentEnv": "{name}: inserisci di nuovo i valori di {names} nelle Impostazioni.",
   "error.import.transferMcpValues":
-    "{name}: il server MCP viene aggiunto disattivato. Controlla il comando, inserisci di nuovo i valori e l'indirizzo completo, poi attivalo nelle impostazioni MCP.",
+    "{name}: il server MCP viene aggiunto disattivato. Controlla il comando, inserisci di nuovo i valori e l'indirizzo completo, poi attivalo in Marketplace, App.",
   "error.import.transferValuesCleared":
     "{name}: i valori che possono contenere un segreto sono stati rimossi dagli argomenti o dall'indirizzo. Inseriscili di nuovo nelle Impostazioni.",
   "error.import.transferSharedKept":
     "{number} file della cartella condivisa sono già presenti qui, quindi restano come sono.",
+  "error.import.transferPartSkipped":
+    "Alcune parti del file non sono state importate. Le altre parti sono su questo server, quindi non importare di nuovo il file.",
 } as const satisfies PartialTranslation<typeof source>;

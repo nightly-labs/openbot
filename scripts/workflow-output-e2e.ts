@@ -1,13 +1,3 @@
-// Checks the output of workflows to a messaging place on the real SQLite and the real workflow service,
-// on a temporary profile. The messaging connection is a row in the real table; only the post itself is
-// a stand-in, so no platform, app, provider, account or network is started. An output with no place
-// fails; an off connection fails; a post sends the workflow's name over the text; empty text posts
-// nothing; each post failure ends the step with its sentence; a retry posts again; a stop during a post
-// leaves it uncertain; after a restart a post that did not start is sent, and one that was on its way
-// fails as uncertain.
-//
-// Run: bun scripts/workflow-output-e2e.ts
-// Writes .openbot-build/workflow-output-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -43,7 +33,6 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   report.checks.push(name);
 };
 
-/** What the next post answers. `hang` never answers, so a stop or a restart cuts it off. */
 let answer: "posted" | MessagingPostFailure | "hang" = "posted";
 let postStarted = false;
 
@@ -101,7 +90,6 @@ async function close() {
   database.close();
 }
 
-/** Waits for the output step of a run to reach a state; the post runs in a fiber of its own. */
 async function outputStep(
   workflows: WorkflowsHandle,
   runId: string,
@@ -118,7 +106,6 @@ async function outputStep(
 }
 const ended = (step: WorkflowStep) => step.status !== "running";
 
-/** Waits for a run to end; it ends in the pass after its last step. */
 async function runEnd(workflows: WorkflowsHandle, runId: string): Promise<string> {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -128,7 +115,6 @@ async function runEnd(workflows: WorkflowsHandle, runId: string): Promise<string
     await new Promise((done) => setImmediate(done));
   }
 }
-/** The kept post of a step, read as the service reads it. */
 const deliveryOf = (stepId: string) => new WorkflowRunStore({ database }).output(stepId);
 
 let requests = 0;
@@ -259,7 +245,6 @@ try {
   );
   check("nothing works after the stop", !workflows.working());
 
-  // A restart during a post: the step stays running, and the first pass after it decides.
   postStarted = false;
   const cutRun = await runOnce(workflows, digest);
   const cut = await outputStep(workflows, cutRun.id, () => postStarted);
@@ -268,8 +253,6 @@ try {
   await close();
   database = new OpenBotDatabase(directory);
   await Effect.runPromise(database.initialize());
-  // The second run's output as if the restart came between its keep and its post, and the first as
-  // if the process died during its post.
   database.connection
     .prepare("UPDATE workflow_steps SET status = 'running', ended_at = NULL, output = NULL WHERE step_id = ?")
     .run(waiting.id);

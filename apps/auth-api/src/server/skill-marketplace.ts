@@ -47,7 +47,6 @@ interface ApprovedRow {
   bundle_sha256: string;
   files_json: string;
   icon_key: string | null;
-  /** Absent from the rows of the catalog list. */
   card_key?: string | null;
   updated_at: number;
   creator_name: string | null;
@@ -176,15 +175,10 @@ export class SkillMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /** The approved skill a shared link names by its slug, which the site's page address holds. */
   getBySlug(slug: string) {
     return this.approvedIdBySlug(slug).pipe(Effect.flatMap((skillId) => this.get(skillId)));
   }
 
-  /**
-   * The approved skill for its page on the site: the catalog entry and its share card, without the
-   * bundle. The page shows no instructions, so it does not read and unpack the archive on each visit.
-   */
   pageBySlug(slug: string) {
     return Effect.fn("SkillMarketplace.pageBySlug")(() =>
       Effect.gen({ self: this }, function* () {
@@ -202,10 +196,6 @@ export class SkillMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /**
-   * The catalog entries of the approved skills among `skillIds`, in their order, for an agent page.
-   * An agent holds at most `AGENT_TEMPLATE_LIMITS.skills` (32) skills, inside the D1 limit of 100 bound values.
-   */
   summariesByIds(skillIds: readonly string[]) {
     return Effect.fn("SkillMarketplace.summariesByIds")(() =>
       Effect.gen(function* () {
@@ -250,7 +240,6 @@ export class SkillMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /** The share card of the approved version. Public, like the skill's page. */
   card(skillId: string, conditions?: Headers) {
     return Effect.fn("SkillMarketplace.card")(() =>
       Effect.gen({ self: this }, function* () {
@@ -273,7 +262,6 @@ export class SkillMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /** Stores the share card the reviewer's script drew for an approved version. */
   setCard(versionId: string, card: Uint8Array) {
     return Effect.fn("SkillMarketplace.setCard")(() =>
       Effect.gen({ self: this }, function* () {
@@ -671,7 +659,6 @@ export class SkillMarketplace {
             ),
           );
         }
-        // The status guard and RETURNING make a second, concurrent review lose instead of overwriting.
         const reviewed = yield* marketplaceCall(() =>
           bindings.DB.prepare(
             "UPDATE marketplace_skill_versions SET status = ?, rejection_note = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' RETURNING id",
@@ -726,7 +713,6 @@ export class SkillMarketplace {
         const bindings = yield* MarketplaceStorage;
 
         const result = yield* marketplaceCall(() =>
-          // A feature is not a change of the skill, so "Recently updated" keeps its order.
           bindings.DB.prepare(
             "UPDATE marketplace_skills SET featured = ? WHERE id = ? AND approved_version_id IS NOT NULL",
           )
@@ -747,7 +733,6 @@ export class SkillMarketplace {
         const bindings = yield* MarketplaceStorage;
 
         const result = yield* marketplaceCall(() =>
-          // A check is not a change of the skill, so "Recently updated" keeps its order.
           bindings.DB.prepare(
             "UPDATE marketplace_skills SET verified = ? WHERE id = ? AND approved_version_id IS NOT NULL",
           )
@@ -966,7 +951,6 @@ function iconUrl(row: {
   const cacheKey = row.status ? `${versionId}-${row.status}` : versionId;
   return `/v1/skills/${skillId}/icon${cacheKey ? `?v=${encodeURIComponent(cacheKey)}` : ""}`;
 }
-/** The ORDER BY of a catalog page, the clause that starts after the cursor, and the cursor of the next page. */
 function skillListOrder(
   sort: MarketplaceSkillSort | undefined,
   value: string | undefined,
@@ -990,7 +974,6 @@ function skillListOrder(
   }
   if (sort === "name") {
     const cursor = decodeMarketplaceCursor(value, "name");
-    // lower() on both sides: the cursor holds the name as stored, and SQLite folds the case the same way.
     return {
       orderBy: "lower(versions.name) ASC, skills.id ASC",
       clause: cursor
@@ -1007,9 +990,6 @@ function skillListOrder(
   const primary = order === "installs" ? "skills.installs" : "skills.featured";
   return {
     orderBy: `${primary} DESC, skills.updated_at DESC, skills.id DESC`,
-    // A v0 cursor holds only a timestamp. The order also leads with featured and ends with id, so a
-    // timestamp cannot say where that page stopped. It adds no clause. The first page comes again
-    // and its v1 cursor then pages the rest, which costs one request and loses no skill.
     clause:
       cursor && !("legacyUpdatedAt" in cursor)
         ? {

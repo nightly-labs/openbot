@@ -7,20 +7,12 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/** The operating system's cipher. Injected, so tests need neither a keychain nor a display. */
 export interface VoiceApiKeyCipher {
   canPersist: () => boolean;
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
 }
 
-/**
- * The API key of one voice provider, such as ElevenLabs or Groq, encrypted with the system cipher. The plaintext stays
- * in this process: the renderer learns only whether a key is saved.
- *
- * A key that this computer cannot decrypt, for example after the keychain changed, reads as no key.
- * The user saves it again.
- */
 export class VoiceApiKeyStore {
   readonly #path: string;
   readonly #cipher: VoiceApiKeyCipher;
@@ -82,7 +74,6 @@ export class VoiceApiKeyStore {
   });
 }
 
-/** The error that the user sees when a provider's key is not saved. A locked keychain keeps its own text. */
 export function savedKeyError(cause: unknown, provider: VoiceKeyProvider): Error {
   const unavailable = sourceText("error.app.secretStorageUnavailable");
   return new Error(

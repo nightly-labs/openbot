@@ -1,32 +1,40 @@
-import type { VaultSaveInput } from "@openbot/contracts/ipc";
-import type { UiBlockStatus, UiBlockValue, UiVaultRequestKind, UiVaultSavedItem } from "@openbot/contracts/ui-blocks";
+import { VAULT_API_KEY_LIMIT, type VaultItemKind, type VaultSaveInput } from "@openbot/contracts/ipc";
+import {
+  UI_API_KEY_SCOPE_FIELD_ID,
+  type UiBlockStatus,
+  type UiBlockValue,
+  type UiVaultSavedItem,
+} from "@openbot/contracts/ui-blocks";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, CreditCard, KeyRound, UserRound } from "@openbot/ui";
-import { createSignal, Match, onCleanup, Show, Switch } from "solid-js";
+import { Button, CreditCard, Field, KeyRound, NativeSelect, UserRound } from "@openbot/ui";
+import { createSignal, createUniqueId, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { UiBlockCard } from "../conversation/ui-blocks/UiBlockCard";
-import { VAULT_BRAND_NAME, VaultCardLogo, VaultContactLogo, VaultRequestDialog, VaultSiteLogo } from "./VaultPanel";
+import {
+  VAULT_BRAND_NAME,
+  VaultCardLogo,
+  VaultContactLogo,
+  VaultRequestDialog,
+  type VaultRequestScope,
+  VaultSecretInput,
+  VaultSiteLogo,
+} from "./VaultPanel";
 
 export interface VaultRequestCardProps {
-  kind: UiVaultRequestKind;
-  /** What the agent asks for, in its own words. */
+  kind: VaultItemKind;
   title: string;
-  /** The agent that asks. Absent when the app does not know it. */
   agentName?: string | undefined;
-  /** The fields that the agent filled in. A secret field is never one of them. */
   prefill: Readonly<Record<string, string>>;
+  scope?: VaultRequestScope | undefined;
+  keyPlaceholder?: string | undefined;
+  submitLabel?: string | undefined;
   status: UiBlockStatus;
-  /** The item that the user saved. */
   saved?: UiVaultSavedItem | undefined;
-  /** The values of the saved item that are not secret, for its summary line. */
+  closedOutcome?: string | undefined;
   values?: Readonly<Record<string, UiBlockValue>> | undefined;
-  /** Why the last answer failed, such as a skip that did not go through. */
   error?: string | undefined;
-  /** The answer is on its way. */
   busy?: boolean | undefined;
-  /** Saves the item. A failure stays in the dialog, so the user can correct a value. Absent in the history. */
-  onSave?: ((input: VaultSaveInput) => Promise<void>) | undefined;
-  /** Closes the request with nothing saved. */
+  onSave?: ((input: VaultSaveInput, scope?: string) => Promise<void>) | undefined;
   onSkip?: (() => void) | undefined;
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
@@ -35,14 +43,14 @@ const ADD_LABEL = {
   login: "vault.request.addLogin",
   card: "vault.request.addCard",
   contact: "vault.request.addContact",
-} as const satisfies Record<UiVaultRequestKind, AppTextKey>;
+} as const satisfies Record<Exclude<VaultItemKind, "apiKey">, AppTextKey>;
 
 const text = (values: Readonly<Record<string, UiBlockValue>> | undefined, key: string) => {
   const value = values?.[key];
   return typeof value === "string" ? value.trim() : "";
 };
 
-function KindTile(props: { kind: UiVaultRequestKind }) {
+function KindTile(props: { kind: VaultItemKind }) {
   return (
     <span class="vault-logo integration-logo-tile" aria-hidden="true">
       <Switch>
@@ -52,7 +60,7 @@ function KindTile(props: { kind: UiVaultRequestKind }) {
         <Match when={props.kind === "contact"}>
           <UserRound />
         </Match>
-        <Match when={props.kind === "login"}>
+        <Match when={props.kind === "login" || props.kind === "apiKey"}>
           <KeyRound />
         </Match>
       </Switch>
@@ -60,11 +68,7 @@ function KindTile(props: { kind: UiVaultRequestKind }) {
   );
 }
 
-function SavedLogo(props: {
-  kind: UiVaultRequestKind;
-  saved: UiVaultSavedItem;
-  values: VaultRequestCardProps["values"];
-}) {
+function SavedLogo(props: { kind: VaultItemKind; saved: UiVaultSavedItem; values: VaultRequestCardProps["values"] }) {
   return (
     <Switch>
       <Match when={props.kind === "card"}>
@@ -76,24 +80,96 @@ function SavedLogo(props: {
       <Match when={props.kind === "login"}>
         <VaultSiteLogo website={text(props.values, "website") || props.saved.name} />
       </Match>
+      <Match when={props.kind === "apiKey"}>
+        <KindTile kind="apiKey" />
+      </Match>
     </Switch>
   );
 }
 
-/**
- * The chat card of an agent's request for a Vault item: what the item is for, and a button that
- * opens the Vault dialog with the fields that the agent filled in. The user types the secrets,
- * which go to the Vault and never to the agent. Once saved, the card shows the item.
- */
+function ApiKeyRequestForm(props: {
+  formId: string;
+  name: string;
+  placeholder?: string | undefined;
+  scope?: VaultRequestScope | undefined;
+  apiKey: string;
+  scopeChoice: string;
+  onKeyChange: (key: string) => void;
+  onScopeChange: (scope: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <form
+      id={props.formId}
+      class="ui-block-form-fields"
+      novalidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.onSubmit();
+      }}
+    >
+      <Field label={props.name}>
+        <VaultSecretInput
+          field="key"
+          saved={false}
+          value={props.apiKey}
+          maxlength={VAULT_API_KEY_LIMIT}
+          placeholder={props.placeholder}
+          onChange={props.onKeyChange}
+          onReveal={() => Promise.resolve("")}
+          onRevealFailed={() => undefined}
+        />
+      </Field>
+      <Show when={props.scope}>
+        {(choice) => (
+          <Field label={choice().label}>
+            <NativeSelect
+              value={props.scopeChoice}
+              onChange={(event) => props.onScopeChange(event.currentTarget.value)}
+            >
+              <For each={choice().options}>{(option) => <option value={option}>{option}</option>}</For>
+            </NativeSelect>
+          </Field>
+        )}
+      </Show>
+    </form>
+  );
+}
+
 export function VaultRequestCard(props: VaultRequestCardProps) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const [dialogOpen, setDialogOpen] = createSignal(false);
+  const formId = createUniqueId();
+  const [apiKey, setApiKey] = createSignal("");
+  const [scopeChoice, setScopeChoice] = createSignal(untrack(() => props.scope?.value ?? ""));
+  const [saveFailure, setSaveFailure] = createSignal<string>();
   onCleanup(() => props.elementRef?.(undefined));
   const pending = () => props.status === "pending";
+  const keyForm = () => props.kind === "apiKey" && pending();
 
-  const savedDetail = (saved: UiVaultSavedItem) => {
+  async function saveApiKey(): Promise<void> {
+    const save = props.onSave;
+    if (!save || props.busy || apiKey().trim() === "") return;
+    setSaveFailure(undefined);
+    try {
+      await save(
+        { kind: "apiKey", id: null, name: props.prefill.name ?? "", notes: "", key: apiKey() },
+        props.scope ? scopeChoice() : undefined,
+      );
+      setApiKey("");
+    } catch (cause) {
+      setSaveFailure(errorMessage(cause, t("vault.failed")));
+    }
+  }
+
+  const saved = () => props.status === "answered" && (props.saved !== undefined || props.kind === "apiKey");
+
+  const savedDetail = (saved: UiVaultSavedItem | undefined) => {
     switch (props.kind) {
+      case "apiKey":
+        return [props.prefill.name, text(props.values, UI_API_KEY_SCOPE_FIELD_ID)].filter(Boolean).join(" · ");
       case "card": {
+        if (!saved) return "";
         const masked =
           saved.last4 === undefined
             ? ""
@@ -117,11 +193,12 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
   };
 
   const subtitle = () => {
+    if (pending() && props.kind === "apiKey") return t("vault.request.apiKeyPrivate");
     if (pending())
       return props.agentName
         ? t("vault.request.private", { agent: props.agentName })
         : t("vault.request.privateUnnamed");
-    return props.saved ? savedDetail(props.saved) || undefined : undefined;
+    return saved() ? savedDetail(props.saved) || undefined : undefined;
   };
 
   return (
@@ -138,18 +215,47 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
           </Show>
         </span>
       }
-      outcome={props.status === "answered" && props.saved ? t("vault.request.saved") : undefined}
+      outcome={saved() ? t("vault.request.saved") : props.status === "closed" ? props.closedOutcome : undefined}
       outcomeBadge
-      inlineActions
+      inlineActions={!keyForm()}
       busy={props.busy}
-      error={props.error}
+      error={props.error ?? saveFailure()}
       onSkip={props.onSkip}
       actions={
-        <Button size="sm" disabled={!props.onSave || props.busy} onClick={() => setDialogOpen(true)}>
-          {t(ADD_LABEL[props.kind])}
-        </Button>
+        <Show
+          when={props.kind !== "apiKey" ? props.kind : undefined}
+          fallback={
+            <Button
+              type="submit"
+              size="sm"
+              form={formId}
+              disabled={!props.onSave || props.busy || apiKey().trim() === ""}
+            >
+              {props.submitLabel ?? t("common.save")}
+            </Button>
+          }
+        >
+          {(kind) => (
+            <Button size="sm" disabled={!props.onSave || props.busy} onClick={() => setDialogOpen(true)}>
+              {t(ADD_LABEL[kind()])}
+            </Button>
+          )}
+        </Show>
       }
     >
+      <Show when={keyForm()}>
+        <ApiKeyRequestForm
+          formId={formId}
+          name={props.prefill.name ?? ""}
+          placeholder={props.keyPlaceholder}
+          scope={props.scope}
+          apiKey={apiKey()}
+          scopeChoice={scopeChoice()}
+          onKeyChange={setApiKey}
+          onScopeChange={setScopeChoice}
+          onSubmit={() => void saveApiKey()}
+        />
+      </Show>
       <Show when={dialogOpen() && pending() ? props.onSave : undefined}>
         {(save) => (
           <VaultRequestDialog

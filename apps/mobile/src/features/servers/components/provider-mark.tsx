@@ -4,7 +4,6 @@ import { useThemeColor } from "heroui-native/hooks";
 import Svg, { Path } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 
-/** The colour of a provider mark. Codex, Grok and the others draw in the text colour. */
 function useProviderColor(provider: AgentProviderId): string {
   const foreground = String(useThemeColor("foreground"));
   const [claude, gemini] = useCSSVariable(["--openbot-provider-claude", "--openbot-provider-antigravity"]);
@@ -13,7 +12,6 @@ function useProviderColor(provider: AgentProviderId): string {
   return foreground;
 }
 
-/** The mark of a provider, from the shapes that desktop draws too. */
 export function ProviderMark({ provider, size }: { provider: AgentProviderId; size: number }) {
   const color = useProviderColor(provider);
   const shape = providerLogoShape(provider);

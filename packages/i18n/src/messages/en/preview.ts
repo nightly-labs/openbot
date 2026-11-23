@@ -19,6 +19,11 @@ export const messages = defineMessages("preview", {
   "preview.unsupported.title": "Preview unavailable",
   "preview.unsupported.description": "This file type can be opened in its default application.",
   "preview.unsupported.openExternally": "Open externally",
+  "preview.tooLarge.title": "File too large to preview",
+  "preview.tooLarge.description": "Previews stop at 100 MB. You can open this file in its default application.",
   "preview.spreadsheet.readFailed": "Could not read this spreadsheet.",
   "preview.spreadsheet.truncated": "Preview limited to the first {rows} rows and {columns} columns.",
+  "preview.document.readFailed": "Could not read this document.",
+  "preview.document.empty": "This document has no text to show.",
+  "preview.document.truncated": "Preview limited to the first part of the document.",
 });

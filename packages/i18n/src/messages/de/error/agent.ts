@@ -12,6 +12,18 @@ export const messages = {
     "Das Werkzeug wurde nicht ausgeführt. In tool_call muss arguments ein JSON-Objekt sein, kein Text. Sende den Aufruf erneut mit arguments als Objekt.",
   "error.agent.toolCallDiscoveryTool":
     "Das Werkzeug wurde nicht ausgeführt. tool_call kann openbot.tool_search und openbot.tool_describe nicht ausführen. Rufe sie direkt mit denselben Argumenten auf.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call nimmt nur name und arguments an. Gib die Argumente des Werkzeugs in arguments als Objekt an und sende den Aufruf erneut.",
+  "error.agent.toolCallMissingName":
+    "Das Werkzeug wurde nicht ausgeführt. Der tool_call hat keinen name. Gib in name den qualifizierten Namen aus tool_search an, zum Beispiel openbot.history_read, und sende den Aufruf erneut.",
+  "error.agent.toolCallUnknownTool":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Verwende den genauen qualifizierten Namen aus tool_search, zum Beispiel openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Der qualifizierte Name ist möglicherweise {name}. Wenn ja, sende den Aufruf mit diesem Namen erneut.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe hat kein OpenBot-Werkzeug mit dem Namen {names} gefunden. Es beschreibt nur die OpenBot- und Browser-Werkzeuge, die openbot.tool_search auflistet, keine MCP-Werkzeuge.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Rufe {names} direkt auf. tool_describe beschreibt die Suchwerkzeuge nicht.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Der Zeitplan der Routine ist ungültig: {detail} Korrigiere den Zeitplan und versuche es erneut. openbot.tool_describe liefert das Schema.",
   "error.agent.approvalWhileDeleting": "Während der Agent gelöscht wird, kann keine Genehmigung erteilt werden.",
@@ -48,6 +60,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Das gewählte Agentenmodell ist nicht verfügbar.",
   "error.agent.modelProviderNotConnected":
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} ist nicht verbunden.",
+  "error.agent.modelProviderSignInRequired":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} braucht eine Anmeldung. Melde dich bei {provider} an und versuche es erneut.",
+  "error.agent.modelProviderNotInstalled":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} ist nicht installiert.",
+  "error.agent.modelProviderOutdated":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} braucht ein Update.",
   "error.agent.modelListEmpty":
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} hat keine Modelle aufgeführt. Letzter Fehler: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -60,6 +78,8 @@ export const messages = {
   "error.agent.modelNotListed": "Das Modell „{model}“ ist nicht verfügbar. Verfügbare Modelle: {models}.",
   "error.agent.providerNotListed":
     "Derzeit ist kein Modell von {provider} verfügbar. Rufe list_models auf, um die verfügbaren Modelle zu sehen.",
+  "error.agent.creatorModelNotListed":
+    "Dein Modell „{model}“ ist gerade nicht in der Modellliste, daher kann der neue Agent nicht damit starten. Versuche es in ein paar Sekunden erneut, oder setze provider und model auf ein Modell, das list_models zeigt.",
   "error.agent.reasoningEffortUnsupported":
     "Das Modell „{model}“ unterstützt den Denkaufwand „{effort}“ nicht. Unterstützte Stufen: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -97,8 +117,18 @@ export const messages = {
     "Der von diesem Agenten verwendete Endpunkt wurde entfernt. Wähle ein anderes Modell für ihn.",
   "error.agent.turnStalled":
     "{provider} reagiert nicht mehr, daher hat OpenBot diesen Durchlauf beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
+  "error.agent.promptCancelled":
+    "{provider} hat diese Nachricht abgebrochen, bevor sie begann. Sende die Nachricht erneut.",
+  "error.agent.toolLoopStopped":
+    "{provider} hat einen fehlgeschlagenen Schritt viele Male wiederholt, daher hat OpenBot diesen Durchgang beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
+  "error.agent.answerCutOff":
+    "Der Agent hat angehalten, bevor er seine Antwort beendet hat, daher ist die Antwort nicht vollständig. Sende die Nachricht erneut.",
   "error.agent.compactionConnectionLost":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung und sende dann eine Nachricht, um fortzufahren.",
+  "error.agent.compactionConnectionLostAddress":
+    "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung und ob {variable} unter Variablen in den {provider}-Einstellungen die API-Adresse deines Modelldienstes ist (oft mit /v1 am Ende). Sende dann eine Nachricht.",
+  "error.agent.compactionLoopStopped":
+    "{provider} hat den Kontext immer wieder komprimiert, und jedes Mal blieb er zu voll, um weiterzumachen. Daher hat OpenBot diesen Durchlauf angehalten. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, und sende dann eine Nachricht. Wenn du oder der Agent geändert habt, wann {provider} komprimiert, mach diese Änderung rückgängig.",
   "error.agent.selectedGone": "Der gewählte Agent existiert nicht mehr.",
   "error.agent.profileEndpointsChanged":
     "Die benutzerdefinierten Endpunkte wurden während der Erstellung geändert. Versuche es erneut.",
@@ -118,6 +148,12 @@ export const messages = {
     "Stoppe den Agenten und storniere seine Nachrichten in der Warteschlange, bevor du ihn löschst.",
   "error.agent.deleteIncomplete":
     "Die Agentendaten konnten nicht vollständig entfernt werden. Versuche erneut, den Agenten zu löschen.",
+  "error.agent.deleteFolderInUse":
+    "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. Lösche den Agenten erneut, wenn diese Arbeit endet, oder nach einem Neustart von OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Ein anderes Programm nutzt noch den Ordner dieses Agenten, zum Beispiel ein Programm, das der Agent gestartet hat. Schließe dieses Programm oder starte den Computer neu, auf dem dieser Agent läuft, und lösche den Agenten dann erneut.",
+  "error.agent.deleteWhenFolderFree":
+    "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. OpenBot löscht diesen Agenten, wenn diese Arbeit endet.",
   "error.agent.duplicationBusy": "Dieser Agent wird bereits dupliziert.",
   "error.agent.waitBeforeDuplicate":
     "Warte, bis der Agent fertig ist, und leere seine Warteschlange, bevor du ihn duplizierst.",
@@ -144,6 +180,8 @@ export const messages = {
     "Das Verhalten von Nachrichten während der Arbeit des Agenten kann nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
   "error.agent.backupModelsLocalOnly":
     "Ersatzmodelle können nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
+  "error.agent.backupModelsAtLimit":
+    "Kein Ersatzmodell kann jetzt übernehmen: Jedes hat sein Nutzungslimit erreicht oder ist vor Kurzem fehlgeschlagen. Modelle eines Kontos können sich ein Limit teilen. Um jetzt weiterzumachen, füge ein Ersatzmodell eines anderen Anbieters oder Kontos hinzu, oder warte auf das Zurücksetzen.",
   "error.agent.taskLimitLocalOnly":
     "Das Aufgabenlimit lässt sich nur auf dem Computer festlegen, auf dem der Agent läuft.",
   "error.agent.localScriptsOff": "Dieser Agent erlaubt keine lokalen Skripte.",
@@ -161,8 +199,14 @@ export const messages = {
     "Dieser Server hat wenig freien Arbeitsspeicher. Deine Nachricht wartet in der Warteschlange und startet, wenn Speicher frei ist.",
   "error.agent.workspaceOnlyToolMissing":
     "„Nur Arbeitsbereich“ benötigt {tool}, das OpenBot nicht gefunden hat. Installiere es oder wähle „Voller Zugriff“ in den Agenteneinstellungen.",
+  "error.agent.codexSandboxUnavailable":
+    "„Nur Arbeitsbereich“ braucht die Codex-Sandbox, die Codex auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Erst fragen“ oder „Voller Zugriff“ in den Agenteneinstellungen.",
   "error.agent.claudeSandboxUnavailable":
     "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann: {reason}. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
+  "error.agent.claudeNoSandbox":
+    "Claude kann auf diesem Computer keine Sandbox nutzen, daher funktioniert „Nur Arbeitsbereich“ damit nicht. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
+  "error.agent.claudeSandboxBlocked":
+    "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
   "error.agent.screenCaptureOff":
     "Die Bildschirmaufnahme ist für diesen Agenten deaktiviert. Der Benutzer kann die Computersteuerung in den Agenteneinstellungen aktivieren.",
   "error.agent.screenCaptureUnavailable": "Die Bildschirmaufnahme ist auf diesem Computer nicht verfügbar.",
@@ -170,6 +214,8 @@ export const messages = {
     "Die Bildschirmaufnahme funktioniert nicht in einer Slack-, Discord- oder Telegram-Unterhaltung, da andere Personen ihre Dateien erhalten.",
   "error.agent.screenCaptureDeclined":
     "Der Benutzer hat diese Bildschirmaufnahme nicht erlaubt. Es wurde nichts aufgenommen.",
+  "error.agent.mcpToolDeclined":
+    "Der Benutzer hat diesen MCP-Toolaufruf nicht erlaubt. Das Tool wurde nicht ausgeführt.",
   "error.agent.screenCaptureWindowMissing":
     "Dieses Fenster ist gerade nicht geöffnet. Rufe list_capture_sources auf, um die aktuellen Fenster-IDs zu erhalten.",
   "error.agent.screenCaptureDisplayMissing":
@@ -178,6 +224,8 @@ export const messages = {
     "Der Bereich liegt nicht innerhalb eines Bildschirms. Verwende Desktop-Punkte innerhalb der Grenzen eines Bildschirms aus list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot hat keine Berechtigung zur Bildschirmaufnahme. Bitte den Benutzer, Systemeinstellungen → Datenschutz & Sicherheit → Bildschirm- & Systemaudioaufnahme zu öffnen, OpenBot zu aktivieren und OpenBot dann zu beenden und neu zu öffnen.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot hat noch keine Berechtigung zur Bildschirmaufnahme und kann die Fenster daher nicht auflisten. Um einen Bildschirm aufzunehmen, rufe capture_screen mit target screen auf. Der Benutzer erlaubt die Aufnahme zuerst, danach kann macOS den Benutzer um die Berechtigung bitten.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows hat ein leeres Bild geliefert. Bitte den Benutzer, den Computer zu entsperren und geschützte Inhalte zu schließen. Auch eine Richtlinie der Organisation kann die Bildschirmaufnahme verhindern.",
   "error.agent.screenCaptureFailed": "Die Bildschirmaufnahme ist fehlgeschlagen. Versuche es erneut.",

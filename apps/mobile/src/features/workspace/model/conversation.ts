@@ -70,7 +70,6 @@ export function decodeConversationSearchPage(value: unknown): ConversationSearch
   };
 }
 
-/** Conversation projections identify user bubbles by recipient delivery, not mailbox message. */
 export function conversationMessageId(receipt: QueuedMessageReceipt, agentId: string): string {
   const delivery = receipt.deliveries.find((item) => item.recipientAgentId === agentId);
   if (!delivery) throw new Error("The host returned no delivery for this agent.");

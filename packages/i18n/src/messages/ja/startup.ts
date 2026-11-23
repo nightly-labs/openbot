@@ -20,6 +20,10 @@ export const messages = {
   "startup.newerDataDownload": "OpenBot をダウンロード",
   "startup.newerDataGuide": "ガイドを開く",
   "startup.newerDataQuit": "終了",
+  "startup.newerDataLoopTitle": "最新の OpenBot が開きませんでした",
+  "startup.newerDataLoopBody":
+    "新しいバージョンの OpenBot がデータを保存したため、このバージョン ({version}) では開けません。OpenBot {loopVersion} は開く前に何度も続けて停止したため、再インストールしません。\n\n{loopVersion} より新しいバージョンが公開されたら、それをインストールしてください。サポートが必要な場合は、ガイドを開いてください。\n\nローカルデータはリセットも上書きもされていません。",
+  "startup.newerDataReleases": "リリースを表示",
   "startup.recoveryWindowTitle": "OpenBot の復旧",
   "startup.recoveryTitle": "OpenBot を開けませんでした",
   "startup.recoveryBody": {
@@ -28,8 +32,11 @@ export const messages = {
   },
   "startup.recoveryHint":
     "もう一度試すか、最後に開けたバージョンをインストールしてください。サポートが必要な場合は、診断情報を書き出し、そのファイルをレポートと一緒に送ってください。",
+  "startup.recoveryHintLatest":
+    "データを開ける以前のバージョンが見つかりませんでした。もう一度試すか、最新バージョンをインストールしてください。サポートが必要な場合は、診断情報を書き出し、そのファイルをレポートと一緒に送ってください。",
   "startup.recoveryRetry": "再試行",
   "startup.recoveryPreviousVersion": "前のバージョンをダウンロード",
+  "startup.recoveryLatestVersion": "最新バージョンをダウンロード",
   "startup.recoveryExportDiagnostics": "診断情報を書き出す",
   "startup.recoveryOpenDataFolder": "データフォルダを開く",
   "startup.recoveryQuit": "終了",

@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "De leden gaven deze taak te vaak aan elkaar door. De taak is gestopt om een lus te voorkomen.",
   "channel.conversation.noMembers": "Voeg agents toe in de kanaalinstellingen om te beginnen.",
+  "channel.conversation.waitFull": "Wachten - {name} begint als een lopende taak klaar is",
   "channel.conversation.archivedNotice": "Verwijderd kanaal. Alleen voorvertoning.",
   "channel.composer.label": "Bericht aan kanaal",
   "channel.composer.placeholder": "Bericht aan {name}",
@@ -21,6 +22,11 @@ export const messages = {
   "channel.panel.close": "Kanaalpaneel sluiten",
   "channel.settings.title": "Kanaalinstellingen",
   "channel.settings.memories": "Herinneringen",
+  "channel.settings.folders.title": "Mappen",
+  "channel.settings.folders.description":
+    "Alle leden van {channel} kunnen in deze mappen bestanden wijzigen en opdrachten uitvoeren.",
+  "channel.settings.folders.toastAdded": "Leden van {channel} kunnen nu bestanden in {folder} wijzigen",
+  "channel.settings.folders.toastRemoved": "Leden van {channel} kunnen geen bestanden in {folder} meer wijzigen",
   "channel.settings.isolated": "Herinneringen in dit kanaal houden",
   "channel.settings.isolatedDescription":
     "Agenten bewaren wat ze hier leren als kanaalherinneringen. Hun andere chats zien ze niet.",

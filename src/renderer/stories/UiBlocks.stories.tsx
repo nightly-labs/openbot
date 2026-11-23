@@ -52,7 +52,6 @@ const dangerSpec: UiConfirmSpec = {
   ],
 };
 
-/** The plan card of `acknowledge_request`. The host presses Start when nobody answers in 10 s. */
 const planSpec: UiConfirmSpec = {
   type: "confirm",
   title: "On it. This is my plan for the 502 on staging.",
@@ -88,7 +87,6 @@ const singleChoiceSpec: UiChoiceSpec = {
   ],
 };
 
-// Agents no longer get quick replies; a stored or remote one shows as a choice.
 const quickSpec: UiQuickRepliesSpec = {
   type: "quick_replies",
   title: "Found 3 new emails. One is important: an invoice for 2 490, due 12 October.",
@@ -131,10 +129,8 @@ interface LiveProps<Spec extends UiBlockSpec> {
   disabled?: boolean;
   busy?: boolean;
   onSkip?: () => void;
-  footerFieldId?: string | undefined;
 }
 
-/** Keeps the answer in the story, so a pending card freezes the way it does in the chat. */
 function live<Spec extends UiBlockSpec>(
   Block: (props: LiveProps<Spec>) => JSX.Element,
 ): (props: LiveProps<Spec>) => JSX.Element {
@@ -146,7 +142,6 @@ function live<Spec extends UiBlockSpec>(
         state={state()}
         disabled={props.disabled ?? false}
         busy={props.busy ?? false}
-        footerFieldId={props.footerFieldId}
         onRespond={(response) => {
           props.onRespond(response);
           setState(answered(props.spec, response));
@@ -200,7 +195,6 @@ export const ConfirmExpired: Story = {
   render: (args) => <LiveConfirm spec={confirmSpec} state={{ status: "expired" }} onRespond={args.onRespond} />,
 };
 
-/** A draft taller than the preview box fades out at its end, and "Show all" under it opens the rest. */
 export const ConfirmLongPreview: Story = {
   render: (args) => (
     <LiveConfirm
@@ -213,7 +207,6 @@ export const ConfirmLongPreview: Story = {
   ),
 };
 
-/** Skip and three long buttons do not fit on one row of a chat-wide card: the buttons fill both rows. */
 export const ConfirmManyActions: Story = {
   render: (args) => (
     <div style={{ "max-width": "540px" }}>
@@ -234,7 +227,6 @@ export const ConfirmManyActions: Story = {
   ),
 };
 
-/** Start counts down to the time the host answers. Cancel sits at the far end, and there is no Skip. */
 export const PlanCountdown: Story = {
   render: (args) => (
     <LiveConfirm
@@ -245,7 +237,6 @@ export const PlanCountdown: Story = {
   ),
 };
 
-/** Nobody answered in time, so the host pressed Start. */
 export const PlanAutoAnswered: Story = {
   render: (args) => (
     <LiveConfirm
@@ -315,7 +306,6 @@ const vaultLoginSpec: UiFormSpec = {
   submit: "Save to Vault",
 };
 
-/** A form that asks for a secret. Once answered, its values show as rows and the secret shows as hidden. */
 export const SecretFormPending: Story = {
   render: (args) => <LiveForm spec={vaultLoginSpec} onRespond={args.onRespond} />,
 };
@@ -333,7 +323,6 @@ export const SecretFormAnswered: Story = {
   ),
 };
 
-/** The form of `request_api_key` with `vault`: the key, and who can use it, small next to the submit button. */
 const apiKeySpec: UiFormSpec = {
   type: "form",
   title: "PrivateMail app password for the CRM sync",
@@ -352,7 +341,7 @@ const apiKeySpec: UiFormSpec = {
 };
 
 export const ApiKeyPending: Story = {
-  render: (args) => <LiveForm spec={apiKeySpec} footerFieldId={UI_API_KEY_SCOPE_FIELD_ID} onRespond={args.onRespond} />,
+  render: (args) => <LiveForm spec={apiKeySpec} onRespond={args.onRespond} />,
 };
 
 export const Narrow: Story = {
