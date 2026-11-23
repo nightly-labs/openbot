@@ -1,8 +1,3 @@
-// Runs `resources/cli/openbot-cli.mjs` as a child process against the real `AutomationServer` on a
-// loopback port. The agent service behind the server is a small in-memory stand-in: a message gets a
-// delivery that moves from queued to running to its end each time the CLI reads it. The script checks
-// the CLI's output and exit codes for each outcome and that the token never reaches the output.
-// Writes .openbot-build/automation-cli-e2e/report.json. Run: `bun scripts/automation-cli-e2e.ts`.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -16,6 +11,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { AgentSettingsRefused } from "../src/backend/agent/agent-settings-refused";
 import { AutomationServer, type UpdatedAgent } from "../src/main/automation-server";
@@ -29,7 +25,6 @@ interface Check {
   detail: unknown;
 }
 
-/** How a message's delivery ends, chosen by the message text. */
 type Outcome = "completed" | "failed" | "person" | "forever" | "behind" | "restart";
 
 interface FakeDelivery {
@@ -74,7 +69,7 @@ const deliveries = new Map<string, FakeDelivery>();
 const updates: UpdateAgentInput[] = [];
 const cleared: string[] = [];
 let busy = false;
-/** The account default "Requests an hour" of Settings › Agents › Local scripts. */
+let approvalCommand: string | null = null;
 let automationRunsPerHour = DEFAULT_AGENT_DEFAULTS.automationRunsPerHour;
 
 function deliveryState(
@@ -83,7 +78,6 @@ function deliveryState(
   delivery.reads += 1;
   const base = { recipientAgentId: delivery.agentId, turnId: delivery.reads > 1 ? `turn-${delivery.id}` : null };
   if (delivery.reads === 1 || delivery.outcome === "behind") return { ...base, status: "queued", error: null };
-  // OpenBot restarts while the CLI waits: the next read comes through a new port and token.
   if (delivery.reads === 2 && delivery.outcome === "restart") restarted = restart();
   if (delivery.reads < 3 || delivery.outcome === "person" || delivery.outcome === "forever")
     return { ...base, status: "running", error: null };
@@ -121,13 +115,27 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
     return Effect.succeed(receipt);
   },
   getLocalAttention: (agentId) => {
-    // Only the newest delivery can wait: an earlier question is gone once the next test starts. A
-    // delivery that stays queued waits behind an earlier turn's question.
     const newest = [...deliveries.values()].at(-1);
     const waiting = newest?.agentId === agentId && (newest.outcome === "person" || newest.outcome === "behind");
     return {
       prompts: [],
-      approvals: [],
+      approvals:
+        waiting && approvalCommand
+          ? [
+              {
+                requestId: "approval-1",
+                agentId,
+                threadId: "thread-ada",
+                turnId: "turn-ada",
+                kind: "command" as const,
+                command: approvalCommand,
+                cwd: null,
+                reason: null,
+                grantRoot: null,
+                permissions: null,
+              },
+            ]
+          : [],
       browserTakeovers: waiting ? [{ requestId: "takeover-1", requiresOpenBot: true }] : [],
     };
   },
@@ -173,7 +181,6 @@ interface Run {
 
 function cli(args: string[], stdin?: string): Promise<Run> {
   return new Promise((done, fail) => {
-    // The CLI is for Node, which is what users have; Bun runs only this script.
     const child = spawn("node", [CLI, ...args], {
       env: { ...process.env, OPENBOT_AUTOMATION_DIR: root },
       stdio: ["pipe", "pipe", "pipe"],
@@ -289,7 +296,6 @@ try {
   );
   await check("set-model takes the provider from the model", ["agent", "set-model", "Ada", "gpt-5.5"], 0, () => {
     const update = updates.at(-1);
-    // The agent's `high` is not supported by gpt-5.5, so the model's default replaces it.
     return update?.provider === "codex" && update.model === "gpt-5.5" && update.reasoningEffort === "medium";
   });
   const updateCount = updates.length;
@@ -312,7 +318,6 @@ try {
     return parsed(run).cleared === true && cleared.at(-1) === "agent-ada";
   });
   await check("new-chat needs exactly one agent", ["agent", "new-chat"], 2, (run) => run.stderr.includes("Usage:"));
-  // The restarted server has no runs yet, so the agent gets exactly the limit from the account default.
   automationRunsPerHour = 2;
   await check("a message under the limit is accepted", ["run", "Ada", "hello"], 0, () => true);
   await check("a message at the limit is accepted", ["run", "Ada", "hello"], 0, () => true);
@@ -324,6 +329,24 @@ try {
   await check("a raised limit accepts the next message at once", ["run", "Ada", "hello"], 0, () => {
     return deliveries.size === beforeLimit + 1;
   });
+  automationRunsPerHour = 10;
+  const shortVaultPassword = "nt-ad";
+  registerSecretValue(shortVaultPassword, { allowShort: true });
+  registerSecretValue("gentI", { allowShort: true });
+  approvalCommand = `echo ${shortVaultPassword}`;
+  await check("a short saved secret inside an agent ID keeps the ID in the list", ["list", "--json"], 0, (run) => {
+    return parsed(run).agents[0]?.id === "agent-ada";
+  });
+  await check(
+    "a short saved secret inside an agent ID still finds the agent by ID and redacts the approval",
+    ["run", "agent-ada", "ask me", "--wait", "--json"],
+    3,
+    (run) => {
+      const approval = parsed(run).pending.approvals[0];
+      return approval?.agentId === "agent-ada" && approval.command === "echo [redacted]";
+    },
+  );
+  approvalCommand = null;
   busy = true;
   await check("a refused update exits 1 with its reason", ["agent", "set-account", "Ada", "default"], 1, (run) => {
     return run.stderr.includes("Wait until the agent is idle.");

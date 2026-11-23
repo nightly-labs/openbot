@@ -43,6 +43,11 @@ export const messages = {
   "update.idleRestart.description": "新しいルーティンの実行は再起動まで待機します。",
   "update.idleRestart.waitingFor": "{reasons} を待っています。",
   "update.idleRestart.cancel": "再起動をキャンセル",
+  "update.idleRestart.restartNow": "今すぐ再起動",
+  "update.idleRestart.restartNowTitle": "今すぐ OpenBot を再起動しますか？",
+  "update.idleRestart.restartNowDescription":
+    "終わっていないエージェントのターンとルーティンの実行は、今すぐ停止します。",
+  "update.idleRestart.keepWaiting": "待機を続ける",
   "update.idleRestart.cancelFailed": "再起動をキャンセルできませんでした。",
   "update.idleRestart.requestFailed": "再起動を予定できませんでした。",
   "update.idleRestart.failedTitle": "OpenBot は再起動しませんでした",
@@ -66,4 +71,10 @@ export const messages = {
   "update.whatsNew.changelog": "完全な変更履歴",
   "update.whatsNew.changelogFailed": "OpenBot は変更履歴を開けませんでした。",
   "update.whatsNew.done": "OK",
+  "update.required.title": "アップデートが必要です",
+  "update.required.description":
+    "OpenBot {version} はサポートが終了しました。続けるには {minimum} 以降にアップデートしてください。",
+  "update.required.download": "OpenBot をダウンロード",
+  "update.required.continue": "アップデートせずに続ける",
+  "update.required.failed": "アップデートが完了しませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

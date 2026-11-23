@@ -153,8 +153,6 @@ export const messages = {
   "agentSettings.runtime.busyMessage": "Pendant le travail",
   "agentSettings.runtime.busyMessageLabel": "Messages pendant le travail de l’agent",
 
-  "agentSettings.runtime.taskLimit": "Fils en parallèle",
-  "agentSettings.runtime.taskLimitLabel": "Fils exécutés en même temps",
   "agentSettings.runtime.workingDirectory": "Répertoire de travail",
   "agentSettings.runtime.notAvailable": "Pas encore disponible",
   "agentSettings.runtime.fullAccessNote":
@@ -174,22 +172,22 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Orienter",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
-  "agentSettings.taskLimit.default": "Par défaut ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} exécute un seul tour à la fois. Les fils de cet agent s’attendent les uns les autres.",
   "agentSettings.notificationLevel.title": "Me notifier",
   "agentSettings.notificationLevel.server": "Par défaut du serveur ({level})",
   "agentSettings.notificationLevel.note":
     "Ce choix ne concerne que vous, sur tous vos appareils. Si le serveur est en sourdine ou réglé sur « Rien », cet agent reste aussi silencieux.",
 
   "agentSettings.newChat.title": "Nouvelle discussion",
-  "agentSettings.newChat.description": "L’agent oublie cette discussion. Sa configuration reste.",
+  "agentSettings.newChat.description":
+    "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Sa configuration reste.",
   "agentSettings.newChat.button": "Commencer",
   "agentSettings.newChat.confirmTitle": "Commencer une nouvelle discussion avec {name} ?",
   "agentSettings.newChat.confirmDescription":
-    "L’agent oublie cette discussion. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
+    "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
   "agentSettings.newChat.confirm": "Nouvelle discussion",
   "agentSettings.newChat.failed": "Impossible de commencer une nouvelle discussion.",
+  "agentSettings.newChat.busy":
+    "L’agent travaille. Pour commencer une nouvelle discussion, attendez qu’il termine ou arrêtez-le.",
   "agentSettings.deleteHistory.title": "Supprimer l’historique",
   "agentSettings.deleteHistory.description":
     "Les messages de cette discussion sont supprimés et l’agent les oublie. Sa configuration reste.",
@@ -210,6 +208,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "Demander d’abord",
 
   "agentSettings.links.usage": "Utilisation",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Tous les agents",
   "agentSettings.links.memories": "Souvenirs",
   "agentSettings.links.memoriesCount": { one: "{count} enregistré", other: "{count} enregistrés" },
   "agentSettings.links.skills": "Compétences",
@@ -236,6 +236,9 @@ export const messages = {
     "L’agent peut démarrer une nouvelle discussion quand la sienne devient longue. Il enregistre d’abord des notes.",
   "agentSettings.quickAcknowledgement.title": "Montrer le plan avant les longues tâches",
   "agentSettings.quickAcknowledgement.description": "Avant une longue tâche, l’agent montre son plan.",
+  "agentSettings.builtinMemory.title": "Mémoire OpenBot",
+  "agentSettings.builtinMemory.description":
+    "L’agent enregistre et lit ses propres souvenirs. Désactivez-la pour utiliser seulement une app de mémoire, comme Mem0. Les souvenirs enregistrés restent.",
   "agentSettings.browserProfile.label": "Profil de navigateur",
   "agentSettings.browserProfile.shared": "Partagé",
   "agentSettings.browserProfile.agent": "Cet agent uniquement",
@@ -245,6 +248,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Chaque profil garde ses propres connexions et cookies. Un changement ferme les onglets ouverts de l’agent.",
   "agentSettings.browserProfile.manage": "Gérer",
+  "agentSettings.browserProfile.movedNote":
+    "Les connexions aux sites restent dans l’ancien profil. L’agent doit se reconnecter à ces sites.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Tout le processus {provider} s’exécute dans un bac à sable : une écriture à l’extérieur échoue donc. Disponible sur macOS uniquement.",
 } as const satisfies PartialTranslation<typeof source>;

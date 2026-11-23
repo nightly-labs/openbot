@@ -4,8 +4,6 @@ import { LandingTextProvider } from "../../components/landing/LandingText";
 import { landingPageText } from "../../lib/landing-page-text";
 import { loadPageText } from "../../lib/page-text";
 
-// `head` imports the pages when it runs, as in routes/compare/$slug.tsx.
-// The hero download selector reads the home page text. The hub is in English, so the selector is too.
 export const Route = createFileRoute("/download/")({
   loader: () => loadPageText("en", landingPageText),
   head: async ({ match }) => {

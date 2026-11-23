@@ -1,7 +1,6 @@
 import { Effect, Schema } from "effect";
 import { StripeRequestError, type StripeTransportError } from "./stripe-client";
 
-/** The statuses of a subscription that still gives its plan or license. */
 export const OPEN_STATUSES_SQL = "('active', 'trialing', 'past_due', 'unpaid', 'paused')";
 
 export class BillingError extends Schema.TaggedError<BillingError>()("BillingError", {

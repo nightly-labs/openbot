@@ -12,7 +12,6 @@ export interface AlertProps extends JSX.HTMLAttributes<HTMLDivElement> {
 
 const NotificationContext = createContext<((report: FailureProperties) => void) | null>(null);
 
-/** Applications observe presentations. The shared UI does not send or store reports. */
 export function NotificationObserver(props: {
   onShown: (report: FailureProperties) => void;
   children?: JSX.Element;

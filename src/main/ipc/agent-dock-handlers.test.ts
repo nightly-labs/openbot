@@ -3,6 +3,7 @@
 import type {
   AgentDockAction,
   AgentDockDragPhase,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
@@ -11,8 +12,6 @@ import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { agentDockIpcHandlers } from "./agent-dock-handlers";
 
-// Same reason as define-ipc-group.test.ts: electron cannot be imported outside an Electron process, so
-// registrations are captured.
 const { registrations } = vi.hoisted(() => ({
   registrations: new Map<string, (event: unknown, payload?: unknown) => unknown>(),
 }));
@@ -49,11 +48,12 @@ const PRESENTATION: AgentDockPresentation = {
   sizePercent: 120,
   offsets: [{ displayId: 1, offset: 0.25 }],
   seats: [
-    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "working" } },
+    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "working" }, temporary: false },
     {
       kind: "channel",
       channel: { id: "channel-1", name: "Launch", title: "", members: ["agent-1"], icon: null, imageUrl: null },
       state: { kind: "unread", count: 1 },
+      temporary: false,
     },
   ],
   available: [],
@@ -75,6 +75,10 @@ const PRESENTATION: AgentDockPresentation = {
       ],
       working: true,
       wait: null,
+      approval: null,
+      prompt: null,
+      takeover: null,
+      usageLimit: null,
     },
   ],
   results: [],
@@ -100,6 +104,7 @@ function register() {
   const interactive: Array<[number, SetAgentDockInteractiveInput]> = [];
   const drags: Array<[number, AgentDockDragPhase]> = [];
   const regions: Array<[number, AgentDockInputRect[]]> = [];
+  const extents: Array<[number, AgentDockExtent | null]> = [];
   const xwayland: boolean[] = [];
   const { agentDock } = agentDockIpcHandlers({
     agentDock: {
@@ -120,6 +125,9 @@ function register() {
       setInputRegion: (rendererId, rects) => {
         regions.push([rendererId, rects]);
       },
+      setExtent: (rendererId, extent) => {
+        extents.push([rendererId, extent]);
+      },
       listDisplays: () => DISPLAYS,
       drag: (rendererId, phase) => {
         drags.push([rendererId, phase]);
@@ -136,7 +144,7 @@ function register() {
     if (!listener) throw new Error(`No handler for ${name}.`);
     return listener(event(senderId), payload);
   };
-  return { published, actions, interactive, drags, regions, xwayland, call };
+  return { published, actions, interactive, drags, regions, extents, xwayland, call };
 }
 
 beforeEach(() => registrations.clear());
@@ -231,6 +239,28 @@ describe("agent dock handlers", () => {
     expect(regions).toEqual([
       [DOCK_ID, shape],
       [DOCK_ID, []],
+    ]);
+  });
+
+  it("takes the window extent only from the dock window, with whole px inside the limits", () => {
+    const { extents, call } = register();
+    const extent = { inward: 120, above: 180, below: 200 };
+    expect(() => call("setExtent", MAIN_ID, extent)).toThrow("outside the agent dock window");
+    expect(() => call("setExtent", OTHER_ID, extent)).toThrow("outside the agent dock window");
+    const wrong = [
+      { inward: -1, above: 0, below: 0 },
+      { inward: 0.5, above: 0, below: 0 },
+      { inward: 0, above: 100_001, below: 0 },
+      { inward: 0, above: 0 },
+      undefined,
+      [],
+    ];
+    for (const value of wrong) expect(() => call("setExtent", DOCK_ID, value)).toThrow("extent is invalid");
+    call("setExtent", DOCK_ID, extent);
+    call("setExtent", DOCK_ID, null);
+    expect(extents).toEqual([
+      [DOCK_ID, extent],
+      [DOCK_ID, null],
     ]);
   });
 

@@ -1,7 +1,3 @@
-// The sitemap and the per-collection RSS feeds, built from the article
-// registries. They live here rather than inside the route files so that the
-// tests can assert on the XML without standing up a router.
-
 import {
   createMarketplaceShareUrl,
   isMarketplaceAgentId,
@@ -19,20 +15,17 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "../lib/content-collection";
+import { CREDITS_PAGE_UPDATED_AT, CREDITS_ROUTE } from "../lib/credits-page";
 import { DOWNLOAD_PAGE_ORDER, DOWNLOAD_PAGES_UPDATED_AT, downloadPageUrl } from "../lib/download-pages";
 import { MARKETPLACE_APPS_ROUTE, MARKETPLACE_ROUTE, MARKETPLACE_SKILLS_ROUTE } from "../lib/marketplace-routes";
 import { PLUGINS_UPDATED_AT, pluginUrl, SITE_PLUGINS } from "../lib/plugins";
 import { PRICING_PAGE_UPDATED_AT, PRICING_ROUTE } from "../lib/pricing-page";
 import { PRIVACY_POLICY_ROUTE, PRIVACY_POLICY_UPDATED_AT } from "../lib/privacy-policy";
 import { OPENBOT_SITE_TITLE, OPENBOT_SITE_URL } from "../lib/site-metadata";
-import { type EnglishPagePath, LOCALIZED_PAGE_PATHS } from "../lib/site-paths";
+import { type EnglishPagePath, localizedPagePath, TRANSLATED_SITE_LOCALES } from "../lib/site-paths";
 import { TEAMS_PAGE_UPDATED_AT, TEAMS_ROUTE } from "../lib/teams-page";
 import { readMarketplaceSitemapListings } from "./marketplace-catalog";
 
-/**
- * The five characters XML reserves. `>` is only special after `]]`, but escaping
- * it as well keeps the rule one line long and costs nothing.
- */
 function escapeXml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -42,12 +35,10 @@ function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
-/** The date of the newest article. Fixed input, so the feed stays cacheable. */
 function latestPublishedAt(collection: ContentCollection): string {
   return collection.articles[0]?.publishedAt ?? "2026-01-01";
 }
 
-/** When an article in the collection last changed: an edit counts, not only a new article. */
 function latestModifiedAt(collection: ContentCollection): string {
   return (
     collection.articles
@@ -57,7 +48,6 @@ function latestModifiedAt(collection: ContentCollection): string {
   );
 }
 
-/** The newest change anywhere on the site, for the home page entry. */
 function latestSiteModifiedAt(): string {
   return CONTENT_COLLECTIONS.map(latestModifiedAt).toSorted().at(-1) ?? "2026-01-01";
 }
@@ -67,7 +57,6 @@ interface SitemapEntry {
   lastmod: string;
 }
 
-/** The newest `updatedAt` of a set of listings, as a date. */
 function newestListingDate(listings: readonly { updatedAt: string }[]): string {
   return (
     listings
@@ -77,10 +66,6 @@ function newestListingDate(listings: readonly { updatedAt: string }[]): string {
   );
 }
 
-/**
- * The Marketplace tabs and every approved agent and skill. An agent that waits for its first review
- * has no approved version, so the catalog never returns it and it is never here.
- */
 function marketplaceSitemapEntries(listings: MarketplaceSitemapListings | null): SitemapEntry[] {
   const marketplaceUrl = (path: string) => new URL(path, OPENBOT_SITE_URL).toString();
   const apps = { loc: marketplaceUrl(MARKETPLACE_APPS_ROUTE), lastmod: PLUGINS_UPDATED_AT };
@@ -91,7 +76,6 @@ function marketplaceSitemapEntries(listings: MarketplaceSitemapListings | null):
       apps,
     ];
   }
-  // The link helper throws on an id it cannot address. One bad row must not take the sitemap down.
   const agents = listings.agents.filter((agent) => isMarketplaceAgentId(agent.id));
   const skills = listings.skills.filter((skill) => isMarketplaceSkillSlug(skill.slug));
   return [
@@ -109,10 +93,9 @@ function marketplaceSitemapEntries(listings: MarketplaceSitemapListings | null):
   ];
 }
 
-/** The sitemap entries of the copies of `page` in each language other than English. */
 function localizedSitemapEntries(page: EnglishPagePath, lastmod: string): SitemapEntry[] {
-  return Object.values(LOCALIZED_PAGE_PATHS).map((paths) => ({
-    loc: new URL(paths[page], OPENBOT_SITE_URL).toString(),
+  return TRANSLATED_SITE_LOCALES.map((locale) => ({
+    loc: new URL(localizedPagePath(locale, page), OPENBOT_SITE_URL).toString(),
     lastmod,
   }));
 }
@@ -134,14 +117,13 @@ function contentSitemapXml(listings: MarketplaceSitemapListings | null): string 
       })),
     ]),
     ...marketplaceSitemapEntries(listings),
-    /* The plugin pages hold no secret, unlike /join, so they are indexed like any article. Each
-       entry's date is the catalog's own, which is what changes when a listing ships. */
     ...SITE_PLUGINS.map((plugin) => ({ loc: pluginUrl(plugin.slug), lastmod: PLUGINS_UPDATED_AT })),
     { loc: changelogUrl(), lastmod: CHANGELOG_UPDATED_AT },
     { loc: new URL(TEAMS_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: TEAMS_PAGE_UPDATED_AT },
     ...localizedSitemapEntries(TEAMS_ROUTE, TEAMS_PAGE_UPDATED_AT),
     { loc: new URL(PRICING_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: PRICING_PAGE_UPDATED_AT },
     ...localizedSitemapEntries(PRICING_ROUTE, PRICING_PAGE_UPDATED_AT),
+    { loc: new URL(CREDITS_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: CREDITS_PAGE_UPDATED_AT },
     { loc: new URL(BRAND_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: BRAND_PAGE_UPDATED_AT },
     { loc: new URL(PRIVACY_POLICY_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: PRIVACY_POLICY_UPDATED_AT },
   ];
@@ -149,7 +131,6 @@ function contentSitemapXml(listings: MarketplaceSitemapListings | null): string 
   const urls = entries
     .map(
       (entry) =>
-        // An empty <lastmod> is invalid, and the changelog has none until a release is dated.
         `  <url>\n    <loc>${escapeXml(entry.loc)}</loc>\n${entry.lastmod ? `    <lastmod>${entry.lastmod}</lastmod>\n` : ""}  </url>`,
     )
     .join("\n");
@@ -165,13 +146,9 @@ function contentRssXml(collection: ContentCollection): string {
         "    <item>",
         `      <title>${escapeXml(article.title)}</title>`,
         `      <link>${escapeXml(url)}</link>`,
-        // A permanent identity for the item. Readers use it to tell a new article
-        // from an edited one, so it must never be the title or the date.
         `      <guid isPermaLink="true">${escapeXml(url)}</guid>`,
         `      <description>${escapeXml(article.description)}</description>`,
         `      <pubDate>${articleRssDate(article.publishedAt)}</pubDate>`,
-        // RSS 2.0 `<author>` holds an email address, and a name there makes the
-        // item invalid. Dublin Core's creator is the field for a name.
         `      <dc:creator>${escapeXml(article.author)}</dc:creator>`,
         `      <enclosure url="${escapeXml(articleOgImageUrl(collection, article.slug))}" type="image/png" length="0" />`,
         "    </item>",
@@ -196,15 +173,10 @@ function contentRssXml(collection: ContentCollection): string {
   ].join("\n");
 }
 
-/** One hour at the edge, one day while a redeploy is in flight. */
 export const FEED_CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400";
 
 type MarketplaceSitemapListings = Awaited<ReturnType<typeof readMarketplaceSitemapListings>>;
 
-/**
- * The sitemap reads the Marketplace from D1. When that read fails, the sitemap still lists every
- * other page and the three tabs, and no cache keeps that shorter version.
- */
 export async function contentSitemapResponse(): Promise<Response> {
   const listings = await readMarketplaceSitemapListings().catch(() => null);
   return new Response(contentSitemapXml(listings), {

@@ -12,30 +12,22 @@ import { stopProcessTree } from "../windows-process-tree";
 import type { CliCodeLogin, CliCodeLoginFailed } from "./cli-code-login";
 import type { ProviderProcessFailed } from "./provider-status";
 
-/** A sign-in that is a CLI process the user completes in a browser the CLI opened, or on another device. */
 interface PendingCliLogin {
-  /** Absent when the login scope owns the process, as for a Muse host. */
   child?: ChildProcess;
   cli: AgentCliInfo;
-  /** True when the sign-in ended with the provider signed in. */
   task: Fiber.Fiber<boolean, CliLoginFailed> | null;
   scope: Scope.Closeable;
-  /** A code sign-in: what the CLI printed for the user, and the prompt a pasted code goes to. */
   code?: Pick<CliCodeLogin, "prompt" | "submit">;
 }
 
-/** The sign-in process a caller starts, and how it ends. */
 export type CliLoginProcess = {
-  /** The process to stop on a cancel. Without it, closing the login scope stops the sign-in. */
   child?: ChildProcess;
   done: Effect.Effect<void, ProviderClientOperationError | CliCodeLoginFailed | ProviderProcessFailed>;
 } & Partial<Pick<CliCodeLogin, "prompt" | "submit">>;
 
 export interface CliLoginFlowOptions {
-  /** The provider runtime's scope, read at each use: a start after a dispose replaces it. */
   scope(): Scope.Scope;
   resolveCli(provider: AgentProvider): Effect.Effect<AgentCliInfo, CliLoginFailed>;
-  /** A new client that is started and signed in, but not active. */
   authenticate(
     provider: AgentProvider,
     cli: AgentCliInfo,
@@ -52,11 +44,6 @@ export interface CliLoginFlowOptions {
   setFailure(provider: AgentProvider, error: unknown, version?: string | null): void;
 }
 
-/**
- * Owns the pending CLI sign-ins, at most one for each provider: the sign-in process, the task that
- * waits for it, and the code a code sign-in printed. It never imports the provider runtime, which
- * owns the clients and the status.
- */
 export class CliLoginFlow {
   readonly #options: CliLoginFlowOptions;
   readonly #pending = new Map<AgentProvider, PendingCliLogin>();
@@ -104,7 +91,6 @@ export class CliLoginFlow {
       };
       this.#pending.set(provider, pending);
       recordRestartActivity();
-      // The login outlives the request; dispose/cancel owns the registered child and task.
       pending.task = yield* Effect.forkIn(
         done.pipe(
           toCliLoginFailed,
@@ -119,11 +105,6 @@ export class CliLoginFlow {
     );
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Starts a sign-in the user finishes on another device, and reports what the CLI printed for it.
-   * `start` is the provider's CLI command (`startCliCodeLogin`) or another process with a prompt,
-   * and `timeoutMs` is how long that process waits for the user.
-   */
   readonly startCode = Effect.fn("CliLogin.startCode")(function* (
     this: CliLoginFlow,
     provider: AgentProvider,
@@ -154,7 +135,6 @@ export class CliLoginFlow {
         };
   }, Effect.uninterruptible).bind(this);
 
-  /** Types a pasted code into the CLI that waits for it. The code is a credential: it goes nowhere else. */
   submit(provider: AgentProvider, code: string): void {
     const pending = this.#pending.get(provider);
     if (!pending?.code) throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
@@ -172,23 +152,16 @@ export class CliLoginFlow {
     const settle = Effect.gen({ self: this }, function* () {
       yield* Scope.close(pending.scope, Exit.void);
       const task = pending.task;
-      // Closing the login scope can interrupt its completion task. Wait for cleanup without
-      // propagating that expected interruption into Cancel or the next Connect command.
       if (task) yield* Fiber.await(task);
       if (message) this.#options.setFailure(provider, new Error(message), pending.cli.version);
       else this.#options.clearConnectionState(provider);
     });
-    // A stop that fails still ends the sign-in: the row must not stay connecting after it is forgotten.
     yield* (pending.child ? stopProcessTree(pending.child) : Effect.void).pipe(
       toCliLoginFailed,
       Effect.ensuring(settle),
     );
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Waits until the pending sign-in of `provider` ends, and answers whether it signed the provider
-   * in. `null` when no sign-in is pending: it did not start, or it already ended.
-   */
   readonly settled = Effect.fn("CliLogin.settled")(function* (this: CliLoginFlow, provider: AgentProvider) {
     const task = this.#pending.get(provider)?.task;
     if (!task) return null;
@@ -196,7 +169,6 @@ export class CliLoginFlow {
     return Exit.isSuccess(exit) && exit.value;
   }).bind(this);
 
-  /** Forgets every pending sign-in now, and returns the stop of their processes, which the caller runs. */
   dispose(): Effect.Effect<void> {
     const logins = [...this.#pending.values()];
     this.#pending.clear();

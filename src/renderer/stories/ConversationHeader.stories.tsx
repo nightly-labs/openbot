@@ -1,7 +1,57 @@
 import { ConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
+import type { PinnedMessageItem } from "@openbot/ui/features/conversation/PinnedMessages";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { STORY_AGENT, STORY_AGENT_STATUS, STORY_MODELS, storyRuntimeSettings } from "./fixtures";
+import { STORY_AGENT, STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, storyRuntimeSettings } from "./fixtures";
+
+const STORY_PINS: PinnedMessageItem[] = [
+  {
+    id: "pin-checklist",
+    author: STORY_AGENT.name,
+    time: "18 Aug, 08:36",
+    thread: null,
+    pinnedBy: STORY_AGENT.name,
+    body: "**Launch day checklist**\n\n1. 08:00: freeze `main` and tag the release candidate.\n2. 08:20: smoke test the macOS, Windows and Linux builds.\n3. 08:40: publish the blog post as a draft and check the links.\n4. 09:00: publish the release, the blog post and the X thread.\n5. 09:30: watch the crash reports and the support inbox for one hour.",
+  },
+  {
+    id: "pin-staging",
+    author: STORY_AGENT.name,
+    time: "17 Aug, 10:18",
+    thread: "Staging review",
+    pinnedBy: null,
+    body: "Staging is ready for review.\n\n- URL: `staging.openbot.run`\n- Test account: `launch-review@openbot.run`\n- Password: in the shared vault, item **Staging review**",
+  },
+  {
+    id: "pin-launch-date",
+    author: "You",
+    time: "17 Aug, 09:02",
+    thread: null,
+    pinnedBy: null,
+    body: "The launch date is fixed: **Tuesday 1 September, 09:00 CET**. Ask me before you move anything that depends on it.",
+  },
+];
+
+const MANY_STORY_PINS: PinnedMessageItem[] = Array.from({ length: 50 }, (_, index) => {
+  const base = STORY_PINS[index % STORY_PINS.length] ?? {
+    id: "pin",
+    author: "You",
+    time: "",
+    body: "",
+    thread: null,
+    pinnedBy: null,
+  };
+  const body =
+    index % 7 === 3
+      ? "ok"
+      : index % 7 === 5
+        ? `https://staging.openbot.run/review/${"launch-checklist-".repeat(12)}${index}`
+        : `${base.body}\n\n${"The reviewers read each step again before the release and report every difference. ".repeat(index % 4)}`;
+  const thread =
+    index % 6 === 4 ? `Release notes for the macOS, Windows and Linux builds of version 0.${index}` : base.thread;
+  return { ...base, id: `pin-${index}`, body, thread };
+});
+
+const pinnedMessages = (pins: PinnedMessageItem[]) => ({ pins, agents: STORY_AGENTS, onJump: fn(), onUnpin: fn() });
 
 const meta = {
   title: "Conversation/Header",
@@ -40,7 +90,6 @@ export const OfflineHost: Story = {
 export const AgentUsingBrowser: Story = {
   args: { sidePanel: { open: true, actingAgentName: STORY_AGENT.name, onToggle: fn() } },
 };
-/** A model chosen during the turn. The picker names it; the badge says that it starts with the next turn. */
 export const ModelAfterThisTurn: Story = {
   args: {
     pendingModel: { running: "GPT-5.6 Luna", next: "GPT-5.6 Terra" },
@@ -55,7 +104,6 @@ export const ModelAfterThisTurn: Story = {
     },
   },
 };
-/** A provider chosen during the turn. The running turn keeps its provider; the next turn uses the new one. */
 export const ProviderAfterThisTurn: Story = {
   args: {
     pendingModel: { running: "Codex · GPT-5.6 Luna", next: "Grok · Grok 4.6" },
@@ -71,3 +119,6 @@ export const ProviderAfterThisTurn: Story = {
     },
   },
 };
+export const PinnedMessages: Story = { args: { pinnedMessages: pinnedMessages(STORY_PINS) } };
+export const ManyPinnedMessages: Story = { args: { pinnedMessages: pinnedMessages(MANY_STORY_PINS) } };
+export const NoPinnedMessages: Story = { args: { pinnedMessages: pinnedMessages([]) } };

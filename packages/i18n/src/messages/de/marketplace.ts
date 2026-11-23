@@ -97,6 +97,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Einige Apps oder Skills sind nicht installiert. „Neu verbinden“ installiert sie.",
   "marketplace.app.notConnected": "Nicht verbunden",
+  "marketplace.app.paused": "Pausiert",
   "marketplace.app.custom": "MCP-Server",
   "marketplace.app.githubTagline": "Repositorys, Issues und Pull Requests",
   "marketplace.app.onePasswordTagline": "Bei Websites mit von dir geteilten Zugangsdaten anmelden",
@@ -122,7 +123,16 @@ export const messages = {
   "marketplace.app.remove.action": "Entfernen",
   "marketplace.app.remove.confirmTitle": "{name} entfernen?",
   "marketplace.app.remove.keep": "Behalten",
+  "marketplace.app.replace.title": "{server} ersetzen?",
+  "marketplace.app.replace.description":
+    "Du hast bereits einen Server namens {server}, aber er ist nicht {name}. Durch {name} ersetzen? Seine Adresse und gespeicherten Schlüssel werden gelöscht.",
+  "marketplace.app.replace.action": "Ersetzen",
   "marketplace.app.connection": "Verbindung",
+  "marketplace.app.access.use": "Kann nutzen",
+  "marketplace.app.access.noAgents": "Keine Agenten",
+  "marketplace.app.access.agentsOf": "Agenten, die {name} nutzen können",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Agenten wählen",
+  "marketplace.app.access.level": "Zugriff von {role} auf {name}",
   "marketplace.app.setup.account": "Melde dich im Browser mit deinem {name}-Konto an.",
   "marketplace.app.setup.key": "Benötigt einen API-Schlüssel aus deinem {name}-Konto.",
   "marketplace.app.setup.keySaved": "{field} auf {host} gespeichert.",
@@ -134,6 +144,7 @@ export const messages = {
     "Auf {host} läuft eine ältere OpenBot-Version, die keine Apps verbinden kann. Aktualisiere OpenBot auf {host} oder bitte den Inhaber darum.",
   "marketplace.app.blocked.member":
     "Nur ein Inhaber oder Admin von {host} kann dort Apps verbinden. Bitte eine dieser Personen, {name} zu verbinden oder OpenBot auf {host} zu aktualisieren, damit Mitglieder Apps verbinden können.",
+  "marketplace.app.blocked.mac": "{name} funktioniert nur auf einem Mac, auf dem OpenBot läuft.",
   "marketplace.app.connectAgain": "Erneut verbinden",
   "marketplace.app.automation.askOnInstall": "Bei Installation macOS um Zugriff bitten",
   "marketplace.app.automation.title": "Zugriff auf Apple-Apps",
@@ -257,6 +268,16 @@ export const messages = {
     "Erstelle mit Higgsfield ein Produktfoto einer Keramiktasse auf einem Holztisch.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Erstelle mit Higgsfield ein 5-Sekunden-Video von Wellen bei Sonnenuntergang.",
+  "marketplace.plugin.sunra.tagline": "KI-Bilder, -Videos, -Audio und 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra lässt Agenten Bilder, Videos, Audio und 3D-Modelle mit Modellen wie GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling und Veo erzeugen, das Guthaben an Credits prüfen und die Ergebnisse abrufen. Ergebnisse landen in einem Projekt im Sunra-Konto des Nutzers. Jeder Nutzer meldet sich im Browser bei seinem eigenen Sunra-Konto an. Sunra nennt zuerst die Kosten jeder Generierung und verbraucht Credits dieses Kontos erst nach der Bestätigung.",
+  "marketplace.plugin.sunra.app":
+    "Bild-, Video-, Audio- und 3D-Generierung, Credits und Ergebnisse über den MCP-Server von Sunra mit Anmeldung im Browser.",
+  "marketplace.plugin.sunra.prompt.balance": "Wie viele Sunra-Credits habe ich?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Erstelle mit Sunra ein Poster von einem Nachtmarkt im Regen, im Hochformat.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Erstelle mit Sunra ein 5-Sekunden-Video von einem Papierboot auf einem Fluss. Nenne mir zuerst die Kosten.",
   "marketplace.plugin.elevenlabs.tagline": "Sprache, Stimmen und Sprachagenten",
   "marketplace.plugin.elevenlabs.description":
     "Mit ElevenLabs wandeln Agenten Text in Sprache um, arbeiten mit Stimmen und erstellen, testen und prüfen ElevenLabs-Sprachagenten und ihre Gespräche. Erzeugtes Audio kommt als kurzlebiger Download-Link zurück. Jeder Benutzer meldet sich im Browser bei seinem eigenen ElevenLabs-Konto an, und jede Erzeugung verbraucht Credits dieses Kontos.",
@@ -394,7 +415,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.log":
     "Füge eine Zusammenfassung der heutigen Arbeit zu meiner Notiz Arbeitsprotokoll hinzu.",
   "marketplace.plugin.obsidian.hint.apiKey":
-    'Öffne in Obsidian Settings > Local REST API. Kopiere den API-Schlüssel und aktiviere "Enable non-encrypted (HTTP) server".',
+    "Öffne in Obsidian Settings > Local REST API und kopiere den API-Schlüssel.",
   "marketplace.plugin.resend.tagline": "Transaktions-E-Mails",
   "marketplace.plugin.resend.description":
     "Mit Resend senden Agenten Transaktions-E-Mails und prüfen die Zustellung über eine API. Ein API-Schlüssel aus dem Resend-Dashboard wird dem lokalen Server als eine Umgebungsvariable übergeben.",
@@ -406,9 +427,9 @@ export const messages = {
     "Entwirf eine E-Mail zum Zurücksetzen des Passworts für den neuen Ablauf.",
   "marketplace.plugin.omnisend.tagline": "E-Mail- und SMS-Marketing",
   "marketplace.plugin.omnisend.description":
-    "Mit Omnisend lesen Agenten Kampagnen- und Formularberichte, finden Kontakte und Segmente und erstellen und bearbeiten Kampagnen, Automatisierungen, E-Mail-Vorlagen, Formulare und Produkte. Jede Person meldet sich im Browser bei ihrem eigenen Omnisend-Konto an und wählt die Zugriffsstufe auf der Zustimmungsseite. Mit Schreibzugriff können Agenten auch Kampagnen senden und Daten löschen. Wähle Nur-Lese-Zugriff, wenn Agenten nur Berichte brauchen.",
+    "Mit Omnisend lesen Agenten Kampagnen- und Formularberichte, finden Kontakte und Segmente und erstellen und bearbeiten Kampagnen, Automatisierungen, E-Mail-Vorlagen, Formulare und Produkte. Jede Person verbindet sich mit einem API-Schlüssel aus ihrem eigenen Omnisend-Konto. Agenten können alles tun, was der Schlüssel erlaubt, auch Kampagnen senden und Daten löschen.",
   "marketplace.plugin.omnisend.app":
-    "Kampagnen, Automatisierungen, Kontakte, Segmente, Formulare und Berichte über den MCP-Server von Omnisend mit Anmeldung im Browser.",
+    "Kampagnen, Automatisierungen, Kontakte, Segmente, Formulare und Berichte über den MCP-Server von Omnisend mit einem API-Schlüssel.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Wie haben die Kampagnen der letzten Woche im Vergleich zur Woche davor abgeschnitten?",
   "marketplace.plugin.omnisend.prompt.segment":
@@ -416,6 +437,8 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Entwirf eine Kampagne für die neue Kollektion, aber sende sie nicht.",
   "marketplace.plugin.postiz.tagline": "Social-Media-Planung",
+  "marketplace.plugin.omnisend.hint.apiKey":
+    "Öffne in Omnisend Store settings > API keys und erstelle einen Schlüssel.",
   "marketplace.plugin.postiz.description":
     "Mit Postiz können Agenten deine Social-Media-Kanäle auflisten und Beiträge auf über 30 Netzwerken wie X, LinkedIn, Instagram und TikTok entwerfen, planen und veröffentlichen. Agenten können auch Medien hochladen und KI-Bilder und -Videos erstellen. Melde dich im Browser bei deinem Postiz-Konto an oder füge den API-Schlüssel aus Settings › Developers in Postiz ein. Alle Postiz-Cloud-Tarife enthalten API-Zugriff. Agenten können einen Beitrag sofort veröffentlichen, also prüfe jeden Beitrag, bevor du ihn genehmigst.",
   "marketplace.plugin.postiz.app":
@@ -424,6 +447,16 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Welche Beiträge sind für nächste Woche geplant?",
   "marketplace.plugin.postiz.prompt.draft":
     "Entwirf einen LinkedIn-Beitrag zu unserem neuen Release, aber plane ihn nicht ein.",
+  "marketplace.plugin.trypost.tagline": "Social-Media-Planung",
+  "marketplace.plugin.trypost.description":
+    "Mit TryPost können Agenten deine verbundenen Kanäle auflisten und Beiträge auf X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest und weiteren Netzwerken entwerfen, planen, in die Warteschlange stellen und veröffentlichen. Agenten können auch Statistiken lesen, Ideen und Freigaben verwalten und Veröffentlichungszeiten festlegen. Melde dich im Browser bei deinem TryPost-Konto an und wähle einen Workspace. Agenten können einen Beitrag sofort veröffentlichen, prüfe also jeden Beitrag, bevor du ihn genehmigst.",
+  "marketplace.plugin.trypost.app":
+    "Kanäle, Beiträge, Warteschlange, Ideen und Statistiken über den MCP-Server von TryPost mit Anmeldung im Browser.",
+  "marketplace.plugin.trypost.prompt.week": "Welche Beiträge sind für diese Woche geplant?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Entwirf einen LinkedIn-Beitrag zu unserem neuen Release, aber plane ihn nicht ein.",
+  "marketplace.plugin.trypost.prompt.analytics":
+    "Welche meiner Beiträge vom letzten Monat hatten das meiste Engagement?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub und über 1.000 weitere Apps",
   "marketplace.plugin.composio.description":
     "Composio verbindet deine Agenten über einen MCP-Server mit Gmail, Slack, GitHub und über 1.000 weiteren Apps. Melde dich mit deinem Composio-Konto an. Wenn ein Agent eine App braucht, bittet er dich, diese App zu verbinden.",
@@ -588,6 +621,14 @@ export const messages = {
   "marketplace.skills.origin.local": "Auf diesem Computer erstellt",
   "marketplace.skills.origin.workspace": "Im Ordner dieses Agenten",
   "marketplace.skills.origin.marketplace": "Aus dem Marketplace · Version {version}",
+  "marketplace.skills.origin.github": "Von GitHub · {repository}",
+  "marketplace.skills.github.search": "Suchen oder GitHub-Link einfügen",
+  "marketplace.skills.github.reading": "Fähigkeiten im Repository werden gesucht",
+  "marketplace.skills.github.trust":
+    "OpenBot hat Fähigkeiten von GitHub nicht geprüft. Lies eine Fähigkeit, bevor du sie hinzufügst.",
+  "marketplace.skills.github.source": "GitHub · {repository} bei {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "{repository} auf GitHub öffnen",
   "marketplace.skills.status.notAdded": "Nicht hinzugefügt",
   "marketplace.skills.status.on": "Aktiv bei {agents}",
   "marketplace.skills.agentCount": { one: "{count} Agent", other: "{count} Agenten" },
@@ -645,6 +686,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Installiere {name} auf dem Computer, auf dem diese Agenten laufen: Die App erfordert eine Anmeldung im Browser.",
   "marketplace.error.appInvalid": "{name} kann nicht hinzugefügt werden: {reason}",
+  "marketplace.error.appNotConnected": "{name} konnte nicht verbunden werden: {reason}",
   "marketplace.error.uninstallNoServer": "Wähle einen lokalen Server, um ein Plugin zu deinstallieren.",
   "marketplace.error.uninstallPartial": "Teile von {name} konnten nicht entfernt werden. {failures}",
   "marketplace.error.actionFailed": "Die Marketplace-Aktion konnte nicht abgeschlossen werden. Versuche es erneut.",

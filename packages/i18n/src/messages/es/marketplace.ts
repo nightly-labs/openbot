@@ -97,6 +97,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Algunas de sus apps o habilidades no están instaladas. Reconectar las instala.",
   "marketplace.app.notConnected": "Sin conectar",
+  "marketplace.app.paused": "En pausa",
   "marketplace.app.custom": "Servidor MCP",
   "marketplace.app.githubTagline": "Repositorios, incidencias y pull requests",
   "marketplace.app.onePasswordTagline": "Inicia sesión en sitios con las credenciales que compartes",
@@ -121,7 +122,16 @@ export const messages = {
   "marketplace.app.remove.action": "Eliminar",
   "marketplace.app.remove.confirmTitle": "¿Eliminar {name}?",
   "marketplace.app.remove.keep": "Conservar",
+  "marketplace.app.replace.title": "¿Reemplazar {server}?",
+  "marketplace.app.replace.description":
+    "Ya tienes un servidor llamado {server}, pero no es {name}. ¿Reemplazarlo por {name}? Se eliminarán su dirección y sus claves guardadas.",
+  "marketplace.app.replace.action": "Reemplazar",
   "marketplace.app.connection": "Conexión",
+  "marketplace.app.access.use": "Puede usar",
+  "marketplace.app.access.noAgents": "Ningún agente",
+  "marketplace.app.access.agentsOf": "Agentes que pueden usar {name}",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Elegir agentes",
+  "marketplace.app.access.level": "Acceso de {role} a {name}",
   "marketplace.app.setup.account": "Inicia sesión con tu cuenta de {name} en el navegador.",
   "marketplace.app.setup.key": "Necesita una clave de API de tu cuenta de {name}.",
   "marketplace.app.setup.keySaved": "{field} se guarda en {host}.",
@@ -133,6 +143,7 @@ export const messages = {
     "{host} usa una versión antigua de OpenBot que no puede conectar apps. Actualiza OpenBot en {host} o pide a su propietario que lo actualice.",
   "marketplace.app.blocked.member":
     "Solo un propietario o administrador de {host} puede conectar apps allí. Pide a uno de ellos que conecte {name} o que actualice OpenBot en {host} para que los miembros puedan conectar apps.",
+  "marketplace.app.blocked.mac": "{name} solo funciona en un Mac que ejecuta OpenBot.",
   "marketplace.app.connectAgain": "Volver a conectar",
   "marketplace.app.automation.askOnInstall": "Pedir acceso a macOS al instalar",
   "marketplace.app.automation.title": "Acceso a las apps de Apple",
@@ -253,6 +264,16 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Haz con Higgsfield una foto de producto de una taza de cerámica sobre una mesa de madera.",
   "marketplace.plugin.higgsfield.prompt.clip": "Haz con Higgsfield un vídeo de 5 segundos de olas al atardecer.",
+  "marketplace.plugin.sunra.tagline": "Imágenes, vídeos, audio y 3D con IA",
+  "marketplace.plugin.sunra.description":
+    "Sunra permite a los agentes crear imágenes, vídeos, audio y modelos 3D con modelos como GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling y Veo, consultar el saldo de créditos y leer los resultados. Los resultados se guardan en un proyecto de la cuenta de Sunra del usuario. Cada usuario inicia sesión en su propia cuenta de Sunra en el navegador. Sunra indica primero el coste de cada generación y solo gasta créditos de esa cuenta después de confirmarla.",
+  "marketplace.plugin.sunra.app":
+    "Generación de imágenes, vídeos, audio y 3D, créditos y resultados, mediante el servidor MCP de Sunra con inicio de sesión en el navegador.",
+  "marketplace.plugin.sunra.prompt.balance": "¿Cuántos créditos de Sunra tengo?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Haz con Sunra un póster de un mercado nocturno bajo la lluvia, en formato vertical.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Haz con Sunra un vídeo de 5 segundos de un barco de papel en un río. Dime primero cuánto cuesta.",
   "marketplace.plugin.elevenlabs.tagline": "Voz, voces y agentes de voz",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs permite a los agentes convertir texto en voz, trabajar con voces y crear, probar y revisar agentes de voz de ElevenLabs y sus conversaciones. El audio generado vuelve como un enlace de descarga de corta duración. Cada usuario inicia sesión en su propia cuenta de ElevenLabs en el navegador, y cada generación usa créditos de esa cuenta.",
@@ -384,8 +405,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "¿Qué dicen mis notas sobre las decisiones de este proyecto?",
   "marketplace.plugin.obsidian.prompt.save": "Guarda esta decisión como una nota nueva en mi bóveda.",
   "marketplace.plugin.obsidian.prompt.log": "Añade un resumen del trabajo de hoy a mi nota Registro de trabajo.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'En Obsidian, abre Settings > Local REST API. Copia la clave de API y activa "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "En Obsidian, abre Settings > Local REST API y copia la clave de API.",
   "marketplace.plugin.resend.tagline": "Correo transaccional",
   "marketplace.plugin.resend.description":
     "Resend permite a los agentes enviar correo transaccional y comprobar la entrega con una única API. Una clave de API del panel de Resend se pasa al servidor local como una variable de entorno.",
@@ -397,15 +417,16 @@ export const messages = {
     "Redacta un correo de restablecimiento de contraseña para el nuevo flujo.",
   "marketplace.plugin.omnisend.tagline": "Marketing por email y SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend permite a los agentes leer informes de campañas y formularios, buscar contactos y segmentos, y crear y editar campañas, automatizaciones, plantillas de email, formularios y productos. Cada usuario inicia sesión en su propia cuenta de Omnisend en el navegador y elige el nivel de acceso en la pantalla de consentimiento. Con acceso de escritura, los agentes también pueden enviar campañas y eliminar datos. Elige acceso de solo lectura cuando los agentes solo necesiten informes.",
+    "Omnisend permite a los agentes leer informes de campañas y formularios, buscar contactos y segmentos, y crear y editar campañas, automatizaciones, plantillas de email, formularios y productos. Cada usuario se conecta con una clave de API de su propia cuenta de Omnisend. Los agentes pueden hacer lo que la clave permite, lo que puede incluir enviar campañas y eliminar datos.",
   "marketplace.plugin.omnisend.app":
-    "Campañas, automatizaciones, contactos, segmentos, formularios e informes, a través del servidor MCP de Omnisend con inicio de sesión en el navegador.",
+    "Campañas, automatizaciones, contactos, segmentos, formularios e informes, a través del servidor MCP de Omnisend con una clave de API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "¿Qué tal funcionaron las campañas de la semana pasada en comparación con la anterior?",
   "marketplace.plugin.omnisend.prompt.segment": "¿Cuántos contactos hay en el segmento VIP y cómo cambió este mes?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prepara un borrador de campaña para la nueva colección, pero no lo envíes.",
   "marketplace.plugin.postiz.tagline": "Programación de redes sociales",
+  "marketplace.plugin.omnisend.hint.apiKey": "En Omnisend, abre Store settings > API keys y crea una clave.",
   "marketplace.plugin.postiz.description":
     "Postiz permite a los agentes listar tus canales de redes sociales y redactar, programar y publicar posts en más de 30 redes, como X, LinkedIn, Instagram y TikTok. Los agentes también pueden subir archivos multimedia y crear imágenes y vídeos con IA. Inicia sesión en tu cuenta de Postiz en el navegador o pega la clave de API de Settings › Developers en Postiz. Todos los planes de Postiz en la nube incluyen acceso a la API. Los agentes pueden publicar un post al instante, así que revisa cada post antes de aprobarlo.",
   "marketplace.plugin.postiz.app":
@@ -414,6 +435,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "¿Qué posts están programados para la próxima semana?",
   "marketplace.plugin.postiz.prompt.draft":
     "Redacta un post de LinkedIn sobre nuestra nueva versión, pero no lo programes.",
+  "marketplace.plugin.trypost.tagline": "Programación de redes sociales",
+  "marketplace.plugin.trypost.description":
+    "TryPost permite a los agentes listar tus canales conectados y redactar, programar, poner en cola y publicar posts en X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest y más. Los agentes también pueden leer las analíticas, gestionar ideas y aprobaciones y definir los horarios de publicación. Inicia sesión en tu cuenta de TryPost en el navegador y elige un workspace. Los agentes pueden publicar un post al instante, así que revisa cada post antes de aprobarlo.",
+  "marketplace.plugin.trypost.app":
+    "Canales, posts, cola, ideas y analíticas, con el servidor MCP de TryPost e inicio de sesión en el navegador.",
+  "marketplace.plugin.trypost.prompt.week": "¿Qué posts están programados para esta semana?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Redacta un post de LinkedIn sobre nuestra nueva versión, pero no lo programes.",
+  "marketplace.plugin.trypost.prompt.analytics": "¿Cuáles de mis posts del mes pasado tuvieron más interacción?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub y más de 1000 aplicaciones",
   "marketplace.plugin.composio.description":
     "Composio conecta tus agentes con Gmail, Slack, GitHub y más de 1000 aplicaciones más mediante un único servidor MCP. Inicia sesión con tu cuenta de Composio. Cuando un agente necesita una aplicación, te pide que la conectes.",
@@ -575,6 +605,14 @@ export const messages = {
   "marketplace.skills.origin.local": "Creada en este equipo",
   "marketplace.skills.origin.workspace": "En la carpeta de este agente",
   "marketplace.skills.origin.marketplace": "Del Marketplace · versión {version}",
+  "marketplace.skills.origin.github": "De GitHub · {repository}",
+  "marketplace.skills.github.search": "Busca o pega un enlace de GitHub",
+  "marketplace.skills.github.reading": "Buscando habilidades en el repositorio",
+  "marketplace.skills.github.trust":
+    "OpenBot no revisó las habilidades de GitHub. Lee una habilidad antes de añadirla.",
+  "marketplace.skills.github.source": "GitHub · {repository} en {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Abrir {repository} en GitHub",
   "marketplace.skills.status.notAdded": "Sin añadir",
   "marketplace.skills.status.on": "Activada en {agents}",
   "marketplace.skills.agentCount": { one: "{count} agente", other: "{count} agentes" },
@@ -632,6 +670,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Instala {name} en el equipo donde se ejecutan estos agentes: su app requiere iniciar sesión en un navegador.",
   "marketplace.error.appInvalid": "No se puede añadir {name}: {reason}",
+  "marketplace.error.appNotConnected": "No se pudo conectar {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Selecciona un servidor local para desinstalar un plugin.",
   "marketplace.error.uninstallPartial": "No se pudieron eliminar algunas partes de {name}. {failures}",
   "marketplace.error.actionFailed": "No se pudo completar la acción del marketplace. Inténtalo de nuevo.",

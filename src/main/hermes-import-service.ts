@@ -1,12 +1,3 @@
-// Hermes Agent import into the local host: the profiles of a Hermes folder on this computer.
-//
-// `stage` reads the profiles once and keeps them under a token; the preview lists what each one holds,
-// item by item, and why an item needs approval or stays in Hermes. `apply` makes one agent per profile,
-// through the same services the user reaches by hand. A profile imported before updates the agent it
-// made: same agent and chats, new instructions, and only the memories, skills and routines it does
-// not have yet. A failure on a new agent removes it; on an agent that existed, it keeps what is done.
-// MCP servers are on every agent, so an allowed one is added once and turned off, as Transfer does.
-
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -41,9 +32,7 @@ import {
   routineSchedule,
 } from "./hermes-import-reader";
 
-/** Skill folders are copied here, published to the local library, and removed again. */
 const SKILL_STAGING = ".openbot/import-skills";
-/** A persona longer than the instructions keeps its full text here, in the agent's workspace. */
 const SOUL_COPY = ["imported", "hermes", "SOUL.md"] as const;
 const SOUL_POINTER = "\n\nThe full persona is in imported/hermes/SOUL.md. Read it before your first task.";
 const LINKS_VERSION = 1;
@@ -72,7 +61,6 @@ interface Staged {
   profiles: HermesProfileData[];
 }
 
-/** Which agent each profile folder made, kept beside the other app files. */
 interface StoredLinks {
   version: number;
   links: Record<string, string>;
@@ -88,7 +76,6 @@ export class HermesImportService {
     private readonly timezone: () => string = () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   ) {}
 
-  /** Reads the Hermes folder. A new read replaces the previous one. Null: the folder has no profiles. */
   readonly stage = Effect.fn("HermesImportService.stage")(function* (
     this: HermesImportService,
     root: string,
@@ -128,7 +115,6 @@ export class HermesImportService {
     const staged = this.#staged;
     if (!staged || staged.token !== input.token)
       return yield* archiveFailure(new Error(sourceText("error.import.hermesClosed")));
-    // Until the checks below pass, nothing changes, so a failed check keeps the profiles open.
     const byKey = new Map(staged.profiles.map((profile) => [profile.key, profile]));
     const selected = input.profiles.flatMap((entry) => {
       const profile = byKey.get(entry.key);
@@ -161,13 +147,10 @@ export class HermesImportService {
       agents.push(imported.success);
       done.push(entry);
       links[profile.directory] = imported.success.id;
-      // The agent is made either way. Without its link, the next import adds it again, so the user is told.
       const saved = yield* Effect.result(this.#writeLinks(links));
       if (Result.isFailure(saved)) warnings.push(sourceText("error.import.hermesLinkNotSaved", { name: profile.name }));
     }
-    // A profile that did not import brings no MCP server with it.
     yield* this.#addMcpServers(done, warnings);
-    // The result shows each agent as it is now, after its routines and skills.
     const now = new Map(this.agents.listAgents().map((agent) => [agent.id, agent]));
     return {
       agents: agents.map((agent) => now.get(agent.id) ?? agent),
@@ -281,7 +264,6 @@ export class HermesImportService {
     );
   });
 
-  /** Publishes the skill to the local library, as a new revision when the library has its name, and installs it. */
   readonly #installSkill = Effect.fn("HermesImportService.installSkill")(function* (
     this: HermesImportService,
     agent: AgentSummary,
@@ -289,7 +271,6 @@ export class HermesImportService {
     allowed: boolean,
     published: Array<{ id: string; revision: number }>,
   ): Effect.fn.Return<void, ArchiveOperationError> {
-    // The folder is read again here. A skill that got code after the preview needs the user's approval.
     const files = yield* readSkillFiles(skill.directory);
     if (!allowed && hasSkillCode(files.map(([path]) => path)))
       return yield* archiveFailure(new Error(sourceText("error.import.hermesSkillCodeAdded")));
@@ -320,7 +301,6 @@ export class HermesImportService {
     );
   });
 
-  /** Adds the entries the agent does not have, up to the memory limit. */
   #addMemories(agent: AgentSummary, profile: HermesProfileData, warnings: string[]): void {
     const memories = this.agents.listMemories(agent.id);
     const known = new Set(memories.map((memory) => memory.text));
@@ -341,7 +321,6 @@ export class HermesImportService {
     if (memories.length === 0) this.agents.initializeMemorySelection(agent.id);
   }
 
-  /** Each allowed server once, turned off, unless a server with its name is already here. */
   readonly #addMcpServers = Effect.fn("HermesImportService.addMcpServers")(function* (
     this: HermesImportService,
     selected: ReadonlyArray<{ profile: HermesProfileData; allow: ReadonlySet<string> }>,
@@ -371,7 +350,6 @@ export class HermesImportService {
     const empty: StoredLinks["links"] = {};
     const text = yield* archiveCall(() => readFile(path, "utf8").catch(() => null));
     if (!text) return empty;
-    // A damaged file only loses the links: the next import adds the profiles as new agents.
     const parsed = yield* Effect.result(
       Effect.try({ try: () => parseStoredJson(path, text, decodeLinks), catch: archiveFailure }),
     );
@@ -397,7 +375,6 @@ function decodeLinks(value: unknown): StoredLinks["links"] {
   return links;
 }
 
-/** The persona as the agent's instructions. A long one keeps its start and points to the full copy. */
 function personaInstructions(soul: string): { description: string; long: boolean } {
   const limit = INPUT_LIMITS.agentDescription;
   if (soul.length <= limit) return { description: soul, long: false };

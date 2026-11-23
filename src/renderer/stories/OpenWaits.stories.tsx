@@ -2,12 +2,6 @@ import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-/*
- * The block above the composer while an agent waits for something outside its turn: a build, a
- * nightly run, or a script event. A routine run of the agent wakes the wait.
- */
-
-/** A fixed moment, so the times read the same in every screenshot. */
 const NOW = new Date(Date.UTC(2026, 9, 12, 14, 30));
 const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000).toISOString();
 
@@ -52,13 +46,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Waiting: Story = {};
 
-/** The release build woke the agent, and its run continues the request. */
 export const Resuming: Story = {
   args: { items: items.map((item) => (item.id === "wait-release" ? { ...item, state: "resuming" } : item)) },
 };
 
-/** The person closed the block. The header names the first wait. */
 export const Collapsed: Story = { args: { defaultOpen: false } };
 
-/** Without a way to show the request, the menu has only Cancel. */
 export const CancelOnly: Story = { args: { onShowRequest: undefined } };

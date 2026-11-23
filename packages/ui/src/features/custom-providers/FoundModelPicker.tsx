@@ -16,23 +16,15 @@ function MenuMark(props: { on: boolean }) {
   );
 }
 
-/**
- * The models that an endpoint lists, in a menu with a search field, as the add menu of the agent
- * dock. The menu stays open while the user checks models, and only the model rows scroll.
- */
 export function FoundModelPicker(props: {
   models: readonly DiscoveredModel[];
-  /** The model is a row of the form. */
   listed: (id: string) => boolean;
-  /** The form holds as many models as one endpoint can have. */
   full: boolean;
   busy: boolean;
   open: boolean;
-  /** The dialog element that the menu portals into. */
   mount: HTMLElement | undefined;
   onOpenChange: (open: boolean) => void;
   onToggle: (model: DiscoveredModel, checked: boolean) => void;
-  /** Adds or removes each model that the search shows. */
   onToggleAll: (models: readonly DiscoveredModel[], checked: boolean) => void;
 }) {
   const { t } = useText();

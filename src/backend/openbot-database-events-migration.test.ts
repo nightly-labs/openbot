@@ -102,7 +102,6 @@ describe("OpenBot webhook routine migration", () => {
         scheduledFor: "2026-10-01T10:00:00.000Z",
       }),
     ]);
-    // A routine from the old schema can switch to a webhook trigger and keep its runs.
     migratedRoutines.saveRecord("chief", routine.id, {
       name: routine.name,
       instruction: routine.instruction,
@@ -114,7 +113,7 @@ describe("OpenBot webhook routine migration", () => {
     expect(migratedRoutines.getRecord("chief", routine.id)?.trigger).toMatchObject({ kind: "webhook", url: null });
     expect(migratedRoutines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining({ id: run.id })]);
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 60,
+      version: 68,
     });
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     expect(migrated.connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -138,8 +137,6 @@ describe("OpenBot webhook routine migration", () => {
 
     const legacy = new DatabaseSync(path);
     removeWebhookSchema(legacy);
-    // Migration 30 creates this index after creating its first tables. A table with the same name
-    // makes the migration fail after its first DDL statement, which exercises transaction rollback.
     legacy.exec("CREATE TABLE webhook_receipts_recent (conflict TEXT)");
     legacy.close();
 
@@ -164,7 +161,7 @@ describe("OpenBot webhook routine migration", () => {
       instruction: routine.instruction,
     });
     expect(retried.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 60,
+      version: 68,
     });
     expect(retried.connection.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     expect(retried.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -192,7 +189,7 @@ function removeWebhookSchema(database: DatabaseSync): void {
     DROP TRIGGER agent_memory_delete;
     DROP TABLE agent_memory_search;
     DROP TABLE agent_memory_selections;
-    DELETE FROM schema_migrations WHERE version IN (30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60);
+    DELETE FROM schema_migrations WHERE version IN (30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68);
   `);
 }
 

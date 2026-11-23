@@ -1,10 +1,6 @@
 import { Tabs } from "heroui-native";
 import { haptics } from "@/shared/lib/haptics";
 
-/**
- * A full-width segmented choice, such as the range of a usage report. The native segmented control is
- * a capsule that cannot take the 16 pt group corner, so this uses HeroUI tabs with the group radius.
- */
 export function UsageSegments<T extends string>({
   options,
   value,
@@ -15,7 +11,6 @@ export function UsageSegments<T extends string>({
   options: readonly { value: T; label: string }[];
   value: T;
   disabled?: boolean;
-  /** Names the choice for VoiceOver and TalkBack. */
   accessibilityLabel?: string;
   onChange: (value: T) => void;
 }) {
@@ -30,7 +25,6 @@ export function UsageSegments<T extends string>({
       }}
     >
       <Tabs.List className="self-stretch rounded-grouped" accessibilityLabel={accessibilityLabel}>
-        {/* The group corner less the 3 pt list padding, so the corners stay concentric. */}
         <Tabs.Indicator className="rounded-[13px]" />
         {options.map((option) => (
           <Tabs.Trigger key={option.value} value={option.value} isDisabled={disabled} className="flex-1 px-1">

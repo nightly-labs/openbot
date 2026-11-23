@@ -1,7 +1,3 @@
-/* Story-only. The in-article mount stays on `.post-mount`; this is the product-shot
-   treatment from the marketing frame: the card gradient is the whole stage, and the
-   screenshot sits on it with room around it. */
-
 .story-product-shot {
   position: relative;
   isolation: isolate;

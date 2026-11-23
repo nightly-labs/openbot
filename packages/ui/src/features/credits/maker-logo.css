@@ -1,0 +1,17 @@
+.maker-logo {
+  flex: none;
+  width: 1em;
+  height: 1em;
+}
+
+.maker-logo-mono {
+  background: currentcolor;
+  mask: var(--maker-logo) center / contain no-repeat;
+}
+
+.maker-logo-monogram {
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  line-height: 1;
+}

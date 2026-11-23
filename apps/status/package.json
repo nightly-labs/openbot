@@ -17,7 +17,7 @@
     "@solidjs/web": "catalog:",
     "effect": "catalog:",
     "lucide-solid": "catalog:",
-    "solid-js": "2.0.0-rc.18"
+    "solid-js": "2.0.3"
   },
   "devDependencies": {
     "@solidjs/vite-plugin": "catalog:",

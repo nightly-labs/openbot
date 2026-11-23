@@ -19,11 +19,17 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
-import { MobileConnectAddPhoneDialog, MobileConnectLinkDialog } from "./MobileConnectDialogs";
+import {
+  MobileConnectAddPhoneDialog,
+  MobileConnectLinkDialog,
+  type MobileInstallRequest,
+} from "./MobileConnectDialogs";
 import { RemoteNetworkRouteChoice } from "./RemoteNetworkRouteChoice";
 import type { SettingsMobileConnectStore } from "./stores/mobile-connect-store";
+
+export type { MobileInstallRequest };
 
 interface SettingsMobileConnectTabProps {
   store: SettingsMobileConnectStore;
@@ -32,20 +38,27 @@ interface SettingsMobileConnectTabProps {
   canManageLink: boolean;
   canRevokeDevice: boolean;
   canSetRoute: boolean;
+  installRequest?: MobileInstallRequest | null | undefined;
+  onInstallRequestHandled?: (() => void) | undefined;
 }
 
 const IOS_PLATFORM_LABEL = "iOS";
 const ANDROID_PLATFORM_LABEL = "Android";
 
-/**
- * The phones that use this account, as cards. "Add phone" opens a dialog that shows one code at a
- * time, so a phone camera cannot catch the wrong code. The permanent link is one more card, and how
- * devices connect is a chip in the header.
- */
 export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
   const { t } = useText();
   const [adding, setAdding] = createSignal(false);
   const [linkOpen, setLinkOpen] = createSignal(false);
+  const [dialogInstallRequest, setDialogInstallRequest] = createSignal<MobileInstallRequest | null>(null);
+  createEffect(
+    () => (props.canCreateTicket ? props.installRequest : null),
+    (request) => {
+      if (!request) return;
+      setDialogInstallRequest(request);
+      setAdding(true);
+      props.onInstallRequestHandled?.();
+    },
+  );
   const devices = () => props.store.state.devices.devices;
   const addButton = () => (
     <Button
@@ -121,6 +134,7 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
         open={adding()}
         store={props.store}
         canCancelTicket={props.canCancelTicket}
+        installRequest={dialogInstallRequest()}
         onClose={() => setAdding(false)}
       />
       <Show when={props.canManageLink}>
@@ -130,7 +144,6 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
           onCancel={() => props.store.setLinkConfirm(null)}
           onConfirm={async () => {
             await props.store.createLink();
-            // The new link is shown, so its code opens at once.
             if (props.store.state.link.revealed) setLinkOpen(true);
           }}
           tone="default"
@@ -205,7 +218,6 @@ function PhoneCard(props: { store: SettingsMobileConnectStore; device: MobileCon
   );
 }
 
-/** The permanent link among the phones: a dashed card that makes one, or the link with its menu. */
 function LinkCard(props: { store: SettingsMobileConnectStore; onOpen: () => void }) {
   const { t, format } = useText();
   const link = () => props.store.state.link;
@@ -297,7 +309,6 @@ function LinkCard(props: { store: SettingsMobileConnectStore; onOpen: () => void
   );
 }
 
-/** How devices connect: the current route as a chip, and both routes in a popover. */
 function RouteChip(props: { store: SettingsMobileConnectStore; disabled: boolean }) {
   const { t } = useText();
   return (

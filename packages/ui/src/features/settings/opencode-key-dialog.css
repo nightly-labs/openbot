@@ -1,12 +1,3 @@
-/*
- * The OpenCode Go key dialog. It opens on top of the settings modal, so its layer is one above
- * the shared dialog layer rather than the same one -- both portals are children of `body`, and
- * relying on insertion order alone would break the first time a caller mounts it from elsewhere.
- *
- * Minimal on purpose: left-aligned title with one dynamic description line instead of stacked
- * notice cards, matching the small confirm dialogs.
- */
-
 .opencode-key-backdrop {
   z-index: calc(var(--openbot-layer-dialog) + 1);
 }

@@ -1,5 +1,3 @@
-# OpenBot asks for an update now with an empty file in its runtime directory. This starts
-# openbot-update-request.service as root, which removes the file and never reads it.
 [Unit]
 Description=Watch for an OpenBot update request
 

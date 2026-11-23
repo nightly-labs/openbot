@@ -1,14 +1,8 @@
 import type { JSX } from "@solidjs/web";
 import { type Accessor, createEffect, createMemo, createSignal, Show } from "solid-js";
 
-/** Longer than the close transition in `composer-stack.css`, for a window that does not send its end. */
 const CLOSE_FALLBACK_MS = 400;
 
-/**
- * One card of the stack above the message input. It grows out from behind the input when `when`
- * becomes truthy, and goes back down when it becomes falsy. The children stay in the page, with the
- * last value, until the card is closed.
- */
 export function ComposerStackCard<T>(props: {
   when: T | false | null | undefined;
   children: (value: Accessor<NonNullable<T>>) => JSX.Element;

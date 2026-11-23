@@ -1,10 +1,10 @@
 {
-  "version": "0.68.0",
+  "version": "0.76.1",
   "highlights": [
-    "Set which members can use the browser in a channel, and see their tabs and the channel's files in the side panel.",
-    "Right-click the Dynamic Island or the agent dock to hide it, drag agents on the dock to move them, and change the dock size.",
-    "A chat that you read no longer stays in the Unread group, and you can turn the group off.",
-    "A Claude chat that got too long now starts a new session with its history, and an agent moves to its backup model at the 5-hour limit.",
-    "New versions now go to about 1 in 10 computers first, and to all computers about one day later."
+    "Update your joined servers to this version too, so that parallel tasks, workflow folders, typed workflow answers and up to 20 provider accounts work there.",
+    "Agents can split unrelated work into tasks that run at the same time and combine the results for you.",
+    "Open the agent browser in its own window and move it to a second monitor.",
+    "Word documents open in the file preview, and the Files panel opens the workspace folder of the agent.",
+    "Change any keyboard shortcut in the new Keyboard tab of Settings."
   ]
 }

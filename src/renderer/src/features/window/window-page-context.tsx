@@ -1,12 +1,14 @@
+import { type CreditsMenu, createCreditsSummary } from "@openbot/ui/features/credits/credits-store";
 import type { SettingsPageBack, SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { appPort } from "../../app-port";
 import { createSimpleContext } from "../../simple-context";
+import { useAuth } from "../account/account-context";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useUsage } from "../usage/usage-context";
 
-/** The pages of the window rail. Each one fills the card below the top row. */
 export type WindowPage =
   | "agents"
   | "tasks"
@@ -14,15 +16,13 @@ export type WindowPage =
   | "workflows"
   | "usage"
   | "library"
+  | "crm"
   | "marketplace"
   | "settings"
-  | "server-settings";
+  | "server-settings"
+  | "credits"
+  | "pricing";
 
-/**
- * How a page sits in the window. The tasks page shows in the middle pane, as the agents do, with the
- * agent list beside it. A settings page starts below the top row. The title of a schedule, workflows
- * or usage page goes in the top row after the buttons of the frame.
- */
 export type WindowPageKind = "agents" | "settings" | "titled";
 
 export function windowPageKind(page: WindowPage): WindowPageKind {
@@ -30,83 +30,112 @@ export function windowPageKind(page: WindowPage): WindowPageKind {
   return page === "agents" || page === "tasks" ? "agents" : "titled";
 }
 
-/** The settings pages: the settings of the user, or the settings of one server. */
+export interface PricingPagePlacement {
+  mount: () => HTMLElement | undefined;
+  open: (leave: () => void) => void;
+  close: () => void;
+}
+
 export type SettingsKind = "personal" | "server";
 
-/**
- * The page of the desktop window, from the state that already opens each page: the settings flags,
- * the Marketplace flag and the host pane of `usage-context`. Every opener keeps its call, and this provider joins them.
- *
- * The user settings and the server settings are two pages. An opener of one closes the other. When
- * the user selects another server, the server settings page follows it.
- *
- * It sits above `ServerScopeBoundary`: the boundary rebuilds everything below it on a server switch,
- * so only a provider above it can see the switch.
- */
 const context = createSimpleContext({
   name: "WindowPageProvider",
   init: () => {
     const settings = useSettings();
     const serverSettings = useServerSettings();
     const usage = useUsage();
-    const { activeServerId } = useServers();
-    /** The elements of the settings page that the settings panel shows in. The page sets them. */
+    const { activeServerId, hostStatus } = useServers();
+    const { signedInAccount } = useAuth();
+    const credits = createCreditsSummary(
+      () => appPort().credits,
+      () => signedInAccount()?.id ?? null,
+    );
     const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
-    /** The search of the server settings page. The server settings show only the sections that match it. */
     const [serverSettingsQuery, setServerSettingsQuery] = createSignal("");
-    /** Each Enter in the server settings search adds one. The server settings then open the first match. */
     const [openFirstServerSectionRequest, setOpenFirstServerSectionRequest] = createSignal(0);
 
-    const page = createMemo<WindowPage>(() => {
+    const [pricingLeave, setPricingLeave] = createSignal<(() => void) | null>(null);
+    const [pricingMount, setPricingMount] = createSignal<HTMLElement | undefined>();
+    function leavePricing() {
+      const leave = untrack(pricingLeave);
+      if (!leave) return;
+      setPricingLeave(null);
+      setPricingMount(undefined);
+      leave();
+    }
+    const [creditsOpen, setCreditsOpen] = createSignal<{ serverId: string | null } | null>(null);
+    function closeCredits() {
+      if (untrack(creditsOpen)) setCreditsOpen(null);
+    }
+    const pricing: PricingPagePlacement = {
+      mount: pricingMount,
+      open: (leave) => {
+        closeCredits();
+        setPricingLeave(() => leave);
+      },
+      close: () => {
+        setPricingLeave(null);
+        setPricingMount(undefined);
+      },
+    };
+
+    const basePage = createMemo<WindowPage>(() => {
       if (serverSettings.serverSettingsOpen()) return "server-settings";
       if (settings.appSettingsOpen()) return "settings";
       if (settings.skillsMarketplaceOpen()) return "marketplace";
       return usage.state.serverId ? usage.state.view : "agents";
     });
+    const page = createMemo<WindowPage>(() => {
+      if (pricingLeave()) return "pricing";
+      return creditsOpen() ? "credits" : basePage();
+    });
 
-    // Opening the user settings closes the server settings, the Marketplace and the host pane.
+    createEffect(basePage, (_next, previous) => {
+      if (previous !== undefined) leavePricing();
+    });
+
     createEffect(settings.appSettingsOpenRequest, (request, previous) => {
       if (previous === undefined || request === previous) return;
+      leavePricing();
+      closeCredits();
       usage.dismissUsage();
       if (untrack(settings.skillsMarketplaceOpen)) settings.setSkillsMarketplaceOpen(false);
       if (untrack(serverSettings.serverSettingsOpen)) serverSettings.setServerSettingsOpen(false);
     });
 
-    // Opening the server settings closes the user settings, the Marketplace and the host pane.
     createEffect(serverSettings.serverSettingsOpenRequest, (request, previous) => {
       if (previous === undefined || request === previous) return;
+      leavePricing();
+      closeCredits();
       usage.dismissUsage();
       if (untrack(settings.skillsMarketplaceOpen)) settings.setSkillsMarketplaceOpen(false);
       if (untrack(settings.appSettingsOpen)) settings.setAppSettingsOpen(false);
     });
 
-    // An open host pane closes the settings pages and the Marketplace, so the rail shows one page.
     createEffect(
       () => usage.state.serverId,
       (serverId) => {
         if (!serverId) return;
+        closeCredits();
         if (untrack(settings.appSettingsOpen)) settings.setAppSettingsOpen(false);
         if (untrack(serverSettings.serverSettingsOpen)) serverSettings.setServerSettingsOpen(false);
         if (untrack(settings.skillsMarketplaceOpen)) settings.setSkillsMarketplaceOpen(false);
       },
     );
 
-    // Opening the Marketplace closes the settings pages and the host pane.
     createEffect(settings.skillsMarketplaceOpen, (open) => {
       if (!open) return;
+      closeCredits();
       usage.dismissUsage();
       if (untrack(settings.appSettingsOpen)) settings.setAppSettingsOpen(false);
       if (untrack(serverSettings.serverSettingsOpen)) serverSettings.setServerSettingsOpen(false);
     });
 
-    // The server settings page follows the server that the user selects.
     createEffect(activeServerId, (serverId, previous) => {
       if (previous === undefined || serverId === previous || !serverId) return;
-      // An effect calls this, and the opener reads the state of the server settings.
       if (untrack(serverSettings.serverSettingsOpen)) untrack(() => serverSettings.openServerSettings(serverId, null));
     });
 
-    /** The way back from the open detail page of each settings page. */
     const [personalBack, setPersonalBack] = createSignal<SettingsPageBack | null>(null);
     const [serverBack, setServerBack] = createSignal<SettingsPageBack | null>(null);
     const placementFor = (kind: SettingsKind) =>
@@ -117,20 +146,26 @@ const context = createSimpleContext({
       });
     const placements = { personal: placementFor("personal"), server: placementFor("server") };
 
-    /** Where the panel of a settings page shows, or nothing while that page is not on screen. */
     function settingsPlacement(kind: SettingsKind): SettingsPagePlacement | undefined {
       return placements[kind]();
     }
 
-    /** The way back from the detail page that shows, such as Providers › ChatGPT, or nothing. */
     function pageBack(): SettingsPageBack | null {
       if (page() === "settings") return personalBack();
       return page() === "server-settings" ? serverBack() : null;
     }
 
+    function openCredits(serverId: string | null) {
+      leavePricing();
+      usage.dismissUsage();
+      if (untrack(settings.appSettingsOpen)) settings.setAppSettingsOpen(false);
+      if (untrack(serverSettings.serverSettingsOpen)) serverSettings.setServerSettingsOpen(false);
+      if (untrack(settings.skillsMarketplaceOpen)) settings.setSkillsMarketplaceOpen(false);
+      setCreditsOpen({ serverId });
+    }
+
     return {
       page,
-      /** Whether a page other than the agents covers the conversation. A message there is not seen. */
       conversationCovered: () => page() !== "agents",
       setSettingsMounts,
       settingsPlacement,
@@ -139,34 +174,60 @@ const context = createSimpleContext({
       openFirstServerSectionRequest,
       openFirstServerSection: () => setOpenFirstServerSectionRequest((request) => request + 1),
       pageBack,
-      /** Shows the agents and closes the other pages. */
+      pricing,
+      setPricingMount: (element: HTMLElement | undefined) => setPricingMount(element),
+      leavePricing,
+      creditsServerId: () => creditsOpen()?.serverId ?? null,
+      creditsAvailable: credits.available,
+      adoptCredits: credits.adopt,
+      creditsMenu: (): CreditsMenu => ({
+        state: credits.state(),
+        localServerId: hostStatus().serverId,
+        onOpen: openCredits,
+        onRefresh: credits.refresh,
+      }),
+      openCredits,
+      closeCredits,
       showAgents() {
+        leavePricing();
+        closeCredits();
         settings.setAppSettingsOpen(false);
         serverSettings.setServerSettingsOpen(false);
         settings.setSkillsMarketplaceOpen(false);
         usage.dismissUsage();
       },
       openTasks(source: HTMLElement | null) {
+        leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openTasks(serverId, source);
       },
       openSchedule(source: HTMLElement | null) {
+        leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openSchedule(serverId, source);
       },
-      openWorkflows(source: HTMLElement | null) {
-        const serverId = activeServerId();
-        if (serverId) usage.openWorkflows(serverId, source);
+      openWorkflows(source: HTMLElement | null, workflow?: { serverId: string; workflowId: string }) {
+        leavePricing();
+        const serverId = workflow?.serverId ?? activeServerId();
+        if (serverId) usage.openWorkflows(serverId, source, workflow?.workflowId);
       },
       openUsage(source: HTMLElement | null) {
+        leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openUsage(serverId, source);
       },
       openLibrary(source: HTMLElement | null) {
+        leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openLibrary(serverId, source);
       },
+      openCrm(source: HTMLElement | null, connectors = false) {
+        leavePricing();
+        const serverId = activeServerId();
+        if (serverId) usage.openCrm(serverId, source, connectors);
+      },
       openSettings(source: HTMLElement | null) {
+        leavePricing();
         settings.openAppSettings(source);
       },
     };

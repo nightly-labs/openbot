@@ -13,11 +13,7 @@ const LOCAL_IDENTITY_KEYS = [
   "SKILLS_ADMIN_TOKEN",
 ] as const;
 
-/**
- * Manual harness tests read these with `dotenvx run`. Provider CLIs read them from the environment
- * too, so the dev stack must not pass them on: a dev thread would spend the shared token budget.
- */
-const MANUAL_TEST_KEYS = new Set(["INCEPTION_API_KEY"]);
+const MANUAL_TEST_KEYS = new Set(["INCEPTION_API_KEY", "DEV_TEST_GMAIL_ADDRESS", "DEV_TEST_GMAIL_PASSWORD"]);
 
 export function withoutDecryptionKeys(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith("DOTENV_")));
@@ -58,7 +54,6 @@ async function decryptEnvironment(
     if (result.error || Object.values(values).some((value) => value.startsWith("encrypted:"))) throw new Error(message);
     return Object.fromEntries(Object.entries(values).filter(([key]) => !key.startsWith("DOTENV_")));
   } catch {
-    // Library errors can contain private-key details. Do not retain their cause.
     throw new Error(message);
   }
 }
@@ -69,7 +64,6 @@ export async function loadDevelopmentEnvironment(
 ): Promise<NodeJS.ProcessEnv> {
   const state = readDevelopmentState(projectRoot);
   const shared = await loadSharedDevelopmentEnvironment(projectRoot, environment);
-  // Shared service credentials must not change the identity of an existing local instance.
   for (const key of LOCAL_IDENTITY_KEYS) delete shared[key];
   return withoutDecryptionKeys({
     ...state.defaults,
@@ -148,7 +142,7 @@ export function requireDevelopmentValues(environment: NodeJS.ProcessEnv, names: 
 }
 
 const ACCOUNT_SETTINGS =
-  /^(?:STRIPE_|BOAT_|HOSTED_SERVERS_|HOSTED_SERVER_TEMPLATE$|EMAIL_|SITE_REPORT_HASH_SECRET$|COMPANY_SIGN_IN_SECRET$|SKILLS_ADMIN_TOKEN$|APNS_|FCM_|GITHUB_APP_|GITHUB_WEBHOOK_SECRET$|SLACK_|DISCORD_|TELEGRAM_|REMOTE_TICKET_|REMOTE_AUTH_WEBHOOK_SECRET$|OPENPANEL_)/u;
+  /^(?:STRIPE_|BOAT_|HOSTED_SERVERS_|HOSTED_SERVER_TEMPLATE$|EMAIL_|SITE_REPORT_HASH_SECRET$|COMPANY_SIGN_IN_SECRET$|SKILLS_ADMIN_TOKEN$|APNS_|FCM_|GITHUB_APP_|GITHUB_WEBHOOK_SECRET$|SLACK_|DISCORD_|TELEGRAM_|REMOTE_TICKET_|REMOTE_AUTH_WEBHOOK_SECRET$|OPENPANEL_|MEDIA_API_)/u;
 const SIGNAL_SETTINGS = new Set([
   "REMOTE_TICKET_PUBLIC_JWKS",
   "REMOTE_TICKET_PUBLIC_KEYS",
@@ -183,7 +177,6 @@ export function developmentChildEnvironment(
   return child;
 }
 
-/** Only the API receives the full account configuration. Signal receives its verification values. */
 export function developmentSettingsForService(
   environment: NodeJS.ProcessEnv,
   service: "api" | "remote" | "app" | "test-client",

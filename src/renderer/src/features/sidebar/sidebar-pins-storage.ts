@@ -36,16 +36,13 @@ export function writeSidebarPins(
 ): void {
   try {
     storage.setItem(SIDEBAR_PINS_STORAGE_KEY, JSON.stringify(pinsByServer));
-  } catch {
-    // A UI preference must not block navigation when browser storage is unavailable.
-  }
+  } catch {}
 }
 
 const SIDEBAR_PINS_PENDING_STORAGE_KEY = "openbot:sidebar-pins-pending:v1";
 
 const pendingSchema = z.array(z.string().trim().min(1).nullable().catch(null)).catch([]);
 
-/** The scopes whose last pin change has not reached their server yet. */
 export function readPendingSidebarPinScopes(storage: SidebarPinStorage = window.localStorage): Set<string> {
   try {
     const parsed = pendingSchema.safeParse(JSON.parse(storage.getItem(SIDEBAR_PINS_PENDING_STORAGE_KEY) ?? "[]"));
@@ -61,7 +58,5 @@ export function writePendingSidebarPinScopes(
 ): void {
   try {
     storage.setItem(SIDEBAR_PINS_PENDING_STORAGE_KEY, JSON.stringify([...scopes]));
-  } catch {
-    // The server keeps its last list. The next change from this computer sends the list again.
-  }
+  } catch {}
 }

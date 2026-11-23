@@ -1,10 +1,3 @@
-// Adapted from the reproduction in nightly-labs/openbot#1824.
-// A custom ACP agent whose interpreter is only on the user's login-shell PATH, with OpenBot started
-// the way Finder, the Dock or a login item starts it: PATH=/usr/bin:/bin:/usr/sbin:/sbin.
-// Most ACP adapters are `#!/usr/bin/env node` scripts and Node comes from Homebrew, nvm or mise, so
-// this is the normal macOS setup. Both ways the agent starts must work: Check agent, and the `acp`
-// provider driver that lists its models. `bun run test:custom-agents:login-path`; exit 0 = both
-// worked. Writes .openbot-build/custom-acp-agent-login-path-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -18,8 +11,6 @@ import { createCustomAgentChanges } from "../src/main/custom-agent-changes";
 import { CustomAgentStore } from "../src/main/custom-agent-store";
 import { stopClients, xorCipher } from "./provider-fakes/host";
 
-// The interpreter has a name no system folder holds, so the result does not depend on whether this
-// machine also has a `node` in /usr/bin.
 const INTERPRETER = "openbot-login-path-node";
 
 const FAKE_AGENT = `#!/usr/bin/env ${INTERPRETER}
@@ -59,7 +50,6 @@ const clients: AgentClient[] = [];
 let passed = false;
 
 try {
-  // The user's login shell puts a tool folder on PATH, as Homebrew's `brew shellenv` or nvm does.
   const home = join(root, "home");
   const tools = join(home, "tools");
   await mkdir(tools, { recursive: true });
@@ -70,9 +60,7 @@ try {
   delete process.env.ZDOTDIR;
   if (process.platform !== "darwin") process.env.SHELL = "/bin/bash";
 
-  // OpenBot started from Finder, the Dock or a login item.
   process.env.PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
-  // Control run: the same agent with the tool folder on OpenBot's own PATH, as when started from a terminal.
   if (process.env.LOGIN_PATH_CONTROL) process.env.PATH = `${tools}:${process.env.PATH}`;
 
   const found = await runCauseEffect(runInLoginShell(`command -v ${INTERPRETER}`));
@@ -87,7 +75,6 @@ try {
     store.save({ id: "alpha", name: "Alpha", command: executable, args: [], env: [], usagePrompt: null }),
   );
 
-  // Check agent, before the user saves an agent. Only the store's environment check is used.
   const unused = () => Effect.die(new Error("Check agent changes no agent."));
   const changes = createCustomAgentChanges({
     service: {

@@ -42,6 +42,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "Impossible de restaurer ce canal. Réessayez.",
   "mobile.channel.chat.fallbackName": "Canal",
   "mobile.channel.chat.deletedNotice": "Canal supprimé. Aperçu seulement.",
+  "mobile.channel.chat.waitBusy": "En attente – {name} travaille dans {channel}",
+  "mobile.channel.chat.waitFull": "En attente – {name} commence quand une tâche en cours se termine",
   "mobile.channel.records.connect": "Connectez-vous au serveur pour modifier ce canal.",
   "mobile.channel.records.loadFailed": "Impossible de charger les réglages du canal.",
   "mobile.channel.records.gone": "Cet élément n’est plus disponible.",
@@ -77,10 +79,41 @@ export const messages = {
   "mobile.channel.form.deselectAll": "Tout désélectionner",
   "mobile.channel.form.memories": "Souvenirs",
   "mobile.channel.form.routines": "Routines",
+  "mobile.channel.folders.description":
+    "Tous les membres de {channel} peuvent modifier des fichiers et exécuter des commandes dans ces dossiers.",
+  "mobile.channel.folders.removeBody": "Les membres de {channel} ne peuvent plus modifier les fichiers de {folder}",
   "mobile.channel.form.deleteTitle": "Supprimer le canal ?",
   "mobile.channel.form.deleteBody":
     "Cette action arrête le canal. Son historique reste dans « Canaux supprimés », en aperçu uniquement. Vous pouvez le restaurer depuis cette liste. Les agents membres sont conservés.",
   "mobile.channel.form.delete": "Supprimer le canal",
+  "mobile.channel.newConversation.title": "Nouvelle conversation",
+  "mobile.channel.newConversation.starting": "Démarrage de la nouvelle conversation…",
+  "mobile.channel.newConversation.footer":
+    "Les membres oublient les messages précédents. Les réglages du canal restent.",
+  "mobile.channel.newConversation.confirmTitle": "Démarrer une nouvelle conversation dans {name} ?",
+  "mobile.channel.newConversation.confirmBody":
+    "Les membres oublient les messages précédents de ce canal. Les messages restent visibles au-dessus d’un séparateur. Les membres, les instructions, les souvenirs et les routines ne changent pas.",
+  "mobile.channel.newConversation.confirm": "Démarrer une nouvelle conversation",
+  "mobile.channel.newConversation.failed": "Impossible de démarrer une nouvelle conversation",
+  "mobile.channel.newConversation.failedBody": "L’hôte n’a pas pu commencer une nouvelle conversation.",
+  "mobile.channel.compact.title": "Compacter le contexte",
+  "mobile.channel.compact.compacting": "Démarrage de la compaction…",
+  "mobile.channel.compact.footer":
+    "Les membres gardent un court résumé de leur session du canal et utilisent moins de jetons.",
+  "mobile.channel.compact.started":
+    "Compaction démarrée. Les fournisseurs des membres raccourcissent le contexte sur l’hôte.",
+  "mobile.channel.compact.failed": "Impossible de compacter le contexte du canal",
+  "mobile.channel.compact.failedBody": "L’hôte n’a pas pu compacter le contexte.",
+  "mobile.channel.deleteHistory.title": "Supprimer l’historique",
+  "mobile.channel.deleteHistory.deleting": "Suppression de l’historique…",
+  "mobile.channel.deleteHistory.footer":
+    "Les messages sont supprimés et les membres les oublient. La configuration du canal reste.",
+  "mobile.channel.deleteHistory.confirmTitle": "Supprimer l’historique de {name} ?",
+  "mobile.channel.deleteHistory.confirmBody":
+    "Tous les messages et fichiers de ce canal sont supprimés d’OpenBot et les membres les oublient. Cette action est irréversible. Les membres, les instructions, les mémoires, les routines et les tâches ne changent pas.",
+  "mobile.channel.deleteHistory.confirm": "Supprimer l’historique",
+  "mobile.channel.deleteHistory.failed": "Impossible de supprimer l’historique",
+  "mobile.channel.deleteHistory.failedBody": "L’hôte n’a pas pu supprimer l’historique.",
   "mobile.channel.form.unavailable":
     "Connectez-vous à un serveur de bureau qui prend en charge les canaux pour faire des modifications.",
   "mobile.channel.form.invalidName": "Saisissez un nom de canal valide.",

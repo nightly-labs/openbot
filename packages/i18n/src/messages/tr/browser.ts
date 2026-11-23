@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "{name} sekmesini kapat",
   "browser.tab.closeUnnamed": "Tarayıcı sekmesini kapat",
   "browser.newTab": "Yeni tarayıcı sekmesi",
-  "browser.hide": "Tarayıcıyı gizle",
+  "browser.backToChat": "Sohbete dön",
   "browser.goBack": "Geri git",
   "browser.goForward": "İleri git",
   "browser.reload": "Sayfayı yenile",
@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Tarayıcı açılır penceresini kapat",
   "browser.pip.reattachFailed": "OpenBot tarayıcıyı kenar çubuğuna geri ekleyemedi.",
   "browser.pip.closeFailed": "OpenBot tarayıcı açılır penceresini kapatamadı.",
+  "browser.window.open": "Tarayıcıyı yeni pencerede aç",
+  "browser.window.openFailed": "OpenBot tarayıcı penceresini açamadı.",
   "browser.popupBlocked.title": "Açılır pencere engellendi",
   "browser.popupBlocked.dismiss": "Açılır pencere mesajını kapat",
   "browser.liveView.label": "Sunucudaki sayfanın canlı görünümü",
@@ -67,6 +69,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Bu metin yapıştırmak için çok uzun. 100.000 karakterden az yapıştırın.",
   "browser.liveView.copyTooLarge": "Seçim kopyalamak için çok uzun. Daha az metin seçin.",
   "browser.liveView.copyFailed": "Metin kopyalanamadı. Sayfaya tıklayıp yeniden deneyin.",
+  "browser.liveView.pageCopied": "Sayfa metin kopyaladı. Panonuza almak için Kopyala'yı seçin.",
   "browser.previews.label": "Tarayıcı önizlemeleri",
   "browser.previews.resize": "Sağ paneli yeniden boyutlandır",
   "browser.previews.empty": "Tarayıcı sekmesi yok",
@@ -91,6 +94,19 @@ export const messages = {
   "browser.secret.submitting": "Gönderiliyor…",
   "browser.secret.takeOver": "Devral",
   "browser.secret.failed": "İstek tamamlanamadı. Bağlantıyı kontrol edin ve tekrar deneyin.",
+  "browser.secret.ended": "Bu oturum açma isteği sona erdi. Ajandan tekrar denemesini isteyin.",
+  "browser.secret.vaultSkip.agentScript":
+    "Ajan bu sayfada bir betik çalıştırdığı için OpenBot kayıtlı oturum bilgilerinizi kullanmadı. Kullanmak için ajandan sayfayı yeniden yüklemesini ve tekrar denemesini isteyin.",
+  "browser.secret.vaultSkip.fieldKind":
+    "Ajan sayfada yanlış alanı seçtiği için OpenBot kayıtlı oturum bilgilerinizi kullanmadı.",
+  "browser.secret.vaultSkip.loginChoice":
+    "Ajan bu site için kayıtlı oturum bilgilerinden birini seçmediği için OpenBot kayıtlı bir oturum bilgisi kullanmadı. Ajana hangi hesabı kullanacağını söyleyin.",
+  "browser.secret.vaultSkip.noPassword":
+    "Kayıtlı oturum bilgilerinizde bu site için şifre olmadığı için OpenBot bunları kullanmadı.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "Kayıtlı oturum bilgilerinizde kimlik doğrulayıcı anahtarı olmadığı için OpenBot bunları kullanmadı.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "Şifre yöneticiniz okunamadığı için OpenBot kayıtlı bir oturum bilgisi kullanmadı.",
   "browser.error.openAddress": "Adres bu sekmede açılamadı.",
   "browser.error.channelNoBrowserMember": "Bu kanalda hiçbir üye yeni sekme açamaz.",
   "browser.error.closeTab": "Tarayıcı sekmesi kapatılamadı.",

@@ -1,9 +1,3 @@
-/*
- * Waiting for replies: the task list rows, in the queue panel's surface. It hangs off the top of the
- * next panel like the queue: its bottom goes under the composer, or under the queue when the queue
- * shows, and that panel paints over the overlap.
- */
-
 .awaiting-replies {
   --awaiting-composer-overlap: 14px;
 
@@ -24,7 +18,6 @@
   border-radius: var(--openbot-radius-lg);
 }
 
-/* The close button sits next to the header button, because a button cannot hold another. */
 .awaiting-replies-bar {
   display: flex;
   align-items: center;
@@ -89,9 +82,40 @@
   color: var(--openbot-danger-text);
 }
 
-/* An agent that was asked waits for the user or for its plan, so its work does not go on. */
 .awaiting-replies-item[data-wait] .awaiting-replies-state-label {
   color: var(--openbot-warning-text);
+}
+
+.awaiting-replies-item[data-stopped] :is(.awaiting-replies-name, .awaiting-replies-state-label) {
+  color: var(--openbot-text-muted);
+}
+
+.awaiting-replies-item[data-stopped] .task-list-mark-fill {
+  fill: var(--openbot-text-dim);
+}
+
+.awaiting-replies-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.awaiting-replies-stop-icon {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity var(--openbot-duration-fast) ease;
+}
+
+.awaiting-replies-item:is(:hover, :focus-within) .awaiting-replies-stop-icon {
+  opacity: 1;
+}
+
+.awaiting-replies-item:is(:hover, :focus-within)
+  .awaiting-replies-mark:has(.awaiting-replies-stop-icon)
+  .task-list-item-mark {
+  opacity: 0;
 }
 
 .awaiting-replies-open,
@@ -108,6 +132,10 @@
 @media (prefers-reduced-motion: reduce) {
   .awaiting-replies {
     animation: none;
+  }
+
+  .awaiting-replies-stop-icon {
+    transition: none;
   }
 
   .awaiting-replies-item[data-state="active"] .awaiting-replies-state-label {

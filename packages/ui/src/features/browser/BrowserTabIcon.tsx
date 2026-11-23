@@ -1,6 +1,5 @@
-import type { BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserTab, BrowserTabAgent } from "@openbot/contracts/ipc";
 import { Globe2, LoaderCircle } from "@openbot/ui";
-import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
@@ -8,8 +7,7 @@ import type { BrowserFullViewProps } from "./browser-full-view-types";
 import { browserDisplayUrl } from "./browser-suggestions";
 import { type BrowserShortcutName, browserShortcutGlyph } from "./browser-view-shortcuts";
 
-/** The agent of a tab, or a globe for a tab of the user. A ring shows that the agent acts on the page now. */
-export function BrowserOwnerIcon(props: { agent: AgentProfile | undefined; acting?: boolean }) {
+export function BrowserOwnerIcon(props: { agent: BrowserTabAgent | undefined; acting?: boolean }) {
   return (
     <Show when={props.agent} fallback={<Globe2 class="browser-full-owner-globe" aria-hidden="true" />}>
       {(agent) => (
@@ -33,7 +31,6 @@ export function BrowserTabIcon(props: { view: BrowserFullViewProps; tab: Browser
   );
 }
 
-/** The keys of a menu row. The web client has none. */
 export function BrowserShortcutHint(props: { view: BrowserFullViewProps; name: BrowserShortcutName }) {
   return (
     <Show when={props.view.shortcuts}>
@@ -46,7 +43,6 @@ export function BrowserShortcutHint(props: { view: BrowserFullViewProps; name: B
   );
 }
 
-/** The name of a tab: its title, its address, or the loading text. */
 export function useBrowserTabTitle() {
   const { t } = useText();
   return (tab: BrowserTab) =>

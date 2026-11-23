@@ -2,6 +2,7 @@ import { type AnalyticsTotals, analyticsTokens, type HostAnalytics } from "@open
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, SlidingTabs } from "@openbot/ui";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
 import { UsageChart } from "./UsageChart";
 import { UsageProviderMark } from "./UsageProviderMark";
@@ -36,7 +37,6 @@ const TOTAL_ROWS = [
   { field: "assistantMessages", label: "usage.totals.assistantMessages" },
 ] as const satisfies ReadonlyArray<{ field: UsageTotalField; label: AppTextKey }>;
 
-// The fields that `Date.prototype.toLocaleString()` shows when it gets no options.
 const UPDATED_AT_FORMAT: Intl.DateTimeFormatOptions = {
   year: "numeric",
   month: "numeric",
@@ -55,10 +55,6 @@ function Amount(props: { value: number | null; cost?: boolean }) {
     </>
   );
 }
-// The model and agent tables carry the same three value columns, so they share them and
-// the metric switch changes the same one column in both by construction. The headers name
-// the measure only: every cost cell carries its currency, and the note under the tables
-// already says a share is of the known amount.
 function BreakdownColumns(props: { label: string }) {
   const { t } = useText();
   return (
@@ -92,8 +88,6 @@ export function AgentUsageReport(props: {
   const text = useText();
   const { t, format } = text;
   onSettled(() => queueMicrotask(props.onReady));
-  // The host report answers "which teammate spent this" first, so the split by agent is
-  // the tab that opens.
   const [state, setState] = createStore({ breakdown: "agent" });
   const totals = () => props.result.totals;
   const cost = () => props.metric === "cost";
@@ -160,9 +154,6 @@ export function AgentUsageReport(props: {
                 <div class="agent-usage-provider">
                   <div class="agent-usage-provider-heading">
                     <span>
-                      {/* The chart needs a legend, and this list already names every
-                          series, so the dot is it - which is why the colour follows the
-                          provider rather than the row's place in a metric-sorted list. */}
                       <span
                         class="agent-usage-series-dot"
                         style={{ background: usageSeriesColor(provider.provider) }}
@@ -176,7 +167,6 @@ export function AgentUsageReport(props: {
                     </strong>
                   </div>
                   <p>
-                    {/* A provider with no known cost has no share of it, and its heading already says so. */}
                     <Show when={!cost() || provider.cost !== null}>
                       {cost()
                         ? t("usage.provider.shareOfCost", { share: share(provider.cost) })
@@ -237,18 +227,14 @@ export function AgentUsageReport(props: {
             <SlidingTabs.Trigger value="model">{t("usage.breakdown.model")}</SlidingTabs.Trigger>
             <SlidingTabs.Trigger value="agent">{t("usage.breakdown.agent")}</SlidingTabs.Trigger>
             <SlidingTabs.Trigger value="day">{t("usage.breakdown.day")}</SlidingTabs.Trigger>
-            {/* Only this computer counts skill loads; a report from another host has none. */}
             <Show when={props.result.skills}>
               <SlidingTabs.Trigger value="skill">{t("usage.breakdown.skill")}</SlidingTabs.Trigger>
             </Show>
           </SlidingTabs.List>
         </div>
-        {/* Every panel is force-mounted, and the grid slot is what makes the hidden ones
-            share one cell instead of each reserving its own height below the visible table.
-            The hidden panels also get no height, so the open table alone sets the height. */}
         <SlidingTabs.ContentSlot class="agent-usage-breakdown">
           <SlidingTabs.Content value="model">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byModel")}>
               <table>
                 <caption class="sr-only">{t("usage.breakdown.byModel")}</caption>
                 <thead>
@@ -263,8 +249,6 @@ export function AgentUsageReport(props: {
                             <UsageProviderMark provider={model.provider} />
                             <span>
                               {model.model || t("usage.unknownModel")}
-                              {/* The logo carries the provider for a reader who sees it, and the
-                                  row stays one line high; the name is still spoken. */}
                               <span class="sr-only">{usageProviderName(model.provider)}</span>
                             </span>
                           </span>
@@ -275,10 +259,10 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
           <SlidingTabs.Content value="agent">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byAgent")}>
               <table>
                 <caption class="sr-only">{t("usage.breakdown.byAgent")}</caption>
                 <thead>
@@ -300,10 +284,10 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
           <SlidingTabs.Content value="day">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byDay")}>
               <table ref={dailyTable} tabindex={-1}>
                 <caption class="sr-only">{t("usage.breakdown.byDay")}</caption>
                 <thead>
@@ -325,12 +309,12 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
           <Show when={props.result.skills}>
             {(skills) => (
               <SlidingTabs.Content value="skill">
-                <div class="agent-usage-table">
+                <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.bySkill")}>
                   <table>
                     <caption class="sr-only">{t("usage.breakdown.bySkill")}</caption>
                     <thead>
@@ -373,7 +357,7 @@ export function AgentUsageReport(props: {
                       </For>
                     </tbody>
                   </table>
-                </div>
+                </ScrollEdges>
               </SlidingTabs.Content>
             )}
           </Show>

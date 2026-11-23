@@ -1,15 +1,3 @@
-// The `opencode acp` of `opencode-background-turn-e2e.ts`. OpenCode 2.2.0 sends session updates only
-// for the execution that a prompt starts. When a background subagent ends, OpenCode answers it in a
-// turn of its own: that turn reaches only its store, the session's `updatedAt` in `session/list`
-// changes, and `session/load` replays it (#3406). This fake keeps each session's history the same way.
-//
-// A prompt with `steps` writes text, calls a tool, and then writes the answer in two steps, each a
-// message of its own with no tool call between them, as OpenCode 2.2.0 can. A prompt with
-// `background` also starts a subagent that stays running. Its turn comes in parts, each at a
-// `session/list`: first a tool call that runs, then, after the test creates the file named after the
-// session in the folder `FAKE_RELEASE`, the tool's end and an answer with no text yet. The answer's
-// text then comes in two more parts, as a replay can find a message that grows. Any other prompt
-// answers `pong`.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
@@ -17,15 +5,18 @@ import { type AcpPeer, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODEL = "opencode/big-pickle";
 const RELEASE = process.env.FAKE_RELEASE ?? "";
+const CHILD_MS = Number(process.env.FAKE_CHILD_MS ?? 5_000);
+const CHILD_METHOD = "opencode/session/child_update";
+const NL = "\n";
 
 interface Session {
   id: string;
   cwd: string;
   history: SessionUpdate[];
   updatedAt: number;
-  /** The next part of the background turn that a `session/list` adds: 0 none. */
   pending: 0 | 1 | 2 | 3 | 4;
   prompts: number;
+  followsChildren: boolean;
 }
 
 const sessions = new Map<string, Session>();
@@ -44,7 +35,6 @@ function text(messageId: string, value: string) {
   } satisfies SessionUpdate;
 }
 
-/** The background answer, which the later parts fill in. */
 const ANSWER = ["", "The background task", "The background task finished: DONE."] as const;
 
 function tool(toolCallId: string, status: "in_progress" | "completed", rawOutput?: unknown): SessionUpdate[] {
@@ -54,7 +44,20 @@ function tool(toolCallId: string, status: "in_progress" | "completed", rawOutput
   ];
 }
 
-/** Sends the updates of a prompt's own execution and keeps them in the history. */
+function childStatus(session: Session, childSessionId: string, status: "created" | "completed"): void {
+  if (!session.followsChildren) return;
+  const params = {
+    rootSessionId: session.id,
+    childSessionId,
+    parentSessionId: session.id,
+    depth: 1,
+    title: "Index the repository",
+    type: "status",
+    status,
+  };
+  process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", method: CHILD_METHOD, params })}${NL}`);
+}
+
 function send(peer: AcpPeer, session: Session, updates: SessionUpdate[]): void {
   for (const update of updates) {
     session.history.push(update);
@@ -62,7 +65,6 @@ function send(peer: AcpPeer, session: Session, updates: SessionUpdate[]): void {
   }
 }
 
-/** Adds the background turn's part to the history only, as OpenCode 2.2.0 does. */
 function advance(session: Session): void {
   if (session.pending === 1) {
     session.history.push(
@@ -120,6 +122,7 @@ serveFakeAcpAgent({
       updatedAt: 0,
       pending: 0,
       prompts: 0,
+      followsChildren: true,
     };
     touch(session);
     sessions.set(session.id, session);
@@ -148,6 +151,7 @@ serveFakeAcpAgent({
       return;
     }
     logEntry({ event: "load", session: session.id });
+    session.followsChildren = false;
     for (const update of session.history) peer.update(session.id, update);
     peer.reply(request, {});
   },
@@ -173,10 +177,47 @@ serveFakeAcpAgent({
         text(`${turn}_c`, ""),
         text(`${turn}_c`, "Nothing to change."),
       ]);
+    } else if (prompt.includes("child")) {
+      const childId = `ses_child_${turn}`;
+      const rawInput = {
+        description: "Index the repository",
+        prompt: "Index every file.",
+        agent: "explore",
+        background: true,
+      };
+      send(peer, session, [
+        text(`${turn}_a`, "Starting a subagent."),
+        {
+          sessionUpdate: "tool_call",
+          toolCallId: `${turn}_subagent`,
+          title: "subagent",
+          kind: "other",
+          status: "pending",
+          rawInput,
+        },
+      ]);
+      childStatus(session, childId, "created");
+      send(peer, session, [
+        {
+          sessionUpdate: "tool_call_update",
+          toolCallId: `${turn}_subagent`,
+          status: "completed",
+          rawOutput: { output: "Started.", metadata: { status: "running", sessionID: childId } },
+        },
+        text(`${turn}_b`, "I started it."),
+      ]);
+      setTimeout(() => {
+        childStatus(session, childId, "completed");
+        logEntry({ event: "child-ended", session: session.id, sent: session.followsChildren });
+        session.pending = 1;
+      }, CHILD_MS);
     } else if (prompt.includes("background")) {
+      const metadata = prompt.includes("shell")
+        ? { status: "running", truncated: false, shellID: `shl_${turn}` }
+        : { sessionID: `ses_child_${turn}`, status: "running" };
       send(peer, session, [
         text(`${turn}_a`, "Starting a background task."),
-        ...tool(`${turn}_subagent`, "completed", { metadata: { sessionID: `ses_child_${turn}`, status: "running" } }),
+        ...tool(`${turn}_task`, "completed", { metadata }),
         text(`${turn}_b`, "I started it."),
       ]);
       session.pending = 1;

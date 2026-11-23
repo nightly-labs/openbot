@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Fechar {name}",
   "browser.tab.closeUnnamed": "Fechar aba do navegador",
   "browser.newTab": "Nova aba do navegador",
-  "browser.hide": "Ocultar navegador",
+  "browser.backToChat": "Voltar ao chat",
   "browser.goBack": "Voltar",
   "browser.goForward": "Avançar",
   "browser.reload": "Recarregar página",
@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Fechar janela flutuante do navegador",
   "browser.pip.reattachFailed": "O OpenBot não conseguiu reanexar o navegador.",
   "browser.pip.closeFailed": "O OpenBot não conseguiu fechar a janela flutuante do navegador.",
+  "browser.window.open": "Abrir navegador em nova janela",
+  "browser.window.openFailed": "O OpenBot não conseguiu abrir a janela do navegador.",
   "browser.popupBlocked.title": "Pop-up bloqueado",
   "browser.popupBlocked.dismiss": "Dispensar mensagem de pop-up",
   "browser.liveView.label": "Visualização ao vivo da página no servidor",
@@ -67,6 +69,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Este texto é longo demais para colar. Cole menos de 100.000 caracteres.",
   "browser.liveView.copyTooLarge": "A seleção é longa demais para copiar. Selecione menos texto.",
   "browser.liveView.copyFailed": "Não foi possível copiar o texto. Clique na página e tente de novo.",
+  "browser.liveView.pageCopied": "A página copiou texto. Escolha Copiar para colocá-lo na sua área de transferência.",
   "browser.previews.label": "Prévias do navegador",
   "browser.previews.resize": "Redimensionar painel direito",
   "browser.previews.empty": "Nenhuma aba do navegador",
@@ -91,6 +94,18 @@ export const messages = {
   "browser.secret.submitting": "Enviando…",
   "browser.secret.takeOver": "Assumir",
   "browser.secret.failed": "Não foi possível concluir a solicitação. Verifique a conexão e tente novamente.",
+  "browser.secret.ended": "Esta solicitação de login terminou. Peça ao agente que tente de novo.",
+  "browser.secret.vaultSkip.agentScript":
+    "O OpenBot não usou seu login salvo porque o agente executou um script nesta página. Para usá-lo, peça ao agente que recarregue a página e tente de novo.",
+  "browser.secret.vaultSkip.fieldKind":
+    "O OpenBot não usou seu login salvo porque o agente escolheu o campo errado na página.",
+  "browser.secret.vaultSkip.loginChoice":
+    "O OpenBot não usou nenhum login salvo porque o agente não escolheu nenhum dos logins salvos para este site. Diga ao agente qual conta usar.",
+  "browser.secret.vaultSkip.noPassword": "O OpenBot não usou seu login salvo porque ele não tem senha para este site.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "O OpenBot não usou seu login salvo porque ele não tem chave do autenticador.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "O OpenBot não usou nenhum login salvo porque não conseguiu ler seu gerenciador de senhas.",
   "browser.error.openAddress": "Não foi possível abrir o endereço nesta aba.",
   "browser.error.channelNoBrowserMember": "Nenhum membro pode abrir uma nova aba neste canal.",
   "browser.error.closeTab": "Não foi possível fechar a aba do navegador.",

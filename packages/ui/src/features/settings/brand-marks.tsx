@@ -1,17 +1,15 @@
-/** Brand marks for integrations. The file imports only plain paths, so the public site can use it without the shared UI root. */
-
 import {
   DISCORD_MARK_PATH,
   GITHUB_MARK_PATH,
   ONEPASSWORD_MARK_PATH,
   PROTON_MARK_PATH,
   SLACK_MARK_PATH,
+  STRIPE_MARK_PATH,
   TELEGRAM_MARK_PATH,
   WHATSAPP_MARK_PATH,
 } from "@openbot/brand/connector-mark-shape";
 import type { JSX } from "@solidjs/web";
 
-/** GitHub's mark. Lucide has no brand icons, so the path is GitHub's own. */
 export function GitHubMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -20,7 +18,6 @@ export function GitHubMark(props: { class?: string | undefined }) {
   );
 }
 
-/** Slack's mark, for the same reason. */
 export function SlackMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -29,7 +26,6 @@ export function SlackMark(props: { class?: string | undefined }) {
   );
 }
 
-/** Discord's mark, for the same reason. */
 export function DiscordMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -38,7 +34,6 @@ export function DiscordMark(props: { class?: string | undefined }) {
   );
 }
 
-/** Telegram's mark, for the same reason. */
 export function TelegramMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -47,7 +42,6 @@ export function TelegramMark(props: { class?: string | undefined }) {
   );
 }
 
-/** WhatsApp's mark, for the same reason. */
 export function WhatsAppMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -59,7 +53,6 @@ export function WhatsAppMark(props: { class?: string | undefined }) {
 const X_MARK_PATH =
   "M17.5 3h3.2l-7 8 8.2 10h-6.4l-5-6.5L4.7 21H1.5l7.5-8.5L1.1 3h6.5l4.5 6 5.4-6Zm-1.1 16h1.8L7.6 4.9H5.7L16.4 19Z";
 
-/** The X mark, for the same reason. The public site footer draws the same path. */
 export function XMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -68,10 +61,6 @@ export function XMark(props: { class?: string | undefined }) {
   );
 }
 
-/**
- * A connector's app icon: its brand color fills the whole square and the mark is on it, as the icon of a
- * catalog app fills its tile. The colors are the Simple Icons brand colors (CC0).
- */
 function BrandTile(props: { background: string; children: JSX.Element }) {
   return (
     <svg class="connector-brand-tile" viewBox="-6 -6 36 36" aria-hidden="true">
@@ -81,10 +70,8 @@ function BrandTile(props: { background: string; children: JSX.Element }) {
   );
 }
 
-/** Slack's four colors, in the order of the arms in the path: bottom left, top left, top right, bottom right. */
 const SLACK_ARM_COLORS = ["#E01E5A", "#36C5F0", "#2EB67D", "#ECB22E"] as const;
 
-/** Slack's app icon: the mark in its four colors, on white. Each arm is two parts of the path. */
 export function SlackTile() {
   const parts = SLACK_MARK_PATH.split(/(?=M)/);
   return (
@@ -100,6 +87,14 @@ export function DiscordTile() {
   return (
     <BrandTile background="#5865F2">
       <path d={DISCORD_MARK_PATH} fill="#FFFFFF" />
+    </BrandTile>
+  );
+}
+
+export function StripeTile() {
+  return (
+    <BrandTile background="#635BFF">
+      <path d={STRIPE_MARK_PATH} fill="#FFFFFF" />
     </BrandTile>
   );
 }
@@ -136,7 +131,6 @@ export function OnePasswordTile() {
   );
 }
 
-/** Bitwarden's shield (Simple Icons, CC0): white, with its right half in the brand color. */
 const BITWARDEN_SHIELD_PATH =
   "M5.11 2.92h13.8c.208 0 .388.076.54.228a.737.737 0 01.227.539v9.2c0 .687-.134 1.367-.401 2.042a7.618 7.618 0 01-.995 1.797 11.097 11.097 0 01-1.413 1.528c-.547.495-1.052.906-1.515 1.234-.464.327-.947.636-1.45.928-.503.291-.86.489-1.072.593-.212.104-.381.184-.51.24a.687.687 0 01-.31.071.688.688 0 01-.312-.072 13.784 13.784 0 01-.51-.24 20.61 20.61 0 01-1.071-.592 19.133 19.133 0 01-1.45-.928 16.457 16.457 0 01-1.515-1.234 11.11 11.11 0 01-1.414-1.528 7.617 7.617 0 01-.994-1.797 5.502 5.502 0 01-.401-2.042v-9.2c0-.208.076-.387.227-.54a.737.737 0 01.54-.227z";
 const BITWARDEN_HALF_PATH = "M12.01 5.22v13.62c.95-.502 1.801-1.05 2.552-1.64 1.877-1.47 2.815-2.907 2.815-4.313V5.22Z";

@@ -1,8 +1,3 @@
-// Storage and files: what the host keeps on disk, measured for the Storage tab, the agent Files
-// detail and the chat Files panel. Files come from the mailbox state and their chats from the
-// database; folders are walked with a bound. Nothing here follows a symbolic link, and nothing here
-// deletes outside the cache and log folders the caller names.
-
 import { lstat, readdir, realpath, rm, statfs } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -32,17 +27,15 @@ import {
 } from "./database/storage-usage-queries";
 import type { MailboxStore, MailboxStoredFile } from "./mailbox-store";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import type { UserFilesBytes } from "./user-files-bytes";
+import type { WorkflowFileOwner } from "./workflows/workflow-file-owners";
 
 interface StorageRoots {
-  /** The SQLite file. Its `-wal` and `-shm` companions are counted with it. */
   database: string;
   downloads: string;
-  /** Folders of copies the app can download again. Clear removes what is in them. */
   caches: readonly string[];
-  /** Folders of rotated log files. Only `*.log` and `*.log.N` files directly in them count. */
   logs: readonly string[];
   runtimes: string | null;
-  /** A path on the disk that holds the host data, for the free space. */
   data: string;
 }
 
@@ -59,23 +52,18 @@ export interface StorageUsageSources {
     deleteStoredFile: OmitThisParameter<MailboxStore["deleteStoredFile"]>;
   };
   agents: () => readonly StorageAgent[];
-  /**
-   * The files of one channel's messages, by attachment id, or null when the host has no such channel.
-   * Absent on a host without channels.
-   */
   channelFiles?: (channelId: string) => readonly StorageChannelFile[] | null;
+  userFiles?: Pick<UserFilesBytes, "read" | "forget" | "dispose">;
+  workflowFiles?: () => ReadonlyMap<string, WorkflowFileOwner>;
 }
 
 export interface StorageChannelFile {
   attachmentId: string;
-  /** The channel message that carries the file. */
   messageId: string;
 }
 
-/** The request names an agent or a file the host does not have. The Team API answers 404. */
 export class StorageNotFoundError extends Error {}
 
-/** A folder with more entries than this counts what it reached and marks the result truncated. */
 const STORAGE_WALK_ENTRY_LIMIT = 100_000;
 const STAT_BATCH = 64;
 const LOG_FILE = /\.log(\.\d+)?$/;
@@ -91,10 +79,6 @@ interface TreeSize {
   complete: boolean;
 }
 
-/**
- * Bytes of the regular files under `root`. A symbolic link is never followed, so a workspace that
- * links to a large folder does not count it, and a loop cannot run forever.
- */
 export const measureTree = Effect.fn("StorageUsage.measureTree")(function* (
   root: string,
   entryLimit = STORAGE_WALK_ENTRY_LIMIT,
@@ -152,7 +136,6 @@ function safeBytes(value: number): number | null {
   return Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
-/** One statfs call and no scan, so the sidebar can ask often. */
 export const diskSpace = Effect.fn("StorageUsage.diskSpace")((path: string) =>
   storedIO(() => statfs(path)).pipe(
     Effect.map(
@@ -167,7 +150,6 @@ export const diskSpace = Effect.fn("StorageUsage.diskSpace")((path: string) =>
 
 const freeBytes = (path: string) => diskSpace(path).pipe(Effect.map((disk) => disk.freeBytes));
 
-/** A wire identifier or nothing, so one odd id drops a link instead of failing the whole answer. */
 function wireId(value: string | null | undefined): string | null {
   return value && value.length <= INPUT_LIMITS.identifier ? value : null;
 }
@@ -175,9 +157,7 @@ function wireId(value: string | null | undefined): string | null {
 interface MeasuredFile {
   stored: MailboxStoredFile;
   placement: StoragePlacement | null;
-  /** Every chat of the scope that shows the file. */
   threadIds: ReadonlySet<string>;
-  /** On the channel scope: the channel message that carries the file. */
   channelMessageId: string | null;
   agentId: string | null;
   bytes: number;
@@ -213,8 +193,6 @@ export class StorageUsageScanner {
         cause: new StorageNotFoundError(sourceText("error.storage.agentMissing")),
       });
 
-    // A channel's members answer in channel threads, which hold no chat of their own: the channel
-    // scope is the files of the channel's messages only.
     const channelFiles =
       input.scope === "channel" && input.channelId !== undefined
         ? (this.#sources.channelFiles?.(input.channelId) ?? null)
@@ -250,8 +228,12 @@ export class StorageUsageScanner {
       ),
       STORAGE_LIMITS.conversations,
     );
+    const workflowFiles =
+      input.scope === "host" && this.#sources.workflowFiles
+        ? yield* storedSync(this.#sources.workflowFiles)
+        : new Map<string, WorkflowFileOwner>();
     const fileRows = largestFirst(
-      files.map((file) => ({ bytes: file.bytes, row: this.#fileRow(file, threadById, scannedAt) })),
+      files.map((file) => ({ bytes: file.bytes, row: this.#fileRow(file, threadById, workflowFiles, scannedAt) })),
       STORAGE_LIMITS.files,
     );
     truncated ||= conversations.cut || fileRows.cut;
@@ -317,7 +299,6 @@ export class StorageUsageScanner {
     };
   }).bind(this);
 
-  /** Placements in the scope's chats, by attachment id. Paged, with a yield between pages. */
   #placements = Effect.fn("StorageUsage.placements")(function* (
     this: StorageUsageScanner,
     db: DatabaseSync,
@@ -395,10 +376,16 @@ export class StorageUsageScanner {
     return measured;
   });
 
-  #fileRow(file: MeasuredFile, threadById: ReadonlyMap<string, StorageThread>, scannedAt: string): StoredFileRow {
+  #fileRow(
+    file: MeasuredFile,
+    threadById: ReadonlyMap<string, StorageThread>,
+    workflowFiles: ReadonlyMap<string, WorkflowFileOwner>,
+    scannedAt: string,
+  ): StoredFileRow {
     const thread = file.placement ? threadById.get(file.placement.threadId) : undefined;
     const conversationId = wireId(thread?.threadId);
     const messageId = conversationId ? wireId(file.placement?.messageId) : wireId(file.channelMessageId);
+    const owner = file.stored.source === "generated" ? workflowFiles.get(file.stored.attachment.id) : undefined;
     return {
       ...file.stored.attachment,
       source: file.stored.source,
@@ -406,9 +393,10 @@ export class StorageUsageScanner {
       conversation:
         thread && conversationId ? { id: conversationId, title: thread.title.slice(0, STORAGE_LIMITS.title) } : null,
       messageId,
-      createdAt: file.stored.createdAt ?? file.placement?.createdAt ?? file.modifiedAt ?? scannedAt,
+      createdAt: file.stored.createdAt ?? file.placement?.createdAt ?? owner?.createdAt ?? file.modifiedAt ?? scannedAt,
       status: file.status,
       deletable: true,
+      ...(owner ? { workflow: owner.workflow } : {}),
     };
   }
 
@@ -439,7 +427,6 @@ export class StorageUsageScanner {
     threadSizes: ReadonlyMap<string, { bytes: number }>,
   ): AgentStorageRow {
     const chats = threads.filter((thread) => thread.agentId === agentId);
-    // The same rule as the agent scope: a file shown in two agents' chats counts for both.
     const owned = files.filter((file) =>
       file.threadIds.size === 0
         ? file.agentId === agentId
@@ -474,7 +461,6 @@ export class StorageUsageScanner {
         complete &&= size.complete;
         return size.bytes;
       });
-    // Two agents can share a workspace folder; the disk holds it once.
     const byWorkspace = new Map<string, number>();
     for (const path of new Set(agents.map((agent) => agent.workspacePath))) byWorkspace.set(path, yield* measure(path));
     let caches = 0;
@@ -495,17 +481,12 @@ export class StorageUsageScanner {
   });
 }
 
-/** Two records can point at one file on disk; count it once. */
 function uniqueBytes(files: readonly MeasuredFile[]): number {
   const byPath = new Map<string, number>();
   for (const file of files) byPath.set(file.stored.path, file.bytes);
   return [...byPath.values()].reduce((total, bytes) => total + bytes, 0);
 }
 
-/**
- * Removes what is in each cache folder, or the rotated log files, and nothing else: the folders
- * stay, and a subfolder of a log folder (such as the transfer journal) is not touched.
- */
 const clearStorageCategory = Effect.fn("StorageUsage.clearCategory")(function* (
   roots: StorageRoots,
   category: ClearableStorageCategory,
@@ -533,14 +514,9 @@ function scopeKey(input: GetStorageUsageInput): string {
   return JSON.stringify([input.scope, input.agentId ?? null, input.conversationId ?? null, input.channelId ?? null]);
 }
 
-/**
- * Scans are slow on a large host, so each scope keeps its last answer for a minute, and two
- * surfaces that ask at the same time share one scan. A delete, a clear, or a change to the agents
- * drops every answer, and a scan that was running at that moment is not kept.
- */
 export class StorageUsageService {
   readonly #scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> };
-  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox">;
+  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">;
   readonly #now: () => number;
   readonly #cache = new Map<string, { at: number; usage: StorageUsage }>();
   readonly #running = new Map<string, { token: symbol; fiber: Fiber.Fiber<StorageUsage, StoredStateFailure> }>();
@@ -550,7 +526,7 @@ export class StorageUsageService {
 
   constructor(
     scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> },
-    sources: Pick<StorageUsageSources, "roots" | "mailbox">,
+    sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">,
     now: () => number = Date.now,
   ) {
     this.#scanner = scanner;
@@ -591,21 +567,34 @@ export class StorageUsageService {
   readonly deleteFile = Effect.fn("StorageUsage.deleteFile")(function* (this: StorageUsageService, fileId: string) {
     if (!this.#sources.mailbox.listStoredFiles().some((file) => file.attachment.id === fileId))
       return yield* new StoredStateFailure({ cause: new StorageNotFoundError(sourceText("error.backend.fileGone")) });
-    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.invalidate())));
+    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.#afterRemove())));
   }).bind(this);
 
   disk() {
     return diskSpace(this.#sources.roots.data);
   }
 
+  readonly diskUse = Effect.fn("StorageUsage.diskUse")(function* (this: StorageUsageService) {
+    const disk = yield* diskSpace(this.#sources.roots.data);
+    const userBytes = this.#sources.userFiles ? yield* this.#sources.userFiles.read() : null;
+    return { ...disk, userBytes };
+  }).bind(this);
+
   clear(category: ClearableStorageCategory) {
     return clearStorageCategory(this.#sources.roots, category).pipe(
-      Effect.ensuring(Effect.sync(() => this.invalidate())),
+      Effect.ensuring(Effect.sync(() => this.#afterRemove())),
     );
   }
 
   dispose() {
-    return Scope.close(this.#scope, Exit.void);
+    return Scope.close(this.#scope, Exit.void).pipe(
+      Effect.andThen(this.#sources.userFiles ? this.#sources.userFiles.dispose() : Effect.void),
+    );
+  }
+
+  #afterRemove(): void {
+    this.invalidate();
+    this.#sources.userFiles?.forget();
   }
 
   invalidate(): void {

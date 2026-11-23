@@ -11,7 +11,6 @@ import type {
 } from "../messaging-types";
 import { slackInboundAction, slackInboundMessage } from "./slack-events";
 
-/** Slack sends a request again when the answer is late, with the same `event_id`. */
 const RECENT_EVENTS = 2_000;
 const OK: IngressAnswer = { status: 200 };
 
@@ -20,12 +19,6 @@ export interface SlackEventsTransportOptions {
   ingress: MessagingIngress;
 }
 
-/**
- * The inbound half of one workspace's OpenBot app: the Events API, which Slack posts to Signal.
- * Signal checks Slack's signature, which only it can, and passes the workspace's requests to this
- * host. This holds the ingress socket open while it runs and answers at once. The agent's work
- * starts after the answer, because Slack gives up after three seconds.
- */
 export class SlackEventsTransport implements MessagingTransport {
   readonly #identity: ConnectionIdentity;
   readonly #ingress: MessagingIngress;
@@ -33,6 +26,8 @@ export class SlackEventsTransport implements MessagingTransport {
   #sink: TransportSink | null = null;
   #release: (() => void) | null = null;
   #unsubscribe: (() => void) | null = null;
+  #unsubscribeRoutes: (() => void) | null = null;
+  #linked = true;
 
   constructor(options: SlackEventsTransportOptions) {
     this.#identity = options.identity;
@@ -41,12 +36,15 @@ export class SlackEventsTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
+    this.#unsubscribeRoutes ??= this.#ingress.onLinkedRoutes("slack", (ids) => {
+      this.#linked = ids === null || ids.has(this.#identity.workspaceId);
+      this.#report(this.#ingress.state());
+    });
     this.#release ??= this.#ingress.acquire("slack");
     this.#unsubscribe ??= this.#ingress.onState((state) => this.#report(state));
     this.#report(this.#ingress.state());
   }
 
-  /** The main process reconnects the ingress socket itself when the computer wakes. */
   reconnect(): void {}
 
   readonly stop = Effect.fn("SlackEvents.stop")(() =>
@@ -54,6 +52,9 @@ export class SlackEventsTransport implements MessagingTransport {
       this.#sink = null;
       this.#unsubscribe?.();
       this.#unsubscribe = null;
+      this.#unsubscribeRoutes?.();
+      this.#unsubscribeRoutes = null;
+      this.#linked = true;
       this.#release?.();
       this.#release = null;
     }),
@@ -94,10 +95,17 @@ export class SlackEventsTransport implements MessagingTransport {
   );
 
   #report(state: IngressState): void {
-    this.#sink?.state(state === "online" ? "connected" : state === "connecting" ? "connecting" : "relay_unavailable");
+    this.#sink?.state(
+      state === "online"
+        ? this.#linked
+          ? "connected"
+          : "not_linked"
+        : state === "connecting"
+          ? "connecting"
+          : "relay_unavailable",
+    );
   }
 
-  /** True when the event was already handled. */
   #remember(eventId: string): boolean {
     if (this.#seen.has(eventId)) return true;
     this.#seen.add(eventId);
@@ -109,7 +117,6 @@ export class SlackEventsTransport implements MessagingTransport {
   }
 }
 
-/** A Slack payload is always a JSON object. Anything else is a request Slack did not send. */
 function parseRecord(text: string): DynamicRecord | null {
   try {
     const value = JSON.parse(text);

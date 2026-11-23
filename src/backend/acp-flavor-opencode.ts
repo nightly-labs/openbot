@@ -1,18 +1,53 @@
-import { RequestError } from "@agentclientprotocol/sdk";
+import { RequestError, type SessionUpdate } from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { CauseCode } from "@openbot/telemetry";
-import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
+import { type AcpCustomEndpoint, type AcpFlavor, type AcpRetryCause, shownFailureDetail } from "./acp-flavor";
 import {
+  isContextTooSmallFailure,
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
+  isUnreadableContentDiagnostic,
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
 
-/** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
-function isOpenCodeStarting(error: unknown): boolean {
+const logger = createOpenBotLogger("acp-client");
+
+function isOpenCodeTimeoutRetry(update: SessionUpdate): boolean {
+  if (update.sessionUpdate !== "session_info_update" || !isRecord(update._meta)) return false;
+  if (!("opencode/retry" in update._meta)) return false;
+  const retry = update._meta["opencode/retry"];
+  if (retry === null) return true;
+  return isRecord(retry) && isRecord(retry.error) && /\btimed out\b/iu.test(String(retry.error.message ?? ""));
+}
+
+const OPENCODE_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
+  ["provider.internal", false],
+  ["provider.timeout", false],
+  ["provider.transport", true],
+]);
+
+const OPENCODE_OUT_OF_MEMORY = /\bout of memory\b|\binsufficient memory\b|\bmemory limit exceeded\b/iu;
+
+function openCodeRetryUpdate(update: SessionUpdate): { attempt: number; cause: AcpRetryCause } | null {
+  if (update.sessionUpdate !== "session_info_update" || !isRecord(update._meta)) return null;
+  const retry = update._meta["opencode/retry"];
+  if (!isRecord(retry) || !isRecord(retry.error) || typeof retry.attempt !== "number") return null;
+  const type = retry.error.type;
+  const unreachable = typeof type === "string" ? OPENCODE_RETRY_TYPES.get(type) : undefined;
+  if (unreachable === undefined) return null;
+  const cause = unreachable
+    ? "unreachable"
+    : OPENCODE_OUT_OF_MEMORY.test(String(retry.error.message ?? ""))
+      ? "outOfMemory"
+      : "serverError";
+  return { attempt: Math.max(1, retry.attempt - 1), cause };
+}
+
+export function isOpenCodeStarting(error: unknown): boolean {
   return (
     error instanceof RequestError &&
     error.code === -32603 &&
@@ -21,70 +56,75 @@ function isOpenCodeStarting(error: unknown): boolean {
   );
 }
 
-/**
- * OpenCode's wrapper error for a failed call to its internal server. It carries no cause: OpenCode
- * maps each such failure that is not an authentication error to this one.
- */
 function isOpenCodeServiceFailure(error: unknown): boolean {
   return error instanceof RequestError && error.code === -32603 && /\bOpenCode service failure\b/.test(error.message);
 }
 
-/**
- * OpenCode 2.1.3's wrapper error for any failure that it has no ACP error for. Its data names only
- * the JavaScript error class, so the user read the generic text with no provider name (#2850).
- * A start can get it too, when the probe `session/new` fails on a slow computer; a later start works (#4237).
- */
 export const OPENCODE_INTERNAL_FAILURE = "Internal error: Internal service failure";
 
 export function isOpenCodeInternalFailure(error: unknown): boolean {
   return error instanceof RequestError && error.code === -32603 && error.message === OPENCODE_INTERNAL_FAILURE;
 }
 
-/**
- * OpenCode 2.1.1 answers a turn whose model provider has no credentials with the protocol's
- * `-32000` and "provider authentication required", and no provider ID. A user with no key can pick
- * a paid or third-party model, and met that text with no next step (#2746). The model ID names the
- * provider before its first `/`.
- *
- * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
- * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
- * OpenCode sign-in sent the user to the wrong place.
- *
- * OpenCode 2.2.7 also answers this way, with empty data, for a free model that it refuses for the
- * user's country: `opencode run` shows "This model is not available in your country". A free model
- * needs no sign-in, so the text told the user to choose a free model while one was chosen. The ID
- * stands in for the display name: a free ID ends in `-free`, as the name ends in "Free".
- */
-function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
+function isOpenCodeServerLost(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.errorName === "ServerUnavailable"
+  );
+}
+
+function openCodeAuthRequired(
+  error: unknown,
+  model: string | null,
+  endpoint: AcpCustomEndpoint | null,
+  savedKey: boolean,
+  providerKeyStored: (provider: string) => boolean,
+  refusalStatus: () => number | null,
+): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
-      endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
+      endpoint.hasCredentials
+        ? "error.provider.customEndpointAccessRefused"
+        : "error.provider.customEndpointKeyMissing",
       { provider: endpoint.name },
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
     return sourceText("error.provider.opencodeFreeModelRefused");
+  if (savedKey)
+    return sourceText(
+      refusalStatus() === 403 ? "error.provider.opencodeGoRequestRefused" : "error.provider.opencodeKeyRefused",
+    );
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
-  return provider
-    ? sourceText("error.provider.opencodeAuthRequired", { provider })
-    : sourceText("error.provider.opencodeAuthRequiredUnknown");
+  if (!provider) return sourceText("error.provider.opencodeAuthRequiredUnknown");
+  return provider.toLowerCase() !== "opencode-go" && providerKeyStored(provider)
+    ? sourceText("error.provider.opencodeProviderRefused", { provider })
+    : sourceText("error.provider.opencodeAuthRequired", { provider });
 }
 
-/**
- * A request that the model refused for a file, image or audio part in the chat. OpenCode 2.1.1
- * sends a part when the model catalog lists its kind, or when the part has a kind it does not know,
- * such as an MCP resource. Each gateway words the refusal differently; OpenCode itself refuses a
- * kind that the protocol cannot carry.
- */
-const OPENCODE_UNREADABLE_CONTENT =
-  /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\bsupports text-only requests\b|\bdoes not support media type\b/iu;
+const NVIDIA_MODEL_NOT_SERVED = /\bFunction '[^']*': Not found for account\b/u;
+const NVIDIA_MODEL_DEGRADED = /\bDEGRADED function cannot be invoked\b/iu;
+const NVIDIA_SAFETY_SCREENING = /\binput rejected by content safety screening\b/iu;
 
-/**
- * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
- * reports each kind as `Upstream request failed: <reason>`, so billing and the rate limit come
- * first. The provider's own failure comes before the network: a gateway that could not reach its
- * model was reached by this computer. Text that names no kind is shown as it is.
- */
+function isOpenCodeSafetyRefusal(error: unknown): boolean {
+  return (
+    error === "refusal" ||
+    (error instanceof RequestError && error.code === -32603 && NVIDIA_SAFETY_SCREENING.test(error.message))
+  );
+}
+
+function isReasoningEffortRefusal(error: unknown): boolean {
+  if (!(error instanceof RequestError) || error.code !== -32603) return false;
+  return (
+    /\breasoning[_ .]?effort\b/iu.test(error.message) &&
+    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|unexpected|invalid|not allowed|not permitted)\b/iu.test(
+      error.message,
+    )
+  );
+}
+
 const OPENCODE_REQUEST_FAILURES = [
   [
     "error.provider.opencodeBilling",
@@ -92,6 +132,7 @@ const OPENCODE_REQUEST_FAILURES = [
   ],
   ["error.provider.opencodeRateLimited", /\brate[ _-]?limit|\btoo many requests\b/iu],
   ["error.provider.opencodeInvalidUpload", /\binvalid upload request\b/iu],
+  ["error.provider.opencodeModelUnavailable", /\bmodel[_ ]not[_ ]found\b|\bmodel_not_supported\b|不支持模型/iu],
   [
     "error.provider.opencodeProviderFailed",
     /\binternal server error\b|\bservice unavailable\b|\bendpoint is unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\boverloaded\b|\bupstream request failed\b/iu,
@@ -102,51 +143,64 @@ const OPENCODE_REQUEST_FAILURES = [
   ],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
-/**
- * OpenCode retries a rate limit or a provider failure by itself. When it stops, it fails the prompt
- * with the provider's text behind `Internal error:`, so a billing refusal, a rate limit and an
- * offline computer all read as one failure of OpenBot, and the user could not tell whether
- * waiting helps (#1163). The kind comes first; the provider's own text follows it.
- */
 function openCodeRequestFailure(
   error: unknown,
   detail: string,
   redact: (text: string) => string,
   log: (text: string) => void,
+  endpoint: AcpCustomEndpoint | null,
 ): string {
+  if (isOpenCodeSafetyRefusal(error)) {
+    logger.warn("A model provider's safety rules refused an OpenCode turn.", { detail });
+    return sourceText("error.provider.opencodeSafetyBlocked");
+  }
   if (!(error instanceof RequestError) || error.code !== -32603) return detail;
   const reason = error.message.replace(/^Internal error:\s*/u, "");
-  // All free models share one limit, and the free tier has no usage reading that could explain it.
   if (isRecord(error.data) && error.data.errorName === "provider.free-limit")
     return sourceText("error.provider.opencodeFreeLimit");
-  // OpenCode Console's own text says to replace the key in "your client"; here that is Settings (#2544).
   if (/\bapi key has expired\b[\s\S]*\bopencode console\b/iu.test(detail))
     return sourceText("error.provider.opencodeKeyExpired");
-  // A spent usage limit shows in OpenCode's own words, which the turn also reads for a plan window.
   if (isUsageLimitDiagnostic(reason)) return redact(reason);
-  // A gateway wraps it as an upstream failure; the turn reads the provider's text to start a new session.
   if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason) || isImageCountDiagnostic(reason))
     return redact(reason);
-  // The part stays in the session, so each turn on this model fails until the user picks another.
-  // The provider's text says nothing more to the user; it goes to the log.
-  if (OPENCODE_UNREADABLE_CONTENT.test(reason)) {
+  if (isUnreadableContentDiagnostic(reason)) {
     log(`OpenCode model refused the chat content: ${reason}`);
-    return sourceText("error.provider.opencodeUnreadableContent");
+    return redact(reason);
   }
-  // OpenCode 2.2.7 names a model reply that ended with no finish reason, or that it could not read.
-  // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
   if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
     return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
-  const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
+  if (isRecord(error.data) && error.data.errorName === "output-limit")
+    return sourceText(endpoint ? "error.provider.opencodeOutputLimitEndpoint" : "error.provider.opencodeOutputLimit");
+  if (/\breasoning start before end\b/u.test(reason)) {
+    log(`OpenCode could not read the model's reasoning stream: ${reason}`);
+    return sourceText("error.provider.opencodeReasoningOverlap");
+  }
+  if (OPENCODE_OUT_OF_MEMORY.test(reason)) {
+    logger.warn("A model server ran out of memory for an OpenCode request.", { reason: redact(reason) });
+    return sourceText("error.provider.opencodeOutOfMemory");
+  }
+  if (isContextTooSmallFailure(reason)) {
+    log(`OpenCode request does not fit the model's context window: ${reason}`);
+    return sourceText("error.provider.opencodeContextTooSmall");
+  }
+  if (NVIDIA_MODEL_NOT_SERVED.test(reason)) {
+    log(`The model provider does not serve this model to the account: ${reason}`);
+    return sourceText("error.provider.opencodeModelNotServed");
+  }
+  if (NVIDIA_MODEL_DEGRADED.test(reason))
+    return sourceText("error.provider.opencodeProviderFailed", { detail: shownFailureDetail(redact(reason)) });
+  const errorName = isRecord(error.data) ? error.data.errorName : undefined;
+  const key =
+    OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0] ??
+    (errorName === "provider.internal"
+      ? "error.provider.opencodeProviderFailed"
+      : errorName === "provider.no-route"
+        ? "error.provider.opencodeModelUnavailable"
+        : undefined);
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
 }
 
-/**
- * The causes of OpenCode 2.2.5's error names: `-32603` errors carry `data.errorName`. A name that is
- * not here, such as `provider.unknown` or `tool.execution`, gives the decision to the text. A spent
- * budget is a limit that the user set, not a payment.
- */
 const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
   "provider.auth": "authentication",
   "provider.rate-limit": "rate_limit",
@@ -160,6 +214,7 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
   "provider.timeout": "timeout",
   "provider.internal": "provider_unavailable",
   "provider.invalid-output": "provider_internal_error",
+  "output-limit": "provider_internal_error",
   "provider.invalid-request": "invalid_request",
   "provider.unsupported-operation": "invalid_request",
   "provider.no-route": "model_not_found",
@@ -168,7 +223,11 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
 };
 
 function openCodeFailureCause(error: unknown): CauseCode | null {
-  if (!(error instanceof RequestError) || !isRecord(error.data)) return null;
+  if (!(error instanceof RequestError)) return null;
+  if (isOpenCodeSafetyRefusal(error)) return "content_blocked";
+  if (NVIDIA_MODEL_NOT_SERVED.test(error.message)) return "model_not_found";
+  if (NVIDIA_MODEL_DEGRADED.test(error.message)) return "provider_unavailable";
+  if (!isRecord(error.data)) return null;
   const name = error.data.errorName;
   return typeof name === "string" && Object.hasOwn(OPENCODE_ERROR_CAUSES, name)
     ? (OPENCODE_ERROR_CAUSES[name] ?? null)
@@ -176,63 +235,49 @@ function openCodeFailureCause(error: unknown): CauseCode | null {
 }
 
 export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
-  // OpenCode 2.x has a session that 1.x wrote after the one-time `session_v2` copy. It answers with
-  // invalid params and the ID in data.sessionId. The same code with another message is a session of
-  // another directory, which is not missing.
   sessionNotFound: (error, sessionId) =>
     error.code === -32602
       ? isRecord(error.data) &&
         error.data.sessionId === sessionId &&
-        error.message === `Invalid params: session not found: ${sessionId}`
+        (error.message === `Invalid params: session not found: ${sessionId}` ||
+          (typeof error.data.cwd === "string" &&
+            error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
-  turnFailure: (error, detail, redact, log, model, endpoint) => {
-    const authRequired = openCodeAuthRequired(error, model, endpoint);
+  turnFailure: (error, detail, redact, log, model, endpoint, savedKey, providerKeyStored, _label, refusalStatus) => {
+    const authRequired = openCodeAuthRequired(error, model, endpoint, savedKey, providerKeyStored, refusalStatus);
     if (authRequired) return authRequired;
-    // Google answers "API key not valid" (#1388).
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))
       return sourceText("error.provider.opencodeCredentialsRejected", {
         detail: shownFailureDetail(detail.replace(/^RequestError:\s*Internal error:\s*/u, "")),
       });
-    if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error))
+    if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error) || isOpenCodeServerLost(error))
       return sourceText("error.provider.opencodeServiceFailure");
-    return openCodeRequestFailure(error, detail, redact, log);
+    if (endpoint && isReasoningEffortRefusal(error)) {
+      logger.warn("A custom endpoint refused the reasoning effort.", { detail });
+      return sourceText("error.provider.customEndpointEffortRefused", { provider: endpoint.name });
+    }
+    return openCodeRequestFailure(error, detail, redact, log, endpoint);
   },
   failureCause: openCodeFailureCause,
-  // OpenCode reports a model reply with no text, or with reasoning only, as a successful empty
-  // turn and logs no error. OpenCode 1.18.31 failed the prompt on a rate limit and on a refused
-  // connection; other provider errors can still end here. Do not invent the upstream cause or
-  // report that turn as a successful reply.
+  serverLost: isOpenCodeServerLost,
   emptyAnswerFailure: ({ reasoned }) =>
     sourceText(reasoned ? "error.provider.opencodeReasoningWithoutAnswer" : "error.provider.opencodeNoAnswer"),
+  stillStarting: isOpenCodeStarting,
   restoreFailure: (error, method) => {
     if (method === "resume" && isOpenCodeStarting(error)) return "wait-for-start";
     return isOpenCodeServiceFailure(error) ? "list-sessions" : null;
   },
-  // Initialization already proved that OpenCode's catalogue works. A later refresh can time out
-  // while probing model options; keep the last successful list instead of making a connected
-  // provider appear to have no models.
   keepModelsOnRefreshFailure: true,
-  // A long answer with no tool call otherwise shows nothing until the prompt ends, and the turn
-  // looks stuck (#2858).
   streamAnswerBeforePromptReturns: true,
-  // OpenCode 1.18.31 and 2.1.4 pass on the reasoning that an endpoint streams between answer tokens.
-  // Ending the answer at each thought cut words in two, such as "B aca" (#3351).
   thoughtsInsideAnswer: true,
-  // OpenCode 2.2.0 sends updates only for the execution that a prompt starts. The turn that a
-  // finished background subagent starts reaches only its store, so the chat never showed it (#3406).
   unsentBackgroundTurns: true,
-  // OpenCode 2.2.7 sends `usage_update` and has no ACP method that compacts. It compacts by itself
-  // only when the context is full, so a long chat sent an almost full context with each request (#7171).
   contextCompaction: "handoff",
-  // OpenCode 2.2.7 loads a session from its own store with all of its messages. Each idle release
-  // added one more copy of the instructions to a long chat (#7171).
   reopenKeepsPrompts: true,
-  // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
+  modelRetryUpdate: isOpenCodeTimeoutRetry,
+  retryUpdate: openCodeRetryUpdate,
   messagePerId: true,
-  // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
-  // second chat of the agent replaced the `openbot` token, and closing it left the first refused.
   mcpServersPerDirectory: true,
-  // OpenCode 2.2.5 sends each subagent's session as `opencode/session/child_update` when the client
-  // asks. Without it, the subagent's tool calls showed as the parent's, and nothing told when it ended.
+  mcpConnectLimitMs: 30_000,
+  relayStdioMcpServers: true,
   childSessionUpdates: true,
 };

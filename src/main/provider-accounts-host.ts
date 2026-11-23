@@ -1,5 +1,3 @@
-// The provider accounts of this host for an administrator of a joined server (`provider-accounts-v1`).
-
 import { type AgentProviderId, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { PROVIDER_ACCOUNT_MODELS_LIMIT } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -19,25 +17,23 @@ export interface ProviderAccountsHostDependencies {
     | "listAgents"
     | "updateAgent"
     | "signInProviderAccountOnHost"
+    | "connectProviderAccountKey"
+    | "startProviderAccountCodeLogin"
+    | "submitProviderAccountCodeLogin"
+    | "providerAccountCodeLoginStatus"
+    | "cancelProviderAccountSignIn"
     | "renameProviderAccount"
     | "removeProviderAccount"
     | "setProviderAccountPool"
+    | "setLiveVoiceAccount"
+    | "liveVoiceAccount"
   >;
   browser: Pick<BrowserHost, "openPrivate" | "privateTab" | "close">;
 }
 
-/**
- * The accounts of this host's providers, for an administrator who is not at this computer.
- *
- * The sign-in of an account opens its page in a private tab of this host's browser, and the
- * administrator signs in through the live view of that tab: the provider sends the grant to a
- * listener on this host. `startSignIn` returns at once; the client reads `signInStatus` until the
- * sign-in ends. One account sign-in runs for each provider: a second start replaces the first.
- */
 export class ProviderAccountsHost {
   readonly #dependencies: ProviderAccountsHostDependencies;
   readonly #pages: HostSignInPages<AgentProviderId, { error: string | null }>;
-  /** One start at a time, so each start stops the sign-in that it replaces. */
   readonly #starting = Semaphore.makeUnsafe(1);
 
   constructor(dependencies: ProviderAccountsHostDependencies) {
@@ -45,14 +41,12 @@ export class ProviderAccountsHost {
     this.#pages = new HostSignInPages(dependencies.browser);
   }
 
-  /** The accounts of each provider that can hold more than one, and the agents on an account after the first. */
   list() {
     const providers = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) =>
       row.accounts
         ? [
             {
               provider: row.id,
-              // `provider-accounts-v1` carries no model list: the account's models stay on this computer.
               accounts: row.accounts.map(({ models: _models, ...account }) => ({
                 ...account,
                 message: account.message?.slice(0, PROVIDER_ACCOUNTS_MESSAGE_LIMIT) ?? null,
@@ -71,10 +65,6 @@ export class ProviderAccountsHost {
     return { providers, agents };
   }
 
-  /**
-   * The models that each account after the first serves and the provider's own sign-in does not
-   * (`provider-account-models-v1`). An account whose check listed none is left out.
-   */
   models() {
     const providers = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) => {
       const accounts = (row.accounts ?? []).flatMap((account) =>
@@ -94,7 +84,6 @@ export class ProviderAccountsHost {
     return { providers };
   }
 
-  /** The providers whose account pool is on, with the accounts left out and the account in use (`provider-account-pool-v1`). */
   pools() {
     const pools = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) =>
       row.accounts && row.accountPool ? [{ provider: row.id, ...row.accountPool }] : [],
@@ -106,18 +95,24 @@ export class ProviderAccountsHost {
     return this.#dependencies.service.setProviderAccountPool(provider, enabled, leftOut).pipe(Effect.asVoid);
   }
 
-  /** The readings of the accounts after the first. The released usage routes give the provider's own. */
+  liveVoiceAccount() {
+    return { accountId: this.#dependencies.service.liveVoiceAccount() };
+  }
+
+  setLiveVoiceAccount(accountId: string | null) {
+    return this.#dependencies.service.setLiveVoiceAccount(accountId).pipe(Effect.asVoid);
+  }
+
   readonly usage = Effect.fn("ProviderAccountsHost.usage")(function* (this: ProviderAccountsHost) {
     return yield* this.#dependencies.service.getProviderAccountUsage();
   }).bind(this);
 
-  /** The sign-in it replaces ends first, so that account does not stay connecting where no cancel reaches it. */
-  startSignIn(provider: AgentProviderId, accountId: string | null, mode: HostSignInPageMode = "tab") {
+  startSignIn(provider: AgentProviderId, accountId: string | null, mode: HostSignInPageMode = "tab", atHost = false) {
     return this.#pages.interrupt(provider).pipe(
       Effect.andThen(
         this.#pages.start(
           provider,
-          (openPage) => this.#dependencies.service.signInProviderAccountOnHost(provider, accountId, openPage),
+          (openPage) => this.#dependencies.service.signInProviderAccountOnHost(provider, accountId, openPage, atHost),
           (exit) => resultOf(provider, exit),
           mode,
         ),
@@ -126,12 +121,10 @@ export class ProviderAccountsHost {
     );
   }
 
-  /** Starts the sign-in with no tab: the page address waits for a client to open it (`provider-account-relay-v1`). */
-  startRelay(provider: AgentProviderId, accountId: string | null) {
-    return this.startSignIn(provider, accountId, "relay");
+  startRelay(provider: AgentProviderId, accountId: string | null, atHost = false) {
+    return this.startSignIn(provider, accountId, "relay", atHost);
   }
 
-  /** The page address of a relayed sign-in, and how it ended. */
   relayStatus(provider: AgentProviderId): { pageUrl: string | null; result: { error: string | null } | null } {
     return { pageUrl: this.#pages.pageUrl(provider), result: this.signInStatus(provider).result };
   }
@@ -140,7 +133,27 @@ export class ProviderAccountsHost {
     return this.#pages.status(provider) ?? { tabId: null, result: { error: endedText(provider) } };
   }
 
-  /** The interrupt ends the sign-in, and a new account that did not sign in goes with it. */
+  connectKey(provider: AgentProviderId, accountId: string | null, key: string) {
+    return this.#dependencies.service.connectProviderAccountKey(provider, accountId, key).pipe(Effect.asVoid);
+  }
+
+  startCodeSignIn(provider: AgentProviderId, accountId: string | null) {
+    return this.#dependencies.service.startProviderAccountCodeLogin(provider, accountId);
+  }
+
+  submitCodeSignIn(provider: AgentProviderId, accountId: string, code: string): void {
+    this.#dependencies.service.submitProviderAccountCodeLogin(provider, accountId, code);
+  }
+
+  codeSignInStatus(provider: AgentProviderId, accountId: string) {
+    const { result } = this.#dependencies.service.providerAccountCodeLoginStatus(provider, accountId);
+    return { result: result && { error: result.error?.slice(0, PROVIDER_ACCOUNTS_MESSAGE_LIMIT) ?? null } };
+  }
+
+  cancelCodeSignIn(provider: AgentProviderId, accountId: string) {
+    return this.#dependencies.service.cancelProviderAccountSignIn(provider, accountId).pipe(Effect.asVoid);
+  }
+
   cancelSignIn(provider: AgentProviderId) {
     return this.#pages.interrupt(provider);
   }
@@ -149,10 +162,6 @@ export class ProviderAccountsHost {
     return this.#dependencies.service.renameProviderAccount(provider, accountId, label).pipe(Effect.asVoid);
   }
 
-  /**
-   * A client without claude-api-key-v1 shows the key account as a signed-out account that it can
-   * remove. Only the key dialog removes it, with the key.
-   */
   remove(provider: AgentProviderId, accountId: string) {
     if (provider === "claude" && accountId === CLAUDE_API_KEY_ACCOUNT_ID)
       return Effect.fail(
@@ -164,10 +173,6 @@ export class ProviderAccountsHost {
     return this.#dependencies.service.removeProviderAccount(provider, accountId).pipe(Effect.asVoid);
   }
 
-  /**
-   * Moves the agent to an account of its provider; null is the provider's own sign-in. Only the
-   * Team API calls this, and its protocol has no `pendingRuntime`, so a change during work is refused.
-   */
   setAgentAccount(agentId: string, accountId: string | null) {
     return this.#dependencies.service
       .updateAgent({ agentId, providerAccountId: accountId }, undefined, false)

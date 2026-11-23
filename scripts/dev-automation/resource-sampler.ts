@@ -1,11 +1,6 @@
-// A time series of what one app instance holds, for `dev:bench`. Each tick
-// reads the `ps` tree under the recorded pid; every few ticks it also reads the
-// JS heap and DOM counters of each page over CDP and the main-process heap over
-// the Node inspector. Those two are slower and wake the process they read, so
-// they run less often than `ps`, which costs the app nothing.
-
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { Logger } from "@openbot/logging";
 import type { Browser, CDPSession, Page } from "playwright-core";
 import { cpuMetrics, type MetricValues, parseFootprint, processMetrics } from "./bench-stats";
@@ -17,16 +12,12 @@ import { describeTarget } from "./page-url";
 const run = promisify(execFile);
 
 export interface ResourceSamplerOptions {
-  // Getters: sampling starts at spawn, to catch the startup peak, before CDP
-  // and the inspector answer.
   browser: () => Browser | null;
   inspector: () => InspectorClient | null;
   rootPid: number;
-  // The app window. Its heap is reported apart from the helper surfaces.
   appPage: () => Page | null;
   logger: Logger;
   intervalMs?: number;
-  // Heap and DOM readings every this many ticks.
   heapEvery?: number;
 }
 
@@ -40,8 +31,6 @@ async function readProcessTree(rootPid: number): Promise<ProcessTableRow[]> {
   return collectDescendants(parseProcessTable(stdout), rootPid);
 }
 
-// macOS only. Elsewhere, or for a process the tool may not read, the pid is
-// missing from the map and only RSS is reported for it.
 async function readFootprints(rows: ProcessTableRow[]): Promise<Map<number, number>> {
   if (process.platform !== "darwin" || rows.length === 0) return new Map();
   try {
@@ -52,10 +41,22 @@ async function readFootprints(rows: ProcessTableRow[]): Promise<Map<number, numb
     );
     return parseFootprint(stdout);
   } catch (error) {
-    // A process that exits between `ps` and `footprint` fails the whole call.
     const stdout = error instanceof Error && "stdout" in error && typeof error.stdout === "string" ? error.stdout : "";
     return parseFootprint(stdout);
   }
+}
+
+const READ_PROCESS_KINDS = "globalThis.__openbotPerfProbes?.processKinds() ?? null";
+const KIND_REFRESH_TICKS = 10;
+
+export async function readAppProcessKinds(inspector: InspectorClient | null): Promise<Map<number, string>> {
+  const kinds = new Map<number, string>();
+  const listed = inspector ? await inspector.evaluate(READ_PROCESS_KINDS).catch(() => null) : null;
+  if (!Array.isArray(listed)) return kinds;
+  for (const entry of listed) {
+    if (isDynamicRecord(entry) && isNumber(entry.pid) && isString(entry.kind)) kinds.set(entry.pid, entry.kind);
+  }
+  return kinds;
 }
 
 function allPages(browser: Browser | null): Page[] {
@@ -68,7 +69,6 @@ async function withSession<T>(page: Page, use: (session: CDPSession) => Promise<
     session = await page.context().newCDPSession(page);
     return await use(session);
   } catch {
-    // A page that closes while we attach is not a failed run.
     return null;
   } finally {
     await session?.detach().catch(() => undefined);
@@ -80,6 +80,8 @@ export class ResourceSampler {
   readonly #samples: ResourceSample[] = [];
   #previousRows: ProcessTableRow[] | null = null;
   #previousAt = 0;
+  #appKinds = new Map<number, string>();
+  #kindsTick = -KIND_REFRESH_TICKS;
   #tick = 0;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #running: Promise<void> | null = null;
@@ -129,11 +131,21 @@ export class ResourceSampler {
     const atMs = Date.now();
     const rows = await readProcessTree(this.#options.rootPid);
     const values: MetricValues = processMetrics(rows, await readFootprints(rows));
-    if (this.#previousRows) Object.assign(values, cpuMetrics(this.#previousRows, rows, atMs - this.#previousAt));
+    await this.#refreshAppKinds(rows);
+    if (this.#previousRows) {
+      Object.assign(values, cpuMetrics(this.#previousRows, rows, atMs - this.#previousAt, this.#appKinds));
+    }
     this.#previousRows = rows;
     this.#previousAt = atMs;
     if (withHeaps) Object.assign(values, await this.readHeaps());
     return { atMs, values };
+  }
+
+  async #refreshAppKinds(rows: ProcessTableRow[]): Promise<void> {
+    const unknownPid = rows.some((row) => row.ppid === this.#options.rootPid && !this.#appKinds.has(row.pid));
+    if (!unknownPid && this.#tick - this.#kindsTick < KIND_REFRESH_TICKS) return;
+    this.#kindsTick = this.#tick;
+    this.#appKinds = await readAppProcessKinds(this.#options.inspector());
   }
 
   start(): void {
@@ -145,7 +157,6 @@ export class ResourceSampler {
       const started = Date.now();
       const sample = await this.#sample(this.#tick % heapEvery === 0);
       this.#tick += 1;
-      // The first reading has no CPU interval. It still carries RSS.
       this.#samples.push(sample);
       if (this.#stopped) return;
       this.#timer = setTimeout(
@@ -165,11 +176,6 @@ export class ResourceSampler {
     return [...this.#samples];
   }
 
-  /**
-   * Collects garbage in main and in each page, waits, and reads everything
-   * once. CPU in this reading covers the wait only, which is the idle cost
-   * after the scenario.
-   */
   async settled(waitMs: number): Promise<MetricValues> {
     const { rootPid } = this.#options;
     await this.#options
@@ -187,9 +193,10 @@ export class ResourceSampler {
     const startedAt = Date.now();
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     const after = await readProcessTree(rootPid);
+    const appKinds = await readAppProcessKinds(this.#options.inspector());
     return {
       ...processMetrics(after, await readFootprints(after)),
-      ...cpuMetrics(before, after, Date.now() - startedAt),
+      ...cpuMetrics(before, after, Date.now() - startedAt, appKinds),
       ...(await this.readHeaps()),
     };
   }

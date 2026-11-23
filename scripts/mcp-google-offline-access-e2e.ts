@@ -1,7 +1,3 @@
-// Drives a Sign in through the MCP probe against Google's Calendar MCP server, with a saved sign-in
-// app, up to the Google authorization page, and checks that the page asks for a refresh token.
-// Needs the network and no Google account: the client ID is a placeholder, so the page is never
-// shown and no grant is made. Writes a JSON report.
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
@@ -48,7 +44,6 @@ async function runCase(name: string, scope: string): Promise<Case> {
       write: (resource, record) => Effect.sync(() => void records.set(resource, record)),
       clear: (resource) => Effect.sync(() => void records.delete(resource)),
     },
-    // The browser never opens: the page is only read, and the sign-in then times out.
     openExternal: async (page) => void opened.push(page),
     redirectUrl: "http://127.0.0.1:28417/mcp-auth",
     signInTimeoutMs: 2_000,

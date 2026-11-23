@@ -1,7 +1,7 @@
 # `src/renderer`
 
-The UI stack sits on prerelease channels your training data does not cover: `solid-js@2.0.0-rc.18`
-with `@solidjs/signals` and `@solidjs/web` at the same RC, `@kobalte/core@2.0.0-alpha.0` (patched
+The UI stack sits on releases your training data does not cover: `solid-js@2.0.0` (stable)
+with `@solidjs/signals` and `@solidjs/web` at the same version, `@kobalte/core@2.0.0-alpha.0` (patched
 here), plus patched `lucide-solid` and `solid-sonner`. Read props in the compute function of a
 `createEffect`, not in its callback. The compiler makes a conditional prop (`a() && b`, `x.y ? a : b`)
 a getter that creates a memo, and a memo created in an effect callback throws
@@ -72,7 +72,7 @@ of the IPC surface and belong beside `mock-openbot.ts` — and the base styleshe
 (`base.css`, `transitions.css`; `action-menu.css` and `sliding-tabs.css` are now in
 `packages/ui/src/styles/`, and `otp-input.css` is in `packages/ui/src/features/account/`) —
 plus `styles/app-shell.css`, which ends in a theme layer that assigns the palette across every domain
-at once and cannot be split until that layer is lifted out; its header says so. Stories stay in
+at once and cannot be split until that layer is lifted out. Stories stay in
 `src/renderer/stories/`, where the test rules relax.
 
 A cluster earns a directory when the feature is the only thing that reads it. That test applies to
@@ -120,7 +120,7 @@ design when the app changes. Delete a concept or prototype story when its decisi
 ## Design system
 
 Use `lucide-solid` icons, and reuse a suitable one before adding an inline SVG or a local icon
-component — document the exception next to any custom icon. The `:root` properties in
+component — give the reason for a custom icon in the PR. The `:root` properties in
 `packages/brand/src/tokens.css` are the palette, shared with the web and mobile apps: use the
 closest semantic `--openbot-*` token, including opacity variants, instead of a colour literal, and
 add a token only for a new semantic role — there, not in a renderer stylesheet. A token whose dark

@@ -5,6 +5,7 @@ import type {
   ServerSummary,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Button, Toaster, toast } from "@openbot/ui";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, onCleanup } from "solid-js";
@@ -22,7 +23,6 @@ import { createMockOpenBot } from "./mock-openbot";
 import { SettingsPageStory } from "./settings-page-story";
 import { previewStorySoundSettings } from "./sound-feedback-fixture";
 
-/** A packaged Windows run, which offers every switch that the defaults hide. */
 const storyGeneralSettings: GeneralSettingsValue = {
   ...DEFAULT_GENERAL_SETTINGS,
   launchAtLogin: true,
@@ -52,7 +52,16 @@ const storyUpdateStatus: UpdateStatus = {
 function storyInitialUpdateStatus(props: {
   scheduledRestart?: UpdateStatus["scheduledRestart"];
   stagedVersion?: string;
+  notInstalled?: boolean;
 }): UpdateStatus {
+  if (props.notInstalled)
+    return {
+      ...storyUpdateStatus,
+      phase: "ready",
+      availableVersion: "0.3.0",
+      progress: 100,
+      message: sourceText("error.update.notInstalled"),
+    };
   if (props.scheduledRestart)
     return {
       ...storyUpdateStatus,
@@ -78,21 +87,15 @@ const storyAgentDock = {
 
 function SettingsModalStory(props: {
   initialOpen: boolean;
-  /** Adds the Hosted servers tab with a stopped server and a server whose plan ended. */
   hostedServers?: boolean;
-  /** How long the hosted server list takes to answer. */
   hostedServersDelayMs?: number;
   initialTab?: SettingsTab;
   openTab?: SettingsTab;
-  /** A restart that a server admin asked for. */
   scheduledRestart?: UpdateStatus["scheduledRestart"];
-  /** A release in its staged rollout that the automatic check did not offer. Check for updates gets it. */
   stagedVersion?: string;
-  /** The downloaded dictation models and the saved voice setting. */
+  notInstalled?: boolean;
   voice?: MockVoiceOptions;
-  /** Whether Codex can open live voice. */
   codexLiveAccess?: CodexLiveAccess;
-  /** Adds the Agent dock tab with the agents of the first server. */
   agentDock?: boolean;
 }) {
   const previousApi = window.openbot;
@@ -102,7 +105,6 @@ function SettingsModalStory(props: {
   onCleanup(() => {
     mock.dispose();
     toast.dismiss();
-    // Storybook can render the story again before it cleans up the first render. That render's API stays.
     if (window.openbot === mock.api) window.openbot = previousApi;
   });
   const hostedServersApi = {
@@ -116,7 +118,6 @@ function SettingsModalStory(props: {
   const [value, setValue] = createSignal({ ...storyGeneralSettings });
   const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(storyInitialUpdateStatus(props));
   const [account, setAccount] = createSignal<CentralAuthUser>({ ...storyAccount });
-  // The notification level and the mute of each server, as the server list of the app keeps them.
   const [servers, setServers] = createSignal<readonly ServerSummary[]>(STORY_SERVERS);
   const updateServer = (serverId: string, change: Partial<ServerSummary>): void => {
     setServers((list) => list.map((server) => (server.id === serverId ? { ...server, ...change } : server)));
@@ -153,7 +154,6 @@ function SettingsModalStory(props: {
 
   async function runUpdateAction(): Promise<void> {
     const checkedAt = new Date().toISOString();
-    // Check for updates gets a release that is in its staged rollout.
     setUpdateStatus(
       props.stagedVersion
         ? { ...storyUpdateStatus, phase: "available", availableVersion: props.stagedVersion, checkedAt }
@@ -161,7 +161,6 @@ function SettingsModalStory(props: {
     );
   }
 
-  /** A phone scans the code and signs in a few seconds after the code shows. */
   let scanTimer: number | undefined;
   onCleanup(() => window.clearTimeout(scanTimer));
   async function createMobileConnect(): Promise<{ qrData: string; expiresAt: number }> {
@@ -251,6 +250,7 @@ function SettingsModalStory(props: {
               onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
               onUpdateAction={runUpdateAction}
               billingApi={billingApi}
+              referralApi={mock.api.referral}
               hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
               onAddHostedServer={props.hostedServers ? fn() : undefined}
               agentDock={props.agentDock ? storyAgentDock : undefined}
@@ -329,6 +329,10 @@ export const Voice: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="voice" />,
 };
 
+export const Keyboard: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="keyboard" />,
+};
+
 export const VoiceWhisperHungarian: Story = {
   render: () => (
     <SettingsModalStory
@@ -342,7 +346,6 @@ export const VoiceWhisperHungarian: Story = {
   ),
 };
 
-/** Cohere Transcribe offers only its own languages, so the saved Hungarian shows as English. */
 export const VoiceCohereLanguages: Story = {
   render: () => (
     <SettingsModalStory
@@ -356,7 +359,6 @@ export const VoiceCohereLanguages: Story = {
   ),
 };
 
-/** Bark is retired, but it stays in the list while it is downloaded and in use. */
 export const VoiceRetiredBarkInUse: Story = {
   render: () => (
     <SettingsModalStory
@@ -370,7 +372,6 @@ export const VoiceRetiredBarkInUse: Story = {
   ),
 };
 
-/** Downloaded models, and the speech model, each with Remove. */
 export const VoiceModelsDownloaded: Story = {
   render: () => (
     <SettingsModalStory
@@ -381,37 +382,34 @@ export const VoiceModelsDownloaded: Story = {
   ),
 };
 
-/** Codex signs in with an API key or not at all: live voice says why it is off, and Connect opens Providers. */
 export const VoiceCodexSignIn: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="voice" codexLiveAccess="signIn" />,
 };
 
-/** The install guide for each phone, the sign-in code and the connected phones. */
 export const MobileConnect: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="mobile-connect" />,
 };
 
-/** The agent dock above the other apps, with the switches for hiding it in the screen edge. */
 export const AgentDock: Story = {
   render: () => <SettingsModalStory initialOpen agentDock initialTab="agent-dock" />,
 };
 
-/** No plan yet. Choose a plan: the mock then shows it as active, as after a Stripe payment. */
 export const Billing: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="billing" />,
 };
 
-/** An account that can create hosted servers. Start, renew and delete change the mock list. */
+export const InviteFriends: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="referral" />,
+};
+
 export const HostedServers: Story = {
   render: () => <SettingsModalStory initialOpen hostedServers initialTab="hosted-servers" />,
 };
 
-/** "Manage servers" with a list that answers after 300 ms: the tab opens at once and shows no spinner. */
 export const HostedServersFastList: Story = {
   render: () => <SettingsModalStory initialOpen hostedServers hostedServersDelayMs={300} openTab="hosted-servers" />,
 };
 
-/** "Manage servers" with a list that answers after 3 s: the spinner fades in after its delay. */
 export const HostedServersSlowList: Story = {
   render: () => <SettingsModalStory initialOpen hostedServers hostedServersDelayMs={3_000} openTab="hosted-servers" />,
 };
@@ -428,6 +426,10 @@ export const ScheduledRemoteUpdate: Story = {
 
 export const StagedRollout: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="updates" stagedVersion="0.3.0" />,
+};
+
+export const UpdateNotInstalled: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="updates" notInstalled />,
 };
 
 export const Interactive: Story = {
