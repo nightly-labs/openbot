@@ -222,6 +222,7 @@ export const messages = {
   "provider.account.numbered": "账号 {number}",
   "provider.account.listLabel": "{name} 的账号",
   "provider.account.usedBy": "被 {agents} 使用",
+  "provider.account.sameEmail": "与 {name} 的邮箱相同",
   "provider.account.failed": "登录失败",
   "provider.account.moreActions": "{name} 的更多操作",
   "provider.account.renameLabel": "{name} 的名称",

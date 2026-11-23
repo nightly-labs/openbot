@@ -234,6 +234,7 @@ export const messages = defineMessages("provider", {
   "provider.account.apiKey": "API key",
   "provider.account.listLabel": "{name} accounts",
   "provider.account.usedBy": "Used by {agents}",
+  "provider.account.sameEmail": "Same email as {name}",
   "provider.account.failed": "Sign-in failed",
   "provider.account.moreActions": "More actions for {name}",
   "provider.account.renameLabel": "Name of {name}",

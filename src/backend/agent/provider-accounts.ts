@@ -808,7 +808,11 @@ export class ProviderAccounts {
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
           const organization = signedIn.organization ?? null;
-          if (afterSignIn && email && this.#loginTaken(provider, account.id, { email, organization })) {
+          if (
+            afterSignIn &&
+            email &&
+            this.#loginTaken(provider, account.id, { email, organization }, yield* this.#ownLogin(provider))
+          ) {
             this.#usage.delete(account.id);
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
@@ -966,10 +970,17 @@ export class ProviderAccounts {
     );
   }
 
-  #loginTaken(provider: AgentProviderId, accountId: string, login: AccountLogin): boolean {
+  #ownLogin(provider: AgentProviderId): Effect.Effect<AccountLogin | null> {
+    const login = this.#host.defaultLogin(provider);
+    const readOwnEmail = homeSupport(provider)?.readOwnEmail;
+    if (login?.email || !readOwnEmail || this.#host.apiKey(provider)) return Effect.succeed(login);
+    return readOwnEmail().pipe(Effect.map((email) => (email ? { email, organization: null } : login)));
+  }
+
+  #loginTaken(provider: AgentProviderId, accountId: string, login: AccountLogin, own: AccountLogin | null): boolean {
     const same = (other: AccountLogin | null | undefined) =>
       other?.email?.toLowerCase() === login.email?.toLowerCase() && other?.organization === login.organization;
-    if (same(this.#host.defaultLogin(provider))) return true;
+    if (same(own)) return true;
     return this.#store.list(provider).some((other) => other.id !== accountId && same(this.#states.get(other.id)));
   }
 

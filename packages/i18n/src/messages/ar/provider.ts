@@ -257,6 +257,7 @@ export const messages = {
   "provider.account.apiKey": "مفتاح API",
   "provider.account.listLabel": "حسابات {name}",
   "provider.account.usedBy": "يستخدمه {agents}",
+  "provider.account.sameEmail": "نفس البريد الإلكتروني مثل {name}",
   "provider.account.failed": "فشل تسجيل الدخول",
   "provider.account.moreActions": "إجراءات إضافية لـ {name}",
   "provider.account.renameLabel": "اسم {name}",

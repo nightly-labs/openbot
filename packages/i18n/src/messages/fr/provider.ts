@@ -232,6 +232,7 @@ export const messages = {
   "provider.account.apiKey": "Clé API",
   "provider.account.listLabel": "Comptes {name}",
   "provider.account.usedBy": "Utilisé par {agents}",
+  "provider.account.sameEmail": "Même e-mail que {name}",
   "provider.account.failed": "Échec de la connexion",
   "provider.account.moreActions": "Autres actions pour {name}",
   "provider.account.renameLabel": "Nom de {name}",
