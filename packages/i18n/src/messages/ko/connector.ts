@@ -309,7 +309,7 @@ export const messages = {
   "connector.whatsapp.linkNumber": "번호 연결",
   "connector.whatsapp.ownNumberNote": "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요.",
   "connector.whatsapp.dedicatedNote":
-    "허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp이 연결된 기기에서 이 컴퓨터를 삭제했어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "connector.whatsapp.helpError":
@@ -415,7 +415,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "선택 사항이에요. 비워 두면 목록에 전화번호가 표시돼요.",
   "connector.whatsapp.add": "추가",
   "connector.whatsapp.groupTitle": "그룹 추가",
-  "connector.whatsapp.groupDescription": "이 그룹의 사람들은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "connector.whatsapp.groupDescription":
+    "이 그룹의 사람들은 이 번호를 멘션하거나 이 번호의 메시지에 답장하면 내 에이전트에게 작업을 맡길 수 있어요.",
   "connector.whatsapp.groupSearch": "그룹 검색",
   "connector.whatsapp.groupsLoading": "그룹을 읽는 중이에요…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot이 그룹을 읽지 못했어요",
@@ -566,9 +567,9 @@ export const messages = {
   "connector.protonPass.expiredTitle": "Proton Pass 키가 만료되었습니다",
   "connector.protonPass.expiredDescription": "다시 로그인할 때까지 에이전트가 공유 로그인 정보로 로그인할 수 없습니다.",
   "connector.protonPass.reconnect": "다시 연결",
-  "connector.protonPass.planTitle": "Proton Pass에는 유료 요금제가 필요합니다",
+  "connector.protonPass.planTitle": "Proton Pass에는 Pass Plus가 포함된 요금제가 필요합니다",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI는 유료 Proton 요금제에서만 작동합니다. 요금제를 변경한 다음 다시 연결하세요.",
+    "Proton Pass CLI에는 Pass Plus가 포함된 Proton 요금제가 필요합니다. Mail Plus 같은 다른 유료 요금제에는 포함되지 않습니다. 요금제를 변경한 다음 다시 연결하세요.",
   "connector.protonPass.vaultTitle": "공유 보관함",
   "connector.protonPass.vaultDescription":
     "에이전트는 이 보관함의 로그인 정보로 로그인할 수 있습니다. 공유할 로그인 정보를 여기로 옮기세요.",

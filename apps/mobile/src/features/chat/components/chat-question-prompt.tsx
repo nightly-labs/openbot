@@ -7,6 +7,8 @@ import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import X from "lucide-react-native/icons/x";
 import { View } from "react-native";
+import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
+import { ChatLocationRequest } from "@/features/chat/components/chat-location-request";
 import {
   answeredSelect,
   ChatChoicePrompt,
@@ -19,6 +21,7 @@ import {
 } from "@/features/chat/components/chat-ui-block-cards";
 import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { isLocationRequest } from "@/features/chat/model/location-request";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
@@ -42,6 +45,7 @@ export function ChatQuestionPrompt({
   onActivate?: () => void;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const canEditPreview = useMobileWorkspaceSelector((workspace) => workspace.canEditUiBlockPreview(serverId));
   const vaultRequest = vaultRequestOf(uiBlock);
@@ -57,11 +61,22 @@ export function ChatQuestionPrompt({
         onActivate={onActivate}
       />
     );
+  if (uiBlock && isLocationRequest(uiBlock))
+    return (
+      <ChatLocationRequest
+        serverId={serverId}
+        prompt={prompt}
+        uiBlock={uiBlock}
+        controller={controller}
+        canSend={canSend}
+        onActivate={onActivate}
+      />
+    );
   const confirm = confirmBlockOf(prompt, uiBlock);
   const choice = choiceBlockOf(prompt, uiBlock);
   if (!prompt.resolution && !controller && onActivate) {
     return (
-      <View className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
+      <View className={`max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
         {confirm ? (
           <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
         ) : (
@@ -77,10 +92,7 @@ export function ChatQuestionPrompt({
     prompt.resolution ?? controller?.resolution ?? (controller ? null : { status: "expired" as const });
   if (resolution) {
     return (
-      <View
-        className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
-      >
+      <View className={`max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
         <View className="flex-row items-center gap-2">
           {resolution.status === "answered" ? <Check color={String(muted)} size={18} /> : null}
           <Typography type="body-sm" className="text-text-secondary">
@@ -97,7 +109,6 @@ export function ChatQuestionPrompt({
                 : t("mobile.chat.question.formExpired")}
           </Typography>
         </View>
-        {/* A closed form keeps what it asked, as on desktop, so the person can still read the draft. */}
         {confirm ? (
           <ConfirmBody spec={confirm} closed selectValue={answeredSelect(prompt, resolution, t)} />
         ) : (
@@ -106,7 +117,6 @@ export function ChatQuestionPrompt({
               <QuestionText question={item.question} variant="secondary" />
               {resolution.status === "answered" ? (
                 <Typography>
-                  {/* The options of a choice with more than one answer come as lines; show them as a list. */}
                   {item.id === UI_CHOICE_QUESTION_ID
                     ? promptAnswerLabel(item, resolution, t).split("\n").filter(Boolean).join(", ")
                     : promptAnswerLabel(item, resolution, t)}
@@ -133,59 +143,15 @@ export function ChatQuestionPrompt({
       />
     );
   if (choice) return <ChatChoicePrompt spec={choice} controller={controller} canSend={canSend} />;
-  const { question, index, disabled, setIndex, answer, submit, replyInChat, setReplyInChat } = controller;
+  const { question, index, disabled, setIndex, answer, submit, replyInChat, setReplyInChat, picked, togglePick } =
+    controller;
 
   const described = question.options?.filter((option) => option.description) ?? [];
 
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
-      <View
-        className="max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
-      >
-        <View className="flex-row items-center gap-2">
-          <View className="min-w-0 flex-1">
-            <QuestionText question={question.question} variant="title" />
-          </View>
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            accessibilityLabel={t("mobile.chat.question.cancelForm")}
-            isDisabled={disabled}
-            onPress={() => void submit({})}
-          >
-            <X color={String(muted)} size={18} />
-          </Button>
-        </View>
-        {prompt.questions.length > 1 ? (
-          <View className="flex-row items-center justify-between">
-            <Typography type="body-xs" className="flex-1 text-text-secondary">
-              {t("mobile.chat.question.position", { current: index + 1, total: prompt.questions.length })}
-            </Typography>
-            <Button
-              variant="ghost"
-              size="sm"
-              isIconOnly
-              accessibilityLabel={t("mobile.chat.question.previous")}
-              isDisabled={disabled || index === 0}
-              onPress={() => setIndex(index - 1)}
-            >
-              <ChevronLeft color={String(muted)} size={18} style={MIRROR_IN_RTL} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              isIconOnly
-              accessibilityLabel={t("mobile.chat.question.next")}
-              isDisabled={disabled || index === prompt.questions.length - 1}
-              onPress={() => setIndex(index + 1)}
-            >
-              <ChevronRight color={String(muted)} size={18} style={MIRROR_IN_RTL} />
-            </Button>
-          </View>
-        ) : null}
-        {/* A pill holds only its label, so the bubble keeps what each option means. */}
+      <View className={`max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
+        <QuestionText question={question.question} variant="title" />
         {described.length ? (
           <View className="gap-2 pt-1">
             {described.map((option) => (
@@ -201,36 +167,80 @@ export function ChatQuestionPrompt({
           </View>
         ) : null}
         {question.isSecret ? (
-          // The private answer is typed in the masked field that takes the composer's place.
           <Typography type="body-xs" className="text-text-secondary">
             {t("mobile.chat.question.secretBelow")}
           </Typography>
         ) : null}
+        <View className="flex-row items-center gap-1 pt-1">
+          {prompt.questions.length > 1 ? (
+            <Typography type="body-xs" className="min-w-0 shrink text-text-secondary">
+              {t("mobile.chat.question.position", { current: index + 1, total: prompt.questions.length })}
+            </Typography>
+          ) : null}
+          <View className="ms-auto flex-row items-center">
+            {prompt.questions.length > 1 ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  accessibilityLabel={t("mobile.chat.question.previous")}
+                  isDisabled={disabled || index === 0}
+                  onPress={() => setIndex(index - 1)}
+                >
+                  <ChevronLeft color={String(muted)} size={18} style={MIRROR_IN_RTL} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  accessibilityLabel={t("mobile.chat.question.next")}
+                  isDisabled={disabled || index === prompt.questions.length - 1}
+                  onPress={() => setIndex(index + 1)}
+                >
+                  <ChevronRight color={String(muted)} size={18} style={MIRROR_IN_RTL} />
+                </Button>
+              </>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              accessibilityLabel={t("mobile.chat.question.cancelForm")}
+              isDisabled={disabled}
+              onPress={() => void submit({})}
+            >
+              <X color={String(muted)} size={18} />
+            </Button>
+          </View>
+        </View>
       </View>
 
-      {/* Answer pills under the bubble, as the quick replies of the chat design. */}
       <View className="flex-row flex-wrap gap-2">
-        {question.options?.map((option) => (
-          <Button
-            key={option.label}
-            size="sm"
-            variant="tertiary"
-            // An agent can write a long label: the pill grows to more lines, not past the screen.
-            className="h-auto min-h-10 max-w-full rounded-full py-2"
-            isDisabled={disabled}
-            accessibilityLabel={option.label}
-            accessibilityHint={option.description}
-            onPress={() => {
-              void haptics.selection();
-              answer([option.label]);
-            }}
-          >
-            <Button.Label className="shrink text-center font-sans font-semibold">{option.label}</Button.Label>
-          </Button>
-        ))}
+        {question.options?.map((option) => {
+          const checked = picked.includes(option.label);
+          return (
+            <Button
+              key={option.label}
+              size="sm"
+              variant={checked ? "primary" : "tertiary"}
+              className="h-auto min-h-10 max-w-full rounded-full py-2"
+              isDisabled={disabled}
+              accessibilityRole={question.multiSelect ? "checkbox" : "button"}
+              accessibilityLabel={option.label}
+              accessibilityHint={option.description}
+              accessibilityState={question.multiSelect ? { checked, disabled } : { disabled }}
+              onPress={() => {
+                if (question.multiSelect) return togglePick(option.label);
+                void haptics.selection();
+                answer([option.label]);
+              }}
+            >
+              <Button.Label className="shrink text-center font-sans font-semibold">{option.label}</Button.Label>
+            </Button>
+          );
+        })}
         {question.isSecret ? null : (
-          // The composer answers only after this choice, so a message typed meanwhile still goes
-          // to the chat, which matters in a channel where others talk too.
           <Button
             size="sm"
             variant={replyInChat ? "primary" : "tertiary"}
@@ -256,6 +266,20 @@ export function ChatQuestionPrompt({
         >
           <Button.Label className="font-sans font-semibold">{t("mobile.chat.question.skip")}</Button.Label>
         </Button>
+        {question.multiSelect ? (
+          <Button
+            size="sm"
+            variant="primary"
+            className="rounded-full"
+            isDisabled={disabled || picked.length === 0}
+            onPress={() => {
+              void haptics.selection();
+              answer(picked);
+            }}
+          >
+            <Button.Label className="font-sans font-semibold">{t("common.done")}</Button.Label>
+          </Button>
+        ) : null}
       </View>
       {replyInChat ? (
         <Typography type="body-xs" className="text-text-secondary">

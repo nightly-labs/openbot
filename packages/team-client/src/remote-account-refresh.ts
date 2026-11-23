@@ -4,7 +4,6 @@ import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "./remote-directory";
 
 const ACCOUNT_RETRY_INTERVAL_MS = 60_000;
 
-/** One endpoint per account: absolute freshness, shared requests, and no background polling. */
 export function createRemoteAccountRefresh<E>(load: () => Effect.Effect<void, E>, now = Date.now) {
   let active = false;
   let disposed = false;
@@ -33,7 +32,6 @@ export function createRemoteAccountRefresh<E>(load: () => Effect.Effect<void, E>
     const operation = Deferred.makeUnsafe<void, E>();
     pending = operation;
     return yield* Effect.gen(function* () {
-      // Foreground work can be cancelled by immediate background entry.
       yield* Effect.callback<void>((resume) => {
         queueMicrotask(() => resume(Effect.void));
       });

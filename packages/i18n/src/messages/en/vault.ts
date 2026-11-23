@@ -1,6 +1,5 @@
 import { defineMessages } from "../../message";
 
-/** The Vault section of the server settings: logins, cards and contact info that agents fill into pages, and API keys. */
 export const messages = defineMessages("vault", {
   "vault.items.title": "Saved items",
   "vault.items.description":
@@ -88,6 +87,7 @@ export const messages = defineMessages("vault", {
   "vault.placeholder.variableName": "OPENAI_API_KEY",
   "vault.placeholder.expiry": "MM/YY",
   "vault.placeholder.saved": "Saved. Type to replace it.",
+  "vault.expiryInvalid": "Enter the month and year as MM/YY.",
   "vault.billingNone": "None",
   "vault.chooseCountry": "Choose a country",
   "vault.showPassword": "Show password",
@@ -124,16 +124,13 @@ export const messages = defineMessages("vault", {
   "vault.reset": "Reset Vault",
   "vault.resetTitle": "Reset the Vault?",
   "vault.resetDescription": "OpenBot deletes the Vault file and all items in it. You cannot undo this.",
-  // Chat card: an agent asks the user to add a Vault item. The agent never sees its secrets.
   "vault.request.private": "Goes to your Vault. {agent} never sees it.",
   "vault.request.privateUnnamed": "Goes to your Vault. The agent never sees it.",
   "vault.request.addLogin": "Add login",
   "vault.request.addCard": "Add card",
   "vault.request.addContact": "Add address",
-  "vault.request.addApiKey": "Add API key",
   "vault.request.apiKeyPrivate": "Goes to your Vault, not into the chat.",
   "vault.request.saved": "Saved to Vault",
-  // Two-step (TOTP) code of a login: the live code, and the setup of its key in the login dialog.
   "vault.twoStep.title": "Two-step code",
   "vault.twoStep.on": "On",
   "vault.twoStep.off": "Off. Agents ask you for the code.",

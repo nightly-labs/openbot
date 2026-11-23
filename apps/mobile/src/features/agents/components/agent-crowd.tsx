@@ -14,7 +14,6 @@ import Animated, { cubicBezier } from "react-native-reanimated";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { useMotionPreference } from "@/shared/lib/motion";
 
-// CSS animations take `cubicBezier`.
 const EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
 const EASE_IN_OUT = cubicBezier(0.77, 0, 0.175, 1);
 const ENTER_MS = 300;
@@ -23,31 +22,21 @@ const POP_IN = {
   from: { opacity: 0, transform: [{ translateY: 10 }, { scale: 0.9 }] },
   to: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
 };
-// Reduce Motion keeps the fade and drops the movement.
 const FADE_IN = { from: { opacity: 0 }, to: { opacity: 1 } };
-// The float is small, so the group rests instead of bobbing.
 const FLOAT = { from: { transform: [{ translateY: 0 }] }, to: { transform: [{ translateY: -3 }] } };
 
-/** How a group moves: fully, with fades only (Reduce Motion), or not at all. */
 export type CrowdMotion = "full" | "fade" | "none";
 
-/** A placeholder character in a scene. It is not an agent and opens nothing. */
 interface SceneBot {
   seed: string;
   hue: AvatarHue;
   mood: AvatarMood;
   size: number;
-  /** The center of the character, as a share of the scene. */
   x: `${number}%`;
   y: `${number}%`;
   floatMs: number;
 }
 
-// One group stands in the welcome of the first run and on the home of a server with no agents, so
-// the welcome can hand its characters to the home. The biggest one stands in the middle and the
-// others close round it at different sizes, as in a group photo. The positions are shares of the
-// group's area, so the group keeps its shape on any phone. Placeholder characters only: no mood is
-// busy, because a working face would claim that something runs.
 const CROWD: readonly SceneBot[] = [
   { seed: "onboarding:hello:main", hue: 245, mood: "responded", size: 124, x: "50%", y: "54%", floatMs: 3200 },
   { seed: "onboarding:hello:left", hue: 30, mood: "idle", size: 78, x: "21%", y: "62%", floatMs: 2800 },
@@ -61,7 +50,6 @@ const CROWD: readonly SceneBot[] = [
   { seed: "onboarding:hello:bottom-right", hue: 100, mood: "responded", size: 46, x: "67%", y: "89%", floatMs: 3500 },
 ];
 
-// The kinds of work agents do float between them as small badges.
 const BADGES: readonly { id: string; icon: LucideIcon; x: `${number}%`; y: `${number}%`; floatMs: number }[] = [
   { id: "code", icon: Code, x: "12%", y: "13%", floatMs: 3000 },
   { id: "write", icon: PenLine, x: "88%", y: "11%", floatMs: 3400 },
@@ -70,27 +58,16 @@ const BADGES: readonly { id: string; icon: LucideIcon; x: `${number}%`; y: `${nu
 ];
 const BADGE_SIZE = 40;
 const BADGE_FLOAT = { from: { transform: [{ translateY: 0 }] }, to: { transform: [{ translateY: -3 }] } };
-// The badges arrive after the characters.
 const BADGE_DELAY_MS = 420;
 
-/**
- * Both screens lay out the group alike, so it stands in the same places on both: from this far
- * under the top inset, which leaves the home's header row and its blur clear, the group takes
- * `CROWD_SHARE` of the height above the main action and the text `TEXT_SHARE` under it.
- */
 export const CROWD_TOP = 52;
 export const CROWD_SHARE = 3;
 export const TEXT_SHARE = 2;
 
-/** The share of the group area, from "17%" to 0.17. */
 function share(value: `${number}%`): number {
   return Number.parseFloat(value) / 100;
 }
 
-/**
- * A placeholder character that pops in at its point, then floats while `floats`. Only index 0
- * animates its face.
- */
 function FloatingBot({
   bot,
   index,
@@ -104,7 +81,6 @@ function FloatingBot({
   reducedMotion: boolean;
   floats: boolean;
   focused: boolean;
-  /** It is there at once: the same character stood in its place on the screen before. */
   instant?: boolean;
 }) {
   const enterDelay = index * ENTER_STAGGER_MS;
@@ -114,7 +90,6 @@ function FloatingBot({
         position: "absolute",
         left: bot.x,
         top: bot.y,
-        // The margins center the character on its point. They are static; motion uses transforms.
         marginLeft: -bot.size / 2,
         marginTop: -bot.size / 2,
         ...(instant
@@ -138,14 +113,11 @@ function FloatingBot({
                 animationDirection: "alternate",
                 animationIterationCount: "infinite",
                 animationTimingFunction: EASE_IN_OUT,
-                // The avatar clocks stop when the screen loses focus; the float stops with them.
                 animationPlayState: focused ? "running" : "paused",
               }
             : undefined
         }
       >
-        {/* Only the main character runs a face animation. Each SVG frame redraws a mask and a
-            filter, so the others hold their face and move with the float transform alone. */}
         <BloubAvatarPreview seed={bot.seed} hue={bot.hue} mood={bot.mood} size={bot.size} animateIdle={index === 0} />
       </Animated.View>
     </Animated.View>
@@ -169,7 +141,6 @@ function Badge({
 }) {
   const muted = String(useThemeColor("muted"));
   const Icon = badge.icon;
-  // The whole badge pops in and floats; the icon stays in its centre.
   return (
     <Animated.View
       className="absolute"
@@ -211,10 +182,6 @@ function Badge({
   );
 }
 
-/**
- * A layer that holds one member of the group. When the group leaves, it flies off the screen away
- * from the middle of the group, tilts and fades. Reduce Motion keeps the fade only.
- */
 function Departure({
   x,
   y,
@@ -258,11 +225,6 @@ function Departure({
   );
 }
 
-/**
- * The group of placeholder characters and work badges. It fills its parent. `leaving` flies it off
- * the screen. `instant` shows it at once, with no entrance: the same group stood in the same places
- * on the screen before, which fades off it.
- */
 export function AgentCrowd({
   motion,
   leaving = false,
@@ -273,7 +235,6 @@ export function AgentCrowd({
   instant?: boolean;
 }) {
   const focused = useIsFocused();
-  // The float is idle motion, as the faces are: the Settings switch for faces stops it too.
   const faces = useMotionPreference("agentFaces");
   const floats = motion === "full" && faces;
   const [area, setArea] = useState({ width: 0, height: 0 });

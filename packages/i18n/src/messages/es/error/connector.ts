@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub no reconoce el Client ID de esta GitHub App.",
   "error.connector.githubUnexpected": "GitHub envió una respuesta inesperada: {detail}",
   "error.connector.githubUnreachable": "OpenBot no puede acceder a GitHub: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot no puede acceder a GitHub. Comprueba la conexión a internet y la configuración DNS del ordenador o servidor donde se ejecuta OpenBot y vuelve a intentarlo.",
   "error.connector.githubExpired": "La conexión con GitHub caducó. Conecta GitHub de nuevo.",
   "error.connector.githubFileUnreadable": "El archivo de conexión de GitHub no se puede leer.",
   "error.connector.githubFileTooLarge": "El archivo de conexión de GitHub es demasiado grande.",
@@ -31,6 +33,8 @@ export const messages = {
     "1Password recibió demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo.",
   "error.connector.onePasswordNoVault":
     "La cuenta de servicio no puede leer ninguna bóveda. Dale acceso a una bóveda e inténtalo de nuevo.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot no puede leer tus inicios de sesión de 1Password. Desconecta 1Password y vuelve a conectarlo.",
   "error.connector.onePasswordFileUnreadable": "El archivo de conexión de 1Password no se puede leer.",
   "error.connector.onePasswordFileTooLarge": "El archivo de conexión de 1Password es demasiado grande.",
   "error.connector.bitwardenFailed":
@@ -43,6 +47,10 @@ export const messages = {
     "Introduce una dirección de servidor HTTPS, el client_id y el client_secret de la clave de API y la contraseña maestra.",
   "error.connector.bitwardenHostFailed":
     "No se pudo abrir Bitwarden en este servidor. Comprueba la dirección del servidor, la clave de API y la contraseña maestra, y asegúrate de que una carpeta se llama Shared with OpenBot. Después, conecta de nuevo.",
+  "error.connector.bitwardenHostSignInFailed":
+    "No se pudo iniciar sesión en Bitwarden en este servidor. Comprueba la dirección del servidor y la clave de API, y conecta de nuevo.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "No se pudo desbloquear Bitwarden en este servidor. Comprueba la contraseña maestra y conecta de nuevo.",
   "error.connector.bitwardenCliInstallFailed":
     "No se pudo instalar la CLI de Bitwarden en este servidor. Comprueba su conexión de red y conecta de nuevo.",
   "error.connector.bitwardenFileUnreadable": "El archivo de conexión de Bitwarden no se puede leer.",
@@ -54,6 +62,8 @@ export const messages = {
     "No se pudo instalar la CLI de Proton Pass. Comprueba la conexión de red y vuelve a conectar.",
   "error.connector.protonPassPlan":
     "Tu plan de Proton no permite la CLI de Proton Pass. Cambia el plan y vuelve a conectar.",
+  "error.connector.protonPassPlanMissing":
+    "Tu plan de Proton no incluye la CLI de Proton Pass. Necesita un plan de Proton que incluya Pass Plus. Cambia el plan y vuelve a conectar.",
   "error.connector.protonPassExpired": "El acceso a Proton Pass ha terminado. Vuelve a conectar.",
   "error.connector.protonPassKeyInvalid": "Introduce una clave de acceso de Proton Pass que empiece por pst_.",
   "error.connector.protonPassExtraPassword": "La contraseña adicional no es correcta. Introdúcela de nuevo.",

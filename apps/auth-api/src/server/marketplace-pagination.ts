@@ -4,13 +4,10 @@ import { decodeBase64Url, encodeBase64Url } from "./crypto";
 const MARKETPLACE_DEFAULT_PAGE_SIZE = 24;
 const MARKETPLACE_MAX_PAGE_SIZE = 50;
 const MARKETPLACE_MAX_QUERY_LENGTH = 100;
-// A name cursor holds a skill name of up to 80 characters, which can need more than 512 characters.
 const MAX_CURSOR_LENGTH = 1024;
 const MAX_CURSOR_NAME_LENGTH = 80;
 
-/** The orders that skills and agents share. `updated` is the default one: featured first. */
 export type MarketplaceSort = "updated" | "installs";
-/** All orders that a cursor can name. `recent` and `name` are skill orders only. */
 export type MarketplaceCursorSort = MarketplaceSort | "recent" | "name";
 
 export interface MarketplaceCursor {
@@ -61,7 +58,6 @@ export function normalizeMarketplaceQuery(value: string | undefined): string | u
   return query || undefined;
 }
 
-/** The public name of a creator. A creator with no display name stays anonymous: the email is private. */
 export function marketplaceCreatorName(name: string | null | undefined): string {
   return name?.trim() || "OpenBot user";
 }
@@ -70,14 +66,6 @@ export function marketplaceLikePattern(value: string): string {
   return `%${value.toLowerCase().replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
 }
 
-/**
- * The cursor of each catalog order holds the keys of that order. Its `s` names the order, so the cursor
- * of one order is not accepted for another.
- * - `updated`: featured first, then the latest update. Keys: featured, `updated_at`, id.
- * - `installs`: the most installs first. Keys: installs, `updated_at`, id.
- * - `recent`: the latest update only (skill `sort=updated`). Keys: `updated_at`, id.
- * - `name`: the name A to Z (skill `sort=name`). Keys: the name, id.
- */
 export function encodeMarketplaceCursor(sort: MarketplaceSort, cursor: MarketplaceCursor): string;
 export function encodeMarketplaceCursor(sort: "recent", cursor: MarketplaceRecentCursor): string;
 export function encodeMarketplaceCursor(sort: "name", cursor: MarketplaceNameCursor): string;
@@ -106,7 +94,6 @@ export function decodeMarketplaceCursor(
 ): MarketplaceCursor | MarketplaceRecentCursor | MarketplaceNameCursor | { legacyUpdatedAt: number } | null {
   if (!value) return null;
   if (value.length > MAX_CURSOR_LENGTH) throw invalidCursor();
-  // A v0 cursor came only from the default order, before cursors held their order.
   if (/^\d+$/u.test(value) && sort === "updated") {
     const legacyUpdatedAt = Number(value);
     if (Number.isSafeInteger(legacyUpdatedAt)) return { legacyUpdatedAt };

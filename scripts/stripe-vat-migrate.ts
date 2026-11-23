@@ -4,23 +4,6 @@ import { z } from "zod";
 import { billingDetailsOf, type VatTreatment, vatTreatment } from "../apps/auth-api/src/server/billing-tax";
 import { STRIPE_API_VERSION, type StripeCustomerTax, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
 
-/**
- * One-off move of the open subscriptions from Stripe Tax to the Tax Rate of Polish VAT. Each subscription
- * with `automatic_tax` gets the VAT that a new Checkout page of its customer gets (`billing-tax.ts`):
- * the Tax Rate for `standard`, no rate for `reverse` and `none`. The customer's tax exemption follows, so
- * that the invoice of a reverse charge says so. The next invoice uses the new VAT; no invoice is made now.
- * The subscription also gets its VAT treatment in its metadata, so that a later change of the billing details
- * changes its rate as it does for a Checkout subscription.
- *
- *   STRIPE_SECRET_KEY=sk_test_... bun scripts/stripe-vat-migrate.ts [--apply] [--live]
- *
- * Without `--apply` it changes nothing and prints the plan. Without `--live` it refuses a live key. Run
- * `bun run api:stripe:bootstrap` first: it makes the Tax Rate. A subscription whose customer has no
- * country, or has an EU VAT ID of another country than Poland that no check confirmed, keeps Stripe Tax,
- * and the script names it for a manual check. Run it again at any time: a
- * subscription without `automatic_tax` is not changed.
- */
-
 const logger = createOpenBotLogger("stripe-vat-migrate");
 const OPEN_STATUSES = new Set(["active", "trialing", "past_due", "unpaid", "incomplete", "paused"]);
 
@@ -79,7 +62,6 @@ async function stripe<T>(
   });
   const value = await response.json().catch(() => null);
   if (!response.ok) {
-    // Stripe's message names the request parameter at fault. It holds no key.
     const error = z.object({ error: z.object({ message: z.string().optional() }) }).safeParse(value);
     throw new Error(
       `Stripe ${method} ${path.split("?")[0]} failed with ${response.status}: ${error.data?.error.message ?? "no message"}`,
@@ -104,7 +86,6 @@ interface Plan {
   customerId: string;
   country: string | null;
   treatment: VatTreatment | null;
-  /** Why a subscription with no treatment needs a manual check. */
   reason: string;
 }
 
@@ -138,8 +119,6 @@ async function main(args: readonly string[]): Promise<void> {
       }
       const details = billingDetailsOf(tax);
       const treatment = details.country ? vatTreatment(details.country, details.vatId !== null) : null;
-      // Stripe Tax gave reverse charge for an EU VAT ID that Stripe could not verify. Such a company
-      // keeps Stripe Tax until a person checks the ID, so that its next invoice does not add 23%.
       const unverifiedVatId =
         treatment === "standard" &&
         details.country !== VAT_SELLER_COUNTRY &&

@@ -1,7 +1,6 @@
 import type { MarketplaceAgentSummary } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-// The site's stylesheet, loaded only when a site story opens. See `ArticleMedia.stories.tsx`.
 import "../../styles.css";
 import "./MarketplaceShareCardPrototype.css";
 import { MessagesFrame, ShareCard, SlackFrame, XFrame } from "./MarketplaceShareCardPrototype";
@@ -16,7 +15,6 @@ function agent(id: string): MarketplaceAgentSummary {
 const VERIFIED = agent("00000000-0000-4000-8000-000000000001");
 const PUBLIC = agent("00000000-0000-4000-8000-000000000002");
 
-/** The card at full width for a verified and a public agent, then the verified one in each app. */
 function SharePreviews(): JSX.Element {
   return (
     <main class="marketplace-share-page">
@@ -52,5 +50,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The chosen card: the site's dark canvas, the avatar on the left, the name beside it. */
 export const Dark: Story = {};

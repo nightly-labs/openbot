@@ -229,6 +229,13 @@ export const messages = {
     "Le secret actuel cesse de fonctionner. L’hôte rejette les requêtes qui l’utilisent.",
   "mobile.agent.webhook.rotateConfirm": "Régénérer",
   "mobile.agent.webhook.rotateFailed": "Impossible de régénérer le secret. Réessayez.",
+  "mobile.agent.webhook.giveToAgent": "Donner le secret de signature à {name}",
+  "mobile.agent.webhook.giveTitle": "Donner un nouveau secret de signature à {name} ?",
+  "mobile.agent.webhook.giveBody":
+    "Le secret actuel cesse de fonctionner. {name} enregistre le nouveau secret comme clé API et peut l’ajouter chez l’expéditeur.",
+  "mobile.agent.webhook.giveConfirm": "Donner",
+  "mobile.agent.webhook.giveFailed": "Impossible de donner le secret de signature à l’agent. Réessayez.",
+  "mobile.agent.webhook.given": "{name} a le nouveau secret de signature.",
   "mobile.agent.webhook.activity": "Activité",
   "mobile.agent.webhook.activityFailed": "Impossible de charger l’activité. Réessayez.",
   "mobile.agent.webhook.activity.ignored": "Ignoré",
@@ -325,6 +332,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Aucun modèle disponible pour ce fournisseur.",
   "mobile.agent.runtime.searchModels": "Rechercher des modèles",
   "mobile.agent.runtime.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Aucun modèle ne correspond à votre recherche. Vos réglages de confidentialité, de fournisseurs et de garde-fous sur openrouter.ai peuvent masquer des modèles de cette liste.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Ce fournisseur ne fonctionne pas avec « Espace de travail uniquement » sous Windows et Linux. Pour l’utiliser, modifiez d’abord les « Autorisations ».",
   "mobile.agent.runtime.usageLimit": "Limite d’utilisation atteinte",
@@ -403,10 +412,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gérer les profils",
   "mobile.agent.browserProfile.footer":
     "Chaque profil garde ses propres connexions et cookies. Un changement ferme les onglets ouverts de l’agent.",
+  "mobile.agent.browserProfile.movedNote":
+    "Les connexions aux sites restent dans l’ancien profil. L’agent doit se reconnecter à ces sites.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot n’a pas pu modifier le profil de navigateur de l’agent.",
   "mobile.agent.planCard.label": "Montrer le plan avant les longues tâches",
   "mobile.agent.planCard.footer":
     "Avant une longue tâche, l’agent montre son plan. Il commence après 10 s ou quand vous appuyez sur Démarrer.",
+  "mobile.agent.builtinMemory.label": "Mémoire OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "L’agent enregistre et lit ses propres souvenirs. Désactivez-la pour utiliser seulement une app de mémoire, comme Mem0. Les souvenirs enregistrés restent.",
   "mobile.agent.workspace.title": "Dossier de l’espace de travail",
   "mobile.agent.workspace.footer": "Le dossier de cet agent sur l’ordinateur hôte.",
   "mobile.agent.advanced.behavior": "Comportement",
@@ -423,10 +437,11 @@ export const messages = {
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour un agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "mobile.agent.newChat.title": "Nouvelle discussion",
   "mobile.agent.newChat.starting": "Démarrage de la nouvelle discussion…",
-  "mobile.agent.newChat.footer": "L’agent oublie cette discussion. Sa configuration reste.",
+  "mobile.agent.newChat.footer":
+    "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Sa configuration reste.",
   "mobile.agent.newChat.confirmTitle": "Commencer une nouvelle discussion avec {name} ?",
   "mobile.agent.newChat.confirmBody":
-    "L’agent oublie cette discussion. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
+    "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
   "mobile.agent.newChat.confirm": "Nouvelle discussion",
   "mobile.agent.newChat.failed": "Impossible de commencer une nouvelle discussion",
   "mobile.agent.newChat.failedBody": "L’hôte n’a pas pu commencer une nouvelle discussion.",
@@ -491,6 +506,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Cet hôte ne peut pas publier d’agents depuis un appareil distant.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Jetons hors lectures du cache",
   "mobile.agent.usage.estimatedCost": "Coût estimé",
+  "mobile.agent.usage.noCostEstimate": "Aucune estimation de coût",
   "mobile.agent.usage.daily": "Utilisation quotidienne",
   "mobile.agent.usage.tokens": "Jetons",
   "mobile.agent.usage.cost": "Coût",
@@ -618,7 +634,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Aucune discussion ouverte",
   "mobile.agent.home.noChatOpenBody": "Choisissez une discussion dans la liste.",
   "mobile.agent.home.chatListWidth": "Largeur de la liste des discussions",
-  "mobile.agent.home.serverTitle": "{name}, ouvrir les serveurs",
   "mobile.agent.home.waiting": "En attente de connexion",
   "mobile.agent.home.waitingBody": "La liste des agents se chargera une fois ce serveur connecté.",
   "mobile.agent.home.noAgents": "Aucun agent sur ce serveur",

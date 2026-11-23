@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { WorkflowKindTile } from "@/features/workflows/components/workflow-kind-tile";
 import { rowIndent } from "@/features/workflows/components/workflow-steps-list";
-import { STEP_STATUS_LABEL, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
+import { stepLabel, stepStatusLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -19,10 +19,6 @@ const STATUS_CLASS: Record<WorkflowStep["status"], string> = {
   skipped: "text-text-secondary",
 };
 
-/**
- * One step of a run, or a step that ran alone: its status and output. The person approves or declines
- * a step that waits, retries a step that failed, and stops a step that runs.
- */
 export function WorkflowRunStepRow({
   node,
   step,
@@ -40,13 +36,11 @@ export function WorkflowRunStepRow({
   onDecide: (step: WorkflowStep, approved: boolean) => void;
   onRetry: (step: WorkflowStep) => void;
   onStop: (step: WorkflowStep) => void;
-  /** The depth of the path of the step: each path sits one level deeper than its split. */
   depth?: number;
 }) {
   const { t } = useText();
   const [open, setOpen] = useState(false);
   const status = step?.status;
-  // The output of an image or video step is the id of the file that it made, not text to read.
   const output = node.kind !== "image" && step?.output?.trim() ? step.output : null;
   return (
     <View
@@ -67,7 +61,7 @@ export function WorkflowRunStepRow({
             className={status ? STATUS_CLASS[status] : "text-text-secondary"}
             style={typeScale.small}
           >
-            {status ? t(STEP_STATUS_LABEL[status]) : t("mobile.workflow.status.notRun")}
+            {step ? t(stepStatusLabel(step)) : t("mobile.workflow.status.notRun")}
           </Typography.Paragraph>
         </View>
         <Typography.Paragraph style={typeScale.preview}>{stepText(node, t)}</Typography.Paragraph>

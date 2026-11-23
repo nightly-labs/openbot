@@ -1,12 +1,3 @@
-// Runs the real account server billing (`createHostedBilling`) on a migrated SQLite database with a fake
-// Stripe API and a fake operator webhook. Signed Stripe events go through `BillingService.handleWebhook`.
-// A new server plan and a new license each send one operator message with the account email, the
-// product, the amount, the currency and the period. A cancelled renewal, a resumed renewal and the end of
-// a subscription each send one message too. A repeated event, a second event of the same state and a
-// renewal send none, and a deployment with no webhook URL sends none.
-//
-// Run: bun run test:purchase-alert
-// It writes .openbot-build/purchase-alert-e2e/report.json and exits non-zero on a failure.
 import { createHmac } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -43,7 +34,6 @@ function migratedDatabase(): DatabaseSync {
   return database;
 }
 
-/** The subscriptions that the fake Stripe API gives. */
 function subscriptions(periodEnd: number) {
   return new Map<string, object>(
     Object.entries({
@@ -104,6 +94,7 @@ async function run(alertUrl: string | undefined) {
   const stored = subscriptions(Math.floor(clock.now / 1000) + 30 * 24 * 3600);
   const alerts: string[] = [];
   const work: Promise<void>[] = [];
+  const gate: { reads: number; waiting: (() => void)[] } = { reads: 0, waiting: [] };
   const { billing } = createHostedBilling(
     {
       DB: sqliteD1(database),
@@ -123,7 +114,18 @@ async function run(alertUrl: string | undefined) {
         }
         const url = new URL(input);
         const subscription = stored.get(decodeURIComponent(url.pathname.replace("/v1/subscriptions/", "")));
-        if ((init.method ?? "GET") === "GET" && subscription) return Response.json(subscription);
+        if ((init.method ?? "GET") === "GET" && subscription) {
+          if (gate.reads > 0) {
+            const read = Promise.withResolvers<void>();
+            gate.waiting.push(read.resolve);
+            if (gate.waiting.length === gate.reads) {
+              gate.reads = 0;
+              for (const release of gate.waiting.splice(0)) release();
+            }
+            await read.promise;
+          }
+          return Response.json(subscription);
+        }
         return Response.json({ error: { type: "api_error" } }, { status: 500 });
       },
     },
@@ -142,17 +144,26 @@ async function run(alertUrl: string | undefined) {
     await Effect.runPromise(billing.handleWebhook(payload, `t=${created},v1=${signature}`));
     await Promise.all(work.splice(0));
   };
-  /** Changes a subscription in the fake Stripe API, as a cancel in the Customer Portal does. */
-  const change = (id: string, patch: { cancel_at_period_end?: boolean; cancel_at?: number; status?: string }) =>
-    stored.set(id, { ...stored.get(id), ...patch });
-  return { database, alerts, deliver, change };
+  const change = (
+    id: string,
+    patch: { cancel_at_period_end?: boolean; cancel_at?: number; canceled_at?: number; status?: string },
+  ) => stored.set(id, { ...stored.get(id), ...patch });
+  const deliverTogether = (events: Parameters<typeof deliver>[]) => {
+    gate.reads = events.length;
+    return Promise.all(events.map((event) => deliver(...event)));
+  };
+  return { database, alerts, deliver, deliverTogether, change };
 }
 
+const FIRST_CANCEL = 1_790_000_000;
+const SECOND_CANCEL = 1_790_000_100;
+const LICENSE_CANCEL = 1_790_000_200;
+
 async function purchasesAlertTheOperator() {
-  const { database, alerts, deliver, change } = await run(ALERT_URL);
+  const { database, alerts, deliver, deliverTogether, change } = await run(ALERT_URL);
 
   await deliver("customer.subscription.created", { id: "sub_server" }, "evt_server_created");
-  const serverText = `New server plan for \`${SERVER_BUYER.email}\`: standard, $35.00 (USD) for 1 month.`;
+  const serverText = `🆕 **New** server · \`${SERVER_BUYER.email}\` · standard · $35/mo`;
   check(
     "a new server plan sends one message with the email, the plan, the amount and the period",
     alerts.length === 1 && alerts[0] === serverText,
@@ -165,10 +176,14 @@ async function purchasesAlertTheOperator() {
   check("a repeated event, an update and a renewal of that plan send no message", alerts.length === 1, alerts);
 
   await deliver("customer.subscription.created", { id: "sub_license" });
-  const amount = new Intl.NumberFormat("en", { style: "currency", currency: "PLN" }).format(
-    licensePeriodAmount({ tier: "team", interval: "year", bundle: false }, 7, "pln") / 100,
-  );
-  const licenseText = `New license for \`${LICENSE_BUYER.email}\`: team, 7 users, ${amount} (PLN) for 1 year.`;
+  const amount = new Intl.NumberFormat("en", {
+    style: "currency",
+    currency: "PLN",
+    trailingZeroDisplay: "stripIfInteger",
+  })
+    .format(licensePeriodAmount({ tier: "team", interval: "year", bundle: false }, 7, "pln") / 100)
+    .replace("\u00a0", " ");
+  const licenseText = `🆕 **New** license · \`${LICENSE_BUYER.email}\` · team · 7 users · ${amount}/yr`;
   check(
     "a new license sends one message with the email, the tier, the users, the amount and the period",
     alerts.length === 2 && alerts[1] === licenseText,
@@ -177,13 +192,30 @@ async function purchasesAlertTheOperator() {
 
   await deliver("customer.subscription.updated", { id: "sub_license" });
   check("a second event of the license sends no message", alerts.length === 2, alerts);
-
-  const serverTerms = `for \`${SERVER_BUYER.email}\`: standard, $35.00 (USD) for 1 month.`;
-  change("sub_server", { cancel_at_period_end: true });
-  await deliver("customer.subscription.updated", { id: "sub_server" });
+  const licenseGrants = database
+    .prepare(
+      "SELECT credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, starts_at, expires_at FROM credit_grants WHERE user_id = ?",
+    )
+    .all(LICENSE_BUYER.id);
+  const licenseGrant = licenseGrants[0];
   check(
-    "a cancelled renewal of a server plan sends one message with the last day",
-    alerts.length === 3 && alerts[2] === `Cancelled renewal of the server plan ${serverTerms} It ends on 2026-12-15.`,
+    "a paid yearly Team license with 7 users gives its owner 400 free credits for the current month at once, one time",
+    licenseGrants.length === 1 &&
+      licenseGrant?.credits === 400 &&
+      licenseGrant.remaining === 400 &&
+      Number(licenseGrant.expires_at) - Number(licenseGrant.starts_at) <= 31 * 24 * 3600 * 1000,
+    licenseGrants,
+  );
+
+  const serverTerms = `server · \`${SERVER_BUYER.email}\` · standard · $35/mo`;
+  change("sub_server", { cancel_at_period_end: true, canceled_at: FIRST_CANCEL });
+  await deliverTogether([
+    ["customer.subscription.updated", { id: "sub_server" }],
+    ["customer.subscription.updated", { id: "sub_server" }],
+  ]);
+  check(
+    "a cancelled renewal of a server plan sends one message with the last day, also for two events at the same time",
+    alerts.length === 3 && alerts[2] === `🚪 **Cancelled** ${serverTerms} · ends 2026-12-15`,
     alerts,
   );
   await deliver("customer.subscription.updated", { id: "sub_server" });
@@ -193,7 +225,19 @@ async function purchasesAlertTheOperator() {
   await deliver("customer.subscription.updated", { id: "sub_server" });
   check(
     "a resumed renewal sends one message",
-    alerts.length === 4 && alerts[3] === `Resumed renewal of the server plan ${serverTerms}`,
+    alerts.length === 4 && alerts[3] === `🔄 **Resumed** ${serverTerms}`,
+    alerts,
+  );
+
+  change("sub_server", { cancel_at_period_end: true, canceled_at: SECOND_CANCEL });
+  await deliver("customer.subscription.updated", { id: "sub_server" });
+  change("sub_server", { cancel_at_period_end: false });
+  await deliver("customer.subscription.updated", { id: "sub_server" });
+  check(
+    "a second cancel and resume of the same renewal each send one message again",
+    alerts.length === 6 &&
+      alerts[4] === `🚪 **Cancelled** ${serverTerms} · ends 2026-12-15` &&
+      alerts[5] === `🔄 **Resumed** ${serverTerms}`,
     alerts,
   );
 
@@ -202,13 +246,12 @@ async function purchasesAlertTheOperator() {
   await deliver("customer.subscription.updated", { id: "sub_server" });
   check(
     "an ended server plan sends one message with the reason",
-    alerts.length === 5 && alerts[4] === `Ended server plan ${serverTerms} Reason: cancelled.`,
+    alerts.length === 7 && alerts[6] === `⛔ **Ended** ${serverTerms} · cancelled`,
     alerts,
   );
 
-  const licenseTerms = `for \`${LICENSE_BUYER.email}\`: team, 7 users, ${amount} (PLN) for 1 year.`;
-  // A cancel date from the Dashboard is not the end of the paid period.
-  change("sub_license", { cancel_at: Date.UTC(2027, 0, 31) / 1000 });
+  const licenseTerms = `license · \`${LICENSE_BUYER.email}\` · team · 7 users · ${amount}/yr`;
+  change("sub_license", { cancel_at: Date.UTC(2027, 0, 31) / 1000, canceled_at: LICENSE_CANCEL });
   await deliver("customer.subscription.updated", { id: "sub_license" });
   change("sub_license", { status: "past_due" });
   await deliver("customer.subscription.updated", { id: "sub_license" });
@@ -216,9 +259,9 @@ async function purchasesAlertTheOperator() {
   await deliver("customer.subscription.deleted", { id: "sub_license" });
   check(
     "a license sends one message for its cancel date and one for its end after a failed payment",
-    alerts.length === 7 &&
-      alerts[5] === `Cancelled renewal of the license ${licenseTerms} It ends on 2027-01-31.` &&
-      alerts[6] === `Ended license ${licenseTerms} Reason: not paid.`,
+    alerts.length === 9 &&
+      alerts[7] === `🚪 **Cancelled** ${licenseTerms} · ends 2027-01-31` &&
+      alerts[8] === `⛔ **Ended** ${licenseTerms} · not paid`,
     alerts,
   );
 
@@ -226,9 +269,17 @@ async function purchasesAlertTheOperator() {
     .prepare("SELECT event_id FROM billing_webhook_events WHERE type = 'purchase' ORDER BY event_id")
     .all();
   check(
-    "each subscription has one start claim and one end claim",
+    "each subscription has one start claim, one end claim, and one claim for each cancel request",
     claims.map((claim) => claim.event_id).join() ===
-      "openbot_purchase:sub_license,openbot_purchase:sub_server,openbot_purchase_end:sub_license,openbot_purchase_end:sub_server",
+      [
+        "openbot_purchase:sub_license",
+        "openbot_purchase:sub_server",
+        `openbot_purchase_cancel:sub_license:${LICENSE_CANCEL}`,
+        `openbot_purchase_cancel:sub_server:${FIRST_CANCEL}`,
+        `openbot_purchase_cancel:sub_server:${SECOND_CANCEL}`,
+        "openbot_purchase_end:sub_license",
+        "openbot_purchase_end:sub_server",
+      ].join(),
     claims,
   );
 }

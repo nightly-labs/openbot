@@ -13,10 +13,14 @@ import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChannelHistoryRefreshError } from "@/features/channels/model/channel-store";
 import { donateShareTarget } from "@/features/share/model/share-extension";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceReader,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { OutboxMessage } from "../model/outbox";
 import { createOutboxFiles } from "../model/outbox-files";
 import {
@@ -32,12 +36,9 @@ const NO_SERVERS: ReadonlySet<string> = new Set();
 
 interface AccountOutbox {
   store: OutboxStore;
-  /** The workspace that sends now. A send in flight keeps the one that started it. */
-  workspace: { current: MobileWorkspaceContextValue | null };
+  workspace: { current: (() => MobileWorkspaceContextValue) | null };
 }
 
-// One outbox per account for the whole run. A sign-out and a sign-in to the same account use it
-// again: a second store would read the same file while the first one still writes it.
 const accountOutboxes = new Map<string, AccountOutbox>();
 
 function createAccountOutbox(scope: string | null): AccountOutbox {
@@ -46,7 +47,7 @@ function createAccountOutbox(scope: string | null): AccountOutbox {
     storage: scope ? createOutboxFiles(scope) : null,
     deliver: async (message, delivery) => {
       if (!workspace.current) throw new Error(currentText().t("mobile.workspace.error.transportNotReady"));
-      return deliverOutboxMessage(workspace.current, message, delivery);
+      return deliverOutboxMessage(workspace.current(), message, delivery);
     },
     describeError: (error) => {
       const { t, errorMessage } = currentText();
@@ -59,7 +60,6 @@ function createAccountOutbox(scope: string | null): AccountOutbox {
 }
 
 function accountOutbox(scope: string | null): AccountOutbox {
-  // Signed out: nothing to keep, and nothing to send.
   if (!scope) return createAccountOutbox(null);
   let outbox = accountOutboxes.get(scope);
   if (!outbox) {
@@ -69,30 +69,31 @@ function accountOutbox(scope: string | null): AccountOutbox {
   return outbox;
 }
 
-/**
- * The messages of this account that wait for their server. It sends them while the app runs, in any
- * screen, and the phone keeps them over a restart.
- */
 export function OutboxProvider({ children }: PropsWithChildren) {
-  const workspace = useMobileWorkspace();
+  const readWorkspace = useMobileWorkspaceReader();
   const { session } = useMobileSession();
   const [{ store, workspace: current }] = useState(() =>
     accountOutbox(session ? `${session.apiUrl}:${session.user.id}` : null),
   );
-  current.current = workspace;
-  const onlineKey = workspace.servers
-    .filter((server) => server.state === "online")
-    .map((server) => server.id)
-    .sort()
-    .join("\n");
-  const online = useMemo(() => new Set(onlineKey ? onlineKey.split("\n") : []), [onlineKey]);
+  current.current = readWorkspace;
+  const onlineKey = useMobileWorkspaceSelector((workspace) =>
+    workspace.servers
+      .filter((server) => server.state === "online")
+      .map((server) => server.id)
+      .sort()
+      .join("\n"),
+  );
+  const foreground = useAppForeground();
+  const online = useMemo(
+    () => (foreground && onlineKey ? new Set(onlineKey.split("\n")) : NO_SERVERS),
+    [foreground, onlineKey],
+  );
   useEffect(() => {
     void store.load();
   }, [store]);
   useEffect(() => {
     store.setOnline(online);
   }, [store, online]);
-  // After sign-out nothing starts. A send in flight still saves its result for this account.
   useEffect(() => () => store.setOnline(NO_SERVERS), [store]);
   return <OutboxContext value={store}>{children}</OutboxContext>;
 }
@@ -142,18 +143,15 @@ async function deliverOutboxMessage(
     upload: (file, onProgress) => channelStore.upload(target.serverId, file, onProgress),
     discard: (id) => channelStore.discard(target.serverId, id),
     send: async (ids) => {
-      // The host keeps the receipt of a channel operation with the channel, so a repeat is always safe.
       await delivery.beforeStore(true);
       try {
         await channelStore.command(
           target.serverId,
           {
             type: "send",
-            // The outbox id, so a repeat after a lost answer stores the message once.
             operationId: message.clientMessageId,
             channelId: target.channelId,
             text: message.text,
-            // The member that the message names at its start, as the person saw the channel.
             recipientAgentId: target.recipientAgentId,
             replyToMessageId: message.replyToMessageId,
             attachmentDraftIds: ids,
@@ -161,8 +159,6 @@ async function deliverOutboxMessage(
           { waitForRefresh: true },
         );
       } catch (error) {
-        // The host stored the message. The next channel read shows it, so a failed read is not a
-        // failed send, and its drafts must not be discarded.
         if (!(error instanceof ChannelHistoryRefreshError)) throw error;
       }
       return "";

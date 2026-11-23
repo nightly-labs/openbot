@@ -4,54 +4,33 @@ import type { SkillReviewSuggestion } from "./memory-review-prompt";
 import { chatTranscript, promptJson } from "./side-question";
 import { workSteps } from "./skill-suggestion";
 
-/** The most characters of a skill description that a review writes, as openbot-skill-creator says. */
 const LEARNED_DESCRIPTION_CHARACTERS = 500;
-/** The most characters of the instructions that a review writes. A longer skill costs every chat that loads it. */
 const LEARNED_INSTRUCTIONS_CHARACTERS = 12_000;
 
-/** The current text of a local library skill that a review changes. */
 export interface LearnedSkillSource {
   description: string;
   instructions: string;
   revision: number;
 }
 
-/** A skill that a review wrote. Every text is redacted by the review. */
 export type LearnedSkillDraft =
   | { action: "create"; name: string; description: string; instructions: string }
   | { action: "update"; skillId: string; expectedRevision: number; description: string; instructions: string };
 
-/**
- * Saves what a memory review learns, read and written on this computer only. `save` puts a new skill
- * or the next revision in the local library and installs it for the agent; when the install fails it
- * removes the revision again, so the review can ask the user instead.
- */
 export interface SkillLearner {
   read(skillId: string): Effect.Effect<LearnedSkillSource, unknown>;
   save(agentId: string, draft: LearnedSkillDraft): Effect.Effect<SkillConversationEvent, unknown>;
 }
 
-/** The characters that the writer can add for a lesson to a skill, in `LEARNED_INSTRUCTIONS_CHARACTERS`. */
 const LESSON_ROOM_CHARACTERS = 2_000;
-/** The most share of the current text, and of its non-ASCII letters, that a revision drops without a question. */
 const DROPPED_SHARE = 0.25;
-/** A revision can always drop this many characters and non-ASCII letters, as when it changes one wrong sentence. */
 const DROPPED_CHARACTERS = 200;
 const DROPPED_LETTERS = 10;
 
-/**
- * Whether the writer can revise this skill without a question. It writes the whole text again in at
- * most `LEARNED_INSTRUCTIONS_CHARACTERS`, with the lesson, so a longer skill would lose its rules: the
- * review asks the user.
- */
 export function writerCanRevise(current: LearnedSkillSource): boolean {
   return current.instructions.trim().length <= LEARNED_INSTRUCTIONS_CHARACTERS - LESSON_ROOM_CHARACTERS;
 }
 
-/**
- * Whether a revision keeps the current text. A writer can answer a summary, or write the letters of
- * the language in ASCII (ş as s); the review then asks the user and does not save it.
- */
 export function revisionKeepsSkill(current: LearnedSkillSource, instructions: string): boolean {
   const before = current.instructions.trim();
   const after = instructions.trim();
@@ -69,18 +48,11 @@ function nonAsciiLetters(text: string): number {
   return text.match(/(?![A-Za-z])\p{L}/gu)?.length ?? 0;
 }
 
-/** The answer of the skill writer. */
 export const SkillWriterResult = Schema.Struct({
   description: Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(LEARNED_DESCRIPTION_CHARACTERS)),
   instructions: Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(LEARNED_INSTRUCTIONS_CHARACTERS)),
 });
 
-/**
- * The prompt that writes the skill a review found, after the skill review of Hermes Agent (MIT): the
- * review saves the skill without a question to the user. The generation has no tools. It reads the
- * lesson, the reviewed chat and its work steps, and for a change the current instructions, and answers
- * the whole new text. Every text is redacted by the caller.
- */
 export function skillWriterPrompt(
   agent: Pick<AgentSummary, "name" | "title" | "description">,
   lesson: SkillReviewSuggestion,

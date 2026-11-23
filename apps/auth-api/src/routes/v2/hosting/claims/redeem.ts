@@ -10,7 +10,6 @@ import {
 } from "../../../../server/request-auth";
 import { requestSourceIp } from "../../../../server/source-ip";
 
-/** A new hosted server exchanges its claim for the owner's account session. */
 export const Route = createFileRoute("/v2/hosting/claims/redeem")({
   server: {
     handlers: {

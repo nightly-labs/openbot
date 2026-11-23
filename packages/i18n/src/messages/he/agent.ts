@@ -21,7 +21,6 @@ export const messages = {
   "agent.setup.creating": "יוצר סוכן…",
   "agent.setup.create": "יצירת סוכן",
   "agent.setup.suggestions": "הצעות",
-  // Suggested agents. Selecting one copies its name and purpose into the new agent.
   "agent.setup.suggestion.label": "{name}. {description}",
   "agent.setup.suggestion.inboxHelper.name": "עוזר דואר",
   "agent.setup.suggestion.inboxHelper.description": "מנסח תשובות ומוודא שאין מעקב שנשכח.",
@@ -54,8 +53,11 @@ export const messages = {
   "agent.dock.add": "הוספה למעגן",
   "agent.dock.allAdded": "כל הסוכנים והערוצים שלך כבר במעגן",
   "agent.dock.more": "עוד",
+  "agent.dock.keepOpen": "להשאיר פתוח",
+  "agent.dock.closeOnLeave": "לסגור בלחיצה בחוץ",
   "agent.dock.openInMain": "פתיחה בחלון הראשי",
   "agent.dock.openWindow": "פתיחה בחלון חדש",
+  "agent.dock.openPage": "פתיחת {title}",
   "agent.dock.remove": "הסרה מהמעגן",
   "agent.dock.send": "שליחה",
   "agent.dock.working": "עובד…",
@@ -90,7 +92,6 @@ export const messages = {
   "agent.error.provider": "שגיאת ספק",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "שגיאה של {provider}",
-  // Avatar color names. They fill `{color}` and `{hue}` inside a sentence.
   "agent.color.red": "אדום",
   "agent.color.orange": "כתום",
   "agent.color.yellow": "צהוב",

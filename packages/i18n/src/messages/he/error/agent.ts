@@ -13,6 +13,8 @@ export const messages = {
     "הכלי לא רץ. tool_call לא יכול להריץ את openbot.tool_search או את openbot.tool_describe. יש לקרוא להם ישירות עם אותם ארגומנטים.",
   "error.agent.toolCallEnvelopeKeys":
     "הכלי לא רץ. tool_call מקבל רק name ו-arguments. יש לשים את הארגומנטים של הכלי ב-arguments, כאובייקט, ולשלוח את הקריאה שוב.",
+  "error.agent.toolCallMissingName":
+    "הכלי לא רץ. ל-tool_call אין name. יש לשים ב-name את השם המלא ש-tool_search מחזיר, למשל openbot.history_read, ולשלוח את הקריאה שוב.",
   "error.agent.toolCallUnknownTool":
     "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. יש להשתמש בשם המלא המדויק ש-tool_search מחזיר, למשל openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -47,6 +49,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "הגדרת הסוכן נכשלה ולא ניתן היה להסיר את הסוכן החלקי.",
   "error.agent.modelUnavailable": "מודל הסוכן שנבחר אינו זמין.",
   "error.agent.modelProviderNotConnected": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} אינו מחובר.',
+  "error.agent.modelProviderSignInRequired":
+    'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} דורש התחברות. התחבר ל-{provider} ונסה שוב.',
+  "error.agent.modelProviderNotInstalled": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} אינו מותקן.',
+  "error.agent.modelProviderOutdated": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} דורש עדכון.',
   "error.agent.modelListEmpty":
     'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} לא פרסם מודלים. השגיאה האחרונה: {detail}',
   "error.agent.modelListEmptyNoError": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} לא פרסם מודלים.',
@@ -111,6 +117,12 @@ export const messages = {
   "error.agent.deletionBusy": "מחיקת הסוכן כבר מתבצעת.",
   "error.agent.stopBeforeDelete": "יש לעצור את הסוכן ולבטל את ההודעות שלו בתור לפני המחיקה.",
   "error.agent.deleteIncomplete": "לא ניתן היה להסיר את נתוני הסוכן לגמרי. יש לנסות למחוק את הסוכן שוב.",
+  "error.agent.deleteFolderInUse":
+    "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. יש למחוק את הסוכן שוב כשהעבודה הזו מסתיימת, או אחרי הפעלה מחדש של OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "תוכנה אחרת עדיין משתמשת בתיקייה של הסוכן הזה, למשל תוכנה שהסוכן הפעיל. יש לסגור את התוכנה הזו או להפעיל מחדש את המחשב שהסוכן הזה פועל בו, ואז למחוק את הסוכן שוב.",
+  "error.agent.deleteWhenFolderFree":
+    "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. OpenBot ימחק את הסוכן הזה כשהעבודה הזו תסתיים.",
   "error.agent.duplicationBusy": "הסוכן הזה כבר משוכפל.",
   "error.agent.waitBeforeDuplicate": "יש להמתין שהסוכן יסיים ולרוקן את התור שלו לפני השכפול.",
   "error.agent.saveOtherAgent": "השמירה הזו שייכת לסוכן אחר.",
@@ -131,6 +143,8 @@ export const messages = {
   "error.agent.webSearchFailed": "החיפוש באינטרנט לא הסתיים. נסו שוב.",
   "error.agent.busyMessageModeLocalOnly": "אפשר להגדיר מה קורה להודעות בזמן שהסוכן עובד רק במחשב שמריץ את הסוכן.",
   "error.agent.backupModelsLocalOnly": "אפשר להגדיר מודלי גיבוי רק במחשב שמריץ את הסוכן.",
+  "error.agent.backupModelsAtLimit":
+    "אף מודל גיבוי לא יכול להמשיך עכשיו: כל אחד מהם הגיע למגבלת השימוש או נכשל לפני זמן קצר. מודלים של חשבון אחד יכולים לחלוק מגבלה אחת. כדי להמשיך עכשיו, הוסיפו מודל גיבוי מספק אחר או מחשבון אחר, או חכו לאיפוס המגבלה.",
   "error.agent.taskLimitLocalOnly": "אפשר להגדיר את מגבלת המשימות רק במחשב שמריץ את הסוכן.",
   "error.agent.localScriptsOff": "הסוכן הזה אינו מאפשר סקריפטים מקומיים.",
   "error.agent.localScriptsRateLimited":
@@ -164,6 +178,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",
   "error.agent.mcpServerKeysMove":
     "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "שרת ה-MCP {name} מריץ פקודה מקומית, ולכן אינו מקבל כותרות. בקש מהמשתמש להזין את המפתחות שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "רק המשתמש של OpenBot זה, בצ'אט איתך, יכול לתת את המפתחות של שרת ה-MCP {name}. בקש מהמשתמש להזין אותם בחנות, אפליקציות, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} הוא חלק מ-OpenBot, ולכן כלי ה-MCP לא יכולים לבדוק, להפעיל, לכבות או להסיר אותו. המשתמש שולט בו במחשב שמריץ את OpenBot: חיבור GitHub בחנות, אפליקציות, GitHub, ושליטה במחשב בהגדרות, שליטה במחשב.",
   "error.agent.mcpServerUnknown": "אין שרת MCP בשם {name}. אפשר לקרוא ל-list_mcp_servers כדי לראות את השמות.",
@@ -175,6 +193,8 @@ export const messages = {
     "האזור אינו בתוך תצוגה אחת. יש להשתמש בנקודות שולחן עבודה בתוך גבולות תצוגה אחת מתוך list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "ל-OpenBot אין הרשאת Screen Recording. יש לבקש מהמשתמש לפתוח את System Settings > Privacy & Security > Screen & System Audio Recording, להפעיל את OpenBot, ואז לצאת מ-OpenBot ולפתוח אותו שוב.",
+  "error.agent.screenCaptureListPermission":
+    "ל-OpenBot עדיין אין הרשאת Screen Recording, ולכן הוא לא יכול להציג את רשימת החלונות. כדי לצלם תצוגה, יש לקרוא ל-capture_screen עם target screen. המשתמש מאשר קודם את הצילום, ואז macOS עשוי לבקש מהמשתמש את ההרשאה.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows החזירה תמונה ריקה. יש לבקש מהמשתמש לבטל את נעילת המחשב ולסגור תוכן מוגן. גם מדיניות של הארגון יכולה לחסום צילום מסך.",
   "error.agent.screenCaptureFailed": "צילום המסך נכשל. יש לנסות שוב.",

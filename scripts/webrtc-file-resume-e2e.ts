@@ -1,11 +1,3 @@
-// Run: bun scripts/webrtc-file-resume-e2e.ts
-// Report: .openbot-build/webrtc-file-resume-e2e.json
-//
-// A sender resumes on the same connection after one chunk fails to send. The chunks that it sent
-// before arrive late, so a periodic ack from the last attempt reaches it after its new `file-open`.
-// It then sends again from that ack, before bytes that the receiver already has. The receiver must
-// skip that overlap and finish the file.
-
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -24,11 +16,8 @@ import { TeamWebRtcFileTransfer } from "../src/main/team-webrtc-file-transfer";
 type BridgeEvents = TeamWebRtcBridge extends EventEmitter<infer Events> ? Events : never;
 
 const FILE_BYTES = 3 * 1024 * 1024;
-// The chunks before this one hold more than one ack interval (1 MiB), so the receiver sends a periodic
-// ack for them.
 const FAILED_CHUNK_INDEX = 30;
 
-/** Delivers frames to `target` in order. `hold` keeps frames back until `release`. */
 class LinkedBridge extends EventEmitter<BridgeEvents> {
   target: LinkedBridge | null = null;
   #chain: Promise<void> = Promise.resolve();
@@ -95,8 +84,6 @@ const host = new TeamWebRtcFileTransfer(hostBridge, join(directory, "host"));
 client.setPeerAuthenticated("host", true);
 host.setPeerAuthenticated("client", true);
 
-// The first `file-open` goes through. The chunks after it wait in the channel, one chunk send fails,
-// and the next `file-open` lets the waiting frames arrive, in order, before it.
 let opens = 0;
 let chunks = 0;
 let highestSent = 0;
@@ -106,7 +93,6 @@ clientBridge.setPolicy((data) => {
     opens += 1;
     if (opens === 1) return "send";
     if (opens === 2) {
-      // The held frames arrive before this `file-open`, so the receiver has these bytes when it answers.
       report.deliveredBeforeResume = highestSent;
       return "release";
     }

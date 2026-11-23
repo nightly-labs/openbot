@@ -19,7 +19,6 @@ import { MoreArticles } from "./MoreArticles";
 import { ReadingProgress } from "./ReadingProgress";
 
 export interface ArticlePageProps {
-  /** Only collections with prose bodies. A comparison has its own page. */
   collection: ContentCollection<ProseCollectionId>;
   article: CollectionArticle;
 }
@@ -31,12 +30,6 @@ export function ArticlePage(props: ArticlePageProps) {
 
   const tracked = (): ArticleReference => ({ collection: props.collection.id, slug: props.article.slug });
 
-  // The article's own path, so one article can be told from another in the report. An unpublished
-  // slug falls back to the index inside `reportedArticlePath`.
-  //
-  // Tracked rather than mounted once: a related-article link stays on this route and only changes
-  // the parameter, so a mount hook would leave every later event under the first article's path.
-  // The effect disposes the previous article's listener before it starts the new one.
   createTrackedEffect(() => {
     const article = tracked();
     return landingAnalytics.start(
@@ -79,12 +72,6 @@ export function ArticlePage(props: ArticlePageProps) {
             </p>
           </header>
 
-          {/*
-            Keyed, because a link to a related article stays on this route and
-            only changes the parameter. The gradient draws from the title it was
-            built with and keeps the frame it captured, so a reused one would
-            leave the reader looking at the previous article's artwork.
-          */}
           <div class="post-article-art" data-enter="post-art">
             <Show when={props.article.slug} keyed>
               {(slug) => (

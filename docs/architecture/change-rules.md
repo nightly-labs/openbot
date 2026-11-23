@@ -80,7 +80,7 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
     line masks that exact value. The provider credential store and the MCP store (for header and
     environment names that look secret) do this. `info` and above is written by default; `OPENBOT_LOG_LEVEL` changes the
     threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
-    `process.stdout.write` with a `// Machine-readable:` comment instead. Dev automation
+    `process.stdout.write` instead. Dev automation
     (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
     remote-debugging CDP port and never launches a second instance, seeds, or resets the dev profile.
     Because several worktrees run dev side by side, each instance publishes its worktree, profile,
@@ -119,8 +119,8 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
     snapshot document only through `describeTarget`.
 
 SQLite migration history starts at the frozen version 8 compatibility baseline. Keep the baseline
-schema unchanged, append every later migration in numeric order, and update the separate latest
-schema used for new databases. Never remove or rewrite a migration that may have shipped.
+schema unchanged and append every later migration in numeric order. A new database runs the same
+migrations from the baseline. Never remove or rewrite a migration that may have shipped.
 
 At startup, chat recovery reads all saved provider sessions for each thread, including inactive
 sessions from an upgrade or a provider change. It uses each session's provider and merges the

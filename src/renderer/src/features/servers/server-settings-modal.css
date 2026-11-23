@@ -139,7 +139,6 @@
   padding-inline-start: var(--openbot-space-8);
 }
 
-/* The card has a thin line around it on the background of the page, as the other settings cards do. */
 .server-settings-invite-card.ui-card {
   border: 1px solid var(--openbot-border);
   background: transparent;
@@ -154,8 +153,6 @@
   gap: var(--openbot-space-2);
 }
 
-/* The hidden tab panels stay mounted for the slide animation, so without this the
-   slot sizes to the widest panel and the active one inherits its width as dead space. */
 .server-settings-invite-composer .ui-sliding-tabs-content-slot {
   position: relative;
   grid-template-columns: minmax(0, 1fr);
@@ -472,7 +469,6 @@
   gap: var(--openbot-space-1);
 }
 
-/* The feed area before the first read answers. It fades in after a delay, so a fast answer does not flash it. */
 .server-settings-routine-feed-loading {
   display: grid;
   place-items: center;
@@ -494,7 +490,6 @@
   gap: var(--openbot-space-2);
 }
 
-/* The empty pending list: sample invitations land behind the invite action. Both share one cell. */
 .server-invites-empty {
   display: grid;
 }
@@ -503,7 +498,6 @@
   grid-area: 1 / 1;
 }
 
-/* The middle of the faint list clears for the action, and the list fades out at the bottom. */
 .server-invites-empty-board {
   min-height: calc(4 * 3.75rem);
   display: grid;
@@ -583,7 +577,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The one handwritten word writes itself once. The app has no hand font, so it uses the system's. */
 .server-invites-empty-hand {
   display: inline-block;
   color: var(--openbot-accent-text);
@@ -614,7 +607,6 @@
   }
 }
 
-/* The width of the zone list, which shows the long "Automatic (zone)" label of most hosts. */
 .server-settings-timezone-pending {
   width: 220px;
   min-height: var(--openbot-control-sm);

@@ -46,7 +46,6 @@ const viewArgs = (overrides: Partial<ViewArgs> = {}): ViewArgs => ({
   ...overrides,
 });
 
-/** The view alone. The screen buttons work. */
 function Stage(props: { args: ViewArgs }) {
   const [screen, setScreen] = createSignal(props.args.screen);
   return (
@@ -58,7 +57,6 @@ function Stage(props: { args: ViewArgs }) {
   );
 }
 
-/** Server settings > Transfer for this computer. The preview exports and imports. */
 export const InServerSettings: Story = {
   name: "Server settings",
   render: () => (
@@ -74,13 +72,11 @@ export const InServerSettings: Story = {
 
 export const Home: Story = { name: "Which computer", render: () => <Stage args={viewArgs()} /> };
 
-/** This computer, or a host with `instance-transfer-full-copy-v1`: each part has its own switch. */
 export const Export: Story = {
   name: "Export",
   render: () => <Stage args={viewArgs({ screen: "export", historyAvailable: true, fullCopyAvailable: true })} />,
 };
 
-/** A host with only `instance-transfer-chunks-v1`: the chat history also carries the channel messages. */
 export const ExportOlderHost: Story = {
   name: "Export: older host",
   render: () => <Stage args={viewArgs({ screen: "export", historyAvailable: true })} />,
@@ -167,7 +163,6 @@ export const ImportResult: Story = {
   ),
 };
 
-/** Server settings > Transfer > Copy to another server. The preview copies to its joined servers. */
 export const CopyInServerSettings: Story = {
   name: "Copy: server settings",
   render: () => (
@@ -185,7 +180,6 @@ type CopyArgs = Parameters<typeof CopyAgentsDialog>[0];
 
 const [LOCAL_SERVER, TEAM_SERVER] = STORY_SERVERS;
 
-/** Agents of the other server. Two have the names of agents on this computer. */
 const TEAM_AGENTS = [...INSTANCE_TRANSFER_SUMMARY.agents, ...STORY_AGENT_SUMMARIES.slice(0, 2)];
 
 const copyArgs = (overrides: Partial<CopyArgs> = {}): CopyArgs => ({

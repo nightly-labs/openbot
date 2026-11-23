@@ -1,4 +1,5 @@
 import type { QueueDelivery } from "@openbot/contracts/ipc";
+import { awaitingReplyEnded } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { type Accessor, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { agentAwaitingReplies } from "../../../awaiting-replies";
@@ -9,7 +10,6 @@ import { currentConversationTarget } from "./composer-store";
 export interface QueueStoreDeps {
   props: ConversationProps;
   hiddenAwaitingReplyIds: Accessor<ReadonlySet<string>>;
-  /** Messages sent while the agent was idle that the host is about to start. The chat still shows them. */
   startingDeliveryIds: Accessor<ReadonlySet<string>>;
 }
 
@@ -22,14 +22,10 @@ export function createQueueStore(deps: QueueStoreDeps) {
       activeTurnId: deps.props.activeTurnId,
       renderedMessageIds: new Set(deps.props.messages.map((message) => message.id)),
     });
-    // A hold keeps the message waiting, so the panel shows it at once.
     if (deps.props.queue?.hold) return presented;
     const starting = deps.startingDeliveryIds();
     return starting.size ? presented.filter((delivery) => !starting.has(delivery.id)) : presented;
   });
-  // The agents this agent asked, and the answers that wait for it. A queue of another agent, which
-  // the view holds for a moment while it switches, answers nothing here.
-  // The person can close the block when every agent is done. A closed row that works again shows.
   const awaitingReplies = createMemo(() => {
     const hidden = deps.hiddenAwaitingReplyIds();
     return agentAwaitingReplies({
@@ -38,12 +34,10 @@ export function createQueueStore(deps: QueueStoreDeps) {
       agents: deps.props.agents,
       self: deps.props.agent,
       waits: deps.props.agentWaits,
-    }).filter((row) => !(hidden.has(row.id) && (row.state === "replied" || row.state === "failed")));
+    }).filter((row) => !(hidden.has(row.id) && awaitingReplyEnded(row.state)));
   });
   const [renderedQueueDeliveries, setRenderedQueueDeliveries] = createSignal<QueueDelivery[]>([]);
-  /** The panel is in the DOM. It stays while it closes, so it can slide down behind the input. */
   const queuePanelVisible = createMemo(() => renderedQueueDeliveries().length > 0);
-  /** The panel has messages that wait. Its slot starts to close when the last one goes. */
   const queueOpen = createMemo(() => presentedQueueDeliveries().length > 0);
   let queueExitTimer: number | undefined;
   let renderedOwner: string | undefined;
@@ -64,13 +58,10 @@ export function createQueueStore(deps: QueueStoreDeps) {
         return;
       }
       if (untrack(renderedQueueDeliveries).length === 0) return;
-      // The queue of the chat before a switch does not stay open in this one.
       if (switched) {
         setRenderedQueueDeliveries([]);
         return;
       }
-      // The empty queue is computed again for each change of the chat, such as each part of a reply
-      // that streams. The panel closes at the end of its first exit, not after the chat is quiet.
       if (queueExitTimer !== undefined) return;
       queueExitTimer = window.setTimeout(() => {
         queueExitTimer = undefined;

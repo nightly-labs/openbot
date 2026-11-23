@@ -12,8 +12,6 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 
-// The first face, as the app picks one at random. Story args are made before a provider renders, so
-// the default name is English.
 const DEFAULT_FIRST_AGENT_DRAFT = createFirstAgentDraft(() => 0);
 
 function draftFromSuggestion(suggestion: FirstAgentSuggestion): FirstAgentDraft {
@@ -55,7 +53,6 @@ const args: FirstAgentSetupProps = {
   value: DEFAULT_FIRST_AGENT_DRAFT,
   suggestions: FIRST_AGENT_SUGGESTIONS,
   submitting: false,
-  // The app always passes the model catalog, so every story shows the model picker.
   modelOptions: STORY_MODELS,
   agentStatus: STORY_AGENT_STATUS,
   onManageProviders: fn(),

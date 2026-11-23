@@ -13,15 +13,6 @@ import { readJson } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(MCP_SIGN_IN_APP_ROUTES));
 
-/**
- * The sign-in apps of this host's http MCP rows, set from a joined server. Frozen by
- * `mcp-sign-in-app-v1`.
- *
- * The client secret arrives in `save` and stays in this host's encrypted sign-in store; no answer
- * carries it. An admin check runs on every route, as on the MCP list itself. With
- * `mcp-member-access-v1`, a member reads any row's app, and saves or removes the app only of a row
- * whose sign-in is theirs.
- */
 export async function routeMcpSignInApp(
   context: TeamApiRequestContext,
   signIns: TeamApiMcpSignIns | undefined,
@@ -34,7 +25,6 @@ export async function routeMcpSignInApp(
     throw new HttpError(400, sourceText("error.team.mcpUnsupported"));
   const access = requireMcpAccess(member, capabilities, owners);
   const servers = () => mcpServers?.listMcpServers() ?? [];
-  // `readJson` has already run the body through the `mcp-sign-in-app-v1` codec.
   const body = await readJson(request);
   switch (url.pathname) {
     case MCP_SIGN_IN_APP_ROUTES.save: {

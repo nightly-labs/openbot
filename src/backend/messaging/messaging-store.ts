@@ -10,9 +10,9 @@ import {
   requiredStringColumn,
 } from "../database/database-rows";
 import { withTransaction } from "../database/sqlite-transaction";
+import { cachedStatement } from "../database/statement-cache";
 import type { OpenBotDatabase } from "../openbot-database";
 
-/** One workspace of a platform, where every agent of this computer can answer. */
 export interface MessagingConnectionRecord {
   connectionId: string;
   platform: MessagingPlatform;
@@ -21,13 +21,10 @@ export interface MessagingConnectionRecord {
   enabled: boolean;
   botUserId: string | null;
   appId: string | null;
-  /** The agent that receives every new conversation. Null until the user adds it. */
   orchestratorAgentId: string | null;
-  /** The last failure that stops the connection until the user acts, such as a revoked token. */
   lastErrorCode: string | null;
 }
 
-/** One external conversation, answered in its own execution thread of the agent. */
 export interface MessagingLink {
   linkId: string;
   connectionId: string;
@@ -37,37 +34,30 @@ export interface MessagingLink {
   isDirect: boolean;
   threadId: string;
   title: string;
-  /** The newest platform message that the agent already read as context. */
   historyCursor: string | null;
   updatedAt: string;
 }
 
-/** A role whose members can use OpenBot in one connection, by the name the user chose it from. */
 export interface MessagingAllowedRole {
   id: string;
   name: string;
 }
 
-/** A WhatsApp contact (phone number in digits) or group (its JID) that can give work in one connection. */
 export interface MessagingAllowedSender {
   id: string;
   kind: "contact" | "group";
   name: string;
 }
 
-/** People that an agent's post pinged in a Slack thread that has no link yet. */
 export interface MessagingPingInput {
   connectionId: string;
   platformChannelId: string;
   threadKey: string;
   userIds: readonly string[];
-  /** The agent that posted. */
   agentId: string;
-  /** The redacted post. */
   text: string;
 }
 
-/** The post that pinged one person in a thread. */
 export interface MessagingPing {
   userId: string;
   agentId: string;
@@ -86,15 +76,6 @@ export interface MessagingLinkInput {
 
 const LINK_LIST_LIMIT = 200;
 
-/**
- * Owns `projection_messaging_connections`, `projection_messaging_threads`,
- * `projection_messaging_allowed_roles` and `projection_messaging_allowed_senders`. It never stores a
- * token, and it never imports the database facade's callers.
- *
- * A connection row is configuration, so it is written directly, as MCP servers are. A link creates
- * a row in `projection_threads`, so it goes through `dispatch`, as a channel context does. Its event
- * payload holds ids only: the event log is append-only and must not keep external text.
- */
 export class MessagingStore {
   readonly #database: OpenBotDatabase;
 
@@ -126,10 +107,6 @@ export class MessagingStore {
     return row ? (decodeConnection(row)[0] ?? null) : null;
   }
 
-  /**
-   * Creates the connection of this workspace, or returns the one it had. A workspace connected
-   * again keeps its row, so its conversations keep their agents.
-   */
   ensureConnection(platform: MessagingPlatform, workspaceId: string, workspaceName: string): MessagingConnectionRecord {
     const existing = this.connectionForWorkspace(platform, workspaceId);
     if (existing) return existing;
@@ -172,7 +149,6 @@ export class MessagingStore {
       );
   }
 
-  /** The roles whose members can use OpenBot here. Empty lets everyone. */
   allowedRoles(connectionId: string): MessagingAllowedRole[] {
     return databaseRows(
       this.#database.connection
@@ -184,7 +160,6 @@ export class MessagingStore {
     ).map((row) => ({ id: requiredStringColumn(row, "role_id"), name: requiredStringColumn(row, "role_name") }));
   }
 
-  /** Replaces the role list of a connection at once. A role kept from before keeps its place. */
   replaceAllowedRoles(connectionId: string, roles: readonly MessagingAllowedRole[]): void {
     const db = this.#database.connection;
     withTransaction(db, () => {
@@ -205,7 +180,6 @@ export class MessagingStore {
     });
   }
 
-  /** The WhatsApp contacts and groups that can give work here, oldest first. */
   allowedSenders(connectionId: string): MessagingAllowedSender[] {
     return databaseRows(
       this.#database.connection
@@ -221,7 +195,6 @@ export class MessagingStore {
     });
   }
 
-  /** Adds a sender, or gives one that is already there its new name. */
   addAllowedSender(connectionId: string, sender: MessagingAllowedSender): void {
     this.#database.connection
       .prepare(
@@ -238,7 +211,6 @@ export class MessagingStore {
       .run(connectionId, senderId);
   }
 
-  /** Records each person that a post pinged. A newer post in the thread replaces the text and the agent. */
   savePings(input: MessagingPingInput): void {
     const db = this.#database.connection;
     withTransaction(db, () => {
@@ -263,7 +235,6 @@ export class MessagingStore {
     });
   }
 
-  /** The people that agents' posts pinged in a thread. Empty for a thread that no ping opened. */
   pings(connectionId: string, platformChannelId: string, threadKey: string): MessagingPing[] {
     return databaseRows(
       this.#database.connection
@@ -301,7 +272,9 @@ export class MessagingStore {
 
   linkForThread(threadId: string): MessagingLink | null {
     const row = databaseRow(
-      this.#database.connection.prepare("SELECT * FROM projection_messaging_threads WHERE thread_id = ?").get(threadId),
+      cachedStatement(this.#database.connection, "SELECT * FROM projection_messaging_threads WHERE thread_id = ?").get(
+        threadId,
+      ),
     );
     return row ? decodeLink(row) : null;
   }
@@ -316,14 +289,12 @@ export class MessagingStore {
     ).map(decodeLink);
   }
 
-  /** The agent id and thread id of every link, for boot recovery. */
   executionThreads(): Array<{ id: string; threadId: string }> {
     return databaseRows(
       this.#database.connection.prepare("SELECT agent_id, thread_id FROM projection_messaging_threads").all(),
     ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
   }
 
-  /** Finds the link of one external conversation, or creates it with a new execution thread. */
   ensureLink(input: MessagingLinkInput): MessagingLink {
     const existing = this.linkByKey(input.connectionId, input.platformChannelId, input.threadKey);
     if (existing) return existing;
@@ -374,7 +345,6 @@ export class MessagingStore {
     return created;
   }
 
-  /** Marks new activity, so the link lists first, and records what the agent has read. */
   touch(linkId: string, historyCursor?: string): void {
     const now = new Date().toISOString();
     if (historyCursor === undefined)
@@ -387,12 +357,12 @@ export class MessagingStore {
         .run(now, historyCursor, linkId);
   }
 
-  /**
-   * Removes every link of an agent, with the execution threads and their history. A workspace whose
-   * orchestrator it was has none until the user adds one again. The caller releases the provider
-   * sessions of `threadIdsForAgent` first.
-   */
-  deleteForAgent(agentId: string): void {
+  deleteForAgent(agentId: string): string[] {
+    const orchestratorOf = databaseRows(
+      this.#database.connection
+        .prepare("SELECT connection_id FROM projection_messaging_connections WHERE orchestrator_agent_id = ?")
+        .all(agentId),
+    ).map((row) => requiredStringColumn(row, "connection_id"));
     const links = databaseRows(
       this.#database.connection
         .prepare("SELECT link_id, thread_id FROM projection_messaging_threads WHERE agent_id = ?")
@@ -421,8 +391,6 @@ export class MessagingStore {
           deleteAggregateHistory(db, "thread", [threadId]);
           deleteThreadAttachments(db, threadId);
         }
-        // The pings of the agent's threads go with them, and so do the agent's pings of threads that no
-        // reply opened. The pings of a thread that another agent answers stay: they decide who it hears.
         db.prepare(
           `DELETE FROM projection_messaging_pings WHERE EXISTS (
              SELECT 1 FROM projection_messaging_threads AS link WHERE link.agent_id = ?
@@ -446,6 +414,13 @@ export class MessagingStore {
         return null;
       },
     );
+    return orchestratorOf;
+  }
+
+  restoreOrchestrator(agentId: string, connectionIds: readonly string[]): void {
+    for (const connectionId of connectionIds)
+      if (this.connection(connectionId)?.orchestratorAgentId === null)
+        this.updateConnection(connectionId, { orchestratorAgentId: agentId });
   }
 
   threadIdsForAgent(agentId: string): string[] {
@@ -457,7 +432,6 @@ export class MessagingStore {
   }
 }
 
-/** A row of a platform this build has no driver for is skipped, not an error: a newer build wrote it. */
 function decodeConnection(row: DynamicRecord): MessagingConnectionRecord[] {
   const platform = requiredStringColumn(row, "platform");
   if (!isOneOf(MESSAGING_PLATFORMS, platform)) return [];

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "该主机未关联到 OpenBot 所有者账号。",
   "error.team.ownerEmailRequired": "请用创建该主机时使用的 OpenBot 邮箱登录。",
   "error.team.hostNotConfigured": "团队主机未配置。",
@@ -52,6 +51,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "登录尝试次数过多，请稍后再试。",
   "error.team.clientUpdateRequired": "连接该主机前请先更新该 OpenBot 客户端。",
   "error.team.hostUpdateRequired": "连接前请先更新主机上的 OpenBot。",
+  "error.team.serverSafeMode": "此服务器处于安全模式，因为 OpenBot 无法在其上启动。",
+  "error.team.serverSafeModeNewerDatabase":
+    "此服务器上的 OpenBot {version} 无法打开其数据，因为更新版本的 OpenBot 保存过这些数据。在服务器上安装更新的 OpenBot 版本即可解决。",
+  "error.team.serverSafeModeStartFailed":
+    "此服务器上的 OpenBot {version} 多次启动失败后已停止。在服务器上安装更新的 OpenBot 版本即可解决。",
   "error.team.sidebarLayoutUnavailable": "侧边栏布局不可用。",
   "error.team.providersUnsupported": "当前连接不支持服务商设置。",
   "error.team.providerNotManaged": "OpenBot 不管理该服务商的 CLI。",
@@ -85,6 +89,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "此连接无法停止自动化任务的运行。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
   "error.team.libraryFoldersUnsupported": "当前连接不支持资料库文件夹。",
+  "error.team.workflowFoldersUnsupported": "此连接不支持工作流文件夹。",
   "error.team.agentNotificationLevelsUnsupported":
     "此服务器无法为每个助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
   "error.team.sidebarPinsUnsupported": "此服务器无法为你的所有设备保存已置顶的聊天。请在运行它的电脑上更新 OpenBot。",
@@ -113,12 +118,15 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "当前连接不支持更改服务器身份。",
   "error.team.hostUpdateUnsupported": "当前连接不支持主机更新。",
   "error.team.hostTimezoneUnsupported": "当前连接不支持服务器时区。",
+  "error.team.hostVoiceModelUnsupported": "此连接不支持服务器的语音识别模型。",
   "error.team.hostRestartUnsupported": "当前连接不支持重启服务器。",
+  "error.team.ownerTransferUnsupported": "该服务器不支持转移所有权。",
   "error.team.hostKeyRotationUnsupported": "当前连接不支持更改服务器密钥。",
   "error.team.localServersUnsupported": "当前连接不支持此电脑上的服务器。",
   "error.team.routineResultsUnsupported": "当前连接不支持自动化任务的结果去向。",
   "error.team.agentMemoryLimitUnsupported": "当前连接不支持助手记忆上限。",
   "error.team.agentFoldersUnsupported": "当前连接不支持助手的文件夹。",
+  "error.team.channelFoldersUnsupported": "当前连接不支持频道的文件夹。",
   "error.team.folderUnavailable": "此文件夹在主机电脑上不可用。",
   "error.team.memoryReviewUnsupported": "当前连接不支持记忆整理。",
   "error.team.skillLearningUnsupported": "此连接不支持技能学习。",
@@ -126,6 +134,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "当前连接不支持提示缓存时间。",
   "error.team.claudeUserSetupUnsupported": "当前连接不支持 Claude Code 配置开关。",
   "error.team.claudeCompactWindowUnsupported": "此连接不支持 Claude 压缩大小。",
+  "error.team.cacheExpiryCompactionUnsupported": "此连接不支持在缓存过期前压缩。",
   "error.team.providerEnvironmentUnsupported": "此连接不支持提供方变量。",
   "error.team.modelVisibilityUnsupported": "当前连接不支持模型列表。",
   "error.team.providerDefaultUnsupported": "当前连接不支持默认服务商。",
@@ -142,6 +151,8 @@ export const messages = {
   "error.team.browserSessionNotFound": "未找到浏览器视图会话。",
   "error.team.mcpUnsupported": "当前连接不支持 MCP 服务器。",
   "error.team.mcpServerListNeedsUpdate": "请在此设备上更新 OpenBot，才能在此服务器上使用超过 {limit} 个 MCP 服务器。",
+  "error.team.providerAccountListNeedsUpdate":
+    "请在此设备上更新 OpenBot，才能在此服务器上为一个提供商使用超过 {limit} 个账号。",
   "error.team.storageUnsupported": "当前连接不支持存储。",
   "error.team.machineResourcesUnsupported": "当前连接不支持机器使用情况。",
   "error.team.machineAlertMemberInvalid": "只有该服务器的所有者或管理员可以接收机器警报。",
@@ -182,6 +193,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "此连接不支持服务器个性。",
   "error.team.agentWaitsUnsupported": "此连接不支持未关闭的等待。",
   "error.team.pendingApprovalUnsupported": "此连接不支持读取完整的批准请求。",
+  "error.team.pendingPromptsUnsupported": "此连接不支持读取待回答的问题。",
   "error.team.phoneFeedbackUnsupported": "此连接不支持从手机应用发送报告。",
   "error.team.messagePinsUnsupported": "此连接不支持置顶消息。",
   "error.team.queuedMessageThreadUnsupported": "此连接不支持将排队的消息作为新线程运行。",

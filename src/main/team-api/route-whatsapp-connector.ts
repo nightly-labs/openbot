@@ -21,7 +21,6 @@ import { readJson, requireAdmin } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(WHATSAPP_CONNECTOR_ROUTES));
 
-/** The codec checked the shape; the IPC parser checks the values, such as a phone number. */
 function parse<T>(parser: (value: unknown) => T, body: unknown): T {
   try {
     return parser(body);
@@ -30,12 +29,6 @@ function parse<T>(parser: (value: unknown) => T, body: unknown): T {
   }
 }
 
-/**
- * The WhatsApp numbers of this host, which an administrator links and manages from their own
- * computer. Frozen by `whatsapp-connector-v1`. This host's session gets the QR code or the pairing
- * code and answers it; the client shows it. No answer carries a stored key. `requireAdmin` runs on
- * every route.
- */
 export async function routeWhatsAppConnector(
   context: TeamApiRequestContext,
   connectors: TeamApiConnectors | undefined,
@@ -45,7 +38,6 @@ export async function routeWhatsAppConnector(
   if (!connectors || !capabilities.has(WHATSAPP_CONNECTOR_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.connectorsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `whatsapp-connector-v1` codec.
   const body = await readJson(request);
   const { messaging } = connectors;
   switch (url.pathname) {
@@ -65,7 +57,6 @@ export async function routeWhatsAppConnector(
     }
     case WHATSAPP_CONNECTOR_ROUTES.reconnect: {
       const { workspaceId } = parse(parseMessagingWorkspaceInput, body);
-      // A WhatsApp number opens no page: it starts its session again.
       await runCauseEffect(Effect.asVoid(messaging.reconnect("whatsapp", workspaceId, false)));
       return json(200, {});
     }
@@ -75,7 +66,6 @@ export async function routeWhatsAppConnector(
       return json(200, {});
     }
     case WHATSAPP_CONNECTOR_ROUTES.orchestrator:
-      // The orchestrator starts on a new agent's default provider and model, as the host picks it.
       return json(200, await runCauseEffect(messaging.addWhatsAppOrchestrator({})));
     case WHATSAPP_CONNECTOR_ROUTES.groups: {
       const { workspaceId } = parse(parseMessagingWorkspaceInput, body);

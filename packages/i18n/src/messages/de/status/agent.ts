@@ -28,6 +28,8 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Den Hauptbildschirm aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureChannel":
     "Das Bild erscheint im Kanal {channel}, und jedes Mitglied dieses Servers, das den Kanal liest, kann es sehen.",
+  "status.agent.screenCapturePermissionNext":
+    "macOS kann dich danach bitten, OpenBot die Bildschirmaufnahme zu erlauben.",
   "status.agent.screenCaptureDisplay": "Den Bildschirm {name} aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureWindow": "Das Fenster {name} aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureRegion":
@@ -71,6 +73,7 @@ export const messages = {
   "status.agent.browserActing": "Webseite wird bedient…",
   "status.agent.browserReviewing": "Webseite wird geprüft…",
   "status.agent.memoriesSearching": "Erinnerungen werden durchsucht…",
+  "status.agent.chatsSearching": "Frühere Chats werden durchsucht…",
   "status.agent.memoriesSearched": {
     one: "Erinnerungen durchsucht: {count} gefunden",
     other: "Erinnerungen durchsucht: {count} gefunden",
@@ -115,9 +118,15 @@ export const messages = {
   "status.agent.nextStepContinues":
     "Der Agent hat vor dem nächsten Schritt angehalten. Er macht weiter ({current} von {limit}).",
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
+  "status.agent.planStopped":
+    "Der Agent hat mit offenen Schritten im Plan aufgehört. Sende eine Nachricht, damit er weitermacht.",
   "status.agent.compactionContinues":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Der Agent macht weiter.",
   "status.agent.providerExitContinues":
     "Der Agent hat aufgehört, bevor seine Antwort fertig war. Der Agent macht weiter.",
   "status.agent.branchTitle": "Abgezweigter Chat",
+  "status.agent.location.field": "Dein Standort",
+  "status.agent.location.placeholder": "Stadt, Adresse oder Ort",
+  "status.agent.location.submit": "Teilen",
+  "status.agent.location.shared": "Standort geteilt",
 } as const satisfies PartialTranslation<typeof source>;

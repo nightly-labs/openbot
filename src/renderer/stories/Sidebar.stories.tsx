@@ -1,13 +1,18 @@
 import type { ChannelSummary, HiddenAgent, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import { Button } from "@openbot/ui";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
+import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMachineCard } from "@openbot/ui/features/sidebar/SidebarMachineCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
 import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
-import { SIDEBAR_HIDDEN_GROUP_OPEN_ID, type SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
+import {
+  SIDEBAR_HIDDEN_GROUP_OPEN_ID,
+  type SidebarAgentState,
+  type SidebarAgentThreads,
+} from "@openbot/ui/features/sidebar/sidebar-types";
 import { createSignal, For, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -62,7 +67,6 @@ const sectionedLayout: SidebarLayoutSnapshot = {
   agentAssignments: { chief: demoSectionId, research: demoSectionId },
   agentOrder: ["chief", "research", "sales"],
 };
-/** "Research" keeps its "Core team" section while it is hidden, so Restore names that section. */
 const userHiddenAgents: HiddenAgent[] = [
   { agentId: "research", hiddenAt: "2026-09-28T09:00:00.000Z" },
   { agentId: "sales", hiddenAt: "2026-10-02T15:30:00.000Z" },
@@ -107,9 +111,6 @@ const stressLayout: SidebarLayoutSnapshot = {
   agentOrder: stressAgents.map((agent) => agent.id),
 };
 
-/* One channel for each shape the member cluster has to draw: a single face, a pair, the triangle,
- * the full quad, the count that takes the last cell when the members outnumber it, and the count of
- * two digits that takes the bottom row. */
 const channelSizes = [
   { name: "Solo", size: 1 },
   { name: "Pair", size: 2 },
@@ -173,7 +174,6 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
   const [collapsedSectionIds, setCollapsedSectionIds] = createSignal(untrack(() => props.collapsedSectionIds));
   const [hiddenAgents, setHiddenAgents] = createSignal(untrack(() => props.userHiddenAgents ?? []));
   const [chatOrder, setChatOrder] = createSignal(untrack(() => props.chatOrder));
-  // Opening a chat reads it, as in the app, so the unread orders can be tried here.
   const [activeAgentId, setActiveAgentId] = createSignal(untrack(() => props.activeAgentId));
   const [readAgentIds, setReadAgentIds] = createSignal<ReadonlySet<string>>(new Set());
   const [mutedAgentIds, setMutedAgentIds] = createSignal<ReadonlySet<string>>(new Set());
@@ -279,31 +279,26 @@ export const Populated: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** "Recent activity": each section shows its chats by last activity, the most recent first. */
 export const RecentActivity: Story = {
   args: { chatOrder: "recent", pinnedItems: pinnedOne },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** "Unread in a group": the chats with unread replies leave their sections for a group under "Needs you". */
 export const UnreadGroup: Story = {
   args: { chatOrder: "unread-group", pinnedItems: pinnedOne },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** "Unread first in folders": each section shows its unread chats first, then the others by recency. */
 export const UnreadFirst: Story = {
   args: { chatOrder: "unread-first", pinnedItems: pinnedOne },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** A joined server has a new OpenBot version. The header button opens its update. */
 export const ServerUpdate: Story = {
   args: { serverName: "Research server", serverUpdate: { version: "0.24.0", running: false, onOpen: fn() } },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** Back opens the chat that was open before. Forward has no chat yet, so it is disabled. */
 export const ChatHistory: Story = {
   args: {
     chatHistory: {
@@ -318,7 +313,7 @@ export const ChatHistory: Story = {
 };
 
 export const MobileAppCard: Story = {
-  args: { footer: <SidebarMobileAppCard onOpenInstall={fn()} onDismiss={fn()} /> },
+  args: { footer: <SidebarMobileAppCard agents={STORY_AGENTS} onInstall={fn()} onDismiss={fn()} /> },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
@@ -329,7 +324,6 @@ export const CommunityCard: Story = {
 
 const GB = 1024 ** 3;
 
-/** A 12 GB hosted server with 1.1 GB free: the card shows, and it can be closed. */
 export const StorageLow: Story = {
   args: {
     footer: (
@@ -338,6 +332,7 @@ export const StorageLow: Story = {
         serverName="Acme HQ"
         freeBytes={1.1 * GB}
         totalBytes={12 * GB}
+        hostedPlan
         onFreeUpSpace={fn()}
         onDismiss={fn()}
       />
@@ -346,7 +341,6 @@ export const StorageLow: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** At "full" the card is red and has no close button. */
 export const StorageFull: Story = {
   args: {
     footer: (
@@ -355,6 +349,7 @@ export const StorageFull: Story = {
         serverName="Acme HQ"
         freeBytes={0.14 * GB}
         totalBytes={12 * GB}
+        hostedPlan
         onFreeUpSpace={fn()}
         onDismiss={fn()}
       />
@@ -363,7 +358,23 @@ export const StorageFull: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** The disk of a hosted server passed the 80% alert level that an admin set. */
+export const StorageThisComputer: Story = {
+  args: {
+    footer: (
+      <SidebarStorageCard
+        level="low"
+        serverName="OpenBot"
+        freeBytes={5_100_000_000}
+        totalBytes={245_000_000_000}
+        thisComputer
+        onFreeUpSpace={fn()}
+        onDismiss={fn()}
+      />
+    ),
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
 export const MachineDiskAlert: Story = {
   args: {
     footer: (
@@ -383,7 +394,6 @@ export const MachineDiskAlert: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** Memory far above its level: the card is red and has no close button. */
 export const MachineMemoryCritical: Story = {
   args: {
     footer: (
@@ -452,7 +462,6 @@ export const AgentTiles: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** Two agents on a spent plan: one with a reported reset, one without. */
 export const UsageLimit: Story = {
   args: {
     agentStates: {
@@ -461,6 +470,49 @@ export const UsageLimit: Story = {
     },
     pinnedItems: [],
   },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+function storyThread(id: string, title: string, minutes: number, status: ThreadItem["status"], unread = 0): ThreadItem {
+  return {
+    id,
+    kind: "side",
+    title,
+    updatedAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    status,
+    unread,
+  };
+}
+
+const storyThreads: Record<string, ThreadItem[]> = {
+  chief: [
+    storyThread("chief-launch", "Launch plan for the spring release", 2, { kind: "working" }),
+    storyThread("chief-budget", "Q3 budget review", 18, { kind: "waiting", reason: "approval" }),
+    storyThread("chief-hiring", "Hiring pipeline for two designers", 45, { kind: "idle" }, 2),
+    storyThread("chief-board", "Board deck outline", 3 * 60, { kind: "idle" }),
+    storyThread("chief-pricing", "Pricing page copy, second pass with the new plan names", 26 * 60, { kind: "idle" }),
+    storyThread("chief-offsite", "Team offsite agenda", 3 * 24 * 60, { kind: "idle" }),
+    storyThread("chief-vendors", "Vendor contracts that renew this year", 6 * 24 * 60, { kind: "failed" }),
+    storyThread("chief-okr", "OKR draft", 9 * 24 * 60, { kind: "idle" }),
+  ],
+  research: [
+    storyThread("research-market", "Market size of agent tools", 30, { kind: "idle" }),
+    storyThread("research-survey", "User survey summary", 2 * 24 * 60, { kind: "idle" }),
+  ],
+};
+
+function storyAgentThreads(): SidebarAgentThreads {
+  return {
+    threads: (agentId) => storyThreads[agentId] ?? [],
+    openId: (agentId) => (agentId === "chief" ? "chief-board" : undefined),
+    load: fn(),
+    onOpen: fn(),
+    onNew: fn(),
+  };
+}
+
+export const AgentThreads: Story = {
+  args: { agentThreads: storyAgentThreads(), pinnedItems: pinnedOne },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
@@ -522,7 +574,6 @@ export const AgentContextMenu: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** A custom section's menu offers Duplicate when the server can copy agents and change the layout. */
 export const Sections: Story = {
   args: {
     layout: sectionedLayout,
@@ -541,7 +592,6 @@ const folderIds = {
   internal: "55555555-5555-4555-8555-555555555554",
   archive: "55555555-5555-4555-8555-555555555555",
 };
-/** Three levels: "Clients / Acme Robotics / Launch". "Archive" is empty. */
 const folderLayout: SidebarLayoutSnapshot = {
   revision: 1,
   sections: [
@@ -576,7 +626,6 @@ const folderLayout: SidebarLayoutSnapshot = {
 };
 const folderAgents = stressAgents.slice(0, 11);
 
-/** Folders in folders. A folder header stays at the top while its chats scroll under it. */
 export const Folders: Story = {
   args: {
     agents: folderAgents,
@@ -589,7 +638,6 @@ export const Folders: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** Closed folders are a list of headers. A closed folder shows its unread count. */
 export const FoldersClosed: Story = {
   args: {
     agents: folderAgents,
@@ -611,7 +659,6 @@ export const SectionsCollapsed: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** The Hidden group is collapsed until the user opens it. Hide and Restore work in the agent menu. */
 export const HiddenAgents: Story = {
   args: { layout: sectionedLayout, pinnedItems: [], userHiddenAgents, onHideAgent: fn(), onRestoreAgent: fn() },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
@@ -675,9 +722,6 @@ export const EmptyPinDropTarget: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** Three pinned tiles, three people and one small section of three agents, so every region has
- *  rows to shift during a drag. The pinned agents are excluded from the section list, which is
- *  why the section holds stress agents rather than the three real ones. */
 const dragOffsetAgents = stressAgents.slice(0, 6);
 const dragOffsetLayout: SidebarLayoutSnapshot = {
   revision: 1,
@@ -763,7 +807,6 @@ export const Channels: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** Two channels whose work waits for the user: one in "Needs you" with an agent, one pinned. */
 export const ChannelsWaiting: Story = {
   args: {
     ...Channels.args,
@@ -793,8 +836,6 @@ export const DeletedChats: Story = {
   },
 };
 
-/* The felt badges: unread counts of one, two and three digits, a failed routine, and the "+N" count
- * of the channel clusters. "Research" is pinned and active, so its badge sits on the raised row. */
 const feltBadgeStates: Record<string, SidebarAgentState> = {
   chief: { kind: "unread", count: 1 },
   research: { kind: "unread", count: 10 },
@@ -818,8 +859,6 @@ export const FeltBadges: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
-/* The steps of the smoke: a new unread, two counts that go up, the count read to zero, and a routine
- * that fails and then succeeds. Each button sets the state, so each transition can run again. */
 const feltBadgeSteps: {
   label: string;
   chief?: SidebarAgentState | undefined;
@@ -862,7 +901,6 @@ function FeltBadgeTransitions(props: Parameters<typeof Sidebar>[0]) {
   );
 }
 
-/** Each button sets one state, so the badge lands, rolls its digits, closes, and the X lands. */
 export const FeltBadgeMotion: Story = {
   args: { pinnedItems: [{ kind: "agent", id: "chief" }], activeAgentId: "research" },
   render: (storyArgs) => <SettledArgs>{() => <FeltBadgeTransitions {...storyArgs} />}</SettledArgs>,

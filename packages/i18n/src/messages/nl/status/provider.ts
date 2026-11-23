@@ -15,6 +15,8 @@ export const messages = {
     "{provider} kan geen verbinding maken met de modelaanbieder. Nieuwe poging: {attempt}.",
   "status.provider.modelRetryServerError":
     "De modelaanbieder is bezet of heeft een fout. {provider} probeert het opnieuw: poging {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "De modelserver heeft niet genoeg geheugen voor deze chat. {provider} probeert het opnieuw: poging {attempt}. Een nieuwe chat heeft minder geheugen nodig.",
   "status.provider.modelRetryRecovered": "De modelaanbieder antwoordt weer.",
   "status.provider.retryRecovered": "{provider} krijgt weer antwoorden van zijn server.",
   "status.provider.claudeFastModeNeedsUsageCredits":

@@ -1,12 +1,11 @@
 import { ACP_REGISTRY_CODECS } from "./acp-registry-v1";
-// The optional admin routes, one table. `teamSideRouteCodec` in `side-routes.ts` asks here, so every
-// HTTP and WebRTC transport encodes an admin route with its frozen codec. A path that is not listed
-// goes to the protocol adapter.
 import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CODECS } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
+import { AGENT_ARCHIVED_THREADS_CODECS } from "./agent-archived-threads-v1";
 import { AGENT_BACKUP_MODELS_CODECS } from "./agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_CODECS } from "./agent-builtin-memory-v1";
 import { AGENT_COLORS_CODECS } from "./agent-colors-v1";
 import { AGENT_DEFAULTS_CODECS } from "./agent-defaults-v1";
 import { AGENT_FAST_MODE_CODECS } from "./agent-fast-mode-v1";
@@ -51,6 +50,8 @@ import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
+import { CACHE_EXPIRY_COMPACTION_CODECS } from "./cache-expiry-compaction-v1";
+import { CHANNEL_FOLDERS_CODECS } from "./channel-folders-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
 import { CLAUDE_COMPACT_WINDOW_CODECS } from "./claude-compact-window-v1";
@@ -82,12 +83,14 @@ import { HOST_RESTART_CODECS } from "./host-restart-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
 import { HOST_TURN_LIMITS_CODECS } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
+import { HOST_VOICE_MODEL_CODECS } from "./host-voice-model-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CODECS } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CODECS } from "./instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CODECS } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_CODECS } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
+import { LIVE_VOICE_ACCOUNT_CODECS } from "./live-voice-account-v1";
 import { LIVE_VOICE_CODECS } from "./live-voice-v1";
 import { LOCAL_SERVERS_CODECS } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CODECS } from "./machine-resources-v1";
@@ -98,10 +101,12 @@ import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
 import { MESSAGE_DELETE_CODECS } from "./message-delete-v1";
 import { MESSAGE_PINS_CODECS } from "./message-pins-v1";
 import { MODEL_STEERING_CODECS } from "./model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_CODECS } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
 import { PENDING_APPROVAL_CODECS } from "./pending-approval-v1";
+import { PENDING_PROMPTS_CODECS } from "./pending-prompts-v1";
 import { PHONE_FEEDBACK_CODECS } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_CODE_CODECS } from "./provider-account-code-v1";
@@ -116,6 +121,7 @@ import { PROVIDER_DETECTION_CODECS } from "./provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CODECS } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CODECS } from "./provider-host-sign-in-v1";
 import { PROVIDER_MODEL_SOURCE_CODECS } from "./provider-model-source-v1";
+import { PROVIDER_SIGN_IN_RELAY_V2_CODECS } from "./provider-sign-in-relay-v2";
 import { PROVIDER_SIGN_OUT_CODECS } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CODECS } from "./provider-usage-reset-v1";
 import { PROVIDER_USE_CODECS } from "./provider-use-v1";
@@ -137,6 +143,7 @@ import { ROUTINE_RUN_COMMAND_CODECS } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CODECS } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CODECS } from "./routines-once-v1";
 import { SERVER_AUDIT_CODECS } from "./server-audit-v1";
+import { SERVER_SAFE_MODE_CODECS } from "./server-safe-mode-v1";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SIDE_QUESTION_CODECS } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CODECS } from "./sidebar-folders-v1";
@@ -155,15 +162,23 @@ import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
 import { VAULT_V3_CODECS } from "./vault-v3";
 import { VAULT_V4_CODECS } from "./vault-v4";
+import { WEBHOOK_AGENT_SECRET_CODECS } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
 import { WHATSAPP_STATUS_REACTIONS_CODECS } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
+import { WORKFLOW_FOLDERS_CODECS } from "./workflow-folders-v1";
+import { WORKFLOWS_CREDIT_MEDIA_CODECS } from "./workflows-credit-media-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CODECS } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_CATALOG_CODECS } from "./workflows-media-catalog-v1";
+import { WORKFLOWS_MEDIA_CATALOG_V2_CODECS } from "./workflows-media-catalog-v2";
+import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS } from "./workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_CODECS } from "./workflows-media-v1";
+import { WORKFLOWS_PAUSE_CODECS } from "./workflows-pause-v1";
+import { WORKFLOWS_PORTABLE_CODECS } from "./workflows-portable-v1";
+import { WORKFLOWS_STEP_SETTINGS_CODECS } from "./workflows-step-settings-v1";
 import { WORKFLOWS_SUNRA_CODECS } from "./workflows-sunra-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CODECS } from "./workspace-directory-v1";
@@ -193,6 +208,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
+  ...HOST_VOICE_MODEL_CODECS,
   ...HOST_TURN_LIMITS_CODECS,
   ...HOST_PERSONALITY_CODECS,
   ...HOST_KEY_ROTATION_CODECS,
@@ -205,11 +221,13 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...MODEL_STEERING_CODECS,
   ...PROVIDER_MODEL_SOURCE_CODECS,
   ...MODEL_VISIBILITY_CODECS,
+  ...MODEL_VISIBILITY_KEPT_CODECS,
   ...SERVER_AUDIT_CODECS,
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
   ...HOST_RELEASE_CODECS,
   ...HOST_RESTART_CODECS,
+  ...SERVER_SAFE_MODE_CODECS,
   ...HOST_APPEARANCE_CODECS,
   ...HOST_MEMBER_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,
@@ -229,6 +247,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_TASK_LIMIT_CODECS,
   ...AGENT_NEW_CHAT_CODECS,
   ...AGENT_FOLDERS_CODECS,
+  ...CHANNEL_FOLDERS_CODECS,
   ...AGENT_FAST_MODE_CODECS,
   ...AGENT_SPEED_CODECS,
   ...CONTEXT_COMPACT_CODECS,
@@ -249,12 +268,14 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_RUN_COMMAND_CODECS,
   ...CLAUDE_USER_SETUP_CODECS,
   ...CLAUDE_COMPACT_WINDOW_CODECS,
+  ...CACHE_EXPIRY_COMPACTION_CODECS,
   ...PROVIDER_ENVIRONMENT_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
   ...PROVIDER_ACCOUNT_KEYS_CODECS,
   ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,
+  ...AGENT_ARCHIVED_THREADS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_THREAD_REQUESTS_CODECS,
   ...AGENT_ACTIVE_QUEUES_CODECS,
@@ -265,6 +286,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_QUEUE_TASK_CODECS,
   ...AGENT_WAITS_CODECS,
   ...PENDING_APPROVAL_CODECS,
+  ...PENDING_PROMPTS_CODECS,
   ...PHONE_FEEDBACK_CODECS,
   ...MESSAGE_PINS_CODECS,
   ...ROUTINE_FLOWS_CODECS,
@@ -275,6 +297,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_RESULTS_CODECS,
   ...WEBHOOK_TESTS_CODECS,
   ...WEBHOOK_SENDER_SECRET_CODECS,
+  ...WEBHOOK_AGENT_SECRET_CODECS,
   ...STORAGE_DISK_CODECS,
   ...STORAGE_USER_FILES_CODECS,
   ...STORAGE_CHANNEL_CODECS,
@@ -285,6 +308,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_USAGE_RESET_CODECS,
   ...USAGE_CREDITS_CODECS,
   ...PROVIDER_SIGN_OUT_CODECS,
+  ...PROVIDER_SIGN_IN_RELAY_V2_CODECS,
   ...ONEPASSWORD_CONNECTOR_CODECS,
   ...BITWARDEN_CONNECTOR_CODECS,
   ...AGENT_ACCESS_CODECS,
@@ -303,6 +327,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_NOTIFICATION_LEVELS_CODECS,
   ...SIDEBAR_PINS_CODECS,
   ...AGENT_PLAN_CARD_CODECS,
+  ...AGENT_BUILTIN_MEMORY_CODECS,
   ...AGENT_DEFAULTS_CODECS,
   ...BROWSER_USER_CONTROL_CODECS,
   ...BROWSER_TEACH_CODECS,
@@ -318,6 +343,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_THREAD_PAGES_CODECS,
   ...SIDE_QUESTION_CODECS,
   ...LIVE_VOICE_CODECS,
+  ...LIVE_VOICE_ACCOUNT_CODECS,
   ...BROWSER_PROFILES_CODECS,
   ...WORKFLOWS_CODECS,
   ...CRM_CODECS,
@@ -325,9 +351,16 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_MEDIA_CODECS,
   ...WORKFLOWS_SUNRA_CODECS,
   ...WORKFLOWS_HIGGSFIELD_CODECS,
+  ...WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS,
   ...WORKFLOWS_MEDIA_CATALOG_CODECS,
+  ...WORKFLOWS_MEDIA_CATALOG_V2_CODECS,
+  ...WORKFLOWS_CREDIT_MEDIA_CODECS,
+  ...WORKFLOWS_STEP_SETTINGS_CODECS,
+  ...WORKFLOWS_PAUSE_CODECS,
+  ...WORKFLOWS_PORTABLE_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
   ...LIBRARY_FOLDERS_CODECS,
+  ...WORKFLOW_FOLDERS_CODECS,
   ...VAULT_CODECS,
   ...BROWSER_SECRET_VAULT_CODECS,
   ...VAULT_IMPORT_CODECS,

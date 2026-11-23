@@ -1,6 +1,3 @@
-// The devices a host exposes: its embedded browser, and its remote desktop.
-// See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
-
 import {
   type BrowserControlState,
   type BrowserDisplayState,

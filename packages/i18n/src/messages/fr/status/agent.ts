@@ -26,6 +26,8 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Capturer l’écran principal et envoyer l’image au modèle de l’agent.",
   "status.agent.screenCaptureChannel":
     "L’image s’affiche dans le canal {channel}, et chaque membre de ce serveur qui lit le canal peut la voir.",
+  "status.agent.screenCapturePermissionNext":
+    "macOS peut ensuite vous demander d’autoriser l’enregistrement de l’écran pour OpenBot.",
   "status.agent.screenCaptureDisplay": "Capturer l’écran {name} et envoyer l’image au modèle de l’agent.",
   "status.agent.screenCaptureWindow": "Capturer la fenêtre {name} et envoyer l’image au modèle de l’agent.",
   "status.agent.screenCaptureRegion":
@@ -70,6 +72,7 @@ export const messages = {
   "status.agent.browserActing": "Utilisation de la page web…",
   "status.agent.browserReviewing": "Analyse de la page web…",
   "status.agent.memoriesSearching": "Recherche dans ses souvenirs…",
+  "status.agent.chatsSearching": "Recherche dans ses anciennes discussions…",
   "status.agent.memoriesSearched": {
     one: "Souvenirs consultés : {count} trouvé",
     other: "Souvenirs consultés : {count} trouvés",
@@ -113,8 +116,14 @@ export const messages = {
   "status.agent.uiBlockClosedByMessage": "Fermé par un nouveau message",
   "status.agent.nextStepContinues": "L’agent s’est arrêté avant l’étape suivante. Il continue ({current} sur {limit}).",
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
+  "status.agent.planStopped":
+    "L’agent s’est arrêté avec des étapes en cours dans son plan. Envoyez un message pour continuer.",
   "status.agent.compactionContinues":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte. L’agent continue.",
   "status.agent.providerExitContinues": "L’agent s’est arrêté avant de finir sa réponse. L’agent continue.",
   "status.agent.branchTitle": "Chat dérivé",
+  "status.agent.location.field": "Votre position",
+  "status.agent.location.placeholder": "Ville, adresse ou lieu",
+  "status.agent.location.submit": "Partager",
+  "status.agent.location.shared": "Position partagée",
 } as const satisfies PartialTranslation<typeof source>;

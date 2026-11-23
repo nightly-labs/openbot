@@ -8,10 +8,8 @@ import { UsageSegments } from "./usage-segments";
 export type UsageRange = Omit<AgentAnalyticsInput, "agentId">;
 
 const PRESETS = [7, 30, 90, 365] as const;
-/** The host accepts at most 367 calendar days, so the end is at most 366 days after the start. */
 const MAX_SPAN_DAYS = 366;
 
-/** The last `days` calendar days in the phone's time zone, today included. */
 export function lastUsageDays(days = 30): UsageRange {
   const { startDate, endDate, timeZone } = analyticsRange("", days);
   return { startDate, endDate, timeZone };
@@ -27,14 +25,8 @@ function clamp(date: string, min: string, max: string): string {
   return date < min ? min : date > max ? max : date;
 }
 
-/**
- * The preset periods and a custom range of an agent or server usage report. A custom date
- * applies at once. A date that makes the range too long or inverted moves the other date,
- * so each date can be set in any order.
- */
 export function UsageRangePicker({ range, onChange }: { range: UsageRange; onChange: (range: UsageRange) => void }) {
   const { t } = useText();
-  // A report can open on a range from another screen: a preset when the range is one, else a custom range.
   const [period, setPeriod] = useState<(typeof PRESETS)[number] | "custom">(() => {
     const preset = PRESETS.find((days) => {
       const last = lastUsageDays(days);

@@ -111,11 +111,14 @@ export const messages = {
   "provider.picker.download": "Download de {name}",
   "provider.picker.search": "Buscar modelos",
   "provider.picker.noMatches": "Nenhum modelo corresponde à sua busca.",
+  "provider.picker.openrouterNoMatches":
+    "Nenhum modelo corresponde à sua busca. Suas configurações de privacidade, provedores e guardrails no openrouter.ai podem ocultar modelos desta lista.",
   "provider.picker.workspaceOnlyUnavailable":
     "Estes modelos não funcionam com “Espaço de trabalho” no Windows e no Linux. Para usá-los, altere “Permissões” nas configurações do agente.",
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
-  "provider.picker.noModels": "Nenhum modelo de {name} está disponível.",
+  "provider.picker.noModels":
+    "Nenhum modelo de {name} aparece aqui. Se estiverem desativados, um administrador pode ativá-los em Configurações do servidor > Provedores > {name} > Modelos.",
   "provider.picker.endpointModelsInCustom":
     "{name} executa seus endpoints personalizados. Os modelos deles estão na aba Personalizado.",
   "provider.picker.showCustomModels": "Ver modelos",
@@ -136,6 +139,7 @@ export const messages = {
   "provider.picker.effort": "Esforço",
   "provider.picker.effortLabel": "Esforço de raciocínio do agente",
   "provider.picker.effortFixed": "{effort}, definido por {provider}",
+  "provider.picker.effortLimited": "Suas configurações do Claude ou sua organização limitam o esforço a {effort}.",
   "provider.picker.fast": "Rápido",
   "provider.picker.fastText": "Respostas mais rápidas, maior uso",
   "provider.picker.speed": "Velocidade",
@@ -260,19 +264,27 @@ export const messages = {
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
   "provider.settings.geminiKeyReplacesAccount":
     "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
+  "provider.settings.museKeyInUse": "O Muse usa esta chave, não o seu login. Para usar o seu login, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",
   "provider.settings.otherVersionDownloaded": "Sem uso: {version} · baixada pelo OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Alguns modelos precisam de uma parte que esta versão não tem. Baixe a versão do OpenBot para usá-los.",
   "provider.settings.useInstalledVersion": "Usar a instalada",
   "provider.settings.useDownloadedVersion": "Usar a do OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompts",
   "provider.settings.promptCacheDescription":
-    "Por quanto tempo o Claude mantém o contexto de um agente no cache entre os turnos.",
+    "Por quanto tempo Claude e Pi mantêm o contexto de um agente no cache entre turnos.",
   "provider.settings.promptCacheHour": "1 hora",
-  "provider.settings.promptCacheDefault": "Padrão do Claude Code",
+  "provider.settings.promptCacheDefault": "Padrão do provedor",
   "provider.settings.promptCacheLoadFailed": "Não foi possível carregar a duração do cache de prompts deste servidor.",
+  "provider.settings.cacheExpiryCompaction": "Compactar antes de o cache expirar",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Quando um chat com 200K ou mais tokens de contexto fica ocioso com um cache de 1 hora, o agente compacta o contexto antes de o cache expirar. Assim a próxima mensagem não lê todo o contexto de novo sem cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "Não foi possível carregar a configuração de compactação deste servidor.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Usar minha configuração do Claude Code",
   "provider.settings.claudeUserSetupDescription":
@@ -330,4 +342,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
   "provider.settings.disconnectLocalOnly":
     "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
+  "provider.settings.updateAll": "Atualizar tudo",
 } as const satisfies PartialTranslation<typeof source>;

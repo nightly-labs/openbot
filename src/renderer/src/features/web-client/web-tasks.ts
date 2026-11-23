@@ -13,7 +13,6 @@ import { isTaskEvent, type TasksSource } from "../tasks/tasks-port";
 import { withoutPreviewUrls } from "./web-agent-threads";
 import type { WebWorkspace } from "./web-client-context";
 
-/** The tasks on the web: the `agent-tasks-v1` routes and the task events of the connected host. */
 export function webTasksSource(
   workspace: Pick<WebWorkspace, "state" | "onHostEvent">,
   hostRequest: (serverId?: string) => TeamApiRequest,
@@ -32,7 +31,6 @@ export function webTasksSource(
     onEvent: (serverId, apply, reload) =>
       workspace.onHostEvent((event) => {
         if (workspace.state.host?.hostId !== serverId) return;
-        // A snapshot comes after a reconnect: a task can change while the host is away.
         if (event.type === "runtime-snapshot") reload();
         else if (event.type === "agent-task-conversation")
           apply({ ...event, snapshot: withoutPreviewUrls(event.snapshot) });

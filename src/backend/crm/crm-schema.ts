@@ -1,4 +1,3 @@
-/** The CRM tables right after migration 63, for the migration tests of earlier versions. */
 export const CRM_TABLES_AFTER_MIGRATION: Record<string, Record<string, string | number | null>[]> = {
   crm_activity: [],
   crm_agent_access: [],

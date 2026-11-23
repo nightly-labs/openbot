@@ -1,16 +1,3 @@
-// Moves a whole setup between two OpenBot profiles with the real transfer service and checks what
-// arrives. Two real agent services run on temporary profiles with a fake Codex app-server.
-//
-// The source has two agents with memories, routines, a chat with a file, a side thread made by a
-// branch, settings that only restrict, and a channel with both agents, a lead, a memory and a routine.
-// It also has two hidden agents with active routines: one stays as written, and the file of the other
-// is changed to the file of an app that stopped a hidden agent, so its routines arrive turned off.
-// The export includes workspace files, server settings, chat history, channel messages and the
-// server preferences, one of which is changed to a value the import does not accept. A second export
-// has the chats without the channel messages. The import goes into the second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
-// messages in order with the file's bytes, the side thread, and that the first turn of an imported
-// agent gets the imported history. It also checks that `Shared/Transfers` is not copied as files.
-// `bun scripts/instance-transfer-everything-e2e.ts`. Writes .openbot-build/instance-transfer-everything-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -34,7 +21,9 @@ import {
   type ServerNotificationLevel,
   type SkillLearningMode,
   type UpdateHostIdentityInput,
+  WORKFLOW_UNLINKED_CONNECTION,
 } from "@openbot/contracts/ipc";
+import { copiedTransferUpload } from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -44,7 +33,6 @@ const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 const home = join(root, "home");
 
-// Before the service modules load: the Codex process reads these.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -62,11 +50,11 @@ const { INSTANCE_TRANSFER_MANIFEST } = await import("../src/main/instance-transf
 const { LocalSkillLibrary } = await import("../src/main/local-skill-library");
 const { WorkflowStore } = await import("../src/backend/workflows/workflow-store");
 const { workflowScheduleDueAt } = await import("../src/backend/workflows/workflow-triggers");
+const { telegramTriggerMatches } = await import("../src/backend/workflows/telegram-matching");
 const { HostEventsService } = await import("../src/main/host-events-service");
 
 const HISTORY_MARK = "the blue notebook is on the second shelf";
 
-/** A Codex app-server that answers each turn with "Done." and logs what each turn starts with. */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -139,6 +127,7 @@ process.stdin.on("data", (chunk) => {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -192,7 +181,6 @@ function codexLog(): Array<{ method: string; params: unknown }> {
   }
 }
 
-/** One OpenBot profile: its database, stores, agent service and transfer service. */
 function profile(name: string) {
   const userData = join(root, name, "user-data");
   const profileHome = join(root, name, "home");
@@ -231,7 +219,6 @@ function profile(name: string) {
   const pins = new Set<string>();
   const levels = new Map<string, "all" | "needs-me" | "nothing">();
   const approvals = new Map<string, boolean>();
-  // The host-wide preferences, as the Server settings stores keep them.
   const serverPreferences: {
     timezone: string | null;
     personality: { responseStyle: ResponseStyle };
@@ -244,6 +231,7 @@ function profile(name: string) {
     ownerNotificationLevel: ServerNotificationLevel | null;
     browsingMemory: { enabled: boolean };
     claudeUserSetup: boolean;
+    cacheExpiryCompaction: boolean;
     claudeCompactWindow: number | null;
     machineAlerts: MachineAlertSettings;
     modelVisibility: { provider: string; hidden: string[] }[];
@@ -260,12 +248,12 @@ function profile(name: string) {
     ownerNotificationLevel: null,
     browsingMemory: { enabled: true },
     claudeUserSetup: false,
+    cacheExpiryCompaction: true,
     claudeCompactWindow: null,
     machineAlerts: DEFAULT_MACHINE_ALERT_SETTINGS,
     modelVisibility: [],
     turnLimits: { turnLimit: null, agentTaskLimit: null },
   };
-  // The server's name and logo, as Server settings > General keeps them.
   const identity: {
     name: string;
     logo: { path: string; mimeType: "image/png" } | null;
@@ -275,9 +263,7 @@ function profile(name: string) {
     logo: null,
     saved: [],
   };
-  // Members' choices by account. Each server has its own member ids for the same accounts.
   const members = new Map<string, MemberPreferences<string>>();
-  /** One preference of the in-memory server settings, as the transfer port reads and writes it. */
   const preference = <K extends keyof typeof serverPreferences>(key: K) => ({
     get: () => serverPreferences[key],
     set: (value: (typeof serverPreferences)[K]) =>
@@ -290,10 +276,12 @@ function profile(name: string) {
     skills: { library: () => library, installLocal: () => Effect.void },
     sharedSkills: {
       list: () =>
-        library
-          .list()
-          .pipe(Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version })))),
-      // No agent of the check installs a library skill, so each one counts as shared.
+        library.listWithUnreadable().pipe(
+          Effect.map(({ skills, unreadable }) => ({
+            skills: skills.map(({ id, slug, name, version }) => ({ id, slug, name, version })),
+            unreadable: unreadable.map(({ skillId }) => skillId),
+          })),
+        ),
       assigned: () => Effect.succeed(new Set<string>()),
       bundle: (id, version) => library.bundle(id, version),
       add: (bytes) => library.createFromBundle(bytes),
@@ -325,6 +313,7 @@ function profile(name: string) {
       ownerNotificationLevel: preference("ownerNotificationLevel"),
       browsingMemory: preference("browsingMemory"),
       claudeUserSetup: preference("claudeUserSetup"),
+      cacheExpiryCompaction: preference("cacheExpiryCompaction"),
       claudeCompactWindow: preference("claudeCompactWindow"),
       machineAlerts: preference("machineAlerts"),
       modelVisibility: preference("modelVisibility"),
@@ -376,8 +365,14 @@ function profile(name: string) {
         ),
       workflows: {
         workflows: () =>
-          Effect.sync(() => workflows.listWithGraphs().map(({ summary, graph }) => ({ title: summary.title, graph }))),
-        createWorkflow: (input) => Effect.try(() => workflows.create(input)),
+          Effect.sync(() =>
+            workflows.listWithGraphs().map(({ summary, graph, needsNewerApp }) => ({
+              title: summary.title,
+              graph,
+              ...(needsNewerApp ? { needsNewerApp } : {}),
+            })),
+          ),
+        createWorkflow: (input) => Effect.try(() => workflows.create(input, new Date(), "saved")),
       },
       signedInProviders: () => [],
     },
@@ -415,13 +410,15 @@ try {
   await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
   const source = profile("source");
   const target = profile("target");
-  // A server that a released client imports into: "Import server settings" without the new flag.
   const released = profile("released");
+  const copied = profile("copied");
+  const copiedOnPhone = profile("copied-on-phone");
   await runCauseEffect(source.agents.initialize());
   await runCauseEffect(target.agents.initialize());
   await runCauseEffect(released.agents.initialize());
+  await runCauseEffect(copied.agents.initialize());
+  await runCauseEffect(copiedOnPhone.agents.initialize());
 
-  // --- The source setup.
   const create = (name: string) =>
     runCauseEffect(
       source.agents.createAgentProfile({
@@ -443,8 +440,6 @@ try {
     schedule: { kind: "daily", time: "08:00" },
   });
   await runCauseEffect(source.agents.updateAgent({ agentId: editor.id, computerUse: false, allowAutomation: true }));
-  // Two hidden agents with an active routine each. The file of the first one is changed below to the
-  // file of an app that stopped a hidden agent.
   const archivist = await create("Archivist");
   const keeper = await create("Keeper");
   for (const agent of [archivist, keeper]) {
@@ -472,7 +467,6 @@ try {
   source.levels.set(writer.id, "needs-me");
   source.approvals.set(editor.id, false);
 
-  // A real chat turn with a file, then a branch of it as a side thread.
   const notePath = join(root, "shelf-note.txt");
   const noteBytes = new TextEncoder().encode(`Note: ${HISTORY_MARK}.\n`);
   await writeFile(notePath, noteBytes);
@@ -485,7 +479,6 @@ try {
     }),
   );
   await idle(source.agents, writer.id);
-  // A test run of the writer's routine, which leaves a finished run and its messages in the chat.
   const sourceRun = await runCauseEffect(source.agents.testRoutine({ agentId: writer.id, routineId: routine.id }));
   await idle(source.agents, writer.id);
   const finishedRun = await waitFor("the test run to finish", () =>
@@ -528,7 +521,6 @@ try {
       { id: "local", name: "You" },
     ),
   );
-  // A database can keep channel instructions from before the 2,000-character limit (#5929).
   const longDesk = await runCauseEffect(
     source.agents.channels.command(
       {
@@ -557,7 +549,6 @@ try {
     schedule: { kind: "daily", time: "17:00" },
   });
 
-  // A real message with a file in the channel, which an agent answers.
   const layoutPath = join(root, "front-page-layout.txt");
   const layoutBytes = new TextEncoder().encode("Lead story left, weather right.\n");
   await writeFile(layoutPath, layoutBytes);
@@ -569,7 +560,6 @@ try {
         operationId: randomUUID(),
         channelId: channel.id,
         text: "Plan the front page.",
-        // To one member, so no routing turn runs.
         recipientAgentId: writer.id,
         replyToMessageId: null,
         attachmentDraftIds: channelDrafts.map((draft) => draft.id),
@@ -582,7 +572,6 @@ try {
     return messages.some((entry) => entry.author.kind === "agent" && entry.message.status === "completed") && messages;
   });
 
-  // A routine that a webhook starts, and the places of the routines on the writer's canvas.
   const hooked = await runCauseEffect(
     source.events.saveRoutine({
       owner: { kind: "agent", id: writer.id },
@@ -599,31 +588,77 @@ try {
     { nodeKey: `agent:${editor.id}`, x: 520, y: 40 },
   ]);
 
-  // A workflow with an agent step, a channel output, a Slack trigger and a webhook trigger.
   const at = { x: 0, y: 0 };
+  source.workflows.create(
+    {
+      title: "Paper pipeline",
+      graph: {
+        nodes: [
+          { id: "hook", kind: "trigger", at, fields: { trigger: "webhook" } },
+          {
+            id: "slack",
+            kind: "trigger",
+            at,
+            fields: { trigger: "slack", connectionId: "messaging-1", event: "message" },
+          },
+          {
+            id: "telegram",
+            kind: "trigger",
+            at,
+            fields: { trigger: "telegram", connectionId: "messaging-2", event: "mention" },
+          },
+          { id: "anyChat", kind: "trigger", at, fields: { trigger: "telegram", connectionId: "", event: "mention" } },
+          {
+            id: "discord",
+            kind: "trigger",
+            at,
+            fields: {
+              trigger: "discord",
+              connectionId: "messaging-3",
+              event: "mention",
+              placeId: "channel-1",
+              roles: "role-1\nrole-2",
+            },
+          },
+          { id: "reply", kind: "output", at, fields: { target: "telegram", connectionId: "trigger", action: "reply" } },
+          { id: "write", kind: "agent", at, fields: { agentId: writer.id, task: "Write it." } },
+          { id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } },
+        ],
+        edges: [
+          { id: "e1", from: "hook", to: "write", type: "text" },
+          { id: "e2", from: "write", to: "post", type: "text" },
+        ],
+        strokes: [],
+      },
+    },
+    new Date(),
+    "saved",
+  );
+
   source.workflows.create({
-    title: "Paper pipeline",
+    title: "Channel digest",
     graph: {
-      nodes: [
-        { id: "hook", kind: "trigger", at, fields: { trigger: "webhook" } },
-        {
-          id: "slack",
-          kind: "trigger",
-          at,
-          fields: { trigger: "slack", connectionId: "messaging-1", event: "message" },
-        },
-        { id: "write", kind: "agent", at, fields: { agentId: writer.id, task: "Write it." } },
-        { id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } },
-      ],
-      edges: [
-        { id: "e1", from: "hook", to: "write", type: "text" },
-        { id: "e2", from: "write", to: "post", type: "text" },
-      ],
+      nodes: [{ id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } }],
+      edges: [],
       strokes: [],
     },
   });
+  source.workflows.create({
+    title: "Archive sweep",
+    graph: {
+      nodes: [{ id: "sweep", kind: "agent", at, fields: { agentId: archivist.id, task: "Sweep the archive." } }],
+      edges: [],
+      strokes: [],
+    },
+  });
+  const brokenRow = source.workflows.create({
+    title: "Broken row",
+    graph: { nodes: [{ id: "keep", kind: "text", at, fields: { text: "Keep me." } }], edges: [], strokes: [] },
+  });
+  source.database.connection
+    .prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ?")
+    .run('{"text":{"rich":true}}', brokenRow.summary.id);
 
-  // --- Server preferences that differ from a new server's.
   Object.assign(source.serverPreferences, {
     timezone: "Europe/Warsaw",
     personality: { responseStyle: "classic" },
@@ -636,14 +671,13 @@ try {
     ownerNotificationLevel: "needs-me",
     browsingMemory: { enabled: false },
     claudeUserSetup: true,
+    cacheExpiryCompaction: false,
     claudeCompactWindow: 400_000,
-    // The member who gets the alerts belongs to the old server; the import gives them to the owner.
     machineAlerts: { diskPercent: 70, memoryPercent: 75, cpuPercent: 80, responsibleMemberId: "member-on-old-server" },
     modelVisibility: [{ provider: "codex", hidden: ["gpt-old-model"] }],
     turnLimits: { turnLimit: "unlimited", agentTaskLimit: 6 },
   } satisfies typeof source.serverPreferences);
 
-  // Shared skills that no agent has. The target already has one with the same name and other files.
   const fflate = await import("fflate");
   const skillBundle = (name: string, body: string) =>
     fflate.zipSync({
@@ -653,7 +687,6 @@ try {
   await runCauseEffect(source.library.createFromBundle(skillBundle("Fact check", "Check two sources.")));
   await runCauseEffect(target.library.createFromBundle(skillBundle("Fact check", "Check one source.")));
 
-  // A logo for the source server: a 1×1 PNG.
   const logoPath = join(root, "server-logo.png");
   const logoBytes = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -662,7 +695,6 @@ try {
   await writeFile(logoPath, logoBytes);
   source.identity.logo = { path: logoPath, mimeType: "image/png" };
 
-  // Two members with their choices. Only the first one has joined the target server, with no choices yet.
   source.members.set("account-ada", {
     accountId: "account-ada",
     server: "needs-me",
@@ -675,7 +707,6 @@ try {
   source.members.set("account-bob", { accountId: "account-bob", server: "all", agents: [], pins: [] });
   target.members.set("account-ada", { accountId: "account-ada", server: null, agents: [], pins: [] });
 
-  // --- The chats without the channel messages: each part is chosen on its own.
   const chatsOnly = join(root, "chats-only.zip");
   await runCauseEffect(
     source.transfer.exportTo(chatsOnly, {
@@ -706,7 +737,6 @@ try {
     pass("a file without server preferences has none", chatsManifest.serverPreferences === undefined);
   }
 
-  // --- Export everything.
   const file = join(root, "transfer.zip");
   const exported = await runCauseEffect(
     source.transfer.exportTo(file, {
@@ -727,14 +757,76 @@ try {
   const manifest: {
     agents: { name: string; preferences?: { hidden?: boolean; hiddenWorks?: boolean } }[];
     serverPreferences?: { timezone?: unknown; promptCacheTtl?: unknown; ownerNotificationLevel?: unknown };
+    settings?: { workflows?: { title: string; format?: unknown; graph: unknown }[] };
   } = JSON.parse(new TextDecoder().decode(manifestBytes));
+  const fileWorkflows = manifest.settings?.workflows ?? [];
+  const paperInFile = fileWorkflows.find((workflow) => workflow.title === "Paper pipeline");
+  pass("the file gives the graph format of each workflow", paperInFile?.format === 1, JSON.stringify(paperInFile));
+  fileWorkflows.push(
+    {
+      title: "Newer steps",
+      format: 99,
+      graph: {
+        nodes: [
+          { id: "start", kind: "trigger", at, fields: { trigger: "manual" } },
+          { id: "future", kind: "hologram", at, fields: { stepName: "Hologram", depth: 3 } },
+          { id: "after", kind: "llm", at, fields: { prompt: "Sum it up." } },
+        ],
+        edges: [
+          { id: "in", from: "start", to: "future", type: "text" },
+          { id: "out", from: "future", to: "after", type: "text" },
+          { id: "beam", from: "start", to: "after", type: "light" },
+          { id: "kept", from: "start", to: "after", type: "text" },
+        ],
+        strokes: [],
+      },
+    },
+    {
+      title: "Linked media",
+      graph: {
+        nodes: [
+          { id: "listen", kind: "trigger", at, fields: { trigger: "discord", connectionId: "", event: "mention" } },
+          { id: "pic", kind: "asset", at, fields: { fileId: "source-attachment-1", file: "cover.png" } },
+          {
+            id: "clip",
+            kind: "image",
+            at,
+            fields: { media: "video", firstFrame: "pic", lastFrame: "pic", prompt: "Move." },
+          },
+          {
+            id: "reply",
+            kind: "output",
+            at,
+            fields: { target: "discord", connectionId: "trigger", placeId: "trigger", message: "Done." },
+          },
+        ],
+        edges: [
+          { id: "frame", from: "pic", to: "clip", type: "image" },
+          { id: "say", from: "listen", to: "reply", type: "text" },
+        ],
+        strokes: [],
+      },
+    },
+    {
+      title: "Huge notes",
+      graph: {
+        nodes: Array.from({ length: 60 }, (_, index) => ({
+          id: `note-${index}`,
+          kind: "text",
+          at,
+          fields: { text: "x".repeat(20_000) },
+        })),
+        edges: [],
+        strokes: [],
+      },
+    },
+  );
   pass(
     "the file has the server preferences",
     manifest.serverPreferences?.timezone === "Europe/Warsaw" &&
       manifest.serverPreferences.ownerNotificationLevel === "needs-me",
     JSON.stringify(manifest.serverPreferences),
   );
-  // A value that this app does not accept is left out, and the other preferences are still saved.
   if (manifest.serverPreferences) manifest.serverPreferences.promptCacheTtl = "9h";
   const filePreferences = (name: string) => manifest.agents.find((agent) => agent.name === name)?.preferences;
   pass(
@@ -744,7 +836,6 @@ try {
     ),
     JSON.stringify([filePreferences("Archivist"), filePreferences("Keeper")]),
   );
-  // An app that stopped a hidden agent wrote `hidden` only.
   delete filePreferences("Archivist")?.hiddenWorks;
   archive[INSTANCE_TRANSFER_MANIFEST] = new TextEncoder().encode(JSON.stringify(manifest));
   await writeFile(file, zipSync(archive));
@@ -753,10 +844,8 @@ try {
     !Object.keys(archive).some((name) => name.toLowerCase().startsWith("shared/transfers/")),
   );
 
-  // --- Import into the second profile.
   const preview = await runCauseEffect(target.transfer.stage(file));
   pass("preview offers each agent", preview.agents.length === 4);
-  // The open views read a channel again on each change that the channel service publishes.
   const published: { channelId: string; revision: number }[] = [];
   target.agents.on("event", (event: AgentEvent) => {
     if (event.type === "channels-changed") published.push({ channelId: event.channelId, revision: event.revision });
@@ -949,6 +1038,12 @@ try {
       exported.warnings.some((warning) => warning.startsWith("Long desk:") && warning.includes("2000")),
     JSON.stringify({ length: newLongDesk?.instructions.length, warnings: exported.warnings }),
   );
+  pass(
+    "a workflow with a step that this OpenBot cannot read stays out of the file, and the user is told",
+    !(manifest.settings?.workflows ?? []).some((workflow) => workflow.title === "Broken row") &&
+      exported.warnings.some((warning) => warning.startsWith("Broken row is not imported.")),
+    JSON.stringify(exported.warnings),
+  );
   assert.ok(newChannel);
   pass(
     "channel members and lead are the new agents",
@@ -1026,18 +1121,92 @@ try {
     node("write")?.agentId === newWriter.id && node("post")?.channelId === newChannel.id,
     JSON.stringify(newWorkflow?.graph.nodes.map((item) => item.fields)),
   );
-  pass("the workflow's messaging connection is left empty", node("slack")?.connectionId === "");
+  pass(
+    "the workflow's messaging connections need a new link",
+    ["slack", "telegram", "discord"].every((id) => node(id)?.connectionId === WORKFLOW_UNLINKED_CONNECTION),
+    JSON.stringify(newWorkflow?.graph.nodes.map((item) => item.fields)),
+  );
+  pass(
+    "the old server's channel and roles are cleared with the link",
+    node("discord")?.placeId === "" && node("discord")?.roles === "",
+    JSON.stringify(node("discord")),
+  );
+  pass(
+    "an any-chat trigger and a same-as-trigger reply keep their meaning",
+    node("anyChat")?.connectionId === "" && node("reply")?.connectionId === "trigger",
+    JSON.stringify([node("anyChat"), node("reply")]),
+  );
+  const unlinkedTelegram = newWorkflow?.graph.nodes.find((item) => item.id === "telegram");
+  const mention = (connectionId: string) => ({
+    connectionId,
+    chatName: "Team chat",
+    chatId: "chat-1",
+    threadKey: "chat-1",
+    messageId: randomUUID(),
+    authorId: "author-1",
+    authorName: "Ada",
+    text: "@agent hello",
+    receivedAt: new Date().toISOString(),
+  });
+  pass(
+    "a moved Telegram trigger does not start for a chat on the new server",
+    unlinkedTelegram !== undefined &&
+      !telegramTriggerMatches(unlinkedTelegram, mention("messaging-new")) &&
+      !telegramTriggerMatches(unlinkedTelegram, mention("messaging-2")),
+  );
+  pass("a saved value that this OpenBot does not know moves as it is", node("slack")?.event === "message");
+  const movedWorkflows = target.workflows.listWithGraphs();
+  pass(
+    "every moved workflow is paused",
+    movedWorkflows.length > 0 && movedWorkflows.every((item) => item.summary.paused),
+    JSON.stringify(movedWorkflows.map((item) => [item.summary.title, item.summary.paused])),
+  );
+  pass(
+    "the user is told that the moved workflows are paused",
+    result.warnings.some((warning) => warning.includes("workflows are paused")),
+  );
+  const newer = movedWorkflows.find((item) => item.summary.title === "Newer steps");
+  const future = newer?.graph.nodes.find((item) => item.id === "future");
+  pass(
+    "a step from a newer OpenBot is kept as a locked note with its settings",
+    future?.kind === "note" &&
+      future.locked === true &&
+      future.fields.text === "Hologram" &&
+      future.fields.depth === 3 &&
+      JSON.stringify(newer?.graph.edges.map((edge) => edge.id)) === JSON.stringify(["kept"]),
+    JSON.stringify({ graph: newer?.graph, warnings: result.warnings }),
+  );
+  pass(
+    "the user is told which workflows need a newer OpenBot, and only a workflow with locked notes is told about notes",
+    result.warnings.some((warning) => warning.startsWith("Newer steps:") && warning.includes("locked notes")) &&
+      result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("newer version")) &&
+      !result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("locked notes")),
+    JSON.stringify(result.warnings),
+  );
+  const linked = movedWorkflows.find((item) => item.summary.title === "Linked media");
+  const linkedNode = (id: string) => linked?.graph.nodes.find((item) => item.id === id)?.fields;
+  pass(
+    "a step that uses the connection of its trigger keeps it, and a file id from the file is cleared",
+    linkedNode("reply")?.connectionId === "trigger" &&
+      linkedNode("reply")?.placeId === "trigger" &&
+      linkedNode("pic")?.fileId === "" &&
+      linkedNode("clip")?.firstFrame === "pic",
+    JSON.stringify(linked?.graph.nodes.map((item) => item.fields)),
+  );
+  pass(
+    "a workflow over the size limit is not created and the user is told",
+    !movedWorkflows.some((item) => item.summary.title === "Huge notes") &&
+      result.warnings.some((warning) => warning.startsWith("Huge notes is not imported.")),
+    JSON.stringify(result.warnings),
+  );
   pass(
     "the user is told to make the webhook address and choose the connection again",
     result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("webhook")) &&
       result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("connection")),
   );
 
-  // --- The chats.
   const page = await runCauseEffect(target.agents.readConversationPageFor(newWriter.id, "local"));
   const texts = (messages: readonly { text: string }[]) => messages.map((message) => message.text);
-  // The shown order of both chats: a message with no turn, such as a routine run's status, has its
-  // place by time there, and the stored order of the source can differ from it.
   const sourcePage = await runCauseEffect(source.agents.readConversationPageFor(writer.id, "local"));
   pass(
     "the chat shows the same messages in order",
@@ -1072,7 +1241,6 @@ try {
     newWriter.threadId !== null && target.database.threadHasEvent(newWriter.threadId, HISTORY_IMPORTED_EVENT),
   );
 
-  // --- The first turn of the imported agent gets the history.
   const before = codexLog().length;
   await runCauseEffect(target.agents.sendMessage({ agentId: newWriter.id, text: "Where is the notebook?" }));
   await idle(target.agents, newWriter.id);
@@ -1083,6 +1251,100 @@ try {
     "the first turn of the imported agent gets the imported history",
     started.some((params) => params.includes(HISTORY_MARK)),
   );
+
+  const copyFile = join(root, "copy.zip");
+  await runCauseEffect(
+    source.transfer.exportTo(copyFile, { agentIds: [writer.id, editor.id], includeFiles: true, includeSettings: true }),
+  );
+  const exportedCopy = new Uint8Array(await readFile(copyFile));
+  const localCopyFile = join(root, "copy-local.zip");
+  const localExport = await runCauseEffect(
+    source.transfer.prepareExport(
+      { agentIds: [writer.id, editor.id], includeFiles: true, includeSettings: true },
+      undefined,
+      undefined,
+      { sharedSkills: false },
+    ),
+  );
+  await runCauseEffect(localExport.write(localCopyFile));
+  pass(
+    "this computer's copy export has no shared skills",
+    !Object.keys(unzipSync(new Uint8Array(await readFile(localCopyFile)))).some((name) =>
+      name.startsWith("library/"),
+    ) && Object.keys(unzipSync(exportedCopy)).some((name) => name.startsWith("library/")),
+  );
+  const phoneUpload = copiedTransferUpload({
+    name: "copy.zip",
+    mimeType: "application/zip",
+    base64: Buffer.from(exportedCopy).toString("base64"),
+  });
+  assert.ok(phoneUpload, "The mobile copy could not read the file.");
+  const phoneFile = join(root, "copy-on-phone.zip");
+  await writeFile(phoneFile, Buffer.from(phoneUpload.base64, "base64"));
+  await runCauseEffect(source.transfer.keepCopiedSettings(copyFile));
+  const copiedBytes = new Uint8Array(await readFile(copyFile));
+  pass("desktop and mobile make the same copy", sha(copiedBytes) === sha(new Uint8Array(await readFile(phoneFile))));
+  pass("the copy does not copy the files again", copiedBytes.length < exportedCopy.length + 64 * 1024);
+  const copyEntries = unzipSync(copiedBytes);
+  const copyManifest: {
+    settings: {
+      mcpServers: unknown[];
+      customProviders: unknown[];
+      customAgents: unknown[];
+      sidebarSections: unknown[];
+      workflows?: { title: string }[];
+      routineFlowPositions?: unknown[];
+    } | null;
+    sharedSkills?: unknown;
+  } = JSON.parse(new TextDecoder().decode(copyEntries[INSTANCE_TRANSFER_MANIFEST]));
+  pass(
+    "the copy keeps only the workflows and routine canvas of the copied agents and their channel",
+    JSON.stringify(copyManifest.settings?.workflows?.map((workflow) => workflow.title).sort()) ===
+      JSON.stringify(["Channel digest", "Paper pipeline"]) &&
+      (copyManifest.settings?.routineFlowPositions?.length ?? 0) > 0 &&
+      copyManifest.settings?.mcpServers.length === 0 &&
+      copyManifest.settings.customProviders.length === 0 &&
+      copyManifest.settings.customAgents.length === 0 &&
+      copyManifest.settings.sidebarSections.length === 0,
+    JSON.stringify(copyManifest.settings),
+  );
+  pass(
+    "the copy leaves the shared skills out",
+    copyManifest.sharedSkills === undefined && !Object.keys(copyEntries).some((name) => name.startsWith("library/")),
+  );
+  for (const [label, destination, path] of [
+    ["desktop", copied, copyFile],
+    ["mobile", copiedOnPhone, phoneFile],
+  ] as const) {
+    const copyPreview = await runCauseEffect(destination.transfer.stage(path));
+    await runCauseEffect(
+      destination.transfer.apply({
+        token: copyPreview.token,
+        keys: copyPreview.agents.map((agent) => agent.key),
+        includeSettings: true,
+      }),
+    );
+    const copiedWriter = destination.agents.listAgents().find((agent) => agent.name === "Writer");
+    assert.ok(copiedWriter, `The ${label} copy has no Writer.`);
+    pass(
+      `${label} copy: the routines arrive`,
+      destination.agents.listRoutines(copiedWriter.id).some((item) => item.name === "Morning notes"),
+    );
+    const copiedWorkflows = destination.workflows.listWithGraphs();
+    const paper = copiedWorkflows.find((item) => item.summary.title === "Paper pipeline");
+    pass(
+      `${label} copy: the workflows of the copied agents and their channel arrive`,
+      JSON.stringify(copiedWorkflows.map((item) => item.summary.title).sort()) ===
+        JSON.stringify(["Channel digest", "Paper pipeline"]) &&
+        paper?.graph.nodes.find((item) => item.id === "write")?.fields.agentId === copiedWriter.id,
+      JSON.stringify(copiedWorkflows.map((item) => item.summary.title)),
+    );
+    pass(
+      `${label} copy: the places on the routine canvas arrive`,
+      (destination.positions.get(copiedWriter.id)?.length ?? 0) > 0,
+    );
+    pass(`${label} copy: no shared skill is added`, (await runCauseEffect(destination.library.list())).length === 0);
+  }
 
   report.passed = true;
 } catch (error) {

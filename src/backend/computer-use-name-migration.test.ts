@@ -3,8 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: migration 21 misses a saved server whose name differs from `computer_use` only in case, gives two
-// servers one name, changes what the user configured, or keeps a rename after a failure.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -21,8 +19,6 @@ function databaseAt(version: number): DatabaseSync {
   return db;
 }
 
-// The name index of version 20 is case-sensitive, so each of these names was a separate server. Only the first
-// two name Computer Use. The third holds, in a different case, the first name that the migration tries.
 function seedServers(db: DatabaseSync): void {
   db.exec(`INSERT INTO projection_mcp_servers
       (mcp_server_id, name, transport, enabled, command, args_json, env_json, env_passthrough_json,
@@ -47,7 +43,6 @@ function servers(db: DatabaseSync) {
 
 function expectRenamed(db: DatabaseSync, before: ReturnType<typeof servers>): void {
   const after = servers(db);
-  // Only the name of a colliding server changes.
   expect(after.map(({ name: _name, ...rest }) => rest)).toEqual(before.map(({ name: _name, ...rest }) => rest));
   expect(after.slice(2).map((server) => server.name)).toEqual(["COMPUTER_USE_SAVED", "github"]);
   expect(
@@ -59,14 +54,13 @@ function expectRenamed(db: DatabaseSync, before: ReturnType<typeof servers>): vo
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 63 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 68 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
 }
 
 describe("Computer Use server name migration", () => {
-  // Migration 20 made the table, so version 20 is the only released schema with saved servers.
   it("moves every case of the Computer Use name to a free name and keeps the configuration", () => {
     const db = databaseAt(20);
     seedServers(db);

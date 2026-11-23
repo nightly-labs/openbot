@@ -16,7 +16,6 @@ import { PreferenceStore } from "./preference-file";
 
 const logger = createOpenBotLogger("external-links");
 
-/** The program that opens web pages for the user. Main reads it for each page that it opens. */
 export type ExternalLinkPreferenceStore = PreferenceStore<ExternalLinkPreference>;
 
 export function createExternalLinkPreferenceStore(path: string): ExternalLinkPreferenceStore {
@@ -38,22 +37,10 @@ class ExternalLinkFailure extends Schema.TaggedError<ExternalLinkFailure>()("Ext
 export interface ExternalLinkOpenerDependencies {
   preference: ExternalLinkPreferenceStore;
   platform: NodeJS.Platform;
-  /**
-   * The operating system's own open, `shell.openExternal`. On Linux it reports success when
-   * `xdg-open` starts, also when no browser then opens, so a web page there goes to `xdg-open`.
-   */
   openDefault: (url: string) => Promise<void>;
-  /** Tells the window that the chosen program did not start. */
   onFallback: (fallback: ExternalLinkFallback) => void;
 }
 
-/**
- * Opens each web page in the program that the user chose in Settings. An address that is not an
- * http or https page, such as a System Settings pane, always goes to the operating system.
- *
- * The program gets the address as one argument, with no shell, so an address cannot add a command.
- * When the program does not start, the default browser opens the page and the window shows a notice.
- */
 export class ExternalLinkOpener {
   readonly #dependencies: ExternalLinkOpenerDependencies;
 
@@ -65,10 +52,7 @@ export class ExternalLinkOpener {
     const { preference, platform, onFallback } = this.#dependencies;
     const target = preference.get().target;
     const page = webPage(url);
-    const openDefault = () =>
-      platform === "linux" && page
-        ? startProgram("xdg-open", [page], true, XDG_OPEN_ENV)
-        : this.#dependencies.openDefault(url);
+    const openDefault = () => (platform === "linux" && page ? openWithXdg(page) : this.#dependencies.openDefault(url));
     if (target.kind === "app" && page) {
       const launched = yield* Effect.result(launchApp(platform, target.path, page));
       if (Result.isSuccess(launched)) return;
@@ -83,7 +67,6 @@ export class ExternalLinkOpener {
     yield* Effect.tryPromise({ try: openDefault, catch: (cause) => new ExternalLinkFailure({ cause }) });
   });
 
-  /** The applications that open web pages. Empty when the system does not tell, as on Linux and Windows. */
   readonly listBrowsers = Effect.fn("ExternalLinkOpener.listBrowsers")(function* (this: ExternalLinkOpener) {
     if (this.#dependencies.platform !== "darwin") return { defaultBrowser: null, browsers: [] };
     const listed = yield* Effect.result(listMacBrowsers());
@@ -93,18 +76,12 @@ export class ExternalLinkOpener {
   });
 }
 
-/** The address as an http or https page, or null for any other scheme. */
 function webPage(url: string): string | null {
   if (!URL.canParse(url)) return null;
   const parsed = new URL(url);
   return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
 }
 
-/**
- * The words of a Linux or Windows command, split at spaces. A value that names a file, such as
- * `C:\Program Files\Mozilla Firefox\firefox.exe`, is one word. Double quotes keep a path with
- * spaces in one word. A backslash is a plain character, as in a Windows path. No shell reads the words.
- */
 function commandWords(command: string): string[] {
   if (existsSync(command)) return [command];
   return Array.from(command.matchAll(/"([^"]*)"|[^\s"]+/g), (match) => match[1] ?? match[0]);
@@ -114,20 +91,14 @@ function programOf(command: string): string {
   return commandWords(command)[0] ?? command;
 }
 
-/**
- * How long a program on Linux can stop with an error before it counts as started. Some `xdg-open`
- * setups stop only when the browser closes, so a program that still runs then opened the page.
- */
 const LINUX_START_FAILURE_WAIT_MS = 3_000;
 
-/** Electron also sets this for `xdg-open`: a mailcap fallback then does not wait for a terminal. */
 const XDG_OPEN_ENV = { MM_NOTTTY: "1" };
 
-/**
- * Starts a program with no shell. With `watchExit`, a program that stops with an error in the first
- * seconds failed: `xdg-open` does that when no browser opens web pages, and a browser command when
- * the browser cannot run.
- */
+export function openWithXdg(target: string): Promise<void> {
+  return startProgram("xdg-open", [target], true, XDG_OPEN_ENV);
+}
+
 function startProgram(
   program: string,
   args: string[],
@@ -163,12 +134,6 @@ function startProgram(
   });
 }
 
-/**
- * The address starts with `http`, so neither `open` nor the program can read it as an option.
- * `open -a` stops with an error when the application is missing. It has no time limit: it waits
- * while macOS asks the user to open a downloaded application. A program on Linux or Windows fails
- * to spawn when it is missing or cannot run. On Linux it also fails when it stops with an error at once.
- */
 function launchApp(platform: NodeJS.Platform, path: string, page: string): Effect.Effect<void, ExternalLinkFailure> {
   return Effect.tryPromise({
     try: () => {
@@ -183,10 +148,6 @@ function launchApp(platform: NodeJS.Platform, path: string, page: string): Effec
   });
 }
 
-/**
- * LaunchServices knows each application that opens an https page, and the default one. AppKit
- * gives both lists; `osascript` runs the script with no shell.
- */
 const MAC_BROWSERS_SCRIPT = `
 ObjC.import("AppKit");
 const workspace = $.NSWorkspace.sharedWorkspace;
@@ -223,8 +184,6 @@ function decodeMacBrowsers(value: unknown): ExternalLinkBrowsers {
     isDynamicRecord(item) && typeof item.name === "string" && typeof item.path === "string"
       ? { name: item.name.replace(/\.app$/, ""), path: item.path }
       : null;
-  // A copy on a mounted disk image or in a hidden tool folder, such as a test Chrome, is not a
-  // browser that the user installed. OpenBot itself also opens https pages.
   const bundleEnd = process.execPath.indexOf(".app/");
   const ownBundle = bundleEnd === -1 ? null : process.execPath.slice(0, bundleEnd + 4);
   const installed = (path: string) => !path.startsWith("/Volumes/") && !path.includes("/.") && path !== ownBundle;

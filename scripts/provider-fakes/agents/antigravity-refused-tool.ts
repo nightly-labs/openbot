@@ -1,17 +1,3 @@
-// The agent of the refused tool schema cases in `antigravity-mcp-load-failure-e2e.ts` (#7228). The
-// Antigravity CLI 1.5.6 checks each MCP tool schema when it builds the toolbox of a prompt. When it
-// refuses one, it writes the tool only to its own log, answers "Agent execution terminated due to
-// error." and ends the turn as a success. A session keeps the servers that its process started, also
-// after a resume without them. This fake does the same: a session with the server `resend` refuses
-// `mcp_resend_get-contact`, and a prompt with `REFUSE_TOOL=<tool>` refuses that tool, as for a server from the
-// user's own `mcp_config.json`. A prompt with `CLI_1_5_9` gets the answer of the CLI 1.5.9, which names
-// the tool (#9568). The real 1.5.9 also logs the line; this fake does not, so only the answer can
-// name the tool. From #7482: the CLI saves the schema of each tool of a server that it starts, and
-// Google refuses a request whose tool has an array with no `items` or an empty `enum` value. Its
-// answer names the tool only by its place in the request. A session with the server `ticktick` gets
-// that answer, in the log or, with `CLI_1_5_9`, in the answer. From #11063: the real CLI 1.5.9 and
-// 1.5.10 refuse the tool of a server that the session had when it opened again from the second prompt
-// of a process that resumed it without that server. A prompt with `SERVERS_RETURN` does the same.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
@@ -33,7 +19,6 @@ interface SavedTool {
   parameters: { type: "object"; properties: object };
 }
 
-/** The tool schemas that the CLI saves for a server that it starts. Only `ticktick` has tools that Google refuses. */
 const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
   ticktick: [
     { name: "list_tasks", parameters: { type: "object", properties: { tags: { type: "array" } } } },
@@ -42,20 +27,54 @@ const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
       parameters: { type: "object", properties: { status: { type: "string", enum: ["open", ""] } } },
     },
   ],
-  // A field with the same name as a refused one, which Google accepts.
-  atlas: [{ name: "search", parameters: { type: "object", properties: { tags: { type: "string" } } } }],
+  bling: [
+    {
+      name: "listAccountReceivables",
+      parameters: {
+        type: "object",
+        properties: { situacoes: { type: "string", enum: ["1", "2"], items: { type: "integer" } } },
+      },
+    },
+  ],
+  aave: [
+    {
+      name: "get_reserve_holders",
+      parameters: { type: "object", properties: { limit: { type: "number", enum: [10, 50] } } },
+    },
+  ],
+  atlas: [
+    { name: "search", parameters: { type: "object", properties: { tags: { type: "string" } } } },
+    {
+      name: "receivables",
+      parameters: { type: "object", properties: { situacoes: { type: "array", items: { type: "integer" } } } },
+    },
+    {
+      name: "top_holders",
+      parameters: { type: "object", properties: { limit: { type: "string", enum: ["10", "50"] } } },
+    },
+  ],
 };
-const GOOGLE_REFUSAL = [
-  "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[tags].items: missing field.",
-  "* GenerateContentRequest.tools[21].function_declarations[0].parameters.properties[status].enum[1]: cannot be empty",
-].join("\n");
+const FAILURES: Record<string, string> = {
+  KEY: "generating and executing: Error 400, Message: API key not valid. Please pass a valid API key., Status: INVALID_ARGUMENT, Details: [map[@type:type.googleapis.com/google.rpc.ErrorInfo reason:API_KEY_INVALID]]",
+  OTHER: "creating trajectory: unexpected step state 7",
+  QUIET: "",
+};
+const GOOGLE_REFUSALS: Partial<Record<string, string>> = {
+  ticktick: [
+    "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[tags].items: missing field.",
+    "* GenerateContentRequest.tools[21].function_declarations[0].parameters.properties[status].enum[1]: cannot be empty",
+  ].join("\n"),
+  bling:
+    "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[situacoes].items: field predicate failed: $type == Type.ARRAY",
+  aave: [
+    "* GenerateContentRequest.tools[23].function_declarations[0].parameters.properties[limit].enum[0]: cannot be empty",
+    "* GenerateContentRequest.tools[23].function_declarations[0].parameters.properties[limit].enum[1]: cannot be empty",
+  ].join("\n"),
+};
 
-/** The servers of each session that this process started. A resume does not change them. */
 const started = new Map<string, string[]>();
-/** The prompts of each session that this process answered. */
 const answered = new Map<string, number>();
 let sessions = 0;
-/** The servers that each session opened with, kept on disk as the CLI keeps its conversations. */
 const openedWith = (sessionId: string) => join(appData, "sessions", sessionId);
 
 function record(request: AcpRequest, sessionId: string): void {
@@ -107,12 +126,16 @@ serveFakeAcpAgent({
     const refused =
       /REFUSE_TOOL=(\S+)/u.exec(text)?.[1] ??
       (started.get(sessionId)?.includes("resend") || returned ? "mcp_resend_get-contact" : null);
-    const googleRefused = !refused && started.get(sessionId)?.includes("ticktick");
-    logEntry({ method: request.method, sessionId, pid: process.pid, refused: googleRefused ? "ticktick" : refused });
+    const googleRefused = refused ? undefined : started.get(sessionId)?.find((name) => GOOGLE_REFUSALS[name]);
+    logEntry({ method: request.method, sessionId, pid: process.pid, refused: googleRefused ?? refused });
     const failure = googleRefused
-      ? `agent executor error: generating and executing: Error 400, Message: ${GOOGLE_REFUSAL}, Status: INVALID_ARGUMENT`
+      ? `agent executor error: generating and executing: Error 400, Message: ${GOOGLE_REFUSALS[googleRefused]}, Status: INVALID_ARGUMENT`
       : `agent executor error: building toolbox: tool "${refused}" advertises an invalid parameter schema: "schema://tool-parameters.json#" is not valid against metaschema`;
-    if ((refused || googleRefused) && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
+    const own = FAILURES[/\bFAIL_(KEY|OTHER|QUIET)\b/u.exec(text)?.[1] ?? ""];
+    if (own !== undefined) {
+      if (own) log(`E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: ${own}`);
+      peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
+    } else if ((refused || googleRefused) && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
     else if (refused || googleRefused) {
       log(`E1111 00:00:00.200000     294 errorreport.go:273] ${failure}`);
       peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");

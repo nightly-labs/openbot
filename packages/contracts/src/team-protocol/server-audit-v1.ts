@@ -1,14 +1,3 @@
-// Frozen optional server-audit-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a server
-// reads the changes to the access of that server, newest first: members that joined, were removed or
-// got another server role, roles that were made, renamed or deleted, members added to or removed from
-// a role, and the level that a role or every member got for an agent. Each entry names the member who
-// made the change (`actor`, null when the host does not know) and keeps the names of the time of the
-// change, so a removed member or a deleted agent keeps its name. The host keeps the newest 500 entries
-// of each server; the log has no other filter or page. A member cannot read it; `requireAdmin` on the
-// host is the only gate. A client leaves out an entry whose `kind` it does not know, so a later kind
-// needs no new capability. Widening any other part needs a second capability string.
 import { isDynamicRecord, isString } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -46,7 +35,6 @@ const KNOWN_CHANGES = new Map<string, AdminDecoder>([
   ["agent-level", fields({ kind: kind("agent-level"), role: nullable(name), agent: name, from: level, to: level })],
 ]);
 
-// A kind that this contract does not list keeps only its kind; the client leaves the entry out.
 const change: AdminDecoder = (value) => {
   if (!isDynamicRecord(value) || !isString(value.kind) || !value.kind.length || value.kind.length > 64)
     throw new Error("Invalid admin variant.");

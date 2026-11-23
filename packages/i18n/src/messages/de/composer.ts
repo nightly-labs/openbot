@@ -55,6 +55,7 @@ export const messages = {
   "composer.picker.noSkills": "Dieser Agent hat keine Fähigkeiten.",
   "composer.picker.noSkillMatch": "Keine Fähigkeit passt zu „{query}“.",
   "composer.picker.skillsLoadFailed": "Die Fähigkeiten wurden nicht geladen.",
+  "composer.picker.skillProblem": "{name} ist nicht verfügbar. {problem} Bitte den Agenten, das zu beheben.",
   "composer.token.attachment": "Angehängte Datei {name} öffnen",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Fähigkeit {name}",
@@ -66,6 +67,7 @@ export const messages = {
   "composer.voice.stop": "Sprachaufnahme stoppen",
   "composer.voice.cancel": "Sprachaufnahme abbrechen",
   "composer.voice.preparing": "Sprachmodell wird heruntergeladen",
+  "composer.voice.starting": "Sprachaufnahme wird gestartet",
   "composer.voice.requesting": "Mikrofonzugriff wird angefordert",
   "composer.voice.transcribing": "Sprachanweisung wird transkribiert",
   "composer.voice.start": "Anweisung per Sprache erstellen",
@@ -73,6 +75,8 @@ export const messages = {
     "Der Mikrofonzugriff ist gesperrt. Erlaube OpenBot in den Systemeinstellungen den Zugriff auf das Mikrofon.",
   "composer.voice.noMicrophone": "Kein Mikrofon verfügbar.",
   "composer.voice.startFailed": "OpenBot konnte die Sprachaufnahme nicht starten.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot konnte das Mikrofon nicht öffnen. Schließe andere Apps, die es verwenden, prüfe, ob es angeschlossen und in den Systemeinstellungen erlaubt ist, und versuche es erneut.",
   "composer.voice.transcribeFailed": "OpenBot konnte diese Aufnahme nicht transkribieren.",
   "composer.reply.toYou": "Antwort auf deine Nachricht",
   "composer.reply.toAgent": "Antwort an den Agenten",
@@ -102,7 +106,7 @@ export const messages = {
   "composer.voice.recording": "Sprachaufnahme",
   "composer.voice.limitSoon": "Die Aufnahme endet in {seconds} Sekunden.",
   "composer.voice.limitReached":
-    "Die Aufnahme wurde beim Limit von 2 Minuten beendet. Das Gesagte steht in der Nachricht.",
+    "Die Aufnahme wurde beim Limit von 10 Minuten beendet. Das Gesagte steht in der Nachricht.",
   "composer.send.saveQueued": "Nachricht in der Warteschlange speichern",
   "composer.send.voice": "Sprachnachricht senden",
   "composer.send.message": "Nachricht senden",
@@ -135,6 +139,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Es wurde keine Sprache aufgenommen.",
   "composer.voice.noSpeechDetected": "Es wurde keine Sprache erkannt.",
   "composer.voice.readFailed": "Die Antwort konnte nicht vorgelesen werden.",
+  "composer.voice.languageUnsupported":
+    "Die Antwort konnte nicht vorgelesen werden. Diese Sprache ist noch nicht verfügbar.",
   "composer.error.saveEditTryAgain":
     "Diese Änderung konnte nicht auf diesem Computer gespeichert werden. Versuche es erneut.",
   "composer.error.saveUnconfirmed":

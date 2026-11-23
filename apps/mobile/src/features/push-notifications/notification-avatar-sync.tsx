@@ -10,15 +10,10 @@ import {
 
 interface NotificationAvatarSyncProps {
   servers: readonly MobileServer[];
-  /** False while the account directory loads, when the servers can be out of date. */
   serversReady: boolean;
   agents: readonly MobileAgent[];
 }
 
-/**
- * Keeps a picture of each agent where the Android notification service reads it, so a notification
- * shows the agent that sent it. A server that did not load keeps the pictures that the app saw last.
- */
 export function NotificationAvatarSync({ servers, serversReady, agents }: NotificationAvatarSyncProps): null {
   const [saved] = useState(readNotificationAvatars);
 

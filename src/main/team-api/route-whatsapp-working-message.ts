@@ -12,11 +12,6 @@ import { readJson, requireAdmin } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(WHATSAPP_WORKING_MESSAGE_ROUTES));
 
-/**
- * Whether this host posts "Waiting" and "Working on it…" in a WhatsApp chat while a request runs,
- * for each number that it linked. Frozen by `whatsapp-working-message-v1`. `requireAdmin` runs on
- * both routes.
- */
 export async function routeWhatsAppWorkingMessage(
   context: TeamApiRequestContext,
   connectors: TeamApiConnectors | undefined,
@@ -26,7 +21,6 @@ export async function routeWhatsAppWorkingMessage(
   if (!connectors || !capabilities.has(WHATSAPP_WORKING_MESSAGE_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.connectorsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `whatsapp-working-message-v1` codec.
   const body = await readJson(request);
   const { messaging } = connectors;
   if (url.pathname === WHATSAPP_WORKING_MESSAGE_ROUTES.list)

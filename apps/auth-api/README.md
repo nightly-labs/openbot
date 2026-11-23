@@ -42,6 +42,12 @@ has no plan change (`subscription_update` is off); it cancels plans and updates 
 `POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
 `{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
 [Hosted servers](../../docs/hosted-servers.md#storage-tiers).
+The bootstrap also creates the `openbot_credits` Product and one Price for each credit amount
+(`openbot_credits_<n>`). `GET /v1/me/credits` returns the balance of the account and of its servers,
+`POST /v1/me/credits/checkout` with `{credits, currency, serverId?}` opens a Checkout, and
+`POST /v1/me/credits/transfer` with `{serverId, direction, credits}` moves credits between the account
+and a server that it owns. The web client uses the same routes under `/api/browser`.
+`bun run test:credits` checks them.
 
 The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
 `PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
@@ -71,7 +77,9 @@ failed renewal, cancel at the period end, plan change, renew, delete, another ac
 deleted customer, a refund, a dispute, the welcome email of a first plan, and the storage tiers
 (`storage-tier`, which needs the storage Prices of the bootstrap). The `license-*`
 scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
-renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
+renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. The `credits`
+scenario buys the smallest credit pack and checks the invoice: Polish VAT for PL and DE, the OSS amount for DE, and no VAT
+for US. Each scenario uses a Stripe
 test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
 `bun scripts/stripe-flows-e2e.ts --print-user-ids`, `HOSTED_SERVER_TEMPLATE=e2e-template`, and
@@ -83,6 +91,18 @@ repository root:
 ```bash
 bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
 ```
+
+The `promotion-link` scenario makes a coupon with two promotion codes in the sandbox and checks the
+Checkout pages of a discount link (`?promo=CODE`): an active code is applied, and a code that does not
+fit the order or does not exist gives the code field. A copy of the Brazil partner code (BRL server plans only)
+gives a discount on a BRL server page and the code field on a EUR server page and a license page. It deletes the
+coupons and turns off the codes at the end.
+
+The `invite` scenario checks the invite rewards: a referred friend gets the first-payment coupon only on the
+first purchase, the coupon goes after the first paid invoice, a yearly payment gives 12 credit parts 30 days
+apart, the cron (`/cdn-cgi/handler/scheduled`) sends the due parts, and a refund takes the newest unsent parts
+first and then the sent credit. The scenario moves `ready_at` in D1, because the parts use the Worker clock,
+not the Stripe test clock.
 
 The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
 that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
@@ -240,6 +260,14 @@ value, each company must enter its client secret again. Without it, company sign
 everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
 Environment; a local deployment reads it from the encrypted `.env.production`.
 
+`HOSTED_ARCHIVE_KEY_SECRET` (32 random bytes in base64), `B2_WORKER_KEY_ID_EU` and
+`B2_WORKER_APPLICATION_KEY_EU` are set together or not at all. They are for the archives of ended
+pool servers ([plan 012](../../plans/012-pool-server-archive.md)). The first encrypts the `age` key
+of each archive in `hosted_server_archives`; with another value, no archive can be restored. The B2
+key reads the `openbot-pool-archive-eu` bucket and nothing else. The encrypted `.env.production` has
+all three, and GitHub Actions reads them from the `cloudflare-production` Environment. When you
+change one, change it in both places and deploy the Worker.
+
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
 The encrypted `.env.production` has it, so `scripts/hosting/leaseweb-pool.ts custom` can sign a custom
@@ -366,6 +394,15 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   places, a host gets one of the homes at most 1000 km farther from it than the nearest home, from the
   Cloudflare request location. A host keeps its home while that home is near; otherwise it moves at its
   next ticket. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
+- `REMOTE_SIGNAL_HOME_COUNTRIES`: the homes of the hosts in a country, as `CC=id+id,...` with the
+  Cloudflare country code (`request.cf.country`), for example `CN=us+au`. A host in a listed country
+  gets one of its homes by the same hash, and the distance rule does not apply to it. When its home
+  fails, the host moves to another home of its country; when its country has no other home, the
+  distance rule chooses. A host reports only one failed home, so with two homes that are both down it
+  goes between them, as with the distance rule. Empty means the distance rule for each
+  country. Each ID must be a home of `REMOTE_SIGNAL_HOMES`, or each ticket request fails with
+  `503 remote_not_configured`, so remove a home from this list in the same deploy. Use it where the
+  network routes do not follow the map. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
 - `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
   `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
   again only to the URLs that failed.

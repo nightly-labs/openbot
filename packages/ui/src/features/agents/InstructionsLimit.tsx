@@ -3,22 +3,15 @@ import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 import { useText } from "../../text";
 
-// The field shows its count from this share of the limit on, so a short text has no counter.
 const COUNTER_FROM = 0.9;
 
 export function instructionsTooLong(text: string, limit: number = INPUT_LIMITS.agentDescription): boolean {
   return text.length > limit;
 }
 
-/**
- * The count under an instructions field near its limit, and an error over it. The field keeps the
- * whole text rather than cutting it at the limit, so the user sees what does not fit and shortens it.
- */
 export function InstructionsLimit(props: {
   text: string;
-  /** Omitted, the limit of an agent's description. */
   limit?: number;
-  /** The error over the limit. Omitted, it names the instructions. */
   tooLong?: "agent.instructions.tooLong" | "agent.description.tooLong";
 }): JSX.Element {
   const { t, format } = useText();

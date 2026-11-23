@@ -98,8 +98,6 @@ export const storeAccountAvatar = Effect.fn("AvatarStorage.store")(function* (
   return updated.success;
 });
 
-/** Keep the new object only when the account still has the expected avatar. */
-
 export const removeAccountAvatar = Effect.fn("AvatarStorage.remove")(function* (
   service: Pick<AuthService, "updateAvatar">,
   bucket: R2Bucket,

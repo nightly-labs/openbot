@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/host";
 
 export const messages = {
-  // Status lines of the WebRTC host.
   "status.host.registered": "已将本 OpenBot 注册用于 WebRTC 访问。",
   "status.host.keyRotated": "服务器密钥已更改，已配对的设备仍保持配对。",
   "status.host.identityUpdated": "服务器身份信息已更新。",

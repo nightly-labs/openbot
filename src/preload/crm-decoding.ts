@@ -1,6 +1,3 @@
-// What main answers for the CRM: the overview, the pages of customers, payments and activity, and the
-// result of a change.
-
 import {
   isCrmActivityPage,
   isCrmApplyResult,
