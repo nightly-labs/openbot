@@ -215,7 +215,8 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
           expiry: vaultExpiryText(item.expMonth, item.expYear),
           securityCode: "",
           billingContactId: item.billingContactId ?? "",
-          fillSites: item.fillSites,
+          // The item can come from a store, and IPC cannot clone a store proxy, so the list is copied.
+          fillSites: [...item.fillSites],
         }
       : {
           kind,

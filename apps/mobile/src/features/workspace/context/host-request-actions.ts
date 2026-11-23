@@ -41,6 +41,7 @@ import {
   STORAGE_CAPABILITY,
   type TeamRole,
   withFastServiceTiers,
+  withKeptModels,
   withSteeringModels,
   withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
@@ -168,6 +169,10 @@ import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memor
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -1227,15 +1232,18 @@ export function createHostRequestActions({
         : has(serverId, AGENT_FAST_MODE_CAPABILITY)
           ? AGENT_FAST_MODE_ROUTES.models
           : null;
-      const [options, fast, steering] = await Promise.all([
+      const [options, fast, steering, kept] = await Promise.all([
         models,
         fastRoute ? request("POST", fastRoute, decodeAgentFastModels, {}, serverId).catch(() => []) : [],
         has(serverId, MODEL_STEERING_CAPABILITY)
           ? request("POST", MODEL_STEERING_ROUTES.list, decodeAgentSteeringModels, {}, serverId).catch(() => [])
           : [],
+        has(serverId, MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, decodeAgentSteeringModels, {}, serverId).catch(() => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(withFastServiceTiers(options, fast), steering),
+        withSteeringModels(withKeptModels(withFastServiceTiers(options, fast), kept), steering),
         has(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );
     },

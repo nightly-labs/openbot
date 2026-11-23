@@ -6,6 +6,7 @@ import {
   type AgentAuthState,
   type AgentModelOption,
   type AgentProviderId,
+  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_PROMPT_CACHE_TTL,
   type KeyOnlyProviderId,
@@ -140,6 +141,7 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
     | ((cli: AgentCliInfo, region: SignInRegion) => Effect.Effect<readonly string[], ProviderClientOperationError>);
   readonly env: (cli: AgentCliInfo, region: SignInRegion) => Record<string, string>;
   readonly savedSignIn?: (cli: AgentCliInfo, env: NodeJS.ProcessEnv) => Effect.Effect<string | null>;
+  readonly pipedInput?: true;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -319,6 +321,13 @@ const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
   argv: antigravityArgv,
   env: ANTIGRAVITY_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+};
+
+const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
+  argv: () => Effect.succeed([...antigravityArgv({ ...process.env, ...ANTIGRAVITY_ENV }), "--login"]),
+  env: () => ({ ...ANTIGRAVITY_ENV }),
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  pipedInput: true,
 };
 
 const CLINE_ARGV: readonly string[] = ["--acp"];
@@ -846,11 +855,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
         customEndpoint: (modelId) => {
           const endpoint = customProviderOfModel(modelId, openCodeEndpoints(context)());
+          const contextWindow = endpoint?.models.find(
+            (model) => composedCustomModelId(endpoint.id, model.id) === modelId,
+          )?.contextWindow;
           return endpoint
             ? {
                 name: endpoint.name,
                 hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0,
                 stallMs: CUSTOM_ENDPOINT_SILENCE_MS,
+                ...(contextWindow === undefined ? {} : { contextWindow }),
               }
             : null;
         },
@@ -894,6 +907,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "antigravity",
     signIn: ANTIGRAVITY_SIGN_IN,
+    codeSignIn: { kind: "cli", flow: "paste", command: ANTIGRAVITY_CODE_SIGN_IN },
     accounts: {
       homeVariable: "GEMINI_HOME",
       signIn: ANTIGRAVITY_SIGN_IN,

@@ -56,6 +56,8 @@ export const messages = {
   "error.backend.browserSignInUnsupported":
     "Dieser entfernte Host kann keine Anmeldung von diesem Computer übernehmen.",
   "error.backend.browserSignInOpenFailed": "OpenBot konnte das Anmeldefenster nicht öffnen.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot konnte die Seite im Anmeldefenster nicht laden. Prüfe die Internetverbindung und öffne das Anmeldefenster dann erneut.",
   "error.backend.browserSignInReadFailed": "OpenBot konnte die Anmeldung im Fenster nicht lesen.",
   "error.backend.browserStopUnsupported": "Dieser entfernte Host kann das Laden einer Seite nicht stoppen.",
   "error.backend.sharedDataLocalOnly":

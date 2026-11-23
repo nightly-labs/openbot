@@ -52,6 +52,8 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "لا يدعم هذا المضيف البعيد التحكم في علامة تبويب المتصفح.",
   "error.backend.browserSignInUnsupported": "لا يمكن لهذا المضيف البعيد استقبال تسجيل دخول من هذا الحاسوب.",
   "error.backend.browserSignInOpenFailed": "تعذّر على OpenBot فتح نافذة تسجيل الدخول.",
+  "error.backend.browserSignInLoadFailed":
+    "تعذّر على OpenBot تحميل الصفحة في نافذة تسجيل الدخول. تحقّق من الاتصال بالإنترنت، ثم افتح نافذة تسجيل الدخول مرة أخرى.",
   "error.backend.browserSignInReadFailed": "تعذّر على OpenBot قراءة تسجيل الدخول من النافذة.",
   "error.backend.browserStopUnsupported": "لا يمكن لهذا المضيف البعيد إيقاف تحميل الصفحة.",
   "error.backend.sharedDataLocalOnly": "تتم إدارة البيانات المشتركة على الحاسوب الذي يشغّل هؤلاء الوكلاء.",

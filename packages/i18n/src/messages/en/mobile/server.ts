@@ -1783,7 +1783,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.update.waitingFor": "Waiting for {reasons}.",
   "mobile.server.update.disabledTitle": "Remote updates are off",
   "mobile.server.update.disabledDescription":
-    "The user of {name} turned off updates from server members. Ask them to update OpenBot or to turn the setting on.",
+    "The user of {name} turned off updates from server members. Ask them to update OpenBot, or to open Settings > Updates on that computer and turn on “Allow updates from server members”.",
   "mobile.server.update.managedTitle": "A Host Manager controls updates",
   "mobile.server.update.managedDescription": "OpenBot Host Manager updates {name}. Contact the host administrator.",
   "mobile.server.update.unsupportedTitle": "{name} cannot update itself",

@@ -60,6 +60,7 @@ import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machi
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -139,6 +140,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROVIDER_ENVIRONMENT_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
+  MODEL_VISIBILITY_KEPT_ROUTES.list,
   MODEL_STEERING_ROUTES.list,
   PROVIDER_MODEL_SOURCE_ROUTES.list,
   PROVIDER_ACCOUNT_MODELS_ROUTES.list,

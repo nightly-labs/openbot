@@ -255,8 +255,13 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
 export function localCodeSignInProviders(platform: string | undefined): readonly AgentProviderId[] {
   const paste = platform !== undefined && pasteCodeSignInSupported(platform);
   return AGENT_PROVIDERS.filter((provider) => {
-    const codeSignIn = agentProviderDescriptor(provider).localCodeSignIn;
-    return codeSignIn === "device" || (codeSignIn === "paste" && paste);
+    const descriptor = agentProviderDescriptor(provider);
+    const codeSignIn = descriptor.localCodeSignIn;
+    return (
+      codeSignIn === "device" ||
+      (codeSignIn === "paste" && paste) ||
+      (platform === "win32" && descriptor.windowsCodeSignIn === "paste")
+    );
   });
 }
 

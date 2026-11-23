@@ -54,6 +54,8 @@ export const messages = {
     "Bu uzak ana makine bir tarayıcı sekmesinin denetimini almayı desteklemiyor.",
   "error.backend.browserSignInUnsupported": "Bu uzak ana makine bu bilgisayardan oturum açma alamaz.",
   "error.backend.browserSignInOpenFailed": "OpenBot oturum açma penceresini açamadı.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot oturum açma penceresinde sayfayı yükleyemedi. İnternet bağlantısını kontrol edin, ardından oturum açma penceresini yeniden açın.",
   "error.backend.browserSignInReadFailed": "OpenBot pencereden oturumu okuyamadı.",
   "error.backend.browserStopUnsupported": "Bu uzak ana makine sayfa yüklemesini durduramaz.",
   "error.backend.sharedDataLocalOnly": "Paylaşılan veriler bu ajanları çalıştıran bilgisayarda yönetilir.",

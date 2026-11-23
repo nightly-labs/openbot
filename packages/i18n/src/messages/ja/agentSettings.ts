@@ -180,6 +180,8 @@ export const messages = {
     "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.newChat.confirm": "新しいチャットを開始",
   "agentSettings.newChat.failed": "新しいチャットを始められませんでした。",
+  "agentSettings.newChat.busy":
+    "エージェントが作業中です。新しいチャットを始めるには、終わるまで待つか、停止してください。",
   "agentSettings.deleteHistory.title": "履歴を削除",
   "agentSettings.deleteHistory.description":
     "このチャットのメッセージを削除し、エージェントも忘れます。設定は残ります。",

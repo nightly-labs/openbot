@@ -184,7 +184,19 @@ function isPiContextOverflow(provider: AgentProvider, message: string): boolean 
   return (provider === "pi" || isKeyOnlyProvider(provider)) && classifyFailure(message) === "context_too_long";
 }
 
-export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
+const SMALL_CONTEXT_WINDOW = 64_000;
+
+function openCodeCompactionFailure(contextWindow: number | null): string {
+  return contextWindow !== null && contextWindow < SMALL_CONTEXT_WINDOW
+    ? sourceText("error.provider.opencodeContextTooSmall")
+    : sourceText("error.provider.opencodeCompactionFailed");
+}
+
+export function refusedSessionFailure(
+  provider: AgentProvider,
+  message: string,
+  contextWindow: number | null = null,
+): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
   if (isBlankHistoryText(message))
@@ -212,7 +224,7 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.antigravityHistoryUnreadable");
   if (isStuckAcpTurn(provider, message))
     return sourceText("error.provider.acpTurnStuck", { provider: providerLabel(provider) });
-  if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
+  if (isFailedOpenCodeCompaction(provider, message)) return openCodeCompactionFailure(contextWindow);
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
   if (isClaudeContextOverflow(provider, message)) return sourceText("error.provider.claudeContextFull");

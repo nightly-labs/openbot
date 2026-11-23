@@ -55,6 +55,8 @@ export const messages = {
     "このリモートホストは、ブラウザーのタブの操作の引き継ぎに対応していません。",
   "error.backend.browserSignInUnsupported": "このリモートホストはこのコンピューターからのサインインを受け取れません。",
   "error.backend.browserSignInOpenFailed": "OpenBot はサインインウィンドウを開けませんでした。",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot はサインインウィンドウでページを読み込めませんでした。インターネット接続を確認してから、サインインウィンドウをもう一度開いてください。",
   "error.backend.browserSignInReadFailed": "OpenBot はウィンドウからサインインを読み取れませんでした。",
   "error.backend.browserStopUnsupported": "このリモートホストはページの読み込みを停止できません。",
   "error.backend.sharedDataLocalOnly": "共有データは、これらのエージェントを実行しているコンピューターで管理されます。",

@@ -484,7 +484,7 @@ export interface TeamApiAdmin {
     detection: Pick<ProviderDetection, "scanModelServers" | "scanAgents" | "discoverModels">;
     settings: Pick<ProviderDetectionSettingsStore, "get" | "set">;
   };
-  modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings">;
+  modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings" | "kept">;
   defaultProvider?: TeamApiDefaultProvider;
   routineResults?: TeamApiRoutineResults;
   routineRunCommand?: Pick<AgentService, "listAgents" | "automationRunCommand">;

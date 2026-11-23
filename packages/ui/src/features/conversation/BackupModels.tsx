@@ -84,6 +84,7 @@ export function backupModelOptions(
   const option = (choice: AgentModelChoice) =>
     exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [backupModelOption(choice, source)];
   const shared = source.modelOptions.flatMap((model) => {
+    if (model.listing === "kept") return [];
     const modelProvider = model.provider;
     if (!isKnownAgentProvider(modelProvider)) return [];
     const provider = source.providers?.find((status) => status.id === modelProvider);

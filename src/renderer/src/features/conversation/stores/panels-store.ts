@@ -115,6 +115,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setSkillSettingsRequest({ agentId, skillId: skill.skillId });
     setActiveRightPanel("settings", agentId);
   }
+  function clearSkillSettingsRequest(agentId: string): void {
+    setSkillSettingsRequest((current) => (current?.agentId === agentId ? null : current));
+  }
   const [instructionsSettingsRequest, setInstructionsSettingsRequest] = createSignal<{ agentId: string } | null>(null);
   function openInstructionsSettings(agentId: string): void {
     if (deps.props.agent?.id !== agentId) return;
@@ -724,6 +727,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   return {
     skillSettingsRequest,
     openSkillSettings,
+    clearSkillSettingsRequest,
     instructionsSettingsRequest,
     openInstructionsSettings,
     agentSettingRowRequest,

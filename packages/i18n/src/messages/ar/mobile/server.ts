@@ -1878,7 +1878,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "في انتظار {reasons}.",
   "mobile.server.update.disabledTitle": "التحديثات عن بُعد معطّلة",
   "mobile.server.update.disabledDescription":
-    "عطّل مستخدم {name} التحديثات من أعضاء الخادم. اطلب منه تحديث OpenBot أو تفعيل الإعداد.",
+    "عطّل مستخدم {name} التحديثات من أعضاء الخادم. اطلب منه تحديث OpenBot، أو فتح الإعدادات > التحديثات على ذلك الحاسوب وتشغيل «السماح بالتحديثات من أعضاء الخادم».",
   "mobile.server.update.managedTitle": "يتحكم Host Manager في التحديثات",
   "mobile.server.update.managedDescription": "يحدّث OpenBot Host Manager {name}. اتصل بمسؤول المضيف.",
   "mobile.server.update.unsupportedTitle": "لا يستطيع {name} تحديث نفسه",

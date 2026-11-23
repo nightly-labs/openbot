@@ -3224,6 +3224,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  contextWindow(externalThreadId: string): number | null {
+    const thread = this.#threads.get(externalThreadId);
+    return (thread && this.options.customEndpoint?.(thread.currentModelId)?.contextWindow) ?? null;
+  }
+
   #providerName(thread: AcpThread): string {
     return this.options.customEndpoint?.(thread.currentModelId)?.name ?? this.#label;
   }

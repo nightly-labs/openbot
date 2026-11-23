@@ -180,6 +180,7 @@ export const messages = {
     "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
+  "agentSettings.newChat.busy": "De agent is bezig. Wacht tot hij klaar is of stop hem om een nieuwe chat te starten.",
   "agentSettings.deleteHistory.title": "Geschiedenis wissen",
   "agentSettings.deleteHistory.description":
     "De berichten van deze chat worden gewist en de agent vergeet ze. De instellingen blijven.",

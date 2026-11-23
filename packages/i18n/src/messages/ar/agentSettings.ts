@@ -212,6 +212,7 @@ export const messages = {
     "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.newChat.confirm": "بدء دردشة جديدة",
   "agentSettings.newChat.failed": "تعذّر بدء دردشة جديدة.",
+  "agentSettings.newChat.busy": "الوكيل يعمل الآن. لبدء دردشة جديدة، انتظر حتى ينتهي أو أوقفه.",
   "agentSettings.deleteHistory.title": "حذف السجل",
   "agentSettings.deleteHistory.description": "تُحذف رسائل هذه الدردشة وينساها الوكيل. يبقى إعداده كما هو.",
   "agentSettings.deleteHistory.button": "حذف",

@@ -5,6 +5,8 @@ export const messages = {
   "error.attachment.notFound": "لم يُعثر على المرفق.",
   "error.attachment.fileTooLarge": "يتجاوز أحد الملفات الحد البالغ 100 MB.",
   "error.attachment.namedFileTooLarge": "{name} أكبر من الحد البالغ 100 MB.",
+  "error.attachment.emptyFile":
+    "الملف {name} فارغ أو لا يستطيع OpenBot قراءته. احفظ الملف مرة أخرى، ثم أرفقه مرة أخرى.",
   "error.attachment.totalTooLarge": "تتجاوز المرفقات الحد الإجمالي البالغ 250 MB.",
   "error.attachment.unavailable": "لم يعد هذا الملف متاحًا.",
   "error.attachment.noApp": "لم يفتح أي تطبيق على هذا الكمبيوتر هذا الملف. نزّله، ثم افتحه من مدير الملفات.",

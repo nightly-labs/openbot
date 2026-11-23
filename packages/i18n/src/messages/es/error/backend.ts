@@ -57,6 +57,8 @@ export const messages = {
     "Este host remoto no admite tomar el control de una pestaña del navegador.",
   "error.backend.browserSignInUnsupported": "Este host remoto no puede recibir un inicio de sesión de este equipo.",
   "error.backend.browserSignInOpenFailed": "OpenBot no pudo abrir la ventana de inicio de sesión.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot no pudo cargar la página en la ventana de inicio de sesión. Comprueba la conexión a internet y vuelve a abrir la ventana de inicio de sesión.",
   "error.backend.browserSignInReadFailed": "OpenBot no pudo leer el inicio de sesión de la ventana.",
   "error.backend.browserStopUnsupported": "Este host remoto no puede detener la carga de una página.",
   "error.backend.sharedDataLocalOnly": "Los datos compartidos se gestionan en el equipo que ejecuta estos agentes.",
