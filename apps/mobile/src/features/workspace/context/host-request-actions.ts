@@ -403,7 +403,7 @@ import { createProviderAdmin } from "@/features/servers/model/provider-admin";
 import { saveAgentAvatar, savedAgentAvatar } from "@/features/workspace/model/agent-avatar-cache";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
-import type { DownloadQueue } from "@/features/workspace/model/request-lanes";
+import { attachmentDownloadKey, type DownloadQueue } from "@/features/workspace/model/request-lanes";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import {
   hasCapability,
@@ -653,6 +653,7 @@ type HostRequestActions = Pick<
   | "setMessageReaction"
   | "deleteMessage"
   | "downloadAttachment"
+  | "prioritizeAttachmentDownload"
   | "downloadMessageFile"
 >;
 
@@ -1757,7 +1758,12 @@ export function createHostRequestActions({
           progress,
         );
       const queue = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
-      return queue(download, tapped);
+      return queue.run(attachmentDownloadKey(serverId, attachmentId), download, tapped);
+    },
+    prioritizeAttachmentDownload: (serverId, attachmentId) => {
+      const key = attachmentDownloadKey(serverId, attachmentId);
+      attachmentDownloads.prioritize(key);
+      largeAttachmentDownloads.prioritize(key);
     },
     downloadMessageFile: (serverId, file) =>
       request(

@@ -9,7 +9,7 @@ import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
 import { useThemeColor } from "heroui-native/hooks";
 import FileText from "lucide-react-native/icons/file-text";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
@@ -267,7 +267,7 @@ export function useAttachmentFile(
   preview: boolean,
   tapped = !preview,
 ) {
-  const { downloadAttachment } = useMobileWorkspaceActions();
+  const { downloadAttachment, prioritizeAttachmentDownload } = useMobileWorkspaceActions();
   const queryClient = useQueryClient();
   const text = useText();
   const { t } = text;
@@ -290,6 +290,10 @@ export function useAttachmentFile(
     ...fileQuery(tapped),
     enabled: preview && download === "download" && !local && !pending,
   });
+  const waitingForTap = preview && tapped && query.fetchStatus === "fetching";
+  useEffect(() => {
+    if (waitingForTap) prioritizeAttachmentDownload(serverId, attachment.id);
+  }, [waitingForTap, prioritizeAttachmentDownload, serverId, attachment.id]);
   const data = query.data;
   const dimensions = useMemo(() => {
     const known = dimensionCache.get(attachment.id);
@@ -301,7 +305,11 @@ export function useAttachmentFile(
   const localUri = local ?? query.data?.localUri;
   const uri =
     localUri ?? query.data?.fileUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
-  const loadTapped = async () => query.data ?? (await queryClient.fetchQuery(fileQuery(true)));
+  const loadTapped = async () => {
+    if (query.data) return query.data;
+    prioritizeAttachmentDownload(serverId, attachment.id);
+    return queryClient.fetchQuery(fileQuery(true));
+  };
   async function share() {
     requestLargeFile(serverId, attachment.id);
     setSharing(true);
