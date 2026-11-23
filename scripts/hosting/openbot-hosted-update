@@ -107,7 +107,11 @@ install_packages() {
     apt_install "${available[@]}"
   else
     for package in "${available[@]}"; do
-      apt_install "$package" || echo "This system cannot install $package. OpenBot continues without it." >&2
+      if apt_install --simulate "$package" >/dev/null 2>&1; then
+        apt_install "$package"
+      else
+        echo "This system cannot install $package without removing other packages. OpenBot continues without it." >&2
+      fi
     done
   fi
   apt-get clean

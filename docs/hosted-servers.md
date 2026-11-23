@@ -586,7 +586,8 @@ On a server, root runs `openbot-hosted-update`:
    AppImage, checks its SHA-512 against the manifest, unpacks it in `/var/tmp`, checks that it has
    all hosting files, installs the packages in the `packages.txt` and `optional-packages.txt` of
    that release, and copies it to `/opt/OpenBot/staged`. The packages install with `--no-remove`.
-   A package of `optional-packages.txt` that needs a removal is skipped. `stage` runs the installed
+   A package of `optional-packages.txt` is skipped when a command with its name already exists,
+   or when it needs a removal. `stage` runs the installed
    script with the list of the new release, so a package that conflicts with a host package must
    not be in `packages.txt`: an older script would remove the host package or stop.
    `staged.ready` comes after the last file. OpenBot keeps running. The download and unpack use
