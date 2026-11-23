@@ -301,6 +301,10 @@ export const messages = {
     "OpenBot のリアルタイム CPU 制限が 0 のため、Linux がプロバイダーを停止しました。この制限はシステムから来ています。rtkit をインストールして起動し (`rtkit-daemon`)、`systemctl --user restart xdg-desktop-portal` を実行してから OpenBot を再起動してください。rtkit がない間は、xdg-desktop-portal を再起動するだけでは解決しません。",
   "error.provider.cpuUnsupported":
     "このコンピューターのプロセッサーでは、このプロバイダーを実行できません。別のプロバイダーを使用してください。",
+  "error.provider.largeMemoryPages":
+    "この Linux カーネルは 4 KiB より大きいメモリーページを使用しているため、このプロバイダーを実行できません（Raspberry Pi 5 や Asahi Linux など）。4 KiB ページのカーネルか、別のプロバイダーを使用してください。",
+  "error.provider.ipv6Missing":
+    "このプロバイダーには IPv6 が必要ですが、このコンピューターでは IPv6 がオフになっています。IPv6 をオンにしてから、もう一度お試しください。WSL では、.wslconfig から ipv6.disable=1 を削除し、wsl --shutdown を実行してください。",
   "error.provider.windowsBlocked":
     "スマート アプリ コントロールなどの Windows のセキュリティ設定により、このプロバイダーを起動できませんでした。別のプロバイダーを使ってください。",
   "error.provider.opencodeDatabaseNewer":
@@ -463,8 +467,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code はこのチャットの保存済みセッションを見つけられませんでした。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
   "error.provider.grokSignIn": "Grok を使うには `grok login` を実行するか、XAI_API_KEY を設定してください。",
+  "error.provider.acpSignInNoStart":
+    "プロバイダーが起動しなかったため、ログインを開始できませんでした。もう一度お試しいただくか、OpenBot を再起動してください。",
   "error.provider.acpSignInTimedOut": "サインインがタイムアウトしました。",
   "error.provider.acpSignInStopped": "サインインが完了する前に停止しました。",
+  "error.provider.geminiNoBrowserUseCode":
+    "このコンピューターには Google ログイン用のブラウザーがありません。「コードでログイン」を選び、任意のデバイスでリンクを開いてから、コードを貼り付けてください。",
   "error.provider.geminiBrowserUnavailable":
     "Gemini はサインインページを開けませんでした。ブラウザーと xdg-utils をインストールしてから、このホストのデスクトップセッションで接続してください。デスクトップのないサーバーではこのサインインを完了できません。",
   "error.provider.geminiBrowserOpenFailed":

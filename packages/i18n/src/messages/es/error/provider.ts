@@ -298,6 +298,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux detuvo el proveedor porque OpenBot tiene un límite de CPU en tiempo real de 0. El límite viene de tu sistema. Instala e inicia rtkit (`rtkit-daemon`), ejecuta `systemctl --user restart xdg-desktop-portal` y luego reinicia OpenBot. Reiniciar solo xdg-desktop-portal no sirve mientras falte rtkit.",
   "error.provider.cpuUnsupported": "El procesador de este equipo no puede ejecutar este proveedor. Usa otro proveedor.",
+  "error.provider.largeMemoryPages":
+    "Este proveedor no puede ejecutarse en este kernel de Linux, porque el kernel usa páginas de memoria de más de 4 KiB, como en Raspberry Pi 5 o Asahi Linux. Usa un kernel con páginas de 4 KiB u otro proveedor.",
+  "error.provider.ipv6Missing":
+    "Este proveedor necesita IPv6, y IPv6 está desactivado en este equipo. Activa IPv6 y vuelve a intentarlo. En WSL, quita ipv6.disable=1 de .wslconfig y ejecuta wsl --shutdown.",
   "error.provider.windowsBlocked":
     "La configuración de seguridad de Windows, como el Control inteligente de aplicaciones, impidió que este proveedor se iniciara. Usa otro proveedor.",
   "error.provider.opencodeDatabaseNewer":
@@ -454,8 +458,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code no encontró la sesión guardada de este chat. OpenBot inició una nueva sesión de Claude Code con el historial del chat. Inténtalo de nuevo.",
   "error.provider.grokSignIn": "Ejecuta `grok login` o define XAI_API_KEY para usar Grok.",
+  "error.provider.acpSignInNoStart":
+    "El proveedor no se inició, así que el inicio de sesión no pudo empezar. Vuelve a intentarlo o reinicia OpenBot.",
   "error.provider.acpSignInTimedOut": "Se agotó el tiempo del inicio de sesión.",
   "error.provider.acpSignInStopped": "El inicio de sesión se detuvo antes de completarse.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Este equipo no tiene un navegador para iniciar sesión en Google. Elige «Usar código», abre el enlace en cualquier dispositivo y pega el código.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini no pudo abrir la página de inicio de sesión. Instala un navegador y xdg-utils, y conéctate desde una sesión de escritorio en este host. Un servidor sin escritorio no puede completar este inicio de sesión.",
   "error.provider.geminiBrowserOpenFailed":

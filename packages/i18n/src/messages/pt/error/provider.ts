@@ -294,6 +294,10 @@ export const messages = {
     "O Linux parou o provedor porque o OpenBot tem um limite de CPU em tempo real igual a 0. O limite vem do seu sistema. Instale e inicie o rtkit (`rtkit-daemon`), execute `systemctl --user restart xdg-desktop-portal` e depois reinicie o OpenBot. Reiniciar apenas o xdg-desktop-portal não resolve enquanto o rtkit estiver ausente.",
   "error.provider.cpuUnsupported":
     "O processador deste computador não consegue executar este provedor. Use outro provedor.",
+  "error.provider.largeMemoryPages":
+    "Este provedor não pode ser executado neste kernel Linux, porque o kernel usa páginas de memória maiores que 4 KiB, como no Raspberry Pi 5 ou no Asahi Linux. Use um kernel com páginas de 4 KiB ou outro provedor.",
+  "error.provider.ipv6Missing":
+    "Este provedor precisa de IPv6, e o IPv6 está desativado neste computador. Ative o IPv6 e tente de novo. No WSL, remova ipv6.disable=1 do .wslconfig e execute wsl --shutdown.",
   "error.provider.windowsBlocked":
     "As configurações de segurança do Windows, como o Controle Inteligente de Aplicativos, impediram que este provedor iniciasse. Use outro provedor.",
   "error.provider.opencodeDatabaseNewer":
@@ -449,8 +453,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "O Claude Code não encontrou a sessão salva deste chat. O OpenBot iniciou uma nova sessão do Claude Code com o histórico do chat. Tente novamente.",
   "error.provider.grokSignIn": "Execute `grok login` ou defina XAI_API_KEY para usar o Grok.",
+  "error.provider.acpSignInNoStart":
+    "O provedor não iniciou, então o login não pôde começar. Tente de novo ou reinicie o OpenBot.",
   "error.provider.acpSignInTimedOut": "O tempo do login esgotou.",
   "error.provider.acpSignInStopped": "O login parou antes de terminar.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Este computador não tem um navegador para o login do Google. Escolha “Entrar com código”, abra o link em qualquer dispositivo e cole o código.",
   "error.provider.geminiBrowserUnavailable":
     "O Gemini não conseguiu abrir a página de login. Instale um navegador e o xdg-utils, depois conecte a partir de uma sessão de área de trabalho neste computador anfitrião. Um servidor sem área de trabalho não consegue concluir este login.",
   "error.provider.geminiBrowserOpenFailed":

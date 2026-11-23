@@ -285,6 +285,10 @@ export const messages = {
     "Linux остановил провайдера, потому что у OpenBot ограничение процессорного времени реального времени равно 0. Это ограничение задаёт ваша система. Установите и запустите rtkit (`rtkit-daemon`), выполните `systemctl --user restart xdg-desktop-portal`, затем перезапустите OpenBot. Один перезапуск xdg-desktop-portal не поможет, пока rtkit не установлен.",
   "error.provider.cpuUnsupported":
     "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
+  "error.provider.largeMemoryPages":
+    "Этот провайдер не может работать на этом ядре Linux, потому что ядро использует страницы памяти больше 4 КиБ, как на Raspberry Pi 5 или в Asahi Linux. Используйте ядро со страницами 4 КиБ или другого провайдера.",
+  "error.provider.ipv6Missing":
+    "Этому провайдеру нужен IPv6, а на этом компьютере IPv6 выключен. Включите IPv6 и повторите попытку. В WSL удалите ipv6.disable=1 из .wslconfig и выполните wsl --shutdown.",
   "error.provider.windowsBlocked":
     "Параметры безопасности Windows, например интеллектуальное управление приложениями, не дали запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":
@@ -440,8 +444,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code не нашёл сохранённую сессию этого чата. OpenBot начал новую сессию Claude Code с историей чата. Повторите попытку.",
   "error.provider.grokSignIn": "Выполните `grok login` или задайте XAI_API_KEY, чтобы использовать Grok.",
+  "error.provider.acpSignInNoStart":
+    "Провайдер не запустился, поэтому вход не смог начаться. Повторите попытку или перезапустите OpenBot.",
   "error.provider.acpSignInTimedOut": "Время входа истекло.",
   "error.provider.acpSignInStopped": "Вход прервался, не завершившись.",
+  "error.provider.geminiNoBrowserUseCode":
+    "На этом компьютере нет браузера для входа в Google. Выберите «Войти по коду», откройте ссылку на любом устройстве, затем вставьте код.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini не удалось открыть страницу входа. Установите браузер и xdg-utils, затем подключитесь из сеанса рабочего стола на этом хосте. Сервер без рабочего стола не может завершить этот вход.",
   "error.provider.geminiBrowserOpenFailed":
