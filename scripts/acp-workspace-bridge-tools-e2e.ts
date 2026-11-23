@@ -95,6 +95,7 @@ interface Report {
   confined?: Run;
   unconfined?: Run;
   otherFlavor?: Run;
+  otherUnconfined?: Run;
   failure?: string;
 }
 
@@ -162,10 +163,25 @@ try {
   const unconfined = await run("unconfined", false);
   report.unconfined = unconfined;
   assert.equal(unconfined.status, "completed", "The unconfined turn completes.");
+  for (const call of BRIDGE_CALLS)
+    assert.equal(
+      unconfined.outcomes[call.toolCallId],
+      "allow",
+      `${call.toolCallId} runs without a card in Full access.`,
+    );
+  assert.deepEqual(
+    unconfined.cards,
+    [...CONFINED_COMMANDS, ...OTHER_CALLS].map((call) => call.title),
+    "Without Workspace only, OpenBot tools run without a card, and commands and other tools keep their card.",
+  );
+
+  const otherUnconfined = await run("other-flavor-unconfined", false, DEFAULT_ACP_FLAVOR);
+  report.otherUnconfined = otherUnconfined;
+  assert.equal(otherUnconfined.status, "completed", "The unconfined turn of another flavor completes.");
   assert.equal(
-    unconfined.cards.length,
+    otherUnconfined.cards.length,
     ALL_CALLS.length,
-    "An agent without Workspace only keeps a card for each request.",
+    "Another flavor without Workspace only keeps a card for each request.",
   );
 
   const otherFlavor = await run("other-flavor", true, DEFAULT_ACP_FLAVOR);

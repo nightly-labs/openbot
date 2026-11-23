@@ -1,3 +1,7 @@
+### Changed
+
+- Gemini agents with Full access now use OpenBot's own tools, such as memory, the browser and channels, without an approval card, the same as Claude agents. Shell commands and other tools still ask when automatic approval is off.
+
 ### Fixed
 
 - When Google's servers answer a Gemini turn with "Requested entity was not found" after the agent already did work, the agent now continues the work on its backup model. Before, the turn stopped with this error and the work did not continue.

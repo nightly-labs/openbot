@@ -160,6 +160,7 @@ export interface AcpFlavor {
   connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
   mcpCallInputNamesServer?: true;
+  bridgeToolsWithoutCard?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };

@@ -4299,9 +4299,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      ((this.options.confine &&
-        (callsBridgeTool(thread, params.toolCall, kind, this.#flavor.mcpCallInputNamesServer) ||
-          runsConfinedCommand(params.toolCall, kind, this.#flavor.mcpCallInputNamesServer))) ||
+      (((this.options.confine || this.#flavor.bridgeToolsWithoutCard) &&
+        callsBridgeTool(thread, params.toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
+        (this.options.confine && runsConfinedCommand(params.toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
         (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
