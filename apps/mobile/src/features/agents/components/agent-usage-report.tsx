@@ -2,7 +2,7 @@ import {
   type AgentAnalytics,
   type AnalyticsAgent,
   type AnalyticsProviderDay,
-  agentProviderCliName,
+  agentProviderName,
   analyticsTokens,
   isAgentProvider,
 } from "@openbot/contracts/ipc";
@@ -16,25 +16,18 @@ import { UsageChart, useUsageSeriesColor } from "./usage-chart";
 import { UsageBar, UsageValue } from "./usage-motion";
 import { UsageSegments } from "./usage-segments";
 
-// A usage row names the provider the record carried, which is not always one OpenBot knows:
-// an unrecognised string is shown as it was stored rather than guessed at.
-const providerName = (value: string) => (isAgentProvider(value) ? agentProviderCliName(value) : value);
+const providerName = (value: string) => (isAgentProvider(value) ? agentProviderName(value) : value);
 
-/** A row of the per-agent split of a server report, with the name the phone knows for the agent. */
 export interface UsageAgentRow extends AnalyticsAgent {
   name: string;
-  /** The avatar of an agent the phone lists. A removed agent has none. */
   avatar?: ReactNode;
-  /** Opens the agent's own usage. A removed agent has no page to open. */
   onPress?: () => void;
 }
 
-/** The report of one agent, or of a server. A server report also passes its per-agent split. */
 export function AgentUsageReport({
   result,
   agents,
 }: {
-  /** A host report also splits the days by provider, which draws one area per provider. */
   result: Omit<AgentAnalytics, "agentId"> & { providerDaily?: AnalyticsProviderDay[] };
   agents?: UsageAgentRow[];
 }) {
@@ -43,7 +36,7 @@ export function AgentUsageReport({
     value === null ? t("mobile.agent.runtime.unavailable") : format.number(value);
   const money = (value: number | null) =>
     value === null
-      ? t("mobile.agent.runtime.unavailable")
+      ? t("mobile.agent.usage.noCostEstimate")
       : format.currencyUsd(value, { minimumFractionDigits: 4, maximumFractionDigits: 4, useGrouping: false });
   const date = (value: string, includeYear = false) =>
     format.date(new Date(`${value}T12:00:00Z`), {
@@ -79,13 +72,11 @@ export function AgentUsageReport({
       })),
     [chart, seriesColor],
   );
-  // The grid labels round to two significant digits, as the desktop axis does with compact values.
   const axisValue = (value: number) =>
     metric === "processedTokens"
       ? format.number(value, { notation: "compact", maximumFractionDigits: 1 })
       : format.currencyUsd(value, { maximumSignificantDigits: 2 });
   const totals = result.totals;
-  // The backend share and order are of processed tokens, cache reads included, so the rows take theirs again.
   const share = (row: { processedTokens: number; cachedInput: number | null }) =>
     analyticsTokens(totals) ? analyticsTokens(row) / analyticsTokens(totals) : 0;
   const byTokens = <T extends { processedTokens: number; cachedInput: number | null }>(rows: readonly T[]) =>
@@ -143,7 +134,6 @@ export function AgentUsageReport({
                 : t("mobile.agent.usage.selectDay")
             }
           />
-          {/* As the desktop tooltip does, the legend names each provider with its value: of the selected day, or of the range. */}
           {named ? (
             <View className="gap-2">
               {chartSeries.map((item) => {

@@ -111,11 +111,14 @@ export const messages = {
   "provider.picker.download": "Download van {name}",
   "provider.picker.search": "Modellen zoeken",
   "provider.picker.noMatches": "Geen modellen gevonden.",
+  "provider.picker.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "provider.picker.workspaceOnlyUnavailable":
     "Deze modellen werken niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig ‘Machtigingen’ in de agentinstellingen om ze te gebruiken.",
   "provider.picker.olderModels": "Oudere modellen",
   "provider.picker.olderModelsList": "Oudere {name}-modellen",
-  "provider.picker.noModels": "{name} heeft geen modellen beschikbaar.",
+  "provider.picker.noModels":
+    "Hier staan geen modellen van {name}. Als ze uitstaan, kan een beheerder ze aanzetten in Serverinstellingen > Aanbieders > {name} > Modellen.",
   "provider.picker.endpointModelsInCustom":
     "{name} draait je eigen endpoints. Hun modellen staan op het tabblad Eigen.",
   "provider.picker.showCustomModels": "Modellen tonen",
@@ -297,6 +300,8 @@ export const messages = {
     "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van een Google-aanmelding. Verwijder de sleutel om een Google-abonnement en de modellen ervan te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
+  "provider.settings.museKeyInUse":
+    "Muse gebruikt deze sleutel, niet je login. Verwijder de sleutel om je login te gebruiken.",
   "provider.settings.addKey": "Sleutel toevoegen",
   "provider.settings.changeKey": "Sleutel wijzigen",
   "provider.settings.runtime": "Runtime",
@@ -316,10 +321,15 @@ export const messages = {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Promptcache",
   "provider.settings.promptCacheDescription":
-    "Hoelang Claude de context van een agent tussen beurten in de cache bewaart.",
+    "Hoe lang Claude en Pi de context van een agent tussen beurten in de cache houden.",
   "provider.settings.promptCacheHour": "1 uur",
-  "provider.settings.promptCacheDefault": "Standaard van Claude Code",
+  "provider.settings.promptCacheDefault": "Standaard van de provider",
   "provider.settings.promptCacheLoadFailed": "Kan de promptcachetijd van deze server niet laden.",
+  "provider.settings.cacheExpiryCompaction": "Comprimeren voordat de cache verloopt",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Als een chat met 200K of meer tokens context inactief is met een cache van 1 uur, comprimeert de agent de context voordat de cache verloopt. Dan leest het volgende bericht niet de hele context opnieuw zonder cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "De compressie-instelling van deze server kon niet worden geladen.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Mijn Claude Code-configuratie gebruiken",
   "provider.settings.claudeUserSetupDescription":
@@ -386,4 +396,5 @@ export const messages = {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
+  "provider.settings.updateAll": "Alles updaten",
 } as const satisfies PartialTranslation<typeof source>;

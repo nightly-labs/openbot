@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about GitLab here is taken from docs.gitlab.com. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const GITLAB_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

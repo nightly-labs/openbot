@@ -25,7 +25,6 @@ export const Pill: Story = {
   args: { reasoningEffort: "medium", onReasoningEffortChange: fn() },
 };
 
-/** A Claude model with every effort level. */
 export const AllEffortLevels: Story = {
   args: {
     provider: "claude",
@@ -40,10 +39,6 @@ export const AllEffortLevels: Story = {
   },
 };
 
-/**
- * A Claude model whose effort Claude Code limits to Medium, from the user's Claude settings or their
- * organization. The Effort list locks High, Extra high and Max, and says why.
- */
 export const LimitedEffort: Story = {
   args: {
     provider: "claude",
@@ -56,7 +51,6 @@ export const LimitedEffort: Story = {
   },
 };
 
-/** A Codex model that offers Fast and Ultrafast, with Ultrafast on. */
 export const Ultrafast: Story = {
   args: {
     value: "gpt-5.6-sol",
@@ -76,7 +70,6 @@ export const Disabled: Story = {
   args: { disabled: true, disabledReason: "Choose a provider first." },
 };
 
-/** Providers that cannot run stay off the rail. The agent's own provider stays, with its message. */
 export const UnavailableProvidersOpen: Story = {
   args: {
     modelOptions: STORY_MODELS.filter((model) => model.provider === "claude"),
@@ -96,7 +89,6 @@ export const UnavailableProvidersOpen: Story = {
   },
 };
 
-/** Signed-out providers stay off the rail, and the plus opens the settings. */
 export const ConnectedProvidersOnly: Story = {
   args: {
     onManageProviders: fn(),
@@ -231,7 +223,6 @@ const customProviders = [
   },
 ];
 
-/** Nothing configured: the Custom tab is the one entry point, so it must not be a dead end. */
 export const CustomTabEmpty: Story = {
   args: {
     provider: "opencode",
@@ -259,7 +250,6 @@ export const CustomTabWithModels: Story = {
   },
 };
 
-/** Saved endpoints that wait for OpenCode to restart: their models come after the current task. */
 export const CustomTabPending: Story = {
   args: {
     provider: "opencode",
@@ -272,7 +262,6 @@ export const CustomTabPending: Story = {
   },
 };
 
-/** OpenCode read the saved endpoints but lists none of their models, so no restart brings them. */
 export const CustomTabUnlisted: Story = {
   args: {
     ...CustomTabPending.args,
@@ -280,7 +269,6 @@ export const CustomTabUnlisted: Story = {
   },
 };
 
-/** The same catalog on the OpenCode tab, which must not list the two custom endpoints again. */
 export const OpenCodeTabExcludesCustom: Story = {
   args: {
     ...CustomTabWithModels.args,
@@ -288,7 +276,6 @@ export const OpenCodeTabExcludesCustom: Story = {
   },
 };
 
-/** Three days from when the story loads, so the window has not ended yet. */
 const spentWeekResetsAt = Math.floor(Date.now() / 1_000) + 3 * 24 * 60 * 60;
 
 const usageLimitArgs: Parameters<typeof ProviderModelPicker>[0] = {
@@ -313,13 +300,8 @@ const usageLimitArgs: Parameters<typeof ProviderModelPicker>[0] = {
   },
 };
 
-/**
- * The Claude weekly window is spent: a chip beside the provider name gives the window and its reset.
- * The rows and the tab show no mark; their names tell a screen reader. Codex has quota left.
- */
 export const UsageLimitReached: Story = { render: () => <ProviderModelPicker {...usageLimitArgs} /> };
 
-/** Models that Codex lists from its own settings, here an Ollama server, in place of OpenAI's list (#9956). */
 const codexOllamaModels = ["gemma4:latest", "qwen3.6:latest", "glm-5.2:cloud", "kimi-k2.7-code:cloud"].map((id) => ({
   provider: "codex" as const,
   id,
@@ -336,7 +318,6 @@ const codexStatusWithSource = (modelSource: { kind: "provider"; name: string } |
   ),
 });
 
-/** Codex runs on a model provider that its settings select: the ChatGPT tab says which one. */
 export const CodexModelProviderSource: Story = {
   args: {
     value: "gemma4:latest",
@@ -345,7 +326,6 @@ export const CodexModelProviderSource: Story = {
   },
 };
 
-/** Codex lists the models of a file that its settings name: the ChatGPT tab says so. */
 export const CodexModelCatalogSource: Story = {
   args: {
     value: "gemma4:latest",

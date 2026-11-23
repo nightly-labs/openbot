@@ -10,7 +10,6 @@ function subscribe(listener: () => void) {
   if (!subscription) {
     foreground = AppState.currentState !== "background";
     subscription = AppState.addEventListener("change", (state) => {
-      // Notification Center and other system overlays do not end a foreground visit.
       if (state === "inactive") return;
       const next = state === "active";
       if (foreground === next) return;
@@ -31,7 +30,6 @@ function getSnapshot() {
   return subscription ? foreground : AppState.currentState !== "background";
 }
 
-/** Lifecycle only. Consumers own their network work and cancellation. */
 export function useAppForeground() {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

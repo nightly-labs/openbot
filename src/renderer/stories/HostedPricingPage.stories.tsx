@@ -4,10 +4,6 @@ import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { MOCK_HOSTED_SERVER_CATALOG } from "../src/preview/mock-hosted-servers";
 
-/**
- * The plan picker of Add server, with the billing country and the EU VAT ID above the order button. The order
- * button stays off until a country is chosen. Nothing leaves the browser.
- */
 function PricingStory(props: { details: BillingDetailsDraft; offerLicense?: boolean }) {
   const [details, setDetails] = createSignal(props.details);
   return (
@@ -39,36 +35,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A first purchase: no billing country yet, so the order button is off. */
 export const NoBillingCountry: Story = {
   render: () => <PricingStory details={{ country: null, vatId: "" }} />,
 };
 
-/**
- * A consumer in Germany. The optional EU VAT ID shows, with DE as its placeholder. A server order also asks that the
- * hosting service begin before the withdrawal period ends: the order button stays off until both boxes are ticked.
- */
 export const EuCountry: Story = {
   render: () => <PricingStory details={{ country: "DE", vatId: "" }} />,
 };
 
-/**
- * A VAT ID that is not one of the country. The error shows when the field loses focus. A buyer with a VAT ID is a
- * business, so the early start box does not show.
- */
 export const EuCountryWrongVatId: Story = {
   render: () => <PricingStory details={{ country: "FR", vatId: "DE123456789" }} />,
 };
 
-/**
- * A consumer in the United Kingdom: no VAT ID field. A consumer there also has a 14-day right of withdrawal, so a
- * server order asks for the early start, as in the EU. Turkey is the same.
- */
 export const UnitedKingdom: Story = {
   render: () => <PricingStory details={{ country: "GB", vatId: "" }} />,
 };
 
-/** A buyer outside the EU, the United Kingdom and Turkey: no VAT ID field and no early start box. */
 export const OutsideEu: Story = {
   render: () => <PricingStory details={{ country: "US", vatId: "" }} />,
 };

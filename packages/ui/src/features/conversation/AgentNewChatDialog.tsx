@@ -5,10 +5,6 @@ import { createSignal } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 
-/**
- * Asks before the agent forgets its chat. The agent settings and the context meter open it. A failure
- * stays in the dialog; a new chat closes it.
- */
 export function AgentNewChatDialog(props: {
   agent: Pick<AgentProfile, "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
   open: boolean;

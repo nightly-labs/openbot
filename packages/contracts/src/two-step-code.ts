@@ -1,25 +1,15 @@
-// Two-step (TOTP, RFC 6238) codes for a Vault login. The key is a base32 setup key or an
-// `otpauth://totp/` link, as a site shows it under its QR code. Main makes the codes from a saved key;
-// the window makes them only from a key that the user typed in the setup dialog and has not saved.
-// `crypto.subtle` is in Node, Electron and every browser, so one helper serves all of them. The phone
-// has no `crypto.subtle`: it makes the HMAC itself and uses `twoStepMessage` and `twoStepCodeFromMac`.
-
 export type TwoStepAlgorithm = "SHA-1" | "SHA-256" | "SHA-512";
 
 export interface TwoStepKey {
   secret: Uint8Array<ArrayBuffer>;
   algorithm: TwoStepAlgorithm;
-  /** 6–8. */
   digits: number;
-  /** Seconds that one code is valid. */
   period: number;
 }
 
-/** The longest key text that the Vault keeps, an `otpauth:` link included. */
 export const TWO_STEP_KEY_LIMIT = 1024;
 
 const BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-/** 80 bits, the shortest key that sites give. A shorter text is more likely a typing error. */
 const MINIMUM_KEY_CHARACTERS = 16;
 const DEFAULT_PERIOD = 30;
 const DEFAULT_DIGITS = 6;
@@ -78,7 +68,6 @@ function keyParts(text: string): KeyParts | null {
   } catch {
     return null;
   }
-  // A counter (`hotp`) key needs a saved counter, and sites use time keys.
   if (url.host.toLowerCase() !== "totp") return null;
   const base32 = cleanBase32(url.searchParams.get("secret") ?? "");
   const algorithm = ALGORITHMS[(url.searchParams.get("algorithm") ?? "SHA1").toUpperCase()];
@@ -88,7 +77,6 @@ function keyParts(text: string): KeyParts | null {
   return { base32, algorithm, digits, period };
 }
 
-/** A setup key or an `otpauth://totp/` link, or null when the text is neither. */
 export function parseTwoStepKey(text: string): TwoStepKey | null {
   const parts = keyParts(text);
   return parts
@@ -96,10 +84,6 @@ export function parseTwoStepKey(text: string): TwoStepKey | null {
     : null;
 }
 
-/**
- * The text that the Vault saves for a key: the base32 key alone for the usual settings, else a
- * short `otpauth:` link with the settings. The account and issuer are not kept. Null for no key.
- */
 export function normalizeTwoStepKey(text: string): string | null {
   const parts = keyParts(text);
   if (!parts) return null;
@@ -109,12 +93,10 @@ export function normalizeTwoStepKey(text: string): string | null {
   return `otpauth://totp/OpenBot?secret=${parts.base32}&algorithm=${algorithm}&digits=${parts.digits}&period=${parts.period}`;
 }
 
-/** The base32 key in a saved key text, for secret redaction. Null for no key. */
 export function twoStepKeySecret(text: string): string | null {
   return keyParts(text)?.base32 ?? null;
 }
 
-/** The HMAC message of the time step at `at` (milliseconds since 1970): the step as 8 big-endian bytes. */
 export function twoStepMessage(period: number, at: number): Uint8Array<ArrayBuffer> {
   const counter = Math.floor(at / 1000 / period);
   const message = new DataView(new ArrayBuffer(8));
@@ -123,14 +105,12 @@ export function twoStepMessage(period: number, at: number): Uint8Array<ArrayBuff
   return new Uint8Array(message.buffer);
 }
 
-/** The code in the HMAC of `twoStepMessage` (RFC 4226 dynamic truncation). */
 export function twoStepCodeFromMac(mac: Uint8Array, digits: number): string {
   const view = new DataView(mac.buffer, mac.byteOffset, mac.byteLength);
   const offset = view.getUint8(view.byteLength - 1) & 0x0f;
   return String((view.getUint32(offset) & 0x7fffffff) % 10 ** digits).padStart(digits, "0");
 }
 
-/** The code at `at` (milliseconds since 1970). */
 export async function twoStepCode(key: TwoStepKey, at: number): Promise<string> {
   const cryptoKey = await crypto.subtle.importKey("raw", key.secret, { name: "HMAC", hash: key.algorithm }, false, [
     "sign",
@@ -139,13 +119,11 @@ export async function twoStepCode(key: TwoStepKey, at: number): Promise<string> 
   return twoStepCodeFromMac(new Uint8Array(mac), key.digits);
 }
 
-/** Milliseconds until the next code. */
 export function twoStepRemainingMs(period: number, at: number): number {
   const periodMs = period * 1000;
   return periodMs - (at % periodMs);
 }
 
-/** A code in two groups, as authenticator apps show it: `123 456`. */
 export function groupedTwoStepCode(code: string): string {
   const half = Math.ceil(code.length / 2);
   return `${code.slice(0, half)} ${code.slice(half)}`;

@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Fechar janela flutuante do navegador",
   "browser.pip.reattachFailed": "O OpenBot não conseguiu reanexar o navegador.",
   "browser.pip.closeFailed": "O OpenBot não conseguiu fechar a janela flutuante do navegador.",
+  "browser.window.open": "Abrir navegador em nova janela",
+  "browser.window.openFailed": "O OpenBot não conseguiu abrir a janela do navegador.",
   "browser.popupBlocked.title": "Pop-up bloqueado",
   "browser.popupBlocked.dismiss": "Dispensar mensagem de pop-up",
   "browser.liveView.label": "Visualização ao vivo da página no servidor",
@@ -92,6 +94,7 @@ export const messages = {
   "browser.secret.submitting": "Enviando…",
   "browser.secret.takeOver": "Assumir",
   "browser.secret.failed": "Não foi possível concluir a solicitação. Verifique a conexão e tente novamente.",
+  "browser.secret.ended": "Esta solicitação de login terminou. Peça ao agente que tente de novo.",
   "browser.secret.vaultSkip.agentScript":
     "O OpenBot não usou seu login salvo porque o agente executou um script nesta página. Para usá-lo, peça ao agente que recarregue a página e tente de novo.",
   "browser.secret.vaultSkip.fieldKind":

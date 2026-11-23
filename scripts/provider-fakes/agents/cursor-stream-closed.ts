@@ -1,11 +1,9 @@
-// The `cursor-agent acp` of `cursor-stream-closed-e2e.ts`. Cursor 2026.10.22-27dcf5f sends a closed
-// stream error as one answer chunk after a turn that succeeded, and then ends the turn (#3334). This
-// fake answers each prompt in that way. A prompt with "quote-case" gets an answer that only quotes
-// the error.
 import { serveFakeAcpAgent } from "../acp-agent";
 
 const MODEL = "auto";
 const QUOTED_ANSWER = "Cursor said: Error: RetriableError: WritableIterable is closed";
+const STREAM_CANCELED = "RetriableError: [canceled] http/2 stream closed with error code CANCEL (0x8)";
+const INTERNAL_FAILURE = "\n\nError: RetriableError: [internal] The agent loop failed.";
 
 let count = 0;
 serveFakeAcpAgent({
@@ -21,7 +19,18 @@ serveFakeAcpAgent({
   "session/prompt": (request, peer) => {
     const sessionId = request.params.sessionId;
     const text = (request.params.prompt ?? []).map((block) => block.text ?? "").join("");
-    if (text.includes("quote-case")) {
+    if (text.includes("canceled-chunk-case")) {
+      peer.say(sessionId, "Checking the webhook.");
+      peer.say(sessionId, `\n\nError: ${STREAM_CANCELED}`);
+    } else if (text.includes("canceled-recovered-case")) {
+      peer.say(sessionId, `\n\nError: ${STREAM_CANCELED}`);
+      peer.say(sessionId, "Done.");
+    } else if (text.includes("canceled-reject-case")) {
+      peer.fail(request, { code: -32603, message: "Internal error", data: { details: STREAM_CANCELED } });
+      return;
+    } else if (text.includes("internal-case")) {
+      peer.say(sessionId, INTERNAL_FAILURE);
+    } else if (text.includes("quote-case")) {
       peer.say(sessionId, QUOTED_ANSWER);
     } else {
       peer.say(sessionId, "Pong.");

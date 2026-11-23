@@ -12,6 +12,10 @@ export const messages = {
   "error.voice.prepareRequired":
     "Lokale Sprachtranskription ist nicht verfügbar. Führe `bun run voice:prepare` aus und starte OpenBot neu.",
   "error.voice.transcriptionFailed": "OpenBot konnte diese Aufnahme nicht transkribieren.",
+  "error.voice.videoModelMissing":
+    "Unter Einstellungen → Diktat ist kein Spracherkennungsmodell für Aufnahmen eingerichtet.",
+  "error.voice.videoModelMissingServer":
+    "Auf diesem Server ist kein Spracherkennungsmodell eingerichtet. Ein Owner oder Admin kann in den Servereinstellungen unter Spracherkennung ein Modell einrichten.",
   "error.voice.cloud.keyRequired": "Füge deinen {provider}-API-Schlüssel unter Einstellungen → Diktat hinzu.",
   "error.voice.cloud.keyRejected":
     "{provider} hat den API-Schlüssel nicht akzeptiert. Prüfe den Schlüssel unter Einstellungen → Diktat.",
@@ -26,6 +30,7 @@ export const messages = {
   "error.voice.speech.modelRequired": "Lade das Sprachausgabemodell unter Einstellungen → Diktat herunter.",
   "error.voice.speech.timedOut": "Das Vorlesen der Antwort hat zu lange gedauert.",
   "error.voice.speech.failed": "OpenBot konnte die Antwort nicht vorlesen.",
+  "error.voice.speech.providerRefused": "{provider} hat die Audioausgabe abgelehnt: {reason}",
   "error.voice.recordingNotKept": "OpenBot konnte die Sprachaufnahme nicht speichern.",
   "error.voice.live.timedOut": "Codex-Live-Sprache ist nicht rechtzeitig gestartet. Versuche es erneut.",
   "error.voice.live.failed": "Live-Sprache wurde beendet: {reason}",
@@ -33,6 +38,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex auf dem Server konnte Live-Sprache nicht starten. Bitte den Eigentümer, Codex auf diesem Computer zu aktualisieren und sich mit ChatGPT anzumelden. Versuche es dann noch einmal.",
   "error.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
+  "error.voice.live.chooseAccount":
+    "Dieses ChatGPT-Konto kann Live-Sprache nicht nutzen. Wähle in Einstellungen → Sprache ein Konto, dessen Abo Sprache enthält.",
   "error.voice.live.unavailable":
     "OpenAI konnte die Live-Sprache nicht starten. Das Problem liegt bei OpenAI. Versuche es später erneut.",
   "error.voice.live.refused":

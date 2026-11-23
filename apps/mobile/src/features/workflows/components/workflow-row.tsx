@@ -17,7 +17,6 @@ import { typeScale } from "@/shared/lib/type-scale";
 
 export type WorkflowRowAction = "pin" | "run" | "edit";
 
-/** The colour class of a run status line. */
 export function runStatusClass(lastRun: WorkflowSummary["lastRun"]) {
   switch (lastRun?.status) {
     case "running":
@@ -32,7 +31,6 @@ export function runStatusClass(lastRun: WorkflowSummary["lastRun"]) {
   }
 }
 
-/** One workflow of the list: its name, its last run, and a pin when the drawer shows it. */
 export function WorkflowRow({
   workflow,
   pinned,
@@ -53,15 +51,15 @@ export function WorkflowRow({
     "--openbot-file-default-soft",
   ]);
   const menu = useRef<MenuComponentRef | null>(null);
-  // The iOS menu host takes the size of its content, so the row gets the width of its slot.
   const [width, setWidth] = useState<number>();
   const last = workflow.lastRun;
-  const status = last
+  const lastRunText = last
     ? t("mobile.workflow.list.lastRun", {
         status: t(RUN_STATUS_LABEL[last.status]),
         time: formatUpdatedAt(last.at, format),
       })
     : t("mobile.workflow.list.neverRun");
+  const status = workflow.paused ? t("mobile.workflow.list.paused") : lastRunText;
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       <MenuView
@@ -100,8 +98,6 @@ export function WorkflowRow({
             void haptics.impact("soft");
             onPress();
           }}
-          // The native context menu does not cancel this touch. Without a long-press handler, lifting the
-          // finger after the menu opens counts as a tap. Android opens its menu from the row.
           delayLongPress={longPressDelay}
           onLongPress={() => {
             void haptics.longPress();
@@ -121,7 +117,11 @@ export function WorkflowRow({
                 {workflow.title}
               </Typography.Paragraph>
             </View>
-            <Typography.Paragraph className={runStatusClass(last)} numberOfLines={1} style={typeScale.caption}>
+            <Typography.Paragraph
+              className={workflow.paused ? "text-text-secondary" : runStatusClass(last)}
+              numberOfLines={1}
+              style={typeScale.caption}
+            >
               {status}
             </Typography.Paragraph>
           </View>

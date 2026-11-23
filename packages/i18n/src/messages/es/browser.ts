@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Cerrar ventana emergente del navegador",
   "browser.pip.reattachFailed": "OpenBot no pudo volver a acoplar el navegador.",
   "browser.pip.closeFailed": "OpenBot no pudo cerrar la ventana emergente del navegador.",
+  "browser.window.open": "Abrir navegador en una ventana nueva",
+  "browser.window.openFailed": "OpenBot no pudo abrir la ventana del navegador.",
   "browser.popupBlocked.title": "Ventana emergente bloqueada",
   "browser.popupBlocked.dismiss": "Descartar mensaje de ventana emergente",
   "browser.liveView.label": "Vista en directo de la página en el servidor",
@@ -92,6 +94,7 @@ export const messages = {
   "browser.secret.submitting": "Enviando…",
   "browser.secret.takeOver": "Intervenir",
   "browser.secret.failed": "No se pudo completar la solicitud. Comprueba la conexión e inténtalo de nuevo.",
+  "browser.secret.ended": "Esta solicitud de inicio de sesión terminó. Pide al agente que lo intente de nuevo.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot no usó tu inicio de sesión guardado porque el agente ejecutó un script en esta página. Para usarlo, pide al agente que recargue la página y lo intente de nuevo.",
   "browser.secret.vaultSkip.fieldKind":

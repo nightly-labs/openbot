@@ -9,11 +9,6 @@ import {
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Server settings › Transfer (`instance-transfer-v1`), for an owner or admin: move this server's
- * agents and server settings to or from an OpenBot transfer file. Each direction has its own page.
- * A user who administers another such server can also copy agents to it, with no file.
- */
 export function ServerTransferScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();

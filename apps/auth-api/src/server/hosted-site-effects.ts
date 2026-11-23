@@ -14,7 +14,6 @@ export const siteFailure = (error: unknown): HostedSiteFailure =>
 export const siteCall = <A>(operation: () => Promise<A>) => Effect.tryPromise({ try: operation, catch: siteFailure });
 export const siteDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch: siteFailure });
 
-/** Each site operation receives the current Worker's bindings. */
 export class HostedSiteStorage extends Context.Service<HostedSiteStorage, { database: D1Database; bucket: R2Bucket }>()(
   "@openbot/auth-api/HostedSiteStorage",
 ) {

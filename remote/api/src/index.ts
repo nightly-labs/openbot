@@ -23,20 +23,12 @@ import { TurnRelays } from "./turn-relays";
 const config = readRemoteApiConfig();
 const turnRelays = new TurnRelays(config);
 const entry = new SignalEntry(config);
-// Probes each TURN relay every minute, so that peers get relays that allocate. Disposal stops it.
 const turnRuntime = ManagedRuntime.make(turnRelays.watch());
 await turnRuntime.runPromise(Effect.void);
 class ControlPlaneError extends Schema.TaggedError<ControlPlaneError>()("ControlPlaneError", {
   message: Schema.String,
 }) {}
 
-// A restart empties the resume cache, and every peer connects again in the same second. Each hello then
-// asks the account service, and one D1 database answers its queries one at a time. On 2026-10-30 one
-// restart gave 9443 resumes that the account service did not confirm, and each of those peers tried again.
-// The limit keeps the 5-second request timeout for the request only, not for its wait in a queue. A
-// check that waits longer than the deadline fails as unavailable (close 1013), and the peer tries again
-// after its backoff. A request that started can end up to 5 s after the deadline. Two checks (a stale
-// resume token) then still end before the 30-second connect deadline of a new client (`remote-peer.ts`).
 const RESUME_CHECK_CONCURRENCY = 64;
 const RESUME_CHECK_DEADLINE = "7 seconds";
 
@@ -68,7 +60,6 @@ class ControlPlane extends Context.Service<
       import("@openbot/contracts/signal-protocol/telegram-route").TelegramRouteChat[],
       ControlPlaneError
     >;
-    // `null` when the code is not valid (404) or the chat is linked to another host (409).
     linkTelegramChat(
       botId: string,
       chatId: string,
@@ -83,9 +74,7 @@ class ControlPlane extends Context.Service<
       routes: import("@openbot/contracts/signal-protocol/webhook-route").WebhookRoute[],
     ): Effect.Effect<string[], ControlPlaneError>;
     discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
-    // An account service without the route answers 404: no host starts and nothing is kept.
     routeWake(route: IngressRoute, wake: boolean): Effect.Effect<RouteWake, ControlPlaneError>;
-    // False for an account service without `/v2/remote/route-wake`, or one that does not answer.
     supportsRouteWake(): Effect.Effect<boolean>;
     reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
   }
@@ -129,7 +118,6 @@ class ControlPlane extends Context.Service<
             ask("/v2/remote/resume/validate", claims),
             (response) =>
               Effect.gen(function* () {
-                // A failed service is not an inactive session: the session can still be active.
                 if (response.status >= 500 || response.status === 429)
                   return yield* new ControlPlaneError({ message: "The account service is unavailable." });
                 if (!response.ok) return false;
@@ -215,7 +203,6 @@ class ControlPlane extends Context.Service<
       ),
       routeWake: Effect.fn("ControlPlane.routeWake")((route, wake) =>
         Effect.acquireUseRelease(
-          // Longer than Slack waits: Slack sends the event again, and a late answer still keeps this one.
           ask("/v2/remote/route-wake", { route, wake }, 30_000),
           (response) =>
             Effect.gen(function* () {
@@ -344,9 +331,6 @@ const signal = new SignalService(
     telegram: config.telegram
       ? { bot: new TelegramBotApi(config.telegram), files: new TelegramFileTokens(config.sessionSecret) }
       : null,
-    // Only with an account service that has the route: else Signal does not say `ingress-queue`, and
-    // a hosted server with a live connection stays on. A failure keeps nothing: the platform gets the
-    // answer of an offline host, as before.
     routeWaker: (await controlPlane.runPromise(controlPlaneService.supportsRouteWake()))
       ? (route, wake) => controlPlaneService.routeWake(route, wake).pipe(Effect.catch(() => Effect.succeed(null)))
       : null,
@@ -364,11 +348,7 @@ const discordConfig = config.discord;
 if (!discordConfig) {
   console.log("OpenBot Discord is off: DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID are not both set and valid.");
 }
-// Null while the Gateway is stopped.
 let discordApi: DiscordApi | null = null;
-// The Discord bot's Gateway connection runs only while this machine is the entry: a second Gateway
-// session would acknowledge each interaction and answer each direct message two times. Each time the
-// machine becomes the entry, a new layer connects the bot. Interruption closes its scope and the connection.
 const discordWhileEntry: Effect.Effect<void> = discordConfig
   ? Effect.scoped(
       Effect.gen(function* () {
@@ -389,17 +369,13 @@ const discordWhileEntry: Effect.Effect<void> = discordConfig
     )
   : Effect.void;
 const setTelegramWebhooks = () => {
-  // A failure is logged and Signal runs on.
   if (signal.telegram) void signalRuntime.runPromise(signal.telegram.bot.setWebhooks());
 };
-// Resolves the entry name before the listener starts, then every 30 seconds (`SignalEntry`). The
-// Discord Gateway lives in this runtime. Disposal stops the check and closes the Gateway.
 const entryRuntime = ManagedRuntime.make(
   entry.watch({
     whileEntry: discordWhileEntry,
     changed: (isEntry) =>
       Effect.sync(() => {
-        // The peers without a `signal` claim connect again through the entry name.
         if (!isEntry) signal.closeEntrySockets();
         else setTelegramWebhooks();
       }),
@@ -421,7 +397,6 @@ const listen = () =>
       : {}),
   });
 listen();
-// Telegram posts to this Signal only after the listener is up, and only to the entry.
 if (entry.isEntry) setTelegramWebhooks();
 const healthServer = Bun.serve({
   hostname: config.healthHost,
@@ -460,7 +435,6 @@ function reloadTlsWhenChanged(): Promise<void> {
   pendingReload ??= controlPlane
     .runPromise(reloadTlsEffect())
     .catch(() => {
-      // TLS paths and provider causes must not enter diagnostics.
       console.error("OpenBot Remote API could not reload its TLS certificate.");
     })
     .finally(() => {
@@ -521,7 +495,6 @@ const shutdown = () => {
 process.once("SIGINT", () => void shutdown());
 process.once("SIGTERM", () => void shutdown());
 
-/** A constant-time compare: the SHA-256 digests have the same length, so the length does not show. */
 function sameSecret(actual: string, expected: string): boolean {
   return timingSafeEqual(createHash("sha256").update(actual).digest(), createHash("sha256").update(expected).digest());
 }

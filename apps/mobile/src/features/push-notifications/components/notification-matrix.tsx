@@ -36,10 +36,8 @@ import { currentText, useText } from "@/shared/lib/text";
 import { NotificationLevelSegments, SELECTION_RADIUS } from "./notification-level-segments";
 import { ServerMuteRow } from "./server-notification-settings";
 
-/** The row of the whole server. An agent ID cannot be empty, so it cannot be the same. */
 const SERVER_ROW = "";
 
-/** The avatar of an agent row, in points. */
 const AVATAR_SIZE = 32;
 
 const OPEN_MS = 260;
@@ -47,12 +45,6 @@ const CLOSE_MS = 200;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_CLOSE = Easing.bezier(0.32, 0.08, 0.24, 1);
 
-/**
- * What the user hears about: one server at a time, the whole server and each of its agents, and the
- * mute of this phone. On a host that serves `agent-notification-levels-v1`, the host keeps the levels
- * for the user and applies them on all of their devices. An older host has only the level of this
- * phone for the whole server.
- */
 export function NotificationMatrix({
   initialServerId,
   highlightAgentId,
@@ -112,7 +104,6 @@ export function NotificationMatrix({
       ) : null}
     </>
   );
-  // A new server starts with no request in progress and no error.
   return (
     <ServerLevels
       key={server.id}
@@ -129,7 +120,6 @@ function ServerLevels({
   highlightAgentId,
 }: {
   server: MobileServer;
-  /** The title and the server choice, above the rows of the server. */
   header: ReactNode;
   highlightAgentId: string | undefined;
 }) {
@@ -137,19 +127,16 @@ function ServerLevels({
   const { agents, canSendNotifications, canSetAgentNotificationLevel } = useMobileWorkspace();
   const { loadAgentNotificationLevels, setAgentNotificationLevel, setOwnServerNotificationLevel, updateAgent } =
     useMobileWorkspaceActions();
-  /** The agent whose switch for every member turns on now. */
   const [turningOn, setTurningOn] = useState<string | null>(null);
   const preference = usePushNotificationPreference();
   const liveActivities = useLiveActivitiesPreference();
   const synced = useSyncedNotificationLevels((state) => state.servers[server.id]);
-  /** The row that waits for the host, and the level it asked for. A failure shows the saved level again. */
   const [pending, setPending] = useState<{ row: string; level: ServerNotificationLevel | null } | null>(null);
   const [levelError, setLevelError] = useState<string | null>(null);
   const [muteError, setMuteError] = useState<string | null>(null);
   const online = showsOnline(server);
   const keepsLevels = canSetAgentNotificationLevel(server.id);
 
-  // The screen reads the levels again when it opens; the host also sends each change of another device.
   useEffect(() => {
     if (!keepsLevels || !online) return;
     void loadSyncedNotificationLevels(server.id, () => loadAgentNotificationLevels(server.id)).catch(() => undefined);
@@ -157,19 +144,13 @@ function ServerLevels({
 
   const serverLevel = effectiveServerLevel(synced, serverNotificationSetting(preference, server.id));
   const agentLevels = synced ? agentNotificationLevelMap(synced) : null;
-  // The level and the mute of this phone apply while notifications or the Live Activity are on, as
-  // before. Android has no Live Activity.
   const phoneEnabled =
     preference.ready && !preference.saving && (preference.enabled || (isIOS && liveActivities.enabled));
-  // The levels that the host keeps apply on the other devices too, so they do not depend on this phone.
   const hostEnabled = keepsLevels && online && synced !== undefined && pending === null;
   const serverAgents = agents.filter((agent) => agent.serverId === server.id);
-  // As on desktop, the list shows only the agents that do not follow the server. The agent that
-  // opened this screen also shows, until it follows the server again.
   const [highlightShown, setHighlightShown] = useState(highlightAgentId);
   const isShown = (agent: MobileAgent) => {
     if (agent.notifications === false) return true;
-    // A row that goes back to the server level closes at once; a failed save shows it again.
     if (pending?.row === agent.id) return pending.level !== null;
     return agent.id === highlightShown || agentLevels?.has(agent.id) === true;
   };
@@ -198,10 +179,6 @@ function ServerLevels({
     }
   }
 
-  /**
-   * Turns on an agent that a member turned off for every member, with the agent switch of earlier
-   * versions. The host keeps that switch, so this screen is the one place that turns it on again.
-   */
   async function turnOn(agentId: string): Promise<void> {
     setTurningOn(agentId);
     try {
@@ -230,7 +207,6 @@ function ServerLevels({
       });
       return;
     }
-    // The level of this phone shows until the user chooses one for all of their devices.
     if (synced?.server === level) return;
     void saveOnHost(SERVER_ROW, level, () => setOwnServerNotificationLevel(level, server.id));
   }
@@ -256,7 +232,6 @@ function ServerLevels({
       <View className="gap-2">
         {header}
         <SettingsSection footer={levelsFooter}>
-          {/* One child: each agent row brings its own divider, so a row that closes takes it along. */}
           <View>
             <SettingsRow
               supportingText={keepsLevels ? undefined : t("mobile.settings.notifications.thisPhoneOnly")}
@@ -273,7 +248,6 @@ function ServerLevels({
             </SettingsRow>
             {keepsLevels
               ? serverAgents.map((agent) => {
-                  // The switch of the agent is off for every member, so no level of the user applies.
                   const sharedOff = agent.notifications === false;
                   const own = pending?.row === agent.id ? pending.level : (agentLevels?.get(agent.id) ?? null);
                   return (
@@ -291,7 +265,6 @@ function ServerLevels({
                               animateIdle={false}
                             />
                           }
-                          // Only the short title: a note that comes and goes would change the height of the row.
                           supportingText={agent.title || undefined}
                           trailing={
                             sharedOff ? (
@@ -315,10 +288,8 @@ function ServerLevels({
                                 label={agent.name}
                                 value={own}
                                 inherited={serverLevel}
-                                // "Nothing" for the server silences each agent, whatever its own level.
                                 disabled={!hostEnabled || serverLevel === "nothing"}
                                 onSelect={(level) => {
-                                  // A tap on the agent's own level gives the agent back to the server level.
                                   const next = own === level ? null : level;
                                   if (next === null && agent.id === highlightShown) setHighlightShown(undefined);
                                   void saveOnHost(agent.id, next, () =>
@@ -343,10 +314,8 @@ function ServerLevels({
                 <ChooseAgentMenu
                   agents={hiddenAgents}
                   another={shownAgents.length > 0}
-                  // One save at a time, as for the levels of the rows.
                   disabled={!hostEnabled}
                   onChoose={(agentId) => {
-                    // As on desktop, the chosen agent gets the first level that is not the server level.
                     if (!hostEnabled) return;
                     void haptics.selection();
                     const level = firstOtherLevel(serverLevel);
@@ -365,15 +334,9 @@ function ServerLevels({
   );
 }
 
-/**
- * A row under the whole server, with the divider above it. A row that opens shows at once; a row that
- * closes shrinks with its real height, so the rows and the sections below move up and do not jump.
- */
 function CollapsingRow({ open, children }: PropsWithChildren<{ open: boolean }>) {
   const [closed, setClosed] = useState(!open);
-  // Stable, so that a new render does not start the animation again.
   const onClosed = useCallback(() => setClosed(true), []);
-  // A row that opens again before the end of its close stays mounted.
   if (open && closed) setClosed(false);
   if (!open && closed) return null;
   return (
@@ -383,11 +346,9 @@ function CollapsingRow({ open, children }: PropsWithChildren<{ open: boolean }>)
   );
 }
 
-/** The animated part of a row. It mounts with its view, so that the animated style is attached from the start. */
 function CollapsingBody({ open, onClosed, children }: PropsWithChildren<{ open: boolean; onClosed: () => void }>) {
   const reducedMotion = useReducedMotion();
   const openness = useSharedValue(1);
-  // -1 until the row is measured.
   const contentHeight = useSharedValue(-1);
   useEffect(() => {
     openness.set(
@@ -403,7 +364,6 @@ function CollapsingBody({ open, onClosed, children }: PropsWithChildren<{ open: 
   const style = useAnimatedStyle(() => {
     const height = contentHeight.get();
     const progress = openness.get();
-    // The row keeps its natural height until it is measured.
     return height < 0 ? {} : { height: height * progress, opacity: progress };
   });
   return (
@@ -421,14 +381,10 @@ function CollapsingBody({ open, onClosed, children }: PropsWithChildren<{ open: 
   );
 }
 
-/** The first level that is not the level of the server, for an agent that gets its own level. */
 function firstOtherLevel(level: ServerNotificationLevel): ServerNotificationLevel {
   return level === "all" ? "needs-me" : "all";
 }
 
-/**
- * The last row of the agents: the agents that follow the server. A choice gives that agent its own level.
- */
 function ChooseAgentMenu({
   agents,
   another,
@@ -436,7 +392,6 @@ function ChooseAgentMenu({
   onChoose,
 }: {
   agents: readonly MobileAgent[];
-  /** Some agents show already. */
   another: boolean;
   disabled: boolean;
   onChoose: (agentId: string) => void;
@@ -453,7 +408,6 @@ function ChooseAgentMenu({
         const agentId = nativeEvent.event;
         if (agents.some((agent) => agent.id === agentId)) onChoose(agentId);
       }}
-      // The native menu sizes its trigger to the content, so the trigger takes no flexible width.
       style={{ alignSelf: "flex-start", maxWidth: "100%" }}
     >
       <View

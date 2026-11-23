@@ -1,8 +1,6 @@
 import type { EventEndpoint, Untyped } from "@openbot/contracts/ipc";
+import { perfIpcSend } from "../backend/perf-probe-hooks";
 
-// A typed event takes its payload, or nothing when the payload is `undefined`. An event whose group is not
-// typed yet takes anything, as every event did before endpoints had types. The payload comes from the
-// endpoint alone: `NoInfer` keeps a wider argument from widening it.
 type EventArgs<Payload> = [Payload] extends [Untyped]
   ? unknown[]
   : [Payload] extends [undefined]
@@ -35,6 +33,7 @@ export function sendToRenderer<Payload>(
     const frame = contents.mainFrame;
     if (frame.isDestroyed() || frame.detached) return false;
     contents.send(endpoint.channel, ...args);
+    perfIpcSend(contents, endpoint.channel, args);
     return true;
   } catch (error) {
     if (isUnavailableRendererError(error)) return false;

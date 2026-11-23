@@ -19,6 +19,7 @@ export const messages = {
   "computerUse.ready.title": "التحكم في الحاسوب جاهز",
   "computerUse.ready.description":
     "يمكن لـ OpenBot رؤية التطبيقات على هذا الحاسوب والتفاعل معها. لا يطلب هذا النظام أي إذن إضافي.",
+  "computerUse.limited.title": "التحكم في الحاسوب محدود على سطح المكتب هذا",
   "computerUse.openSettingsFailed.title": "تعذّر فتح إعدادات النظام",
   "computerUse.restartRequired.title": "يلزم إعادة التشغيل",
   "computerUse.restartRequired.description":

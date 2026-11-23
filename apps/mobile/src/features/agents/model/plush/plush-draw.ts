@@ -25,50 +25,29 @@ import {
 } from "./plush-felt";
 import type { PlushFrame } from "./plush-frames";
 
-/** The pictures of one plush: its tinted body and felt balls, and the shared eye pads. */
 export interface PlushArt {
   body: SkImage;
   padX: SkImage;
   padY: SkImage;
-  /** The felt ball in the agent colour: the thinking dots. */
   dot: SkImage;
-  /** The blue felt ball of `notify`. */
   notif: SkImage;
-  /** The agent colour: the z's of sleep. */
   ink: string;
 }
 
-/**
- * The Skia objects that each frame uses again, so a moving plush does not make new objects 30 times
- * each second. Each paint has one task. The drawing changes only the values that the task changes,
- * so each paint has the same values as a new paint that the earlier code made for each draw. Skia
- * copies a paint when it records a draw or opens a layer, so a change after the call has no effect
- * on that call.
- */
 interface PlushDrawKit {
-  /** A new paint with no changes: the body, the notify ball and an eye of one piece. */
   plain: SkPaint;
-  /** Only its alpha changes: the layer of an eye, the layer of a faded body, and the dots. */
   alpha: SkPaint;
-  /** Adds the pieces of an eye of more than one piece. */
   plus: SkPaint;
-  /** The lids of a blink cut the pad. */
   mask: SkPaint;
-  /** The white bands of a lid. Only its alpha changes. */
   band: SkPaint;
-  /** The closed eye line. Only its width and its alpha change. */
   line: SkPaint;
-  /** The z's of sleep. Its colour changes with the agent colour, and its width and alpha with each z. */
   stroke: SkPaint;
   strokeInk: string | null;
-  /** The grey layer of a disconnected agent. Its colour filter changes with the saturation. */
   grey: SkPaint;
   greySaturation: number | null;
   source: SkHostRect;
   target: SkHostRect;
-  /** A plain round rectangle: Skia reads it as `Skia.RRectXY(rect, rx, ry)` makes it. */
   bandRect: { rect: SkHostRect; rx: number; ry: number };
-  /** The 3 x 3 values for `canvas.concat`: Skia reads them as `Skia.Matrix(values)` does. */
   matrix: number[];
   path: SkPathBuilder;
   recorder: SkPictureRecorder;
@@ -76,11 +55,6 @@ interface PlushDrawKit {
 }
 
 declare global {
-  /**
-   * The draw objects of the JavaScript runtime that draws the plush: the JS thread and the UI thread
-   * each have their own. A Skia object stays in the runtime that made it, so two threads never
-   * change the same object.
-   */
   var openbotPlushDrawKit: PlushDrawKit | undefined;
 }
 
@@ -124,7 +98,6 @@ function makeDrawKit(): PlushDrawKit {
   };
 }
 
-/** The draw objects of this runtime. The first call in each runtime makes them. */
 function drawKit(): PlushDrawKit {
   "worklet";
   let kit = globalThis.openbotPlushDrawKit;
@@ -153,11 +126,6 @@ function alphaPaint(kit: PlushDrawKit, opacity: number): SkPaint {
   return kit.alpha;
 }
 
-/**
- * Draws a part of `image` into a rectangle. The part is in fractions of the image: 0, 0, 1, 1 is all
- * of it. Do not give a worklet parameter a default that reads a closure value: on the UI runtime the
- * default runs before the closure is read.
- */
 function drawPicture(
   canvas: SkCanvas,
   kit: PlushDrawKit,
@@ -180,11 +148,6 @@ function drawPicture(
   canvas.drawImageRectOptions(image, kit.source, kit.target, FilterMode.Linear, MipmapMode.Linear, paint);
 }
 
-/**
- * One eye: the felt pad in pieces that add up (`plus`) in their own layer, under the lids of a
- * blink, and the closed line of sleep. The layers stay: the pieces must add up before the opacity
- * applies, and the lids cut only the pad. A draw without a layer can change pixels by rounding.
- */
 function drawEye(canvas: SkCanvas, kit: PlushDrawKit, eye: PlushEye, art: PlushArt) {
   "worklet";
   const opacity = eye.alpha * eye.pad;
@@ -253,7 +216,6 @@ function drawEye(canvas: SkCanvas, kit: PlushDrawKit, eye: PlushEye, art: PlushA
   }
 }
 
-/** The colour matrix of SVG `saturate`. */
 export function saturationMatrix(s: number): number[] {
   "worklet";
   return [
@@ -280,11 +242,6 @@ export function saturationMatrix(s: number): number[] {
   ];
 }
 
-/**
- * Draws a plush frame: the whole viewBox in a square of `size` pixels. It runs on the UI thread for a
- * moving avatar and on the JS thread for a still picture, so both show the same pixels. `saturation`
- * below 1 greys the plush, as a disconnected agent shows.
- */
 export function drawPlush(canvas: SkCanvas, frame: PlushFrame, art: PlushArt, size: number, saturation = 1) {
   "worklet";
   const kit = drawKit();
@@ -334,11 +291,6 @@ export function drawPlush(canvas: SkCanvas, frame: PlushFrame, art: PlushArt, si
   canvas.restore();
 }
 
-/**
- * Records a plush frame as a picture of `size` pixels, as `createPicture` does, with the recorder and
- * the bounds of this runtime. Each new frame needs a new picture, but not a new recorder. Without a
- * frame or pictures the picture is empty.
- */
 export function recordPlush(
   frame: PlushFrame | undefined,
   art: PlushArt | null,

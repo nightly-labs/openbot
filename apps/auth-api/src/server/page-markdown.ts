@@ -1,12 +1,3 @@
-// The Markdown copy of an article page (`/guides/some-guide.md`, as llmstxt.org
-// proposes) and `/llms-full.txt`, which holds every one of them. An assistant that
-// reads a page gets its text without the navigation, the scripts and the styles.
-//
-// The text comes from the page itself: the Worker renders the HTML page and turns
-// its `<article>` into Markdown. A second copy of the words, kept beside the page,
-// would drift from it. The input is the site's own server render, so the parser
-// below reads only what that render writes; it is not a general HTML parser.
-
 import { CONTENT_COLLECTIONS } from "../lib/content";
 import { articlePath, articleUrl, type ContentCollection, findArticle } from "../lib/content-collection";
 import { siteUrlForPage } from "../lib/site-metadata";
@@ -23,7 +14,6 @@ type HtmlNode = ElementNode | string;
 
 const VOID_ELEMENTS = new Set(["area", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "wbr"]);
 
-/** Elements whose content is code, styling or a control, never text to read. */
 const SKIPPED_ELEMENTS = new Set([
   "button",
   "canvas",
@@ -88,13 +78,10 @@ function parseAttributes(source: string): Record<string, string> {
   return attributes;
 }
 
-/** The children of a root element, from the tags of a server render. Comments are hydration markers. */
 function parseHtml(html: string): HtmlNode[] {
   const root: ElementNode = { tag: "#root", attributes: {}, children: [] };
   const open: ElementNode[] = [root];
   const tokens = /<!--[\s\S]*?-->|<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:"[^"]*"|'[^']*'|[^'">])*)>|([^<]+)|</gu;
-  // `exec`, not `matchAll`: `matchAll` reads a copy of the pattern, so it would not
-  // see the jump over a script below.
   for (let token = tokens.exec(html); token; token = tokens.exec(html)) {
     const current = open.at(-1) ?? root;
     const [whole, closing, rawTag, rawAttributes = "", text] = token;
@@ -116,7 +103,6 @@ function parseHtml(html: string): HtmlNode[] {
     current.children.push(element);
     if (VOID_ELEMENTS.has(tag) || rawAttributes.trimEnd().endsWith("/")) continue;
     if (tag === "script" || tag === "style") {
-      // Their content is not markup, and may hold a "<" that is not a tag.
       const end = html.indexOf(`</${tag}`, token.index + whole.length);
       tokens.lastIndex = end === -1 ? html.length : end;
     }
@@ -143,7 +129,6 @@ function isBlock(node: HtmlNode): node is ElementNode {
   return typeof node !== "string" && BLOCK_ELEMENTS.has(node.tag);
 }
 
-/** A link target as an absolute URL, or nothing for a link within the same page. */
 function absoluteUrl(href: string | undefined, base: string): string | undefined {
   if (!href || href.startsWith("#")) return undefined;
   try {
@@ -162,8 +147,6 @@ function inlineText(nodes: readonly HtmlNode[], base: string): string {
     }
     if (isSkipped(node)) continue;
     const part = inlineElement(node, base);
-    // A label and its hint, or a name and its description, are apart on the page
-    // through their styles alone. Keep their words apart here.
     if (/[\p{L}\p{N}]$/u.test(text) && /^[\p{L}\p{N}]/u.test(part)) text += " ";
     text += part;
   }
@@ -202,7 +185,6 @@ function wrapInline(text: string, mark: string): string {
   return text ? `${mark}${text}${mark}` : "";
 }
 
-/** The Markdown blocks of a run of nodes, in order. Text between blocks becomes a paragraph. */
 function blocks(nodes: readonly HtmlNode[], base: string): string[] {
   const result: string[] = [];
   let inline: HtmlNode[] = [];
@@ -264,7 +246,6 @@ function listBlock(list: ElementNode, base: string): string[] {
     const marker = list.tag === "ol" ? `${index + start}. ` : "- ";
     const content = blocks(item.children, base).join("\n\n");
     if (!content) return [];
-    // Continuation lines line up under the text; a blank line stays blank.
     return [`${marker}${content.replace(/\n(?=.)/gu, `\n${" ".repeat(marker.length)}`)}`];
   });
   return lines.length > 0 ? [lines.join("\n")] : [];
@@ -296,14 +277,12 @@ function tableBlock(table: ElementNode, base: string): string[] {
   return captionText ? [captionText, ...result] : result;
 }
 
-/** The Markdown of the first `<article>` of a page, with links made absolute against `base`. */
 function articleMarkdown(html: string, base: string): string | undefined {
   const article = findElement(parseHtml(html), "article");
   if (!article) return undefined;
   return `${blocks(article.children, base).join("\n\n")}\n`;
 }
 
-/** The article a path such as `/guides/openbot-101.md` names, or nothing when it names none. */
 function markdownTarget(pathname: string): { collection: ContentCollection; slug: string } | undefined {
   const match = /^\/([a-z]+)\/([a-z0-9-]+)\.md$/u.exec(pathname);
   if (!match) return undefined;
@@ -314,10 +293,6 @@ function markdownTarget(pathname: string): { collection: ContentCollection; slug
 
 type RenderedMarkdown = { markdown: string } | { failure: Response };
 
-/**
- * Renders the HTML page at `path` through the site's own handler and keeps its article.
- * Links in it name `siteUrl`, the site the page goes by, whichever host asked.
- */
 async function renderArticle(
   request: Request,
   path: string,
@@ -338,17 +313,8 @@ function markdownHeaders(contentType: string): Record<string, string> {
   };
 }
 
-/**
- * `/llms-full.txt` for each site URL. It renders every article, and the articles
- * change only with a deploy, so an isolate renders it once. Only the finished text
- * is kept: a Worker request can not wait on a promise that another request made.
- */
 const FULL_TEXT_BY_SITE = new Map<string, string>();
 
-/**
- * The Markdown copy of an article, or `/llms-full.txt`. `undefined` for every other
- * request, which then goes to the site as usual.
- */
 export async function pageMarkdownResponse(request: Request, renderPage: RenderPage): Promise<Response | undefined> {
   if (request.method !== "GET" && request.method !== "HEAD") return undefined;
   const requestUrl = new URL(request.url);
@@ -371,7 +337,6 @@ export async function pageMarkdownResponse(request: Request, renderPage: RenderP
     return new Response(fullText, {
       headers: {
         ...markdownHeaders("text/plain; charset=utf-8"),
-        // Every page in it has its own URL, and a search result should name that one.
         "X-Robots-Tag": "noindex",
       },
     });
@@ -384,7 +349,6 @@ export async function pageMarkdownResponse(request: Request, renderPage: RenderP
   return new Response(rendered.markdown, {
     headers: {
       ...markdownHeaders("text/markdown; charset=utf-8"),
-      // The same words as the HTML page, which is the one a search result should name.
       Link: `<${articleUrl(target.collection, target.slug, siteUrl)}>; rel="canonical"`,
     },
   });

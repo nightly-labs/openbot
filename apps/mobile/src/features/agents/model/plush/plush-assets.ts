@@ -13,11 +13,6 @@ import { Image } from "react-native";
 import type { PlushArt } from "./plush-draw";
 import { NOTIFY_COLOR, tintRamp } from "./plush-felt";
 
-/*
- * The felt pictures come from the bloub package (see `metro.config.js`). A body is grey, and the app
- * tints it in the agent colour once for each size it shows. The eye pads are large photos of felt;
- * they are reduced once, to a size that still has detail for the largest avatar.
- */
 const BODIES: Readonly<Record<ShapeId, number>> = {
   cercle: require("@norbert_bodziony/bloub/assets/forme-cercle.webp"),
   galet: require("@norbert_bodziony/bloub/assets/forme-galet.webp"),
@@ -30,23 +25,18 @@ const BODIES: Readonly<Record<ShapeId, number>> = {
   carre: require("@norbert_bodziony/bloub/assets/forme-carre.webp"),
   losange: require("@norbert_bodziony/bloub/assets/forme-losange.webp"),
   pentagone: require("@norbert_bodziony/bloub/assets/forme-pentagone.webp"),
+  fantome: require("@norbert_bodziony/bloub/assets/forme-fantome.webp"),
+  meduse: require("@norbert_bodziony/bloub/assets/forme-meduse.webp"),
+  poulpe: require("@norbert_bodziony/bloub/assets/forme-poulpe.webp"),
 };
 const PAD_X = require("@norbert_bodziony/bloub/assets/fred-oeil0-x.webp");
 const PAD_Y = require("@norbert_bodziony/bloub/assets/fred-oeil0-y.webp");
 const BALL = require("@norbert_bodziony/bloub/assets/boule.webp");
 
-/** The longest side of a reduced eye pad. A 144 point avatar draws a pad at about 150 pixels. */
 const PAD_PIXELS = 512;
-/** A felt ball is at most a fifth of the avatar. */
 const BALL_PART = 0.2;
-/** Avatar sizes share a picture for each step of this many pixels. */
 const PIXEL_STEP = 32;
-/** Decoded grey bodies: each is 768 pixels square, so few stay. */
 const MAX_SOURCES = 2;
-/**
- * Most avatars draw a body this wide or smaller. Each shape keeps a grey body of this size, so a list
- * of many shapes does not decode the large pictures again for each new colour or size.
- */
 const REDUCED_PIXELS = 384;
 const MAX_ART = 32;
 
@@ -76,7 +66,6 @@ async function decode(module: number): Promise<SkImage> {
   return image;
 }
 
-/** `image` drawn at `width` x `height` on a raster surface, with mipmaps, so a reduction keeps detail. */
 function resized(image: SkImage, width: number, height: number): SkImage {
   const surface = Skia.Surface.Make(width, height);
   if (!surface) throw new Error("The plush surface is unavailable.");
@@ -94,12 +83,10 @@ function resized(image: SkImage, width: number, height: number): SkImage {
   return surface.makeImageSnapshot();
 }
 
-/** The grey picture `image` in `hex`, `pixels` square. */
 function tinted(image: SkImage, hex: string, pixels: number): SkImage {
   return tintedGrey(resized(image, pixels, pixels), hex);
 }
 
-/** The grey picture `grey` in `hex`, at its own size. */
 function tintedGrey(grey: SkImage, hex: string): SkImage {
   const width = grey.width();
   const height = grey.height();
@@ -138,7 +125,6 @@ function source(module: number, key: string): Promise<SkImage> {
   const cached = sources.get(key);
   if (cached) return remember(sources, key, cached, MAX_SOURCES);
   const loading = decode(module);
-  // A failed load tries again next time.
   loading.catch(() => sources.delete(key));
   return remember(sources, key, loading, MAX_SOURCES);
 }
@@ -164,7 +150,6 @@ function felt() {
     };
     return { x: reduce(x), y: reduce(y), ball };
   });
-  // A failed load tries again next time.
   loading.catch(() => {
     pads = null;
   });
@@ -172,7 +157,6 @@ function felt() {
   return loading;
 }
 
-/** The pixels of a plush drawn `size` points wide, in steps, so that near sizes share their pictures. */
 export function plushPixels(size: number, scale: number): number {
   return Math.max(PIXEL_STEP, Math.ceil((size * scale) / PIXEL_STEP) * PIXEL_STEP);
 }
@@ -181,7 +165,6 @@ const art = new Map<string, Promise<PlushArt>>();
 const ready = new Map<string, PlushArt>();
 const artKey = (shape: ShapeId, color: string, pixels: number) => `${shape}|${color}|${pixels}`;
 
-/** The pictures of a plush of `shape` in `color`, drawn `pixels` pixels wide. */
 export function loadPlushArt(shape: ShapeId, color: string, pixels: number): Promise<PlushArt> {
   const key = artKey(shape, color, pixels);
   const cached = art.get(key);
@@ -203,16 +186,13 @@ export function loadPlushArt(shape: ShapeId, color: string, pixels: number): Pro
   return remember(art, key, loading, MAX_ART);
 }
 
-/** The pictures when they are loaded already, so a remount draws at once. */
 export function loadedPlushArt(shape: ShapeId, color: string, pixels: number): PlushArt | null {
   return ready.get(artKey(shape, color, pixels)) ?? null;
 }
 
-/** The smallest alpha that is fur, as the desktop crops the server plush pictures. */
 const FUR_ALPHA = 16;
 const FUR_SOURCE_SCALE = 1.6;
 
-/** The box of the fur of a body, in parts of its side. */
 interface FurBox {
   x: number;
   y: number;
@@ -222,7 +202,6 @@ interface FurBox {
 
 const furBoxes = new Map<ShapeId, FurBox>();
 
-/** The box of the pixels of `image` with alpha `FUR_ALPHA` or more. Each shape is measured once. */
 function furBox(shape: ShapeId, image: SkImage): FurBox {
   const known = furBoxes.get(shape);
   if (known) return known;
@@ -258,15 +237,10 @@ function furBox(shape: ShapeId, image: SkImage): FurBox {
 
 const furBodies = new Map<string, Promise<SkImage>>();
 
-/**
- * The body of `shape` in `color`, with no eyes, in a `pixels` square: its fur fills the square on its
- * longer side and is centred on the other, as the desktop draws the plush of a server with no logo.
- */
 export function loadFurBody(shape: ShapeId, color: string, pixels: number): Promise<SkImage> {
   const key = artKey(shape, color, pixels);
   const cached = furBodies.get(key);
   if (cached) return remember(furBodies, key, cached, MAX_ART);
-  // The fur is about two thirds of the side of a body, so the grey body is larger than the square.
   const loading = body(shape, Math.ceil(pixels * FUR_SOURCE_SCALE)).then((grey) => {
     const box = furBox(shape, grey);
     const greyWidth = grey.width();

@@ -9,22 +9,9 @@ import { ANDROID_PUSH_TOKEN_PATTERN } from "@openbot/contracts/team-protocol/pus
 import { Effect, Schema } from "effect";
 import { importPKCS8, SignJWT } from "jose";
 
-/**
- * Forwards a sealed Android notification from a host to Firebase Cloud Messaging. The host sealed the
- * content with keys that only the phone has, so this service cannot read it. It stores nothing and
- * logs nothing: the token, the host and the bytes live only for the request.
- *
- * This service builds the Firebase message itself: a data message with the sealed bytes and the sound
- * only, never text. The app opens the seal before Android shows the notification, and a seal that
- * the app cannot open shows the app name only. So a host credential alone, without the keys of the
- * phone, cannot make it show text.
- */
-
-/** The Firebase service account key that may send Cloud Messaging messages for the app. */
 export interface FcmConfig {
   projectId: string;
   clientEmail: string;
-  /** The PKCS #8 private key of the service account, as PEM text. */
   privateKey: string;
   privateKeyId: string | null;
 }
@@ -33,13 +20,10 @@ export type FcmRelayResult = "sent" | "gone" | "rejected" | "unavailable";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const MESSAGING_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
-/** Google gives an access token for one hour. A new one is made 5 minutes before it ends. */
 const ASSERTION_LIFETIME_SECONDS = 60 * 60;
 const TOKEN_MARGIN_SECONDS = 5 * 60;
-/** Firebase keeps a notification this long for a phone that is off, as Apple does. */
 const NOTIFICATION_LIFETIME = "86400s";
 const REQUEST_TIMEOUT_MS = 5_000;
-/** Firebase answers these for a token that no longer reaches the app. */
 const GONE_ERRORS = new Set(["UNREGISTERED", "SENDER_ID_MISMATCH"]);
 
 type Fetch = (input: string, init: RequestInit) => Promise<Response>;
@@ -87,7 +71,6 @@ export class FcmRelaySender {
     }).pipe(Effect.catch(() => Effect.succeed(null)));
     if (!response) return "unavailable";
     if (response.ok) return "sent";
-    // Google refused the access token, as after a key change. The next send makes a new one.
     if (response.status === 401) {
       this.#token = null;
       return "unavailable";
@@ -106,7 +89,6 @@ export class FcmRelaySender {
     return response.status === 404 || errors.some((error) => GONE_ERRORS.has(error)) ? "gone" : "rejected";
   }).bind(this);
 
-  /** Only resolved values cross Worker requests; pending I/O remains with its invocation. */
   readonly #accessToken = Effect.fn("FcmRelaySender.accessToken")(function* (
     this: FcmRelaySender,
   ): Effect.fn.Return<string, FcmProviderError> {
@@ -155,11 +137,6 @@ export class FcmRelaySender {
   });
 }
 
-/**
- * A data message, so that Android gives it to the app also when the app does not run. The app opens
- * `sealed` (`OpenBotMessagingService.kt` in the mobile app) and plays `sound`. High priority lets
- * the app run at once also when the phone saves power.
- */
 function notificationMessage(push: AndroidNotificationRelayPush) {
   return {
     message: {
@@ -170,7 +147,6 @@ function notificationMessage(push: AndroidNotificationRelayPush) {
   };
 }
 
-/** Reads one notification from a host request body, or returns `null` when it is not valid. */
 export function readAndroidNotificationRelayPush(body: DynamicRecord): AndroidNotificationRelayPush | null {
   const { token, sessionId, sealed, sound, timestamp } = body;
   if (!isString(token) || !ANDROID_PUSH_TOKEN_PATTERN.test(token)) return null;
@@ -187,7 +163,6 @@ function isSound(value: unknown): value is NotificationSound | null {
   return value === null || NOTIFICATION_SOUNDS.some((sound) => sound === value);
 }
 
-/** Reads the service account key file that Firebase gives, or returns `null` when it is not one. */
 export function readFcmServiceAccount(value: string): FcmConfig | null {
   let parsed: unknown;
   try {
@@ -204,7 +179,6 @@ export function readFcmServiceAccount(value: string): FcmConfig | null {
 
 let shared: { serviceAccount: string; sender: FcmRelaySender } | null = null;
 
-/** One sender for each key, so the key import and the access token are reused. `null` for a bad key. */
 export function sharedFcmSender(serviceAccount: string): FcmRelaySender | null {
   if (shared?.serviceAccount === serviceAccount) return shared.sender;
   const config = readFcmServiceAccount(serviceAccount);

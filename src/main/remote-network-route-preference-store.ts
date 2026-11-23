@@ -6,11 +6,6 @@ import {
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { PreferenceStore } from "./preference-file";
 
-/**
- * The network that devices use to connect to this computer. The host reads it each time it connects
- * to Signal. A file that names an unknown route reads as `openbot`, which is how every connection
- * worked before the setting existed.
- */
 export type RemoteNetworkRoutePreferenceStore = PreferenceStore<RemoteNetworkRoutePreference>;
 
 export function createRemoteNetworkRoutePreferenceStore(path: string): RemoteNetworkRoutePreferenceStore {

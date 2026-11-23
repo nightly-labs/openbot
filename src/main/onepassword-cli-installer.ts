@@ -1,6 +1,3 @@
-// Installs the 1Password CLI into a folder that OpenBot owns, so Connect works without Homebrew,
-// an installer package or administrator rights.
-
 import { createHash, randomBytes } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { chmod, mkdir, rename, rm, stat } from "node:fs/promises";
@@ -12,10 +9,6 @@ import { OnePasswordOperationError, onePasswordCall, toOnePasswordOperationError
 import { extractZipFiles } from "./provider-runtime-archive";
 import type { RuntimeTarget } from "./provider-runtime-descriptors";
 
-/**
- * The release that Install puts in place. 1Password publishes no hash for its downloads, so each
- * archive's SHA-256 is pinned here, taken from 1Password's own CDN. A new release is a code change.
- */
 const ONEPASSWORD_CLI_VERSION = "2.39.0";
 
 const ARCHIVES: Record<RuntimeTarget, { name: string; sha256: string }> = {
@@ -41,7 +34,6 @@ const ARCHIVES: Record<RuntimeTarget, { name: string; sha256: string }> = {
   },
 };
 
-/** Each archive is about 15 MB. A much larger answer is not the archive. */
 const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 
@@ -56,15 +48,10 @@ function archiveUrl(target: RuntimeTarget): string {
   return `https://cache.agilebits.com/dist/1P/op2/pkg/v${ONEPASSWORD_CLI_VERSION}/${name}_v${ONEPASSWORD_CLI_VERSION}.zip`;
 }
 
-/** Where Install puts the CLI. It exists only after a complete, verified install. */
 function managedCliPath(directory: string, target: RuntimeTarget): string {
   return join(directory, ONEPASSWORD_CLI_VERSION, executableName(target));
 }
 
-/**
- * Downloads the pinned release, checks its hash, and unpacks only `op` and its signature into
- * `<directory>/<version>`. A failed, stopped or interrupted install leaves nothing in that folder.
- */
 export const installOnePasswordCli = Effect.fn("OnePasswordCli.install")(function* (options: {
   directory: string;
   target: RuntimeTarget;
@@ -109,7 +96,6 @@ export const installOnePasswordCli = Effect.fn("OnePasswordCli.install")(functio
   );
 });
 
-/** Writes the archive to `archive` and returns its SHA-256. A larger or failed answer rejects with `failed`. */
 export async function downloadArchive(options: {
   url: string;
   archive: string;
@@ -148,7 +134,6 @@ export async function downloadArchive(options: {
   return hash.digest("hex");
 }
 
-/** The installed CLI, or null when Install has not completed. */
 export function installedManagedCli(directory: string, target: RuntimeTarget): Effect.Effect<string | null> {
   const path = managedCliPath(directory, target);
   return onePasswordCall(() => stat(path)).pipe(

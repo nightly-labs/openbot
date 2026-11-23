@@ -5,17 +5,6 @@ import { render } from "@solidjs/web";
 import { flush } from "solid-js";
 import { loadImage, loadSvg, withAlpha } from "../../avatar-canvas";
 
-/*
- * The share card: the image X and other sites show for an `openbot.run/agents/<id>` link.
- *
- * It is drawn here, at publish time, because this is where the agent's avatar is: a generated Bloub
- * or the photo the owner uploaded. The Worker only checks its size and stores it.
- *
- * Layout, on the app's dark canvas: a hero square on the left in the avatar's own colour with the
- * avatar in it, and on the right the OpenBot mark, the name, the role, the instructions, and the
- * "Add to OpenBot" pill the page carries.
- */
-
 const { width: WIDTH, height: HEIGHT } = AGENT_TEMPLATE_CARD;
 const HERO = { x: 40, y: 40, size: 550, radius: 40 };
 const AVATAR_SIZE = 300;
@@ -51,7 +40,6 @@ interface ThemeColors {
   logoEye: string;
 }
 
-/** The app's tokens, read from the document so the card follows the brand if it changes. */
 function themeColors(): ThemeColors {
   const style = getComputedStyle(document.documentElement);
   const token = (name: string) => {
@@ -69,7 +57,6 @@ function themeColors(): ThemeColors {
   };
 }
 
-/** The avatar's colour as soft light on the dark canvas, like the hero of the web page. */
 function drawHero(context: CanvasRenderingContext2D, color: string, canvas: string): void {
   const { x, y, size, radius } = HERO;
   context.save();
@@ -109,7 +96,6 @@ async function drawAvatar(context: CanvasRenderingContext2D, preview: AgentTempl
     context.restore();
     return;
   }
-  // The Bloub is drawn larger than its box, the way `.agent-avatar > svg` draws it in the app.
   const size = AVATAR_SIZE * 1.28;
   const svg = createStaticAvatarSvg(preview.avatarSeed, preview.avatarHue);
   const image = await loadSvg(svg, size);
@@ -124,13 +110,11 @@ async function drawColumn(
   const { x, width } = COLUMN;
   context.textBaseline = "alphabetic";
 
-  // The brand row: the mark and the wordmark.
   await drawLogo(context, x, 92, 44, colors);
   context.fillStyle = colors.primary;
   context.font = `600 28px ${FONT}`;
   context.fillText("OpenBot", x + 58, 124);
 
-  // `y` is always the baseline of the last line drawn.
   let y = 154;
   context.font = `700 60px ${FONT}`;
   context.fillStyle = colors.primary;
@@ -145,7 +129,6 @@ async function drawColumn(
     context.fillText(wrapLines(context, preview.title, width, 1)[0] ?? "", x, y);
   }
 
-  // The instructions fill what is left above the pill, in whole lines.
   const pillTop = 510;
   const lineHeight = 36;
   y += 60;
@@ -171,7 +154,6 @@ async function drawColumn(
   context.fillText("openbot.run", x + pillWidth + 24, pillTop + 38);
 }
 
-/** The app mark from `@openbot/brand`, with its CSS colours written onto the shapes. */
 export async function drawLogo(
   context: CanvasRenderingContext2D,
   x: number,
@@ -196,7 +178,6 @@ export async function drawLogo(
   context.drawImage(await loadSvg(svg, size), x, y, size, size);
 }
 
-/** Lines that fit `width`, at most `max`; the last one ends in an ellipsis when text is left over. */
 function wrapLines(context: CanvasRenderingContext2D, text: string, width: number, max: number): string[] {
   const lines: string[] = [];
   let line = "";
@@ -218,7 +199,6 @@ function wrapLines(context: CanvasRenderingContext2D, text: string, width: numbe
   return lines.map((item) => (context.measureText(item).width > width ? ellipsize(context, item, width) : item));
 }
 
-/** Cuts at a word where it can, so the line does not end in half a word. */
 export function ellipsize(context: CanvasRenderingContext2D, text: string, width: number): string {
   let value = text;
   while (value && context.measureText(`${value}…`).width > width) {

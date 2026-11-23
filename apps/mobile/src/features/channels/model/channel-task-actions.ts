@@ -6,10 +6,6 @@ export function channelTasksNeedingAction(tasks: readonly ChannelTask[]) {
   return tasks.filter((task) => task.state === "failed" || task.state === "paused");
 }
 
-/**
- * Cancel ends the whole run from its root, so only one card of each run shows it: the root's own card
- * when the root needs action, else the first card of that run.
- */
 export function channelTaskCancelCards(tasks: readonly ChannelTask[]) {
   const byRun = new Map<string, string>();
   for (const task of tasks) {
@@ -18,7 +14,6 @@ export function channelTaskCancelCards(tasks: readonly ChannelTask[]) {
   return new Set(byRun.values());
 }
 
-/** Channel work has its own tasks; single-chat activity can belong to another thread. */
 export function channelTaskActivities(
   tasks: readonly ChannelTask[],
   messages: readonly ChannelMessage[],

@@ -1,8 +1,3 @@
-// The /download pages: one per operating system and phone app, and a hub that lists them. Each
-// statement here comes from the release configuration, README.md or docs/TROUBLESHOOTING.md, and for
-// the phone apps from the native module minimums, the Mobile Connect settings and the mobile changelog. Keep it to what the
-// released app does, because these pages are what a search engine shows for "OpenBot for Linux".
-
 import { ANDROID_APK_AVAILABLE } from "./android-apk";
 import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platforms";
 import { faqStructuredData, type LandingQuestion } from "./landing-faq";
@@ -16,34 +11,25 @@ import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-app
 import { OPENBOT_SITE_URL, OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
 import { OPENBOT_SOFTWARE_APPLICATION } from "./software-application";
 
-/** The sitemap date of the pages. Change it when their text changes. */
 export const DOWNLOAD_PAGES_UPDATED_AT = "2026-10-15";
 
-/** A system with its own page: a desktop installer or a phone app. */
 export type DownloadPagePlatform = DownloadPlatform | MobilePlatform;
 
-/** The desktop systems first, then the phone apps, as the hub and the landing page list them. */
 export const DOWNLOAD_PAGE_ORDER: readonly DownloadPagePlatform[] = [...DOWNLOAD_PLATFORM_ORDER, ...MOBILE_APP_ORDER];
 
 export interface DownloadInstaller {
-  /** The button text where the system is not on screen, such as a list of every installer. */
   label: string;
-  /** The button text inside a card or panel that already names the system. */
   shortLabel: string;
-  /** Which computer the file is for, for a reader who has to choose between two. */
   detail: string;
   href: string;
-  /** A store page on another site, which opens in a new tab. */
   external?: boolean;
 }
 
-/** One line of the spec sheet: what the computer needs, or what the download is. */
 interface DownloadSpec {
   label: string;
   value: string;
 }
 
-/** One instruction. `code` is a command to copy, shown under the text. */
 export interface DownloadStep {
   text: string;
   code?: string;
@@ -56,7 +42,6 @@ interface DownloadPageSection {
 
 export interface DownloadPageContent {
   platform: DownloadPagePlatform;
-  /** The name a reader uses for the system, which the headings and the breadcrumb show. */
   name: string;
   title: string;
   description: string;
@@ -65,15 +50,12 @@ export interface DownloadPageContent {
   installers: readonly DownloadInstaller[];
   specs: readonly DownloadSpec[];
   installSteps: readonly DownloadStep[];
-  /** Optional steps for one situation, such as a distribution that needs a security profile. */
   extraSections: readonly DownloadPageSection[];
   notes: readonly string[];
   faq: readonly LandingQuestion[];
-  /** schema.org `operatingSystem` for this page's installer. */
   operatingSystem: string;
 }
 
-/** The English answer of the home page question "Which AI models can OpenBot use?". */
 const PROVIDERS_ANSWER =
   "Codex, Claude Code, Gemini, Grok, OpenCode, Cursor, Cline, Muse Code and Pi, and Inception's Mercury models. You can also run any agent that speaks the Agent Client Protocol, such as Goose or Qwen Code, connect any OpenAI-compatible endpoint, and use local models in Ollama or LM Studio.";
 const FREE_ANSWER =
@@ -105,10 +87,6 @@ const PHONE_COMPUTER_QUESTION: LandingQuestion = {
 const PHONE_FREE_ANSWER =
   "Yes. The app costs $0. You pay only your AI provider, through the plan or API key you already have.";
 
-/**
- * What the Android page adds while a version has an APK (./android-apk.ts). The APK is for a phone
- * with no Google Play, so Google Play stays the first download.
- */
 const ANDROID_APK = {
   installer: {
     label: "Download the APK",
@@ -442,7 +420,6 @@ export const DOWNLOAD_HUB = {
     "Free for Mac, Windows and Linux, with apps for iPhone and Android. Get the installer for this computer, or choose a system below for its requirements and install steps.",
 } as const;
 
-/** One social card for the hub and the page of each system. */
 const DOWNLOAD_SOCIAL_IMAGE: PageSocialImage = {
   path: "/social/download.jpg",
   alt: "Teamwork. Now installing. OpenBot agents around a glass ring",

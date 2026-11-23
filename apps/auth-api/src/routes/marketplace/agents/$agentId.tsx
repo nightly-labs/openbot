@@ -11,11 +11,6 @@ import { marketplaceAgentText, marketplaceMissingText } from "../../../component
 import { readMarketplaceAgentListing } from "../../../lib/marketplace";
 import { loadPageText } from "../../../lib/page-text";
 
-/**
- * One agent. An approved agent is a listing. An agent that waits for its first review opens too,
- * because its creator may share the link at once, but it says so, stays out of search engines and
- * the sitemap, and no cache keeps it. A rejected, removed or unknown agent is a 404.
- */
 export const Route = createFileRoute("/marketplace/agents/$agentId")({
   loader: async ({ context, params }) => {
     const listing = await readMarketplaceAgentListing({ data: params.agentId });

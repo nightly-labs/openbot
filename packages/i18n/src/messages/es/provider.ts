@@ -120,11 +120,14 @@ export const messages = {
   "provider.picker.download": "Descarga de {name}",
   "provider.picker.search": "Buscar modelos",
   "provider.picker.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "provider.picker.openrouterNoMatches":
+    "Ningún modelo coincide con tu búsqueda. Tus ajustes de privacidad, proveedores y guardrails en openrouter.ai pueden ocultar modelos de esta lista.",
   "provider.picker.workspaceOnlyUnavailable":
     "Estos modelos no funcionan con «Solo espacio de trabajo» en Windows y Linux. Para usarlos, cambia «Acceso» en los ajustes del agente.",
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
-  "provider.picker.noModels": "No hay modelos disponibles de {name}.",
+  "provider.picker.noModels":
+    "Aquí no se muestran modelos de {name}. Si están desactivados, un administrador puede activarlos en Ajustes del servidor > Proveedores > {name} > Modelos.",
   "provider.picker.endpointModelsInCustom":
     "{name} ejecuta tus endpoints personalizados. Sus modelos están en la pestaña Personalizado.",
   "provider.picker.showCustomModels": "Ver modelos",
@@ -270,6 +273,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
   "provider.settings.geminiKeyReplacesAccount":
     "Se usa una clave de API de Gemini guardada en lugar de un inicio de sesión de Google. Para usar un plan de Google y sus modelos, elimina la clave.",
+  "provider.settings.museKeyInUse":
+    "Muse usa esta clave, no tu inicio de sesión. Para usar tu inicio de sesión, elimina la clave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
   "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sin usar: {version} · instalada por ti",
@@ -281,10 +286,14 @@ export const messages = {
   "provider.settings.cache": "Caché",
   "provider.settings.promptCache": "Caché de prompts",
   "provider.settings.promptCacheDescription":
-    "Cuánto tiempo guarda Claude el contexto de un agente en la caché entre turnos.",
+    "Cuánto tiempo Claude y Pi guardan el contexto de un agente en la caché entre turnos.",
   "provider.settings.promptCacheHour": "1 hora",
-  "provider.settings.promptCacheDefault": "Predeterminado de Claude Code",
+  "provider.settings.promptCacheDefault": "Predeterminado del proveedor",
   "provider.settings.promptCacheLoadFailed": "No se pudo cargar la duración de la caché de prompts de este servidor.",
+  "provider.settings.cacheExpiryCompaction": "Compactar antes de que caduque la caché",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Cuando un chat con 200K o más tokens de contexto está inactivo con una caché de 1 hora, el agente compacta el contexto antes de que caduque la caché. Así el siguiente mensaje no vuelve a leer todo el contexto sin caché.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "No se pudo cargar el ajuste de compactación de este servidor.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Usar mi configuración de Claude Code",
   "provider.settings.claudeUserSetupDescription":
@@ -342,4 +351,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "No se pudo quitar la descarga.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} en tu terminal mantiene su propia sesión.",
+  "provider.settings.updateAll": "Actualizar todo",
 } as const satisfies PartialTranslation<typeof source>;

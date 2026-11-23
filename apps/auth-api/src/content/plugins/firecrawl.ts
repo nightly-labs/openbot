@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Firecrawl here is taken from firecrawl.dev, docs.firecrawl.dev and
-// Firecrawl's firecrawl-mcp-server repository. Each page used is in `sources`. Check the
-// sources again, and move `checkedAt`, whenever this file changes.
-
 export const FIRECRAWL_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

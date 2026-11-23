@@ -1,11 +1,11 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("status.agent", {
-  // `{address}` is in a code span, so the card links only to the whole page.
   "status.agent.mcpSignInPage": "{name} asks you to sign in on `{address}`. [Sign in]({url}), then choose Continue.",
   "status.agent.mcpSignInPageDoneDetail": "The agent tries the request again.",
   "status.agent.mcpSignInPageDecline": "Don't sign in",
   "status.agent.mcpSignInPageDeclineDetail": "The request stops.",
+  "status.agent.elicitationMoreOptions": "More choices: {options}. To select one, type it as your answer.",
   "status.agent.claudeWriteOutside":
     "Write {path}, outside the agent's workspace, the shared folder and the temporary folders.",
   "status.agent.contextCleared": "Context cleared. A new chat starts here.",
@@ -30,6 +30,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.screenCaptureScreen": "Capture the main screen and send the image to the agent's model.",
   "status.agent.screenCaptureChannel":
     "The image shows in the channel {channel}, and each member of this server who reads the channel can see it.",
+  "status.agent.screenCapturePermissionNext": "macOS can then ask you to allow Screen Recording for OpenBot.",
   "status.agent.screenCaptureDisplay": "Capture the display {name} and send the image to the agent's model.",
   "status.agent.screenCaptureWindow": "Capture the window {name} and send the image to the agent's model.",
   "status.agent.screenCaptureRegion":
@@ -76,6 +77,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.browserActing": "Using the web page…",
   "status.agent.browserReviewing": "Reviewing the web page…",
   "status.agent.memoriesSearching": "Searching its memories…",
+  "status.agent.chatsSearching": "Searching its past chats…",
   "status.agent.memoriesSearched": {
     one: "Searched its memories: {count} found",
     other: "Searched its memories: {count} found",
@@ -118,6 +120,7 @@ export const messages = defineMessages("status.agent", {
     "Add the MCP server {name}: {target}. Every agent on this server gets its tools. OpenBot connects to it to test it.",
   "status.agent.mcpServerChange":
     "Change the MCP server {name} to {target}. Every agent on this server gets its tools. OpenBot connects to it to test it.",
+  "status.agent.mcpServerHeaders": "It also changes these headers: {names}.",
   "status.agent.mcpServerEnable": "Turn on the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerDisable": "Turn off the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerRemove": "Remove the MCP server {name} and its sign-in from every agent on this server.",
@@ -149,7 +152,6 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultField.country": "Country code",
   "status.agent.vaultField.phone": "Phone",
   "status.agent.vaultField.email": "Email address",
-  "status.agent.finishCheckContinues": "The request is not finished yet. The agent continues ({current} of {limit}).",
   "status.agent.nextStepContinues": "The agent stopped before its next step. It continues ({current} of {limit}).",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
   "status.agent.planStopped": "The agent stopped with open steps in its plan. Send a message to continue.",
@@ -158,4 +160,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.providerExitContinues": "The agent stopped before it finished its answer. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
   "status.agent.importedChatTitle": "Imported chat",
+  "status.agent.takeoverLateCompleted":
+    "I finished the browser takeover in tab {tabId}. Take a fresh snapshot and continue.",
+  "status.agent.takeoverLateCancelled":
+    "I cancelled the browser takeover in tab {tabId}. Do not try it again until I ask.",
 });

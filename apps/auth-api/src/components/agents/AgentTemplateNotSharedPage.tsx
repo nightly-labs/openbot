@@ -2,11 +2,6 @@ import { LandingFooter } from "../landing/LandingFooter";
 import { SiteHeader } from "../landing/SiteHeader";
 import { ButtonLink } from "../ui/button";
 
-/**
- * What a shared-agent link shows when there is no agent at that id: the owner unpublished it, or the
- * link is wrong. Both are the same 404 from the loader, so the page names the common case and sends the
- * reader home or to the app.
- */
 export function AgentTemplateNotSharedPage() {
   return (
     <div class="landing-page agent-share-page">

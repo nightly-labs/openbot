@@ -1,5 +1,3 @@
-# Checks the size of the container logs of the OpenBot instances every 5 minutes, so an instance that
-# writes much cannot fill the disk of the host between two daily rotations.
 [Unit]
 Description=Rotate the container logs of the OpenBot instances every 5 minutes
 

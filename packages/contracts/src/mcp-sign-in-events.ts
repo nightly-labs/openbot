@@ -2,12 +2,10 @@ import type { ConversationMessage } from "./ipc-conversation-messages";
 
 export const MCP_SIGN_IN_ITEM_TYPE_PREFIX = "mcp-sign-in:";
 
-/** An MCP server an agent saved that waits for the user's sign-in. The person signs in from the card. */
 export interface McpSignInEvent {
   mcpServerId: string;
 }
 
-/** The id of a saved row, short enough that the item type stays within its 128 characters. */
 function isMcpServerId(value: string): boolean {
   return /^[A-Za-z0-9_-]{1,116}$/u.test(value);
 }
