@@ -182,7 +182,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     previewFileKey,
     previewWorkspaceAgentId,
     quoteSelection,
-    addPageText,
+    addPreviewPageText,
     setPageContext,
     sidebarFileBack,
     openSidebarFileBack,
@@ -636,7 +636,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                   const message = id && props.messages.find((item) => item.attachments?.some((file) => file.id === id));
                   if (message) setPageContext(message, text);
                 }}
-                onPageMessage={addPageText}
+                onPageMessage={addPreviewPageText}
                 isPageAppShortcut={isChatVisualAppShortcut}
                 quoteShortcut={deviceQuoteShortcut(props.platform)}
                 onOpenExternally={openSidebarFileExternally}

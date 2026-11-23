@@ -33,7 +33,7 @@ export function ConversationView(props: ConversationProps) {
     sidePanel,
     sidePanelOpen,
     handleChatSearchShortcut,
-    sendSelectionInstruction,
+    sendMessageSelection,
     quoteSelection,
     setConversationPanelElement,
     setDropActive,
@@ -110,7 +110,7 @@ export function ConversationView(props: ConversationProps) {
         <MessageSelectionActions
           contextKey={conversationOwnerId(props)}
           disabled={!conversationOwnerId(props) || props.channel?.readOnly() === true || !agentReady() || submitting()}
-          onSend={sendSelectionInstruction}
+          onSend={sendMessageSelection}
           onQuote={quoteSelection}
           quoteShortcut={deviceQuoteShortcut(props.platform)}
         />
