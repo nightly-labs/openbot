@@ -43,4 +43,6 @@ export const messages = {
   "error.voice.live.refused":
     "Запуск живого голоса отклонён на стороне OpenAI. Повторите попытку позже или выключите живой голос в Настройках, чтобы говорить голосом.",
   "error.voice.live.off": "Живой голос Codex выключен. Включите его в Настройки → Голос.",
+  "error.voice.server.modelUnsupported":
+    "{host} не может распознавать речь с моделью {model}. В Настройки → Голос выберите другую модель диктовки для голосового сервера.",
 } as const satisfies PartialTranslation<typeof source>;

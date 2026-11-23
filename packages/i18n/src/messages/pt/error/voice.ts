@@ -43,4 +43,6 @@ export const messages = {
   "error.voice.live.refused":
     "A OpenAI recusou iniciar a voz ao vivo. Tente novamente mais tarde ou desative a voz ao vivo em Definições para falar por voz.",
   "error.voice.live.off": "A voz ao vivo do Codex está desativada. Ative-a em Definições → Voz.",
+  "error.voice.server.modelUnsupported":
+    "{host} não consegue transcrever com {model}. Em Definições → Voz, escolha outro modelo de ditado para o servidor de voz.",
 } as const satisfies PartialTranslation<typeof source>;

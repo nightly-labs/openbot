@@ -44,4 +44,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI a refusé de démarrer la voix en direct. Réessayez plus tard, ou désactivez la voix en direct dans Réglages pour parler à la voix.",
   "error.voice.live.off": "La voix en direct Codex est désactivée. Activez-la dans Réglages → Voix.",
+  "error.voice.server.modelUnsupported":
+    "{host} ne peut pas transcrire avec {model}. Dans Réglages → Voix, choisissez un autre modèle de dictée pour le serveur vocal.",
 } as const satisfies PartialTranslation<typeof source>;

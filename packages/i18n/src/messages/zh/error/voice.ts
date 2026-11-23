@@ -38,4 +38,6 @@ export const messages = {
   "error.voice.live.unavailable": "OpenAI 无法启动实时语音。问题出在 OpenAI 一方。请稍后重试。",
   "error.voice.live.refused": "OpenAI 拒绝启动实时语音。请稍后重试，或在 设置 中关闭实时语音以用语音对话。",
   "error.voice.live.off": "Codex 实时语音已关闭。请在 设置 → 语音 中打开。",
+  "error.voice.server.modelUnsupported":
+    "{host} 无法使用 {model} 转写。请在 设置 → 语音 中为语音服务器选择其他听写模型。",
 } as const satisfies PartialTranslation<typeof source>;

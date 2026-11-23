@@ -42,4 +42,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI가 라이브 음성 시작을 거부했습니다. 나중에 다시 시도하거나, 음성으로 대화하려면 설정에서 라이브 음성을 끄세요.",
   "error.voice.live.off": "Codex 라이브 음성이 꺼져 있습니다. 설정 → 음성에서 켜세요.",
+  "error.voice.server.modelUnsupported":
+    "{host}에서 {model}(으)로 받아쓰기를 할 수 없습니다. 설정 → 음성에서 음성 서버의 다른 받아쓰기 모델을 선택하세요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -43,4 +43,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI がライブ音声の開始を拒否しました。しばらくしてからもう一度お試しいただくか、設定 でライブ音声をオフにして音声で話してください。",
   "error.voice.live.off": "Codex ライブ音声はオフです。設定 → 音声 でオンにしてください。",
+  "error.voice.server.modelUnsupported":
+    "{host} は {model} で文字起こしできません。設定 → 音声 で、音声サーバーの別の音声入力モデルを選んでください。",
 } as const satisfies PartialTranslation<typeof source>;

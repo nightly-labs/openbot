@@ -43,4 +43,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI odmówiło uruchomienia głosu na żywo. Spróbuj ponownie później albo wyłącz głos na żywo w Ustawieniach, aby rozmawiać głosem.",
   "error.voice.live.off": "Głos na żywo Codex jest wyłączony. Włącz go w Ustawienia → Głos.",
+  "error.voice.server.modelUnsupported":
+    "{host} nie może transkrybować za pomocą {model}. W Ustawienia → Głos wybierz inny model dyktowania dla serwera głosowego.",
 } as const satisfies PartialTranslation<typeof source>;
