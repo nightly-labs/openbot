@@ -98,6 +98,7 @@ import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/workflow-folders-v1";
@@ -156,6 +157,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   WHATSAPP_CONNECTOR_ROUTES.linkState,
   WHATSAPP_WORKING_MESSAGE_ROUTES.list,
   WHATSAPP_STATUS_REACTIONS_ROUTES.list,
+  WHATSAPP_READ_ONLY_ROUTES.list,
   LIVE_ACTIVITY_PUSH_ROUTES.register,
   LIVE_ACTIVITY_PUSH_ROUTES.remove,
   AGENT_NOTIFICATION_LEVELS_ROUTES.read,

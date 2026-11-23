@@ -23,6 +23,7 @@ export const messages = {
   "error.messaging.whatsappTooManySenders": "Een WhatsApp-nummer kan maximaal 200 contacten en groepen toestaan.",
   "error.messaging.whatsappNumberNotFound":
     "Dit nummer heeft geen WhatsApp-account. Typ het met de landcode, zoals +44 7700 900123.",
+  "error.messaging.whatsappSenderNotFound": "Dit contact of deze groep staat niet meer in de lijst.",
   "error.messaging.whatsappRequestEnded":
     "Dit verzoek is beëindigd. Vraag de persoon opnieuw te schrijven voor een nieuwe code.",
   "error.messaging.memoryLimit":

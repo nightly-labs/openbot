@@ -593,6 +593,22 @@ off, only the answer shows that OpenBot read the message. A client reads this li
 the released overview (`withWhatsAppStatusReactions`), and hides the switch while the host does not
 have the capability. Only protocol 9 peers get it.
 
+Each allowed contact and group has a mode: “Can give work” (`reply`, the default) or “Read only”
+(`read`), in the `mode` column of `projection_messaging_allowed_senders` (migration 69). A message
+from a read-only chat gets the `save` sender decision (`whatsapp-senders.ts`): OpenBot saves it, with
+its author and files, for `messaging_history`, and starts no turn, also for a mention or a reply to
+an OpenBot post. `WhatsAppSession` refuses each send to a read-only chat (`place_read_only`) right
+before the socket sends it, so a reply, a reaction, a “Working on it…” line, a deletion, a
+`messaging_post` and a send that waited in the chat queue when the mode changed all stay out of the
+chat. `messaging_list_places` marks the place with `readOnly`, and `messaging_post` tells the agent
+to answer in its own conversation. An older release refuses a database at version 69, so a downgrade
+cannot make a read-only chat answer again. The optional capability `whatsapp-read-only-v1`
+([`whatsapp-read-only-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-read-only-v1.ts),
+host route [`route-whatsapp-read-only.ts`](../../src/main/team-api/route-whatsapp-read-only.ts))
+lists the read-only sender ids of each number and sets the mode of one sender; owners and admins
+only. A client merges the list into the released overview (`withWhatsAppReadOnly`), and shows the
+mode only while the host has the capability. Only protocol 10 peers get it.
+
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a
 pairing code, because the WhatsApp app on the same phone cannot scan a QR code on its own screen. The

@@ -173,6 +173,7 @@ import {
   isSharedTable,
   isSidebarPinsSnapshot,
   isWhatsAppGroupList,
+  isWhatsAppReadOnlyList,
   isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type McpAccessSnapshot,
@@ -236,6 +237,7 @@ import {
   type SetProviderApiKeyInput,
   type SetRoutineResultDestinationInput,
   type SetWhatsAppOwnNumberInput,
+  type SetWhatsAppSenderReadOnlyInput,
   type SetWhatsAppStatusReactionsInput,
   type SetWhatsAppWorkingMessageInput,
   type SharedTable,
@@ -261,6 +263,7 @@ import {
   type WhatsAppGroupList,
   type WhatsAppLinkState,
   type WhatsAppOverview,
+  type WhatsAppReadOnlyList,
   type WhatsAppSenderInput,
   type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
@@ -414,6 +417,7 @@ import { WEBHOOK_AGENT_SECRET_ROUTES } from "@openbot/contracts/team-protocol/we
 import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { Effect, Schema } from "effect";
@@ -2474,4 +2478,27 @@ export function whatsappConnectorSetStatusReactions(
   input: SetWhatsAppStatusReactionsInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorReadOnly(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppReadOnlyList, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      WHATSAPP_READ_ONLY_ROUTES.list,
+      (value) => {
+        if (!isWhatsAppReadOnlyList(value)) throw new Error("Invalid WhatsApp read-only response.");
+        return value;
+      },
+      {},
+    ),
+  );
+}
+
+export function whatsappConnectorSetSenderReadOnly(
+  request: TeamApiRequest,
+  input: SetWhatsAppSenderReadOnlyInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_READ_ONLY_ROUTES.update, ignoreResponse, { ...input }));
 }
