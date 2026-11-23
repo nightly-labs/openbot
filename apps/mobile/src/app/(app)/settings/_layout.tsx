@@ -33,6 +33,8 @@ export default function SettingsLayout() {
       <Stack.Screen name="sessions" options={{ title: t("mobile.app.route.accountSessions") }} />
       <Stack.Screen name="billing" options={{ title: t("mobile.settings.billing.title") }} />
       <Stack.Screen name="credits" options={{ title: t("mobile.settings.credits.title") }} />
+      <Stack.Screen name="credits-move" options={{ title: t("mobile.settings.credits.move.title") }} />
+      <Stack.Screen name="credits-activity" options={{ title: t("mobile.settings.credits.activity.title") }} />
       <Stack.Screen name="invite" options={{ title: t("mobile.settings.invite.title") }} />
       <Stack.Screen name="about" options={{ title: t("mobile.app.route.about") }} />
       <Stack.Screen name="support" options={{ title: t("mobile.app.route.support") }} />
