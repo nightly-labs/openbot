@@ -71,6 +71,8 @@ export const messages = {
   "workflow.node.place.choose": "チャンネルを選択",
   "workflow.node.result.title": "結果",
   "workflow.node.result.copy": "結果をコピー",
+  "workflow.node.result.yes": "はい",
+  "workflow.node.result.no": "いいえ",
   "workflow.node.result.list": "結果",
   "workflow.node.result.previous": "前の結果",
   "workflow.node.result.next": "次の結果",

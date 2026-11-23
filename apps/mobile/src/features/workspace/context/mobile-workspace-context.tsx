@@ -51,6 +51,7 @@ import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
+import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
@@ -1830,8 +1831,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     load: hostRequests.actions.loadAgentNotificationLevels,
   });
   const workflows = useMemo(
-    () => createWorkflowActions({ request, capabilities: serverCapabilities.current }),
-    [request],
+    () =>
+      createWorkflowActions({
+        request,
+        capabilities: serverCapabilities.current,
+        loadAgentModels: hostRequests.actions.loadAgentModels,
+      }),
+    [request, hostRequests],
   );
   const browser = useMemo(
     () =>
@@ -2261,7 +2267,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             ((Boolean(snapshot.activeTurnId) && item.turnId === snapshot.activeTurnId) ||
               hostAwaitsQuestion(waits, agentId, item.turnId, input.requestId)),
         );
-        if (agent?.serverId !== activeServer.id || !showsOnline(activeServer) || !message?.questionPrompt) {
+        const hostWaits = waits.some(
+          (wait) =>
+            wait.reason === "question" &&
+            wait.agentId === agentId &&
+            String(wait.requestId) === String(input.requestId),
+        );
+        if (
+          agent?.serverId !== activeServer.id ||
+          !showsOnline(activeServer) ||
+          (!message?.questionPrompt && !hostWaits)
+        ) {
           throw new Error(currentText().t("mobile.workspace.error.formUnavailable"));
         }
         await request("POST", TEAM_API_ROUTES.respond.prompt, ignoreResponse, {
@@ -2487,6 +2503,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canRestartServerItself: (serverId) => administers(serverId, HOST_RESTART_CAPABILITY),
         canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
         canManageServerVoiceModel: (serverId) => administers(serverId, HOST_VOICE_MODEL_CAPABILITY),
+        canManageServerSignalHome: (serverId) => administers(serverId, HOST_SIGNAL_HOME_CAPABILITY),
+        servesServerSignalHome: (serverId) => {
+          const server = servers.find((candidate) => candidate.id === serverId);
+          return Boolean(
+            server && online(server) && hasCapability(capabilities, serverId, HOST_SIGNAL_HOME_CAPABILITY),
+          );
+        },
         canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
         canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
         canManageMemoryReview: (serverId) => administers(serverId, MEMORY_REVIEW_CAPABILITY),

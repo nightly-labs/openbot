@@ -21,6 +21,7 @@ source "$SOURCE/openbot-hosted-update"
 exec 9>"$LOCK"
 flock 9
 install_packages "$SOURCE/packages.txt"
+install_optional_packages "$SOURCE/optional-packages.txt"
 if modprobe zram 2>/dev/null && apt-get -o DPkg::Lock::Timeout=600 -o Acquire::AllowReleaseInfoChange::Label=true update &&
   apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends systemd-zram-generator; then
   printf '[zram0]\nzram-size = ram / 2\n' >/etc/systemd/zram-generator.conf

@@ -2478,8 +2478,11 @@ export class ProviderRuntime implements ProviderPort {
             );
         }).pipe(
           Effect.mapError((error) => {
-            if (previousExecutable === undefined) delete this.#bundledExecutables[provider];
-            else this.#bundledExecutables[provider] = previousExecutable;
+            const installedIsOnlyCopy = installed && firstInstall;
+            if (!installedIsOnlyCopy) {
+              if (previousExecutable === undefined) delete this.#bundledExecutables[provider];
+              else this.#bundledExecutables[provider] = previousExecutable;
+            }
             const cause = error.cause;
             const failure = new Error(
               sourceText("error.provider.cliUpdateFailed", {
@@ -2582,6 +2585,18 @@ export class ProviderRuntime implements ProviderPort {
     if (!this.#clients.has(provider)) return false;
     const own = this.#ownProcessFor(agent);
     return own === null || this.#confined.get(agent.id)?.key === this.#confinedKey(provider, own);
+  }
+
+  runningAgentClient(agent: AgentSummary): AgentClient | null {
+    if (!this.agentClientRunning(agent)) return null;
+    const provider = providerForAgent(agent);
+    return this.#ownProcessFor(agent)
+      ? (this.#confined.get(agent.id)?.client ?? null)
+      : (this.#clients.get(provider) ?? null);
+  }
+
+  reloadPending(provider: AgentProvider): boolean {
+    return this.#environmentReloadPending.has(provider);
   }
 
   readonly ensureAgentClient = Effect.fn("ProviderRuntime.ensureAgentClient")(function* (

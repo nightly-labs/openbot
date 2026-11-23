@@ -67,6 +67,7 @@ export * from "./ipc-hidden-agents";
 export * from "./ipc-host-analytics";
 export * from "./ipc-host-personality";
 export * from "./ipc-host-release";
+export * from "./ipc-host-signal-home";
 export * from "./ipc-host-timezone";
 export * from "./ipc-host-turn-limits";
 export * from "./ipc-host-update";

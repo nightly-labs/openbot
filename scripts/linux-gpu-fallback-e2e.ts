@@ -85,6 +85,7 @@ try {
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "gpu-process-crash" });
   assert.equal(launch.ready.hardwareAccelerationEnabled, false);
   assert.equal(existsSync(join(data, GPU_START_FILE)), false, "a software start writes no start file");
+  assert.notEqual(launch.ready.webglRenderer, null, "a desktop page gets a WebGL context in software rendering");
   steps.push({ step: "after gpu crash", ready: launch.ready });
   let softwareGpuProcess = await until(() => descendantWithType(launch.ready.pid, "gpu-process"), "a GPU process");
   for (let exit = 0; exit < 3; exit += 1) softwareGpuProcess = await stopGpuProcess(launch, softwareGpuProcess);
@@ -180,6 +181,7 @@ try {
   launch = await start(forced, 1_000, { OPENBOT_DISABLE_GPU: "1" });
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "environment-off" });
   assert.equal(existsSync(join(forced, GPU_START_FILE)), false);
+  assert.equal(launch.ready.webglRenderer, null, "OPENBOT_DISABLE_GPU=1 turns off WebGL");
   steps.push({ step: "OPENBOT_DISABLE_GPU=1", ready: launch.ready });
   await quit(launch);
 

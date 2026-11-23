@@ -157,7 +157,7 @@ export function isPiCompactionNoOp(message: string): boolean {
 }
 
 const CONTEXT_TOO_SMALL =
-  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bnothing to compact \(session too small\)|\bgreater than the context length\b|\blonger than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
+  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bnothing to compact \(session too small\)|\bgreater than the context length\b|\blonger than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b|\bleaves no room for generation\b/iu;
 
 export function isContextTooSmallFailure(message: string): boolean {
   return CONTEXT_TOO_SMALL.test(message);

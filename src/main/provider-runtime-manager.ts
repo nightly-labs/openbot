@@ -939,8 +939,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         }),
       );
       if (Result.isFailure(result)) {
-        if (installed && !this.#stopping)
-          yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
+        if (installed && !this.#stopping) {
+          const installRoot = this.#installRoot(spec);
+          if (signal.aborted || (yield* this.#workingBackupEffect(dirname(installRoot), spec, spec.version)))
+            yield* runtimeIO(() => rm(installRoot, { recursive: true, force: true }));
+          else yield* this.#removeRuntimePartialsEffect(spec.runtime, spec.target);
+        }
         return yield* result.failure;
       }
       if (download) yield* this.#removeRuntimePartialsEffect(spec.runtime, spec.target);

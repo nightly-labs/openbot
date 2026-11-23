@@ -74,6 +74,8 @@ export const messages = {
   "workflow.node.place.choose": "Kanal seç",
   "workflow.node.result.title": "Sonuç",
   "workflow.node.result.copy": "Sonucu kopyala",
+  "workflow.node.result.yes": "Evet",
+  "workflow.node.result.no": "Hayır",
   "workflow.node.result.list": "Sonuçlar",
   "workflow.node.result.previous": "Önceki sonuç",
   "workflow.node.result.next": "Sonraki sonuç",

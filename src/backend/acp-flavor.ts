@@ -71,6 +71,7 @@ export interface AcpFlavor {
     refusalStatus: () => number | null,
   ): string;
   failureCause?(error: unknown, answer: string): CauseCode | null;
+  unexplainedFailureVerification?(error: unknown, detail: string, message: string): string | null;
   failureReport?: RegExp;
   emptyAnswerFailure?(
     turn: { reasoned: boolean; answered: boolean; showedPlanOrCompaction: boolean },
@@ -466,6 +467,7 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
   steerByPromptCapability: "cognition.ai/midTurnPrompts",
+  emptyAnswerError: /\bThe model ended its turn without a response\b/u,
   promptRun: (response) => {
     const run = isRecord(response._meta) ? response._meta["cognition.ai/userMessageId"] : undefined;
     return typeof run === "string" ? run : undefined;

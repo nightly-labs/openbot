@@ -81,6 +81,8 @@ export const messages = {
   "workflow.node.place.choose": "בחירת ערוץ",
   "workflow.node.result.title": "תוצאה",
   "workflow.node.result.copy": "העתקת התוצאה",
+  "workflow.node.result.yes": "כן",
+  "workflow.node.result.no": "לא",
   "workflow.node.result.list": "תוצאות",
   "workflow.node.result.previous": "התוצאה הקודמת",
   "workflow.node.result.next": "התוצאה הבאה",

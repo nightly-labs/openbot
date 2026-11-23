@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AcpAgentClient } from "../src/backend/acp-client";
-import { type AcpFlavor, DEFAULT_ACP_FLAVOR } from "../src/backend/acp-flavor";
+import { type AcpFlavor, customAgentFlavor, DEFAULT_ACP_FLAVOR } from "../src/backend/acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "../src/backend/acp-flavor-antigravity";
 import { openBotTool, toolActivity, toolUsage, toThreadItem } from "../src/backend/agent/thread-items";
 import type { AgentClient } from "../src/backend/agent-client";
@@ -79,6 +79,27 @@ const OTHER_CALLS = [
 
 const ALL_CALLS = [...BRIDGE_CALLS, ...CONFINED_COMMANDS, ...OTHER_CALLS];
 
+const KIMI_WRITE_PATH = "notes.md";
+
+const KIMI_CALLS = [
+  {
+    toolCallId: "kimi-bash",
+    title: "Bash",
+    kind: "execute",
+    rawInput: { command: "ls attachments" },
+    idOnlyPermission: true,
+  },
+  { toolCallId: "kimi-openbot-tool", title: "mcp__openbot__send_message", kind: "other", idOnlyPermission: true },
+  {
+    toolCallId: "kimi-write",
+    title: "Write",
+    kind: "edit",
+    locations: [{ path: KIMI_WRITE_PATH }],
+    idOnlyPermission: true,
+  },
+  { toolCallId: "kimi-other-server", title: "mcp__github__create_issue", kind: "other", idOnlyPermission: true },
+];
+
 const bridgeIds = new Set(BRIDGE_CALLS.map((call) => call.toolCallId));
 
 const DYNAMIC_TOOLS = [
@@ -103,6 +124,7 @@ interface Run {
   status: string | null;
   error: string | null;
   cards: string[];
+  requests: { method: string; confinedWritePaths: unknown }[];
   outcomes: Record<string, string>;
   items: Record<string, ThreadItem>;
 }
@@ -113,6 +135,7 @@ interface Report {
   unconfined?: Run;
   otherFlavor?: Run;
   otherUnconfined?: Run;
+  kimi?: Run;
   failure?: string;
 }
 
@@ -121,12 +144,17 @@ process.env.GEMINI_HOME = join(root, "gemini");
 const report: Report = { passed: false };
 const clients: AgentClient[] = [];
 
-async function run(name: string, confined: boolean, flavor: AcpFlavor = ANTIGRAVITY_ACP_FLAVOR): Promise<Run> {
+async function run(
+  name: string,
+  confined: boolean,
+  flavor: AcpFlavor = ANTIGRAVITY_ACP_FLAVOR,
+  calls: readonly object[] = ALL_CALLS,
+): Promise<Run> {
   const executable = join(root, name, "bin", "antigravity");
   const log = join(root, name, "agent.jsonl");
   await installFakeAgent(executable, "antigravity-bridge-permission", {
     FAKE_LOG: log,
-    FAKE_TOOL_CALLS: JSON.stringify(ALL_CALLS),
+    FAKE_TOOL_CALLS: JSON.stringify(calls),
   });
   const client = new AcpAgentClient({ executable, version: "1.5.10", source: "managed" }, 10_000, {
     provider: "antigravity",
@@ -138,6 +166,7 @@ async function run(name: string, confined: boolean, flavor: AcpFlavor = ANTIGRAV
   });
   clients.push(client);
   const cards: string[] = [];
+  const requests: Run["requests"] = [];
   const items: Record<string, ThreadItem> = {};
   client.on("notification", (notification: AppServerNotification) => {
     const record = getRecord(notification.params, "item");
@@ -147,6 +176,7 @@ async function run(name: string, confined: boolean, flavor: AcpFlavor = ANTIGRAV
   });
   client.on("request", (request: AppServerRequest) => {
     cards.push(getString(request.params, "reason") ?? request.method);
+    requests.push({ method: request.method, confinedWritePaths: getRecord(request, "params")?.confinedWritePaths });
     client.respond(request.id, { decision: "decline" });
   });
   client.start();
@@ -163,7 +193,7 @@ async function run(name: string, confined: boolean, flavor: AcpFlavor = ANTIGRAV
       .filter((entry) => entry.event === "permission")
       .map((entry) => [entry.text, entry.outcome]),
   );
-  return { status: turn.status, error: turn.error, cards, outcomes, items };
+  return { status: turn.status, error: turn.error, cards, requests, outcomes, items };
 }
 
 try {
@@ -243,6 +273,23 @@ try {
       `${call.toolCallId} on another flavor reads only the title, and runs each command in the sandbox.`,
     );
   }
+
+  const kimi = await run("kimi", true, customAgentFlavor("kimi"), KIMI_CALLS);
+  report.kimi = kimi;
+  assert.equal(kimi.status, "completed", "The confined Kimi turn completes.");
+  assert.equal(kimi.outcomes["kimi-bash"], "allow", "A Kimi command runs in the sandbox without a card.");
+  assert.equal(kimi.outcomes["kimi-openbot-tool"], "allow", "A Kimi call of an OpenBot tool runs without a card.");
+  assert.deepEqual(
+    kimi.requests,
+    [
+      {
+        method: "item/fileChange/requestApproval",
+        confinedWritePaths: [join(root, "kimi", "workspace", KIMI_WRITE_PATH)],
+      },
+      { method: "item/permissions/requestApproval", confinedWritePaths: [] },
+    ],
+    "A Kimi file change takes its kind and path from its tool call, and another MCP server keeps its card.",
+  );
 
   report.passed = true;
 } catch (error) {

@@ -96,6 +96,7 @@ import { createServerOwnerTransferSection, type OwnerTransferCalls } from "./Ser
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
+import type { ServerSignalHomeOptions } from "./ServerSignalHomeSetting";
 import type { ServerSkillLearningOptions } from "./ServerSkillLearningSetting";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
@@ -143,6 +144,7 @@ export interface ServerSettingsModalProps {
   hostUpdate?: ServerUpdateOptions | undefined;
   hostTimezone?: ServerTimezoneOptions | undefined;
   hostVoiceModel?: ServerVoiceModelOptions | undefined;
+  hostSignalHome?: ServerSignalHomeOptions | undefined;
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
   hostPersonality?: ServerPersonalityOptions | undefined;
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
