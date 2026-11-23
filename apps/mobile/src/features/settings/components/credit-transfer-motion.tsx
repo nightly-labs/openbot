@@ -22,7 +22,7 @@ export interface CreditSparkPath {
 
 export type CreditTileMotion = ReturnType<typeof useCreditTileMotion>;
 
-export const CREDIT_FLIGHT_MS = 500;
+const CREDIT_FLIGHT_MS = 500;
 const HIT_EASING = Easing.bezier(0.23, 1, 0.32, 1);
 const FLIGHT_EASING = Easing.bezier(0.4, 0, 0.2, 1);
 const CHARGE_EASING = Easing.bezier(0.45, 0, 0.55, 1);
