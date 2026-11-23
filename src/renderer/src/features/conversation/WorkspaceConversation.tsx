@@ -256,7 +256,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   });
 
   const { deleteAgent } = useAgentActions();
-  const deleteAgentAllowed = () => serverRoleCanAdminister(activeServer());
+  const deleteAgentAllowed = () => !platform.chatWindow && serverRoleCanAdminister(activeServer());
 
   const compactActiveAgentContext = createMemo(() => {
     const agent = activeAgent();
