@@ -196,10 +196,12 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.list(agentId);
   }
 
-  hasActiveRuns(): boolean {
+  hasActiveRuns(queuedRunsWait: (agentId: string) => boolean): boolean {
     for (const agent of this.#hooks.listAgents()) {
+      const waits = queuedRunsWait(agent.id);
       for (const routine of this.#routines.listRecords(agent.id)) {
-        if (this.#routines.activeRuns(agent.id, routine.id).length > 0) return true;
+        const runs = this.#routines.activeRuns(agent.id, routine.id);
+        if (runs.some((run) => !waits || run.status !== "queued")) return true;
       }
     }
     return false;

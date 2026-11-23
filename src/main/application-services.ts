@@ -4069,7 +4069,7 @@ export async function createApplicationServices({
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
       agentWork: [
-        ...service.hasActiveWork(),
+        ...service.workBeforeRestart(),
         ...(workflowRuntime.working() ? ["routine-run"] : []),
         ...(localServers && localServers.workingAgents().length > 0 ? ["agent-turn"] : []),
       ],

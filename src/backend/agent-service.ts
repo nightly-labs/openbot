@@ -2327,26 +2327,43 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   hasActiveWork(): string[] {
+    return this.#activeWork(() => false);
+  }
+
+  workBeforeRestart(): string[] {
+    return this.#activeWork((agentId) => this.#queueWaitsForLimitReset(agentId));
+  }
+
+  #queueWaitsForLimitReset(agentId: string): boolean {
+    return !this.#usageLimits.mayDrain(agentId) && !this.#usageLimits.mayTry(agentId) && this.#waitsForLimit(agentId);
+  }
+
+  #activeWork(queuedWorkWaits: (agentId: string) => boolean): string[] {
     const reasons: string[] = [];
+    const unfinishedDelivery = (agentId: string) =>
+      queuedWorkWaits(agentId)
+        ? this.#mailbox.hasStartedDelivery(agentId)
+        : this.#mailbox.hasUnfinishedDelivery(agentId);
     for (const [, snapshot] of this.#conversation.activeSnapshots()) {
       if (snapshot.activeTurnId && !this.#conversation.isExecutionThread(snapshot.threadId)) {
         reasons.push("agent-turn");
         break;
       }
     }
-    if (this.listAgents().some((agent) => this.#mailbox.hasUnfinishedDelivery(agent.id))) {
+    if (this.listAgents().some((agent) => unfinishedDelivery(agent.id))) {
       reasons.push("queued-delivery");
     }
     for (const agent of this.listAgents()) {
       if (
         this.#drain.taskFor(agent.id) &&
-        (this.#mailbox.hasUnfinishedDelivery(agent.id) || this.#conversation.anyWorkingSnapshot(agent.id)?.activeTurnId)
+        (unfinishedDelivery(agent.id) || this.#conversation.anyWorkingSnapshot(agent.id)?.activeTurnId)
       ) {
         reasons.push("drain-task");
         break;
       }
     }
-    if (this.#routines.hasActiveRuns() || this.#channelRoutines.hasActiveRuns()) reasons.push("routine-run");
+    if (this.#routines.hasActiveRuns(queuedWorkWaits) || this.#channelRoutines.hasActiveRuns())
+      reasons.push("routine-run");
     if (this.channels.hasActiveWork()) reasons.push("channel-work");
     if (this.#providers.activeProcessCount() > 0) reasons.push("provider-process");
     return reasons;
