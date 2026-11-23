@@ -34,6 +34,7 @@ import type {
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTaskWindow,
+  AgentUsageLimitReturn,
   AgentWaitsSnapshot,
   ArchivedAgentTasksPage,
   AskSideQuestionInput,
@@ -1731,7 +1732,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               Effect.forEach(
                 this.#store
                   .list()
-                  .filter((agent) => agent.usageLimitReturn && sameUsageLimit(agent.usageLimitReturn, limit)),
+                  .filter(
+                    (agent) =>
+                      agent.usageLimitReturn?.provider === limit.provider &&
+                      agent.usageLimitReturn.model === limit.model,
+                  ),
                 (agent) => Effect.sync(() => this.#drain.scheduleDrain(agent.id)),
                 { discard: true },
               ),
@@ -4196,16 +4201,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : reasoningEffort,
       };
     };
-    if (
-      agent.usageLimitReturn &&
-      this.#usageLimitReady(agent.usageLimitReturn) &&
-      this.#usageLimits.returnConfirmed(usageLimitOf(agent.usageLimitReturn))
-    )
+    const returnTo = agent.usageLimitReturn && this.#returnTarget(agent.usageLimitReturn);
+    if (returnTo && this.#usageLimitReady(returnTo) && this.#usageLimits.returnConfirmed(usageLimitOf(returnTo)))
       return {
         input: {
-          ...move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort),
-          ...(agent.usageLimitReturn.fastMode ? { fastMode: true } : {}),
-          ...(agent.usageLimitReturn.fastMode && agent.usageLimitReturn.ultrafast ? { ultrafast: true } : {}),
+          ...move(returnTo, returnTo.reasoningEffort),
+          ...(returnTo.fastMode ? { fastMode: true } : {}),
+          ...(returnTo.fastMode && returnTo.ultrafast ? { ultrafast: true } : {}),
         },
         move: "return",
       };
@@ -4220,7 +4222,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #returnCheckPending(agentId: string): boolean {
     const returnTo = this.#store.get(agentId)?.usageLimitReturn;
-    return returnTo !== undefined && this.#usageLimits.returnPending(usageLimitOf(returnTo));
+    return returnTo !== undefined && this.#usageLimits.returnPending(usageLimitOf(this.#returnTarget(returnTo)));
+  }
+
+  #returnTarget(returnTo: AgentUsageLimitReturn): AgentUsageLimitReturn {
+    if (this.#usageLimitReady(returnTo) || !this.#pooled(returnTo)) return returnTo;
+    this.#readPoolWhenStale(returnTo.provider);
+    const pick = this.#poolPick(returnTo.provider, returnTo.model, null, true);
+    if (pick === null) return returnTo;
+    const { providerAccountId: _savedAccount, ...choice } = returnTo;
+    return pick === DEFAULT_PROVIDER_ACCOUNT_ID ? choice : { ...choice, providerAccountId: pick };
   }
 
   #hasWaitingWork(agentId: string): boolean {
@@ -4320,8 +4331,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.accountPool(choice.provider) !== null;
   }
 
-  #poolPick(provider: AgentProvider, model: string | null, current: string | null): string | null {
-    return pickPoolAccount(this.#readyPoolMembers(provider, model), current, Date.now() / 1000);
+  #poolPick(provider: AgentProvider, model: string | null, current: string | null, openOnly = false): string | null {
+    return pickPoolAccount(this.#readyPoolMembers(provider, model), current, Date.now() / 1000, openOnly);
   }
 
   #readyPoolMembers(provider: AgentProvider, model: string | null) {
@@ -4392,7 +4403,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #mayContinueStoppedWork(agentId: string): boolean {
     const returnTo = this.#store.get(agentId)?.usageLimitReturn;
     return (
-      Boolean(returnTo && this.#usageLimitReady(returnTo)) ||
+      Boolean(returnTo && this.#usageLimitReady(this.#returnTarget(returnTo))) ||
       this.#usageLimitBackup(agentId, true) !== undefined ||
       this.#poolBackup(agentId)
     );
@@ -7442,11 +7453,6 @@ function workspaceOnlyUnavailable(provider: AgentProvider): boolean {
 
 function usageLimitOf(choice: AgentModelChoice): UsageLimitKey {
   return { provider: choice.provider, accountId: agentProviderAccount(choice), model: choice.model };
-}
-
-function sameUsageLimit(choice: AgentModelChoice, limit: UsageLimitKey): boolean {
-  const own = usageLimitOf(choice);
-  return own.provider === limit.provider && own.accountId === limit.accountId && own.model === limit.model;
 }
 
 function lifecycleStep<A>(operation: string, run: () => A): Effect.Effect<A, AgentLifecycleFailed> {
