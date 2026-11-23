@@ -63,16 +63,22 @@ export function ChatLocationRequest({
       ? t("mobile.chat.locationRequest.locating")
       : t("mobile.chat.locationRequest.private");
 
+  const controllerRef = useRef(controller);
+  controllerRef.current = controller;
+
   async function share(mode: ShareMode): Promise<void> {
     if (!controller || !agentId || locating || controller.disabled) return;
+    const messageId = controller.messageId;
     if (mode !== "automatic") void haptics.selection();
     setUnavailable(false);
     setLocating(true);
-    const reading = await readCurrentLocation().catch(() => ({ status: "unavailable" as const }));
+    const reading = await readCurrentLocation(mode !== "automatic").catch(() => ({ status: "unavailable" as const }));
     setLocating(false);
+    const current = controllerRef.current;
+    if (!current || current.messageId !== messageId || current.disabled) return;
     if (reading.status === "found") {
-      if (mode === "always") setLocationAlwaysAllowed(serverId, agentId, true);
-      await controller.submit({ [UI_LOCATION_FIELD_ID]: [encodeSharedLocationAnswer(reading.location)] });
+      const sent = await current.submit({ [UI_LOCATION_FIELD_ID]: [encodeSharedLocationAnswer(reading.location)] });
+      if (sent && mode === "always") setLocationAlwaysAllowed(serverId, agentId, true);
       return;
     }
     if (mode !== "automatic") void haptics.notification("warning");
@@ -89,7 +95,8 @@ export function ChatLocationRequest({
 
   const shareRef = useRef(share);
   shareRef.current = share;
-  const canShareAutomatically = open && alwaysAllowed && appActive && canSend && !controller?.disabled;
+  const canShareAutomatically =
+    open && alwaysAllowed && appActive && canSend && Boolean(controller?.automaticAnswer) && !controller?.disabled;
   useEffect(() => {
     if (!canShareAutomatically || automaticTried.current) return;
     automaticTried.current = true;

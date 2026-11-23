@@ -37,6 +37,7 @@ export function useQuestionPrompt(
   canSend: boolean,
   respond: (agentId: string, input: RespondToPromptInput) => Promise<void>,
   onUnsentPreview?: (text: string) => void,
+  automaticAnswer = false,
 ) {
   const scope = JSON.stringify([agentId, message?.id]);
   const [stored, setState] = useState(() => initialState(scope));
@@ -85,13 +86,17 @@ export function useQuestionPrompt(
       }
     }
 
-    async function submit(answers: Record<string, string[]>): Promise<void> {
-      if (disabled || !prompt || submitting.current.has(scope)) return;
-      await send(answers).then(
-        () => void haptics.notification("success"),
+    async function submit(answers: Record<string, string[]>): Promise<boolean> {
+      if (disabled || !prompt || submitting.current.has(scope)) return false;
+      return send(answers).then(
+        () => {
+          void haptics.notification("success");
+          return true;
+        },
         () => {
           void haptics.notification("error");
           update({ failedAnswers: answers });
+          return false;
         },
       );
     }
@@ -155,8 +160,9 @@ export function useQuestionPrompt(
       answerText,
       submit,
       send,
+      automaticAnswer,
     };
-  }, [scope, messageId, state, question, resolution, disabled, prompt, respond, agentId]);
+  }, [scope, messageId, state, question, resolution, disabled, prompt, respond, agentId, automaticAnswer]);
 }
 
 export type QuestionPromptController = ReturnType<typeof useQuestionPrompt>;

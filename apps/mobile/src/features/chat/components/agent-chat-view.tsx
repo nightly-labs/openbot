@@ -9,6 +9,7 @@ import { useBrowserFeature } from "@/features/browser/components/use-browser-fea
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
 import { useChannelList } from "@/features/channels/components/use-channels";
 import { appendComposerDraft } from "@/features/chat/model/composer-drafts";
+import { promptAskedByThisPerson } from "@/features/chat/model/location-request";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useChatPullPreference, useChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
@@ -403,6 +404,7 @@ export function MobileChatView({
     showsOnline(server) && !viewOnly,
     respondToPrompt,
     returnUnsentPreview,
+    promptAskedByThisPerson(messages, activePrompt?.id),
   );
   const swipeAction = useChatSwipePreference((state) => state.action);
   const browserAllowed = useBrowserFeature();

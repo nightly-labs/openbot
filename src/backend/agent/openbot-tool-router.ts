@@ -1127,9 +1127,14 @@ export class OpenBotToolRouter {
     const parsed = requestLocationToolSchema.safeParse(params.arguments);
     if (!parsed.success)
       return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
-    if (this.#messaging.store.linkForThread(this.#conversation.publicThreadId(agentId, params.threadId)))
+    const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
+    if (this.#messaging.store.linkForThread(threadId))
       return openBotToolFailure(
         "request_location does not work in an external chat. Ask the person for a place in your answer.",
+      );
+    if (this.#channels.store.channelForThread(threadId))
+      return openBotToolFailure(
+        "request_location does not work in a channel, because all members read it. Ask the person for a place in your answer.",
       );
     const spec = locationFormSpec(parsed.data.reason);
     if (!spec) return openBotToolFailure("OpenBot could not show this card. Use a shorter reason and retry.");
