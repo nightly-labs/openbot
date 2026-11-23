@@ -27,7 +27,7 @@ import {
 } from "../model/large-files";
 import { shareTypeOptions } from "../model/share-file-type";
 import { shareFilesNative } from "../model/share-files-native";
-import { mediaFile, writeMediaFile } from "./use-media-file";
+import { createSharedDownloads, mediaFile, writeMediaFile } from "./use-media-file";
 
 const dimensionCache = createImageDimensionCache({
   read: () => {
@@ -219,6 +219,29 @@ async function copyImageData(data: RemoteFileUpload & { fileUri?: string }) {
 
 type DownloadAttachment = ReturnType<typeof useMobileWorkspaceActions>["downloadAttachment"];
 
+type AttachmentFile = RemoteFileUpload & { localUri?: string; fileUri?: string };
+
+const sharedAttachmentFiles = createSharedDownloads<AttachmentFile>();
+
+async function downloadAttachmentFile(
+  serverId: string,
+  attachment: AttachmentSummary,
+  downloadAttachment: DownloadAttachment,
+  wanted: () => boolean,
+): Promise<AttachmentFile> {
+  const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
+  const data = await downloadAttachment(
+    serverId,
+    attachment.id,
+    largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
+    undefined,
+    wanted,
+  );
+  if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
+  const fileUri = large || data.mimeType.startsWith("image/") ? await keepFile(serverId, attachment, data) : undefined;
+  return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };
+}
+
 function attachmentFileQuery(
   serverId: string,
   attachment: AttachmentSummary,
@@ -227,20 +250,13 @@ function attachmentFileQuery(
 ) {
   return queryOptions({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
-    queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
+    queryFn: async ({ signal }): Promise<AttachmentFile> => {
       if (attachment.size > MOBILE_LARGE_FILE_BYTES) throw new Error(tooLarge);
       const kept = keptFile(serverId, attachment);
       if (kept) return kept;
-      const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
-      const data = await downloadAttachment(
-        serverId,
-        attachment.id,
-        largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
+      return sharedAttachmentFiles(`${serverId}\n${attachment.id}`, signal, (wanted) =>
+        downloadAttachmentFile(serverId, attachment, downloadAttachment, wanted),
       );
-      if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
-      const fileUri =
-        large || data.mimeType.startsWith("image/") ? await keepFile(serverId, attachment, data) : undefined;
-      return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };
     },
     retry: false,
     staleTime: Infinity,

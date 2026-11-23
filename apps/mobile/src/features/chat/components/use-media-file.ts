@@ -59,6 +59,29 @@ export function writeMediaFile(file: File, base64: string): Promise<void> {
   return write;
 }
 
+export function createSharedDownloads<T>() {
+  const running = new Map<string, (reader: AbortSignal) => Promise<T>>();
+  return (key: string, reader: AbortSignal, start: (wanted: () => boolean) => Promise<T>): Promise<T> => {
+    let join = running.get(key);
+    if (!join) {
+      let readers = 0;
+      const result = start(() => readers > 0).finally(() => running.delete(key));
+      join = (signal) => {
+        if (signal.aborted) return result;
+        readers += 1;
+        signal.addEventListener("abort", () => {
+          readers -= 1;
+        });
+        return result;
+      };
+      running.set(key, join);
+    }
+    return join(reader);
+  };
+}
+
+const sharedMediaFiles = createSharedDownloads<string>();
+
 const useDownloadedBytes = create<{ bytes: ReadonlyMap<string, number> }>(() => ({ bytes: new Map() }));
 
 const downloadKey = (serverId: string, attachmentId: string) => `${serverId}\n${attachmentId}`;
@@ -88,40 +111,49 @@ export function useMediaDownloads(serverId: string, attachments: readonly Attach
 
 export function useMediaFile(serverId: string, attachment: AttachmentSummary, enabled: boolean) {
   const { downloadAttachment } = useMobileWorkspaceActions();
+  async function downloadMediaFile(file: File, wanted: () => boolean) {
+    const key = downloadKey(serverId, attachment.id);
+    const started = Date.now();
+    let arrived: number | null = null;
+    try {
+      const progress =
+        attachment.size > 0
+          ? {
+              size: attachment.size,
+              onProgress: (received: number, total: number) => {
+                if (received >= total) arrived ??= Date.now();
+                setDownloadedBytes(key, received);
+              },
+            }
+          : undefined;
+      file.parentDirectory.create({ intermediates: true, idempotent: true });
+      const data = await downloadAttachment(
+        serverId,
+        attachment.id,
+        largeDownloadOf(attachment, file.uri),
+        progress,
+        wanted,
+      );
+      const handedOver = Date.now();
+      if (!data.file) await writeMediaFile(file, data.base64);
+      const bytesMs = (arrived ?? handedOver) - started;
+      supportLog.add(
+        "info",
+        "connection",
+        `Attachment of ${attachment.size} bytes: bytes ${bytesMs} ms, hand-over ${handedOver - (arrived ?? handedOver)} ms, write ${Date.now() - handedOver} ms`,
+      );
+      return file.uri;
+    } finally {
+      setDownloadedBytes(key, null);
+    }
+  }
   return useQuery({
     enabled,
     queryKey: queryKeys.chatMediaFile(serverId, attachment.id),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const file = mediaFile(serverId, attachment);
       if (file.exists && file.size === attachment.size) return file.uri;
-      const key = downloadKey(serverId, attachment.id);
-      const started = Date.now();
-      let arrived: number | null = null;
-      try {
-        const progress =
-          attachment.size > 0
-            ? {
-                size: attachment.size,
-                onProgress: (received: number, total: number) => {
-                  if (received >= total) arrived ??= Date.now();
-                  setDownloadedBytes(key, received);
-                },
-              }
-            : undefined;
-        file.parentDirectory.create({ intermediates: true, idempotent: true });
-        const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment, file.uri), progress);
-        const handedOver = Date.now();
-        if (!data.file) await writeMediaFile(file, data.base64);
-        const bytesMs = (arrived ?? handedOver) - started;
-        supportLog.add(
-          "info",
-          "connection",
-          `Attachment of ${attachment.size} bytes: bytes ${bytesMs} ms, hand-over ${handedOver - (arrived ?? handedOver)} ms, write ${Date.now() - handedOver} ms`,
-        );
-        return file.uri;
-      } finally {
-        setDownloadedBytes(key, null);
-      }
+      return sharedMediaFiles(file.uri, signal, (wanted) => downloadMediaFile(file, wanted));
     },
     retry: false,
     staleTime: Infinity,
