@@ -45,12 +45,12 @@ On 2026-11-22 the developer accepted the defaults below ("do all as you see fit"
 
 | # | Item | State |
 |---|---|---|
-| 1 | Instance transfer: a cleared chat link does not match every chat | TODO |
-| 2 | A conflict merge never saves placeholder nodes | TODO |
-| 3 | One bad workflow row does not break every list | TODO |
-| 4 | Typed values fail closed at run time | TODO |
-| 5 | Run input and retries use the right answer spec | TODO |
-| 6 | Strict values: numbers, lists, keys, quotes | TODO |
+| 1 | Instance transfer: a cleared chat link does not match every chat | DONE (#15044) |
+| 2 | A conflict merge never saves placeholder nodes | DONE (#15044) |
+| 3 | One bad workflow row does not break every list | DONE (#15044) |
+| 4 | Typed values fail closed at run time | DONE (#14667) |
+| 5 | Run input and retries use the right answer spec | DONE (#14673) |
+| 6 | Strict values: numbers, lists, keys, quotes | DONE (#14661) |
 
 ### 1. A cleared chat link does not match every chat
 
@@ -144,9 +144,9 @@ STOP: none.
 
 | # | Item | State |
 |---|---|---|
-| 7 | A node registry in contracts drives every decoder | TODO |
-| 8 | Workflow paused state | TODO |
-| 9 | Format version, host enforcement and the format change rule | TODO |
+| 7 | A node registry in contracts drives every decoder | DONE (#14868) |
+| 8 | Workflow paused state | DONE (#14875) |
+| 9 | Format version, host enforcement and the format change rule | DONE (#14868) |
 
 ### 7. A node registry in contracts drives every decoder
 
@@ -199,12 +199,12 @@ STOP: if the capability list has no free slot under the protocol limit
 
 | # | Item | State |
 |---|---|---|
-| 10 | Path-aware type check when the graph is saved | TODO |
-| 11 | Agents give answers through a tool | TODO |
-| 12 | Model steps use native structured output where it exists | TODO |
-| 13 | `{{name}}` in output fields | TODO |
-| 14 | Built-in typed fields for every trigger | TODO |
-| 15 | The editor shows the fields of earlier steps | TODO |
+| 10 | Path-aware type check when the graph is saved | DONE (#14720) |
+| 11 | Agents give answers through a tool | DONE (#14722) |
+| 12 | Model steps use native structured output where it exists | DONE (#14724) |
+| 13 | `{{name}}` in output fields | DONE (#14868) |
+| 14 | Built-in typed fields for every trigger | DONE (#14868) |
+| 15 | The editor shows the fields of earlier steps | DONE (#14868) |
 
 ### 10. Path-aware type check when the graph is saved
 
@@ -269,9 +269,9 @@ STOP: none.
 
 | # | Item | State |
 |---|---|---|
-| 16 | The `openbot.workflow` file: codec, sanitizer, assets | TODO |
-| 17 | Export and import on desktop, web client and joined servers | TODO |
-| 18 | Paste between servers and instance transfer use the codec | TODO |
+| 16 | The `openbot.workflow` file: codec, sanitizer, assets | DONE (#14875) |
+| 17 | Export and import on desktop, web client and joined servers | DONE (#14875) |
+| 18 | Paste between servers and instance transfer use the codec | DONE (#14875) |
 
 ### 16. The `openbot.workflow` file
 
@@ -317,7 +317,7 @@ STOP: none.
 
 | # | Item | State |
 |---|---|---|
-| 19 | Compatibility and round-trip E2E | TODO |
+| 19 | Compatibility and round-trip E2E | DONE (#14875) |
 
 ### 19. Compatibility and round-trip E2E
 
