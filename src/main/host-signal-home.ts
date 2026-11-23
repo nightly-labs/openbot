@@ -11,7 +11,7 @@ const LATENCY_SAMPLES = 3;
 const LATENCY_TIMEOUT_MS = 3_000;
 const LATENCY_REUSE_MS = 60_000;
 
-export class HostSignalHomeError extends Schema.TaggedError<HostSignalHomeError>()("HostSignalHomeError", {
+class HostSignalHomeError extends Schema.TaggedError<HostSignalHomeError>()("HostSignalHomeError", {
   cause: Schema.Defect(),
 }) {}
 
@@ -19,7 +19,7 @@ export class SignalHomeUnknownError extends Schema.TaggedError<SignalHomeUnknown
   cause: Schema.Defect(),
 }) {}
 
-export interface ListedSignalHome {
+interface ListedSignalHome {
   readonly id: string;
   readonly url: string;
 }
@@ -58,7 +58,7 @@ const measureOnce = (fetcher: SignalHomeFetch, url: string) =>
     catch: (cause) => new HostSignalHomeError({ cause }),
   });
 
-export const measureSignalLatency = Effect.fn("HostSignalHome.measureLatency")(function* (
+const measureSignalLatency = Effect.fn("HostSignalHome.measureLatency")(function* (
   fetcher: SignalHomeFetch,
   signalUrl: string,
 ) {
