@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub bu GitHub Uygulamasının İstemci Kimliğini (Client ID) bilmiyor.",
   "error.connector.githubUnexpected": "GitHub beklenmeyen bir yanıt gönderdi: {detail}",
   "error.connector.githubUnreachable": "OpenBot GitHub'a ulaşamıyor: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot GitHub'a ulaşamıyor. OpenBot'u çalıştıran bilgisayarın veya sunucunun internet bağlantısını ve DNS ayarlarını kontrol edin, sonra tekrar deneyin.",
   "error.connector.githubExpired": "GitHub bağlantısının süresi doldu. GitHub'a tekrar bağlanın.",
   "error.connector.githubFileUnreadable": "GitHub bağlantı dosyası okunamıyor.",
   "error.connector.githubFileTooLarge": "GitHub bağlantı dosyası çok büyük.",
