@@ -37,6 +37,7 @@ import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import { acpSessionSteers, steerAcpSession } from "./acp-session-steering";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { CODEX_VARIABLE_PROVIDER, readCodexModelSource } from "./agent/codex-model-source";
+import type { ImageFitter } from "./agent/image-reader";
 import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
 import type { TurnContext } from "./agent/turn-context";
@@ -436,6 +437,7 @@ export interface ProviderClientContext {
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
   readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  readonly fitImage?: ImageFitter | null;
 }
 
 const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
@@ -790,6 +792,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         confinement,
         withAccountEnvironment(context),
         context.history?.("grok"),
+        context.fitImage,
       ),
     createProfileClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
@@ -875,6 +878,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           Effect.runSync(readOpenCodeRefusalStatus(sessionId, { ...process.env, ...context.agentEnvironment?.() })),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -937,6 +941,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.antigravitySignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1013,6 +1018,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
             }),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1060,6 +1066,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.clineSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1125,6 +1132,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.kimiSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1173,6 +1181,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1229,6 +1238,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1283,6 +1293,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.mistralSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1343,6 +1354,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1439,6 +1451,7 @@ function customAgentChild(
               ),
             ),
           mcpServers: context.mcpServers,
+          fitImage: context.fitImage,
           reportMcpDrops: context.reportMcpDrops,
           mcpToolRuntimes: context.mcpToolRuntimes,
           mcpEndpoint: context.mcpEndpoint,
