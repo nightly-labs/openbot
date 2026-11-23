@@ -76,7 +76,7 @@ import { createBrowserStore } from "./stores/browser-store";
 import { createComposerActions } from "./stores/composer-actions";
 import { conversationOwnerId, createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMcpServersStore } from "./stores/mcp-servers-store";
-import { createMessageActions, draftWithPageText } from "./stores/message-actions";
+import { createMessageActions, draftWithPageContext, draftWithPageText } from "./stores/message-actions";
 import { createMessagePinsStore } from "./stores/message-pins-store";
 import { createPanelsStore, isSidePanelMode } from "./stores/panels-store";
 import { PENDING_SEND_ID_PREFIX, type PendingSend, pendingSendMessage } from "./stores/pending-send-store";
@@ -1806,7 +1806,7 @@ export function createConversationViewScope(props: ConversationProps) {
 
   function quoteSelection(messageId: string, text: string) {
     const quoted = limitedQuoteText(text);
-    const thread = fileQuoteTarget(messageId) ? previewSideThread() : undefined;
+    const thread = previewSideThread(messageId);
     if (thread) {
       const quote = serializeChatTagReference("quote", quoted, messageId);
       addToSideDraft(thread, (draft) => `${draft}${draft && !/\s$/u.test(draft) ? " " : ""}${quote} `);
@@ -1815,7 +1815,13 @@ export function createConversationViewScope(props: ConversationProps) {
     setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: quoted }));
   }
 
-  function previewSideThread(): { id: string; draftKey: string } | undefined {
+  function quotesShownPreview(quoteId: string): boolean {
+    const target = fileQuoteTarget(quoteId);
+    return target !== null && fileQuoteId({ ...target, lines: undefined }) === previewQuoteId();
+  }
+
+  function previewSideThread(quoteId?: string): { id: string; draftKey: string } | undefined {
+    if (quoteId !== undefined && !quotesShownPreview(quoteId)) return undefined;
     const id = filePreviewOpen() ? sidebarFilePreview()?.threadId : undefined;
     const draftKey = id && sideThreadIds().includes(id) ? threadComposer.sideDraftKey(id) : undefined;
     return id && draftKey ? { id, draftKey } : undefined;
@@ -1834,8 +1840,22 @@ export function createConversationViewScope(props: ConversationProps) {
     else addPageText(text);
   }
 
+  function setPreviewPageContext(attachmentId: string, text: string) {
+    const hasAttachment = (message: { attachments?: readonly { id: string }[] | undefined }) =>
+      message.attachments?.some((file) => file.id === attachmentId) === true;
+    const thread = previewSideThread();
+    if (!thread) {
+      const message = props.messages.find(hasAttachment);
+      if (message) setPageContext(message, text);
+      return;
+    }
+    const message = props.threads?.side.thread(thread.id)?.conversation?.messages.find(hasAttachment);
+    const next = message && draftWithPageContext(threadComposer.draft(thread.draftKey).text, message.id, text);
+    if (next !== undefined) threadComposer.setText(thread.draftKey, next);
+  }
+
   async function sendMessageSelection(messageId: string, body: string): Promise<boolean> {
-    const thread = fileQuoteTarget(messageId) ? previewSideThread() : undefined;
+    const thread = previewSideThread(messageId);
     const side = thread ? props.threads?.side.thread(thread.id) : undefined;
     if (!thread || !side) return sendSelectionInstruction(messageId, body);
     const sent = await side.onSend(body, [], null);
@@ -2786,6 +2806,7 @@ export function createConversationViewScope(props: ConversationProps) {
     addPageText,
     addPreviewPageText,
     setPageContext,
+    setPreviewPageContext,
     skillSettingsRequest,
     openSkillSettings,
     clearSkillSettingsRequest,

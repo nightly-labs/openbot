@@ -548,8 +548,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       releaseFilePreviewPage(file.preview?.pageUrl);
       return;
     }
-    const replacedKey = place === "open" ? key : place === "here" ? shown.file : null;
-    const threadId = file.threadId ?? shown.files.find((item) => item.key === replacedKey)?.threadId;
+    const existing = shown.files.find((item) => item.key === key);
+    const replaced = place === "here" ? shown.files.find((item) => item.key === shown.file) : undefined;
+    const threadId = file.threadId ?? (place === "tab" ? undefined : (existing ?? replaced)?.threadId);
     const tab: SidePanelFile = {
       key,
       name: file.directory?.name ?? file.preview?.name ?? key,
