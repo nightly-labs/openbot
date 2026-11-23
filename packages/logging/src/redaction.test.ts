@@ -310,6 +310,14 @@ describe("redactText", () => {
     expect(containsSecret(`${code}\n{"apiKey":"abcdef123456"}`)).toBe(true);
     expect(containsSecret(`${code}\nmail owner@example.com`)).toBe(true);
     expect(containsSecret('const auth = {"password": "hunter2-real", retry};')).toBe(true);
+    expect(containsSecret(`${code}\n{"headers": {"X-Custom": "abc123zz"}}`)).toBe(true);
+    expect(containsSecret(`${code}\n{"name": "API_TOKEN", "value": "abc123zz"}`)).toBe(true);
+    expect(containsSecret(`${code}\n{"pass\\u0077ord": "hunter2x"}`)).toBe(true);
+    expect(containsSecret('x {"pass\\u0077ord": "hunter2x", retry}')).toBe(true);
+    expect(containsSecret('const body = {"name": "demo"\nlater {"headers": {"X-Custom": "abc123zz"}}')).toBe(true);
+    expect(
+      containsSecret('const body = {"name": "demo"\nlater {"auth": {"user": "a", "pwd": "x"}, "apiKey": "abc123zz"}'),
+    ).toBe(true);
     registerSecretValue("saved-skill-secret-value");
     expect(containsSecret(`${code}\nuse saved-skill-secret-value here`)).toBe(true);
   });

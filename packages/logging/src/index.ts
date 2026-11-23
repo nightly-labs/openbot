@@ -229,6 +229,15 @@ const MAX_EMBEDDED_SCANS = 16;
 
 const UNSCANNED = "[redacted-unscanned]";
 
+const JSON_ONLY_SECRET_SHAPE = new RegExp(
+  String.raw`"headers"\s*:|\\u[0-9A-Fa-f]{4}|"(?:name|key)"\s*:\s*"(?:${SECRET_LABEL}|keys?)"`,
+  "iu",
+);
+
+function keptOrUnscanned(text: string): string {
+  return JSON_ONLY_SECRET_SHAPE.test(text) ? UNSCANNED : text;
+}
+
 function redactEmbeddedJson(value: string, emails: boolean, unscanned: UnscannedText): string {
   let result = "";
   let index = 0;
@@ -237,19 +246,21 @@ function redactEmbeddedJson(value: string, emails: boolean, unscanned: Unscanned
     const start = findPayloadStart(value, index);
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
-      if (unscanned !== "drop") return result + value.slice(index);
+      if (unscanned === "keepPastScanBound") return result + value.slice(index);
+      if (unscanned === "keep") return result + value.slice(index, start) + keptOrUnscanned(value.slice(start));
       return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     scans += 1;
     const end = findBalancedEnd(value, start);
     if (end < 0 && startsLikeJson(value, start)) {
-      if (unscanned === "keep") return result + value.slice(index);
-      return `${result + value.slice(index, start)}${UNSCANNED}`;
+      if (unscanned !== "keep" || JSON_ONLY_SECRET_SHAPE.test(value.slice(start)))
+        return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end), emails);
     if (parsed === null) {
       if (end >= 0 && startsLikeJson(value, start)) {
-        result += value.slice(index, start) + (unscanned === "keep" ? value.slice(start, end) : UNSCANNED);
+        result +=
+          value.slice(index, start) + (unscanned === "keep" ? keptOrUnscanned(value.slice(start, end)) : UNSCANNED);
         index = end;
         continue;
       }
