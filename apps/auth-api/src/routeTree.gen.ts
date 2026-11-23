@@ -88,6 +88,8 @@ import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-temp
 import { Route as V1AppMinimumVersionRouteImport } from './routes/v1/app/minimum-version'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
+import { Route as V1BrowserExtensionExchangeRouteImport } from './routes/v1/browser-extension/exchange'
+import { Route as V1BrowserExtensionXRulesRouteImport } from './routes/v1/browser-extension/x-rules'
 import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
 import { Route as V1FeedbackWithdrawRouteImport } from './routes/v1/feedback/withdraw'
 import { Route as V1GithubInstallationTokensRouteImport } from './routes/v1/github/installation-tokens'
@@ -619,6 +621,18 @@ const V1AvatarsUserIdRoute = V1AvatarsUserIdRouteImport.update({
   path: '/v1/avatars/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1BrowserExtensionExchangeRoute =
+  V1BrowserExtensionExchangeRouteImport.update({
+    id: '/v1/browser-extension/exchange',
+    path: '/v1/browser-extension/exchange',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V1BrowserExtensionXRulesRoute =
+  V1BrowserExtensionXRulesRouteImport.update({
+    id: '/v1/browser-extension/x-rules',
+    path: '/v1/browser-extension/x-rules',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V1FeedbackSimilarRoute = V1FeedbackSimilarRouteImport.update({
   id: '/similar',
   path: '/similar',
@@ -1433,6 +1447,8 @@ export interface FileRoutesByFullPath {
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/browser-extension/exchange': typeof V1BrowserExtensionExchangeRoute
+  '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
@@ -1645,6 +1661,8 @@ export interface FileRoutesByTo {
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/browser-extension/exchange': typeof V1BrowserExtensionExchangeRoute
+  '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
@@ -1862,6 +1880,8 @@ export interface FileRoutesById {
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/browser-extension/exchange': typeof V1BrowserExtensionExchangeRoute
+  '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
@@ -2076,6 +2096,8 @@ export interface FileRouteTypes {
     | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/browser-extension/exchange'
+    | '/v1/browser-extension/x-rules'
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
@@ -2288,6 +2310,8 @@ export interface FileRouteTypes {
     | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/browser-extension/exchange'
+    | '/v1/browser-extension/x-rules'
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
@@ -2504,6 +2528,8 @@ export interface FileRouteTypes {
     | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/browser-extension/exchange'
+    | '/v1/browser-extension/x-rules'
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
@@ -2709,6 +2735,8 @@ export interface RootRouteChildren {
   V1AppMinimumVersionRoute: typeof V1AppMinimumVersionRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
+  V1BrowserExtensionExchangeRoute: typeof V1BrowserExtensionExchangeRoute
+  V1BrowserExtensionXRulesRoute: typeof V1BrowserExtensionXRulesRoute
   V1GithubInstallationTokensRoute: typeof V1GithubInstallationTokensRoute
   V1MobileAuthDevicesRoute: typeof V1MobileAuthDevicesRouteWithChildren
   V1MobileAuthLinkRoute: typeof V1MobileAuthLinkRoute
@@ -3370,6 +3398,20 @@ declare module '@tanstack/solid-router' {
       path: '/v1/avatars/$userId'
       fullPath: '/v1/avatars/$userId'
       preLoaderRoute: typeof V1AvatarsUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/browser-extension/exchange': {
+      id: '/v1/browser-extension/exchange'
+      path: '/v1/browser-extension/exchange'
+      fullPath: '/v1/browser-extension/exchange'
+      preLoaderRoute: typeof V1BrowserExtensionExchangeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/browser-extension/x-rules': {
+      id: '/v1/browser-extension/x-rules'
+      path: '/v1/browser-extension/x-rules'
+      fullPath: '/v1/browser-extension/x-rules'
+      preLoaderRoute: typeof V1BrowserExtensionXRulesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/feedback/similar': {
@@ -4612,6 +4654,8 @@ const rootRouteChildren: RootRouteChildren = {
   V1AppMinimumVersionRoute: V1AppMinimumVersionRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
+  V1BrowserExtensionExchangeRoute: V1BrowserExtensionExchangeRoute,
+  V1BrowserExtensionXRulesRoute: V1BrowserExtensionXRulesRoute,
   V1GithubInstallationTokensRoute: V1GithubInstallationTokensRoute,
   V1MobileAuthDevicesRoute: V1MobileAuthDevicesRouteWithChildren,
   V1MobileAuthLinkRoute: V1MobileAuthLinkRoute,

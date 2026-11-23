@@ -33,6 +33,8 @@ const RATE_WINDOW_MS = 15 * 60_000;
 const START_EMAIL_LIMIT = 5;
 const START_IP_LIMIT = 20;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
+/** A Chrome extension id: 32 letters from a to p. */
+const BROWSER_EXTENSION_ID_PATTERN = /^[a-p]{32}$/u;
 /** The app's loopback listener. The port is the one the app took. */
 const RETURN_PATTERN = /^http:\/\/(?:127\.0\.0\.1|localhost):[0-9]{2,5}\/company-sign-in$/u;
 /** The web app's return on this account service. The browser that started the flow holds its verifier. */
@@ -226,6 +228,8 @@ export class CompanySignInService {
   readonly #database: D1Database;
   readonly #secret: string | null;
   readonly #development: boolean;
+  /** `BROWSER_EXTENSION_IDS`: the published extensions that may get a sign-in from the web app. */
+  readonly #browserExtensionIds: ReadonlySet<string>;
   readonly #fetch: Fetch;
   readonly #now: () => number;
   readonly #flushSessionRevocations: () => Effect.Effect<void, RemoteFailure>;
@@ -237,7 +241,10 @@ export class CompanySignInService {
   readonly #joinServer: JoinServer;
 
   constructor(
-    bindings: Pick<WorkerBindings, "DB" | "COMPANY_SIGN_IN_SECRET" | "AUTH_EXPOSE_DEVELOPMENT_CODE">,
+    bindings: Pick<
+      WorkerBindings,
+      "DB" | "COMPANY_SIGN_IN_SECRET" | "AUTH_EXPOSE_DEVELOPMENT_CODE" | "BROWSER_EXTENSION_IDS"
+    >,
     options: {
       fetch?: Fetch;
       now?: () => number;
@@ -255,6 +262,12 @@ export class CompanySignInService {
     this.#secret = secret && new TextEncoder().encode(secret).byteLength >= 32 ? secret : null;
     // A development API signs in with a local test provider: plain HTTP on loopback, and no DNS.
     this.#development = bindings.AUTH_EXPOSE_DEVELOPMENT_CODE === "true";
+    this.#browserExtensionIds = new Set(
+      (bindings.BROWSER_EXTENSION_IDS ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => BROWSER_EXTENSION_ID_PATTERN.test(id)),
+    );
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#now = options.now ?? Date.now;
     this.#flushSessionRevocations = options.flushSessionRevocations ?? (() => Effect.void);
@@ -783,6 +796,46 @@ export class CompanySignInService {
     }
     // The company's provider decides who gets in, so a person who signs in joins with no invitation.
     yield* this.#join(flow.host_id, userId, { restore: false });
+    return { code: yield* this.#issueCode(userId, flow.client_challenge) };
+  });
+
+  /**
+   * A one-time code that gives the OpenBot browser extension a session of the web app's account. The
+   * web app asks for it when the person allows the extension, and sends it to the extension's own
+   * `https://<id>.chromiumapp.org/` address. The extension spends it with the verifier of
+   * `clientChallenge` at `/v1/browser-extension/exchange`, which is `exchange` with a device, as on the
+   * phone after a company sign-in. Only a listed extension gets a code; a development API takes any
+   * extension id, because an unpacked extension gets an id from its folder.
+   */
+  readonly issueBrowserExtensionCode = Effect.fn("CompanySignIn.issueBrowserExtensionCode")(function* (
+    this: CompanySignInService,
+    userId: string,
+    input: { extensionId: string; clientChallenge: string },
+  ): Effect.fn.Return<{ code: string }, CompanySignInFailure> {
+    const listed = this.#development || this.#browserExtensionIds.has(input.extensionId);
+    if (!BROWSER_EXTENSION_ID_PATTERN.test(input.extensionId) || !listed) {
+      return yield* new CompanySignInError(
+        403,
+        "browser_extension_not_allowed",
+        "This browser extension cannot sign in to OpenBot.",
+      );
+    }
+    if (!TOKEN_PATTERN.test(input.clientChallenge)) {
+      return yield* new CompanySignInError(
+        400,
+        "invalid_company_sign_in_code",
+        "The sign-in did not finish. Try again.",
+      );
+    }
+    return { code: yield* this.#issueCode(userId, input.clientChallenge) };
+  });
+
+  /** Stores the hash of a new one-time code for `exchange`, which the verifier of `clientChallenge` spends. */
+  readonly #issueCode = Effect.fn("CompanySignIn.issueCode")(function* (
+    this: CompanySignInService,
+    userId: string,
+    clientChallenge: string,
+  ): Effect.fn.Return<string, CompanySignInFailure> {
     const exchangeCode = randomToken(32);
     const codeHash = yield* sha256(exchangeCode).pipe(Effect.mapError(() => new CompanySignInOperationError({})));
     const now = this.#now();
@@ -792,10 +845,10 @@ export class CompanySignInService {
           `INSERT INTO company_sign_in_codes(code_hash, user_id, client_challenge, created_at, expires_at)
            VALUES (?, ?, ?, ?, ?)`,
         )
-        .bind(codeHash, userId, flow.client_challenge, now, now + CODE_TTL_MS)
+        .bind(codeHash, userId, clientChallenge, now, now + CODE_TTL_MS)
         .run(),
     );
-    return { code: exchangeCode };
+    return exchangeCode;
   });
 
   readonly #join = Effect.fn("CompanySignIn.join")(function* (

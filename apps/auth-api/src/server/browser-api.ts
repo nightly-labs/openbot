@@ -329,6 +329,16 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   }
   if (!token || !user) return failure(401, "sign_in_required", "Sign in is required.");
   if (path === "session" && request.method === "GET") return json({ user });
+  if (path === "extension/code" && request.method === "POST") {
+    // The person allowed the OpenBot browser extension on this account (`issueBrowserExtensionCode`).
+    const body = yield* readJsonObject(request);
+    const extensionId = yield* requiredString(body, "extensionId");
+    const clientChallenge = yield* requiredString(body, "clientChallenge");
+    return yield* services
+      .companySignIn()
+      .issueBrowserExtensionCode(user.id, { extensionId, clientChallenge })
+      .pipe(Effect.map(json), refuseWith(CompanySignInError));
+  }
   if (path === "v2/remote/hosts" && request.method === "GET")
     return json({ hosts: yield* services.remote.listHosts(user.id) });
   const [, removedHostId] = /^v2\/remote\/hosts\/([^/]+)$/u.exec(path) ?? [];

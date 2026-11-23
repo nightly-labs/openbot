@@ -146,6 +146,8 @@ interface HostServiceOptions {
   machine?: ForwardedApiOptions["machine"];
   backgroundProcesses?: ForwardedApiOptions["backgroundProcesses"];
   liveVoice?: ForwardedApiOptions["liveVoice"];
+  voiceTranscription?: ForwardedApiOptions["voiceTranscription"];
+  clientBrowser?: ForwardedApiOptions["clientBrowser"];
   hostedSites?: ForwardedApiOptions["hostedSites"];
   events?: ForwardedApiOptions["events"];
   agentImport?: ForwardedApiOptions["agentImport"];
@@ -520,6 +522,8 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.machine === undefined ? {} : { machine: options.machine }),
       ...(options.backgroundProcesses === undefined ? {} : { backgroundProcesses: options.backgroundProcesses }),
       ...(options.liveVoice === undefined ? {} : { liveVoice: options.liveVoice }),
+      ...(options.voiceTranscription === undefined ? {} : { voiceTranscription: options.voiceTranscription }),
+      ...(options.clientBrowser === undefined ? {} : { clientBrowser: options.clientBrowser }),
       ...(options.hostedSites === undefined ? {} : { hostedSites: options.hostedSites }),
       ...(options.events === undefined ? {} : { events: options.events }),
       ...(options.agentImport === undefined ? {} : { agentImport: options.agentImport }),

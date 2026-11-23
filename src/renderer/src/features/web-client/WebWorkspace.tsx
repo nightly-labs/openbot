@@ -208,6 +208,7 @@ import { backgroundWorkKey } from "../conversation/background-work-key";
 import "katex/contrib/copy-tex";
 // Copying a selection gives clean HTML, as on desktop.
 import "../../selection-copy";
+import { type CreationPreference, resolveCreationModel } from "@openbot/ui/features/agents/agent-creation-model";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { collectThreadMessageMatches, formatMessageTime, toAgentMessage } from "../../app-message-projection";
@@ -240,7 +241,6 @@ import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
-import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
 import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
 import { agentTakeoverTabIds } from "../agents/agent-thread-attention";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";

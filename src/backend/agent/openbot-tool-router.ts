@@ -143,6 +143,7 @@ import {
   listChannelsToolSchema,
 } from "./channel-agent-tools";
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
+import { type ClientBrowser, isClientBrowserCall, runClientBrowserTool, withClientTabs } from "./client-browser-tools";
 import { handleSetCommitCoAuthorTool, type SetCommitCoAuthor } from "./commit-co-author-tool";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { CRM_TOOL_NAMES, handleCrmTool } from "./crm-tool";
@@ -562,6 +563,8 @@ export interface OpenBotToolRouterOptions {
   vaultItems?: VaultItems | null | undefined;
   /** The agent, thread and turn of a running Codex subagent, by the subagent's own thread. */
   codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
+  /** The Chrome tabs that members share (`client-browser-v1`); null where this process has none. */
+  clientBrowser?: ClientBrowser | null | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -582,6 +585,7 @@ export class OpenBotToolRouter {
   readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
   readonly #browser: AgentBrowserHost;
   readonly #browserUploads: BrowserUploads;
+  readonly #clientBrowser: ClientBrowser | null;
   readonly #attachments: AttachmentGateway;
   readonly #channels: ChannelService;
   readonly #messaging: MessagingThreads;
@@ -652,6 +656,7 @@ export class OpenBotToolRouter {
     this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
     this.#browser = options.browser;
     this.#browserUploads = options.browserUploads;
+    this.#clientBrowser = options.clientBrowser ?? null;
     this.#attachments = options.attachments;
     this.#channels = options.channels;
     this.#messaging = options.messaging;
@@ -932,6 +937,31 @@ export class OpenBotToolRouter {
               client.respond(toolRequest.id, channelRefusal);
               return;
             }
+            // The browser tools read the repaired arguments, such as `tab_id`, so this check does too.
+            const callArgs = repairBrowserToolInput(toolRequest.params.tool, toolRequest.params.arguments).value;
+            // A tab of a member's own Chrome, or `open` there: only the people who requested the turn share one.
+            if (isClientBrowserCall(toolRequest.params.tool, callArgs)) {
+              const signal = toolRequest.signal;
+              if (signal?.aborted) return;
+              const agent = this.#conversation.requireKnownAgent(agentId);
+              const result = yield* runClientBrowserTool(
+                this.#clientBrowser,
+                this.#turnRequesters(agentId, toolRequest.params.turnId),
+                { id: agentId, name: agent.name },
+                toolRequest.params.tool,
+                callArgs,
+              ).pipe(
+                Effect.flatMap((chromeResult) =>
+                  toolRequest.params.tool === "screenshot"
+                    ? saveBrowserScreenshot(() => agent.workspacePath, callArgs, chromeResult)
+                    : Effect.succeed(chromeResult),
+                ),
+                Effect.raceFirst(requestAborted(signal)),
+              );
+              if (signal?.aborted || !client.running) return;
+              client.respond(toolRequest.id, this.#withBrowserPrimer(toolRequest.params.threadId, result));
+              return;
+            }
             if (toolRequest.params.tool === "request_takeover" || toolRequest.params.tool === "submit_secret") {
               const result = yield* this.#attention.surfaceBrowserTakeover(client, toolRequest);
               // A takeover of a stopped client ends with a cancel, and that process has nothing to answer.
@@ -953,8 +983,6 @@ export class OpenBotToolRouter {
               threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
               ownerAgentId: agentId,
             };
-            // The browser tools read the repaired arguments, such as `tab_id`, so this check does too.
-            const callArgs = repairBrowserToolInput(params.tool, params.arguments).value;
             const callTabId = isRecord(callArgs) && isString(callArgs.tabId) ? callArgs.tabId : undefined;
             if (this.#attention.browserTakeoverBlocks(agentId, params.threadId, callTabId)) {
               client.respond(toolRequest.id, {
@@ -992,6 +1020,8 @@ export class OpenBotToolRouter {
                     onUserControl: userControl,
                     cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
+                  if (params.tool === "list_tabs")
+                    return withClientTabs(result, this.#clientBrowser, this.#turnRequesters(agentId, params.turnId));
                   if (params.tool !== "screenshot") return result;
                   // The attachment gateway resolves the same workspace when the agent attaches the file.
                   const workspacePath = () => this.#conversation.requireKnownAgent(agentId).workspacePath;
@@ -1006,18 +1036,7 @@ export class OpenBotToolRouter {
               Effect.onInterrupt(() => Effect.sync(() => this.#browser.endControl(params.threadId, params.turnId))),
             );
             if (signal?.aborted || !client.running) return;
-            const threadId = toolRequest.params.threadId;
-            if (this.#browserSchemasGiven.has(threadId)) client.respond(toolRequest.id, result);
-            else {
-              this.#browserSchemasGiven.add(threadId);
-              client.respond(toolRequest.id, {
-                ...result,
-                contentItems: [
-                  ...result.contentItems,
-                  { type: "inputText", text: JSON.stringify({ browserTools: browserToolsPrimer() }) },
-                ],
-              });
-            }
+            client.respond(toolRequest.id, this.#withBrowserPrimer(toolRequest.params.threadId, result));
             return;
           }
           if (toolRequest.params.namespace === "openbot") {
@@ -3176,6 +3195,19 @@ export class OpenBotToolRouter {
           !this.#messaging.store.linkForThread(executionThreadId) &&
           !this.#channels.store.channelForThread(executionThreadId)))
     );
+  }
+
+  /** The first browser result of a thread also brings the schemas of the other browser tools. */
+  #withBrowserPrimer(threadId: string, result: DynamicToolResult): DynamicToolResult {
+    if (this.#browserSchemasGiven.has(threadId)) return result;
+    this.#browserSchemasGiven.add(threadId);
+    return {
+      ...result,
+      contentItems: [
+        ...result.contentItems,
+        { type: "inputText", text: JSON.stringify({ browserTools: browserToolsPrimer() }) },
+      ],
+    };
   }
 
   /**

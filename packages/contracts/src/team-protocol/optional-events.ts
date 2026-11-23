@@ -12,6 +12,7 @@ import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser
 // adapters reject them, so each transport asks here first and sends or decodes them as they are.
 import { type ChannelEvent, channelEvent } from "./channels-v1";
 import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
+import { type ClientBrowserCommandEvent, clientBrowserCommandEvent } from "./client-browser-v1";
 import { type CrmEvent, crmEvent } from "./crm-v1";
 import { type HostAppearanceEvent, hostAppearanceEvent } from "./host-appearance-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
@@ -35,6 +36,7 @@ export type OptionalTeamEvent =
   | AgentNotificationLevelsEvent
   | AgentSessionSettingsEvent
   | ChatColorsEvent
+  | ClientBrowserCommandEvent
   | BrowserPageStateEvent
   | BrowserProfilesEvent
   | BrowserUserControlEvent
@@ -73,6 +75,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentNotificationLevelsEvent(value) ??
     agentSessionSettingsEvent(value) ??
     chatColorsEvent(value) ??
+    clientBrowserCommandEvent(value) ??
     browserPageStateEvent(value) ??
     browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??

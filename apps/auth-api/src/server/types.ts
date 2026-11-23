@@ -22,6 +22,12 @@ export interface WorkerBindings {
   /** Checked by the bug report route only, so a Worker without it keeps its other routes. */
   FEEDBACK_RATE_LIMITER?: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
+  /**
+   * The ids of the published OpenBot browser extensions, separated by commas. Only they get a sign-in
+   * from the web app (`CompanySignInService.issueBrowserExtensionCode`). Unset: none, unless the API
+   * exposes development codes.
+   */
+  BROWSER_EXTENSION_IDS?: string;
   EMAIL_SMTP_HOST?: string;
   EMAIL_SMTP_PORT?: string;
   EMAIL_SMTP_USERNAME?: string;

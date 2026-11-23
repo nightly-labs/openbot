@@ -1,6 +1,6 @@
 import type { CreateAgentInput } from "@openbot/contracts/ipc";
+import { createAgentInitialMessage } from "@openbot/ui/features/agents/agent-initial-message";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
-import { createAgentInitialMessage } from "./agent-initial-message";
 
 /** A new agent asked for from a short draft, such as the routine canvas's card. */
 export type NewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue" | "avatarColor"> &

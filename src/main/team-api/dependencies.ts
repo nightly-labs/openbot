@@ -16,6 +16,7 @@ import type { BrowserProfileService } from "../browser-profile-service";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
+import type { ClientBrowserHub } from "../client-browser-hub";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { WorkflowGitHubDirectory } from "../github-rest";
@@ -72,6 +73,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
   VoiceLiveEvent,
+  VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
 import type { AgentService } from "../../backend/agent-service";
@@ -106,6 +108,7 @@ import type { RemoteScreenGateway } from "../remote-screen-gateway";
 import type { SignInRelayHost } from "../sign-in-relay-host";
 import type { TeamStore } from "../team-store";
 import type { VaultService } from "../vault-service";
+import type { VoiceOperationError } from "../voice-model-service";
 
 type TeamApiAgentMethods = Pick<
   AgentService,
@@ -765,6 +768,17 @@ export type TeamApiLiveVoice = Pick<AgentService, "startLiveVoice" | "stopLiveVo
   subscribe(listener: (event: VoiceLiveEvent, memberId: string | null) => void): () => void;
 };
 
+/**
+ * `voice-transcription-v1`: dictation for a member, with the speech recognition of this host. Fails
+ * with a fixed sentence when the host has no recognizer ready.
+ */
+export interface TeamApiVoiceTranscription {
+  transcribe(audio: Uint8Array): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError>;
+}
+
+/** `client-browser-v1`: the Chrome tabs that members share with the agents of this host. */
+export type TeamApiClientBrowser = Pick<ClientBrowserHub, "setPresence" | "resolve" | "sessionEnded" | "subscribe">;
+
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
@@ -793,6 +807,8 @@ export interface TeamApiOptions {
   machine?: TeamApiMachine;
   backgroundProcesses?: TeamApiBackgroundProcesses;
   liveVoice?: TeamApiLiveVoice;
+  voiceTranscription?: TeamApiVoiceTranscription;
+  clientBrowser?: TeamApiClientBrowser;
   hostedSites?: TeamApiHostedSites;
   agentImport?: TeamApiAgentImport;
   hermesImport?: TeamApiHermesImport;

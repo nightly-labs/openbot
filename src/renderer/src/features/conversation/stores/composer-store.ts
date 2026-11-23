@@ -1,6 +1,6 @@
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
+import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
 import { createMemo } from "solid-js";
-import { appendVoiceTranscript } from "../../../voice-recording";
 import { EMPTY_DRAFT, rowAttachments, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";

@@ -7,6 +7,7 @@
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import { resolveCreationModel } from "@openbot/ui/features/agents/agent-creation-model";
 import type { DiagramModelChoice } from "@openbot/ui/features/diagrams/DiagramNewAgentCard";
 import { useText } from "@openbot/ui/text";
 import { createMemo, Show } from "solid-js";
@@ -14,7 +15,6 @@ import { useLayout } from "../../layout";
 import { useNavigation } from "../../navigation";
 import { useProviders } from "../../providers";
 import { useAgentActions } from "../agents/agent-actions";
-import { resolveCreationModel } from "../agents/agent-creation-model";
 import { useAgents } from "../agents/agents-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useSetup } from "../onboarding/onboarding-context";

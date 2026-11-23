@@ -217,7 +217,10 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "open",
     description: "Open an HTTP(S) URL in a new persistent private-browser tab; returns its first snapshot.",
-    shape: { url: requiredString(INPUT_LIMITS.browserUrl) },
+    shape: {
+      url: requiredString(INPUT_LIMITS.browserUrl),
+      browser: z.literal("chrome").optional(),
+    },
   }),
   browserTool({
     name: "list_tabs",

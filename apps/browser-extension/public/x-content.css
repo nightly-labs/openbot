@@ -1,0 +1,154 @@
+/* The OpenBot look of X's reply button (`x-content.ts`). Chrome adds this file to X with the content
+   script, so the page's rules cannot block it.
+
+   When a reply mentions @OpenBot_, the button turns from X's blue into the OpenBot gradient (blue,
+   violet, the OpenBot pink) and grows to show the OpenBot mark before its label. While it waits, the
+   gradient moves slowly. When the mention goes, it runs the same way back. */
+html body [data-openbot-x] {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  flex-direction: row;
+  align-items: center;
+  border-color: transparent;
+  color: rgb(255 255 255);
+  /* The colour under the round edge of the gradient: its pink end. */
+  background-color: rgb(236 72 153);
+  background-image: linear-gradient(
+    110deg,
+    rgb(29 155 240) 0%,
+    rgb(29 155 240) 22%,
+    rgb(139 92 246) 52%,
+    rgb(236 72 153) 80%,
+    rgb(244 114 182) 100%
+  );
+  background-position: 100% 0;
+  /* X's button has a clear border: the gradient covers it too, once, so no copy shows at an edge. */
+  background-origin: border-box;
+  background-repeat: no-repeat;
+  background-size: 320% 100%;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 6px 20px -6px rgb(236 72 153 / 0.65);
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 300ms ease;
+}
+
+html body [data-openbot-x] * {
+  color: rgb(255 255 255);
+}
+
+/* The OpenBot mark. Its width grows from nothing, so the button grows with it. */
+html body [data-openbot-x]::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-inline: -2px 6px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Crect width='240' height='240' rx='50' fill='%23fff'/%3E%3Cpolyline points='43.55 93.61 64.69 81.41 36.48 108.04 79.67 83.11 35.93 122.88 91.58 90.74 38.9 132.69 97.66 98.76 42.44 138.88 100.43 105.4 46.9 143.83 101.97 112.04 55.08 149.51 101.83 122.52 73.01 152.43 94.14 140.23' fill='none' stroke='%23a24ed8' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpolyline points='145.65 93.61 166.79 81.41 140.83 101.52 175.58 81.46 138.3 109.53 183.18 83.63 137.55 117.43 189.67 87.33 139.67 129.39 197.88 95.78 142.92 136.32 201.52 102.48 149.03 143.86 204.07 112.08 159.14 150.37 203.51 124.75 169.28 152.61 199.82 134.98' fill='none' stroke='%23a24ed8' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+}
+
+html body [data-openbot-x="armed"] {
+  animation:
+    openbot-x-tint 720ms cubic-bezier(0.4, 0, 0.2, 1) both,
+    openbot-x-drift 3.2s 720ms ease-in-out infinite alternate;
+}
+
+html body [data-openbot-x="armed"]::before {
+  animation: openbot-x-grow 560ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* A soft pink ring that leaves the button now and then. */
+html body [data-openbot-x="armed"]::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  border: 1.5px solid rgb(236 72 153 / 0.6);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: openbot-x-ring 2.4s 720ms ease-out infinite both;
+}
+
+html body [data-openbot-x="armed"]:active {
+  transform: scale(0.96);
+}
+
+html body [data-openbot-x="leaving"] {
+  animation: openbot-x-untint 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+html body [data-openbot-x="leaving"]::before {
+  animation: openbot-x-shrink 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes openbot-x-tint {
+  from {
+    background-position: 0% 0;
+    box-shadow: 0 0 0 0 rgb(236 72 153 / 0);
+  }
+}
+
+@keyframes openbot-x-untint {
+  to {
+    background-position: 0% 0;
+    box-shadow: 0 0 0 0 rgb(236 72 153 / 0);
+  }
+}
+
+@keyframes openbot-x-drift {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 70% 0;
+  }
+}
+
+@keyframes openbot-x-grow {
+  from {
+    width: 0;
+    margin-inline: 0;
+    opacity: 0;
+    transform: scale(0.3) rotate(-25deg);
+  }
+  60% {
+    opacity: 1;
+  }
+}
+
+@keyframes openbot-x-shrink {
+  to {
+    width: 0;
+    margin-inline: 0;
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+@keyframes openbot-x-ring {
+  from {
+    opacity: 0;
+    transform: scale(1);
+  }
+  10% {
+    opacity: 0.85;
+  }
+  60%,
+  to {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body [data-openbot-x],
+  html body [data-openbot-x]::before,
+  html body [data-openbot-x]::after {
+    animation: none;
+  }
+}

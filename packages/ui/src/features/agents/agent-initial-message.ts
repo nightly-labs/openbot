@@ -1,7 +1,7 @@
 import { agentWelcomeMessage } from "@openbot/contracts/agent-welcome";
 import { appLanguageOption } from "@openbot/i18n/languages";
-import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
-import { currentText } from "@openbot/ui/text";
+import { currentText } from "../../text";
+import type { FirstAgentDraft } from "./FirstAgentSetup";
 
 /**
  * The first message of a new agent. A host with `agent-welcome-v1` hides it and shows the agent's

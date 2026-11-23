@@ -1171,6 +1171,57 @@ another device, the host sends the provider's sign-in link, and for Codex, Grok,
 one-time code, to that computer or browser, which shows them and opens the link only when the admin
 asks. The provider's CLI on the host receives the login; no token travels to the admin.
 
+## Browser extension
+
+The OpenBot browser extension (`apps/browser-extension`) signs in through openbot.run. It opens the
+web app in the browser's sign-in window; when you are signed in there and press **Allow**, the web
+app asks the account service for a one-time code and sends it only to the extension's own address,
+which the browser gives to that extension alone. The code lasts two minutes, works once, and works
+only with a secret that the extension kept, so a page that sees the code cannot use it. The extension
+can also sign in with an email code, as the phone app does. Either way, the session shows in your account's device list as "Chrome
+extension", and you can end it there or with **Sign out** in the extension. The extension keeps the
+session, a random id for this browser, the server you chose, the Team protocol of each server and
+the servers' public keys in the browser's extension storage, which only the extension can read.
+Sign-out removes the session and the chosen server. It keeps no chats, agents or files: it reads
+them from the server through the same encrypted connection as the web app each time the side panel
+opens, and they go when the panel closes.
+
+Dictation in the extension uses the microphone only while you record. The recording goes through the
+same encrypted connection to your server, and the server turns it into text with its own speech
+recognition (Settings → Voice on that server: a model on the server, or the voice service that its owner
+set up there). The server keeps no recording. The text goes into your draft, and nothing is sent until
+you press Send. The extension never sends the recording to OpenBot or to a speech service itself.
+
+On X (x.com and twitter.com), the extension runs a script on the page. It reads only the reply that
+you write. When the reply mentions @OpenBot_ and your server has the X Desk agent, the reply button
+changes. When you click it, the script reads the post that you answer, the posts above it in the
+conversation and the rest of the author's thread (names, @handles, times, addresses, text and picture
+addresses), but not the replies of other people. X posts your reply at once, and the extension sends
+the post with your reply's words through the encrypted connection to your own server, as a message to X
+Desk. When your server does not answer, the extension keeps the post in the browser's extension storage
+on this computer, also over a browser restart, and tries again for up to 7 days (23 hours when an
+earlier attempt may have reached the server); then it deletes the post and tells you with a browser
+notification. Nothing goes to OpenBot,
+and nothing is sent when you do not click. To find the parts of the page, the extension
+asks openbot.run once an hour for the newest list of page selectors; that request carries only the hash
+of the list that it has. Except for shared tabs (below), the extension does not read your other tabs or
+the other pages you visit.
+
+Shared tabs are off until you press **Share tabs with agents** in the side panel. Then the extension
+makes a Chrome tab group named "OpenBot" with the current tab, and you can drag more tabs into it. Only
+the tabs of that group are shared, and only with your own agents, in the turns that you started. The
+extension tells your server the address, title and active state of each tab in the group, through the
+same encrypted connection, when it changes and every 30 seconds. When an agent acts on a site for the
+first time, the side panel asks you (Allow once, Always for this site, Deny); the sites that you allow
+always stay in the browser's extension storage until you remove them in the panel. The extension
+always asks again before an agent types into a password or payment field, downloads a file, or acts
+on a page that signs in to an app or gives an app access. To read and use a tab, the extension uses
+Chrome's debugger on that tab, and Chrome shows its own bar while it does. What an agent reads goes
+to your server: the page text and the list of its buttons, links and fields (not the values of
+password or payment fields), screenshots of the visible page, and addresses. Text that an agent types
+goes from your server to the page. Nothing goes to OpenBot. **Stop sharing** ends the group; your
+server forgets the shared tabs at once, or at the latest 75 seconds after the extension stops.
+
 ## Other network connections
 
 Network traffic can also occur when:

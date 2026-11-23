@@ -258,6 +258,20 @@ when the host advertises it, the user turned on GPT live voice in Settings → V
 has WebRTC (`react-native-webrtc`); otherwise the phone's own voice conversation runs. The phone sends
 a voice name only when it is one of the contract. The web client does not use it yet.
 
+### Dictation for a member
+
+`voice-transcription-v1` (`team-protocol/voice-transcription-v1.ts`) lets any member have the host turn
+a short recording into text. `POST /v1/voice/transcribe` takes the raw body (over WebRTC, a file upload):
+a WAV file of 16 kHz mono 16-bit PCM, at most `VOICE_AUDIO_LIMITS.maximumWavBytes` (120 seconds). The
+host answers `{ text }`; the text goes to no agent. The host uses its own speech recognition, as a video
+transcription does (`application-services.ts`): its voice server when it dictates, else the model of
+Settings → Voice when it is ready (a model on the host, or Groq with the host's key). When that model is
+a local model that is not on the host, the request starts its download and answers 409
+`error.voice.host.preparing`; any other missing recognizer is 409 `error.voice.host.notSetUp`. A WAV that
+is not valid is 400, and a longer one is 413. The host advertises the capability to protocol 10 clients
+only. The browser extension uses it for the mic of its composer; the desktop on a joined server
+transcribes on its own computer, and the web client and the phone do not use it yet.
+
 ### Agent import from a joined server
 
 `agent-import-v1` lets any member, not only an owner or admin, import a Grok Bot export into the host.

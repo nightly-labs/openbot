@@ -1,0 +1,842 @@
+import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import {
+  type AgentStatus,
+  type AgentTask,
+  type AvatarColor,
+  CHANNEL_CHATS_CAPABILITY,
+  type ChannelDraft,
+  type ChannelMessage,
+  type ChannelSummary,
+  type ChannelTask,
+  type ClientAgentModelOption,
+  type ClientAgentSummary,
+  type ConversationMessage,
+  type ConversationSnapshot,
+  isAgentStatus,
+  isClientAgentModelOption,
+  isClientAgentSummary,
+  isConversationReadState,
+  isConversationWithReadState,
+  isQueuedMessageReceipt,
+  isSidebarLayoutSnapshot,
+  type SidebarLayoutSnapshot,
+  sidebarFolderAncestors,
+  sidebarFolderParents,
+  sidebarFolderTreeOrder,
+} from "@openbot/contracts/ipc";
+import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_COLORS_CAPABILITY,
+  AGENT_COLORS_ROUTES,
+  decodeAgentColorsSnapshot,
+} from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
+import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  SIDEBAR_FOLDERS_CAPABILITY,
+  SIDEBAR_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/sidebar-folders-v1";
+import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
+import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { VOICE_TRANSCRIPTION_CAPABILITY } from "@openbot/contracts/team-protocol/voice-transcription-v1";
+import { runTeamEffect } from "@openbot/team-client";
+import type { RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
+import { readSidebarPins, setAgentColor } from "@openbot/team-client/team-admin-requests";
+import {
+  listAgentTasks,
+  markAgentThreadRead,
+  readAgentTask,
+  sendAgentTaskMessage,
+  startAgentTask,
+  type TeamApiRequest,
+  teamChannelsApi,
+} from "@openbot/team-client/team-api-requests";
+import { createAgentInitialMessage } from "@openbot/ui/features/agents/agent-initial-message";
+import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
+import { currentText } from "@openbot/ui/text";
+import { createStore, flush } from "solid-js";
+import { createAgentSettingsApi } from "./agent-settings";
+import { createAttachmentMedia, type HostFile } from "./attachment-media";
+
+/** The open chat: the agent's main chat (`taskId` null), one of its threads, or a thread not started yet. */
+export interface OpenChat {
+  agentId: string;
+  taskId: string | null;
+  /** A new thread before its first message. Sending starts it. */
+  draftThread: boolean;
+  status: "loading" | "ready" | "failed";
+  messages: ConversationMessage[];
+  threadId: string | null;
+  revision: number;
+  activeTurnId: string | null;
+  sending: boolean;
+  error: string | null;
+}
+
+/** A pinned chat of the member: an agent or a channel. */
+export interface SidebarPin {
+  kind: "agent" | "channel";
+  id: string;
+}
+
+/** The open channel chat, read as pages of `channel-chats-v1`. */
+export interface OpenChannel {
+  channelId: string;
+  status: "loading" | "ready" | "failed";
+  messages: ChannelMessage[];
+  /** The newest message of the page, which a read mark names. */
+  throughSequence: number;
+  /** The channel's tasks, for the agents that work now. */
+  tasks: ChannelTask[];
+  sending: boolean;
+  error: string | null;
+}
+
+/** A folder of the sidebar layout, which every client of the server shares. */
+export interface WorkspaceFolder {
+  id: string;
+  name: string;
+  /** 0 at the top of the list; a folder in a folder is 1, and so on. */
+  depth: number;
+}
+
+export interface WorkspaceState {
+  status: "loading" | "ready" | "failed";
+  error: string | null;
+  agents: ClientAgentSummary[];
+  /** `agent-colors-v1`: the exact colour of an agent that has one. */
+  colors: Record<string, AvatarColor>;
+  /** The member's pinned agents and channels, in their order (`sidebar-pins-v1`). Empty on an older host. */
+  pins: SidebarPin[];
+  /** Unread messages in each agent's main chat. */
+  unread: Record<string, number>;
+  /** The threads of each agent that the panel read, newest first. */
+  threads: Record<string, AgentTask[]>;
+  /** The server's sidebar folders in tree order, with how deep each one is. */
+  folders: WorkspaceFolder[];
+  /** The folder of each agent or channel that is in one. */
+  folderOf: Record<string, string>;
+  /** The channels that are not archived (`channel-chats-v1`). Empty on a host without channels. */
+  channels: ChannelSummary[];
+  channel: OpenChannel | null;
+  /** This account's member id on the server (`/v1/me`), which marks its own messages in a channel. */
+  memberId: string | null;
+  chat: OpenChat | null;
+}
+
+export const decodeAgents = guardedListDecoder(isClientAgentSummary, "agents");
+const decodeModels = guardedListDecoder(isClientAgentModelOption, "models");
+/** Every host has the folders of the released protocol (`team-protocol/v1.ts`); the name has no constant. */
+const SIDEBAR_LAYOUT_CAPABILITY = "sidebar-layout";
+/** As the phone app: at most one read of the channels in this time, and one after the last change. */
+const CHANNEL_READ_INTERVAL_MS = 250;
+
+/** Item types of an answer that the chat shows: its text, and the files and images that an agent sends or makes. */
+const SHOWN_ITEM_TYPES: ReadonlySet<string | undefined> = new Set([
+  undefined,
+  "agentMessage",
+  "agent_attachment",
+  "image_generation",
+]);
+
+/**
+ * A row of the chat: the person's messages and the agent's answers, with their files. Tool steps and
+ * notes stay in the app.
+ */
+export function isChatMessage(message: ConversationMessage): boolean {
+  const files = (message.attachments?.length ?? 0) > 0;
+  if (message.author === "user") return message.text.trim().length > 0 || files;
+  if (message.author !== "assistant" && message.author !== "agent") return false;
+  return SHOWN_ITEM_TYPES.has(message.itemType) && (message.text.length > 0 || files);
+}
+
+/**
+ * The state of one server, as the phone app keeps it: agents and their looks, pins, unread counts, the
+ * open chat and its threads. Every read goes through the connection's `request`; events from the host
+ * keep it current, and a streamed answer is appended as it comes, as in the web client.
+ */
+export function createWorkspace(
+  request: TeamApiRequest,
+  capabilities: readonly string[],
+  download: (attachmentId: string) => Promise<HostFile>,
+  transcribe: (wav: Uint8Array) => Promise<string>,
+) {
+  const media = createAttachmentMedia(download);
+  const [state, setState] = createStore<WorkspaceState>({
+    status: "loading",
+    error: null,
+    agents: [],
+    colors: {},
+    pins: [],
+    unread: {},
+    threads: {},
+    folders: [],
+    folderOf: {},
+    channels: [],
+    channel: null,
+    memberId: null,
+    chat: null,
+  });
+  const has = (capability: string) => capabilities.includes(capability);
+  const raw = (method: string, path: string, body?: TeamProtocolV2Json) =>
+    request(method, path, (value) => value, body);
+  let readsTimer: ReturnType<typeof setTimeout> | null = null;
+  let chatGeneration = 0;
+  /** A create that failed keeps its id for a retry of the same form, so the host does not make it twice. */
+  const createOperationId = retryOperationIds(() => crypto.randomUUID());
+  const channelsApi = has(CHANNEL_CHATS_CAPABILITY) ? teamChannelsApi(request) : null;
+  const changedChannels = new Set<string>();
+  let channelTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function readReads(): Promise<void> {
+    const value = await raw("GET", TEAM_API_ROUTES.agents.conversationReads);
+    const unread: Record<string, number> = {};
+    if (isDynamicRecord(value))
+      for (const [agentId, read] of Object.entries(value))
+        if (isConversationReadState(read)) unread[agentId] = read.unreadCount;
+    setState((draft) => {
+      draft.unread = unread;
+    });
+  }
+  /** Events come in bursts: read the counts once after the burst. */
+  function refreshReadsSoon(): void {
+    if (readsTimer) clearTimeout(readsTimer);
+    readsTimer = setTimeout(() => {
+      readsTimer = null;
+      void readReads().catch(() => undefined);
+    }, 400);
+  }
+
+  function decodeLayout(value: unknown): SidebarLayoutSnapshot {
+    if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("extension.connection.requestFailed"));
+    return value;
+  }
+
+  /** Shows a layout: its folders in tree order, and the folder of each agent. */
+  function showLayout(layout: SidebarLayoutSnapshot): void {
+    const parents = sidebarFolderParents(layout);
+    const sections = new Map(layout.sections.map((section) => [section.id, section]));
+    // The people and unassigned sections are in `order` too; they are not folders.
+    const folders = sidebarFolderTreeOrder(layout.order, parents).flatMap((id) => {
+      const section = sections.get(id);
+      return section ? [{ id, name: section.name, depth: sidebarFolderAncestors(parents, id).length }] : [];
+    });
+    setState((draft) => {
+      draft.folders = folders;
+      draft.folderOf = Object.fromEntries(
+        Object.entries(layout.agentAssignments).filter(([, sectionId]) => sections.has(sectionId)),
+      );
+    });
+  }
+
+  /** The folders of the sidebar. A host with `sidebar-folders-v1` has nested folders on its own routes. */
+  async function readLayout(): Promise<void> {
+    if (!has(SIDEBAR_LAYOUT_CAPABILITY)) return;
+    showLayout(
+      has(SIDEBAR_FOLDERS_CAPABILITY)
+        ? await request("POST", SIDEBAR_FOLDERS_ROUTES.read, decodeLayout, {})
+        : await request("GET", TEAM_API_ROUTES.sidebarLayout.state, decodeLayout),
+    );
+  }
+
+  /** Makes a folder at the top of the list. */
+  async function createFolder(name: string): Promise<void> {
+    showLayout(
+      await request(
+        "POST",
+        has(SIDEBAR_FOLDERS_CAPABILITY) ? SIDEBAR_FOLDERS_ROUTES.actions : TEAM_API_ROUTES.sidebarLayout.actions,
+        decodeLayout,
+        { type: "create", name },
+      ),
+    );
+  }
+
+  async function readMemberId(): Promise<void> {
+    if (!channelsApi) return;
+    const value = await raw("GET", TEAM_API_ROUTES.me);
+    const id = isDynamicRecord(value) && isString(value.id) ? value.id : null;
+    setState((draft) => {
+      draft.memberId = id;
+    });
+  }
+
+  async function readChannels(): Promise<void> {
+    if (!channelsApi) return;
+    const channels = await channelsApi.listChannels();
+    setState((draft) => {
+      draft.channels = channels.filter((channel) => !channel.archived);
+    });
+  }
+
+  /** Reads the open channel again, and marks it read up to its newest message. */
+  async function reloadChannel(): Promise<void> {
+    const open = state.channel;
+    if (!channelsApi || !open) return;
+    const { channelId } = open;
+    try {
+      const page = await channelsApi.readChannel({ channelId });
+      if (state.channel?.channelId !== channelId) return;
+      const read = page.throughSequence > open.throughSequence;
+      setState((draft) => {
+        if (!draft.channel) return;
+        draft.channel.messages = page.messages;
+        draft.channel.throughSequence = page.throughSequence;
+        draft.channel.tasks = page.tasks;
+        draft.channel.status = "ready";
+        const row = draft.channels.find((channel) => channel.id === channelId);
+        if (row) row.unreadCount = 0;
+      });
+      if (read)
+        await channelsApi
+          .channelCommand({
+            type: "read",
+            operationId: crypto.randomUUID(),
+            channelId,
+            throughSequence: page.throughSequence,
+          })
+          .catch(() => undefined);
+    } catch (error) {
+      if (state.channel?.channelId !== channelId) return;
+      setState((draft) => {
+        if (!draft.channel) return;
+        draft.channel.status = "failed";
+        draft.channel.error = error instanceof Error ? error.message : currentText().t("extension.chat.loadFailed");
+      });
+    }
+  }
+
+  function openChannel(channelId: string): void {
+    setState((draft) => {
+      draft.channel = {
+        channelId,
+        status: "loading",
+        messages: [],
+        throughSequence: -1,
+        tasks: [],
+        sending: false,
+        error: null,
+      };
+    });
+    flush();
+    void reloadChannel();
+  }
+
+  function closeChannel(): void {
+    setState((draft) => {
+      draft.channel = null;
+    });
+  }
+
+  /** Sends to the open channel. A leading @name sends the message to that agent, as on the desktop. */
+  async function sendToChannel(text: string): Promise<void> {
+    const open = state.channel;
+    if (!channelsApi || !open || open.sending) return;
+    const { channelId } = open;
+    const operationId = crypto.randomUUID();
+    const channel = state.channels.find((entry) => entry.id === channelId);
+    const named = /^@(\S+)/.exec(text)?.[1]?.toLowerCase();
+    const recipient = named
+      ? (channel?.members ?? [])
+          .map((member) => state.agents.find((agent) => agent.id === member.agentId))
+          .find((agent) => agent?.name.replace(/\s+/g, "").toLowerCase() === named)
+      : undefined;
+    setState((draft) => {
+      if (!draft.channel) return;
+      draft.channel.sending = true;
+      draft.channel.error = null;
+      // Shown until the host's copy of the channel arrives.
+      draft.channel.messages.push({
+        id: `pending-${operationId}`,
+        channelId,
+        sequence: Number.MAX_SAFE_INTEGER,
+        author: { kind: "member", id: state.memberId ?? "", name: "" },
+        taskId: null,
+        superseded: false,
+        message: {
+          id: `pending-${operationId}`,
+          author: "user",
+          source: "user",
+          text,
+          createdAt: new Date().toISOString(),
+          status: "completed",
+        },
+      });
+    });
+    try {
+      await channelsApi.channelCommand({
+        type: "send",
+        operationId,
+        channelId,
+        text,
+        recipientAgentId: recipient?.id ?? null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      });
+      await reloadChannel();
+    } catch (error) {
+      if (state.channel?.channelId !== channelId) return;
+      setState((draft) => {
+        if (!draft.channel) return;
+        draft.channel.messages = draft.channel.messages.filter((entry) => entry.id !== `pending-${operationId}`);
+        draft.channel.error = error instanceof Error ? error.message : currentText().t("extension.chat.sendFailed");
+      });
+      throw error;
+    } finally {
+      setState((draft) => {
+        if (draft.channel?.channelId === channelId) draft.channel.sending = false;
+      });
+    }
+  }
+
+  /** Makes a channel, as the desktop dialog does, and returns its id. */
+  async function createChannel(draft: ChannelDraft): Promise<string> {
+    if (!channelsApi) throw new Error(currentText().t("extension.create.failed"));
+    const channel = await channelsApi.channelCommand({
+      type: "save",
+      operationId: crypto.randomUUID(),
+      channelId: crypto.randomUUID(),
+      draft,
+    });
+    setState((next) => {
+      if (!next.channels.some((entry) => entry.id === channel.id))
+        next.channels.unshift({ ...channel, unreadCount: 0, activeTasks: 0, lastMessage: null });
+    });
+    void readChannels().catch(() => undefined);
+    return channel.id;
+  }
+
+  /** The host tells each change of a channel, also each part of a streamed answer: read once per burst. */
+  function channelChangedSoon(channelId: string): void {
+    changedChannels.add(channelId);
+    if (channelTimer) return;
+    channelTimer = setTimeout(() => {
+      channelTimer = null;
+      const open = state.channel && changedChannels.has(state.channel.channelId);
+      changedChannels.clear();
+      void readChannels().catch(() => undefined);
+      if (open) void reloadChannel();
+    }, CHANNEL_READ_INTERVAL_MS);
+  }
+
+  async function load(): Promise<void> {
+    try {
+      const [agents, colors, pins] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agents.all, decodeAgents),
+        has(AGENT_COLORS_CAPABILITY)
+          ? request("POST", AGENT_COLORS_ROUTES.read, decodeAgentColorsSnapshot, {}).then((value) => value.agents)
+          : Promise.resolve([]),
+        has(SIDEBAR_PINS_CAPABILITY)
+          ? runTeamEffect(readSidebarPins(request)).then((value) => value.items)
+          : Promise.resolve([]),
+        readReads(),
+        // The folders only group the list: without them the panel still shows every agent.
+        readLayout().catch(() => undefined),
+        readChannels().catch(() => undefined),
+        readMemberId().catch(() => undefined),
+      ]);
+      setState((draft) => {
+        draft.agents = agents;
+        draft.colors = Object.fromEntries(colors.map((entry) => [entry.agentId, entry.color]));
+        draft.pins = pins.map((pin) => ({ kind: pin.kind, id: pin.id }));
+        draft.status = "ready";
+      });
+    } catch (error) {
+      setState((draft) => {
+        draft.status = "failed";
+        draft.error = error instanceof Error ? error.message : currentText().t("extension.connection.requestFailed");
+      });
+    }
+  }
+
+  function setMessages(snapshot: ConversationSnapshot): void {
+    setState((draft) => {
+      const chat = draft.chat;
+      if (!chat) return;
+      chat.messages = snapshot.messages;
+      chat.threadId = snapshot.threadId;
+      chat.revision = snapshot.revision;
+      chat.activeTurnId = snapshot.activeTurnId;
+      chat.status = "ready";
+    });
+  }
+
+  async function readMainChat(agentId: string): Promise<ConversationSnapshot> {
+    if (!has("conversation-pagination")) {
+      const value = await raw("GET", TEAM_API_ROUTES.agent.conversation(agentId));
+      if (!isConversationWithReadState(value)) throw new Error(currentText().t("extension.connection.requestFailed"));
+      return value;
+    }
+    const value = await raw("GET", `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`);
+    if (!isConversationWithReadState(value)) throw new Error(currentText().t("extension.connection.requestFailed"));
+    return value;
+  }
+
+  /** Reads the open chat again, and marks it read up to its last message. */
+  async function reloadChat(): Promise<void> {
+    const chat = state.chat;
+    if (!chat || chat.draftThread) return;
+    const generation = chatGeneration;
+    const { agentId, taskId } = chat;
+    try {
+      const snapshot =
+        taskId === null
+          ? await readMainChat(agentId)
+          : await runTeamEffect(readAgentTask(request, { agentId, taskId }));
+      if (generation !== chatGeneration) return;
+      setMessages(snapshot);
+      void markRead(agentId, taskId, snapshot.messages.at(-1)?.id ?? null);
+    } catch (error) {
+      if (generation !== chatGeneration) return;
+      setState((draft) => {
+        if (!draft.chat) return;
+        draft.chat.status = "failed";
+        draft.chat.error = error instanceof Error ? error.message : currentText().t("extension.chat.loadFailed");
+      });
+    }
+  }
+
+  async function markRead(agentId: string, taskId: string | null, throughMessageId: string | null) {
+    if (!throughMessageId) return;
+    if (taskId === null) {
+      const value = await raw("POST", TEAM_API_ROUTES.agent.conversationRead(agentId), { throughMessageId }).catch(
+        () => null,
+      );
+      if (!isConversationReadState(value)) return;
+      const count = value.unreadCount;
+      setState((draft) => {
+        draft.unread[agentId] = count;
+      });
+    } else if (has(AGENT_THREAD_READS_CAPABILITY)) {
+      await runTeamEffect(markAgentThreadRead(request, { agentId, taskId, throughMessageId })).catch(() => undefined);
+    }
+  }
+
+  async function loadThreads(agentId: string): Promise<void> {
+    if (!has(AGENT_TASKS_CAPABILITY)) return;
+    const snapshot = await runTeamEffect(listAgentTasks(request, agentId));
+    setState((draft) => {
+      draft.threads[agentId] = snapshot.tasks;
+    });
+  }
+
+  function openChat(agentId: string, taskId: string | null): void {
+    chatGeneration += 1;
+    setState((draft) => {
+      draft.chat = {
+        agentId,
+        taskId,
+        draftThread: false,
+        status: "loading",
+        messages: [],
+        threadId: null,
+        revision: -1,
+        activeTurnId: null,
+        sending: false,
+        error: null,
+      };
+    });
+    // A store write shows to reads only after a flush; `reloadChat` reads the new chat.
+    flush();
+    void reloadChat();
+    void loadThreads(agentId).catch(() => undefined);
+  }
+
+  function newThread(agentId: string): void {
+    chatGeneration += 1;
+    setState((draft) => {
+      draft.chat = {
+        agentId,
+        taskId: null,
+        draftThread: true,
+        status: "ready",
+        messages: [],
+        threadId: null,
+        revision: -1,
+        activeTurnId: null,
+        sending: false,
+        error: null,
+      };
+    });
+    // `send` may follow at once ("@agent text" from the home search) and reads the new chat.
+    flush();
+  }
+
+  function closeChat(): void {
+    chatGeneration += 1;
+    setState((draft) => {
+      draft.chat = null;
+    });
+  }
+
+  /** Sends to the open chat. A draft thread starts with this message. */
+  async function send(text: string): Promise<void> {
+    const chat = state.chat;
+    if (!chat || chat.sending) return;
+    const generation = chatGeneration;
+    const clientMessageId = crypto.randomUUID();
+    const { agentId, taskId, draftThread } = chat;
+    setState((draft) => {
+      if (!draft.chat) return;
+      draft.chat.sending = true;
+      draft.chat.error = null;
+      // Shown until the host's copy of the conversation arrives.
+      draft.chat.messages.push({
+        id: `pending-${clientMessageId}`,
+        author: "user",
+        source: "user",
+        text,
+        createdAt: new Date().toISOString(),
+        status: "completed",
+      });
+    });
+    try {
+      if (draftThread) {
+        const task = await runTeamEffect(startAgentTask(request, { agentId, text, clientMessageId }));
+        if (generation !== chatGeneration) return;
+        setState((draft) => {
+          if (!draft.chat) return;
+          draft.chat.draftThread = false;
+          draft.chat.taskId = task.id;
+          draft.threads[agentId] = [task, ...(draft.threads[agentId] ?? []).filter((entry) => entry.id !== task.id)];
+        });
+        flush();
+      } else if (taskId !== null) {
+        await runTeamEffect(sendAgentTaskMessage(request, { agentId, taskId, text, clientMessageId }));
+      } else {
+        const receipt = await raw("POST", TEAM_API_ROUTES.agent.messages(agentId), {
+          text,
+          attachmentDraftIds: [],
+          replyToMessageId: null,
+          // The host uses this zone for a routine that the agent creates from the message.
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          clientMessageId,
+        });
+        if (!isQueuedMessageReceipt(receipt)) throw new Error(currentText().t("extension.chat.sendFailed"));
+      }
+      if (generation === chatGeneration) await reloadChat();
+    } catch (error) {
+      if (generation !== chatGeneration) return;
+      setState((draft) => {
+        if (!draft.chat) return;
+        draft.chat.messages = draft.chat.messages.filter((message) => message.id !== `pending-${clientMessageId}`);
+        draft.chat.error = error instanceof Error ? error.message : currentText().t("extension.chat.sendFailed");
+      });
+      throw error;
+    } finally {
+      if (generation === chatGeneration)
+        setState((draft) => {
+          if (draft.chat) draft.chat.sending = false;
+        });
+    }
+  }
+
+  /** The models a new agent can start on, when the host lets a member choose one (`agent-create-model`). */
+  async function agentCatalog(): Promise<{ models: ClientAgentModelOption[]; status: AgentStatus } | null> {
+    if (!has(TEAM_AGENT_CREATE_MODEL_CAPABILITY)) return null;
+    const [models, status] = await Promise.all([
+      request("GET", TEAM_API_ROUTES.agents.models, decodeModels),
+      request("GET", TEAM_API_ROUTES.agents.status, (value) => {
+        if (!isAgentStatus(value)) throw new Error(currentText().t("extension.connection.requestFailed"));
+        return value;
+      }),
+    ]);
+    return { models, status };
+  }
+
+  /** Creates the agent of the form, as the web client does, and returns its id. */
+  async function createAgent(draft: FirstAgentDraft): Promise<string> {
+    const withModel = has(TEAM_AGENT_CREATE_MODEL_CAPABILITY) && isKnownAgentProvider(draft.provider);
+    const profile = {
+      name: draft.name.trim(),
+      description: draft.purpose.trim(),
+      initialMessage: createAgentInitialMessage(draft, has(AGENT_WELCOME_CAPABILITY)),
+      avatarSeed: draft.avatarSeed,
+      avatarHue: draft.avatarHue,
+      ...(withModel
+        ? {
+            provider: draft.provider,
+            model: draft.model,
+            ...(draft.reasoningEffort ? { reasoningEffort: draft.reasoningEffort } : {}),
+          }
+        : {}),
+    };
+    const operation = has(AGENT_CREATE_OPERATION_CAPABILITY) ? createOperationId(profile) : null;
+    const agent = await request(
+      "POST",
+      TEAM_API_ROUTES.agents.all,
+      (value) => {
+        if (!isClientAgentSummary(value)) throw new Error(currentText().t("extension.connection.requestFailed"));
+        return value;
+      },
+      { ...profile, ...(operation ? { operationId: operation.id } : {}) },
+    ).catch((error: unknown) => {
+      operation?.failed();
+      throw error;
+    });
+    setState((draft) => {
+      if (!draft.agents.some((entry) => entry.id === agent.id)) draft.agents.push(agent);
+    });
+    // The create route keeps the nearest hue; the exact colour goes on `agent-colors-v1` after it. The agent
+    // exists, so a failed colour change does not fail the create.
+    const color = draft.avatarColor;
+    if (color && has(AGENT_COLORS_CAPABILITY))
+      await runTeamEffect(setAgentColor(request, { agentId: agent.id, color })).then(
+        () =>
+          setState((next) => {
+            next.colors[agent.id] = color;
+          }),
+        () => undefined,
+      );
+    return agent.id;
+  }
+
+  /** Appends a streamed part of an answer to the open chat, as `applyDelta` in the web client does. */
+  function appendDelta(event: {
+    threadId: string;
+    turnId: string;
+    messageId: string;
+    delta: string;
+    createdAt: string;
+    revision: number;
+  }): boolean {
+    let stale = false;
+    setState((draft) => {
+      const chat = draft.chat;
+      if (chat?.status !== "ready") return;
+      if (chat.threadId !== null && chat.threadId !== event.threadId) {
+        stale = true;
+        return;
+      }
+      if (event.revision <= chat.revision) return;
+      const message = chat.messages.findLast((entry) => entry.id === event.messageId);
+      if (message) {
+        message.text += event.delta;
+        message.status = "streaming";
+      } else
+        chat.messages.push({
+          id: event.messageId,
+          turnId: event.turnId,
+          author: "assistant",
+          source: "assistant",
+          text: event.delta,
+          createdAt: event.createdAt,
+          status: "streaming",
+        });
+      chat.revision = event.revision;
+      chat.activeTurnId = event.turnId;
+    });
+    return !stale;
+  }
+
+  function handleEvent(event: RemoteTeamEvent): void {
+    const chat = state.chat;
+    const mainChatOf = (agentId: string) =>
+      chat !== null && chat.taskId === null && !chat.draftThread && chat.agentId === agentId;
+    switch (event.type) {
+      case "agents-changed":
+        setState((draft) => {
+          draft.agents = event.agents;
+        });
+        return;
+      case "agent-colors-changed":
+        setState((draft) => {
+          draft.colors = Object.fromEntries(event.agents.map((entry) => [entry.agentId, entry.color]));
+        });
+        return;
+      case "sidebar-pins-changed":
+        setState((draft) => {
+          draft.pins = event.items.map((pin) => ({ kind: pin.kind, id: pin.id }));
+        });
+        return;
+      case "sidebar-layout-changed":
+        showLayout(event.layout);
+        return;
+      case "channels-changed":
+        channelChangedSoon(event.channelId);
+        return;
+      case "conversation-delta":
+        if (mainChatOf(event.agentId) && !appendDelta(event)) void reloadChat();
+        return;
+      case "agent-task-conversation-delta":
+        if (chat?.taskId === event.taskId && !appendDelta(event)) void reloadChat();
+        return;
+      case "agent-task-conversation":
+        if (chat?.taskId === event.taskId) setMessages(event.snapshot);
+        return;
+      case "agent-tasks-changed":
+        setState((draft) => {
+          draft.threads[event.snapshot.agentId] = event.snapshot.tasks;
+        });
+        return;
+      case "turn-started":
+        if (mainChatOf(event.agentId))
+          setState((draft) => {
+            if (draft.chat) draft.chat.activeTurnId = event.turnId;
+          });
+        return;
+      case "conversation":
+        if (mainChatOf(event.snapshot.agentId)) void reloadChat();
+        refreshReadsSoon();
+        return;
+      case "conversation-invalidated":
+        if (mainChatOf(event.agentId)) void reloadChat();
+        refreshReadsSoon();
+        return;
+      case "turn-completed":
+        if (chat && chat.agentId === event.agentId) void reloadChat();
+        refreshReadsSoon();
+        return;
+      default:
+        return;
+    }
+  }
+
+  return {
+    state,
+    load,
+    openChat,
+    newThread,
+    closeChat,
+    send,
+    agentCatalog,
+    createAgent,
+    createFolder,
+    /** The agent settings calls of this server. */
+    settings: createAgentSettingsApi(request, capabilities),
+    foldersAvailable: () => has(SIDEBAR_LAYOUT_CAPABILITY),
+    channelsAvailable: () => channelsApi !== null,
+    openChannel,
+    closeChannel,
+    reloadChannel,
+    sendToChannel,
+    createChannel,
+    clearChannelError: () =>
+      setState((draft) => {
+        if (draft.channel) draft.channel.error = null;
+      }),
+    /** The user closed the error card over the composer. */
+    clearChatError: () =>
+      setState((draft) => {
+        if (draft.chat) draft.chat.error = null;
+      }),
+    handleEvent,
+    reloadChat,
+    threadsAvailable: () => has(AGENT_TASKS_CAPABILITY),
+    /** Dictation, when the server transcribes for its members. */
+    transcribe: has(VOICE_TRANSCRIPTION_CAPABILITY) ? transcribe : null,
+    media,
+    dispose: () => {
+      media.dispose();
+      if (readsTimer) clearTimeout(readsTimer);
+      if (channelTimer) clearTimeout(channelTimer);
+      chatGeneration += 1;
+    },
+  };
+}
+
+export type Workspace = ReturnType<typeof createWorkspace>;

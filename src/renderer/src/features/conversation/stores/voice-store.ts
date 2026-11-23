@@ -1,11 +1,17 @@
 import { VOICE_AUDIO_LIMITS, VOICE_MODELS, VOICE_STREAM_LIMITS, type VoiceModelId } from "@openbot/contracts/ipc";
 import { VOICE_LIMIT_WARNING_SECONDS } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { currentText } from "@openbot/ui/text";
+import {
+  appendVoiceTranscript,
+  encodePcm16,
+  recordingToSamples,
+  recordingToWav,
+  startVoiceMeter as startLevelMeter,
+} from "@openbot/ui/voice-recording";
 import { onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
 import { unlockCompletionSound } from "../../../completion-sound";
 import { playVoiceLimitStop, playVoiceLimitWarning } from "../../../voice-limit-sound";
-import { appendVoiceTranscript, encodePcm16, recordingToSamples, recordingToWav } from "../../../voice-recording";
 import { forgetDictatedMessage, noteDictatedMessage, stopSpokenReply } from "../../speech/speech-replies";
 import { EMPTY_DRAFT } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
@@ -23,17 +29,7 @@ const LIVE_TRANSCRIPT_INTERVAL_MS = 1_000;
 const STREAM_INTERVAL_MS = 250;
 
 /** The recording waveform: how many level samples it shows, and how often a new one arrives. */
-export const VOICE_LEVEL_COUNT = 24;
-const VOICE_LEVEL_INTERVAL_MS = 80;
-/**
- * Waveform loudness, in dB: how fast the noise floor rises and the loudest sound fades per sample,
- * and the smallest speech scale above the floor.
- */
-const VOICE_DIGITAL_SILENCE_DB = -90;
-const VOICE_NOISE_RISE_DB = 0.1;
-const VOICE_NOISE_MARGIN_DB = 6;
-const VOICE_PEAK_FALL_DB = 0.05;
-const VOICE_MIN_RANGE_DB = 12;
+export { VOICE_LEVEL_COUNT } from "@openbot/ui/voice-recording";
 
 /** A dictation that streams to ElevenLabs through main. */
 export interface VoiceCloudStream {
@@ -378,50 +374,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
    */
   function startVoiceMeter(stream: MediaStream): void {
     resources.voiceMeterStop?.();
-    let levels: number[] = new Array(VOICE_LEVEL_COUNT).fill(0);
-    deps.setVoiceLevels(levels);
-    let context: AudioContext | undefined;
-    let analyser: AnalyserNode;
-    try {
-      context = new AudioContext();
-      analyser = context.createAnalyser();
-      analyser.fftSize = 512;
-      context.createMediaStreamSource(stream).connect(analyser);
-    } catch {
-      void context?.close();
-      return;
-    }
-    const samples = new Float32Array(analyser.fftSize);
-    // Room noise differs between microphones, so loudness counts from a noise floor that follows
-    // the quietest recent sound. It starts at the first sample, taken just after the click and before
-    // the user speaks. It falls at once and rises slowly, so speech does not become the floor.
-    let noiseDb = Number.POSITIVE_INFINITY;
-    // Microphone gain differs too, so the scale reaches up to the loudest recent sound.
-    let peakDb = Number.NEGATIVE_INFINITY;
-    let shown = 0;
-    const timer = setInterval(() => {
-      analyser.getFloatTimeDomainData(samples);
-      let sum = 0;
-      for (const sample of samples) sum += sample * sample;
-      const db = 20 * Math.log10(Math.max(Math.sqrt(sum / samples.length), 1e-5));
-      // Digital silence comes before the stream flows and from a muted input; no real room is that quiet.
-      if (db > VOICE_DIGITAL_SILENCE_DB) {
-        noiseDb = db < noiseDb ? db : Math.min(db, noiseDb + VOICE_NOISE_RISE_DB);
-        peakDb = Math.max(db, peakDb - VOICE_PEAK_FALL_DB);
-      }
-      const range = Math.max(VOICE_MIN_RANGE_DB, peakDb - noiseDb - VOICE_NOISE_MARGIN_DB);
-      const loudness = Math.min(1, Math.max(0, (db - noiseDb - VOICE_NOISE_MARGIN_DB) / range));
-      // Squared, so ordinary syllables differ in height and only the loudest fill the bar.
-      const level = loudness * loudness;
-      // Rise quickly with a word and fall back gently, so bars do not flicker between syllables.
-      shown += (level - shown) * (level > shown ? 0.7 : 0.45);
-      levels = [...levels.slice(1), shown];
-      deps.setVoiceLevels(levels);
-    }, VOICE_LEVEL_INTERVAL_MS);
-    const meterContext = context;
+    const stop = startLevelMeter(stream, deps.setVoiceLevels);
+    if (!stop) return;
     resources.voiceMeterStop = () => {
-      clearInterval(timer);
-      void meterContext.close();
+      stop();
       resources.voiceMeterStop = undefined;
     };
   }

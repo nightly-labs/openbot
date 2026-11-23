@@ -8,9 +8,9 @@ import {
 } from "@openbot/contracts/ipc";
 import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
+import { encodePcm16, recordingToSamples, recordingToWav } from "@openbot/ui/voice-recording";
 import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import { encodePcm16, recordingToSamples, recordingToWav } from "../../../voice-recording";
 import { holdSpeech, releaseSpeech, SPEECH_LEVEL_COUNT, speechReading } from "../../speech/speech-playback";
 import { speechPort } from "../../speech/speech-port";
 import {

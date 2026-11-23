@@ -3,9 +3,9 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { resolveCreationModel } from "@openbot/ui/features/agents/agent-creation-model";
 import { createMemo } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
-import { resolveCreationModel } from "../agents/agent-creation-model";
 import { useAgents } from "../agents/agents-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";

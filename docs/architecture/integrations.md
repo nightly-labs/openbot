@@ -725,3 +725,124 @@ Use `bun run dev:automation` for snapshots and screenshots. Do not drive another
 | An agent link in a command, tool output or commentary | The host relays only a link that the text of an agent message holds. |
 | A CLI that opens its own browser and honors no `BROWSER` | The host never gets the page address. Grok, Cursor and Cline use a code kind. |
 | The iPhone app | It does not take relayed sign-ins. It keeps its current behavior. |
+
+## The browser extension on X
+
+The extension (`apps/browser-extension`) sends a post from X to the user's X Desk agent
+(`X_AGENT_LISTING_ID` in `packages/contracts/src/browser-extension-x.ts`, a Marketplace Agent in
+`marketplace/production-catalog`). There are three parts:
+
+- **Content script** (`src/x-content.ts`, built as one IIFE file, `x-content.js`). It finds the parts of
+  an X page with CSS selectors only. When a reply mentions @OpenBot_ and the server answers `ready`, it
+  sets `data-openbot-x` on the reply button, and CSS gives the button the OpenBot look and motion. A
+  click (or Cmd/Ctrl+Enter) is stopped in the capture phase. The script reads the post, the posts above
+  it and the author's next posts (no replies by other people), gives them to the worker, and clicks the
+  button again with `data-openbot-x-pass`, so X posts the reply at once.
+- **Worker** (`src/background.ts`). It answers the selectors, and keeps each post in a queue
+  (`src/x-outbox.ts`, `chrome.storage.local`) until the server has it. Each post keeps one
+  `clientMessageId`, and the host answers a repeated id with the first receipt for a day, so a retry
+  makes no second thread. A failed send waits 30 s, then longer, up to 30 minutes (`chrome.alarms`
+  wakes the worker). A browser start (`onStartup`, or `onInstalled` for an extension that Chrome loads
+  again) and a side panel that has connected send every waiting post at once. Each failure says whether it may have
+  reached the server (`XSendResult.reached`): a post that no attempt can have sent waits up to 7 days,
+  and one that an attempt may have sent is tried only for 23 hours after that attempt. Nothing of
+  OpenBot shows on X for a post that waits; a post that arrives after a failed attempt, or that is
+  dropped, gets a browser notification. The worker cannot load a language, so it keeps the texts that the last
+  `status` answer brought. The side panel shows the posts that wait, with "Send now". The selectors come from the account service (`X_PAGE_RULES_ROUTE`, at most once an
+  hour, by hash) and stay in `chrome.storage.local`. A copy whose hash does not match is dropped. The
+  content script tries the served selectors first, then the built-in ones (`X_PAGE_RULES_DEFAULT`).
+- **One connection at a time.** The account service gives a sign-in one logical session per server
+  (`startSession` in `apps/auth-api/src/server/remote-control-plane.ts`), and the server keeps one
+  connection per session, so a second connection of the same sign-in takes the session of the first.
+  Each open side panel holds a port (`PANEL_PORT`) to the worker. While a panel is open, the worker
+  passes `status` and `send` to it (`src/x-agent.ts` with the panel's connection), closes the offscreen
+  page, and does not open a second panel. With no panel, the offscreen page (`offscreen.html`,
+  `src/offscreen.tsx`) makes the connection. Chrome gives an offscreen page `chrome.runtime` only, so it
+  reads and writes storage through the worker, which takes these requests only from that page. It
+  closes after 10 minutes with no work. Two panels in two windows still take the session from each
+  other.
+
+The E2E (`scripts/browser-extension-e2e.ts`, step 7) uses a local copy of an X post page whose reply
+button has a test id that only the served selectors know.
+
+## Agents on the member's Chrome (host side)
+
+A member can share tabs of the member's own Chrome with the agents of a server, through the OpenBot
+Chrome extension (`client-browser-v1`, `packages/contracts/src/team-protocol/client-browser-v1.ts`).
+The extension is a remote client, so no new data channel is necessary:
+
+- **Presence.** The extension sends `POST /v1/client-browser/presence` (`{ sharing, tabs }`, at most 50
+  tabs) when sharing starts or changes, and every 30 s. `ClientBrowserHub` (`src/main/client-browser-hub.ts`)
+  keeps it per member and logical session. It ends at `sharing: false`, when the last event connection
+  of the session closes (`team-api-server.ts`), or after 75 s with no presence. The newest session of a
+  member that started to share gets the commands.
+- **Commands.** The hub sends each command as the `client-browser-command` event to the event
+  connections of that session that read the capability, and to no other member. The extension answers
+  with `POST /v1/client-browser/result`. The hub accepts the answer only from the same member and
+  session, waits at most 120 s (the person's approval included), and stops waiting when the tool call
+  is cancelled. A command that the contract decoder refuses never leaves the host, because the client
+  closes its event stream on a malformed event.
+- **Tools** (`src/backend/agent/client-browser-tools.ts`). A shared tab has the id
+  `chrome:<member key>:<tab id>`; the key is a short hash of the member id. `list_tabs` adds the shared
+  tabs of the people who requested the turn (`#turnRequesters`), with a short note on what they take.
+  `open` with `browser: "chrome"` opens a tab in the Chrome of the first of them who shares. A turn
+  that no person requested, such as a routine run or a message from another agent, reaches no Chrome.
+  On a Chrome tab, only `snapshot`, `screenshot`, `navigate`, `click`, `type`, `press`, `scroll`,
+  `wait_for` and `close_tab` run; each other tool (Vault, secrets, takeover, uploads, `evaluate`,
+  `run_script`) gets a refusal, and so do a role target and `nth`.
+
+### The extension side
+
+The extension (`apps/browser-extension`) shares the tabs of one Chrome tab group, "OpenBot".
+
+- **Worker** (`src/client-browser-worker.ts`). Only the worker can use `chrome.debugger`, so it owns the
+  group, the approvals and the commands. "Share tabs with agents" (server menu of the side panel)
+  makes the group with the current web tab and stores `openbot.client-browser.sharing.v1`. The worker
+  answers the presence (the group's tabs), and tells the page with the connection when a tab joins,
+  leaves or changes. Stop sharing ungroups the tabs, denies the cards that wait and detaches.
+- **Connection** (`src/client-browser-link.ts`). The page that holds the server connection (the side
+  panel, else the offscreen page) sends the presence when it changes, every 30 s and after a
+  reconnection. It passes each `client-browser-command` event to the worker and posts the worker's
+  answer to `/v1/client-browser/result`. While the user shares, the offscreen page does not close when
+  it is idle, and the worker opens it when the last panel closes or the browser starts.
+- **Commands** (`src/client-browser-executor.ts`). CDP 1.3 on a tab of the group: it attaches on
+  demand and detaches after 30 s with no command. Page scripts run in an isolated world. `snapshot`
+  marks the interactive elements with `data-openbot-ref`, so a `ref` target finds them. A tab outside
+  the group gets `not-shared`, a closed one `not-found`.
+- **Approvals.** Before a command, the worker checks the site (origin) of the tab or address. A site
+  that is not in `openbot.client-browser.sites.v1` gets a card in the side panel (Allow once / Always
+  for this site / Deny), or a notification when no panel is open. The card waits 100 s, then the
+  command fails with `timeout`. These ask every time, also on an allowed site, and have no "Always":
+  typing into a password field or a field with `autocomplete="cc-*"`; a download; and a click, key,
+  `navigate` or `open` on an address whose path has `oauth` or `authorize` and that has a `client_id`
+  parameter. `chrome.debugger` cannot stop downloads (`Page.setDownloadBehavior` is a browser-level
+  command that an extension may not send), so the worker uses `chrome.downloads.onDeterminingFilename`:
+  for 30 s after an agent acts on a site, Chrome holds each new download from that site (by referrer or
+  address) until the person answers. Allow once lets it go on; Deny or no answer cancels it. A download
+  link asks before the click. A download that the person starts on such a site in those 30 s asks too.
+  A browser that Playwright drives skips the listener, so this check runs in a Chrome that Playwright
+  only connects to.
+
+While an agent works in a tab, the executor draws an overlay in the page (`pageOverlay`): a glow
+around the page with "<agent> is using this tab", and a cursor that glides to each click or field
+(350 ms) with a ripple on the click. It is a shadow root on `<html>` with `pointer-events: none`, so
+snapshots (which read `document.body`) and clicks do not see it, and it is hidden while the agent takes
+a screenshot. Styles go through the CSSOM and motion through the Web Animations API, which a page's
+CSP and Trusted Types allow. It is removed when the debugger detaches, and fades out by itself 36 s
+after the last command, also when Chrome's Cancel bar detached the debugger first.
+
+The extension E2E (`scripts/browser-extension-e2e.ts`, step 6b) shares a local page and lets the agent
+click its button through the card.
+
+Chrome Web Store permission notes (for the store listing):
+
+| Permission | Justification |
+| --- | --- |
+| `debugger` | When the user shares tabs, the user's own agents read and use only the tabs of the "OpenBot" tab group (page text, screenshots, clicks and typing), after the user allows each site. Chrome shows its debugging bar while it is attached. |
+| `tabs` | Lists the address and title of the tabs in the "OpenBot" tab group for the user's agents, and opens or closes a tab there when an agent asks. |
+| `tabGroups` | Makes and finds the "OpenBot" tab group, the boundary of what the user shares with agents. |
+| `downloads` | Holds a download that starts on a site where the user's agent works until the user allows it in the side panel, and cancels it when the user denies it. The extension does not read, open or list the user's files. |
+
+The Team API E2E (`scripts/team-api-routes-e2e.ts`, "A member's shared Chrome tabs") checks the
+capability, presence, delivery to one session, foreign and late answers, denial, timeout, refusals,
+and the end of a presence.

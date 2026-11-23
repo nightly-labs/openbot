@@ -238,6 +238,7 @@ import {
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
 } from "./claude-user-setup-preference-store";
+import { ClientBrowserHub } from "./client-browser-hub";
 import { createComputerIdle } from "./computer-idle";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
@@ -622,6 +623,8 @@ const TEARDOWN_ORDER = {
   // After the connections that hold it.
   signalIngress: 86,
   host: 90,
+  /** After the host, so no member answers; before the agent service, so no tool call waits for Chrome. */
+  clientBrowser: 98,
   /** Before the team WebRTC bridge: the computer proxy streams stop before their channels. */
   browserEgress: 99,
   teamWebRtcBridge: 100,
@@ -1422,6 +1425,9 @@ export async function createApplicationServices({
   // The computers of members that share their connection with this server, for computer proxies.
   const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
   teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
+  // The Chrome tabs that members share with the agents (`client-browser-v1`).
+  const clientBrowser = new ClientBrowserHub();
+  teardown.push(TEARDOWN_ORDER.clientBrowser, "the shared Chrome tabs of members", () => clientBrowser.dispose());
   // Only a hosted, self-hosted or container server: one unit or container holds OpenBot and every
   // agent process. The desktop app does not hold turns for memory.
   const hostMemory =
@@ -2465,6 +2471,7 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
+    clientBrowser,
     crm: () => crmHandle,
     // `host` is built later, after the agent service; a CRM tool reads it when it runs.
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
@@ -3603,6 +3610,34 @@ export async function createApplicationServices({
       subscribe: (listener) => {
         service.on("liveVoice", listener);
         return () => service.off("liveVoice", listener);
+      },
+    },
+    // Present, so the host advertises `client-browser-v1`. Any member can share Chrome tabs.
+    clientBrowser,
+    // Present, so the host advertises `voice-transcription-v1`. A member's dictation uses the speech
+    // recognition of this host: its voice server, or its model when it is ready. A model that is not on
+    // this host yet starts its download, as the first dictation on this computer does, and the member
+    // tries again later. The voice services start after the host; a request comes only later.
+    voiceTranscription: {
+      transcribe: (audio) => {
+        if (voiceServer.dictates()) return voiceServer.transcribe(audio, voice.getSettings().language);
+        return voice.getModelStatus().pipe(
+          Effect.flatMap((status) => {
+            if (status.phase === "ready" && (isLocalVoiceModelId(status.modelId) || isGroqVoiceModelId(status.modelId)))
+              return voice.transcribe(audio);
+            const preparing =
+              isLocalVoiceModelId(status.modelId) && (status.phase === "missing" || status.phase === "downloading");
+            const refusal = Effect.fail(
+              new VoiceOperationError({
+                cause: new Error(sourceText(preparing ? "error.voice.host.preparing" : "error.voice.host.notSetUp")),
+              }),
+            );
+            // The download runs in the voice service; its status and its errors show in Settings → Voice.
+            return preparing && status.phase === "missing"
+              ? Effect.forkDetach(Effect.ignore(voice.prepareModel())).pipe(Effect.andThen(refusal))
+              : refusal;
+          }),
+        );
       },
     },
     // Present, so the host advertises `hosted-sites-v1`. Members list; only admins delete.

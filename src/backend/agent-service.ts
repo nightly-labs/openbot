@@ -198,6 +198,7 @@ import { BootRecovery } from "./agent/boot-recovery";
 import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
+import type { ClientBrowser } from "./agent/client-browser-tools";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
 import type { SetCommitCoAuthor } from "./agent/commit-co-author-tool";
 import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
@@ -469,6 +470,8 @@ export interface AgentServiceOptions {
   serverClaims?: AgentServerClaims | null;
   /** The named browser profiles, for `read_agent` and `set_browser_profile`. */
   browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
+  /** The Chrome tabs that members share with the agents (`client-browser-v1`). */
+  clientBrowser?: ClientBrowser | null;
   /** The CRM, for the `crm_*` tools; null until it starts. */
   crm?: (() => CrmHandle | null) | undefined;
   /** Whether a member who is not an owner or admin can see the agent; the `crm_*` tools then refuse it. */
@@ -2218,6 +2221,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       feedbackWithdrawal: this.#feedbackWithdrawal,
       serverClaims: options.serverClaims ?? null,
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
+      ...(options.clientBrowser === undefined ? {} : { clientBrowser: options.clientBrowser }),
       ...(options.crm === undefined ? {} : { crm: options.crm }),
       ...(options.crmAgentVisibleToMembers === undefined
         ? {}

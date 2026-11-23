@@ -20,6 +20,7 @@ import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/Questi
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
 import { prefersReducedMotion, usesTouchLayout } from "@openbot/ui/utils";
+import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
 import { errorReference } from "@openbot/user-errors";
 import {
   createContext,
@@ -35,7 +36,6 @@ import {
 import { actionToast } from "../../action-toast";
 import { holdNativeBrowserPage } from "../../native-browser-page";
 import { createScopeGuard } from "../../scope-lifetime";
-import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";

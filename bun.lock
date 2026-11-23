@@ -130,6 +130,29 @@
         "wrangler": "catalog:",
       },
     },
+    "apps/browser-extension": {
+      "name": "@openbot/browser-extension",
+      "version": "0.0.0",
+      "dependencies": {
+        "@fontsource-variable/inter": "catalog:",
+        "@norbert_bodziony/bloub": "catalog:",
+        "@openbot/brand": "workspace:*",
+        "@openbot/contracts": "workspace:*",
+        "@openbot/i18n": "workspace:*",
+        "@openbot/team-client": "workspace:*",
+        "@openbot/ui": "workspace:*",
+        "@solidjs/signals": "catalog:",
+        "@solidjs/web": "catalog:",
+        "effect": "catalog:",
+        "solid-js": "2.0.0",
+      },
+      "devDependencies": {
+        "@solidjs/vite-plugin": "catalog:",
+        "@tailwindcss/vite": "catalog:",
+        "tailwindcss": "catalog:",
+        "vite": "catalog:",
+      },
+    },
     "apps/mobile": {
       "name": "@openbot/mobile",
       "version": "1.4.11",
@@ -1187,6 +1210,8 @@
     "@openbot/auth-api": ["@openbot/auth-api@workspace:apps/auth-api"],
 
     "@openbot/brand": ["@openbot/brand@workspace:packages/brand"],
+
+    "@openbot/browser-extension": ["@openbot/browser-extension@workspace:apps/browser-extension"],
 
     "@openbot/contracts": ["@openbot/contracts@workspace:packages/contracts"],
 
