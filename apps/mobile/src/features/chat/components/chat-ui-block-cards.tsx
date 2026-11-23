@@ -61,6 +61,13 @@ export function confirmBlockOf(prompt: ConversationQuestionPrompt, uiBlock: Conv
   return spec?.type === "confirm" && prompt.questions[0]?.id === UI_CONFIRM_ACTION_QUESTION_ID ? spec : null;
 }
 
+export function formTitleOf(uiBlock: ConversationUiBlock | undefined, question: string | undefined): string | null {
+  const spec = uiBlock?.spec;
+  if (spec?.type !== "form") return null;
+  const title = spec.title.trim();
+  return title && title !== question?.trim() ? title : null;
+}
+
 export function choiceBlockOf(prompt: ConversationQuestionPrompt, uiBlock: ConversationUiBlock | undefined) {
   const spec = uiBlock?.spec;
   const question = prompt.questions[0];
