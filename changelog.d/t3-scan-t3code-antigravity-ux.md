@@ -1,3 +1,7 @@
+### Added
+
+- You can connect Gemini on a joined server from any device, also on a server with no desktop and on a Windows host. The server shows a Google link; open it on your device, then paste the code or the address of the page where you land. The server must also be on the new version.
+
 ### Changed
 
 - Gemini agents with Full access now use OpenBot's own tools, such as memory, the browser and channels, without an approval card, the same as Claude agents. Shell commands and other tools still ask when automatic approval is off.
