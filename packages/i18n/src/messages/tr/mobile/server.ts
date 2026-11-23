@@ -107,7 +107,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "Bilgisayarınızda OpenBot'u açın.",
   "mobile.server.hosted.steps.settings": "Ayarlar → Barındırılan sunucular bölümüne gidin.",
   "mobile.server.hosted.steps.add": "“Sunucu ekle”yi seçin ve bir plan seçin.",
-  "mobile.server.hosted.steps.ready": "Sunucu hazır olduğunda burada görünür.",
   "mobile.server.hosted.plansToggle": "Her planın içeriği",
   "mobile.server.hosted.computer.add": "Bulut sunucusu ekleyin",
   "mobile.server.hosted.computer.addHint":

@@ -209,7 +209,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "יש לפתוח את OpenBot במחשב שלך.",
   "mobile.server.hosted.steps.settings": "יש לעבור אל הגדרות ← שרתים מארחים.",
   "mobile.server.hosted.steps.add": "יש לבחור בהוספת שרת ובמסלול.",
-  "mobile.server.hosted.steps.ready": "השרת יופיע כאן כשיהיה מוכן.",
   "mobile.server.hosted.plansToggle": "מה כולל כל מסלול",
   "mobile.server.hosted.computer.add": "הוספת שרת ענן",
   "mobile.server.hosted.computer.addHint": "ב-OpenBot, יש לפתוח הגדרות ← שרתים מארחים ולבחור בהוספת שרת.",

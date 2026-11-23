@@ -365,9 +365,9 @@ function ComputerSteps({ showChangePlan }: { showChangePlan: boolean }) {
       </View>
       <View accessibilityRole="list" className="gap-3">
         {COMPUTER_STEPS.map((key, index) => (
-          <View key={key} accessibilityRole="text" className="flex-row gap-3">
-            <View className="size-6 items-center justify-center rounded-full border border-grouped-border">
-              <Typography.Paragraph type="body-xs" weight="semibold" className="text-text-secondary">
+          <View key={key} accessible className="flex-row gap-3">
+            <View className="min-h-6 min-w-6 items-center justify-center rounded-full border border-grouped-border px-1.5">
+              <Typography.Paragraph type="body-xs" weight="semibold" className="text-grouped-secondary">
                 {format.number(index + 1)}
               </Typography.Paragraph>
             </View>
@@ -375,9 +375,6 @@ function ComputerSteps({ showChangePlan }: { showChangePlan: boolean }) {
           </View>
         ))}
       </View>
-      <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
-        {t("mobile.server.hosted.steps.ready")}
-      </Typography.Paragraph>
       {showChangePlan ? (
         <View className="gap-1 border-t border-grouped-border pt-4">
           <Typography.Paragraph weight="semibold">{t("mobile.server.hosted.computer.change")}</Typography.Paragraph>

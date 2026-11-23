@@ -103,7 +103,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "Open OpenBot op je computer.",
   "mobile.server.hosted.steps.settings": "Ga naar Instellingen → Gehoste servers.",
   "mobile.server.hosted.steps.add": "Kies Server toevoegen en kies een abonnement.",
-  "mobile.server.hosted.steps.ready": "De server verschijnt hier zodra hij klaar is.",
   "mobile.server.hosted.plansToggle": "Wat elk abonnement bevat",
   "mobile.server.hosted.computer.add": "Cloudserver toevoegen",
   "mobile.server.hosted.computer.addHint": "Open in OpenBot Instellingen → Gehoste servers en kies Server toevoegen.",

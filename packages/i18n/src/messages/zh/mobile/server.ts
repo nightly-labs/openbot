@@ -101,7 +101,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "在电脑上打开 OpenBot。",
   "mobile.server.hosted.steps.settings": "前往“设置 → 托管服务器”。",
   "mobile.server.hosted.steps.add": "选择“添加服务器”，然后选择套餐。",
-  "mobile.server.hosted.steps.ready": "服务器就绪后会显示在这里。",
   "mobile.server.hosted.plansToggle": "各套餐包含的内容",
   "mobile.server.hosted.computer.add": "添加云服务器",
   "mobile.server.hosted.computer.addHint": "在 OpenBot 中打开“设置 → 托管服务器”，然后选择“添加服务器”。",

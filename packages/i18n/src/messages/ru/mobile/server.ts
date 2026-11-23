@@ -123,7 +123,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "Откройте OpenBot на компьютере.",
   "mobile.server.hosted.steps.settings": "Перейдите в «Настройки» → «Облачные серверы».",
   "mobile.server.hosted.steps.add": "Выберите «Добавить сервер» и тариф.",
-  "mobile.server.hosted.steps.ready": "Сервер появится здесь, когда будет готов.",
   "mobile.server.hosted.plansToggle": "Что входит в каждый тариф",
   "mobile.server.hosted.computer.add": "Добавить облачный сервер",
   "mobile.server.hosted.computer.addHint":

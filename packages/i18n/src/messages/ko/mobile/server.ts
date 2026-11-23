@@ -103,7 +103,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "컴퓨터에서 OpenBot을 여세요.",
   "mobile.server.hosted.steps.settings": "설정 → 호스팅 서버로 이동하세요.",
   "mobile.server.hosted.steps.add": "서버 추가를 선택하고 요금제를 고르세요.",
-  "mobile.server.hosted.steps.ready": "서버가 준비되면 여기에 표시돼요.",
   "mobile.server.hosted.plansToggle": "요금제별 포함 항목",
   "mobile.server.hosted.computer.add": "클라우드 서버 추가",
   "mobile.server.hosted.computer.addHint": "OpenBot에서 설정 → 호스팅 서버를 열고 서버 추가를 선택하세요.",

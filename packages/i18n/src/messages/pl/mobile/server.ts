@@ -124,7 +124,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "Otwórz OpenBot na komputerze.",
   "mobile.server.hosted.steps.settings": "Przejdź do Ustawienia → Hostowane serwery.",
   "mobile.server.hosted.steps.add": "Wybierz „Dodaj serwer” i plan.",
-  "mobile.server.hosted.steps.ready": "Serwer pojawi się tutaj, gdy będzie gotowy.",
   "mobile.server.hosted.plansToggle": "Co zawiera każdy plan",
   "mobile.server.hosted.computer.add": "Dodaj serwer w chmurze",
   "mobile.server.hosted.computer.addHint": "W OpenBot otwórz Ustawienia → Hostowane serwery i wybierz „Dodaj serwer”.",

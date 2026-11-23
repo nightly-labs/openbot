@@ -204,7 +204,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.hosted.steps.open": "Open OpenBot on your computer.",
   "mobile.server.hosted.steps.settings": "Go to Settings → Hosted servers.",
   "mobile.server.hosted.steps.add": "Select Add server and choose a plan.",
-  "mobile.server.hosted.steps.ready": "The server shows here when it is ready.",
   "mobile.server.hosted.plansToggle": "What each plan includes",
   "mobile.server.hosted.computer.add": "Add a cloud server",
   "mobile.server.hosted.computer.addHint": "In OpenBot, open Settings → Hosted servers and select Add server.",

@@ -104,7 +104,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "コンピューターで OpenBot を開きます。",
   "mobile.server.hosted.steps.settings": "「設定」→「ホスト型サーバー」に移動します。",
   "mobile.server.hosted.steps.add": "「サーバーを追加」を選択し、プランを選びます。",
-  "mobile.server.hosted.steps.ready": "準備ができると、サーバーがここに表示されます。",
   "mobile.server.hosted.plansToggle": "各プランの内容",
   "mobile.server.hosted.computer.add": "クラウドサーバーを追加",
   "mobile.server.hosted.computer.addHint":

@@ -131,7 +131,6 @@ export const messages = {
   "mobile.server.hosted.steps.open": "افتح OpenBot على حاسوبك.",
   "mobile.server.hosted.steps.settings": "انتقل إلى الإعدادات ← الخوادم المستضافة.",
   "mobile.server.hosted.steps.add": "اختر إضافة خادم ثم اختر خطة.",
-  "mobile.server.hosted.steps.ready": "يظهر الخادم هنا عندما يصبح جاهزًا.",
   "mobile.server.hosted.plansToggle": "ما تتضمنه كل خطة",
   "mobile.server.hosted.computer.add": "إضافة خادم سحابي",
   "mobile.server.hosted.computer.addHint": "في OpenBot، افتح الإعدادات ← الخوادم المستضافة واختر إضافة خادم.",
