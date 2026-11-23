@@ -9,38 +9,25 @@ import { useVoiceDictation } from "./use-voice-dictation";
 
 export interface ComposerDictation {
   available: boolean;
-  /** Dictation listens hands-free, from the press on the mic until Stop. */
   active: boolean;
-  /** True from the start until the last words are in the draft. Send waits, and a key stops it. */
   busy: boolean;
   phase: DictationPhase;
-  /** Input level from 0 to 1. */
   level: SharedValue<number>;
-  /** 0 with the composer at rest, 1 while dictation listens. Drives the composer on the UI thread. */
   presence: SharedValue<number>;
-  /** Listens and writes the speech after the draft. False when the recognizer cannot start. */
   start: () => boolean;
-  /** Stop, and keep the text. */
   finish: () => void;
 }
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const PRESENCE_MS = 220;
 
-/**
- * Dictation into the composer draft. The words go into the field while the user speaks, and nothing
- * is sent: the user reads the text, edits it and presses Send. The recognizer is the one of
- * Settings > Voice; its session and its errors stay in `useVoiceDictation`.
- */
 export function useComposerDictation({
   enabled,
   focused,
   draft,
   onDraft,
 }: {
-  /** False stops listening and keeps the text, for example when the chat goes offline. */
   enabled: boolean;
-  /** The chat is the screen in front. Only then does Android back belong to dictation. */
   focused: boolean;
   draft: string;
   onDraft: (text: string) => void;
@@ -78,8 +65,6 @@ export function useComposerDictation({
     void stop();
   }, [moveTo, stop]);
 
-  // The session can end without the user: an error, a denied permission, the app in the background or
-  // a lost server. The draft already has what was said.
   const previousPhase = useRef(phase);
   useEffect(() => {
     const ended = previousPhase.current !== "idle" && phase === "idle";
@@ -87,7 +72,6 @@ export function useComposerDictation({
     if (ended && activeRef.current) moveTo(false);
   }, [phase, moveTo]);
 
-  // A screen lock ends the session, so the screen stays on while the user speaks hands-free.
   const keepAwakeTag = useId();
   useEffect(() => {
     if (!active) return;
@@ -97,7 +81,6 @@ export function useComposerDictation({
     };
   }, [active, keepAwakeTag]);
 
-  // Android back stops dictation and keeps the text before it leaves the chat.
   useEffect(() => {
     if (!active || !focused) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -108,17 +91,12 @@ export function useComposerDictation({
   }, [active, focused, finish]);
 
   const { available, level } = dictation;
-  // One object while its values stay, so the composer does not render again with each render of the chat.
   return useMemo(
     () => ({ available, active, busy: active || phase === "stopping", phase, level, presence, start, finish }),
     [available, active, phase, level, presence, start, finish],
   );
 }
 
-/**
- * A build without the speech module, such as Expo Go, still shows the mic, as it shows Settings > Voice.
- * A tap opens Settings > Voice, which says that voice is not available.
- */
 export function useComposerDictationWithSettings(dictation: ComposerDictation): ComposerDictation {
   return useMemo(
     () =>
@@ -127,7 +105,6 @@ export function useComposerDictationWithSettings(dictation: ComposerDictation): 
             ...dictation,
             available: true,
             start: () => {
-              // The keyboard has no place over Settings > Voice, as a long press on the mic closes it too.
               Keyboard.dismiss();
               router.push("/settings/voice");
               return false;

@@ -27,6 +27,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "메인 화면을 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureChannel":
     "이미지가 {channel} 채널에 표시되고, 이 채널을 읽는 서버의 모든 멤버가 볼 수 있어요.",
+  "status.agent.screenCapturePermissionNext": "그다음 macOS가 OpenBot의 화면 녹화를 허용할지 물어볼 수 있어요.",
   "status.agent.screenCaptureDisplay": "디스플레이 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureWindow": "창 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureRegion":
@@ -68,6 +69,7 @@ export const messages = {
   "status.agent.browserActing": "웹 페이지를 사용하는 중…",
   "status.agent.browserReviewing": "웹 페이지를 확인하는 중…",
   "status.agent.memoriesSearching": "메모리를 검색하는 중…",
+  "status.agent.chatsSearching": "이전 채팅을 검색하는 중…",
   "status.agent.memoriesSearched": {
     other: "메모리를 검색했어요: {count}개 찾음",
   },
@@ -109,6 +111,7 @@ export const messages = {
     "MCP 서버 {name}을(를) 추가해요: {target}. 이 서버의 모든 에이전트가 해당 도구를 사용할 수 있어요. OpenBot이 연결을 테스트해요.",
   "status.agent.mcpServerChange":
     "MCP 서버 {name}을(를) {target}(으)로 변경해요. 이 서버의 모든 에이전트가 해당 도구를 사용할 수 있어요. OpenBot이 연결을 테스트해요.",
+  "status.agent.mcpServerHeaders": "다음 헤더도 변경해요: {names}.",
   "status.agent.mcpServerEnable": "이 서버의 모든 에이전트에 MCP 서버 {name}을(를) 켜요.",
   "status.agent.mcpServerDisable": "이 서버의 모든 에이전트에 MCP 서버 {name}을(를) 꺼요.",
   "status.agent.mcpServerRemove": "이 서버의 모든 에이전트에서 MCP 서버 {name}과(와) 로그인 정보를 제거해요.",

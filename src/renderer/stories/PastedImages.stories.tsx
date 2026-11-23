@@ -38,7 +38,6 @@ const brief: DraftAttachment = {
 const pendingScreenshot: ComposerPendingImage = { id: "pending", name: "image.png", url: desktopScreenshot };
 
 const MB = 1024 * 1024;
-/** A file that a joined server has confirmed in part, one that has reported no bytes yet, and a failure. */
 const uploadingArchive: ComposerUploadFile = {
   key: "archive",
   uploadId: "archive",
@@ -60,13 +59,8 @@ const failedArchive: ComposerUploadFile = {
   error: "The connection to OpenBot team closed.",
 };
 
-/** The text with a file token, as a paste puts it at the cursor. */
 const named = (text: string, file: DraftAttachment) => `${text} ${serializeAttachmentReference(file.name, file.id)}`;
 
-/**
- * The message box of a chat, a side thread or the Tasks page. A file token in the text shows where the
- * file is; an image also shows in the thumbnail row.
- */
 function Composer(props: {
   attachments: DraftAttachment[];
   pending?: ComposerPendingImage[];
@@ -75,7 +69,6 @@ function Composer(props: {
   width: string;
 }) {
   const [attachments, setAttachments] = createSignal(props.attachments);
-  // Retry starts the file again with no bytes reported; remove drops it.
   const [uploads, setUploads] = createSignal(props.uploads ?? []);
   const [value, setValue] = createSignal(props.text);
   const row = () => {
@@ -121,7 +114,6 @@ function Composer(props: {
 
 const rowCallbacks = { onSelectAgent: fn(), onOpenLink: fn(), onPreview: fn(), onAttachmentAction: fn() };
 
-/** A sent message in the timeline: its images stand above the text bubble, outside it. */
 function SentMessage(props: { message: AgentMessage; width: string }) {
   return (
     <main class="foundation-story" style={{ width: props.width, "max-width": "calc(100vw - 32px)" }}>
@@ -143,17 +135,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A pasted image shows in the thumbnail row, and its token marks where it is in the text. Hover a tile for its remove button. */
 export const ComposerWithPastedImage: Story = {
   render: () => <Composer attachments={[pastedScreenshot]} text={named("Okay", pastedScreenshot)} width="640px" />,
 };
 
-/** When the token is deleted, the image stays in the row and still goes with the message. */
 export const ComposerImageWithoutToken: Story = {
   render: () => <Composer attachments={[pastedScreenshot]} text="Okay" width="640px" />,
 };
 
-/** Images and a file. A file other than an image shows only as its token, until its token is deleted. */
 export const ComposerWithSeveralFiles: Story = {
   render: () => (
     <Composer
@@ -164,22 +153,16 @@ export const ComposerWithSeveralFiles: Story = {
   ),
 };
 
-/** A paste that takes longer than 150 ms shows its local preview with a spinner until it is ready. */
 export const ComposerWhileImageAdds: Story = {
   render: () => (
     <Composer attachments={[pastedLogo]} pending={[pendingScreenshot]} text={named("Okay", pastedLogo)} width="640px" />
   ),
 };
 
-/**
- * Files picked for a joined server show at once. The ring fills as the host confirms the bytes; a
- * transport that reports none shows a spinner. Send waits until they land.
- */
 export const ComposerWhileFilesUpload: Story = {
   render: () => <Composer attachments={[brief]} uploads={[uploadingArchive, startingPhoto]} text="" width="760px" />,
 };
 
-/** A failed file keeps its chip, with the reason and Retry. Send waits until it is sent again or removed. */
 export const ComposerUploadFailed: Story = {
   render: () => <Composer attachments={[brief]} uploads={[failedArchive, startingPhoto]} text="" width="760px" />,
 };
@@ -194,7 +177,6 @@ export const ComposerNarrow: Story = {
   ),
 };
 
-/** The image stands above the text bubble, outside it. */
 export const SentImage: Story = {
   render: () => (
     <SentMessage
@@ -204,7 +186,6 @@ export const SentImage: Story = {
   ),
 };
 
-/** Several images share one gallery. */
 export const SentImages: Story = {
   render: () => (
     <SentMessage
@@ -220,7 +201,6 @@ export const SentImages: Story = {
   ),
 };
 
-/** An image that the text also names inline keeps its chip and shows full size. */
 export const SentImageNamedInline: Story = {
   render: () => (
     <SentMessage
@@ -236,7 +216,6 @@ export const SentImageNamedInline: Story = {
   ),
 };
 
-/** A message of images only has no bubble. */
 export const SentImagesOnly: Story = {
   render: () => (
     <SentMessage

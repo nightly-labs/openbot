@@ -6,6 +6,7 @@ export const messages = {
   "error.workflow.versionMissing": "لم يعد هذا الإصدار من سير العمل موجودًا.",
   "error.workflow.annotation": "لا يمكن أن تكون للنصوص والملاحظات والأشكال اتصالات.",
   "error.workflow.port": "لا يمكن للخطوة أن تأخذ هذا النوع من المدخلات.",
+  "error.workflow.unknownValue": "لا يعرف OpenBot هذا أحد إعدادات خطوة. حدّث OpenBot، ثم أعد المحاولة.",
   "error.workflow.branch": "الشرط وحده يمكن أن تكون له اتصالات «نعم» و«لا».",
   "error.workflow.conditionBranch": "يجب أن يكون كل اتصال من شرط «نعم» أو «لا».",
   "error.workflow.duplicateEdge": "لهاتين الخطوتين هذا الاتصال بالفعل.",
@@ -17,22 +18,36 @@ export const messages = {
   "error.workflow.agentStepEnded": "أُزيلت رسالة الوكيل لهذه الخطوة قبل أن يجيب.",
   "error.workflow.agentStepStopped": "توقّف الوكيل قبل أن يجيب عن هذه الخطوة. شغّل الخطوة مرة أخرى.",
   "error.workflow.conditionUnclear": "لم يجب النموذج بـ «نعم» أو «لا».",
+  "error.workflow.answerInvalid": "لم تتضمن الإجابة الحقول التي تطلبها هذه الخطوة: {fields}. شغّل الخطوة مرة أخرى.",
+  "error.workflow.answerSetup":
+    "توجد مشكلة في حقول الإجابة لسير العمل هذا هنا: {fields}. صحّح سير العمل، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.answerSourceEnded":
+    "لا توجد قيمة لهذه الحقول لأن الخطوة التي تعطيها لم تكتمل: {fields}. شغّل تلك الخطوة مرة أخرى أولًا.",
+  "error.workflow.runInputInvalid":
+    "مدخلات التشغيل لا تطابق حقول الإجابة للمشغّل: {fields}. أرسل كائن JSON واحدًا بهذه الحقول.",
+  "error.workflow.sourceNotDone": "فشلت خطوة سابقة أو توقفت في آخر مرة تم تشغيلها. شغّل تلك الخطوة مرة أخرى أولًا.",
+  "error.workflow.checkInvalid": "شرط التحقق في هذه الخطوة غير صالح. صحّحه ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.modelFailed": "تعذّر على النموذج الإجابة. شغّل الخطوة مرة أخرى.",
   "error.workflow.modelTimedOut":
     "لم يُجب النموذج في الوقت المحدد. اختر جهدًا أقل أو نموذجًا أسرع لهذه الخطوة، ثم شغّلها مرة أخرى.",
   "error.workflow.modelToolUse":
     "حاول النموذج استخدام أداة، لكن هذه الخطوة لا تجيب إلا بنص. شغّل الخطوة مرة أخرى، أو اختر نموذجًا آخر لها.",
+  "error.workflow.modelImageUnsupported":
+    "لا يستطيع نموذج هذه الخطوة قراءة الصور. اختر نموذجًا يستطيع ذلك، أو أزل اتصال الصورة.",
+  "error.workflow.modelImageType": "يمكن لخطوة النموذج قراءة صور PNG وJPEG وGIF وWebP فقط. صِل صورة من أحد هذه الأنواع.",
   "error.workflow.modelUnavailable": "نموذج هذه الخطوة غير متاح. اختر نموذجًا آخر لهذه الخطوة.",
   "error.workflow.providerBusy": "المزوّد مشغول. انتظر بضع دقائق، ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.providerOffline":
     "تعذّر على OpenBot الوصول إلى المزوّد. تحقّق من الاتصال بالإنترنت، ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.modelBusy": "يجري تنفيذ طلب نموذج آخر. شغّل الخطوة مرة أخرى بعد قليل.",
   "error.workflow.mediaFailed": "تعذّر على النموذج إنشاء الصورة أو الفيديو. شغّل الخطوة مرة أخرى.",
+  "error.workflow.mediaNotMade": "لم يُنشئ النموذج الصورة أو الفيديو. قال: {answer}",
   "error.workflow.pictureMissing": "الصورة لم تعد على الخادم. أرسلها مرة أخرى.",
   "error.workflow.pictureType": "استخدم صورة بتنسيق PNG أو JPEG أو WebP.",
   "error.workflow.mediaInputMissing": "صورة من خطوة سابقة غير متاحة. شغّل تلك الخطوة مرة أخرى.",
   "error.workflow.mediaEmptyRequest": "اكتب وصفًا، أو شغّل الخطوات التي قبل هذه الخطوة حتى يصل نص أو صورة.",
   "error.workflow.mediaInputNotImage": "تقبل هذه الخطوة الصور فقط، لا مقاطع الفيديو. أزل الاتصال من الفيديو.",
+  "error.workflow.mediaInputNotClip": "يقبل هذا الإدخال مقاطع الفيديو والملفات الصوتية فقط. أزل الاتصال من الملف.",
   "error.workflow.stepMissing": "لم تعد هذه الخطوة موجودة.",
   "error.workflow.nodeMissing": "هذه الخطوة ليست في سير العمل.",
   "error.workflow.runMissing": "لم يعد هذا التشغيل موجودًا.",

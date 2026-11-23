@@ -1,15 +1,3 @@
-// Checks the WhatsApp connector end to end against a fake WhatsApp: the link by QR code and by pairing
-// code, the encrypted store and its lock, the sender rules (the owner's own chat, personal chats left
-// alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard, the
-// guard against another OpenBot on the same number and against a loop in the owner's own chat,
-// numbered approval answers, an answer with an email address, the saved history and its search,
-// held messages after a wake, the journal replay after a restart, each close code, the send queue
-// while the socket is down, a post sent again when its socket closed before the ack, a file with its
-// text as the caption, and the disconnect. Runs the real agent service, messaging service, WhatsApp
-// driver, runtime, session and store on a temporary profile. Only the Baileys socket is fake: no
-// message leaves this computer.
-// `bun scripts/messaging-whatsapp-e2e.ts`.
-// Writes .openbot-build/messaging-whatsapp-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -28,6 +16,7 @@ import {
 import {
   type AnyMessageContent,
   type BaileysEventMap,
+  type BinaryNode,
   type GroupMetadata,
   type MiscMessageGenerationOptions,
   proto,
@@ -52,7 +41,9 @@ import {
   backoffDelay,
   closeDecision,
   MESSAGE_ACK,
+  NODE_HANDLING,
   type WhatsAppAck,
+  WhatsAppSession,
   type WhatsAppSocket,
 } from "../src/backend/messaging/whatsapp/whatsapp-session";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -72,7 +63,9 @@ const OWNER_LID = "777001";
 const FRIEND = "48600100300";
 const STRANGER = "48600100400";
 const LID_FRIEND = "48600100500";
-/** A Brazilian mobile number as people type it, and the older form that its WhatsApp account keeps. */
+const LID_FRIEND_CHAT = "999123@lid";
+const LEAD = "48600100600";
+const OTHER_LEAD = "48600100700";
 const BRAZIL_TYPED = "5531988887777";
 const BRAZIL_ACCOUNT = "553188887777";
 const GROUP = "120363000000000001@g.us";
@@ -109,7 +102,6 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
   }
 }
 
-/** Waits for a state, not for a time: the condition is read again until it holds or the time ends. */
 async function until<T>(read: () => T | null | undefined | false, label: string, timeoutMs = 10_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -120,21 +112,16 @@ async function until<T>(read: () => T | null | undefined | false, label: string,
   }
 }
 
-// The fake WhatsApp.
-
 interface Sent {
   jid: string;
   content: AnyMessageContent;
   id: string;
-  /** The id of the message that the post quotes. */
   quotedId: string | null;
 }
 
-/** One Baileys socket as OpenBot sees it. The phone drives it from the steps. */
 class FakeSocket implements WhatsAppSocket {
   readonly #events = new EventEmitter();
-  readonly #frames = new Set<() => void>();
-  readonly #acks = new Set<(node: WhatsAppAck) => void>();
+  readonly #ws = new EventEmitter();
   readonly #phone: FakePhone;
   readonly config: UserFacingSocketConfig;
   ended = false;
@@ -144,16 +131,12 @@ class FakeSocket implements WhatsAppSocket {
       this.#events.on(event, listener);
     },
   };
-  readonly ws: WhatsAppSocket["ws"] = {
-    on: (event: string, listener: (node: WhatsAppAck) => void) => {
-      if (event === MESSAGE_ACK) this.#acks.add(listener);
-      else this.#frames.add(() => listener({ attrs: {} }));
-    },
-  };
+  readonly ws: WhatsAppSocket["ws"] = this.#ws;
   readonly signalRepository = {
     lidMapping: {
       getPNForLID: async (lid: string) =>
         lid.startsWith("999") ? `${LID_FRIEND}@s.whatsapp.net` : lid.startsWith(OWNER_LID) ? OWNER_JID : null,
+      getLIDForPN: async (pn: string) => (pn === `${LID_FRIEND}@s.whatsapp.net` ? LID_FRIEND_CHAT : null),
     },
   };
 
@@ -164,8 +147,17 @@ class FakeSocket implements WhatsAppSocket {
 
   emit<T extends keyof BaileysEventMap>(event: T, arg: BaileysEventMap[T]): void {
     if (this.ended) return;
-    for (const frame of this.#frames) frame();
+    this.#ws.emit("frame");
     this.#events.emit(event, arg);
+  }
+
+  keepAlive(): void {
+    if (!this.ended) this.#ws.emit("frame");
+  }
+
+  stallNode(): void {
+    if (!this.ended)
+      this.#ws.emit(NODE_HANDLING, { tag: "message", attrs: { id: "STALLED" } } satisfies BinaryNode, true);
   }
 
   boot(): void {
@@ -183,7 +175,6 @@ class FakeSocket implements WhatsAppSocket {
     } else this.emit("connection.update", { qr: `2@fake-qr-${this.#phone.sockets.length}` });
   }
 
-  /** The phone scans the code: WhatsApp saves the account and asks for the restart after pairing. */
   scan(): void {
     this.emit("creds.update", { me: { id: `${OWNER}:5@s.whatsapp.net`, lid: `${OWNER_LID}:5@lid`, name: "Ana" } });
     this.close(515);
@@ -204,18 +195,17 @@ class FakeSocket implements WhatsAppSocket {
     if (this.ended) throw new Error("socket closed");
     const id = options?.messageId ?? `SENT${this.#phone.sent.length}`;
     if (this.#phone.dropNext === jid) {
-      // The socket took the bytes, and then the network went down: WhatsApp never got the message.
       this.#phone.dropNext = null;
       this.#phone.lost.push({ jid, content, id, quotedId: null });
       setTimeout(() => this.close(428), 0);
       return { key: { remoteJid: jid, id, fromMe: true }, message: {} } satisfies WAMessage;
     }
     this.#phone.sent.push({ jid, content, id, quotedId: options?.quoted?.key.id ?? null });
-    // WhatsApp's server answers each message with an ack, after the send returns.
     const error = this.#phone.refused.get(jid);
-    setTimeout(() => {
-      for (const ack of this.#acks) ack({ attrs: { id, ...(error ? { error } : {}) } });
-    }, 0);
+    if (!this.#phone.holdAcks)
+      setTimeout(() => {
+        this.#ws.emit(MESSAGE_ACK, { attrs: { id, ...(error ? { error } : {}) } } satisfies WhatsAppAck);
+      }, 0);
     const text = "text" in content && typeof content.text === "string" ? content.text : "";
     const message: WAMessage = {
       key: { remoteJid: jid, id, fromMe: true },
@@ -254,7 +244,6 @@ class FakeSocket implements WhatsAppSocket {
     return group(jid, jid === GROUP ? "Team" : "Family");
   }
 
-  /** Each number has an account, in the form it was asked for, except the Brazilian one, which keeps its older form. */
   async onWhatsApp(...phoneNumbers: string[]) {
     return phoneNumbers.map((number) => ({
       jid: `${number === BRAZIL_TYPED ? BRAZIL_ACCOUNT : number}@s.whatsapp.net`,
@@ -270,17 +259,13 @@ class FakeSocket implements WhatsAppSocket {
 class FakePhone {
   readonly sockets: FakeSocket[] = [];
   readonly sent: Sent[] = [];
-  /** The chats whose posts the server refuses in its ack, with the error code. */
   readonly refused = new Map<string, string>();
-  /** The chat whose next message is lost with its socket, which then closes. */
   dropNext: string | null = null;
+  holdAcks = false;
   readonly lost: Sent[] = [];
   logouts = 0;
-  /** WhatsApp cannot be reached: each socket closes before it shows a code. */
   offline = false;
-  /** A message that the next linked socket receives at once, before any transport listens. */
   onOpen: WAMessage | null = null;
-  /** While set, a pairing-code request waits for it, and fails when its socket closed meanwhile. */
   holdPairing: Promise<void> | null = null;
   pairingWaits = 0;
   pairingDone = 0;
@@ -306,7 +291,6 @@ class FakePhone {
     );
   }
 
-  /** True once OpenBot reacted to the message: 👀 when it took it, 💔 when the queue was full. */
   reactedTo(messageId: string | null | undefined): boolean {
     return this.sent.some((sent) => "react" in sent.content && sent.content.react.key?.id === messageId);
   }
@@ -363,11 +347,10 @@ function message(input: {
   };
 }
 
-// The services.
-
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -401,7 +384,6 @@ function memoryCredentials(): MessagingCredentials {
   };
 }
 
-// The credential store outlives one boot, as safeStorage does.
 const credentials = memoryCredentials();
 const phone = new FakePhone();
 
@@ -425,7 +407,6 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
   const runtime = new WhatsAppRuntime({
     root: whatsappRoot,
     createSocket: phone.create,
-    // The fake socket never encrypts, so it never calls the repository.
     makeSignalRepository: () => {
       throw new Error("Not used by the fake socket.");
     },
@@ -436,6 +417,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     agents: {
       listAgents: () => agents.listAgents(),
       respondToApproval: (input) => agents.respondToApproval(input),
+      approvalExecutionThreadId: (requestId) => agents.approvalExecutionThreadId(requestId),
       onEvent: () => () => {},
       createAgentProfile: (input) => agents.createAgentProfile(input),
       createMemory: (input) => agents.createMemory(input),
@@ -460,16 +442,10 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
   }
 }
 
-/**
- * Bun keeps a closed `node:sqlite` connection, and so the store's exclusive lock, until its statements
- * are collected; Node, which Electron runs, releases it at `close`. This script runs on Bun and opens
- * the same stores again, so it collects them first.
- */
 function releaseClosedStores(): void {
   gc(true);
 }
 
-/** The store of the linked number while no service runs. The credential store keeps its id and key. */
 function openConnectionStore(): WhatsAppAuthStore {
   const values = credentials
     .keys()
@@ -482,7 +458,6 @@ function openConnectionStore(): WhatsAppAuthStore {
   });
 }
 
-/** A journal entry as the transport writes it: the message as protobuf, in JSON. */
 function journalPayload(entry: WAMessage): string {
   return JSON.stringify({ message: Buffer.from(proto.WebMessageInfo.encode(entry).finish()).toString("base64") });
 }
@@ -512,7 +487,6 @@ interface HistoryRead {
   note: string;
 }
 
-/** A `messaging_history` read of a named place, as a turn that answers no external chat calls it. */
 async function readHistory(
   agents: AgentService,
   args: { place: string; query?: string; before?: string },
@@ -531,7 +505,42 @@ async function readHistory(
   return JSON.parse(text);
 }
 
-/** A saved message older than 90 days, with a copy of its file, which the next start deletes. */
+async function postAs(agents: AgentService, agentId: string, place: string, text: string): Promise<void> {
+  const result = await runCauseEffect(
+    agents.messaging.outboundTool(
+      agentId,
+      { threadId: `thread-${agentId}`, turnId: `turn-${agentId}` },
+      "messaging_post",
+      { connection: connectionId(agents), place, text },
+      () => Effect.succeed([]),
+    ),
+  );
+  assert.ok(result.success, result.contentItems[0]?.text);
+}
+
+async function leadReply(
+  agents: AgentService,
+  mailbox: MailboxStore,
+  lead: string,
+  agentId: string,
+  post: string,
+): Promise<{ agentId: string; prompt: string }> {
+  const messaging = agents.messaging;
+  const jid = `${lead}@s.whatsapp.net`;
+  await postAs(agents, agentId, `+${lead}`, post);
+  assert.ok(phone.textsTo(jid).includes(post), "The agent's post did not reach the lead.");
+  const reply = message({ chat: jid, text: "Yes, please send it." });
+  phone.current().receive([reply]);
+  await until(() => received(agents, jid, reply.key.id ?? ""), "the lead's reply in a mailbox");
+  const link = messaging.store.linkByKey(connectionId(agents), jid, "dm");
+  assert.ok(link, "No conversation for the lead's reply.");
+  const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+  assert.ok(request, "No request waits in the lead's chat.");
+  const prepared = await runCauseEffect(messaging.prepare({ delivery: request.delivery, managedAttachments: [] }));
+  assert.equal(phone.textsTo(jid).length, 1, "OpenBot wrote more than the agent's post to the lead.");
+  return { agentId: link.agentId, prompt: prepared?.text ?? "" };
+}
+
 const OLD_ID = "IN-OLD";
 let oldCopy = "";
 
@@ -554,7 +563,6 @@ try {
     assert.equal(closeDecision(408, false, true, true), "retry");
     assert.equal(closeDecision(428, false, false, true), "retry");
     assert.equal(closeDecision(undefined, false, false, true), "retry");
-    // A link that closes before it showed a code did not reach WhatsApp; the user sees "unavailable".
     assert.equal(closeDecision(408, true, false, false), "unreachable");
     assert.equal(closeDecision(428, true, false, false), "unreachable");
     assert.equal(closeDecision(515, true, false, false), "restart");
@@ -612,7 +620,6 @@ try {
       const waiting = await linkState(messaging, (state) => state.qr !== null, "a QR code");
       assert.match(waiting.qr ?? "", /^2@fake-qr-/u);
       assert.equal(phone.current().config.browser?.[1], "OpenBot", "A QR link does not show as OpenBot.");
-      // The phone's first message comes the moment the device opens, before the transport listens.
       const early = message({ chat: OWNER_JID, fromMe: true, text: "first message after the link" });
       phone.onOpen = early;
       phone.current().scan();
@@ -628,12 +635,10 @@ try {
         () => phone.textsTo(OWNER_JID).some((text) => text.includes("Write here to ask your agents.")),
         "the welcome message in the owner's own chat",
       );
-      // No orchestrator exists yet, so the service answers that no agent can answer: it read the message.
       await until(
         () => phone.textsTo(OWNER_JID).some((text) => text.includes("No agent can answer here yet")),
         "the answer to the message that came before the transport listened",
       );
-      // In "Message yourself", an answer quotes the message it answers, so it reads as a reply.
       const answer = phone.sent.find(
         (sent) => sent.jid === OWNER_JID && "text" in sent.content && sent.content.text.includes("No agent can answer"),
       );
@@ -654,7 +659,6 @@ try {
       const friendJid = `${FRIEND}@s.whatsapp.net`;
       const ownBefore = phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length;
       phone.current().receive([message({ chat: friendJid, text: "Is the meeting still on?" })]);
-      // The owner's own chat still gets the notice, and it comes after the contact's message.
       phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "marker 0" })]);
       await until(
         () => phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length > ownBefore,
@@ -665,12 +669,59 @@ try {
       return { contactPosts: 0 };
     });
 
+    await step("no orchestrator: a lead's reply to an agent's post reaches that agent (#9978)", async () => {
+      await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: LEAD, kind: "contact", name: "Lead" }));
+      const sales = await runCauseEffect(
+        agents.createAgentProfile({
+          name: "Sales",
+          description: "Writes to leads.",
+          avatarSeed: "sales",
+          avatarHue: null,
+        }),
+      );
+      const post = "Hello, do you still need the offer?";
+      const reply = await leadReply(agents, mailbox, LEAD, sales.id, post);
+      assert.equal(reply.agentId, sales.id, "The reply did not reach the agent that posted.");
+      assert.ok(reply.prompt.includes(`OpenBot, a post of yours: ${post}`), "The agent does not see its own post.");
+      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, LEAD));
+      await postAs(agents, sales.id, OWNER_JID, "Your morning report.");
+      const notices = () => phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length;
+      const before = notices();
+      phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "Thanks, and the leads?" })]);
+      await until(() => notices() > before, "the setup text in the owner's own chat");
+      assert.equal(
+        agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm"),
+        null,
+        "An agent's post took the owner's own chat.",
+      );
+      return { agent: "Sales", ownChat: "setup text" };
+    });
+
     await step("orchestrator: one WhatsApp Orchestrator answers new conversations", async () => {
       const added = await runCauseEffect(messaging.addWhatsAppOrchestrator({}));
       const agent = agents.listAgents().find((candidate) => candidate.id === added.agentId);
       assert.equal(agent?.name, "WhatsApp Orchestrator");
       assert.equal(connection(messaging)?.orchestratorAgentId, added.agentId);
       return { agentId: added.agentId };
+    });
+
+    await step("orchestrator: a lead's reply to a teammate's post names the teammate (#9978)", async () => {
+      await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: OTHER_LEAD, kind: "contact", name: "Lead" }));
+      const sales = agents.listAgents().find((agent) => agent.name === "Sales");
+      assert.ok(sales, "No Sales agent.");
+      const post = "Hello, the offer is ready.";
+      const reply = await leadReply(agents, mailbox, OTHER_LEAD, sales.id, post);
+      assert.equal(
+        reply.agentId,
+        connection(messaging)?.orchestratorAgentId,
+        "The orchestrator lost the conversation.",
+      );
+      assert.ok(
+        reply.prompt.includes(`OpenBot, a post by your teammate Sales: ${post}`),
+        "The orchestrator does not know which teammate wrote to the lead.",
+      );
+      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, OTHER_LEAD));
+      return { agent: "WhatsApp Orchestrator", teammate: "Sales" };
     });
 
     await step("own chat: the owner's message reaches the orchestrator and gets 👀", async () => {
@@ -688,12 +739,9 @@ try {
       assert.ok(own);
       phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "👀", id: own.id })]);
       phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "echo", id: own.id })], "append");
-      // Another OpenBot linked to the same number posts with ids that this one does not know: its status
-      // post, and an answer of OpenBot 0.70 or older, which ends with a line of blank braille characters.
       const otherStatus = message({ chat: OWNER_JID, fromMe: true, text: "Working on it…\n\nReply stop to stop." });
       const otherAnswer = message({ chat: OWNER_JID, fromMe: true, text: `Here you go.\n${"\u2800".repeat(36)}` });
       phone.current().receive([otherStatus, otherAnswer]);
-      // A later message is read, so the posts above were read and dropped.
       const later = message({ chat: OWNER_JID, fromMe: true, text: "And tomorrow?" });
       phone.current().receive([later]);
       await until(() => received(agents, OWNER_JID, later.key.id ?? ""), "the later message");
@@ -710,10 +758,8 @@ try {
       async () => {
         const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
         assert.ok(handle, "No open store.");
-        // The transport journals each message that it hands on, in the order that WhatsApp gives them.
         const journaled = (id: string | null | undefined) =>
           handle.store.unhandled().some((entry) => entry.dedupKey === `${OWNER_JID}:${id}`);
-        // WhatsApp sends the messages that it held for the device as `append`, with their send time.
         const held = (text: string, minutesAgo: number) => {
           const sent = message({ chat: OWNER_JID, fromMe: true, text });
           sent.messageTimestamp = Math.floor((Date.now() - minutesAgo * 60_000) / 1_000);
@@ -725,13 +771,11 @@ try {
           await until(() => journaled(marker.key.id), label);
         };
 
-        // The first socket after the link gets the number's history: an old `append` is not a new request.
         const history = held("from before the link", 5);
         phone.current().receive([history], "append");
         await readUpTo("a live message on the new link");
         assert.equal(journaled(history.key.id), false, "A new link answered a message from its history.");
 
-        // The computer sleeps and wakes. The next socket of the number gets no history, only held messages.
         const sockets = phone.sockets.length;
         messaging.resume();
         await until(() => phone.sockets.length > sockets && connection(messaging)?.state === "connected", "the wake");
@@ -741,7 +785,6 @@ try {
         await readUpTo("a live message after the wake");
         assert.equal(journaled(recent.key.id), true, "A message that WhatsApp held during the sleep was dropped.");
         assert.equal(journaled(old.key.id), false, "A message older than the held-message window was answered.");
-        // What is not answered is still saved, so an agent can read it with `messaging_history`.
         const saved = new Set(
           agents.messaging.history.recent(connectionId(agents), OWNER_JID, null, 200).map((entry) => entry.id),
         );
@@ -754,14 +797,12 @@ try {
     await step("status post: a number with the setting off gets no “Working on it…” post", async () => {
       const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
       assert.ok(link, "No conversation for the owner's chat.");
-      // No provider runs here, so the check starts the request itself: a start names its request.
       const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
       assert.ok(request, "No request waits in the owner's chat.");
       await runCauseEffect(mailbox.markStarting(request.delivery.id));
       const scope = Effect.runSync(Scope.make());
       const start = (turnId: string) =>
         agents.messaging.event({ type: "turn-started", agentId: link.agentId, threadId: link.threadId, turnId }, scope);
-      // Posts and edits: a second start edits the post of the first one.
       const working = () =>
         phone.sent.filter(
           (sent) =>
@@ -777,11 +818,9 @@ try {
       start("turn-without-status-post");
       await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, true));
       assert.equal(messaging.whatsappOverview().accounts[0]?.workingMessage, true);
-      // The host handles the starts in order, so the post of this one shows that the first is done.
       start("turn-with-status-post");
       await until(() => working() > before, "the “Working on it…” post");
       assert.equal(working(), before + 1, "A number with the setting off got a “Working on it…” post.");
-      // The request waits again, as the steps below expect.
       await runCauseEffect(mailbox.restoreQueued(request.delivery.id));
       return { posts: working() - before };
     });
@@ -789,15 +828,12 @@ try {
     await step("failed turn: the chat gets the catalog reason, never the provider's own text (#11303)", async () => {
       const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
       assert.ok(link, "No conversation for the owner's chat.");
-      // Posts and edits: the end of a request edits its status post.
       const texts = () =>
         phone.sent.flatMap((sent) =>
           sent.jid === OWNER_JID && "text" in sent.content && typeof sent.content.text === "string"
             ? [sent.content.text]
             : [],
         );
-      // No provider runs here, so the step ends each turn as the turn lifecycle does: the failure is
-      // stored on the request before the turn's end.
       const failTurn = async (turnId: string, error: string) => {
         const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
         assert.ok(request, "No request waits in the owner's chat.");
@@ -817,7 +853,6 @@ try {
       await failTurn("turn-provider-text", "Claude Code failed: /home/ana/.claude/settings.json is not valid.");
       await until(() => generalPosts() > before, "the general text");
       assert.ok(!texts().some((text) => text.includes("/home/ana")), "The provider's own text reached WhatsApp.");
-      // Another OpenBot on the same number posts such a reason with ids that this one does not know.
       const otherReason = message({ chat: OWNER_JID, fromMe: true, text: signIn });
       phone.current().receive([otherReason]);
       const later = message({ chat: OWNER_JID, fromMe: true, text: "after the other OpenBot's reason" });
@@ -828,7 +863,6 @@ try {
         false,
         "Another OpenBot's reason was a request.",
       );
-      // The steps below expect the owner to have as many waiting requests as the limit permits.
       for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
         const again = message({ chat: OWNER_JID, fromMe: true, text: `request again ${index}` });
         phone.current().receive([again]);
@@ -837,7 +871,7 @@ try {
       return { reason: signIn, general };
     });
 
-    await step("answer: an email address and a link stay, and a secret is masked", async () => {
+    await step("answer: an email address, a link and an asked password stay, and an API key is masked", async () => {
       const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
       assert.ok(link, "No conversation for the owner's chat.");
       const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
@@ -846,8 +880,8 @@ try {
       const scope = Effect.runSync(Scope.make());
       const turn = { agentId: link.agentId, threadId: link.threadId, turnId: "turn-answer-with-address" };
       agents.messaging.event({ type: "turn-started", ...turn }, scope);
-      // No provider runs here, so the step stores the agent's answer as the turn lifecycle does.
-      const answer = "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2";
+      const answer =
+        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2, key sk-ant-api03-e2efakekey";
       const snapshot = database.readConversation(link.agentId, link.threadId);
       snapshot.messages.push({
         id: `${turn.turnId}:answer`,
@@ -861,8 +895,7 @@ try {
       await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
       agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
       const expected =
-        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=[redacted]";
-      // Posts and edits: the answer takes the place of the status post.
+        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2, key [redacted]";
       const texts = () =>
         phone.sent.flatMap((sent) =>
           sent.jid === OWNER_JID && "text" in sent.content && typeof sent.content.text === "string"
@@ -872,8 +905,7 @@ try {
       await until(() => texts().some((text) => text.includes("kontakt")), "the answer");
       const posted = texts().find((text) => text.includes("kontakt"));
       assert.equal(posted, expected, "The answer changed on its way to WhatsApp.");
-      assert.ok(!texts().some((text) => text.includes("hunter2")), "A secret reached WhatsApp.");
-      // The steps below expect the owner to have as many waiting requests as the limit permits.
+      assert.ok(!texts().some((text) => text.includes("e2efakekey")), "An API key reached WhatsApp.");
       for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
         const again = message({ chat: OWNER_JID, fromMe: true, text: `answer request again ${index}` });
         phone.current().receive([again]);
@@ -1005,7 +1037,6 @@ try {
           text: "@48600100200 summarize the release",
           mentions: [OWNER_JID],
         });
-        // The owner writes in the group from the phone: saved for the history, never answered, also with a mention.
         const ownerReply = message({
           chat: GROUP,
           fromMe: true,
@@ -1064,7 +1095,6 @@ try {
       async () => {
         const folder = await mkdtemp(join(tmpdir(), "openbot-wa-post-"));
         const png = join(folder, "offer.png");
-        // A 1×1 PNG.
         writeFileSync(
           png,
           Buffer.from(
@@ -1100,7 +1130,6 @@ try {
             "The result names another message.",
           );
 
-          // A text that is too long for a caption goes before the file, as before.
           from = phone.sent.length;
           const long = "Long ".repeat(300).trim();
           const apart = await post({ text: long, files: ["offer.png"] });
@@ -1113,7 +1142,6 @@ try {
             ["text", "file"],
           );
 
-          // WhatsApp refuses the captioned post: it fails, and no second post goes, which WhatsApp would count too.
           phone.refused.set(GROUP, "463");
           from = phone.sent.length;
           const refusedPost = await post({ text: "Refused", files: ["offer.png"] }).finally(() =>
@@ -1127,7 +1155,6 @@ try {
             "A refused post was sent again apart.",
           );
 
-          // The socket closes after it took the text, before WhatsApp's ack: the text goes again with its id.
           const sockets = phone.sockets.length;
           phone.dropNext = GROUP;
           const resent = await post({ text: "Lost once" });
@@ -1161,7 +1188,6 @@ try {
         messageTimestamp: Math.floor(Date.now() / 1_000),
         pushName: "Ewa",
       });
-      // WhatsApp sends the HD copy about 1 s later, with its own id, and names the normal copy.
       const hdCopy = (id: string, firstId: string): WAMessage => ({
         key: { remoteJid: GROUP, fromMe: false, id, participant: author },
         message: {
@@ -1176,11 +1202,8 @@ try {
         messageTimestamp: Math.floor(Date.now() / 1_000),
         pushName: "Ewa",
       });
-      // Each message that the service takes gets a reaction: 👀, or ❌ when the agent's queue is full.
       phone.current().receive([photo("IN-HD-NORMAL")]);
       await until(() => phone.reactedTo("IN-HD-NORMAL"), "the answer to the normal copy");
-      // The messages are read in order, so the HD copy is read before the last one. An HD copy of a photo
-      // that this number never read is still a message.
       phone.current().receive([hdCopy("IN-HD-COPY", "IN-HD-NORMAL"), hdCopy("IN-HD-ALONE", "IN-HD-NEVER-SEEN")]);
       await until(() => phone.reactedTo("IN-HD-ALONE"), "the answer to the HD copy of an unread photo");
       assert.equal(phone.reactedTo("IN-HD-COPY"), false, "The HD copy got a second answer.");
@@ -1218,7 +1241,6 @@ try {
           agents.messaging.history.recent(id, GROUP, null, 200).find((entry) => entry.id === messageId)?.text;
         phone.current().receive([fileMessage("IN-KEEP-1", "first.txt"), fileMessage("IN-KEEP-2", "second.txt")]);
         await until(() => savedText("IN-KEEP-2"), "the two saved file messages");
-        // The fake messages have no media key, so the downloads at arrival fail; copies stand in for them.
         const folder = runtime.filesPath(id);
         mkdirSync(folder, { recursive: true });
         const first = join(folder, "copy-first.txt");
@@ -1239,7 +1261,6 @@ try {
             key: { remoteJid: GROUP, id: "IN-KEEP-1", participant: author },
             editedMessage: { conversation: "the first file, renamed" },
           }),
-          // Another member names Ewa's message: the sender chooses the id, so neither change counts.
           change(
             "EDIT-FORGED",
             {
@@ -1305,7 +1326,6 @@ try {
         assert.equal(early.messages.length, 0, "before did not limit the read.");
         const late = await readHistory(agents, { place: GROUP, before: "2999-01-01T00:00:00+02:00" });
         assert.equal(late.messages.length, all.messages.length);
-        // The fake message has no media key, so the download at arrival fails; a copy stands in for it.
         const folder = runtime.filesPath(id);
         mkdirSync(folder, { recursive: true });
         const copy = join(folder, "copy-plan.pdf");
@@ -1315,7 +1335,10 @@ try {
         assert.deepEqual(withPath.messages[0]?.files, [{ name: "plan.pdf", path: copy }]);
         const values = credentials.get(id);
         assert.ok(values);
-        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+          connectionId: "whatsapp-e2e",
+          rateLimited: () => {},
+        });
         await runCauseEffect(adapter.identify());
         const destination = join(root, "downloaded-plan.pdf");
         await runCauseEffect(
@@ -1332,7 +1355,6 @@ try {
           ),
         );
         assert.equal(readFileSync(destination, "utf8"), "plan", "The download did not use the saved copy.");
-        // A message that arrived 91 days ago: the next start deletes it and its copy.
         oldCopy = join(folder, "copy-old.txt");
         writeFileSync(oldCopy, "old");
         const sentAt = new Date(Date.now() - 91 * 24 * 60 * 60_000).toISOString();
@@ -1363,6 +1385,30 @@ try {
       },
     );
 
+    await step(
+      "saved history: a group message that first arrives undecryptable is saved when it comes again",
+      async () => {
+        const id = connectionId(agents);
+        const key = { remoteJid: GROUP, fromMe: false, id: "IN-RESENT", participant: `${FRIEND}@s.whatsapp.net` };
+        const messageTimestamp = Math.floor(Date.now() / 1_000);
+        phone.current().receive([
+          {
+            key,
+            messageTimestamp,
+            messageStubType: proto.WebMessageInfo.StubType.CIPHERTEXT,
+            messageStubParameters: ["No SenderKeyRecord found for decryption"],
+          },
+        ]);
+        phone.current().receive([{ key, messageTimestamp, message: { conversation: "coupon 10" }, pushName: "Ewa" }]);
+        const saved = await until(
+          () => agents.messaging.history.recent(id, GROUP, null, 200).find((entry) => entry.id === "IN-RESENT"),
+          "the resent message",
+        );
+        assert.equal(saved.text, "coupon 10");
+        return { saved: true };
+      },
+    );
+
     await step("LID authors: a LID chat with a phone form, and a LID group member, map to their numbers", async () => {
       const input = parseWhatsAppSenderInput({
         workspaceId: OWNER,
@@ -1387,11 +1433,46 @@ try {
       return { chat: `${LID_FRIEND}@s.whatsapp.net` };
     });
 
+    await step("LID contacts: posts, edits and reactions to a contact with a LID go to the LID chat", async () => {
+      const values = credentials.get(connectionId(agents));
+      assert.ok(values);
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+        connectionId: "whatsapp-e2e",
+        rateLimited: () => {},
+      });
+      await runCauseEffect(adapter.identify());
+      const target = { platformChannelId: `${LID_FRIEND}@s.whatsapp.net`, replyThreadId: null };
+      const sentFrom = phone.sent.length;
+      const status = await runCauseEffect(adapter.post(target, { text: "Working on it" }));
+      await runCauseEffect(adapter.postAnswer(target, "Done", status));
+      await runCauseEffect(adapter.react(target, "IN-LID-REACT", "done", true));
+      const sent = phone.sent
+        .slice(sentFrom)
+        .filter((entry) => entry.jid === LID_FRIEND_CHAT || entry.jid === `${LID_FRIEND}@s.whatsapp.net`);
+      assert.ok(
+        sent.every((entry) => entry.jid === LID_FRIEND_CHAT),
+        "A post to a contact with a LID went to the phone number, where WhatsApp may not deliver it.",
+      );
+      assert.ok(phone.textsTo(LID_FRIEND_CHAT).includes("Working on it"), "The status post did not go out.");
+      const edit = sent.find((entry) => "edit" in entry.content && entry.content.edit?.id === status)?.content;
+      assert.ok(
+        edit && "edit" in edit && edit.edit?.remoteJid === LID_FRIEND_CHAT,
+        "The answer did not edit the status post in the LID chat.",
+      );
+      const reaction = sent.find(
+        (entry) => "react" in entry.content && entry.content.react.key?.id === "IN-LID-REACT",
+      )?.content;
+      assert.ok(
+        reaction && "react" in reaction && reaction.react.key?.remoteJid === LID_FRIEND_CHAT,
+        "The reaction names another chat.",
+      );
+      return { chat: LID_FRIEND_CHAT, posts: sent.length };
+    });
+
     await step(
       "Brazilian numbers: a contact typed with the 9 gets work through the form that WhatsApp sends",
       async () => {
         const accountJid = `${BRAZIL_ACCOUNT}@s.whatsapp.net`;
-        // A contact saved before WhatsApp named the form: the typed number is in the settings.
         agents.messaging.store.addAllowedSender(connectionId(agents), {
           id: BRAZIL_TYPED,
           kind: "contact",
@@ -1402,13 +1483,15 @@ try {
         await until(() => received(agents, accountJid, saved.key.id ?? ""), "the message of the saved contact");
         const values = credentials.get(connectionId(agents));
         assert.ok(values);
-        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+          connectionId: "whatsapp-e2e",
+          rateLimited: () => {},
+        });
         await runCauseEffect(adapter.identify());
         await runCauseEffect(
           adapter.postAnswer({ platformChannelId: accountJid, replyThreadId: null }, "Resposta", null),
         );
         await until(() => phone.textsTo(accountJid).includes("Resposta"), "the answer to the saved contact");
-        // A contact added while the number is connected gets the form that WhatsApp has.
         agents.messaging.store.removeAllowedSender(connectionId(agents), BRAZIL_TYPED);
         const input = parseWhatsAppSenderInput({
           workspaceId: OWNER,
@@ -1418,7 +1501,6 @@ try {
         const ids = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
         assert.ok(ids.includes(BRAZIL_ACCOUNT), "The contact was not saved in the form that WhatsApp has.");
         assert.ok(!ids.includes(BRAZIL_TYPED), "The contact was saved as typed.");
-        // An agent writes the number as the person typed it: the post goes to the form that WhatsApp has.
         const posted = await runCauseEffect(
           agents.messaging.outboundTool(
             "agent-whatsapp-e2e",
@@ -1486,7 +1568,10 @@ try {
     await step("adapter: a post outside the allowed chats is refused, and a late edit becomes a new post", async () => {
       const values = credentials.get(connectionId(agents));
       assert.ok(values);
-      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+        connectionId: "whatsapp-e2e",
+        rateLimited: () => {},
+      });
       await runCauseEffect(adapter.identify());
       const refused = await Effect.runPromise(
         Effect.result(
@@ -1494,7 +1579,6 @@ try {
         ),
       );
       assert.equal(refused._tag, "Failure", "A post to a chat that is not allowed went out.");
-      // A person who only got a pairing code is not allowed either.
       const pending = await Effect.runPromise(
         Effect.result(
           adapter.postAnswer({ platformChannelId: "48600999901@s.whatsapp.net", replyThreadId: null }, "hi", null),
@@ -1506,7 +1590,6 @@ try {
         adapter.edit({ platformChannelId: OWNER_JID, replyThreadId: null }, "UNKNOWN-POST", { text: "Updated" }),
       );
       await until(() => phone.textsTo(OWNER_JID).length === before + 1, "the edit as a new post");
-      // A post in the owner's own chat ends at its last line of text (#8802).
       assert.equal(phone.textsTo(OWNER_JID).at(-1), "Updated", "A post in the owner's own chat has extra text.");
       const contactJid = `${STRANGER}@s.whatsapp.net`;
       await runCauseEffect(
@@ -1519,7 +1602,10 @@ try {
     await step("adapter: a post that the server refuses in its ack fails, and is not reported as sent", async () => {
       const values = credentials.get(connectionId(agents));
       assert.ok(values);
-      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+        connectionId: "whatsapp-e2e",
+        rateLimited: () => {},
+      });
       await runCauseEffect(adapter.identify());
       const contactJid = `${STRANGER}@s.whatsapp.net`;
       phone.refused.set(contactJid, "463");
@@ -1549,20 +1635,20 @@ try {
     await step("adapter: an answer that mentions a person is a new post that notifies them", async () => {
       const values = credentials.get(connectionId(agents));
       assert.ok(values);
-      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+        connectionId: "whatsapp-e2e",
+        rateLimited: () => {},
+      });
       await runCauseEffect(adapter.identify());
       const target = { platformChannelId: OWNER_JID, replyThreadId: null };
       const sentFrom = phone.sent.length;
-      // Without a mention, the answer replaces the status post in place.
       const quiet = await runCauseEffect(adapter.post(target, { text: "Working on it…" }));
-      // An email address and a number in code mention nobody.
       const quietText = `Done. Mail support@${FRIEND}.example, run \`ping @${FRIEND}\`.`;
       assert.equal(await runCauseEffect(adapter.postAnswer(target, quietText, quiet)), quiet);
       assert.ok(
         phone.sent.some((sent) => "edit" in sent.content && sent.content.edit?.id === quiet),
         "An answer without a mention did not edit the status post.",
       );
-      // An edit notifies nobody: the status post goes, and the answer is a new post that lists the person.
       const status = await runCauseEffect(adapter.post(target, { text: "Working on it…" }));
       const answerId = await runCauseEffect(adapter.postAnswer(target, `Done, @${FRIEND}.`, status));
       assert.notEqual(answerId, status, "An answer with a mention kept the edited status post.");
@@ -1582,8 +1668,6 @@ try {
     });
   });
 
-  // A crash after WhatsApp delivered two messages: one reached the mailbox, one did not. Their journal
-  // entries are still unhandled, as a crash leaves them.
   const crash = await (async () => {
     const store = openConnectionStore();
     const done = message({ chat: `${LID_FRIEND}@s.whatsapp.net`, text: "status?", id: lidDirectId });
@@ -1603,7 +1687,6 @@ try {
     await step(
       "restart after a crash: the journal replays the lost message once, and not the one in the mailbox",
       async () => {
-        // Dan already has two requests waiting, so the replayed one gets the busy answer: it was read.
         await until(() => phone.reactedTo(crash.lostId), "the replayed message");
         const reactions = phone.sent.filter(
           (sent) => "react" in sent.content && sent.content.react.key?.id === lidDirectId,
@@ -1617,12 +1700,10 @@ try {
       await until(() => connection(messaging)?.state === "connected", "connected after restart");
       const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
       assert.ok(handle, "No open store after the restart.");
-      // The service enqueues within moments, so the earlier boot's messages are in the mailbox.
       const reactions = phone.reactionsTo(OWNER_JID);
       const strangerReactions = phone.reactionsTo(`${STRANGER}@s.whatsapp.net`);
       const marker = message({ chat: OWNER_JID, fromMe: true, text: "after restart" });
       phone.current().receive([marker]);
-      // The owner already has two requests waiting, so this one gets the busy answer: it was read.
       await until(() => phone.reactedTo(marker.key.id), "a message after the restart");
       await until(() => phone.reactionsTo(OWNER_JID) === reactions + 1, "one new reaction");
       assert.equal(phone.reactionsTo(OWNER_JID), reactions + 1, "A replayed message was answered again.");
@@ -1640,11 +1721,9 @@ try {
       assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, true, "Reactions are not on by default.");
       await runCauseEffect(messaging.setWhatsAppStatusReactions(OWNER, false));
       assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, false);
-      // The owner still has requests waiting, so each new message gets the busy answer.
       const quiet = message({ chat: OWNER_JID, fromMe: true, text: "no reaction, please" });
       phone.current().receive([quiet]);
       await until(() => busy() === posts + 1, "the busy answer with reactions off");
-      // The reverse action. The host reads messages in order, so this reaction shows that the first one is done.
       await runCauseEffect(messaging.setWhatsAppStatusReactions(OWNER, true));
       assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, true);
       const loud = message({ chat: OWNER_JID, fromMe: true, text: "a reaction again" });
@@ -1687,18 +1766,15 @@ try {
             text: `@48600100200 ${text}`,
             mentions: [OWNER_JID],
           });
-        // A person who sends many messages at once, such as forwarded files, is not a loop.
         const burst = Array.from({ length: 35 }, (_, index) =>
           message({ chat: OWNER_JID, fromMe: true, text: `note ${index}` }),
         );
         phone.current().receive(burst);
         const afterBurst = mention("after the burst");
         phone.current().receive([afterBurst]);
-        // Messages are read in order, and the mention goes on after the joined burst.
         await until(() => phone.reactedTo(afterBurst.key.id), "a group mention after the burst");
         assert.equal(paused(), 0, "A burst of messages paused the owner's own chat.");
         assert.equal(journaled(OWNER_JID, burst[0]?.key.id), true, "The burst did not go on as one request.");
-        // Two OpenBots that answer each other's posts send a request every few seconds, without end.
         const start = Date.now() - 31 * 12_000;
         const loop = Array.from({ length: 31 }, (_, index) => {
           const sent = message({ chat: OWNER_JID, fromMe: true, text: `loop ${index}` });
@@ -1707,7 +1783,6 @@ try {
         });
         phone.current().receive(loop);
         await until(() => paused() === 1, "the pause notice");
-        // The requests before the limit go on as one joined burst first, so the next ones stand alone.
         await until(() => !journaled(OWNER_JID, loop[1]?.key.id), "the loop requests before the limit");
         const during = message({ chat: OWNER_JID, fromMe: true, text: "during the pause" });
         const stop = message({ chat: OWNER_JID, fromMe: true, text: "stop" });
@@ -1715,7 +1790,6 @@ try {
         phone.current().receive([during]);
         phone.current().receive([stop]);
         phone.current().receive([marker]);
-        // The mention goes on after the owner's messages above, so they were read.
         await until(() => phone.reactedTo(marker.key.id), "a group mention during the pause");
         assert.equal(journaled(OWNER_JID, during.key.id), false, "The paused chat took a request.");
         assert.equal(journaled(OWNER_JID, stop.key.id), true, "A stop request did not go through the pause.");
@@ -1747,7 +1821,6 @@ try {
         await runCauseEffect(messaging.reconnect("whatsapp", OWNER, true));
         await until(() => connection(messaging)?.state === "connected", "connected after Reconnect");
 
-        // The send waits for the socket while it is down, then goes out.
         phone.current().close(428);
         await until(() => connection(messaging)?.state === "reconnecting", "reconnecting");
         const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
@@ -1784,7 +1857,6 @@ try {
       await linkState(messaging, (state) => state.qr !== null, "the new link's QR code");
       release();
       await until(() => phone.pairingDone === done + 1, "the late failure of the old request");
-      // The failure runs as a dispatched Effect: one turn of the event loop lets it finish.
       await new Promise((resolve) => setImmediate(resolve));
       const after = messaging.whatsappLinkState();
       assert.equal(after.status, "waiting", "The old request's late failure ended the new link.");
@@ -1805,7 +1877,6 @@ try {
         assert.equal(started.status, "waiting");
         const withCode = await linkState(messaging, (state) => state.code !== null, "a pairing code");
         assert.equal(withCode.code, PAIRING_CODE);
-        // WhatsApp answers `bad-request` to the code request of a browser name it does not know.
         assert.equal(phone.current().config.browser?.[1], "Chrome", "A pairing-code link does not show as Chrome.");
         phone.current().scan();
         await linkState(messaging, (state) => state.status === "linked", "the second link");
@@ -1831,13 +1902,12 @@ try {
       const file = storeFile(agents);
       const orchestrator = connection(messaging)?.orchestratorAgentId;
       const logouts = phone.logouts;
-      // No provider runs here, so the orchestrator still holds the requests of the steps above. A busy
-      // orchestrator stops a disconnect, as for the other platforms, so each person stops theirs first.
       const authors: Record<string, string> = {
         [OWNER_JID]: OWNER,
         [`${STRANGER}@s.whatsapp.net`]: STRANGER,
         [`${LID_FRIEND}@s.whatsapp.net`]: LID_FRIEND,
         [`${BRAZIL_ACCOUNT}@s.whatsapp.net`]: BRAZIL_ACCOUNT,
+        [`${OTHER_LEAD}@s.whatsapp.net`]: OTHER_LEAD,
         [GROUP]: FRIEND,
       };
       for (const link of agents.messaging.store.links(orchestrator ?? ""))
@@ -1857,6 +1927,75 @@ try {
       return { disconnected: true };
     });
   });
+
+  await step(
+    "a socket that stops handling messages reconnects by itself, and stops after three stalls in an hour",
+    async () => {
+      let clock = Date.now();
+      const store = WhatsAppAuthStore.open({ path: join(root, "stall.db"), key: newStoreKey(), now: () => clock });
+      store.creds.me = { id: `${OWNER}:7@s.whatsapp.net` };
+      store.saveCreds();
+      const session = new WhatsAppSession({
+        store,
+        createSocket: phone.create,
+        makeSignalRepository: () => {
+          throw new Error("Not used by the fake socket.");
+        },
+        fetchVersion: async () => null,
+        now: () => clock,
+      });
+      const advance = (ms: number) => {
+        clock += ms;
+        phone.current().keepAlive();
+      };
+      const stall = async (label: string) => {
+        const socket = phone.current();
+        socket.stallNode();
+        advance(5 * 60_000);
+        await until(() => socket.ended, label, 20_000);
+      };
+      try {
+        session.start();
+        await until(() => session.state === "open", "the first socket open");
+        await stall("a stalled node ends its socket");
+        await until(() => session.state === "open", "a new socket after the first stall");
+
+        phone.holdAcks = true;
+        const unconfirmed = phone.current();
+        const posted = await runCauseEffect(session.send(OWNER_JID, { text: "not confirmed" }));
+        phone.holdAcks = false;
+        assert.ok(posted.key.id, "The unconfirmed post failed.");
+        await until(() => unconfirmed.ended && session.state === "open", "a new socket after an unconfirmed post");
+
+        await stall("a second stalled node ends its socket");
+        await until(() => session.state === "open", "a new socket after the second stall");
+        await stall("a third stalled node ends its socket");
+        await until(() => session.state === "failing", "Needs attention after three stalls in an hour");
+
+        session.reconnect();
+        await until(() => session.state === "open", "connected after a wake");
+        await stall("a stall after the wake ends its socket");
+        await until(() => session.state === "open", "a new socket after a stall that follows the wake");
+
+        await runCauseEffect(session.stop());
+        session.start();
+        await until(() => session.state === "open", "connected after Reconnect");
+        return {
+          states: [
+            "open after a stall",
+            "open after an unconfirmed post, which does not count",
+            "open after the second stall",
+            "failing after the third stall",
+            "open after a wake, and after one more stall",
+            "open after Reconnect",
+          ],
+        };
+      } finally {
+        await runCauseEffect(session.stop());
+        store.close();
+      }
+    },
+  );
 
   report.passed = true;
 } finally {

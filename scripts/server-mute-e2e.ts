@@ -1,12 +1,3 @@
-// Checks mute and unmute of a server's desktop notifications on the real main-process path. The
-// renderer's request goes through the real `servers:set-muted` IPC handler, with its sender check
-// and its decoder, into a real `RemoteServerManager` on a temporary profile. A finished agent turn
-// then goes through the real notification forwarder, with an Electron `Notification` that records
-// what it shows. The manager restarts on the same file, and the clock moves past a timed mute.
-// Only the local server is used, so no remote host or account is needed.
-// Run: `bun scripts/server-mute-e2e.ts`.
-// Writes .openbot-build/server-mute-e2e/report.json.
-
 import { setSystemTime } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -33,16 +24,12 @@ const UNTRUSTED_SENDER = { senderFrame: { url: "https://example.com/" } };
 const STEP_DEADLINE_MS = 30_000;
 const FIFTEEN_MINUTES = 15 * 60_000;
 
-// The sender check reads this variable in development. The packaged origin is the one checked here.
 delete process.env.ELECTRON_RENDERER_URL;
 
-/** The notifications that the forwarder showed, and the waiters for the next one. */
 const shown: { title: string; body: string }[] = [];
 const shownWaiters: (() => void)[] = [];
-/** The IPC listeners that the handlers registered, by channel. */
 const ipcListeners = new Map<string, (event: unknown, payload: unknown) => unknown>();
 
-// The main process imports Electron. No check here opens a window or a real notification.
 plugin({
   name: "server-mute-electron-boundary",
   setup(build) {
@@ -67,7 +54,6 @@ plugin({
       loader: "object",
       exports: {
         app: { getPath: () => tmpdir(), getVersion: () => APP_VERSION, isPackaged: false, on: () => undefined },
-        // The window is open and not focused: the case in which a notification is due.
         BrowserWindow: class UnfocusedWindow {
           static getAllWindows() {
             return [];
@@ -137,7 +123,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -160,6 +145,7 @@ const serversPath = join(userData, "remote-servers.json");
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -202,7 +188,6 @@ const teamBrowser: TeamApiBrowser = {
   copyViewSelection: unused,
   importSignIn: unused,
 };
-/** Stored tokens are not read here: the local server has none. */
 const cipher = {
   encrypt: (value: string) => Buffer.from(value, "utf8"),
   decrypt: (value: Buffer) => value.toString("utf8"),
@@ -216,7 +201,6 @@ const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
 const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
 let manager = new RemoteServerManager(serversPath, cipher, centralAccount, { appVersion: APP_VERSION });
 let agents: AgentService | undefined;
-/** Registers the IPC handler again after a restart. */
 let restarted = () => {};
 
 function isServerSummary(value: unknown): value is ServerSummary {
@@ -237,7 +221,6 @@ function localServer(servers: ServerSummary[]): ServerSummary {
   return server;
 }
 
-/** Resolves with the next list that the manager reports as changed. */
 function nextChange(): Promise<ServerSummary[]> {
   return new Promise((resolve) => manager.once("changed", resolve));
 }
@@ -256,7 +239,6 @@ async function restartManager(): Promise<void> {
 try {
   const setup = await step("Start the manager, an agent and the forwarder", async () => {
     await runCauseEffect(sidebar.initialize());
-    // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
     await runCauseEffect(agentStore.initialize());
     await runCauseEffect(mailbox.initialize());
     await runCauseEffect(team.initialize());
@@ -289,11 +271,11 @@ try {
     sendTeamInviteEmail: unused,
   });
   const channel = IPC_ENDPOINTS.servers.setMuted.channel;
-  /** Registers the real handler for the current manager, as the app does at each launch. */
   const bindHandler = () => {
     teamIpcHandlers({
       host,
       localServers: null,
+      ownerTransfers: { pendingOwnerTransfer: unused, startOwnerTransfer: unused, cancelOwnerTransfer: unused },
       remoteDesktop: new RemoteDesktopManager(manager),
       remoteServers: manager,
       takePendingInvite: () => null,
@@ -310,12 +292,12 @@ try {
   };
 
   let turn = 0;
-  /** A finished turn of the agent, as the agent service reports it. */
   const finishTurn = () => {
     turn += 1;
     createRendererForwarders({
       getMainWindow: () => mainWindow,
       getChatWindows: () => [],
+      chatWindowTarget: () => null,
       getAgentService: () => agents ?? null,
       getHostService: () => null,
       getHostAnalytics: () => null,
@@ -376,7 +358,6 @@ try {
       assert.equal(server.notificationsMuted, true);
       assert.equal(server.notificationsMutedUntil, null);
     }
-    // For the local server the gate and the notification finish before `forwardAgentEvent` returns.
     finishTurn();
     await restartManager();
     const restarted = localServer(manager.list());

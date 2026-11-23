@@ -165,7 +165,8 @@ the trace file and gives `HostAnalytics` one summary, sent as `system_remote_con
 makes its first request, and for the first failed attempt after a connection or a cancel. Later
 failures are counted in the next connection. An attempt is keyed by the id that `begin` returns, so
 an old attempt that ends late does not change a newer one. The host id stays in memory and is never
-sent. `RemoteServerManager` adds the time since its hosted start request. The account service times
+sent. The Signal home is the `signal` claim of the ticket (`signalHomeOf`), `entry` when there is
+no claim; the Signal address and the ticket are not sent. `RemoteServerManager` adds the time since its hosted start request. The account service times
 the hosted start itself: `start_requested_at` on `hosted_servers` holds the request time, and the
 first observation of a usable sandbox clears it and sends the `ready` action once.
 
@@ -185,9 +186,11 @@ counted, task requests from before task metering, and requests from before migra
 count. The last request counts, also in a session from before migration 15. An update with no
 `last` or no turn ID establishes a baseline.
 Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
-is optional. Missing fields remain unknown. ACP usage is a session total, with one counter for each
-session, except from Antigravity: from 1.4.3 it sends the tokens of one prompt, so each prompt result has its
-own counter, and its `thoughtTokens` count as output. Completed assistant messages exclude commentary and tool
+is optional. Missing fields remain unknown. Built-in ACP agents without their own rule book usage as a session
+total, with one counter for each session. Antigravity (from 1.4.3), OpenCode, Grok and custom agents send the
+tokens of one prompt, so each prompt result has its own counter. Antigravity's `thoughtTokens` count as output.
+The session cost of a custom agent stays cumulative in a separate counter, which keeps the ID of the old session
+counter, so a session that started before the per-prompt counters keeps its cost history. Completed assistant messages exclude commentary and tool
 output. Only post-install messages enter activity counts.
 
 `agent:get-analytics` and the capability-gated `GET /v1/agents/:agentId/analytics` return aggregates.

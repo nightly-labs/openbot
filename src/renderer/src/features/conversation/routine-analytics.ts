@@ -2,7 +2,6 @@ import type { RoutineSchedule } from "@openbot/contracts/ipc";
 import type { DesktopAnalyticsScope } from "../../analytics";
 import { webhookFailureCode } from "../../webhook-failure-code";
 
-/** The routine editor and the schedule page report a routine action with the same event. */
 export function trackRoutineAction(
   analytics: DesktopAnalyticsScope,
   action: "create" | "update" | "delete" | "test",

@@ -18,12 +18,12 @@ import { AgentCard, AppTile, FeaturedAgent, ListingRow } from "../components/mar
 import { MarketplaceSearchBar } from "../components/marketplace-search-bar";
 import {
   byPopularity,
-  CATEGORY_LABELS,
+  installsOf,
   isMarketplaceFiltered,
-  KIND_LABELS,
   type MarketplaceFilter,
   type MarketplaceKind,
   type MarketplaceListing,
+  marketplaceFilterTokens,
   matchesFilter,
   NO_MARKETPLACE_FILTER,
 } from "../model/marketplace-listings";
@@ -34,16 +34,9 @@ import {
   useMarketplaceInstalled,
 } from "../model/use-marketplace";
 
-/** The agents of the shelf and the skills of the list on the overview. */
 const OVERVIEW_ROWS = 8;
-/** The apps of the grid on the overview: two rows of four. */
 const OVERVIEW_APPS = 8;
 
-/**
- * The Marketplace of one server, from the drawer. The overview shows a featured agent, the popular
- * agents, the apps and the popular skills. The field at the bottom searches, and its filter menu
- * narrows the page to one kind, one category, or what the server already has.
- */
 export function MarketplaceScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -59,7 +52,6 @@ export function MarketplaceScreen() {
   const installed = useMarketplaceInstalled(serverId);
   const title = t("mobile.app.route.marketplace");
   const listing = (item: MarketplaceListing) => {
-    // A connector and an MCP server that the user added open their own pages, as on the desktop.
     if (item.kind === "app" && item.source === "connector") {
       router.push({ pathname: "/server-settings/connector", params: { serverId, id: item.connector } });
       return;
@@ -68,7 +60,6 @@ export function MarketplaceScreen() {
       router.push({ pathname: "/server-settings/mcp-server", params: { serverId, mcpServerId: item.server.id } });
       return;
     }
-    // The name goes along, so the sheet has its title before the listing loads.
     router.push({
       pathname: "/marketplace-listing",
       params: { serverId, kind: item.kind, id: item.id, name: item.name },
@@ -80,8 +71,6 @@ export function MarketplaceScreen() {
   };
   const listMode = isMarketplaceFiltered(filter) || catalog.search.length > 0;
 
-  // The agents, the skills or the custom MCP servers did not load. The bundled apps still show under it,
-  // with a way to retry.
   const loadFailed =
     server && catalog.failed ? (
       <View className="items-center gap-3 px-6 py-4">
@@ -104,7 +93,6 @@ export function MarketplaceScreen() {
         more={catalog}
         installed={installed}
         onOpen={listing}
-        // Add custom adds an MCP server, as on the desktop. The host refuses it to a user who cannot manage them.
         onAddCustom={
           canManageMcp
             ? () => {
@@ -136,11 +124,8 @@ export function MarketplaceScreen() {
       <AndroidBlurTarget target={blurTarget} surface="sheet">
         <Animated.ScrollView
           className="flex-1"
-          // The side insets go outside the scroll view, as in `LargeTitleScrollView`.
           style={{ marginLeft: insets.left, marginRight: insets.right }}
           contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-          // Android has no content inset, so the content starts below the transparent header. The bottom
-          // keeps the last row above the field.
           contentContainerStyle={{
             paddingTop: scroll.ownsInset ? scroll.headerHeight : 0,
             paddingBottom: insets.bottom + GLASS_CAPSULE_HEIGHT + 32,
@@ -195,11 +180,6 @@ function SectionHeader({ title, onShowAll }: { title: string; onShowAll?: () => 
   );
 }
 
-/** A listing's installs. Apps have no install count. */
-function installsOf(listing: MarketplaceListing): number {
-  return listing.kind === "app" ? 0 : listing.installs;
-}
-
 function Overview({
   listings,
   pending,
@@ -217,8 +197,6 @@ function Overview({
   const agents = listings.filter((item) => item.kind === "agent").sort(byPopularity);
   const apps = listings.filter((item) => item.kind === "app").sort(byPopularity);
   const skills = listings.filter((item) => item.kind === "skill").sort(byPopularity);
-  // The banner shows the agent with the most installs, so it follows the catalog as installs change.
-  // The catalog page is sorted by installs, so its first page holds the top agent.
   const featured = agents.reduce<MarketplaceListing | undefined>(
     (top, item) => (top === undefined || installsOf(item) > installsOf(top) ? item : top),
     undefined,
@@ -294,20 +272,14 @@ function FilteredList({
   listings: MarketplaceListing[];
   filter: MarketplaceFilter;
   pending: boolean;
-  /** The next catalog page, as the desktop "Load more". */
   more: Pick<MarketplaceCatalog, "hasMore" | "loadingMore" | "loadMoreFailed" | "loadMore">;
   installed: MarketplaceInstalled;
   onOpen: (listing: MarketplaceListing) => void;
-  /** Opens the form of a new MCP server. The Apps list shows it. */
   onAddCustom?: () => void;
   onClear: () => void;
 }) {
   const { t } = useText();
-  const parts = [
-    filter.kind ? t(KIND_LABELS[filter.kind]) : null,
-    filter.category ? t(CATEGORY_LABELS[filter.category]) : null,
-    filter.installed ? t("mobile.marketplace.installed") : null,
-  ].filter(Boolean);
+  const parts = marketplaceFilterTokens(filter, t).map((token) => token.label);
   return (
     <View className="gap-3 px-4">
       {parts.length > 0 ? (

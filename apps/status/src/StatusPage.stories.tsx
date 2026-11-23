@@ -10,8 +10,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** An open incident, planned maintenance, and 75 days of checks. */
 export const OpenIncident: Story = { render: () => <StatusPage status={STATUS_FIXTURE} now={FIXTURE_NOW} /> };
 
-/** No open incident. */
 export const AllClear: Story = { render: () => <StatusPage status={ALL_CLEAR_FIXTURE} now={FIXTURE_NOW} /> };

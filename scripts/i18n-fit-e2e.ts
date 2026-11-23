@@ -1,10 +1,3 @@
-// Opens every story of a running Storybook in each interface language, and finds control text that
-// does not fit: a button, tab, menu item, option, badge or select value whose text is cut off,
-// runs past its box, or wraps to a second line. Opens each menu and list trigger once, so the items
-// of a closed menu are measured too. Pass the URL that `bun run storybook` reports:
-// `bun scripts/i18n-fit-e2e.ts --storybook=http://localhost:6006 [--locales=de,pl] [--stories=sidebar,dialog]`.
-// Writes .openbot-build/i18n-fit/report.json and one screenshot per failure that English does not have.
-// `--out=<name>` writes to .openbot-build/<name> instead, so a second run keeps the first report.
 import assert from "node:assert/strict";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -15,7 +8,6 @@ import { type FitProblem, measureFit } from "./i18n-fit-probe";
 
 const logger = createOpenBotLogger("i18n-fit-e2e");
 
-/** The Storybook preview API that switches a global, such as the locale, without a reload. */
 interface StorybookPreview {
   onUpdateGlobals(update: { globals: { locale: string } }): Promise<void>;
 }
@@ -51,9 +43,7 @@ for (const locale of requestedLocales ?? []) {
 const locales: readonly TranslatedLocale[] = requestedLocales
   ? TRANSLATED_LOCALES.filter((locale) => requestedLocales.includes(locale))
   : TRANSLATED_LOCALES;
-// English runs first and always: it is the baseline that marks a failure as not caused by a translation.
 const order: TranslatedLocale[] = ["en", ...locales.filter((locale) => locale !== "en")];
-// Design explorations are not shipped screens.
 const includeExplorations = process.argv.includes("--include-explorations");
 
 interface StoryEntry {
@@ -71,12 +61,10 @@ interface Failure extends FitProblem {
   screenshot?: string;
 }
 
-/** A key whose English is plain text, with no placeholder or plural forms. */
 function isPlainKey(key: string, source: unknown): key is AppTextKey {
   return key in en && typeof source === "string" && !source.includes("{");
 }
 
-/** The keys whose plain text, in one language, is exactly this text. A guide for a reader, not proof. */
 const textIndex = new Map<TranslatedLocale, Map<string, string[]>>();
 function keysFor(locale: TranslatedLocale, text: string): string[] {
   let index = textIndex.get(locale);
@@ -116,7 +104,6 @@ async function setLocale(page: Page, locale: TranslatedLocale): Promise<void> {
 const POPUPS = "[role=menu],[role=listbox]";
 const TRIGGERS =
   ":is([aria-haspopup=menu],[aria-haspopup=listbox],[aria-haspopup=true]):not([aria-disabled=true],[disabled])";
-/** Rows of a list often repeat one menu. Opening a few distinct triggers is enough. */
 const MAX_TRIGGERS = 4;
 
 interface Measured {
@@ -124,18 +111,11 @@ interface Measured {
   problems: FitProblem[];
 }
 
-/**
- * Measures the story, then opens each distinct menu trigger in turn and measures what opens.
- * `record` runs while a popup is open, so its screenshots show the popup. English picks the
- * triggers by label, and each other language opens the same ones, so each popup scope has an
- * English baseline. `opened` says that a popup changed the story, so the next language must reload it.
- */
 async function measureStory(
   page: Page,
   englishPicks: readonly number[] | undefined,
   record: (measured: Measured) => Promise<void>,
 ): Promise<{ picked: readonly number[]; opened: boolean }> {
-  // Dialogs and toasts render outside the story root, so measure the whole frame.
   await record({ scope: "story", problems: await page.evaluate(measureFit, "body") });
   const picked = englishPicks ?? (await pickTriggers(page));
   let opened = false;
@@ -162,13 +142,11 @@ async function measureStory(
         () => true,
         () => false,
       );
-    // A popup that does not close covers the next trigger.
     if (!closed) break;
   }
   return { picked, opened };
 }
 
-/** The first visible trigger for each distinct label, up to `MAX_TRIGGERS`. */
 async function pickTriggers(page: Page): Promise<number[]> {
   const labels = await page
     .locator(TRIGGERS)
@@ -196,7 +174,6 @@ async function openStory(page: Page, id: string, attempt = 1): Promise<string | 
       () => null,
       (error: unknown) => (error instanceof Error ? error.message.split("\n")[0] : String(error)),
     );
-  // A navigation that a reload of the previous story interrupts reports ERR_ABORTED. One retry clears it.
   if (loaded) return attempt < 2 ? openStory(page, id, attempt + 1) : loaded;
   const state = await page
     .waitForFunction(
@@ -211,7 +188,6 @@ async function openStory(page: Page, id: string, attempt = 1): Promise<string | 
     .then((handle) => handle.jsonValue())
     .catch(() => "timeout");
   if (state === "ready") return null;
-  // The dev server sometimes fails one module fetch under load. A reload clears it.
   return attempt < 2 ? openStory(page, id, attempt + 1) : String(state);
 }
 
@@ -219,7 +195,6 @@ const failures: Failure[] = [];
 const skipped: { story: string; reason: string }[] = [];
 let shotCount = 0;
 
-/** A story past its deadline keeps running. `stopped` keeps its late results out of the report. */
 async function runStory(page: Page, entry: StoryEntry, run: { stopped: boolean }): Promise<void> {
   const problem = await openStory(page, entry.id);
   if (problem) {
@@ -267,7 +242,6 @@ async function runStory(page: Page, entry: StoryEntry, run: { stopped: boolean }
       });
       if (run.stopped) return;
       englishPicks ??= picked;
-      // A popup can leave the story in a state the next language should not start from.
       if (opened && locale !== order.at(-1)) {
         const reopened = await openStory(page, entry.id);
         if (reopened) throw new Error(reopened);
@@ -301,9 +275,6 @@ const browser: Browser = await chromium.launch(
   browserExecutable ? { executablePath: browserExecutable } : { channel: "chrome" },
 );
 const newPage = () => browser.newPage({ viewport: { width: 1280, height: 800 } });
-// A story that navigates away, such as a "Return to OpenBot" page, can leave an evaluate that never
-// settles, and a story can close its own window. The deadline and the closed-page check give the worker
-// a new page, so one story cannot stop the run.
 const STORY_DEADLINE_MS = 120_000;
 const queue = [...stories];
 let done = 0;
@@ -354,7 +325,6 @@ writeFileSync(
 logger.info(
   `Checked ${stories.length} stories in ${order.join(", ")}. ${translated.length} findings that English does not have. Wrote ${resolve(OUT, "report.json")}.`,
 );
-// A run that could not open most stories measured nothing, so its zero is not a result.
 const skippedStories = new Set(skipped.map((entry) => entry.story.replace(/ \(.+\)$/, ""))).size;
 assert.ok(
   skippedStories <= stories.length / 10,

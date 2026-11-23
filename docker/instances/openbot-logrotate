@@ -1,9 +1,4 @@
-# Rotates the container logs of the OpenBot instances. `openbot-instance setup` installs it as
-# /etc/openbot-docker/logrotate.conf, and openbot-logrotate.timer runs it every 5 minutes. A file is
-# rotated each day, or sooner when it is larger than 200 MB. The 30 newest rotated files are kept and
-# none older than 30 days, so one instance keeps at most 31 files on the disk of the host.
 /var/log/openbot/*.log {
-	# rsyslogd writes as syslog, which owns the folder.
 	su syslog adm
 	daily
 	maxsize 200M

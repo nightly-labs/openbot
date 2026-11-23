@@ -11,14 +11,11 @@ type Delta = Extract<AgentEvent, { type: "conversation-delta" }>;
 export interface MobileConversation extends ConversationPage {
   olderLoading: boolean;
   olderError: boolean;
-  /** The window was loaded around a searched message and does not reach the latest message. */
   detached: boolean;
 }
 type ReadPage = (cursor?: string) => Promise<ConversationPage>;
-/** The size of the window that the store keeps for a chat that nobody reads. */
 const KEPT_MESSAGES = 50;
 
-/** In-memory chat windows. Only subscribers to a changed agent are notified. */
 export class MobileConversationStore {
   #entries = new Map<string, MobileConversation>();
   #listeners = new Map<string, Set<() => void>>();
@@ -27,11 +24,11 @@ export class MobileConversationStore {
   #cancelFrame: (() => void) | null = null;
   #olderLoads = new Map<string, symbol>();
   #loads = new Map<string, { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean }>();
-  /** The first message and the cursor of the last latest page, where a closed chat can be cut. */
   #latestPages = new Map<string, { firstId: string; pageInfo: ConversationPage["pageInfo"] }>();
-  /** Chats whose latest page loaded on the current connection, so events keep them up to date. */
   #upToDate = new Set<string>();
-  /** Chats from the phone's cache. The first latest page from the host replaces them, at any revision. */
+  #missedLatest = new Set<string>();
+  #latestReads = new Map<string, number>();
+  #latestLoads = 0;
   #cached = new Set<string>();
 
   constructor(private schedule: (flush: () => void) => () => void) {}
@@ -44,26 +41,29 @@ export class MobileConversationStore {
     return Boolean(this.#listeners.get(agentId)?.size);
   }
 
-  /** True when the chat holds the latest messages and the connection has not stopped since they loaded. */
   isUpToDate(agentId: string) {
     return this.#upToDate.has(agentId) && this.get(agentId)?.detached === false;
   }
 
-  /** True when the chat already holds `revision` of `threadId` (any thread when omitted), so a page read adds nothing. */
   holdsRevision(agentId: string, revision: number, threadId?: string | null) {
     const entry = this.get(agentId);
     return Boolean(entry && entry.revision >= revision && (threadId === undefined || entry.threadId === threadId));
   }
 
-  /** A new connection can have missed events, so each chat loads again before it counts as current. */
+  missedLatest(agentId: string) {
+    return this.#missedLatest.has(agentId);
+  }
+
+  #markMissedLatest(agentId: string, load: number) {
+    if ((this.#latestReads.get(agentId) ?? 0) > load) return;
+    this.#upToDate.delete(agentId);
+    this.#missedLatest.add(agentId);
+  }
+
   markStale() {
     this.#upToDate.clear();
   }
 
-  /**
-   * Keeps an event change for a chat that nobody reads: it loads when it opens, not on each change.
-   * Returns true when the chat has a reader, so the caller reads its page now.
-   */
   invalidate(agentId: string) {
     if (this.isObserved(agentId)) return true;
     this.#upToDate.delete(agentId);
@@ -82,7 +82,6 @@ export class MobileConversationStore {
       if (!listeners.size) {
         this.#listeners.delete(agentId);
         const entry = this.get(agentId);
-        // A window around a searched message is not the chat that the next reader opens.
         if (entry?.detached) this.remove(agentId);
         else if (entry) this.#publish(agentId, entry);
       }
@@ -93,6 +92,8 @@ export class MobileConversationStore {
     this.#entries.delete(agentId);
     this.#latestPages.delete(agentId);
     this.#upToDate.delete(agentId);
+    this.#missedLatest.delete(agentId);
+    this.#latestReads.delete(agentId);
     this.#cached.delete(agentId);
     this.#indices.delete(agentId);
     this.#deltas.delete(agentId);
@@ -101,10 +102,6 @@ export class MobileConversationStore {
     for (const listener of this.#listeners.get(agentId) ?? []) listener();
   }
 
-  /**
-   * Takes a message that a member deleted out of the loaded window and the replies' references. A
-   * latest page keeps the older loaded messages, so the host's change event alone leaves it shown.
-   */
   removeMessage(agentId: string, messageId: string) {
     this.flush();
     const current = this.get(agentId);
@@ -117,6 +114,7 @@ export class MobileConversationStore {
 
   cancelRequests() {
     this.markStale();
+    for (const agentId of this.#loads.keys()) this.#missedLatest.add(agentId);
     this.#loads.clear();
     this.#olderLoads.clear();
     for (const [id, entry] of this.#entries) {
@@ -145,11 +143,6 @@ export class MobileConversationStore {
     for (const listener of this.#listeners.get(agentId) ?? []) listener();
   }
 
-  /**
-   * Keeps a chat that nobody reads at its last latest page and the messages after it, so it opens
-   * at once. The host cursor is opaque, so the store cuts only where a page started. Without that
-   * point a long window is dropped and loads again when the chat opens.
-   */
   #trim(agentId: string, entry: MobileConversation): MobileConversation | undefined {
     if (entry.messages.length <= KEPT_MESSAGES) return entry;
     const latest = this.#latestPages.get(agentId);
@@ -165,14 +158,12 @@ export class MobileConversationStore {
     };
   }
 
-  /** Shows a chat from the phone's cache. A chat that is already loaded stays. */
   restore(page: ConversationPage) {
     if (this.get(page.agentId)) return;
     this.applyPage(page);
     this.#cached.add(page.agentId);
   }
 
-  /** The chat as the phone keeps it: the last latest page and the messages after it. */
   cachedPage(agentId: string): ConversationPage | undefined {
     const current = this.get(agentId);
     const entry = current && !current.detached ? this.#trim(agentId, current) : undefined;
@@ -181,7 +172,6 @@ export class MobileConversationStore {
     return page;
   }
 
-  /** `attach` lets a latest page replace a window around a searched message. */
   applyPage(page: ConversationPage, cursor?: string, attach = false) {
     if (cursor) this.flush();
     const current = this.get(page.agentId);
@@ -191,9 +181,7 @@ export class MobileConversationStore {
     const sameThread = current?.threadId === page.threadId;
     const indices = sameThread ? this.#indices.get(page.agentId) : undefined;
     const overlap = page.messages.find((message) => indices?.has(message.id));
-    // A window around a searched message stays until a latest page meets it or the reader asks for the latest messages.
     if (!cursor && current?.detached && !overlap && !attach) return;
-    // A disconnected latest page must not leave an invisible gap in the history.
     const retain = Boolean(sameThread && (cursor || overlap));
     const oldMessages = retain && current ? current.messages : [];
     const oldById = new Map(oldMessages.map((message) => [message.id, message]));
@@ -232,10 +220,6 @@ export class MobileConversationStore {
     this.#publish(page.agentId, next);
   }
 
-  /**
-   * The loaded requests to teammates before the last latest page that a teammate still had open. That
-   * page kept them as they were, so the chat reads each one again (#9381).
-   */
   openExchangesBeforeLatest(agentId: string): string[] {
     const current = this.get(agentId);
     const firstId = this.#latestPages.get(agentId)?.firstId;
@@ -243,7 +227,6 @@ export class MobileConversationStore {
     return current && first > 0 ? openExchangesOutside(current.messages.slice(0, first), []) : [];
   }
 
-  /** Puts the host's copy of one loaded message in place, from a page around it. The window stays as it is. */
   replaceMessage(page: ConversationPage, messageId: string) {
     this.flush();
     const current = this.get(page.agentId);
@@ -256,12 +239,7 @@ export class MobileConversationStore {
     if (messages[index] !== current.messages[index]) this.#publish(page.agentId, { ...current, messages });
   }
 
-  /**
-   * Shows a page around a searched message. A page that meets the loaded window adds its older
-   * messages to it. Another page replaces the window until the latest messages load again.
-   */
   applyAround(page: ConversationPage) {
-    // A reader who left the chat does not need it, and the next one opens at the latest message.
     if (!this.isObserved(page.agentId)) return;
     this.flush();
     const current = this.get(page.agentId);
@@ -269,7 +247,6 @@ export class MobileConversationStore {
       current && !current.detached && current.threadId === page.threadId ? this.#indices.get(page.agentId) : undefined;
     const overlap = indices ? page.messages.findIndex((message) => indices.has(message.id)) : -1;
     if (current && overlap >= 0) {
-      // The window already starts at the page or before it.
       if (overlap === 0) return;
       this.#publish(page.agentId, {
         ...current,
@@ -298,6 +275,7 @@ export class MobileConversationStore {
       if (attach) pending.attach = true;
       return pending.promise;
     }
+    const serial = ++this.#latestLoads;
     const load: { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean } = {
       dirty: false,
       attach,
@@ -308,16 +286,24 @@ export class MobileConversationStore {
             load.dirty = false;
             page = await read();
             if (page.agentId !== agentId) throw new Error("The server returned a page for another conversation.");
-            if (!isCurrent() || this.#loads.get(agentId) !== load) return page;
+            if (!isCurrent() || this.#loads.get(agentId) !== load) {
+              this.#markMissedLatest(agentId, serial);
+              return page;
+            }
             this.applyPage(page, undefined, load.attach);
           } while (load.dirty);
           this.#upToDate.add(agentId);
+          this.#missedLatest.delete(agentId);
+          this.#latestReads.set(agentId, serial);
           return page;
+        })
+        .catch((error: unknown) => {
+          this.#markMissedLatest(agentId, serial);
+          throw error;
         })
         .finally(() => {
           if (this.#loads.get(agentId) === load) {
             this.#loads.delete(agentId);
-            // The held deltas apply after the page, also when the page is older than the window and changes nothing.
             if (this.#deltas.has(agentId)) this.flush();
           }
         }),
@@ -353,8 +339,6 @@ export class MobileConversationStore {
 
   enqueue(delta: Delta) {
     if (!this.get(delta.agentId)) return;
-    // A closed chat that missed changes reads its latest page when it opens. A delta would add the end
-    // of a message to its old window, and the phone's copy would keep that part message.
     if (!this.isObserved(delta.agentId) && !this.#upToDate.has(delta.agentId) && !this.#loads.has(delta.agentId))
       return;
     const pending = this.#deltas.get(delta.agentId) ?? [];
@@ -369,8 +353,6 @@ export class MobileConversationStore {
     const pending = this.#deltas;
     this.#deltas = new Map();
     for (const [agentId, deltas] of pending) {
-      // A delta that arrives during a latest-page read waits for the page: the page gives a new
-      // message its itemType (such as commentary), and its revision tells which deltas are newer.
       if (this.#loads.has(agentId)) {
         const later = this.#deltas.get(agentId);
         this.#deltas.set(agentId, later ? [...deltas, ...later] : deltas);
@@ -399,7 +381,6 @@ export class MobileConversationStore {
         const text = parts.join("");
         const index = indices.get(messageId);
         if (index === undefined) {
-          // A window around a searched message does not reach the newest messages.
           if (current.detached) continue;
           added = true;
           messages.push({

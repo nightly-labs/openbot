@@ -4,27 +4,16 @@ import { useText } from "@openbot/ui/text";
 import { For } from "solid-js";
 import type { OnboardingAvatarVariant } from "./onboarding-avatars";
 
-// A zigzag in the hand of the logo eyes. It fills from the left with the download, or draws and
-// erases while the wait has no percent.
 const SCRIBBLE_POINTS =
   "3 10 10 4 13 10 21 4 24 10 32 4 35 10 43 4 46 10 54 4 57 10 65 4 68 10 76 4 79 10 87 4 90 10 98 4 101 10 109 4";
 
 interface FirstRunLaunchProps {
-  /** The agents of the first screen. They jump while the user waits, and watch the pointer. */
   team: readonly OnboardingAvatarVariant[];
-  /** The build, for the color of the scribble. */
   variant: AppLogoVariant;
-  /** The free models are still downloading. Otherwise OpenBot is opening. */
   downloading: boolean;
-  /** The download in percent, or null when it reports none. */
   progress: number | null;
 }
 
-/**
- * The splash while first run waits to open the app: for the free models to download and start, and
- * for the setup to save. The team from the first screen jumps in a slow wave, and the scribble under
- * it shows the progress. The app opens from here.
- */
 export function FirstRunLaunch(props: FirstRunLaunchProps) {
   const { t } = useText();
   const label = () => (props.downloading ? t("onboarding.launch.downloading") : t("onboarding.opening"));

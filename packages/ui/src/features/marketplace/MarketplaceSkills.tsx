@@ -52,11 +52,8 @@ import {
   sourceVerified,
 } from "./marketplace-view";
 
-/** A group on the Skills tab shows this many skills. "See all" opens the group on its own page. */
 const GROUP_LIMIT = 6;
-/** "Your skills" on its own page shows this many, and Load more adds this many. */
 const PAGE_SIZE = 24;
-/** A catalog group page starts with this many cards. */
 const FEATURED_LIMIT = 3;
 
 const SORTS: readonly MarketplaceSkillSort[] = ["installs", "updated", "name"];
@@ -80,17 +77,10 @@ function groupLabel(group: SkillGroup): AppTextKey {
   return group === "yours" ? "marketplace.skills.yours" : CATEGORY_LABELS[group];
 }
 
-/**
- * The rows of the Skills tab and of a group page. "Your skills": the skills that the agents have, by
- * name. The catalog: the skills of `items` that no agent has, by category. A source shows only the
- * catalog skills of that source; a skill made on this computer then does not show.
- */
 function createSkillRows(scope: MarketplaceScope, items: () => readonly MarketplaceSkillSummary[]) {
   const model = () => scope.model;
   const state = () => scope.nav.state;
-  /* Each listing that a list brought, so a row of the user's keeps its icon and its source after a search. */
   const seen = new Map<string, MarketplaceSkillSummary>();
-  /* The listings of the user's skills that no page brought: a page holds only the first skills of the catalog. */
   const [read, setRead] = createStore<{ listings: Record<string, MarketplaceSkillSummary> }>({ listings: {} });
   const listings = createMemo(() => {
     for (const listing of Object.values(read.listings)) seen.set(listing.id, listing);
@@ -106,9 +96,7 @@ function createSkillRows(scope: MarketplaceScope, items: () => readonly Marketpl
     return listing !== undefined && (listing.verified === true) === (source === "verified");
   };
   const owned = (skillId: string) => agentsWith(model(), skillId).length > 0;
-  /** Each skill of the user's, with no source and no search. */
   const all = createMemo(() => userSkills(model(), scope.skills.items()));
-  /* A skill made on this computer has no catalog source, so it needs no listing. Each skill is read once. */
   const asked = new Set<string>();
   createEffect(
     () => all().filter((skill) => skill.origin !== "local" && !asked.has(skill.skillId) && !listingOf(skill.skillId)),
@@ -131,7 +119,6 @@ function createSkillRows(scope: MarketplaceScope, items: () => readonly Marketpl
       (skill) => fromSource(skill.skillId) && matches(state().query, `${skill.name} ${skill.description ?? ""}`),
     ),
   );
-  /* The listing already holds only the source and the search. */
   const available = createMemo(() => items().filter((skill) => !owned(skill.id)));
   const byCategory = createMemo(() => {
     const groups = new Map<SkillCategory, MarketplaceSkillSummary[]>();
@@ -149,17 +136,14 @@ function createSkillRows(scope: MarketplaceScope, items: () => readonly Marketpl
     const listing = listingOf(skill.skillId);
     return { name: skill.name, installs: listing?.installs ?? 0, updatedAt: listing?.updatedAt ?? "" };
   };
-  /** A catalog skill opens its page. A skill with no loaded listing opens the page of the installed skill. */
   const open = (skillId: string) => {
     const listing = listingOf(skillId);
-    // `go`, so that a skill opened from a group page goes back to it.
     scope.nav.go(listing ? { kind: "skill", listing } : { kind: "localSkill", skillId });
   };
   return { listingOf, all, mine, available, byCategory, sortKey, open };
 }
 type SkillRows = ReturnType<typeof createSkillRows>;
 
-/** Update on each of the agents that has an older version. An icon: the row line already says "Update available". */
 function UpdateButton(props: { model: MarketplaceModel; skill: DialogSkill; version: number | undefined }) {
   const { t } = useText();
   const old = () =>
@@ -186,7 +170,6 @@ function UpdateButton(props: { model: MarketplaceModel; skill: DialogSkill; vers
   );
 }
 
-/** The shield after a verified skill's or agent's name. */
 export function VerifiedMark(props: { on: boolean }) {
   const { t } = useText();
   return (
@@ -197,12 +180,10 @@ export function VerifiedMark(props: { on: boolean }) {
   );
 }
 
-/** One skill as an app row. The hit area opens the skill page; the actions go at the end. */
 function LibraryRow(props: {
   name: string;
   iconUrl: string | null | undefined;
   verified: boolean;
-  /** A state that asks the user to act. It replaces the resting line. */
   line: string | undefined;
   fallback: string;
   onOpen: () => void;
@@ -290,7 +271,6 @@ function CatalogRows(props: { scope: MarketplaceScope; rows: SkillRows; skills: 
   );
 }
 
-/** All, Verified or Public, at the top right of the Skills and Agents tabs and of each group page. */
 export function SourceSwitch(props: { value: SkillSource | null; onChange: (source: SkillSource | null) => void }) {
   const { t } = useText();
   return (
@@ -315,7 +295,6 @@ export function SourceSwitch(props: { value: SkillSource | null; onChange: (sour
   );
 }
 
-/** The Skills tab's source switch. */
 function SkillSourceSwitch(props: { nav: MarketplaceNavigation }) {
   return (
     <SourceSwitch
@@ -329,7 +308,6 @@ function SkillSourceSwitch(props: { nav: MarketplaceNavigation }) {
   );
 }
 
-/** The search of the Marketplace. The Skills and Agents tabs and their group pages share it. */
 export function MarketplaceSearch(props: {
   nav: MarketplaceNavigation;
   label?: string | undefined;
@@ -357,7 +335,6 @@ export function MarketplaceSearch(props: {
   );
 }
 
-/** The head of a group: its name, the count of "Your skills", and "See all" when the group has more than it shows. */
 export function GroupHead(props: {
   id: string;
   label: string;
@@ -390,7 +367,6 @@ export function GroupHead(props: {
   );
 }
 
-/** "Your skills" when the agents have none: what a skill is, and where to get one. */
 function NoSkills() {
   const { t } = useText();
   return (
@@ -408,7 +384,6 @@ function NoSkills() {
   );
 }
 
-/** "Create skill": a chat in the open agent asks what the skill must do. */
 function CreateSkill(props: { model: MarketplaceModel }) {
   const { t } = useText();
   const create = () => (props.model.agents().length > 0 ? props.model.createSkill : undefined);
@@ -424,11 +399,6 @@ function CreateSkill(props: { model: MarketplaceModel }) {
   );
 }
 
-/**
- * The skills under a GitHub link in the search, in place of the catalog: the server reads the link
- * at its newest commit. "Add" installs that commit. OpenBot did not review these skills, so the note
- * says so above the rows.
- */
 function GithubSkills(props: { scope: MarketplaceScope; link: string }) {
   const { t } = useText();
   const model = () => props.scope.model;
@@ -505,11 +475,6 @@ function GithubSkills(props: { scope: MarketplaceScope; link: string }) {
   );
 }
 
-/**
- * The Skills tab: "Your skills" first, with their actions in each row; then the catalog skills that no
- * agent has, by category. Each group shows its first 6 skills, also during a search; "See all" opens
- * the group page.
- */
 export function SkillLibrary(props: { scope: MarketplaceScope; noMatch: JSX.Element }) {
   const { t } = useText();
   const nav = () => props.scope.nav;
@@ -548,18 +513,15 @@ export function SkillLibrary(props: { scope: MarketplaceScope; noMatch: JSX.Elem
   );
 }
 
-/** "Your skills" and the catalog groups of the Skills tab. */
 function SkillCatalog(props: { scope: MarketplaceScope; rows: SkillRows; noMatch: JSX.Element }) {
   const { t } = useText();
   const nav = () => props.scope.nav;
   const model = () => props.scope.model;
   const rows = props.rows;
   const searching = () => nav().state.query.trim() !== "";
-  /* The empty state shows only to a user who can add skills and has none at all. */
   const showYours = () =>
     model().agents().length > 0 && (rows.mine().length > 0 || (!searching() && rows.all().length === 0));
   const seeAll = (group: SkillGroup) => nav().go({ kind: "skillGroup", group });
-  /* The server can hold more skills of a category than the overview brought. */
   const more = (skills: readonly MarketplaceSkillSummary[]) =>
     skills.length > GROUP_LIMIT || props.scope.skills.hasMore();
   const shown = () => (showYours() ? rows.mine().length : 0) + rows.available().length;
@@ -607,7 +569,6 @@ function SkillCatalog(props: { scope: MarketplaceScope; rows: SkillRows; noMatch
   );
 }
 
-/** "Most used ▾": one choice, as a menu beside the search. */
 function SortMenu(props: { value: MarketplaceSkillSort; onChange: (value: MarketplaceSkillSort) => void }) {
   const { t } = useText();
   return (
@@ -644,7 +605,6 @@ function SortMenu(props: { value: MarketplaceSkillSort; onChange: (value: Market
   );
 }
 
-/** The highlights of a group, as cards over their artwork. Each card opens the skill page. */
 function FeaturedSkills(props: {
   scope: MarketplaceScope;
   rows: SkillRows;
@@ -700,10 +660,6 @@ function FeaturedSkills(props: {
   );
 }
 
-/**
- * The featured skills of one category: the catalog's own picks with the most uses. A category with no
- * pick, or a failed read, shows the loaded skills with the most uses. No agent has a skill that shows.
- */
 function createFeatured(
   scope: MarketplaceScope,
   category: SkillCategory,
@@ -750,7 +706,6 @@ function createFeatured(
   });
 }
 
-/** The catalog skills of one category on its own page, from the server in pages. */
 function CategoryPage(props: { scope: MarketplaceScope; category: SkillCategory }) {
   const { t } = useText();
   const category = untrack(() => props.category);
@@ -795,7 +750,6 @@ function CategoryPage(props: { scope: MarketplaceScope; category: SkillCategory 
   );
 }
 
-/** Each skill of the user's on one page, in the chosen order, 24 more at a time. */
 function YoursPage(props: { scope: MarketplaceScope; rows: SkillRows }) {
   const { t } = useText();
   const rows = untrack(() => props.rows);
@@ -839,11 +793,6 @@ function YoursPage(props: { scope: MarketplaceScope; rows: SkillRows }) {
   );
 }
 
-/**
- * One group on its own page, for a catalog of thousands. A category starts with three featured cards,
- * so the page does not start as a flat list; a search hides them. Then the rest in two columns, as on
- * the Skills tab. The search and the sort stay at the top while the list scrolls.
- */
 export function SkillGroupPage(props: { scope: MarketplaceScope; group: SkillGroup }) {
   const { t } = useText();
   const group = untrack(() => props.group);
@@ -857,7 +806,6 @@ export function SkillGroupPage(props: { scope: MarketplaceScope; group: SkillGro
         draft.skillSort = sort;
       }),
     );
-  // An effect, not `onSettled`: the read goes through the owner's props, which `onSettled` refuses.
   createEffect(
     () => props.group,
     () => props.scope.model.readSkills(),
@@ -870,7 +818,6 @@ export function SkillGroupPage(props: { scope: MarketplaceScope; group: SkillGro
           <Heading as="h3" size="lg" class="marketplace-browse-title">
             {label()}
           </Heading>
-          {/* A catalog group has no total: the server sends pages. */}
           <Show when={group === "yours"}>
             <Text as="p" variant="body" tone="muted">
               {t("marketplace.skills.count", { count: yours.mine().length })}

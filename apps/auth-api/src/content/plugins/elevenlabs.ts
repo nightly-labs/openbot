@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about ElevenLabs here is taken from elevenlabs.io. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const ELEVENLABS_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

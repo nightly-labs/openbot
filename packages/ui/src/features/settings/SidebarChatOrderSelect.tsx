@@ -8,14 +8,9 @@ const options = [...SIDEBAR_CHAT_ORDERS];
 export interface SidebarChatOrderSelectProps {
   value: SidebarChatOrder;
   onChange: (value: SidebarChatOrder) => void;
-  /** The dialog element the popover portals into, as the other Settings selects receive it. */
   mount?: HTMLElement | undefined;
 }
 
-/**
- * The "Sort chats" row control in Settings. It sets the same order as "Sort chats" in the sidebar
- * menu. "Manual" and "Recent activity" turn off the "Unread" group.
- */
 export function SidebarChatOrderSelect(props: SidebarChatOrderSelectProps): JSX.Element {
   const { t } = useText();
   return (

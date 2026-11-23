@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Higgsfield here is taken from higgsfield.ai. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const HIGGSFIELD_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

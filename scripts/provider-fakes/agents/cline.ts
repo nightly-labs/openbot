@@ -1,6 +1,3 @@
-// The `cline --acp` of `cline-free-models-e2e.ts`, which answers as Cline 3.0.73 does: a provider
-// option of the model category comes before the model option, the model option does not list the
-// `cline-free/*` models, and the agent takes any model value.
 import { logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const LISTED = [
@@ -71,7 +68,6 @@ serveFakeAcpAgent({
     const { sessionId, configId, value = "" } = request.params;
     const session = sessionOf(sessionId);
     logEntry({ event: "set", sessionId, configId, value });
-    // As Cline's acpAgent.ts: a provider must be one it knows, and a model is taken as it is.
     if (configId === "provider" && !PROVIDERS.includes(value)) {
       peer.fail(request, { code: -32602, message: `Invalid provider ${value}` });
       return;

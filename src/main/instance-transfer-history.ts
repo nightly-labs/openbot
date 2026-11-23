@@ -1,12 +1,3 @@
-// The chats of the agents in an instance transfer file, when the user includes the chat history.
-// Each agent has `agents/<key>/history/index.json`, which lists its chats and the files of their
-// messages. The messages of a chat are in JSON parts of at most `PART_MESSAGES` messages, and each
-// file is one entry, so the import never holds a whole long chat or all files in memory at once.
-//
-// An agent id in a message is written as the agent's key in the file, and a routine id stays the
-// routine's key, so the import links each one to the copy that it made. A link to an agent or a
-// routine that is not in the file goes.
-
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -15,6 +6,7 @@ import {
   type Channel,
   type ChannelMessage,
   type ConversationMessage,
+  fitAgentTaskTitle,
   isChannelMessage,
   isConversationMessage,
 } from "@openbot/contracts/ipc";
@@ -32,14 +24,11 @@ import type { MailboxStore } from "../backend/mailbox-store";
 import { type ArchiveFile, extractEntryEffect, readEntriesEffect, withArchive } from "./agent-archive";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
 
-/** Messages in one part. */
 const PART_MESSAGES = 200;
-/** The largest part or index the import reads. A message carries at most its text and trace. */
 const PART_MAX_BYTES = 64 * 1024 * 1024;
 const TITLE_SOURCES = ["auto", "agent", "user"] as const;
 const ORIGINS = ["user", "agent"] as const;
 
-/** The agent operations that read and write chats, as `AgentService` offers them. */
 export interface TransferHistoryAgents {
   readTransferHistory(agentId: string): HistoryThread[];
   resolveTransferFile(
@@ -51,7 +40,6 @@ export interface TransferHistoryAgents {
   ): Effect.Effect<void, AgentHistoryTransferFailed>;
 }
 
-/** An entry the export writes. */
 export interface HistoryEntry {
   name: string;
   read: () => Promise<Uint8Array>;
@@ -75,10 +63,6 @@ interface IndexFile {
   mimeType: string;
 }
 
-/**
- * Adds the agent's chats to the export. Returns the archive path of the index, or null when the agent
- * has no chat, with the bytes of the files it adds.
- */
 export const exportHistory = Effect.fn("InstanceTransfer.exportHistory")(function* (
   agents: TransferHistoryAgents,
   agentId: string,
@@ -128,17 +112,12 @@ export const exportHistory = Effect.fn("InstanceTransfer.exportHistory")(functio
   return { index, bytes: bytes + data.byteLength };
 });
 
-/** The message as the file keeps it: no queue state, and an agent named by its key in the file. */
 function exportedMessage(message: ConversationMessage, agentKeys: ReadonlyMap<string, string>): ConversationMessage {
   const { delivery: _delivery, reaction: _reaction, reactions: _reactions, senderAgentId, ...rest } = message;
   const sender = senderAgentId ? agentKeys.get(senderAgentId) : undefined;
   return { ...rest, ...(sender ? { senderAgentId: sender } : {}) };
 }
 
-/**
- * Writes the chats of one imported agent. A chat that fails is a warning, and the others go on.
- * The files are copied out of the archive to `scratch`, which this removes at the end.
- */
 export const importHistory = Effect.fn("InstanceTransfer.importHistory")(function* (
   archive: ArchiveFile,
   agents: TransferHistoryAgents,
@@ -201,10 +180,6 @@ export const importHistory = Effect.fn("InstanceTransfer.importHistory")(functio
   );
 });
 
-/**
- * Adds the files of `messages` that `files` does not list yet, each as `<folder><n>`, and returns
- * their bytes. A file that is gone keeps its card, as in a branch. Chats and channel messages share it.
- */
 const addMessageFiles = Effect.fn("InstanceTransfer.addMessageFiles")(function* (
   resolveFile: TransferHistoryAgents["resolveTransferFile"],
   messages: readonly ConversationMessage[],
@@ -227,7 +202,6 @@ const addMessageFiles = Effect.fn("InstanceTransfer.addMessageFiles")(function* 
   return bytes;
 });
 
-/** Copies the listed files out of the archive into `directory`, by their ids. A file that fails is left out. */
 const extractMessageFiles = Effect.fn("InstanceTransfer.extractMessageFiles")(function* (
   archive: ArchiveFile,
   files: readonly IndexFile[],
@@ -269,7 +243,7 @@ function decodeIndexValue(value: unknown, folder: string): { threads: IndexThrea
         main: item.main === true,
         title:
           typeof item.title === "string" && item.title.trim()
-            ? item.title.slice(0, 200)
+            ? fitAgentTaskTitle(item.title)
             : sourceText("status.agent.importedChatTitle"),
         titleSource,
         origin,
@@ -289,17 +263,14 @@ function decodeIndexValue(value: unknown, folder: string): { threads: IndexThrea
       ? [{ id: item.id, path: item.path, name: item.name.slice(0, 255), mimeType: item.mimeType.slice(0, 255) }]
       : [],
   );
-  // One own chat at most: a second one would mix two chats.
   const main = threads.findIndex((thread) => thread.main);
   return { threads: threads.filter((thread, number) => !thread.main || number === main), files };
 }
 
-/** The valid messages of a part. An invalid one is left out. */
 function decodePart(bytes: Uint8Array | undefined): ConversationMessage[] {
   return parsed(bytes, (value) => (Array.isArray(value) ? value.filter(isConversationMessage) : []), []);
 }
 
-/** The JSON of an entry through `decode`, or `fallback` when the entry is not JSON. */
 function parsed<T>(bytes: Uint8Array | undefined, decode: (value: unknown) => T, fallback: T): T {
   if (!bytes) return fallback;
   try {
@@ -309,26 +280,21 @@ function parsed<T>(bytes: Uint8Array | undefined, decode: (value: unknown) => T,
   }
 }
 
-/** The channel operations that read and write channel messages, as `ChannelService` offers them. */
 export interface TransferChannelHistory {
   store: {
     get(channelId: string): Channel;
     messages(channelId: string, before?: number, limit?: number): ChannelMessage[];
     update(channel: Channel, changes: { messages: ChannelMessage[] }, operationId?: string): Channel;
-    /** The thread of one agent in the channel. The files of imported messages belong to it. */
     context(channelId: string, agentId: string): { threadId: string };
   };
-  /** Stores the files of imported messages, as the chat import does. */
   mailbox: Pick<
     MailboxStore,
     "stageGeneratedCopy" | "persistGeneratedAttachmentsWith" | "discardStagedGeneratedAttachments"
   >;
 }
 
-/** The files of a channel's messages in the file, as the manifest lists them. */
 export type ChannelFile = IndexFile;
 
-/** What `importChannelMessages` writes. */
 interface ImportChannelInput {
   channelId: string;
   parts: readonly string[];
@@ -339,16 +305,10 @@ interface ImportChannelInput {
   runIds: ReadonlyMap<string, string>;
   exporter: string | null;
   actor: { id: string; name: string };
-  /** An imported agent of the channel, which keeps the files of the people's messages. */
   fileOwner: string | null;
   scratch: string;
 }
 
-/**
- * Adds a channel's shown messages to the export, as JSON parts, with the files of the messages in
- * `<prefix>files/`. An agent author is written as its key in the file. A file that is gone keeps its
- * card, as in a chat.
- */
 export const exportChannelMessages = Effect.fn("InstanceTransfer.exportChannelMessages")(function* (
   channels: TransferChannelHistory,
   resolveFile: TransferHistoryAgents["resolveTransferFile"],
@@ -387,10 +347,6 @@ export const exportChannelMessages = Effect.fn("InstanceTransfer.exportChannelMe
   return { parts, files, bytes };
 });
 
-/**
- * One JSON part of the file. The size is counted now, and the bytes are made again when the archive
- * writes the part, so the export does not keep the encoded history of every chat in memory.
- */
 function jsonPart(value: readonly unknown[]): { bytes: number; read: HistoryEntry["read"] } {
   return {
     bytes: Buffer.byteLength(JSON.stringify(value)),
@@ -398,15 +354,6 @@ function jsonPart(value: readonly unknown[]): { bytes: number; read: HistoryEntr
   };
 }
 
-/**
- * Writes the messages of an imported channel in batches of one part. Each message gets a new id and
- * no task. An agent author points to its copy, and a message of an agent that the user did not import
- * is left out. The person who exported is the person who imports.
- *
- * The files of the messages are copied out of the archive to `scratch`, which this removes at the
- * end, and saved with each batch as files of an agent's thread in the channel: the author's, or for a
- * person's message the thread of `fileOwner`. Deleting the channel removes them with that thread.
- */
 export const importChannelMessages = Effect.fn("InstanceTransfer.importChannelMessages")(function* (
   archive: ArchiveFile,
   channels: TransferChannelHistory,
@@ -464,7 +411,6 @@ const importChannelParts = Effect.fn("InstanceTransfer.importChannelParts")(func
         } = entry.message;
         const senderAgentId = message.senderAgentId ? input.agentIds.get(message.senderAgentId) : undefined;
         const replyTo = message.replyToMessageId ? ids.get(message.replyToMessageId) : undefined;
-        // A routine and a run point to their copies here.
         const {
           senderAgentId: _sender,
           replyToMessageId: _reply,
@@ -516,7 +462,6 @@ const importChannelParts = Effect.fn("InstanceTransfer.importChannelParts")(func
   }
 });
 
-/** The message with each file that has a copy here pointing to the copy. A file with none keeps its card. */
 function withMessageFiles(
   message: ConversationMessage,
   copies: ReadonlyMap<string, AttachmentSummary>,
@@ -530,7 +475,6 @@ function withMessageFiles(
   };
 }
 
-/** The checked file list of a channel in the manifest: each path inside the channel's folder. */
 export function decodeChannelFiles(value: unknown, prefix: string): ChannelFile[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item): ChannelFile[] =>

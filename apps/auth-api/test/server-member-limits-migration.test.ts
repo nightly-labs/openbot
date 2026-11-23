@@ -32,7 +32,6 @@ describe("server member limits migration", () => {
     database.exec(migration("0040_server_member_limits.sql"));
 
     expect(snapshot(database)).toEqual(before);
-    // The old Worker's host registration still runs.
     database.exec(`
       UPDATE remote_hosts SET device_public_key = 'key-b', auth_epoch = auth_epoch + 1, updated_at = 2
        WHERE host_id = 'host-1' AND owner_user_id = 'owner';
@@ -45,20 +44,15 @@ describe("server member limits migration", () => {
       "INSERT INTO server_member_limits(server_id, owner_user_id, member_limit, created_at, updated_at) VALUES (?, ?, ?, 3, 3)",
     );
     insert.run("host-1", "owner", 40);
-    // A hosted server that has not published its host yet can have a limit too.
     insert.run("hosted-1", "owner", 60);
     expect(() => insert.run("host-1", "owner", 50)).toThrow();
-    // A host stores at most 100 members, and a limit is a whole number.
     for (const limit of [0, 101, 2.5]) expect(() => insert.run("host-2", "owner", limit)).toThrow();
     expect(() => insert.run("host-2", "missing", 10)).toThrow();
 
-    // The query of RemoteControlPlane.#memberLimit.
     const customLimit = (serverId: string) => database.prepare(SERVER_MEMBER_LIMIT_SQL).get(serverId);
     expect(customLimit("host-1")).toEqual({ member_limit: 40 });
     expect(customLimit("hosted-1")).toEqual({ member_limit: 60 });
 
-    // A host that the owner deletes and registers again keeps its limit. Another account that
-    // registers the same ID gets nothing.
     database.exec("DELETE FROM remote_hosts WHERE host_id = 'host-1'");
     expect(customLimit("host-1")).toBeUndefined();
     const register = database.prepare(
@@ -70,7 +64,6 @@ describe("server member limits migration", () => {
     register.run("owner");
     expect(customLimit("host-1")).toEqual({ member_limit: 40 });
 
-    // The rows stop with their account.
     insert.run("host-3", "other", 10);
     database.exec("DELETE FROM users WHERE id = 'other'");
     expect(database.prepare("SELECT server_id FROM server_member_limits ORDER BY server_id").all()).toEqual([

@@ -10,7 +10,6 @@ import { createMemo, createSignal, createStore, onSettled, Show } from "solid-js
 import { useI18n } from "../../i18n-context";
 import { settingsPort } from "./settings-port";
 
-/** The option that is never a value: on macOS it opens the file dialog, on Linux and Windows the command field. */
 const OTHER = "other";
 const APP_PREFIX = "app:";
 
@@ -27,7 +26,6 @@ function sameKeys(before: string[], after: string[]): boolean {
   return before.length === after.length && before.every((key, index) => key === after[index]);
 }
 
-/** The line under "OpenBot" ends the two fixed places. */
 function groupClass(key: string) {
   if (key === "openbot") return "settings-modal-select-group-end";
   return undefined;
@@ -36,21 +34,15 @@ function groupClass(key: string) {
 interface ExternalLinkSelectProps {
   target: ExternalLinkTarget;
   platform: "darwin" | "win32" | "linux" | undefined;
-  /** The dialog element the list portals into. */
   mount: HTMLElement | undefined;
   onChange: (target: ExternalLinkTarget) => void;
 }
 
-/**
- * One list: the default browser, OpenBot, each browser that macOS knows, and "Other app…" for the
- * file dialog. Linux and Windows do not list browsers, so "Command…" opens a field under the list.
- */
 export function ExternalLinkSelect(props: ExternalLinkSelectProps) {
   const i18n = useI18n();
   const [found, setFound] = createSignal<ExternalLinkBrowsers>({ defaultBrowser: null, browsers: [] });
   const [form, setForm] = createStore({ open: false, editing: false, path: "" });
   const mac = () => props.platform === "darwin";
-  // Kobalte closes the list after each choice. The choice of "Command…" keeps it open.
   let keepOpen = false;
   let trigger: HTMLButtonElement | undefined;
 
@@ -66,7 +58,6 @@ export function ExternalLinkSelect(props: ExternalLinkSelectProps) {
     };
   });
 
-  // A new array makes Kobalte choose again, so the list changes only when its keys change.
   const options = createMemo(
     (): string[] => {
       const listed = found().browsers.map((browser) => `${APP_PREFIX}${browser.path}`);
@@ -123,7 +114,6 @@ export function ExternalLinkSelect(props: ExternalLinkSelectProps) {
           keepOpen = false;
           return;
         }
-        // Kobalte reads its state when a focused option goes away. Focus leaves the list first.
         if (!open) trigger?.focus();
         setForm(() => ({ open, editing: false, path: "" }));
       }}

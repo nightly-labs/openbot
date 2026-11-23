@@ -16,7 +16,7 @@ import { AgentAndroidMenu, AgentContextMenuLink } from "@/features/agents/compon
 import { type AgentListRevealState, AgentListRowReveal } from "@/features/agents/components/agent-list-reveal";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
-import { AGENT_WAIT_STATE, AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
+import { AgentWaitBadge, agentListStateLabel } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import {
   AgentDragPreview,
@@ -52,7 +52,6 @@ const PINNED_COLUMNS = 4;
 const PINNED_PADDING_X = 12;
 const TILE_REVEAL_STYLE = { width: "100%", alignItems: "center" } as const;
 
-/** The place of one tile in the list reveal: the tiles come in left to right, before the rows. */
 const PinnedRevealContext = createContext<{ reveal: AgentListRevealState; index: number } | null>(null);
 
 function PinnedReveal({
@@ -64,11 +63,6 @@ function PinnedReveal({
   return <PinnedRevealContext.Provider value={value}>{children}</PinnedRevealContext.Provider>;
 }
 
-/**
- * The pinned agents, then `children`: the pinned channels. `animateLayout` false stops the grid from
- * animating to a new place, while something above it changes height on every frame. With `reveal`,
- * the tiles take the list reveal places from `revealOffset` on.
- */
 export function PinnedAgentsGrid({
   agents,
   animateLayout = true,
@@ -79,7 +73,6 @@ export function PinnedAgentsGrid({
 }: PropsWithChildren<{
   agents: MobileAgent[];
   animateLayout?: boolean;
-  /** Shows an empty place for a new pin, while the user drags a chat and nothing is pinned. */
   dropZone?: boolean;
   reveal?: AgentListRevealState;
   revealOffset?: number;
@@ -142,7 +135,6 @@ function PinDropZone({ dropTarget }: { dropTarget: ReturnType<typeof useChatDrop
 const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const agentChatPreview = useAgentChatPreview(agent);
-  // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag("pin", () => ({
     chat: { kind: "agent", id: agent.id },
@@ -153,7 +145,6 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const unreadCount = useAgentListUnreadCount(agent.id);
   const unreadThreads = useAgentListUnreadThreads(agent.id);
-  // The tile reads the activity once and gives it to the avatar and the badge.
   const activity = useAgentListActivity(agent.id);
   const waitReason = agentListWaitReason(activity);
 
@@ -163,19 +154,7 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
   const trigger = (
     <ChatLinkPressable
       chatId={agent.id}
-      accessibilityLabel={
-        waitReason
-          ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : unreadCount > 0 || unreadThreads
-            ? t("mobile.agent.list.withState", {
-                label: openLabel,
-                state:
-                  unreadCount > 0
-                    ? t("mobile.agent.list.unread", { count: unreadCount })
-                    : t("mobile.agent.list.unreadThreads"),
-              })
-            : openLabel
-      }
+      accessibilityLabel={agentListStateLabel(t, openLabel, waitReason, unreadCount, unreadThreads)}
       accessibilityRole="button"
       className="w-full items-center gap-2 px-1"
       onPressIn={agentChatPreview.onPressIn}
@@ -197,7 +176,6 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
           rings
           activityMood={agentActivityMood(activity)}
         />
-        {/* As on the desktop, a wait outranks the unread count in the corner of the avatar. */}
         {waitReason ? (
           <AgentWaitBadge reason={waitReason} size={22} />
         ) : unreadCount > 0 || unreadThreads ? (

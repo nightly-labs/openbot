@@ -18,7 +18,6 @@ import { messages as zh } from "./messages/zh/format";
 
 const catalogs = { en, ar, de, es, fr, he, it, ja, ko, nl, pl, pt, ru, tr, zh } as const;
 
-/** The format catalog of `locale`, or `undefined` while it is not loaded. See `app-catalogs.ts`. */
 export function formatTranslation(locale: TranslatedLocale): PartialTranslation<typeof en> | undefined {
   return catalogs[locale];
 }

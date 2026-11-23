@@ -3,7 +3,6 @@ import { attachmentReferenceAt } from "./attachment-references";
 import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "./chat-math";
 import { chatTagReferences, expandChatTagReferences } from "./chat-tag-references";
 
-// The chat renders messages with `marked`, so a preview reads the same tokens and keeps their text.
 const markdown = new Marked({
   gfm: true,
   breaks: true,
@@ -27,8 +26,6 @@ const markdown = new Marked({
       },
     },
     {
-      // A mention (`@[Chief](agent:chief)`) or a file (`@[notes.md](attachment:<id>)`) would otherwise
-      // read as `@` and a link. A file shows its name.
       name: "chatTag",
       level: "inline",
       start: (source) => source.indexOf("@["),
@@ -38,7 +35,6 @@ const markdown = new Marked({
         const reference = chatTagReferences(source)[0];
         if (reference?.start !== 0) return undefined;
         const raw = source.slice(0, reference.end);
-        // A one-line preview has no room for a block quote, so the quoted text stands in marks.
         const text = reference.kind === "quote" ? `“${reference.name}”` : expandChatTagReferences(raw);
         return { type: "chatTag", raw, text };
       },
@@ -48,7 +44,6 @@ const markdown = new Marked({
 
 const WORD_CHARACTER = /[\p{L}\p{N}]/u;
 
-/** The text a reader sees in a token, without the Markdown marks. A line break becomes `lineBreak`. */
 function plainText(token: Token, lineBreak = " "): string {
   switch (token.type) {
     case "space":
@@ -76,10 +71,6 @@ function plainTextOf(cell: { tokens: Token[] }): string {
   return inlineText(cell.tokens);
 }
 
-/**
- * Joins inline tokens. A `*` pair inside a word, as in `2*3*4`, is arithmetic more often than
- * emphasis, so it stays as written.
- */
 function inlineText(tokens: Token[], lineBreak = " "): string {
   let text = "";
   for (const [index, token] of tokens.entries()) {
@@ -93,11 +84,6 @@ function inlineText(tokens: Token[], lineBreak = " "): string {
   return text;
 }
 
-/**
- * A message as one line of plain text, for a list or sidebar preview: headings, emphasis, code,
- * quotes, links, tables and list marks are removed, mentions show their name, and the blocks are
- * joined with single spaces.
- */
 export function markdownPreviewText(body: string): string {
   return markdown
     .lexer(body)
@@ -107,15 +93,36 @@ export function markdownPreviewText(body: string): string {
     .trim();
 }
 
-/**
- * Inline Markdown as one line of plain text, such as the question of an agent that a card draws as
- * inline Markdown: a line that starts with `1.` or `#` keeps that text, as the card shows it.
- */
+export function markdownImageName(alt: string, url: string): string {
+  if (alt.trim()) return alt.trim();
+  try {
+    const path = new URL(url).pathname;
+    const name = decodeURIComponent(path.split(/[\\/]/u).pop() ?? "");
+    if (name) return name;
+  } catch {}
+  return url;
+}
+
+function childTokens(token: Token): Token[] {
+  if (token.type === "list") return token.items;
+  if (token.type === "table") return [token.header, ...token.rows].flat().flatMap((cell) => cell.tokens);
+  return "tokens" in token && Array.isArray(token.tokens) ? token.tokens : [];
+}
+
+function imageNames(tokens: readonly Token[]): string[] {
+  return tokens.flatMap((token) =>
+    token.type === "image" ? [markdownImageName(token.text, token.href)] : imageNames(childTokens(token)),
+  );
+}
+
+export function markdownImageNames(body: string): string[] {
+  return imageNames(markdown.lexer(body));
+}
+
 export function markdownInlinePlainText(body: string): string {
   return inlineText(new markdown.Lexer(markdown.defaults).inlineTokens(body)).replace(/\s+/gu, " ").trim();
 }
 
-/** A list as lines, each with its bullet or number, and a nested list indented under its item. */
 function listLines(token: Tokens.List, depth: number): string[] {
   const start = typeof token.start === "number" ? token.start : 1;
   return token.items.flatMap((item, index) => {
@@ -151,11 +158,6 @@ function blockText(token: Token): string {
   return plainText(token).trim();
 }
 
-/**
- * A message as plain text that keeps its lines, for text that a reader selects: the Markdown marks
- * are removed, mentions show their name, and paragraphs, list items and table rows stay on their
- * own lines.
- */
 export function markdownPlainText(body: string): string {
   return markdown
     .lexer(body)

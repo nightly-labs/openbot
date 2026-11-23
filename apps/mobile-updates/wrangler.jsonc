@@ -11,8 +11,6 @@
       "custom_domain": true
     }
   ],
-  // Workers Logs stay off, as for the account service. A request also has the last fatal error text of
-  // the app in a header, and invocation logs record request headers. `wrangler tail` shows live events.
   "observability": {
     "enabled": false
   },

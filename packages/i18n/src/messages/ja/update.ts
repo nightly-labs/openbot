@@ -43,6 +43,11 @@ export const messages = {
   "update.idleRestart.description": "新しいルーティンの実行は再起動まで待機します。",
   "update.idleRestart.waitingFor": "{reasons} を待っています。",
   "update.idleRestart.cancel": "再起動をキャンセル",
+  "update.idleRestart.restartNow": "今すぐ再起動",
+  "update.idleRestart.restartNowTitle": "今すぐ OpenBot を再起動しますか？",
+  "update.idleRestart.restartNowDescription":
+    "終わっていないエージェントのターンとルーティンの実行は、今すぐ停止します。",
+  "update.idleRestart.keepWaiting": "待機を続ける",
   "update.idleRestart.cancelFailed": "再起動をキャンセルできませんでした。",
   "update.idleRestart.requestFailed": "再起動を予定できませんでした。",
   "update.idleRestart.failedTitle": "OpenBot は再起動しませんでした",

@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about PostHog here is taken from posthog.com. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const POSTHOG_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

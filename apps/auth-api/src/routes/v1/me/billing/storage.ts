@@ -11,7 +11,6 @@ import {
   requestUser,
 } from "../../../../server/request-auth";
 
-/** Buys a larger storage tier for the server of one subscription, and returns the billing state after it. */
 export const Route = createFileRoute("/v1/me/billing/storage")({
   server: {
     handlers: {

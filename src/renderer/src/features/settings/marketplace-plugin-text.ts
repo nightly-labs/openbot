@@ -5,7 +5,6 @@ import type {
   MarketplacePluginServer,
 } from "@openbot/ui/features/settings/marketplace-plugins";
 
-/** The keys of one catalog listing's text. Apps and prompts go by their catalog id. */
 interface PluginTextKeys {
   tagline: AppTextKey;
   description: AppTextKey;
@@ -13,13 +12,6 @@ interface PluginTextKeys {
   prompts: Readonly<Record<string, AppTextKey>>;
 }
 
-/**
- * The text keys of each catalog listing, by slug.
- *
- * `marketplace-plugin-catalog.ts` is generated from `marketplace/plugin-catalog/`, and its English
- * is also what the auth API sends, so the catalog keeps its English and the screen maps a slug to
- * keys here. A listing that is not here shows its catalog text.
- */
 const PLUGIN_TEXT = {
   aave: {
     tagline: "marketplace.plugin.aave.tagline",
@@ -551,10 +543,6 @@ const PLUGIN_TEXT = {
   },
 } as const satisfies Record<string, PluginTextKeys>;
 
-/**
- * The keys of the connect form text, by its catalog English: the field labels and hints, and the
- * label of the page that gives a key. Text that is not here shows as the catalog has it.
- */
 const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
   "API key": "marketplace.auth.apiKey",
   "Personal API key": "marketplace.auth.personalApiKey",
@@ -571,25 +559,18 @@ const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
 
 const english = translateFor("en");
 
-/** The key at `id`, if the record has one of its own. */
 function own(keys: Readonly<Record<string, AppTextKey>>, id: string): AppTextKey | undefined {
   return Object.hasOwn(keys, id) ? keys[id] : undefined;
 }
 
-/**
- * `text` in the reader's language. The catalog is the source: a key whose English is not `text`
- * was written for older catalog text, so the catalog text shows, as it does for a listing with no key.
- */
 function catalogText(t: AppTranslate, key: AppTextKey | undefined, text: string): string {
   return key && english(key) === text ? t(key) : text;
 }
 
-/** Connect form text in the reader's language, if the text is a catalog text that has a key. */
 function authText(t: AppTranslate, text: string): string {
   return catalogText(t, Object.hasOwn(AUTH_TEXT, text) ? AUTH_TEXT[text] : undefined, text);
 }
 
-/** A way into a server, with its labels, hints and key page label in the reader's language. */
 function localizedFlow(flow: McpConnectFlow, t: AppTranslate): McpConnectFlow {
   const label = authText(t, flow.label);
   if (flow.kind === "link") return { ...flow, label };
@@ -607,15 +588,10 @@ function localizedFlow(flow: McpConnectFlow, t: AppTranslate): McpConnectFlow {
   };
 }
 
-/** The server of an app, with its connect form text in the reader's language. */
 function localizedServer(server: MarketplacePluginServer, t: AppTranslate): MarketplacePluginServer {
   return server.auth ? { ...server, auth: server.auth.map((flow) => localizedFlow(flow, t)) } : server;
 }
 
-/**
- * A catalog listing with its tagline, description, app descriptions, prompts and connect form text
- * in the reader's language.
- */
 export function localizedPlugin(plugin: MarketplacePluginDetail, t: AppTranslate): MarketplacePluginDetail {
   const table: Readonly<Record<string, PluginTextKeys | undefined>> = PLUGIN_TEXT;
   const keys = Object.hasOwn(table, plugin.slug) ? table[plugin.slug] : undefined;

@@ -1,45 +1,29 @@
-// The Cursor plan usage, read from the Cursor backend with the Cursor CLI's own sign-in.
-//
-// Cursor's ACP process does not report usage, so this is the request the Cursor CLI sends itself:
-// `aiserver.v1.DashboardService/GetCurrentPeriodUsage` on its API endpoint, as Connect JSON, with
-// the access token of the CLI's sign-in. The answer splits the plan into Cursor's own models
-// (`autoPercentUsed`) and every other model (`apiPercentUsed`) for one billing cycle. The included
-// usage of a merged plan (`GetPlanInfo` `isMerged`) covers Grok and Composer only, so its reading is
-// the total alone, as in the Cursor app. That total is the quota of the Grok plan, so the reading
-// names Grok as sharing it, and the rail shows one ring for both. A split plan also sends its total,
-// which the Cursor CLI shows first, as `tertiary`.
-
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { Effect, Option, Schema } from "effect";
 import { type AccountRateLimitsReadResult, type AccountRateLimitWindowResult, getRecord } from "./protocol";
 
-/** The CLI's default endpoint. `CURSOR_API_ENDPOINT` moves the CLI, so it moves this read too. */
 const CURSOR_API_ENDPOINT = "https://api2.cursor.sh";
 const CURRENT_PERIOD_USAGE_PATH = "/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
 const PLAN_INFO_PATH = "/aiserver.v1.DashboardService/GetPlanInfo";
 const CURSOR_USAGE_TIMEOUT_MS = 10_000;
 const KEYCHAIN_TIMEOUT_MS = 3_000;
+const SECRET_TOOL_PATHS = ["/usr/bin/secret-tool", "/usr/local/bin/secret-tool"];
+const SECRET_SERVICE_ATTRIBUTES = ["service", "cursor-credentials", "account", "cursor-user"];
+const SECRET_SERVICE_MISS_REUSE_MS = 30 * 60_000;
 
 const execFileAsync = promisify(execFile);
 
 const NO_USAGE: AccountRateLimitsReadResult = { rateLimits: null, rateLimitsByLimitId: null };
 
-/**
- * No sign-in file, a token the backend rejects, and a plan with no percentages all read as no
- * usage, so the dock shows the provider as not reporting instead of an error.
- */
 class CursorUsageFailed extends Schema.TaggedError<CursorUsageFailed>()("CursorUsageFailed", {
   cause: Schema.Defect(),
 }) {}
 
-/**
- * The file where the Cursor CLI keeps its sign-in. On macOS the CLI uses the login Keychain and
- * writes this file only when the Keychain cannot be used.
- */
 export function cursorAuthFile(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   switch (platform()) {
     case "win32":
@@ -51,11 +35,52 @@ export function cursorAuthFile(env: NodeJS.ProcessEnv = process.env, home = home
   }
 }
 
-const CursorAuth = Schema.Struct({ accessToken: Schema.NonEmptyString });
+const CursorAuth = Schema.Struct({
+  accessToken: Schema.optional(Schema.String),
+  storedIn: Schema.optional(Schema.String),
+});
+const decodeCursorAuth = Schema.decodeUnknownOption(Schema.fromJsonString(CursorAuth));
+
+function secretServiceEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  if (env.DBUS_SESSION_BUS_ADDRESS || !env.XDG_RUNTIME_DIR) return env;
+  return { ...env, DBUS_SESSION_BUS_ADDRESS: `unix:path=${join(env.XDG_RUNTIME_DIR, "bus")}` };
+}
+
+let secretServiceRead: { authFile: string; modifiedMs: number; readAt: number; accessToken: string | null } | null =
+  null;
+
+const readSecretServiceAccessToken = Effect.fn("Cursor.readSecretServiceAccessToken")(function* (authFile: string) {
+  const modified = yield* Effect.tryPromise({
+    try: () => stat(authFile),
+    catch: (cause) => new CursorUsageFailed({ cause }),
+  }).pipe(Effect.option);
+  if (Option.isNone(modified)) return null;
+  const modifiedMs = modified.value.mtimeMs;
+  if (
+    secretServiceRead?.authFile === authFile &&
+    secretServiceRead.modifiedMs === modifiedMs &&
+    (secretServiceRead.accessToken !== null || Date.now() - secretServiceRead.readAt < SECRET_SERVICE_MISS_REUSE_MS)
+  ) {
+    return secretServiceRead.accessToken;
+  }
+  const output = yield* Effect.tryPromise({
+    try: () =>
+      execFileAsync(
+        SECRET_TOOL_PATHS.find((path) => existsSync(path)) ?? "secret-tool",
+        ["search", ...SECRET_SERVICE_ATTRIBUTES],
+        { timeout: CURSOR_USAGE_TIMEOUT_MS, env: secretServiceEnvironment() },
+      ),
+    catch: (cause) => new CursorUsageFailed({ cause }),
+  }).pipe(Effect.option);
+  const secret = Option.isSome(output) ? /^secret = (.*)$/mu.exec(output.value.stdout)?.[1] : undefined;
+  const auth = secret === undefined ? Option.none() : decodeCursorAuth(secret);
+  const accessToken = Option.isSome(auth) && auth.value.accessToken ? auth.value.accessToken : null;
+  secretServiceRead = { authFile, modifiedMs, readAt: Date.now(), accessToken };
+  return accessToken;
+});
 
 const readAccessToken = Effect.fn("Cursor.readAccessToken")(function* () {
   if (platform() === "darwin") {
-    // The CLI writes the item with `/usr/bin/security`, so reading it with the same tool asks nothing.
     const keychain = yield* Effect.tryPromise({
       try: () =>
         execFileAsync(
@@ -68,16 +93,19 @@ const readAccessToken = Effect.fn("Cursor.readAccessToken")(function* () {
     const token = Option.isSome(keychain) ? keychain.value.stdout.trim() : "";
     if (token) return token;
   }
+  const authFile = cursorAuthFile();
   const text = yield* Effect.tryPromise({
-    try: () => readFile(cursorAuthFile(), "utf8"),
+    try: () => readFile(authFile, "utf8"),
     catch: (cause) => new CursorUsageFailed({ cause }),
   }).pipe(Effect.option);
   if (Option.isNone(text)) return null;
-  const auth = Schema.decodeUnknownOption(Schema.fromJsonString(CursorAuth))(text.value);
-  return Option.isSome(auth) ? auth.value.accessToken : null;
+  const auth = decodeCursorAuth(text.value);
+  if (Option.isNone(auth)) return null;
+  if (auth.value.accessToken) return auth.value.accessToken;
+  if (auth.value.storedIn !== "os-secret-store" || platform() !== "linux") return null;
+  return yield* readSecretServiceAccessToken(authFile);
 });
 
-/** The answer of one dashboard call, or null when the backend rejects the token. */
 const postDashboard = Effect.fn("Cursor.postDashboard")(function* (
   endpoint: string,
   path: string,
@@ -89,7 +117,6 @@ const postDashboard = Effect.fn("Cursor.postDashboard")(function* (
       Effect.gen(function* () {
         const response = yield* Effect.tryPromise({
           try: () =>
-            // Appended, not resolved: a resolved absolute path drops a path in the endpoint.
             fetch(`${endpoint.replace(/\/+$/u, "")}${path}`, {
               method: "POST",
               headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
@@ -114,11 +141,6 @@ const postDashboard = Effect.fn("Cursor.postDashboard")(function* (
 
 const EXCHANGE_API_KEY_PATH = "/auth/exchange_user_api_key";
 
-/**
- * Whether Cursor accepts the API key: the request with which the Cursor CLI signs a key in. The CLI
- * itself answers a refused key and a failed connection with the same internal error, so the account
- * of a key asks here first. Fails when Cursor did not answer or had a server error.
- */
 export const checkCursorApiKey = Effect.fn("Cursor.checkApiKey")(function* (key: string) {
   const endpoint = process.env.CURSOR_API_ENDPOINT?.trim() || CURSOR_API_ENDPOINT;
   return yield* Effect.acquireUseRelease(
@@ -135,10 +157,8 @@ export const checkCursorApiKey = Effect.fn("Cursor.checkApiKey")(function* (key:
             }),
           catch: (cause) => new CursorUsageFailed({ cause }),
         });
-        // The answer holds the tokens of the key. Nothing reads them here.
         yield* Effect.promise(() => response.body?.cancel() ?? Promise.resolve()).pipe(Effect.ignore);
         if (response.ok) return true;
-        // Only these mean a refused key. A rate limit or the answer of a proxy says nothing about the key.
         if (response.status === 401 || response.status === 403) return false;
         return yield* new CursorUsageFailed({
           cause: new Error(`Cursor key check returned HTTP ${response.status}.`),
@@ -157,7 +177,6 @@ export const readCursorUsage = Effect.fn("Cursor.readUsage")(function* () {
   const [usage, planInfo] = yield* Effect.all(
     [
       postDashboard(endpoint, CURRENT_PERIOD_USAGE_PATH, accessToken),
-      // A plan info that fails to read keeps the split reading, as before the plan info was read.
       postDashboard(endpoint, PLAN_INFO_PATH, accessToken).pipe(Effect.option),
     ],
     { concurrency: "unbounded" },
@@ -167,7 +186,6 @@ export const readCursorUsage = Effect.fn("Cursor.readUsage")(function* () {
   return cursorRateLimits(usage, merged);
 });
 
-/** Connect JSON writes an int64 as a string. */
 const Int64 = Schema.Union([Schema.Finite, Schema.FiniteFromString]);
 const CurrentPeriodUsage = Schema.Struct({
   billingCycleStart: Schema.optional(Int64),
@@ -179,12 +197,6 @@ const PlanUsage = Schema.Struct({
   totalPercentUsed: Schema.optional(Schema.Finite),
 });
 
-/**
- * The primary window holds Cursor's own models and the secondary one every other model; the dock
- * names them by slot. `tertiary` holds the total of a split plan, the number that Cursor shows first.
- * The Team API does not send `tertiary`, so a peer keeps the two windows. A merged plan, or a plan
- * that reports only the total, fills the primary window with the total.
- */
 function cursorRateLimits(value: unknown, merged: boolean): AccountRateLimitsReadResult {
   const period = Schema.decodeUnknownOption(CurrentPeriodUsage)(value);
   const plan = Schema.decodeUnknownOption(PlanUsage)(getRecord(value, "planUsage") ?? {});

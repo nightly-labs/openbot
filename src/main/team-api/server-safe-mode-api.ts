@@ -1,14 +1,3 @@
-// The Team API of a server in safe mode (`../server-safe-mode.ts`). The server stopped its start loop,
-// so its services, its database and its normal `TeamApiServer` do not run. This API answers only:
-//
-// - `compatibility`, above the protocol gate as in `TeamApiServer`. It offers protocol 10 only, so
-//   a client of protocol 1-9 reads that it must update. A protocol 10 client reads the
-//   `server-safe-mode-v1` capability and no other.
-// - `server-safe-mode-v1` `GET /v1/server/safe-mode`, for each signed-in member of any role.
-//
-// It refuses each other route and each WebSocket upgrade. Nothing here writes: no route signs in, joins
-// or changes a value. The reason is a fixed word, the app version and a time, never a path or an
-// error text.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import type { TeamMemberSummary } from "@openbot/contracts/ipc";
@@ -30,13 +19,11 @@ import { bearerToken, firstHeaderValue, requestCapabilityListsV10, requestProtoc
 
 export interface ServerSafeModeApiOptions {
   reason: ServerSafeModeReason;
-  /** The member of a session token, or null. It reads the team file and the open WebRTC sessions only. */
   authenticate(token: string): TeamMemberSummary | null;
 }
 
 type SafeModeSupport = TeamProtocolSupportV1 | TeamProtocolSupportV10;
 
-/** The error bodies of `TeamApiServer`. */
 interface SafeModeErrorBody {
   error: string;
   code?: string;
@@ -45,7 +32,6 @@ interface SafeModeErrorBody {
 
 type SafeModeBody = SafeModeSupport | SafeModeErrorBody | ServerSafeModeReason;
 
-/** The compatibility answer. A protocol 10 request gets the two protocol 10 lists. */
 function serverSafeModeCompatibility(appVersion: string, protocol: number | null): SafeModeSupport {
   const support: TeamProtocolSupportV1 = {
     appVersion,
@@ -68,10 +54,6 @@ function send(response: ServerResponse, status: number, value: SafeModeBody): vo
   response.end(body);
 }
 
-/**
- * The protocol gate, with the bodies of `TeamApiServer`: a client of protocol 1-9 must update. A
- * client of a newer protocol always offers protocol 10 too, so it never sends a higher one here.
- */
 function protocolIssue(
   request: IncomingMessage,
   appVersion: string,
@@ -100,7 +82,6 @@ function protocolIssue(
   return requestCapabilityListsV10(request) ? null : malformed;
 }
 
-/** Answers one HTTP request of the safe-mode API. It reads no request body. */
 export function handleServerSafeModeRequest(
   request: IncomingMessage,
   response: ServerResponse,
@@ -131,7 +112,6 @@ export function handleServerSafeModeRequest(
   send(response, 200, { reason, appVersion, haltedAt });
 }
 
-/** The events socket and every other upgrade: safe mode sends no events. */
 export function refuseServerSafeModeUpgrade(socket: Duplex): void {
   socket.write("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
   socket.destroy();

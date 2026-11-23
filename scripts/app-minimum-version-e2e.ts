@@ -1,12 +1,3 @@
-// End-to-end check of the minimum app version (plan 011, item 24).
-//   bun scripts/app-minimum-version-e2e.ts
-// 1. The CI check: `appMinimumVersionProblems` on fixed releases, and on the real values and changelogs.
-// 2. The routes: starts the site's development server on a free port and reads
-//    `/v1/app/minimum-version` for each surface and `/v1/mobile/features`.
-// 3. The desktop and host client: `RequiredUpdate` with the real route and with fixed answers (a failed
-//    check never blocks), and `RequestedUpdate` with a required update: it does not install while an
-//    agent turn runs.
-// Writes .openbot-build/app-minimum-version-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
@@ -34,7 +25,6 @@ const OUT = resolve(ROOT, ".openbot-build/app-minimum-version-e2e");
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
-// 1. The CI check ------------------------------------------------------------------
 function release(version: string, date: string, stores: ChangelogRelease["stores"] = []): ChangelogRelease {
   return { version, date, stores, anchor: "", intro: [], notices: [], groups: [] };
 }
@@ -49,13 +39,11 @@ const FIXTURE = {
   ],
 };
 const NONE = { desktop: null, host: null, ios: null, android: null };
-// 60 days before 2026-11-17 is 2026-09-18.
 const checkCases = [
   { versions: NONE, problems: 0 },
   { versions: { ...NONE, desktop: "0.58.0", host: "0.58.0", android: "1.3.0" }, problems: 0 },
   { versions: { ...NONE, desktop: "0.70.0" }, problems: 1 },
   { versions: { ...NONE, host: "0.59.0" }, problems: 1 },
-  // iOS had 1.3.0 only on 2026-09-25; an over-the-air version never counts.
   { versions: { ...NONE, ios: "1.3.0" }, problems: 1 },
   { versions: { ...NONE, ios: "1.3.0.1" }, problems: 1 },
 ];
@@ -74,7 +62,6 @@ const decisions = [
   { current: "0.40.0", minimum: "0.58.0", below: true },
   { current: "0.58.0", minimum: "0.58.0", below: false },
   { current: "0.40.0", minimum: null, below: false },
-  // A development version that cannot be read never blocks.
   { current: "dev", minimum: "0.58.0", below: false },
 ] as const;
 for (const decision of decisions) {
@@ -83,7 +70,6 @@ for (const decision of decisions) {
 assert.equal(parseAppMinimumVersion({ minimumVersion: 5 }), null);
 assert.equal(parseAppMinimumVersion({ minimumVersion: "not a version" }), null);
 
-// 2. The routes --------------------------------------------------------------------
 const freePort = () =>
   new Promise<number>((done, fail) => {
     const server = createServer();
@@ -103,7 +89,6 @@ const site = spawn(
   { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] },
 );
 let siteOutput = "";
-/** Resolves once Vite prints the address it listens on, or rejects when the server exits first. */
 const siteReady = new Promise<void>((done, fail) => {
   const read = (chunk: Buffer) => {
     siteOutput += chunk.toString();
@@ -114,7 +99,6 @@ const siteReady = new Promise<void>((done, fail) => {
   site.once("exit", () => fail(new Error("The site's development server stopped before it listened.")));
 });
 
-/** A fake updater with the parts of `UpdateService` that the two classes use. */
 class FakeUpdater extends EventEmitter {
   status: UpdateStatus;
   installs = 0;
@@ -160,7 +144,6 @@ class FakeUpdater extends EventEmitter {
   setAutoDownload = () => Effect.void;
 }
 
-/** Resolves when a status of `updater` meets `done`. It rejects after 10 s so a broken flow cannot hang. */
 function waitForStatus(updater: FakeUpdater, label: string, done: (status: UpdateStatus) => boolean) {
   return new Promise<UpdateStatus>((resolveStatus, reject) => {
     if (done(updater.status)) {
@@ -223,17 +206,14 @@ try {
     routes.push({ surface: `features:${platform}`, minimumVersion: body.minimumVersion });
   }
 
-  // 3. The client ------------------------------------------------------------------
   const run = (instance: RequiredUpdate) => Effect.runPromise(instance.check());
   const closedPort = await freePort();
   const closed = `http://127.0.0.1:${closedPort}`;
 
-  // The real route: an old app is blocked only when the route names a minimum.
   const realApp = new FakeUpdater("0.0.1");
   const realOutcome = await run(requiredUpdate(realApp, origin, () => undefined));
   assert.equal(realOutcome, APP_MINIMUM_VERSIONS.desktop ? "required" : "supported");
 
-  // Below the minimum, then offline: the block stays.
   const old = new FakeUpdater("0.0.1");
   const oldRequired: boolean[] = [];
   assert.equal(
@@ -245,7 +225,6 @@ try {
   assert.equal(old.status.requiredVersion, MINIMUM);
   assert.deepEqual(oldRequired, [true]);
 
-  // Never confirmed: offline, an error status and a damaged answer do not block.
   const fresh = new FakeUpdater("0.0.1");
   const freshRequired: boolean[] = [];
   const freshOutcomes = [
@@ -257,7 +236,6 @@ try {
   assert.equal(fresh.status.requiredVersion, undefined);
   assert.deepEqual(freshRequired, []);
 
-  // A tenant whose host manages updates is never blocked by this check.
   const tenant = new FakeUpdater("0.0.1");
   tenant.status = { ...tenant.status, managedByHost: true };
   assert.equal(
@@ -265,7 +243,6 @@ try {
     "supported",
   );
 
-  // The required install waits for the agent turn, then installs once.
   const host = new FakeUpdater("0.0.1");
   let agentTurn = true;
   const preference: UpdatePreference = { autoDownload: true, allowRemoteUpdates: true, autoInstall: false };
