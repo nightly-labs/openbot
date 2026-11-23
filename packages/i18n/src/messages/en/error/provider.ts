@@ -177,6 +177,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.stoppedBeforeStart": "{provider} stopped before this message started. Send the message again.",
   "error.provider.sessionStartTimedOut":
     "{provider} did not open a new chat in time, so this message did not start. On the computer that runs OpenBot, open Providers, select {provider} and click Restart. Then try again.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} did not open this chat in time, so this message did not start. On the computer that runs OpenBot, open Providers, select {provider} and click Restart. Then try again.",
   "error.provider.serviceUnreachable":
     "{provider} cannot connect to its service. Check your internet connection. OpenBot will try again.",
   "error.provider.serviceUnreachableRefresh":

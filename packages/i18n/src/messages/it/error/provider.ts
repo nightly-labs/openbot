@@ -188,6 +188,8 @@ export const messages = {
     "{provider} si è fermato prima che questo messaggio iniziasse. Invia di nuovo il messaggio.",
   "error.provider.sessionStartTimedOut":
     "{provider} non ha aperto una nuova chat in tempo, quindi questo messaggio non è iniziato. Sul computer che esegue OpenBot, apri Provider, seleziona {provider} e fai clic su Riavvia. Poi riprova.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} non ha aperto questa chat in tempo, quindi questo messaggio non è iniziato. Sul computer che esegue OpenBot, apri Provider, seleziona {provider} e fai clic su Riavvia. Poi riprova.",
   "error.provider.serviceUnreachable":
     "{provider} non riesce a connettersi al suo servizio. Controlla la connessione a internet. OpenBot riproverà.",
   "error.provider.serviceUnreachableRefresh":
