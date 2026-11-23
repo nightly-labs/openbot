@@ -486,6 +486,8 @@ export const messages = {
   "chat.suggestion.updating": "Aggiornamento…",
   "chat.suggestion.saveReply": "Sì, salvalo come skill.",
   "chat.suggestion.updateReply": "Sì, aggiungilo alla skill.",
+  "chat.suggestion.saveFailed":
+    "Non è stato possibile salvare la skill. Riprova quando l'agente ha finito il suo lavoro.",
   "chat.suggestion.detailsNamed": "Apri {name} nel Marketplace",
   "chat.suggestion.dismissed": "Suggerimento {name} ignorato.",
   "chat.suggestion.undo": "Annulla",

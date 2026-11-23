@@ -384,7 +384,7 @@ export function createConversationViewScope(props: ConversationProps) {
       const result = await save?.catch(() => null);
       if (result?.saved === true) return "saved";
     }
-    return sendCardMessage(reply, target) ? "sent" : null;
+    return sendCardReplyNow(reply, target) ? "sent" : null;
   }
   const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills, installedSkillsLoadFailed } = skills;
@@ -1270,6 +1270,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardReplyNow,
     sendCardFile,
     retryPendingSend,
     editPendingSend,
