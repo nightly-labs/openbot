@@ -59,7 +59,7 @@ function codexRouteBaseUrl(config: unknown): string | null | undefined {
   return provider ? getString(provider, "base_url")?.trim() || null : undefined;
 }
 
-export function codexRoutesToOpenai(config: unknown): boolean {
+function codexRoutesToOpenai(config: unknown): boolean {
   const baseUrl = codexRouteBaseUrl(config);
   if (baseUrl === undefined) return false;
   if (baseUrl === null) return true;
